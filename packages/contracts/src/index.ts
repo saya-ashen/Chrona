@@ -306,6 +306,7 @@ export type {
   AiClientType,
   AiFeature,
   HermesClientConfig,
+  DebugClientConfig,
   LLMClientConfig,
   AgentProviderClientConfig,
   SmartSuggestRequest,

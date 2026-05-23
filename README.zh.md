@@ -6,19 +6,19 @@
 
 <p align="center">
   <h1 align="center">Chrona</h1>
-  <p align="center"><strong>AI 原生工作的控制层。</strong></p>
+  <p align="center"><strong>面向 AI 原生工作的任务控制层：规划、日程与执行。</strong></p>
   <p align="center">
-    从任务到计划，从计划到日程，从日程到跨后端智能体执行。
+    Chrona 把粗略意图变成结构化任务、计划图、日程块和可观测的 AI 执行过程。
   </p>
 </p>
 
 <p align="center">
-  <a href="#安装">安装</a> ·
-  <a href="#愿景">愿景</a> ·
-  <a href="#当前可用">当前可用</a> ·
-  <a href="#正在构建">正在构建</a> ·
-  <a href="#后端生态">后端生态</a> ·
-  <a href="#openclaw">OpenClaw</a>
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#项目定位">项目定位</a> ·
+  <a href="#核心功能">核心功能</a> ·
+  <a href="#架构概览">架构概览</a> ·
+  <a href="#配置说明">配置说明</a> ·
+  <a href="#文档导航">文档导航</a>
 </p>
 
 <p align="center">
@@ -28,483 +28,276 @@
 
 ---
 
-## 愿景
+## 项目定位
 
-AI 正在从“回答问题”走向“执行工作”。
-
-但今天的大多数工具仍然是分裂的：
-
-- Todo App 负责记录任务，但不知道任务如何完成
-- Calendar 负责安排时间，但不知道任务需要什么步骤
-- AI Chat 可以生成建议，但建议通常停留在对话里
-- Agent Runtime 可以执行任务，但缺少个人任务、计划和日程上下文
-
-Chrona 想连接这些部分。
+Chrona 是一个 local-first 的 AI 原生工作台。它把通常分散在不同工具里的四层能力连接起来：
 
 ```text
 Task → Plan → Schedule → Execution
 ```
 
-Chrona 的目标是成为 AI 原生工作的控制层：
+Chrona 不只是 todo list、calendar 或 chat UI。它是一个让工作状态保持显式的控制层：
 
-- 你创建任务
-- Chrona 生成计划
-- AI 帮你修改和优化计划
-- Chrona 把计划放入日程
-- 到了合适的时间，Chrona 调度智能体执行任务
-- 如果任务缺少信息，Chrona 暂停并请求你补充
-- 补充完成后，任务继续执行，直到完成
+- task 保存面向用户的工作单元、优先级、状态、标签、依赖、父子任务、日程信息和结果
+- plan 把任务变成可编辑、可接受、可执行的类型化图节点
+- schedule 把工作放入时间块，并暴露冲突和建议
+- execution 通过 AI-visible refs、checkpoint/wait 状态、人类审批、工具轨迹和持久化输出运行计划图
 
-这不是一个普通 Todo App。
+Chrona 的目标很直接：把工作从一次性 AI 对话里移出来，放进一个可以暂停、恢复、解释执行过程的任务、计划、日程和执行系统。
 
-Chrona 要做的是一个可以持续推进工作的系统。
+## 快速开始
 
----
+Chrona 使用 Bun 和 SQLite。
 
-## 当前状态
-
-Chrona 分为两层能力：
-
-```text
-Chrona
-├── Plan Layer       已可用
-└── Execution Layer  正在构建
-```
-
-### Plan Layer
-
-Plan Layer 负责把任务变成结构化计划。
-
-这是 Chrona 当前已经可用的核心能力。
-
-### Execution Layer
-
-Execution Layer 负责让计划真正被执行。
-
-这是 Chrona 正在构建的下一阶段能力。
-
-Chrona 会从计划中分析可执行路径，判断哪些步骤可以由 AI
-自动完成，哪些步骤需要人类补充信息，并在任务被安排到日程后自动推进执行。
-
----
-
-## 安装
-
-从最新 Release 下载对应平台的二进制文件即可运行。
-
-| 平台                | 文件                     |
-| ------------------- | ------------------------ |
-| macOS Apple Silicon | `chrona-darwin-arm64`    |
-| macOS Intel         | `chrona-darwin-x64`      |
-| Linux x64           | `chrona-linux-x64`       |
-| Linux ARM64         | `chrona-linux-arm64`     |
-| Windows x64         | `chrona-windows-x64.exe` |
-
-macOS / Linux：
-
-```bash
-chmod +x chrona-darwin-arm64
-./chrona-darwin-arm64 start
-```
-
-Windows：
-
-```powershell
-.\chrona-windows-x64.exe start
-```
-
-然后打开：
-
-```text
-http://localhost:3101
-```
-
-> 不需要全局安装 npm
-> 包，也不需要手动启动前端或后端服务。下载对应平台的二进制文件后即可运行。
-
----
-
-## 当前可用
-
-Chrona 当前已经完成 Plan Layer。
-
-你现在可以用 Chrona 完成从 task 到 plan 的工作流。
-
-### 创建 Task
-
-Task 是 Chrona 中最基础的工作单元。
-
-它可以是一件明确的待办事项，也可以是一个模糊目标。
-
-例如：
-
-```text
-重写 Chrona README，让它更准确地表达当前能力和未来方向。
-```
-
-Chrona 不把 task 当成一个静态
-checkbox，而是把它作为后续生成计划、调整计划和执行任务的入口。
-
-### 生成 Plan
-
-Chrona 可以基于 task 生成结构化 plan。
-
-一个模糊任务会被拆解成清晰步骤：
-
-```text
-1. 分析当前 README 的问题
-2. 明确 Chrona 当前已经完成的能力
-3. 梳理正在开发中的执行能力
-4. 重写 README 顶部介绍
-5. 补充安装和后端配置说明
-6. 检查文档是否准确表达产品路线
-```
-
-Plan 让任务不再只是“要做的事”，而是变成“可以推进的路径”。
-
-### AI 修改 Plan
-
-生成 plan 后，你可以继续用 AI 修改它。
-
-例如：
-
-```text
-这个计划太偏技术了，帮我改得更像产品介绍。
-```
-
-或者：
-
-```text
-把已经完成的功能和开发中的功能分开，但不要写得太保守。
-```
-
-Chrona 会根据你的反馈继续调整 plan。
-
-这让 plan 成为一个可以反复迭代的工作对象，而不是一次性 AI 输出。
-
----
-
-## 正在构建
-
-Chrona 的下一阶段是 Execution Layer。
-
-这是 Chrona 真正变成“AI 原生工作控制层”的关键。
-
-### 自动运行日程中的 Task
-
-未来，Chrona 会根据日程自动启动 task。
-
-例如：
-
-```text
-15:00 - 16:00 重写 Chrona README
-```
-
-到了对应时间，Chrona 可以自动进入该任务上下文，加载相关 plan，并准备执行。
-
-### 自动计算 Plan 的可执行路径
-
-Chrona 会分析 plan 中的步骤，判断哪些路径可以自动执行。
-
-例如：
-
-```text
-1. 读取当前 README                    可自动执行
-2. 分析当前 README 的问题              可自动执行
-3. 询问用户产品定位                    需要人类输入
-4. 根据定位重写 README                 等待第 3 步完成
-5. 检查 README 是否过度承诺             可自动执行
-```
-
-AI 不应该盲目执行整个计划。
-
-Chrona 会尝试判断：
-
-- 当前步骤是否有足够上下文
-- 是否需要用户提供信息
-- 是否需要用户确认
-- 是否依赖其他步骤完成
-- 是否可以交给某个后端自动完成
-
-### 自动完成无需人工干预的步骤
-
-对于不需要人类参与的路径，Chrona 会自动推进。
-
-例如：
-
-- 阅读文件
-- 总结代码结构
-- 分析文档问题
-- 生成草稿
-- 整理候选方案
-- 检查格式
-- 根据已有上下文完成低风险修改
-
-### 等待人类补充信息
-
-如果任务缺少必要信息，Chrona 不应该编造答案。
-
-它应该暂停，并明确告诉用户需要什么。
-
-例如：
-
-```text
-需要你补充：Chrona 的 Execution Layer 当前是否已经支持自动执行？
-```
-
-用户补充信息后，Chrona 可以继续执行剩余步骤。
-
-### 继续未完成任务
-
-普通 AI Chat 的问题是：一次对话结束，工作也就断了。
-
-Chrona 的目标是让任务可以持续推进。
-
-当用户补充信息、确认操作或提供新上下文后，Chrona
-可以从中断点继续执行，而不是重新开始整个任务。
-
----
-
-## 后端生态
-
-Chrona 不应该绑定到单一模型或单一 agent runtime。
-
-它的目标是成为多个 AI 执行后端之上的控制层。
-
-### 当前支持
-
-Chrona 当前支持：
-
-| 后端              | 状态   | 说明                                  |
-| ----------------- | ------ | ------------------------------------- |
-| OpenAI-compatible | 已支持 | 支持 OpenAI 兼容接口                  |
-| OpenClaw          | 已支持 | 支持通过 OpenClaw 接入 agent workflow |
-
-### 计划支持
-
-Chrona 后续计划接入更多 AI coding / agent 后端：
-
-| 后端        | 状态     | 目标                           |
-| ----------- | -------- | ------------------------------ |
-| Claude Code | 计划支持 | 接入 Claude Code 工作流        |
-| Codex       | 计划支持 | 接入 Codex 风格的代码执行能力  |
-| opencode    | 计划支持 | 接入开源 coding agent runtime  |
-| Hermes      | 计划支持 | 接入 Hermes agent/backend 能力 |
-
-Chrona 的长期目标不是成为某一个后端的
-UI，而是成为多个后端之上的统一任务、计划、日程和执行控制层。
-
-你可以把 Chrona 理解为：
-
-```text
-              ┌──────────────┐
-              │    Chrona    │
-              │ Control Layer │
-              └──────┬───────┘
-                     │
-     ┌───────────────┼────────────────┐
-     │               │                │
-OpenClaw      Claude Code          Codex
-     │               │                │
-  opencode        Hermes            ...
-```
-
-不同后端负责执行不同类型的任务。
-
-Chrona 负责管理：
-
-- task
-- plan
-- schedule
-- execution state
-- human input
-- continuation
-- result tracking
-
----
-
-## AI 后端配置
-
-### OpenAI-compatible
-
-Chrona 可以连接 OpenAI 兼容接口。
-
-适用于：
-
-- OpenAI API
-- 本地或自托管 OpenAI-compatible endpoint
-- 其他兼容 OpenAI API 格式的模型服务
-
-通常需要配置：
-
-```text
-Base URL
-API Key
-Model
-```
-
-### OpenClaw
-
-Chrona 也支持 OpenClaw 作为后端。
-
-OpenClaw 更适合作为 agent workflow 后端，也是 Chrona Execution Layer
-的重要组成部分。
-
----
-
-## OpenClaw
-
-使用 OpenClaw 前，需要确保 OpenClaw 的 Responses endpoint 已开启。
-
-请在 OpenClaw 配置中加入：
-
-```json
-{
-  "gateway": {
-    "http": {
-      "endpoints": {
-        "responses": {
-          "enabled": true
-        }
-      }
-    }
-  }
-}
-```
-
-然后在 Chrona 中进入：
-
-```text
-Settings → AI Clients
-```
-
-添加或启用 OpenClaw 后端。
-
-### 为什么需要开启 Responses？
-
-Chrona 需要通过 OpenClaw 的 Responses 能力与后端交互。
-
-如果没有开启该 endpoint，Chrona 可能可以连接到 OpenClaw，但无法正常使用相关 AI
-能力。
-
-### 后续自动配置
-
-后续 Chrona 可以提供自动检测和辅助配置：
-
-```bash
-chrona openclaw doctor
-chrona openclaw setup
-```
-
-理想体验：
-
-```text
-✓ OpenClaw binary found
-✓ Gateway reachable
-✗ Responses endpoint disabled
-
-Run `chrona openclaw setup` to enable it.
-```
-
-`setup` 可以在用户确认后自动写入配置，并备份原配置文件。
-
----
-
-## 为什么需要 Chrona？
-
-AI 工具正在快速变强，但工作流本身还很破碎。
-
-你可能会同时使用：
-
-- 一个 Todo App 记录任务
-- 一个 Calendar 安排时间
-- 一个 AI Chat 讨论方案
-- 一个 coding agent 执行代码任务
-- 一个文档系统记录结果
-
-Chrona 想把这些连接起来。
-
-不是再做一个 isolated AI tool，而是建立一个面向 AI 工作流的控制系统。
-
-| 工具类型     | 主要能力                               | 局限                           |
-| ------------ | -------------------------------------- | ------------------------------ |
-| Todo App     | 记录任务                               | 不理解任务结构，也不会生成计划 |
-| Calendar     | 安排时间                               | 不知道任务如何完成             |
-| AI Chat      | 生成建议                               | 难以持续管理任务状态           |
-| Coding Agent | 执行代码任务                           | 缺少个人任务、计划和日程上下文 |
-| Chrona       | 任务、计划、日程、后端执行的统一控制层 | 正在逐步构建 Execution Layer   |
-
----
-
-## Roadmap
-
-### Plan Layer
-
-- [x] 创建 task
-- [x] 生成 plan
-- [x] AI 修改 plan
-- [x] OpenAI-compatible 后端
-- [x] OpenClaw 后端
-
-### Execution Layer
-
-- [ ] 日程中的 task 自动启动
-- [ ] 自动分析 plan 的可执行路径
-- [ ] 自动执行不需要人工干预的步骤
-- [ ] 在缺少信息时暂停并请求用户补充
-- [ ] 用户补充信息后继续执行
-- [ ] 执行过程可视化
-- [ ] 执行结果回写到 task / plan
-
-### Backend Ecosystem
-
-- [x] OpenAI-compatible
-- [x] OpenClaw
-- [ ] Claude Code
-- [ ] Codex
-- [ ] opencode
-- [ ] Hermes
-- [ ] 更多 agent runtime
-
----
-
-## 开发
-
-如果你想从源码运行 Chrona：
+### 从源码运行
 
 ```bash
 bun install
 bun run dev
 ```
 
-构建二进制：
+然后打开 Web 应用：
+
+```text
+http://localhost:3101
+```
+
+`bun run dev` 会启动 Bun/Hono API server 和 Vite Web 应用，用于本地开发。只启动服务端时使用：
+
+```bash
+bun run server:start
+```
+
+### 二进制 / 打包构建
+
+仓库中也包含构建各平台独立二进制的脚本：
 
 ```bash
 bun run build:binaries
 ```
 
-项目结构：
+Release 资产预期使用这些目标名称：
+
+| 平台 | 二进制文件 |
+| --- | --- |
+| macOS Apple Silicon | `chrona-darwin-arm64` |
+| macOS Intel | `chrona-darwin-x64` |
+| Linux x64 | `chrona-linux-x64` |
+| Linux ARM64 | `chrona-linux-arm64` |
+| Windows x64 | `chrona-windows-x64.exe` |
+
+macOS/Linux 示例：
+
+```bash
+chmod +x chrona-linux-x64
+./chrona-linux-x64 start
+```
+
+请使用与你的平台匹配的二进制文件。
+
+## 核心功能
+
+### 任务管理
+
+Chrona 支持任务创建、更新、完成、重开、删除、状态、优先级、标签、截止时间、估时、依赖、父子任务、日程信息和结果确认。
+
+### AI 计划生成与编辑
+
+粗略任务可以变成结构化 plan blueprint。Chrona 会把接受后的计划 materialize 成持久化的 TaskPlanLayer 和图节点。计划可以重新生成或打补丁，而不是停留在一次性 assistant 文本里。
+
+### 图计划执行
+
+计划执行被建模为图，而不是普通 checklist。当前支持的节点类型包括：
+
+- `task`
+- `checkpoint`
+- `condition`
+- `wait`
+
+执行节点可以是 manual、assist 或 auto，也可以分配给 user、AI 或 system executor。
+
+### AI-visible 节点运行时
+
+AI worker 拿到的是安全 ref，而不是内部数据库 ID。节点 worker 使用 Chrona tools 上报结果，例如：
+
+- `chrona.task.complete`
+- `chrona.condition.select`
+- `chrona.node.block`
+- `chrona.node.fail`
+- `chrona.wait.complete`
+
+这样 Chrona 继续拥有真实的 task、plan、graph、run 和 node ID，外部 agent 只看到受限的运行时 ref。
+
+### Work 页面
+
+Work 页面是实时任务工作台：最新结果、计划图、执行记录、任务信息、右侧 rail/inspector、对话历史、工具/活动轨迹，以及用于继续推进工作的 composer dock。
+
+### Task workspace
+
+Task workspace 支持任务编辑、AI 计划生成、计划接受、执行概览、节点详情和人工审阅状态。
+
+### Schedule 和 Inbox
+
+Chrona 包含 schedule 页面，提供时间线/任务视图、AI insights、冲突和自动化建议、任务创建、日程提案处理。Inbox 聚合 pending approvals、schedule proposals、等待中的 run、失败 run 和取消 run。
+
+### Memory console
+
+Memory console 展示 workspace/task memory entries，让长期任务在单次对话之外保留有用上下文。
+
+### Assistant surfaces
+
+Chrona 提供 global AI sidebar 和面向 task、schedule、workbench 流程的页面感知 assistant surface。
+
+### AI client 管理
+
+AI client 存在数据库中，并通过 `Settings → AI Clients` 配置。Feature binding 决定 suggest、generate_plan、chat、dispatch、node execution、condition evaluation、checkpoint review 等能力使用哪个 client。
+
+## 架构概览
+
+Chrona 是 Bun + React monorepo。
 
 ```text
 apps/
-  server/     API server
-  web/        Web UI
+  web/        Vite + React 19 + React Router 7 SPA
+  server/     Bun 上的 Hono API server
 
 packages/
-  cli/        CLI tool
-  common/     Shared utilities and AI feature surface
-  contracts/  Shared DTOs, Zod schemas, API contracts
-  db/         Database schema and migrations
-  domain/     Pure business rules, state derivations
-  providers/  AI provider adapters
-  runtime/    Agent runtime integration
+  cli/        Chrona CLI 和二进制入口
+  contracts/  API schema、AI feature spec、plan runtime type、SSE event、MCP tool schema
+  db/         Prisma 7 + SQLite 数据库层
+  domain/     纯业务规则和 projection
+  engine/     task、plan、execution、scheduling、page projection、AI-client services
+  graph-runtime/ 图构建、resolve、transition command 和 execution state
+  i18n/       本地化消息
+  providers/  provider foundation、Hermes provider、debug provider
+  runtime-core/ Runtime 抽象
+  shared/     共享工具
 
-docs/
-  architecture.md
-  quick-start.md
+external-plugins/
+  hermes/     Hermes 外部插件集成
 ```
 
----
+运行时形态：
+
+```text
+Web UI
+  ↓ /api/*
+Hono server
+  ↓
+Chrona engine
+  ├─ task / plan / schedule / projection modules
+  ├─ graph-runtime execution state
+  ├─ Prisma SQLite persistence
+  └─ AI clients
+       ├─ 用于 OpenAI-compatible model API 的 LLM clients
+       └─ 用于 agent-style runs 的 Hermes provider client
+```
+
+重要 API 分组包括：
+
+- `/api/health`
+- `/api/tasks` 和 `/api/tasks/:taskId`
+- `/api/tasks/:taskId/plan`、`/plan/accept`、`/plan/generations`、`/plan/generations/active/events`、`/plan/generations/stop` 和 plan patch operations
+- `/api/tasks/:taskId/execution/current`
+- `/api/tasks/:taskId/execution/actions`
+- `/api/tasks/:taskId/execution/checkpoint/:checkpointId/actions`
+- `/api/tasks/:taskId/schedule`
+- `/api/schedule`、`/api/inbox`、`/api/memory`、`/api/work/:taskId`、`/api/work/:taskId/events`、`/api/work/:taskId/commands`
+- `/api/workspaces`、`/api/workspaces/default`、`/api/workspaces/:workspaceId/overview`
+- `/api/runtime/providers`
+- `/api/ai/clients`、`/api/ai/clients/test`、`/api/ai/clients/:clientId`、`/api/ai/clients/:clientId/bindings`
+- `/api/assistant-surface` 和 `/api/assistant-surface/actions`
+- 用于 Chrona tool execution 的 MCP endpoints
+
+## 配置说明
+
+### 环境变量
+
+如需本地覆盖配置，可以复制 `.env.example`。
+
+| 变量 | 用途 | 默认值 / 说明 |
+| --- | --- | --- |
+| `DATABASE_URL` | SQLite database URL | `file:./prisma/dev.db` |
+| `HOST` | API server 绑定地址 | 默认 local-only `127.0.0.1` |
+| `PORT` | API server 端口 | `3101` |
+| `CHRONA_WEB_DIST` | server/static 模式下的前端构建目录 | `apps/web/dist` |
+| `ALLOWED_ORIGINS` | 逗号分隔的 CORS allowlist | 省略时适合本地开发 |
+| `API_KEY` | 可选的 `/api/*` bearer token | 设置后请求需带 `Authorization: Bearer <key>` |
+| `CHRONA_UNSAFE_PUBLIC_BIND` | 未认证公开绑定的显式确认开关 | 仅在理解暴露风险时设置 |
+| `VITE_API_BASE_URL` | 前端 API base URL 覆盖 | Web 与 API 拆分时有用 |
+
+### 数据库
+
+常用数据库命令：
+
+```bash
+bun run db:generate
+bun run db:seed
+bun run db:push
+bun run db:migrate
+```
+
+`bun run setup` 会在 schema 或依赖变化需要时运行 Prisma client generation 和 seed data。在 NixOS 上，Prisma 可能需要自定义 engine 配置或设置 `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1`，因为上游可能缺少 `linux-nixos` engine target 的 checksum 文件。
+
+### AI clients
+
+在 Web 应用中进入以下位置配置 AI clients：
+
+```text
+Settings → AI Clients
+```
+
+当前代码支持的 client types：
+
+| 类型 | 用途 |
+| --- | --- |
+| `llm` | OpenAI-compatible model APIs；配置 base URL、API key、model 和可选 temperature |
+| `hermes` | Hermes Agent provider gateway；配置 base URL、可选 API key 和 timeout |
+| `debug` | 开发/测试流程使用的本地 debug provider |
+
+如果未配置 base URL，Hermes provider client 默认使用 `http://127.0.0.1:8642`，并访问 `/v1/capabilities`、`/v1/runs`、`/v1/runs/{run_id}/events` 等 provider endpoints。
+
+## 开发命令
+
+```bash
+bun run dev              # development server stack
+bun run dev:web          # 只启动 Vite web dev server
+bun run server:start     # 只启动 Bun/Hono server
+bun run typecheck        # TypeScript check
+bun run lint             # ESLint
+bun run test             # Vitest
+bun run test:bun         # Bun tests
+bun run test:api         # API tests
+bun run test:e2e         # Playwright E2E tests
+bun run check:ui-foundation
+bun run check:boundaries
+bun run analyze
+```
+
+## 文档导航
+
+建议从这里开始：
+
+| 主题 | 文档 |
+| --- | --- |
+| 文档索引 | [docs/README.md](./docs/README.md) |
+| 快速开始 | [docs/en/quick-start.md](./docs/en/quick-start.md) / [docs/zh/quick-start.md](./docs/zh/quick-start.md) |
+| 架构 | [docs/architecture.md](./docs/architecture.md) |
+| API 参考 | [docs/api-reference.md](./docs/api-reference.md) |
+| 数据模型 | [docs/data-model.md](./docs/data-model.md) |
+| 后端执行流程 | [docs/backend-execution-flow.md](./docs/backend-execution-flow.md) |
+| Provider boundary | [docs/provider-boundary.md](./docs/provider-boundary.md) |
+| Package boundaries | [docs/package-boundaries.md](./docs/package-boundaries.md) |
+| Roadmap | [docs/en/roadmap.md](./docs/en/roadmap.md) / [docs/zh/roadmap.md](./docs/zh/roadmap.md) |
+
+更多入口：
+
+- [English docs](./docs/en/README.md)
+- [中文文档](./docs/zh/README.md)
+- [Engine package README](./packages/engine/README.md)
+- [Graph runtime README](./packages/graph-runtime/README.md)
+- [External plugins README](./external-plugins/README.md)
+- [Hermes plugin README](./external-plugins/hermes/README.md)
 
 ## License
 

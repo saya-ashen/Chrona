@@ -1,120 +1,111 @@
 # Chrona Roadmap
 
-> **Current version:** 0.1.4
-> **Status:** Phase 1 — Scheduling Cockpit
+Current version: 0.1.4
 
----
+Chrona is evolving into a task control plane for AI-assisted work. The product connects four loops that should stay visible and recoverable: task capture, graph planning, schedule placement, and runtime execution.
 
-## Product Framing
+This roadmap separates shipped capability from intended direction. It is not a commitment to ship every item in order; near-term items are the current product focus, while mid- and long-term items describe likely evolution after the execution and schedule foundations stabilize.
 
-Chrona is shaped around three major product areas:
+## Current product pillars
 
-- **Schedule creation & arrangement** — turn ideas into structured, time-bound work
-- **Task automatic completion** — let AI agents execute that work with continuous oversight
-- **Agent integration** — make Chrona the "action destination" that agents can push work into from conversations, emails, and notes
+1. Task control: capture work, structure it, prioritize it, and keep status clear.
+2. Plan control: generate, edit, accept, and execute graph plans.
+3. Execution control: run AI/runtime-backed nodes with human checkpoints, explicit actions, and recoverable state.
+4. Schedule control: turn plans into time-bound work and surface conflicts, proposals, and due-work automation.
+5. Agent integration: let external agents create, plan, schedule, and advance Chrona work through safe tool contracts.
 
-The long-term goal: make the schedule not just a passive calendar, but the **control surface that continuously drives real task execution**.
+## Completed / available capabilities
 
----
+These capabilities exist in the current codebase and should be treated as product baseline.
 
-## Guiding Principles
+| Area | Current capability |
+| --- | --- |
+| Tasks | Task create/update/delete, completion/reopen, priority, status, labels, dependencies, parent/child relationships, and task projection rebuilds. |
+| AI planning | Streaming plan generation, generated-plan persistence, plan review/edit/accept flows, and materialization into task plan layers. |
+| Graph plans | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with graph state resolution. |
+| AI node runtime | AI-visible refs for node completion, condition selection, block/fail, and wait completion; backend IDs stay behind server-side mapping. |
+| Work page | Latest result, plan graph, execution records, task details, right rail/inspector, and bottom composer surface. |
+| Task Workspace | Task editing, plan generation/acceptance, execution overview, and node detail inspection. |
+| Schedule page | Timeline, task list, AI insights, conflicts, schedule proposals, task creation, and configuration surfaces. |
+| Inbox | Pending approvals, schedule proposals, waiting inputs, and failed/cancelled run surfaces. |
+| Memory console | Workspace/task memory display surfaces. |
+| AI clients | Database-backed AI clients and feature bindings through Settings / AI Clients. |
+| Backend API | Task CRUD/lifecycle routes, plan generation/acceptance routes, task-scoped execution routes, work/schedule page projections, runtime provider routes, and AI client routes. |
+| MCP / Hermes | Streamable HTTP MCP tools for Chrona execution/plan/node operations and Hermes provider/plugin integration for agent-style execution. |
 
-1. **Schedule and execution should not drift apart** — the plan you schedule is the same plan the agent executes
-2. **Plans should be editable before execution and updateable during execution** — not static instructions
-3. **Runtime choice should be infrastructure, not a user-facing architectural burden** — one UX, many backends
-4. **The product should remain useful even before full automation is complete** — usable at every maturity level
+## Near-term priorities
 
----
+Near-term work should make the existing product dependable and understandable rather than adding unrelated surfaces.
 
-## Phases
+### 1. Make the Work page execution record practical
 
-### Phase 1 — Scheduling Cockpit ✅ *(current, shipping)*
+- Keep the composer fixed at the bottom and the middle record area scrollable.
+- Keep conversation history across all task runs, not only the latest run.
+- In the collaboration/conversation view, show conversation messages without tool-call and task-event clutter.
+- Simplify message cards so speaker labels are not duplicated.
+- Rework the execution record into a usable layout: left-side stream grouped by run, right-side fixed task cockpit with current state, active node, blockers, and primary actions.
+- Distinguish final outputs, checkpoints, runtime events, tool calls, and assistant/user conversation instead of mixing everything into a raw linear dump.
 
-> Focus: make schedule creation fast and intelligent
+### 2. Harden task-scoped execution APIs
 
-| Capability | Status |
-|-----------|--------|
-| Smart task suggestions from partial text (suggest) | ✅ Shipped |
-| AI task plan generation with streaming SSE | ✅ Shipped |
-| Editable plan graph (nodes, edges, dependencies) | ✅ Shipped |
-| Accept/dismiss flow for AI-generated plans | ✅ Shipped |
-| Calendar view with drag-and-drop time blocks | ✅ Shipped |
-| Schedule conflict detection | ✅ Shipped |
-| AI timeslot suggestions | ✅ Shipped |
-| Multi-language UI (English, Chinese) | ✅ Shipped |
-| Zero-config install (`npm install -g` + `chrona start`) | ✅ Shipped |
-| Assistant chat with task plan proposals | ✅ Shipped |
-| Inbox triage (approvals, proposals, suggestions) | ✅ Shipped |
+- Prefer lightweight task-scoped status and action endpoints for execution state checks.
+- Keep execution endpoints explicit instead of routing feature calls and task execution through generic chat semantics.
+- Preserve AI-visible refs as the external contract for agent workers.
+- Make per-task session reuse, isolation, refresh-after-error, and recovery behavior explicit.
+- Use tool inputs/results as execution source of truth instead of relying on ad-hoc structured-result submission paths.
 
-### Phase 2 — Autonomous Task Execution 🚧 *(in progress)*
+### 3. Stabilize schedule-to-execution behavior
 
-> Focus: agents run on schedule, intelligently decide which tasks need human attention — and auto-complete the rest
+- Ensure accepted schedule proposals reliably create or update WorkBlocks.
+- Start due work through the scheduler only when configured and safe.
+- Surface conflicts and automation suggestions without forcing full schedule projection refreshes for lightweight status checks.
+- Keep schedule UI polish focused on the P0 interaction path: find work, understand conflicts, accept proposals, and start due execution.
 
-| Capability | Status |
-|-----------|--------|
-| Auto-trigger agents by schedule (background scheduler) | 🚧 In progress |
-| Execute tasks through configured runtime backend | 🚧 In progress |
-| Intelligent task triage — skip tasks requiring human judgment, auto-complete the rest | 📋 Planned |
-| Live execution progress connected to task plan | 🚧 In progress |
-| Dynamic plan updates as agent progresses | 📋 Planned |
-| Resume and retry across sessions | 🚧 In progress |
-| Mid-run operator intervention (input, approval) | 🚧 In progress |
+### 4. Keep provider and package boundaries clean
 
-### Phase 3 — Multi-Runtime Backend Support 📋 *(planned)*
+- Keep AI client selection database-driven.
+- Keep feature-specific contracts such as `generate_plan`, `edit_plan`, `dispatch_task`, and `execute_task_node` explicit.
+- Keep provider protocol parsing below `packages/providers/*`.
+- Keep orchestration, plan execution, scheduling, and task lifecycle policy in `packages/engine`.
+- Keep shared schemas and API contracts in `packages/contracts`.
 
-> Focus: one product workflow, multiple runtime engines
+### 5. Bring docs in line with the product
 
-| Capability | Status |
-|-----------|--------|
-| Bare LLM backend for lightweight planning/execution | 📋 Planned |
-| Hermes bridge for agent-style execution | 🚧 In progress |
-| Hermes provider for deeper agent/tool orchestration | 📋 Planned |
-| Opencode provider for agent runtime | 📋 Planned |
-| Runtime adapter interface (`RuntimeExecutionAdapter`) | 🚧 In progress |
-| A/B testing across runtime backends | 📋 Planned |
-| Runtime migration tooling | 📋 Planned |
+- Keep README and quick-start pages focused on the current Vite + Hono + Bun app.
+- Remove or archive stale refactor/audit plans after their content is merged into current docs.
+- Keep API, architecture, data model, provider boundary, and package boundary docs aligned with real routes and schemas.
 
-### Agent Integration — MCP Tool / Skill 🚧 *(in progress)*
+## Mid-term evolution
 
-> Focus: make Chrona the "action destination" for AI agents. When an agent identifies work during a conversation, it can push it into Chrona's execution pipeline.
+Mid-term work should extend the current loops once Work, execution, and schedule behavior are stable.
 
-Chrona will expose an MCP (Model Context Protocol) tool or Skill that external agents (Hermes, Claude, etc.) can call to create tasks, generate plans, and schedule work programmatically. This turns every AI conversation into a potential source of structured, executable tasks.
+| Theme | Direction |
+| --- | --- |
+| Dynamic replanning | Let running tasks request plan changes, route them through review/acceptance, and resume safely after approval. |
+| Execution recovery | Improve retry, resume, cancellation, blocked-state recovery, and run/session diagnostics. |
+| Runtime abstraction | Support additional execution backends without changing the core task/plan/schedule workflow. |
+| Richer memory | Use task and workspace memory more deliberately in planning, node execution, and summaries. |
+| Better projections | Make page projections fast, task-scoped where possible, and consistent across Work, Schedule, Inbox, and Task Workspace. |
+| Test coverage | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP tools, Work projections, and schedule proposal decisions. |
 
-| Capability | Status |
-|-----------|--------|
-| MCP tool: create task from agent context (title, description, priority, time block) | 🚧 In progress |
-| MCP tool: generate plan for a new or existing task | 📋 Planned |
-| Agent proactively asks user: "Should I schedule this in Chrona?" | 📋 Planned |
-| Auto-create tasks from external sources (email, notes, etc.) via agent parsing | 📋 Planned |
-| Chrona as a registerable Skill for Hermes and compatible runtimes | 📋 Planned |
+## Long-term direction
 
-**Key use cases:**
+Long-term work should be treated as strategic direction, not near-term promise.
 
-1. **Conversation → task** — you're chatting with an agent about a bug; the agent detects this and asks: *"Want me to create a Chrona task to track this fix? I'll schedule it for tomorrow morning."*
+| Theme | Direction |
+| --- | --- |
+| External ingestion | Turn conversations, email, notes, and external systems into structured Chrona tasks that can be planned and scheduled. |
+| Collaboration | Add stronger multi-user review, approvals, audit trails, and shared execution context. |
+| Production readiness | Improve authentication, deployment docs, backup/restore, observability, migration safety, and operational runbooks. |
+| Agent ecosystem | Let more agents and tools participate through explicit, inspectable contracts while Chrona remains the control plane. |
+| Organization-scale planning | Connect individual tasks, schedules, dependencies, and execution history into portfolio-level visibility. |
 
-2. **Email → task** — an agent reads your inbox, identifies action items, and auto-creates Chrona tasks with appropriate priorities and time blocks — no manual data entry.
+## Contribution focus
 
-3. **Meeting notes → execution plan** — an agent processes meeting notes, generates a structured Chrona plan with subtasks, and asks for your approval.
+Good areas to improve now:
 
----
-
-## Status Legend
-
-| Symbol | Meaning |
-|--------|---------|
-| ✅ | Shipped — available in current release |
-| 🚧 | In progress — active development |
-| 📋 | Planned — on the roadmap |
-| 💡 | Proposed — under consideration |
-
----
-
-## How to Contribute
-
-The roadmap is driven by real usage patterns and community feedback. If you have ideas:
-
-1. Open a [GitHub Issue](https://github.com/saya-ashen/Chrona/issues)
-2. Tag it with `enhancement` or `feature-request`
-3. Describe your use case — what problem would this solve for you?
-
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup.
+- Keep documentation and examples aligned with actual route/schema behavior.
+- Add narrow tests around task plans, execution actions, Work page projections, schedule decisions, and MCP tools.
+- Improve UI clarity in Work, Schedule, Inbox, Task Workspace, and Settings / AI Clients.
+- Tighten package boundaries when code drifts into the wrong layer.
+- Prefer small, verifiable changes over broad rewrites.

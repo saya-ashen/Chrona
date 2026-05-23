@@ -13,7 +13,7 @@ responses. It should not orchestrate engine internals directly.
   the server. This direction is correct.
 - The package can run in the Bun runtime through its existing modules and DB
   access. A separate deployment unit is not currently required.
-- The boundary is still too wide. `src/index.ts` exports many low-level command,
+- The boundary is still too wide. `packages/engine/src/index.ts` exports many low-level command,
   query, projection, runtime, and AI functions directly.
 - Server routes import many engine internals and perform orchestration that
   belongs behind an engine application boundary.
@@ -122,7 +122,7 @@ from `modules/*` or directly from individual command/query files.
 ## Migration Plan
 
 1. Add the facade without changing behavior.
-   - Create `src/engine.ts`, `src/ports.ts`, and `src/errors.ts`.
+   - Create `packages/engine/src/engine.ts`, `packages/engine/src/ports.ts`, and `packages/engine/src/errors.ts`.
    - Wrap existing command/query functions behind service methods.
    - Keep existing modules as internal implementation.
 
@@ -146,7 +146,7 @@ from `modules/*` or directly from individual command/query files.
    - Routes should not compose multiple low-level engine operations unless that
      composition is purely transport-related.
 
-5. Narrow `src/index.ts`.
+5. Narrow `packages/engine/src/index.ts`.
    - Export `createChronaEngine`, `ChronaEngine`, engine input/output types, and
      typed errors.
    - Stop exporting internal modules, commands, queries, projections, and runtime

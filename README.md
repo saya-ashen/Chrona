@@ -6,18 +6,19 @@ English | [中文](./README.zh.md)
 
 <p align="center">
   <h1 align="center">Chrona</h1>
-  <p align="center"><strong>Turn tasks into plans, schedules, and executable AI work.</strong></p>
+  <p align="center"><strong>AI-native task control plane for planning, scheduling, and executing work.</strong></p>
   <p align="center">
-    Chrona helps you define work, break it down, place it on your schedule, and steadily move it forward with AI.
+    Chrona turns rough intent into structured tasks, plan graphs, schedule blocks, and observable AI execution.
   </p>
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> ·
-  <a href="#vision">Vision</a> ·
-  <a href="#available-today">Available Today</a> ·
-  <a href="#being-built">Being Built</a> ·
-  <a href="#backend-ecosystem">Backend Ecosystem</a>
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#what-chrona-is">Positioning</a> ·
+  <a href="#core-features">Core Features</a> ·
+  <a href="#architecture-overview">Architecture</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#documentation">Docs</a>
 </p>
 
 <p align="center">
@@ -27,446 +28,276 @@ English | [中文](./README.zh.md)
 
 ---
 
-## Vision
+## What Chrona Is
 
-Chrona is an AI workbench for people who want more than a todo list and less than a pile of disconnected AI chats.
-
-It gives work a clear lifecycle:
+Chrona is a local-first workbench for AI-native work. It connects four layers that are usually split across separate tools:
 
 ```text
 Task → Plan → Schedule → Execution
 ```
 
-In practical terms, Chrona helps you:
+Chrona is not just a todo list, calendar, or chat UI. It is a control plane that keeps work state explicit:
 
-- capture a task or goal
-- turn it into a structured plan
-- refine that plan with AI
-- place the work into your schedule
-- keep execution moving instead of leaving the result inside a chat window
+- tasks hold the user-facing unit of work, priority, status, tags, dependencies, parent/child relationships, schedule metadata, and results
+- plans turn tasks into typed graph nodes that can be edited, accepted, and executed
+- schedules place work into time blocks and surface conflicts or suggestions
+- execution runs the graph through AI-visible refs, checkpoint/wait states, human approvals, tool traces, and persisted outputs
 
-The problem Chrona is trying to solve is simple:
+The product goal is simple: move work out of disposable AI chats and into a durable task, plan, schedule, and execution system that can pause, resume, and explain what happened.
 
-- todo apps track tasks, but not how the work should unfold
-- calendars track time, but not what each block of work actually needs
-- AI chats can draft ideas, but the output often stays trapped in conversation history
-- agent runtimes can execute, but usually lack task, plan, and schedule context
+## Quick Start
 
-Chrona connects those layers into one system.
+Chrona uses Bun and SQLite.
 
-So the product is not just “AI for tasks”.
-
-It is a workspace for turning intent into structured work, and structured work into forward progress.
-
----
-
-## Current Status
-
-Chrona currently has two layers:
-
-```text
-Chrona
-├── Plan Layer       Available today
-└── Execution Layer  Being built
-```
-
-### What you can use today
-
-Today, Chrona is strongest at the Plan Layer.
-
-That means you can already use it to:
-
-- create tasks
-- generate structured plans from rough goals
-- refine those plans with AI
-- organize work so it is easier to schedule and execute later
-
-If you want to understand Chrona quickly, this is the shortest description:
-
-> Today, Chrona helps you go from task to plan.
-
-### What is being built next
-
-The next major step is the Execution Layer.
-
-This is the part that will make plans actively run instead of staying as static planning artifacts.
-
-Chrona is being built to:
-
-- inspect a plan and find which paths are executable
-- detect where human input or approval is still required
-- hand off runnable steps to the right agent backend
-- resume work after missing context is provided
-- keep scheduled work moving forward automatically when possible
-
-In short:
-
-> Today: Chrona helps structure work.
-> Next: Chrona helps run that work.
-
----
-
-## Install
-
-Download the binary for your platform from the latest release.
-
-| Platform            | Binary                   |
-| ------------------- | ------------------------ |
-| macOS Apple Silicon | `chrona-darwin-arm64`    |
-| macOS Intel         | `chrona-darwin-x64`      |
-| Linux x64           | `chrona-linux-x64`       |
-| Linux ARM64         | `chrona-linux-arm64`     |
-| Windows x64         | `chrona-windows-x64.exe` |
-
-macOS / Linux:
-
-```bash
-chmod +x chrona-darwin-arm64
-./chrona-darwin-arm64 start
-```
-
-Windows:
-
-```powershell
-.\chrona-windows-x64.exe start
-```
-
-Then open:
-
-```text
-http://localhost:3101
-```
-
-> No global npm package, no manual frontend/backend startup. Download the binary
-> for your platform and run it directly.
-
----
-
-## Available Today
-
-Chrona currently ships the Plan Layer.
-
-You can use Chrona today to move from task to plan.
-
-### Create Tasks
-
-A task is the basic unit of work in Chrona.
-
-It can be a concrete todo item or a rough goal.
-
-For example:
-
-```text
-Rewrite the Chrona README so it clearly communicates the current product and future direction.
-```
-
-Chrona does not treat a task as a static checkbox.
-
-A task is the entry point for generating, refining, and eventually executing a
-plan.
-
-### Generate Plans
-
-Chrona can generate a structured plan from a task.
-
-A rough task becomes a clear sequence of steps:
-
-```text
-1. Analyze the current README
-2. Identify what Chrona already supports
-3. Separate current capabilities from upcoming execution features
-4. Rewrite the README hero section
-5. Add install and backend configuration instructions
-6. Review the document for clarity and overpromising
-```
-
-A plan turns a task from “something to do” into a path that can actually be
-moved forward.
-
-### Modify Plans with AI
-
-After a plan is generated, you can keep refining it with AI.
-
-For example:
-
-```text
-This plan feels too technical. Make it read more like a product introduction.
-```
-
-Or:
-
-```text
-Separate available features from features under development, but do not make the project sound too conservative.
-```
-
-Chrona updates the plan based on your feedback.
-
-This makes the plan an editable work object, not a one-off AI response.
-
----
-
-## Being Built
-
-The next stage of Chrona is the Execution Layer.
-
-This is where Chrona becomes a true control layer for AI-native work.
-
-### Automatically Run Scheduled Tasks
-
-Chrona will be able to start tasks based on your schedule.
-
-For example:
-
-```text
-15:00 - 16:00 Rewrite Chrona README
-```
-
-When the scheduled time arrives, Chrona can enter the task context, load the
-related plan, and prepare execution.
-
-### Compute Executable Paths in a Plan
-
-Chrona will analyze plan steps and determine which paths can be executed
-automatically.
-
-For example:
-
-```text
-1. Read the current README                    Can run automatically
-2. Analyze issues in the current README        Can run automatically
-3. Ask the user about product positioning      Requires human input
-4. Rewrite the README based on positioning     Blocked by step 3
-5. Check whether the README overpromises       Can run automatically
-```
-
-AI should not blindly execute the entire plan.
-
-Chrona will reason about:
-
-- Whether a step has enough context
-- Whether user input is required
-- Whether user confirmation is needed
-- Whether the step depends on previous steps
-- Whether a specific backend can complete the step
-
-### Automatically Complete Steps Without Human Intervention
-
-For paths that do not require human input, Chrona will advance the work
-automatically.
-
-Examples include:
-
-- Reading files
-- Summarizing code structure
-- Analyzing documentation issues
-- Drafting content
-- Organizing candidate solutions
-- Checking formatting
-- Applying low-risk changes based on existing context
-
-### Pause for Human Input
-
-When required information is missing, Chrona should not make things up.
-
-It should pause and clearly ask for what it needs.
-
-For example:
-
-```text
-Need your input: Is the Chrona Execution Layer already able to run tasks automatically?
-```
-
-After the user provides the missing information, Chrona can continue the
-remaining steps.
-
-### Continue Unfinished Work
-
-The problem with ordinary AI chat is that once the conversation ends, the work
-often stops.
-
-Chrona is designed for continuity.
-
-When the user provides additional information, confirms an action, or adds new
-context, Chrona can resume from the interruption point instead of starting over.
-
----
-
-## Backend Ecosystem
-
-Chrona should not be tied to a single model or agent runtime.
-
-Its goal is to become the control layer above multiple AI execution backends.
-
-### Currently Supported
-
-Chrona currently supports:
-
-| Backend           | Status    | Description                        |
-| ----------------- | --------- | ---------------------------------- |
-| OpenAI-compatible | Supported | Works with OpenAI-compatible APIs  |
-| Hermes            | Supported | Connects Chrona to agent workflows |
-
-### Planned Support
-
-Chrona plans to integrate with more AI coding and agent backends:
-
-| Backend     | Status  | Goal                                         |
-| ----------- | ------- | -------------------------------------------- |
-| Claude Code | Planned | Connect to Claude Code workflows             |
-| Codex       | Planned | Connect to Codex-style code execution        |
-| opencode    | Planned | Connect to open-source coding agent runtimes |
-| More providers | Planned | Connect to additional agent runtimes |
-
-Chrona’s long-term goal is not to become the UI for a single backend.
-
-It is designed to become the unified task, plan, schedule, and execution control
-layer above multiple backends.
-
-You can think of Chrona as:
-
-```text
-              ┌──────────────┐
-              │    Chrona    │
-              │ Control Layer │
-              └──────┬───────┘
-                     │
-     ┌───────────────┼────────────────┐
-     │               │                │
-Hermes        Claude Code          Codex
-     │               │                │
-  opencode        Hermes            ...
-```
-
-Different backends can execute different types of work.
-
-Chrona manages:
-
-- tasks
-- plans
-- schedules
-- execution state
-- human input
-- continuation
-- result tracking
-
----
-
-## AI Backend Configuration
-
-### OpenAI-compatible
-
-Chrona can connect to OpenAI-compatible APIs.
-
-This includes:
-
-- OpenAI API
-- Local or self-hosted OpenAI-compatible endpoints
-- Other model services compatible with the OpenAI API format
-
-Typical configuration:
-
-```text
-Base URL
-API Key
-Model
-```
-
-## Why Chrona?
-
-AI tools are getting stronger, but workflows are still fragmented.
-
-You may currently use:
-
-- A todo app to record tasks
-- A calendar to manage time
-- An AI chat to discuss solutions
-- A coding agent to execute code tasks
-- A documentation system to record results
-
-Chrona is built to connect these parts.
-
-It is not another isolated AI tool.
-
-It is a control system for AI-native workflows.
-
-| Tool Type    | Main Capability                                                          | Limitation                                           |
-| ------------ | ------------------------------------------------------------------------ | ---------------------------------------------------- |
-| Todo App     | Records tasks                                                            | Does not understand task structure or generate plans |
-| Calendar     | Manages time                                                             | Does not know how tasks should be completed          |
-| AI Chat      | Generates suggestions                                                    | Hard to manage long-running task state               |
-| Coding Agent | Executes code tasks                                                      | Lacks personal task, plan, and schedule context      |
-| Chrona       | Unified control layer for tasks, plans, schedules, and backend execution | Execution Layer is being built progressively         |
-
----
-
-## Roadmap
-
-### Plan Layer
-
-- [x] Create tasks
-- [x] Generate plans
-- [x] Modify plans with AI
-- [x] OpenAI-compatible backend
-- [x] Provider bridge backend
-
-### Execution Layer
-
-- [ ] Automatically start scheduled tasks
-- [ ] Analyze executable paths in a plan
-- [ ] Automatically execute steps that do not require human intervention
-- [ ] Pause and request user input when information is missing
-- [ ] Continue execution after user input is provided
-- [ ] Visualize execution progress
-- [ ] Write execution results back to tasks and plans
-
-### Backend Ecosystem
-
-- [x] OpenAI-compatible
-- [x] Hermes
-- [ ] Claude Code
-- [ ] Codex
-- [ ] opencode
-- [ ] More agent runtimes
-
----
-
-## Development
-
-Run Chrona from source:
+### Run from source
 
 ```bash
 bun install
 bun run dev
 ```
 
-Build binaries:
+Then open the web app:
+
+```text
+http://localhost:3101
+```
+
+`bun run dev` starts the Bun/Hono API server and the Vite web app for local development. For server-only operation, use:
+
+```bash
+bun run server:start
+```
+
+### Binary / packaged builds
+
+The repository also contains scripts for building standalone platform binaries:
 
 ```bash
 bun run build:binaries
 ```
 
-Project structure:
+Release assets are expected to use these target names:
+
+| Platform | Binary |
+| --- | --- |
+| macOS Apple Silicon | `chrona-darwin-arm64` |
+| macOS Intel | `chrona-darwin-x64` |
+| Linux x64 | `chrona-linux-x64` |
+| Linux ARM64 | `chrona-linux-arm64` |
+| Windows x64 | `chrona-windows-x64.exe` |
+
+Example for macOS/Linux:
+
+```bash
+chmod +x chrona-linux-x64
+./chrona-linux-x64 start
+```
+
+Use the binary matching your platform.
+
+## Core Features
+
+### Task management
+
+Chrona supports task creation, update, completion, reopening, deletion, status, priority, tags, due dates, estimates, dependencies, parent/child tasks, schedule metadata, and result acceptance.
+
+### AI plan generation and editing
+
+A rough task can become a structured plan blueprint. Chrona materializes accepted plans into persisted task plan layers and graph nodes. Plans can be regenerated or patched instead of remaining one-off assistant text.
+
+### Graph-based execution
+
+Plan execution is modeled as a graph, not a plain checklist. Supported node types include:
+
+- `task`
+- `checkpoint`
+- `condition`
+- `wait`
+
+Execution nodes can be manual, assisted, or automatic, and can be assigned to user, AI, or system executors.
+
+### AI-visible node runtime
+
+AI workers receive safe refs instead of internal database IDs. Node workers report progress with Chrona tools such as:
+
+- `chrona.task.complete`
+- `chrona.condition.select`
+- `chrona.node.block`
+- `chrona.node.fail`
+- `chrona.wait.complete`
+
+This lets Chrona own the real task, plan, graph, run, and node IDs while external agents only see scoped runtime refs.
+
+### Work page
+
+The Work page provides the live task workbench: latest result, plan graph, execution record, task information, right-side rail/inspector, conversation history, tool/activity traces, and a composer dock for continuing work.
+
+### Task workspace
+
+The task workspace supports task editing, AI plan generation, plan acceptance, execution overview, node details, and human review states.
+
+### Schedule and inbox
+
+Chrona includes a schedule page with timeline/task views, AI insights, conflict and automation suggestions, task creation, and schedule proposal handling. The inbox aggregates pending approvals, schedule proposals, waiting runs, failed runs, and cancelled runs.
+
+### Memory console
+
+The memory console exposes workspace/task memory entries so long-running work can keep useful context beyond a single chat session.
+
+### Assistant surfaces
+
+Chrona includes a global AI sidebar and page-aware assistant surfaces for task, schedule, and workbench flows.
+
+### AI client management
+
+AI clients are managed in the database and configured from `Settings → AI Clients`. Feature bindings decide which client powers capabilities such as suggestions, plan generation, chat, dispatch, node execution, condition evaluation, and checkpoint review.
+
+## Architecture Overview
+
+Chrona is a Bun + React monorepo.
 
 ```text
 apps/
-  server/     API server
-  web/        Web UI
+  web/        Vite + React 19 + React Router 7 SPA
+  server/     Hono API server on Bun
 
 packages/
-  cli/        CLI tool
-  common/     Shared utilities and AI feature surface
-  contracts/  Shared DTOs, Zod schemas, API contracts
-  db/         Database schema and migrations
-  domain/     Pure business rules, state derivations
-  providers/  AI provider adapters
-  runtime/    Agent runtime integration
+  cli/        Chrona CLI and binary entrypoints
+  contracts/  API schemas, AI feature specs, plan runtime types, SSE events, MCP tool schemas
+  db/         Prisma 7 + SQLite database layer
+  domain/     Pure business rules and projections
+  engine/     Task, plan, execution, scheduling, page projection, and AI-client services
+  graph-runtime/ Graph construction, resolution, transition commands, and execution state
+  i18n/       Localized messages
+  providers/  Provider foundation, Hermes provider, debug provider
+  runtime-core/ Runtime abstractions
+  shared/     Shared utilities
 
-docs/
-  architecture.md
-  quick-start.md
+external-plugins/
+  hermes/     Hermes external plugin integration
 ```
 
----
+Runtime shape:
+
+```text
+Web UI
+  ↓ /api/*
+Hono server
+  ↓
+Chrona engine
+  ├─ task / plan / schedule / projection modules
+  ├─ graph-runtime execution state
+  ├─ Prisma SQLite persistence
+  └─ AI clients
+       ├─ LLM clients for OpenAI-compatible model APIs
+       └─ Hermes provider client for agent-style runs
+```
+
+Important API groups include:
+
+- `/api/health`
+- `/api/tasks` and `/api/tasks/:taskId`
+- `/api/tasks/:taskId/plan`, `/plan/accept`, `/plan/generations`, `/plan/generations/active/events`, `/plan/generations/stop`, and plan patch operations
+- `/api/tasks/:taskId/execution/current`
+- `/api/tasks/:taskId/execution/actions`
+- `/api/tasks/:taskId/execution/checkpoint/:checkpointId/actions`
+- `/api/tasks/:taskId/schedule`
+- `/api/schedule`, `/api/inbox`, `/api/memory`, `/api/work/:taskId`, `/api/work/:taskId/events`, `/api/work/:taskId/commands`
+- `/api/workspaces`, `/api/workspaces/default`, `/api/workspaces/:workspaceId/overview`
+- `/api/runtime/providers`
+- `/api/ai/clients`, `/api/ai/clients/test`, `/api/ai/clients/:clientId`, `/api/ai/clients/:clientId/bindings`
+- `/api/assistant-surface` and `/api/assistant-surface/actions`
+- MCP endpoints for Chrona tool execution
+
+## Configuration
+
+### Environment variables
+
+Copy `.env.example` if you want local overrides.
+
+| Variable | Purpose | Default / note |
+| --- | --- | --- |
+| `DATABASE_URL` | SQLite database URL | `file:./prisma/dev.db` |
+| `HOST` | API server bind host | defaults to local-only `127.0.0.1` |
+| `PORT` | API server port | `3101` |
+| `CHRONA_WEB_DIST` | Built web app directory for server/static mode | `apps/web/dist` |
+| `ALLOWED_ORIGINS` | Comma-separated CORS allowlist | omit for permissive local development |
+| `API_KEY` | Optional bearer token for all `/api/*` routes | if set, use `Authorization: Bearer <key>` |
+| `CHRONA_UNSAFE_PUBLIC_BIND` | Explicit override required for unauthenticated public bind | set only when you understand the exposure |
+| `VITE_API_BASE_URL` | Frontend API base URL override | useful when web and API are split |
+
+### Database
+
+Common database commands:
+
+```bash
+bun run db:generate
+bun run db:seed
+bun run db:push
+bun run db:migrate
+```
+
+`bun run setup` runs Prisma client generation and seed data when schema or dependency changes require it. On NixOS, Prisma may require custom engine configuration or `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1` because upstream checksum files can be unavailable for the `linux-nixos` engine target.
+
+### AI clients
+
+Configure AI clients in the web app at:
+
+```text
+Settings → AI Clients
+```
+
+Supported client types in the current codebase:
+
+| Type | Use |
+| --- | --- |
+| `llm` | OpenAI-compatible model APIs; configure base URL, API key, model, and optional temperature |
+| `hermes` | Hermes Agent provider gateway; configure base URL, optional API key, and timeout |
+| `debug` | Local debug provider for development/test flows |
+
+The Hermes provider client defaults to `http://127.0.0.1:8642` when no base URL is provided and talks to provider endpoints such as `/v1/capabilities`, `/v1/runs`, and `/v1/runs/{run_id}/events`.
+
+## Development Commands
+
+```bash
+bun run dev              # development server stack
+bun run dev:web          # Vite web dev server only
+bun run server:start     # Bun/Hono server only
+bun run typecheck        # TypeScript check
+bun run lint             # ESLint
+bun run test             # Vitest
+bun run test:bun         # Bun tests
+bun run test:api         # API tests
+bun run test:e2e         # Playwright E2E tests
+bun run check:ui-foundation
+bun run check:boundaries
+bun run analyze
+```
+
+## Documentation
+
+Start here:
+
+| Topic | Document |
+| --- | --- |
+| Documentation index | [docs/README.md](./docs/README.md) |
+| Quick start | [docs/en/quick-start.md](./docs/en/quick-start.md) / [docs/zh/quick-start.md](./docs/zh/quick-start.md) |
+| Architecture | [docs/architecture.md](./docs/architecture.md) |
+| API reference | [docs/api-reference.md](./docs/api-reference.md) |
+| Data model | [docs/data-model.md](./docs/data-model.md) |
+| Backend execution flow | [docs/backend-execution-flow.md](./docs/backend-execution-flow.md) |
+| Provider boundary | [docs/provider-boundary.md](./docs/provider-boundary.md) |
+| Package boundaries | [docs/package-boundaries.md](./docs/package-boundaries.md) |
+| Roadmap | [docs/en/roadmap.md](./docs/en/roadmap.md) / [docs/zh/roadmap.md](./docs/zh/roadmap.md) |
+
+More entrypoints:
+
+- [English docs](./docs/en/README.md)
+- [中文文档](./docs/zh/README.md)
+- [Engine package README](./packages/engine/README.md)
+- [Graph runtime README](./packages/graph-runtime/README.md)
+- [External plugins README](./external-plugins/README.md)
+- [Hermes plugin README](./external-plugins/hermes/README.md)
 
 ## License
 

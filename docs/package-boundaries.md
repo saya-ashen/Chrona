@@ -1,596 +1,231 @@
 # Package Boundaries
 
-This document explains what each package under `packages/` is for, what it is not for, and how to decide where new code should live.
+This document explains where code belongs in Chrona's monorepo.
 
-Use this when `apps/web` and `apps/server` feel clear, but `packages/*` feels abstract or overlapping.
+## Quick map
 
-## Quick Mental Model
+| Path | Responsibility |
+| --- | --- |
+| `apps/web` | Browser UI, routing, page composition, frontend hooks/components |
+| `apps/server` | Hono HTTP entrypoints, validation, route wiring, SSE streaming, response shape |
+| `packages/cli` | Thin command-line API client |
+| `packages/contracts` | Shared API schemas, AI feature specs, plan/runtime event types, MCP tool schemas |
+| `packages/domain` | Pure domain rules with no IO, HTTP, Prisma, provider, or React dependency |
+| `packages/db` | Prisma client/bootstrap/repositories and SQLite access |
+| `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
+| `packages/graph-runtime` | Graph construction, resolution, transitions, and execution-command primitives |
+| `packages/providers/*` | External AI/runtime protocol adapters |
+| `packages/runtime-core` | Runtime support types/utilities shared by engine/providers |
+| `packages/i18n` | Shared localization message infrastructure |
+| `packages/shared` | Small cross-cutting utilities that are not domain/application logic |
+| `external-plugins/*` | Integration plugins outside the core app package graph |
 
-- `apps/web`: browser UI and page composition
-- `apps/server`: HTTP entrypoints and API wiring
-- `packages/contracts`: shared schema and payload contracts
-- `packages/domain`: pure business rules
-- `packages/db`: Prisma, SQLite bootstrap, repositories
-- `packages/engine`: application orchestration and use cases
-- `packages/runtime-core`, `packages/i18n`, `packages/cli`: reusable system support packages
-- `packages/providers/*`: external AI/runtime provider integrations
-
-> **Note:** `packages/ai-features` was absorbed into `packages/contracts` (AI feature types, specs) and `packages/engine/modules/ai/` (feature implementation). It no longer exists as a standalone package.
-
-If `apps/*` is where the program starts, `packages/*` is where the reusable system layers live.
-
-## Dependency Direction
+## Dependency direction
 
 Prefer this direction:
 
 ```text
-apps/web, apps/server
-  -> engine
-  -> providers/*
-  -> contracts, domain, db, runtime-core
+apps/web ─┐
+apps/server ─┬─> packages/engine ─┬─> packages/domain
+packages/cli ┘                    ├─> packages/db
+                                   ├─> packages/contracts
+                                   ├─> packages/graph-runtime
+                                   └─> packages/providers/*
 ```
 
-And at a lower level:
+Rules:
 
-```text
-engine
-  -> contracts
-  -> domain
-  -> db
-  -> provider integrations
+- Apps may depend on packages.
+- Packages should not depend on apps.
+- Contracts may be imported broadly, but should stay schema/type focused.
+- Domain should stay pure and IO-free.
+- Engine coordinates use cases and may call db/providers/graph runtime.
+- Providers adapt external protocols; they do not decide Chrona workflow semantics.
+- Web components should not call Prisma, engine internals, or provider internals directly.
 
-domain
-  -> depends on nothing application-specific
-
-contracts
-  -> depends only on schema/type utilities like zod
-```
-
-The lower the package, the less it should know about transport, frameworks, or specific providers.
-
-## Final Target Structure
-
-This is the target structure future refactors should move toward.
-
-```text
-apps/
-  web/                  # browser UI entrypoint only
-  server/               # HTTP API entrypoint and app wiring only
-
-packages/
-  cli/                  # Chrona CLI as an independent client entrypoint
-  contracts/            # canonical shared contracts and schemas
-  domain/               # pure business rules
-  db/                   # Prisma/bootstrap/repositories
-  engine/               # application orchestration and use cases
-  runtime-core/         # backend-agnostic runtime adapter contracts
-  providers/
-    foundation/         # provider-facing middle layer Chrona calls
-    hermes/
-      integration/      # Hermes protocol/transport/runtime integration
-      bridge/           # Hermes HTTP/SSE bridge server
-    hermes/             # future provider, mirroring the same shape when real
-  i18n/                 # small shared locale utilities
-```
-
-> **Note:** `packages/ai-features` was absorbed into `contracts` (AI types/specs) and `engine` (feature implementation). The old `packages/common/*` nesting has been flattened — `cli`, `runtime-core`, `i18n` now live directly under `packages/`. `providers/core` is now `providers/foundation`.
-
-This target means:
-
-- `apps/server` remains an app, not the home of all backend logic.
-- `packages/*` is not reserved only for things shared by web and server.
-- a package may stay in `packages` even if only `apps/server` currently uses it, as long as it represents a stable system layer.
-- `cli` should remain a separate package-level entrypoint, but should be modeled as `packages/cli`, not as a generic helper under `packages/common/cli`.
-
-## Keep Vs Move Vs Rename
-
-### Keep In `packages`
-
-These are real system layers and should not be collapsed back into `apps/server`:
-
-- `packages/contracts`
-- `packages/domain`
-- `packages/db`
-- `packages/engine`
-- `packages/runtime-core`
-- `packages/providers/hermes/*`
-- `packages/providers/hermes/*` when it becomes real
-
-Reason:
-- they are not just "shared helpers"
-- they represent stable layer boundaries
-- moving them into `apps/server` would mix entrypoint concerns with orchestration, persistence, and provider integration
-
-### Keep As Package, But Tighten Boundary
-
-These should stay as packages, but need cleanup to match their intended role:
-
-- `packages/providers/foundation`
-  - should be the provider-facing middle layer Chrona calls
-  - should not leak provider wire protocol details upward
-
-### Rename / Re-home For Clarity
-
-These renames have been completed:
-
-- ~~`packages/common/cli`~~ -> `packages/cli` ✓
-- ~~`packages/common/runtime-core`~~ -> `packages/runtime-core` ✓
-- ~~`packages/common/ai-features`~~ -> absorbed into `contracts` + `engine` ✓
-- ~~`packages/common/i18n`~~ -> `packages/i18n` ✓
-
-### Move Out Of Current Package Home
-
-These are the clearest current structural mismatches:
-
-- `packages/contracts/src/hooks/`
-  - should not live under `contracts`
-  - move to the app layer or a clearly UI-facing package if still needed
-- deprecated compatibility re-exports under runtime that only mirror `@chrona/contracts`
-  - should be removed after imports are updated
-
-## Final Placement Rules
-
-Use these rules for the large refactor unless there is a strong reason not to.
-
-### `apps/web`
+## `apps/web`
 
 Put here:
-- routes/pages/components
-- browser state and UI composition
-- app-specific frontend helpers
+
+- route components and page shells
+- Schedule, Inbox, task workspace, Work page, Settings UI
+- frontend hooks for API/page projections
+- client-side formatting and presentation helpers
+- i18n usage and UI composition
 
 Do not put here:
-- server-only orchestration
-- provider protocol logic
-- Prisma or repository code
 
-### `apps/server`
+- task execution state machines
+- schedule automation policy
+- provider protocol code
+- server-only secrets
+- database calls
+
+## `apps/server`
 
 Put here:
-- Hono route registration
-- request parsing/validation glue
-- auth/context/bootstrap
-- API response shaping
-- server startup and wiring
+
+- Hono route definitions
+- param/body validation glue
+- API key/bind-safety checks
+- response helpers
+- SSE route wiring
+- mapping HTTP requests to engine calls
 
 Do not put here:
-- domain rules
-- repositories
-- plan execution orchestration
-- provider protocol parsing
 
-### `packages/cli`
+- long business workflows
+- graph progression algorithms
+- provider protocol semantics beyond request boundary wiring
+- database queries that belong in engine/db modules
 
-Put here:
-- CLI command tree
-- terminal UX
-- CLI entrypoints and binaries
+If a route grows complex, move use-case logic into `packages/engine`.
 
-This is an independent client entrypoint, similar in role to `apps/web`, not a random shared helper bucket.
-
-### `packages/contracts`
+## `packages/engine`
 
 Put here:
-- canonical DTOs
-- shared Zod schemas
-- provider-facing business payloads
+
+- task CRUD/lifecycle use cases
+- plan generation, patching, acceptance, and materialization orchestration
+- plan execution runner/progression
+- checkpoint, wait, block, fail, retry, cancel handling
+- schedule proposal and WorkBlock orchestration
+- page projection builders
+- AI client and feature binding loading
+- assistant surface use cases
 
 Do not put here:
-- hooks
-- React-facing behavior
-- runtime orchestration helpers
 
-### `packages/domain`
+- Hono request/response code
+- React components/hooks
+- raw provider wire parsing
+- canonical cross-layer schema definitions
 
-Put here:
-- pure business derivation and validation
-
-### `packages/db`
+## `packages/contracts`
 
 Put here:
-- Prisma bootstrap
-- repositories
-- persistence implementation details
 
-### `packages/engine`
-
-Put here:
-- command/query handlers
-- plan execution orchestration
-- use-case coordination across lower layers
-
-This is the main backend application layer. `apps/server` should call into it instead of absorbing its logic.
-
-### `packages/runtime-core`
-
-Put here:
-- backend-agnostic runtime adapter contracts and config specs
-
-### `packages/ai-features`
-
-Put here:
-- feature-level AI APIs such as `generatePlan`, `suggest`, `dispatchTask`
-- normalization from provider-facing payloads to Chrona feature results
+- Zod schemas
+- request/response DTOs
+- PlanBlueprint and plan runtime types
+- SSE event payload types
+- AI feature specs
+- MCP tool schemas and public payload contracts
 
 Do not put here:
-- provider-specific wire parsing
-- bridge transport knowledge
 
-### `packages/providers/foundation`
+- DB queries
+- HTTP handlers
+- provider calls
+- React components
+- business orchestration
+
+## `packages/domain`
 
 Put here:
-- the middle layer Chrona calls for provider access
-- provider-client interfaces
-- normalized provider result types
-- provider session abstractions and virtualization
+
+- pure business derivation
+- validation that can run with plain inputs and outputs
+- state/status helpers with no IO
 
 Do not put here:
-- app orchestration
-- business schema ownership
-- logic that requires upper layers to know provider wire format
-- task or plan lifecycle semantics
 
-### `packages/providers/<provider>/...`
-
-Put here:
-- anything that exists only because a provider has a specific protocol or transport
-- provider-native session, response, approval, and history adaptation
-- SSE/OpenResponses/tool-call/session quirks
-- bridge/server/client adapters for that provider
-
-## Non-negotiable Rules For The Big Refactor
-
-1. Do not move `domain`, `db`, `runtime`, `contracts`, or provider integration code back into `apps/server` just because `apps/server` currently consumes them.
-2. Do move thin HTTP glue, route-local helpers, and app-specific startup code into `apps/server`.
-3. Do keep CLI as a separate package-level entrypoint.
-4. Do treat `packages/providers/foundation` as the only provider-facing layer upper Chrona code should call.
-5. Do keep provider-specific protocol knowledge below `packages/providers/<provider>/...`.
-6. Do keep canonical business contracts in `packages/contracts` only.
-7. If a package exists only as a compatibility facade, remove it after imports are migrated.
-
-## Target Provider Integration Architecture
-
-Chrona's intended direction is:
-
-- Chrona should not know the concrete calling protocol of Hermes, Hermes, or any future provider.
-- Chrona should talk to a provider-facing middle layer.
-- That middle layer should hide provider-specific details such as:
-  - OpenResponses request formatting
-  - SSE event parsing
-  - function/tool call extraction
-  - provider-specific response quirks
-- After that middle layer returns a normalized result, Chrona can validate it, store it, and use it.
-
-In practical terms, the target stack is:
-
-```text
-engine / apps
-  -> providers/foundation
-  -> providers/<provider>/integration + bridge
-```
-
-With responsibility split like this:
-
-- `packages/engine`
-   - consumes normalized feature results
-  - does business orchestration, storage, projections, and execution flow
-  - must not parse provider protocol details
-- `packages/contracts`
-  - defines canonical AI payload contracts (PlanBlueprint, feature specs, etc.)
-  - consumed by engine and providers alike
-- `packages/providers/foundation`
-  - is the middle layer Chrona talks to
-  - should expose provider-client interfaces and normalized provider result shapes
-  - should hide provider-specific request/stream/protocol mechanics from upper layers
-- `packages/providers/<provider>/...`
-  - owns all provider-specific protocol knowledge
-  - may know about OpenResponses, function calls, SSE, session mechanics, provider config quirks, and bridge transport details
-
-### What This Means Concretely
-
-Good:
-- runtime asks for `generate_plan`
-- provider layer returns canonical payload like `AIPlanOutput`
-- runtime stores and uses the normalized result
-
-Bad:
-- runtime or app routes inspect provider SSE events directly
-- runtime or feature layers parse provider-specific function call wire format
-- provider packages redefine canonical business schemas instead of consuming `packages/contracts`
-
-### Current Status Vs Target
-
-The current codebase is partway to this design, but not fully there yet.
-
-Already aligned with the target:
-- canonical AI plan contract lives in `packages/contracts/src/ai.ts`
-- provider-specific bridge logic lives under `packages/providers/hermes/*`
-- engine consumes normalized feature results instead of raw provider responses
-
-Still drifting away from the target:
-- `packages/providers/foundation` is not fully provider-neutral yet
-- some package internals still feel too close to provider mechanics
-- engine could use a more explicit public barrel that reflects its real role
-
-### Rule For Future Changes
-
-When changing AI/provider code, prefer this question order:
-
-1. Is this a canonical Chrona contract?
-   Put it in `packages/contracts`.
-2. Is this provider-neutral layer Chrona should call?
-   Put it in `packages/providers/foundation`.
-3. Does this exist only because Hermes/Hermes has a specific protocol?
-   Put it in `packages/providers/<provider>/...`.
-
-If upper layers need to understand raw provider protocol details to work, the boundary is probably wrong.
-
-## Package Map
-
-### `packages/contracts`
-
-Responsible for:
-- canonical request/response contracts
-- shared Zod schemas
-- provider-facing AI payload contracts such as `AIPlanOutput`
-- DTOs that must be consistent across server, runtime, and integrations
-
-Not responsible for:
-- React hooks
-- database access
-- orchestration logic
-- provider transport behavior
-
-Good fit examples:
-- `packages/contracts/src/ai.ts`
-- enums like `AI_TASK_EXECUTORS`
-- validation schemas shared across layers
-
-Current drift to watch:
-- `src/hooks/` inside `contracts` is confusing because hooks feel app-facing, not contract-facing
-
-Rule of thumb:
-- if a type is the canonical shape exchanged between layers, put it here
-- if a type only exists to help one implementation file work internally, do not put it here
-
-### `packages/domain`
-
-Responsible for:
-- pure business rules
-- derivation logic
-- validation that does not require IO
-
-Not responsible for:
 - Prisma
 - fetch
 - React
 - provider APIs
 - environment variables
 
-Good fit examples:
-- task state derivation
-- schedule rule evaluation
-- invariant checks on business entities
+## `packages/db`
 
-Healthy boundary status:
-- this is one of the cleanest packages in the repo today
+Put here:
 
-Rule of thumb:
-- if it can run with plain inputs and return plain outputs, `domain` is a strong candidate
-
-### `packages/db`
-
-Responsible for:
-- Prisma client bootstrap
+- Prisma bootstrap
 - SQLite/Bun database setup
 - repositories and persistence helpers
 - generated Prisma artifacts
 
-Not responsible for:
+Do not put here:
+
 - HTTP request handling
 - page composition
+- provider transport behavior
 - high-level workflow orchestration
 
-Good fit examples:
-- `db.ts`
-- `execution-session-repository.ts`
-- `work-block-repository.ts`
+## `packages/graph-runtime`
 
-Healthy boundary status:
-- mostly healthy, though it is naturally infrastructure-heavy
+Put here:
 
-Rule of thumb:
-- if the code knows SQL/Prisma/table persistence details, it belongs here
+- graph validation/building
+- effective graph resolution
+- node transition primitives
+- graph command execution primitives
 
-### `packages/engine`
+Do not put here:
 
-Responsible for:
-- application orchestration
-- command handlers
-- query handlers
-- plan execution flow
-- projections and runtime synchronization
-- tying together domain, db, AI, and provider capabilities into use cases
+- product UI assumptions
+- provider transport calls
+- persistence-specific logic
+- task/schedule policy that belongs in engine
 
-Not responsible for:
-- serving HTTP directly
-- owning canonical cross-layer contracts
-- low-level provider protocol details
+## `packages/providers/*`
 
-Good fit examples:
-- `modules/commands/*`
-- `modules/queries/*`
-- `modules/plan-execution/*`
+Put here:
 
-Current drift to watch:
-- `src/index.ts` does not describe the real package surface well today
-- deprecated compatibility exports from runtime back to contracts increase confusion
+- provider-neutral adapter contracts in `foundation`
+- provider-specific transport code in each provider package
+- session/run/response adaptation
+- SSE or streaming event normalization
+- tool-call/approval parsing
+- provider config validation
 
-Rule of thumb:
-- if the code answers “what should the app do next?”, it usually belongs in `runtime`
+Do not put here:
 
-### `packages/runtime-core`
+- Chrona task lifecycle decisions
+- retry/block/fail policy
+- projection derivation
+- HTTP route handlers
 
-Responsible for:
-- backend-agnostic runtime adapter contracts
-- config-spec field definitions
-- shared runtime interface types
+See `docs/provider-boundary.md` for the detailed provider rules.
 
-Not responsible for:
-- Hermes protocol
-- transport clients
-- orchestration behavior
+## `packages/runtime-core`
 
-Healthy boundary status:
-- one of the clearest packages in the repo
+Put here:
 
-Rule of thumb:
-- if a runtime adapter interface should work for Hermes, Hermes, or any future backend, it belongs here
+- backend-agnostic runtime support types and utilities
+- config specs shared by engine/providers
 
-### `packages/i18n`
+Keep it small. If code answers “what should Chrona do next?”, it belongs in engine.
 
-Responsible for:
-- tiny shared locale helpers
+## `packages/cli`
 
-Not responsible for:
-- app state
-- runtime orchestration
+Put here:
 
-Rule of thumb:
-- keep this package small; do not let it become a dumping ground for unrelated shared utilities
+- command tree
+- terminal UX
+- API client calls
+- output formatting
 
-### `packages/providers/foundation`
+The CLI is a separate client entrypoint, like `apps/web`, not a shared helper bucket.
 
-Responsible for:
-- provider client abstractions used by the app
-- local provider-facing client helpers
+## `packages/i18n` and `packages/shared`
 
-Not responsible for:
-- becoming Hermes-specific in its public mental model
+`packages/i18n` owns localization messages and helpers. `packages/shared` is for small cross-cutting utilities, not a place to hide domain logic or application orchestration.
 
-Current drift to watch:
-- it currently contains both abstraction (`ProviderClient`) and a concrete `HermesClient`
-- it also depends on Hermes bridge/integration contracts, so it is not fully provider-neutral yet
+## `external-plugins/*`
 
-Rule of thumb:
-- this package should describe how Chrona talks to a provider client, not the entire Hermes protocol model
+External plugins bridge Chrona to other hosts such as Hermes Agent. They should use public Chrona APIs/MCP contracts and should not import private server or engine internals unless intentionally developed as in-repo integration code.
 
-### `packages/providers/hermes`
+## Placement checklist
 
-Responsible for:
-- Hermes-specific protocol types
-- transport clients
-- runtime adapter/orchestration integration
-- gateway request/response mapping helpers
+Ask these questions before adding a file:
 
-Not responsible for:
-- generic app orchestration
-- canonical domain/business rules
-
-Why it feels heavy:
-- it is intentionally a full provider package, not just a small adapter shim
-- it contains several sublayers: `protocol`, `transport`, `runtime`, `config`, `execution`, `features`, `parse`, and `shared`
-
-Current drift to watch:
-- `execution/gateway.ts` remains a complexity hotspot and still carries too many responsibilities
-
-Rule of thumb:
-- if the concept only exists because Hermes exists, it belongs here
-
-### `packages/providers/hermes`
-
-Responsible for:
-- future Hermes provider support
-
-Current status:
-- mostly scaffolding mirroring Hermes layout
-- do not treat it as an active implementation yet
-
-## Healthy Vs Drifting Boundaries
-
-Healthier boundaries today:
-- `domain`
-- `runtime-core`
-- much of `db`
-- the `apps/web` and `apps/server` split
-
-Boundaries that still drift and therefore feel confusing:
-- `providers/foundation` abstraction vs concrete Hermes implementation
-- `engine` public barrel vs actual package scope
-- `contracts` because of `src/hooks/`
-
-This means your confusion is not just inexperience. Some of the repo is genuinely mid-cleanup.
-
-## When Code Should Stay In `apps/*`
-
-Keep code in `apps/web` or `apps/server` when it is mainly entrypoint wiring:
-- route registration
-- HTTP parsing/response formatting
-- page composition
-- request auth/context plumbing
-- app startup/bootstrap
-
-Move code into `packages/*` when it becomes a reusable layer:
-- shared contract
-- pure domain rule
-- repository
-- use-case orchestration
-- provider integration
-
-Do not move code into `packages/*` just because it feels “important”.
-Move it only when its responsibility is stable and cross-cutting.
-
-## Placement Checklist
-
-Before adding a new file, ask in order:
-
-1. Is this UI composition or HTTP wiring?
-   If yes, keep it in `apps/web` or `apps/server`.
-2. Is this a canonical schema or DTO shared across layers?
-   If yes, put it in `packages/contracts`.
-3. Is this a pure business rule with no IO?
-   If yes, put it in `packages/domain`.
-4. Is this persistence or Prisma-specific?
-   If yes, put it in `packages/db`.
-5. Is this orchestrating a use case across multiple lower layers?
-   If yes, put it in `packages/engine`.
-6. Is this a provider integration that should feel provider-neutral to callers?
-   If yes, put it in `packages/providers/foundation`.
-7. Does this concept only exist because of one external provider?
-   If yes, put it in `packages/providers/<provider>/...`.
-
-## Smells That Usually Mean The Boundary Is Wrong
-
-- a package named `contracts` starts owning hooks or framework behavior
-- a package named `core` depends on one concrete provider everywhere
-- runtime packages re-export compatibility aliases for lower packages for too long
-- app routes contain business decisions or direct DB logic
-- provider packages start inventing canonical business schemas instead of consuming `contracts`
-
-## Practical Rules For Avoiding Future Confusion
-
-1. Keep one canonical owner for each concept.
-   Example: AI plan payload contract belongs to `packages/contracts/src/ai.ts`.
-
-2. Prefer a thin app layer and a clear runtime layer.
-   `apps/server` should wire requests to runtime, not absorb orchestration logic.
-
-3. Name packages by responsibility, then enforce that responsibility.
-   A good name with a leaky boundary is more confusing than a less elegant but honest package.
-
-4. Avoid compatibility barrels unless they are temporary and clearly marked.
-   If you add one, leave a removal note.
-
-5. When in doubt, optimize for dependency direction.
-   Lower layers should know less, not more.
-
-6. If a file needs React, Prisma, HTTP, and provider protocol knowledge all at once, it is probably in the wrong place.
-
-## Recommended Next Cleanup Targets
-
-If you want to reduce package confusion further, the highest-value cleanup targets are:
-
-1. remove or relocate `packages/contracts/src/hooks/`
-2. make `packages/providers/foundation` truly middle-layer oriented and less Hermes-shaped
-3. replace deprecated runtime compatibility exports with direct imports from `@chrona/contracts`
-4. make `packages/engine/src/index.ts` reflect the package's real role more honestly
+1. Is it UI or browser state? `apps/web`.
+2. Is it HTTP parsing/routing/SSE glue? `apps/server`.
+3. Is it a product use case or workflow decision? `packages/engine`.
+4. Is it canonical cross-layer shape? `packages/contracts`.
+5. Is it pure IO-free business derivation? `packages/domain`.
+6. Is it persistence access? `packages/db`.
+7. Is it graph mechanics independent of Chrona product policy? `packages/graph-runtime`.
+8. Is it external provider protocol behavior? `packages/providers/*`.
+9. Is it a terminal client feature? `packages/cli`.

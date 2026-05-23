@@ -141,6 +141,45 @@ describe("createTask", () => {
     ).rejects.toThrow(/Approval policy must be one of/);
   });
 
+  it("falls back to the registered runtime when workspace default is stale", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Legacy Runtime",
+        status: "Active",
+        defaultRuntime: "openclaw",
+      },
+    });
+
+    const result = await createTask({
+      workspaceId: workspace.id,
+      title: "Use fallback runtime",
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({
+      where: { id: result.taskId },
+    });
+
+    expect(storedTask.executionRuntime).toBe("hermes");
+  });
+
+  it("still rejects an explicitly unsupported runtime", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Unsupported Runtime",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+
+    await expect(
+      createTask({
+        workspaceId: workspace.id,
+        title: "Use unsupported runtime",
+        executionRuntime: "openclaw",
+      }),
+    ).rejects.toThrow("Unknown runtime: openclaw");
+  });
+
 });
 
 describe("updateTask", () => {

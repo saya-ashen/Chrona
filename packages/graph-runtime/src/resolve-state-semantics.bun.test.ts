@@ -65,4 +65,44 @@ describe("resolveEffectivePlanGraph state semantics", () => {
     expect(effective.skippedNodeIds).toEqual([]);
     expect(effective.completedNodeIds).toEqual([]);
   });
+
+  it("lets a current result supersede an older failed attempt", () => {
+    const graph = createPlanGraphFromCompiledPlan({ taskId: "task_1", compiledPlan: makePlan(), now });
+    const nodeLayerId = layerId(graph, "user");
+    const effective = resolveEffectivePlanGraph({
+      graph,
+      attempts: [{
+        id: "attempt_user_1",
+        taskId: "task_1",
+        graphId: graph.id,
+        nodeId: "user",
+        nodeLayerId,
+        executionContextSnapshotId: "ctx_user_1",
+        idempotencyKey: "idem_user_1",
+        attemptNumber: 1,
+        status: "failed",
+        error: { code: "NODE_FAILED", message: "Hermes request aborted" },
+        startedAt: now,
+        finishedAt: now,
+      }],
+      results: [
+        {
+          nodeId: "user",
+          nodeLayerId,
+          status: "rejected",
+          error: "Hermes request aborted",
+        },
+        {
+          nodeId: "user",
+          nodeLayerId,
+          status: "current",
+          outputSummary: "Recovered externally",
+        },
+      ],
+    });
+
+    expect(effective.nodes.find((node) => node.id === "user")?.status).toBe("completed");
+    expect(effective.completedNodeIds).toContain("user");
+    expect(effective.failedNodeIds).not.toContain("user");
+  });
 });

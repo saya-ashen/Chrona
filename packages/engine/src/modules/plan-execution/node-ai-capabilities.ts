@@ -49,7 +49,7 @@ function buildFailureDetails(input: {
   };
 }
 
-async function runTaskNodeFeature(
+export async function runTaskNodeFeature(
   input: NodeAiCapabilityInput & {
     featureSpec: PreparedAiFeatureSpec;
     providerInput: Record<string, unknown>;
@@ -93,18 +93,31 @@ async function runTaskNodeFeature(
       };
     }
 
-    const nodeResult: NodeExecutionResult = {
-      status: "started",
-      summary:
-        invocation.response.outputText?.trim() ||
-        `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} started`,
-      evidence,
-      output: {
-        runtimeRunRef: invocation.runtimeRunRef,
-        runtimeName: input.runtimeName,
-        provider: invocation.response.provider,
-      },
+    const output = {
+      runtimeRunRef: invocation.runtimeRunRef,
+      runtimeName: input.runtimeName,
+      provider: invocation.response.provider,
+      outputText: invocation.response.outputText,
+      structuredPayload: invocation.response.structuredPayload,
     };
+    const summary = invocation.response.outputText?.trim();
+    const nodeResult: NodeExecutionResult = invocation.response.status === "completed"
+      ? {
+          status: "done",
+          summary:
+            summary ||
+            `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} completed`,
+          evidence,
+          output,
+        }
+      : {
+          status: "started",
+          summary:
+            summary ||
+            `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} started`,
+          evidence,
+          output,
+        };
     await updateInvocationRunFromNodeResult(invocation, nodeResult);
     return nodeResult;
   } catch (error) {

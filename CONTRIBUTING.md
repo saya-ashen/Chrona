@@ -55,7 +55,8 @@ Chrona is a Vite + Hono monorepo:
 | `packages/cli/` | CLI package: npm entry point, launcher, and commands |
 | `packages/contracts/` | Shared DTOs, Zod schemas |
 | `packages/db/` | Prisma bootstrap and repositories |
-| `packages/domain/` | Pure business rules |
+| `packages/engine/` | Business use cases for tasks, plans, execution, scheduling, projections, and AI clients |
+| `packages/graph-runtime/` | Plan graph build, resolve, transition, and command execution primitives |
 | `packages/runtime-core/` | Shared runtime contracts and helpers |
 | `packages/providers/foundation/` | Provider-neutral client contracts |
 | `packages/providers/hermes/` | Hermes provider adapter |
@@ -97,8 +98,8 @@ Do not cross layers without reason. Prefer moving files and fixing imports over 
 - No business logic in React components or route handlers
 - No React, Prisma, or `fetch` imports into `packages/domain`
 - Shared types/schemas in `packages/contracts`
-- Command/query/projection handlers in `packages/runtime/src/modules/`
-- API routes validate input, call runtime handlers, return responses — no direct DB access
+- Command/query/projection handlers in `packages/engine/src/modules/`
+- API routes validate input, call engine handlers, return responses — no direct DB access
 
 ## Schema-First Contracts
 
@@ -135,35 +136,32 @@ bun run test:e2e          # Playwright E2E tests (CI-stable, no AI dependency)
 
 ### E2E test layout
 
-```
+```text
 e2e/
 ├── specs/                # CI-stable tests — what `bun run test:e2e` runs
-│   ├── schedule.spec.ts  # Schedule page flows (render, quick-add, validation, seed data)
-│   ├── task.spec.ts      # Task workspace flows (navigation, assistant, error states)
-│   └── control-plane.spec.ts  # Control-plane navigation
-├── demo/                 # Demo / recording scripts — NOT run in CI
-│   ├── demo.readme.spec.ts   # README GIF recording (mocked AI, video enabled)
-│   └── demo-record.spec.ts   # Manual recording (no webServer, requires `bun run dev`)
-└── helpers/              # Shared test helpers (future)
+│   ├── ai-client-settings-flow.spec.ts       # Settings / AI Clients flow
+│   ├── task-plan-generation-hermes.spec.ts   # Hermes-backed plan generation flow
+│   ├── task-workspace-accessibility.spec.ts  # Workspace accessibility checks
+│   ├── task-workspace-chat.spec.ts           # Workspace chat behavior
+│   └── task-workspace-layout.spec.ts         # Workspace layout behavior
+└── specs/task-workspace-test-helpers.ts      # Shared Playwright test helpers
 ```
 
 | Command | Scope | AI dependency | CI |
 |---------|-------|---------------|-----|
 | `bun run test:e2e` | `e2e/specs/` | Mocked only | Yes |
-| `bun run test:e2e:demo` | `e2e/demo/demo.readme.spec.ts` | Mocked | No |
-| `bun run test:e2e:record` | `e2e/demo/demo-record.spec.ts` | Real AI | No |
 
-Demo tests are separated because they include video recording, fixed viewports,
-`waitForTimeout` calls, and (in the record config) real AI calls —
-none of which belong in a CI pipeline that should be fast, deterministic,
-and self-contained.
+Demo/recording flows are separated from `bun run test:e2e` because they may
+include video recording, fixed viewports, long waits, or real AI calls — none of
+which belong in a CI pipeline that should be fast, deterministic, and
+self-contained.
 
 ## Adding an AI Runtime Adapter
 
-1. Create adapter in `packages/providers/<name>/`
-2. Implement the runtime adapter interface
-3. Register in the execution registry
-4. Add tests
+1. Create provider code in a concrete package under `packages/providers/`.
+2. Keep protocol-specific transport and event normalization inside that package.
+3. Put provider-neutral contracts in `packages/providers/foundation` and product workflow policy in `packages/engine`.
+4. Add tests.
 
 ## License
 

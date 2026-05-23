@@ -2,466 +2,275 @@
 
 Base URL: `http://localhost:3101/api`
 
-- **Content-Type:** `application/json`
-- **Auth:** Optional `Authorization: Bearer <token>` (when `API_KEY` env var is set)
-- **Default bind:** Chrona listens on `127.0.0.1` by default. Use `HOST=0.0.0.0` only for intentional LAN/public access and set `API_KEY`; unsafe public bind without `API_KEY` requires `CHRONA_UNSAFE_PUBLIC_BIND=1`.
-- **Response envelope:** List endpoints return `{ tasks: [], count: N }`, detail endpoints return the object directly, action endpoints return `{ success: true, ... }`.
-- **Dates:** ISO 8601
+- Content type: `application/json` unless the endpoint is an SSE stream.
+- Auth: optional `Authorization: Bearer <token>` when `API_KEY` is configured.
+- Default bind: `127.0.0.1`. Use `HOST=0.0.0.0` only intentionally and protect it with `API_KEY`; unsafe public bind without `API_KEY` requires `CHRONA_UNSAFE_PUBLIC_BIND=1`.
+- IDs shown here are examples. Agents should use AI-visible refs from MCP tool results, not backend IDs.
 
 ## Health
 
-### `GET /api/health`
+### GET /api/health
+
+Returns server health.
 
 ```sh
 curl http://localhost:3101/api/health
 ```
 
-Response: `{ "status": "ok" }`
-
 ## Tasks
 
-### `GET /api/tasks`
+### GET /api/tasks
 
-List tasks.
+Query parameters:
 
-| Query Param | Type | Required | Description |
-|-------------|------|----------|-------------|
-| `workspaceId` | string | Yes | |
-| `status` | string | No | Filter by status |
-| `limit` | number | No | |
+| Name | Required | Notes |
+| --- | --- | --- |
+| `workspaceId` | yes | Workspace scope |
+| `status` | no | Filter by task status |
+| `limit` | no | Limit result count |
 
-```sh
-curl "http://localhost:3101/api/tasks?workspaceId=ws_abc"
-```
+### POST /api/tasks
 
-Response: `{ tasks: Task[], count: number }`
+Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `executionRuntime`, `executionConfig`, and `parentTaskId`.
 
-### `POST /api/tasks`
+### GET /api/tasks/:taskId
 
-Create a task.
+Returns full task detail data.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `workspaceId` | string | Yes | |
-| `title` | string | Yes | |
-| `description` | string | No | |
-| `priority` | `"Low" \| "Medium" \| "High" \| "Urgent"` | No | Default `"Medium"` |
-| `executionRuntime` | string (`EXECUTION_RUNTIMES`) | No | e.g. `"hermes"` |
-| `executionConfig` | `Record<string, unknown>` | No | Runtime-specific configuration |
-| `parentTaskId` | string \| null | No | Parent for subtask nesting |
+### PATCH /api/tasks/:taskId
 
-```sh
-curl -X POST http://localhost:3101/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"workspaceId":"ws_abc","title":"Deploy service","priority":"High"}'
-```
+Partially updates a task.
 
-Response: `201 Created`
+### DELETE /api/tasks/:taskId?workspaceId=...
 
-### `GET /api/tasks/:taskId`
+Deletes a task and related task data.
 
-Get full task detail page data.
+## Task lifecycle and result
 
-```sh
-curl http://localhost:3101/api/tasks/task_xyz
-```
+### POST /api/tasks/:taskId/complete
 
-### `PATCH /api/tasks/:taskId`
+Marks a task complete.
 
-Partial update.
+### POST /api/tasks/:taskId/reopen
 
-```sh
-curl -X PATCH http://localhost:3101/api/tasks/task_xyz \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Updated title","priority":"Urgent"}'
-```
+Reopens a completed task.
 
-### `DELETE /api/tasks/:taskId`
+### POST /api/tasks/:taskId/result/accept
 
-Cascade-delete a task.
+Accepts the current task result.
 
-| Query Param | Type | Required | Description |
-|-------------|------|----------|-------------|
-| `workspaceId` | string | Yes | |
+## Task plan
 
-```sh
-curl -X DELETE "http://localhost:3101/api/tasks/task_xyz?workspaceId=ws_abc"
-```
+### GET /api/tasks/:taskId/plan
 
-## Task Execution
+Returns the current plan state for a task.
 
-### `POST /api/tasks/:taskId/execution/actions`
+### POST /api/tasks/:taskId/plan/generations
 
-Dispatch an execution action. Body validated against `executionActionBodySchema`.
+Starts plan generation. With `Accept: text/event-stream`, streams generation progress. Without SSE, returns the generated result as JSON.
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/execution/actions \
-  -H "Content-Type: application/json" \
-  -d '{"action":"start"}'
-```
+Request fields:
 
-## Task Lifecycle
+| Field | Required | Notes |
+| --- | --- | --- |
+| `forceRefresh` | no | Bypass cached or active generation state when allowed |
+| `userInstruction` | no | Additional instruction for plan generation |
 
-### `POST /api/tasks/:taskId/complete`
+SSE event types include `status`, `tool_call`, `partial`, `result`, `error`, `cancelled`, `done`, and heartbeat events.
 
-Mark a task as done.
+### GET /api/tasks/:taskId/plan/generations/active
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/complete
-```
+Returns metadata for the currently active generation session, if any.
 
-### `POST /api/tasks/:taskId/reopen`
+### GET /api/tasks/:taskId/plan/generations/active/events
 
-Reopen a completed task.
+Subscribes to an active plan generation session over SSE.
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/reopen
-```
+### POST /api/tasks/:taskId/plan/generations/stop
 
-## Task Result
+Stops an active plan generation session.
 
-### `POST /api/tasks/:taskId/result/accept`
+### POST /api/tasks/:taskId/plan/accept
 
-Accept a task result.
+Accepts a generated or edited plan.
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/result/accept
-```
+Request fields:
 
-## Task Plan
+| Field | Required | Notes |
+| --- | --- | --- |
+| `planId` | yes | Plan to accept |
+| `workspaceId` | no | Optional workspace guard |
 
-### `POST /api/tasks/:taskId/plan/generations`
+### POST /api/tasks/:taskId/plan
 
-Generate a plan via SSE streaming.
+Applies plan patch operations. The route accepts the plan patch schema used by the task workspace and Work page. Common operations include adding, deleting, updating, and reordering nodes or edges.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `forceRefresh` | boolean | No | Bypass cache |
-| `planningPrompt` | string | No | Custom prompt override |
+## Task execution
 
-For streaming, set `Accept: text/event-stream`. Without it, falls back to JSON.
+### GET /api/tasks/:taskId/execution/current
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/plan/generations \
-  -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{"forceRefresh":true}'
-```
+Returns the current execution session state and supported actions.
 
-#### SSE Events
+### POST /api/tasks/:taskId/execution/actions
 
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `status` | `{ phase: string, message: string }` | Progress update |
-| `tool_call` | `{ tool: string, callId?: string, input?: object }` | AI tool invocation |
-| `partial` | `{ text: string }` | Streaming text fragment |
-| `result` | `{ plan: PlanBlueprint }` | Completed plan graph |
-| `done` | `{ text: string }` | Stream finished successfully |
-| `error` | `{ code: string, message: string, rawText?: string }` | Error during generation |
+Dispatches an execution action and streams progress over SSE.
 
-### `POST /api/tasks/:taskId/plan/generations/stop`
+Common action values include:
 
-Stop an in-flight plan generation.
+- `start_manual`
+- `resume_with_input`
+- `resume_with_approval`
+- `retry_node`
+- `resume_after_unblock`
+- `complete_manual_node`
+- `fail_current_node`
+- `cancel_session`
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/plan/generations/stop
-```
+SSE event types include graph events, runtime events, state updates, result events, and heartbeats.
 
-### `POST /api/tasks/:taskId/plan`
+### POST /api/tasks/:taskId/execution/checkpoint/:checkpointId/actions
 
-Edit a plan with patch operations (passthrough schema — allows extra fields).
+Submits a checkpoint/input/approval action and streams the resulting execution progress over SSE.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `operation` | string | Top-level operation |
-| `operations` | string[] | Batch operations |
-| `nodes` | Record[] | Plan nodes |
-| `edges` | Record[] | Plan edges |
-| `nodePatches` | `{ id: string }[]` | Targeted node updates |
-| `deletedNodeIds` | string[] | Nodes to remove |
-| `reorder` | string[] | New ordering |
-| `summary` | string | Text summary |
+Common checkpoint actions include `submit_input`, `approve_result`, `reject_result`, `request_changes`, `accept_replan`, `reject_replan`, `request_replan`, `retry_node`, `resume_after_unblock`, `mark_node_completed`, `mark_node_skipped`, `fail_task`, and `cancel_session`.
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/plan \
-  -H "Content-Type: application/json" \
-  -d '{"operation":"add_node","nodes":[{"type":"task","title":"New step"}]}'
-```
+## Task schedule
 
-#### Plan Types
+### PUT /api/tasks/:taskId/schedule
 
-- **PlanBlueprint** — AI-generated plan with nodes (`task`, `checkpoint`, `condition`, `wait`) and edges.
-- **EditablePlan** — User-editable plan with version tracking.
-- **PlanPatch** — Operations: `add_node`, `delete_node`, `update_node`, `update_dependencies`.
+Applies a concrete schedule.
 
-## Task Schedule
+Fields include `scheduledStartAt`, `scheduledEndAt`, `dueAt`, and `scheduleSource`.
 
-### `PUT /api/tasks/:taskId/schedule`
+### DELETE /api/tasks/:taskId/schedule
 
-Apply a schedule to a task.
+Clears a task schedule.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `scheduledStartAt` | ISO 8601 | Yes | |
-| `scheduledEndAt` | ISO 8601 | Yes | |
-| `dueAt` | ISO 8601 | No | |
-| `scheduleSource` | `"human" \| "ai" \| "system"` | No | Origin of schedule |
+### POST /api/tasks/:taskId/schedule/proposals
 
-```sh
-curl -X PUT http://localhost:3101/api/tasks/task_xyz/schedule \
-  -H "Content-Type: application/json" \
-  -d '{"scheduledStartAt":"2026-05-10T09:00:00Z","scheduledEndAt":"2026-05-10T11:00:00Z"}'
-```
+Creates a schedule proposal for a task.
 
-### `DELETE /api/tasks/:taskId/schedule`
+### POST /api/tasks/schedule-proposals/decision
 
-Clear a task's schedule.
+Accepts or rejects a schedule proposal.
 
-```sh
-curl -X DELETE http://localhost:3101/api/tasks/task_xyz/schedule
-```
+Fields include `proposalId`, `decision`, and optional `resolutionNote`.
 
-### `POST /api/tasks/:taskId/schedule/proposals`
+## Page projections
 
-Create an AI-generated schedule proposal for a task.
+These endpoints serve pre-computed UI page data.
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/task_xyz/schedule/proposals
-```
+### GET /api/schedule?workspaceId=...
 
-### `POST /api/tasks/schedule-proposals/decision`
+Schedule page projection: timeline, work blocks, task summaries, conflicts, and schedule suggestions.
 
-Accept or reject a schedule proposal.
+### GET /api/inbox?workspaceId=...
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `proposalId` | string | Yes | |
-| `decision` | `"Accepted" \| "Rejected"` | Yes | |
-| `workspaceId` | string | No | |
-| `resolutionNote` | string | No | |
+Inbox projection: pending approvals, schedule proposals, waiting inputs, failed/cancelled runs, and attention items.
 
-```sh
-curl -X POST http://localhost:3101/api/tasks/schedule-proposals/decision \
-  -H "Content-Type: application/json" \
-  -d '{"proposalId":"prop_123","decision":"Accepted"}'
-```
+### GET /api/memory?workspaceId=...
 
-## Pages
+Memory console projection.
 
-Pre-computed page data endpoints. Each requires `workspaceId` query param.
+### GET /api/work/:taskId
 
-### `GET /api/schedule`
+Work page projection for a task: task shell, latest result, plan graph, execution records, metadata, and conversation context.
 
-Schedule page data.
+### POST /api/work/:taskId/commands
 
-```sh
-curl "http://localhost:3101/api/schedule?workspaceId=ws_abc"
-```
+Submits a Work page command asynchronously. Command types include plan generation, plan acceptance, execution actions, and checkpoint actions. Returns `202` with a `commandId`; subscribe to Work events for updates.
 
-### `GET /api/inbox`
+### GET /api/work/:taskId/events
 
-Inbox page data.
-
-```sh
-curl "http://localhost:3101/api/inbox?workspaceId=ws_abc"
-```
-
-### `GET /api/memory`
-
-Memory page data.
-
-```sh
-curl "http://localhost:3101/api/memory?workspaceId=ws_abc"
-```
-
-### `GET /api/work/:taskId`
-
-Work page data for a specific task.
-
-```sh
-curl "http://localhost:3101/api/work/task_xyz"
-```
+Subscribes to Work page projection events over SSE.
 
 ## Workspaces
 
-### `GET /api/workspaces/default`
+### GET /api/workspaces/default
 
-Get the default workspace.
+Returns the default workspace.
 
-```sh
-curl http://localhost:3101/api/workspaces/default
-```
+### GET /api/workspaces
 
-### `GET /api/workspaces`
+Lists workspaces.
 
-List all workspaces.
+### GET /api/workspaces/:workspaceId/overview
 
-```sh
-curl http://localhost:3101/api/workspaces
-```
+Returns workspace overview stats and recent activity.
 
-### `GET /api/workspaces/:workspaceId/overview`
+## Runtime providers
 
-Workspace overview (stats, counts, recent activity).
+### GET /api/runtime/providers
 
-```sh
-curl http://localhost:3101/api/workspaces/ws_abc/overview
-```
+Lists execution runtimes available to the current server. `debug` is only returned in development or when explicitly enabled.
 
-## AI Clients
+## AI clients
 
-### `GET /api/ai/clients`
+### GET /api/ai/clients
 
-List all AI clients.
+Lists configured AI clients and feature bindings.
 
-```sh
-curl http://localhost:3101/api/ai/clients
-```
+### POST /api/ai/clients
 
-Response:
+Creates an AI client.
 
-```json
-{
-  "clients": [
-    {
-      "id": "client_1",
-      "name": "Hermes",
-      "type": "hermes",
-      "config": {},
-      "isDefault": true,
-      "enabled": true,
-      "bindings": ["suggest", "generate_plan"],
-      "createdAt": "2026-01-01T00:00:00Z"
-    }
-  ]
-}
-```
+### PATCH /api/ai/clients/:clientId
 
-### `POST /api/ai/clients`
+Updates an AI client.
 
-Create an AI client.
+### DELETE /api/ai/clients/:clientId
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | Yes | |
-| `type` | `"hermes" \| "llm"` | Yes | |
-| `config` | Record | Yes | Provider-specific configuration |
-| `isDefault` | boolean | No | |
+Deletes an AI client.
 
-```sh
-curl -X POST http://localhost:3101/api/ai/clients \
-  -H "Content-Type: application/json" \
-  -d '{"name":"GPT-4","type":"llm","config":{"apiKey":"sk-..."}}'
-```
+### POST /api/ai/clients/test
 
-Response: `201 Created`
+Tests connectivity for a client config.
 
-### `PATCH /api/ai/clients/:clientId`
+### PUT /api/ai/clients/:clientId/bindings
 
-Update an AI client (partial).
+Replaces feature bindings for a client. Features include `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task`.
 
-| Field | Type | Required |
-|-------|------|----------|
-| `name` | string | No |
-| `config` | Record | No |
-| `isDefault` | boolean | No |
-| `enabled` | boolean | No |
+## Assistant Surface
 
-```sh
-curl -X PATCH http://localhost:3101/api/ai/clients/client_1 \
-  -H "Content-Type: application/json" \
-  -d '{"enabled":false}'
-```
+### GET /api/assistant-surface?pageType=...
 
-### `DELETE /api/ai/clients/:clientId`
+Returns assistant surface state for supported pages such as `schedule`, `task`, and `workbench`.
 
-Delete an AI client.
+### POST /api/assistant-surface/actions
 
-```sh
-curl -X DELETE http://localhost:3101/api/ai/clients/client_1
-```
+Requests an assistant action for the current surface.
 
-### `POST /api/ai/clients/test`
+## MCP integration
 
-Test connectivity to an AI provider.
+### POST /api/mcp
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `type` | `"hermes" \| "llm"` | Yes | |
-| `config` | Record | Yes | |
+Streamable HTTP MCP endpoint exposing Chrona tools to external agents.
 
-```sh
-curl -X POST http://localhost:3101/api/ai/clients/test \
-  -H "Content-Type: application/json" \
-  -d '{"type":"llm","config":{"apiKey":"sk-..."}}'
-```
+Public tool names:
 
-Response: `{ ok: boolean, available: boolean, reason?: string }`
+| Tool | Purpose |
+| --- | --- |
+| `chrona_execution_read` | Read execution session state and next actions |
+| `chrona_plan_read` | Read accepted plan state through AI-visible refs |
+| `chrona_plan_generate` | Generate a draft plan from a complete blueprint |
+| `chrona_node_read` | Read the current node through AI-visible refs |
+| `chrona_task_complete` | Complete the current task node |
+| `chrona_condition_select` | Select the current condition branch by branch ref |
+| `chrona_node_block` | Block the current node with a reason and recovery form |
+| `chrona_node_fail` | Fail the current node |
+| `chrona_wait_complete` | Complete the current wait node |
 
-### `PUT /api/ai/clients/:clientId/bindings`
+MCP write tools resolve the active Chrona execution context from the session and injected metadata. Agents should not send backend task, plan, node, layer, or graph IDs unless Chrona explicitly provided them as public input.
 
-Assign feature bindings to an AI client.
+## Error shape
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `features` | string[] | Yes | One or more of: `"suggest"`, `"generate_plan"`, `"conflicts"`, `"timeslots"`, `"chat"`, `"dispatch_task"` |
+Errors generally use HTTP status codes with a JSON body containing `error` and sometimes `code`, `reasonCode`, or recovery hints.
 
-```sh
-curl -X PUT http://localhost:3101/api/ai/clients/client_1/bindings \
-  -H "Content-Type: application/json" \
-  -d '{"features":["suggest","chat"]}'
-```
+Common statuses:
 
-## Error Codes
-
-| Status | Code | Description |
-|--------|------|-------------|
-| 400 | `INVALID_PARAMS` | Missing or malformed parameters |
-| 404 | `NOT_FOUND` | Resource not found |
-| 409 | `STATE_CONFLICT` | State conflict (task not in correct state for operation) |
-| 409 | `PLAN_GENERATION_IN_FLIGHT` | A plan generation is already running for this task |
-| 500 | `INTERNAL_ERROR` | Unexpected server error |
-
-Error response body:
-
-```json
-{
-  "error": "human-readable description",
-  "code": "ERROR_CODE"
-}
-```
-
-## Quick Reference
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/health` | Health check |
-| `GET` | `/api/tasks` | List tasks |
-| `POST` | `/api/tasks` | Create task |
-| `GET` | `/api/tasks/:taskId` | Get task detail |
-| `PATCH` | `/api/tasks/:taskId` | Update task |
-| `DELETE` | `/api/tasks/:taskId` | Delete task |
-| `POST` | `/api/tasks/:taskId/execution/actions` | Dispatch execution action |
-| `POST` | `/api/tasks/:taskId/complete` | Mark task done |
-| `POST` | `/api/tasks/:taskId/reopen` | Reopen task |
-| `POST` | `/api/tasks/:taskId/result/accept` | Accept task result |
-| `POST` | `/api/tasks/:taskId/plan/generations` | Generate plan (SSE) |
-| `POST` | `/api/tasks/:taskId/plan/generations/stop` | Stop plan generation |
-| `POST` | `/api/tasks/:taskId/plan` | Edit plan |
-| `PUT` | `/api/tasks/:taskId/schedule` | Set schedule |
-| `DELETE` | `/api/tasks/:taskId/schedule` | Clear schedule |
-| `POST` | `/api/tasks/:taskId/schedule/proposals` | Propose schedule |
-| `POST` | `/api/tasks/schedule-proposals/decision` | Resolve schedule proposal |
-| `GET` | `/api/schedule` | Schedule page |
-| `GET` | `/api/inbox` | Inbox page |
-| `GET` | `/api/memory` | Memory page |
-| `GET` | `/api/work/:taskId` | Work page |
-| `GET` | `/api/workspaces/default` | Default workspace |
-| `GET` | `/api/workspaces` | List workspaces |
-| `GET` | `/api/workspaces/:workspaceId/overview` | Workspace overview |
-| `GET` | `/api/ai/clients` | List AI clients |
-| `POST` | `/api/ai/clients` | Create AI client |
-| `PATCH` | `/api/ai/clients/:clientId` | Update AI client |
-| `DELETE` | `/api/ai/clients/:clientId` | Delete AI client |
-| `POST` | `/api/ai/clients/test` | Test AI connectivity |
-| `PUT` | `/api/ai/clients/:clientId/bindings` | Set AI client feature bindings |
+| Status | Meaning |
+| --- | --- |
+| 400 | Invalid parameters or malformed body |
+| 404 | Resource not found |
+| 409 | State conflict, duplicate active generation, or invalid transition |
+| 500 | Unexpected server error |

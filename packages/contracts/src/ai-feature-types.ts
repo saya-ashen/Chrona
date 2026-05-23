@@ -5,7 +5,7 @@
 import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
-export type AiClientType = "llm" | "hermes" | (string & {});
+export type AiClientType = "llm" | "hermes" | "debug" | (string & {});
 export type AiFeature =
   | "suggest"
   | "generate_plan"
@@ -21,7 +21,7 @@ export interface AiClientRecord {
   id: string;
   name: string;
   type: AiClientType;
-  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig;
+  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig;
   isDefault: boolean;
   enabled: boolean;
 }
@@ -48,6 +48,8 @@ export interface HermesClientConfig {
   apiKey?: string;
   timeoutMs?: number;
 }
+
+export interface DebugClientConfig {}
 
 type StructuredResultReliability = "business_tool" | "assistant_text";
 

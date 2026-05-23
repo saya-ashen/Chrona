@@ -6,6 +6,7 @@ import {
   executeTaskNodeCapabilityMock,
   makeInputCheckpointThenTaskPlan,
   makeManualThenTaskPlan,
+  makeTwoEntryTaskPlan,
   makeTwoTaskPlan,
   seedAcceptedCompiledPlan,
   seedWorkspaceAndTask,
@@ -171,5 +172,101 @@ describe("plan-runner task executor continuation", () => {
       ["first_task", "succeeded"],
       ["second_task", "running"],
     ]);
+  });
+
+  it("starts another ready entry node after syncing one completed entry runtime run", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "First entry runtime run started",
+        evidence: { sessionId: "main-session", runId: "run_first_entry" },
+        output: { runtimeRunRef: "runtime-first-entry" },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "Second entry runtime run started",
+        evidence: { sessionId: "main-session", runId: "run_second_entry" },
+        output: { runtimeRunRef: "runtime-second-entry" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner multiple entry continuation");
+    const compiledPlan = makeTwoEntryTaskPlan("graph_two_entry_runtime_sync_continuation");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const started = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(started.status).toBe("running");
+    expect(started.currentNodeId).toBe("first_entry");
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
+
+    await taskPlanExecution.syncRuntimeResult({
+      taskId: task.id,
+      runtimeRunRef: "runtime-first-entry",
+      status: "Completed",
+      summary: "First entry complete",
+      output: { architectureFacts: "ready" },
+    });
+
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
+    expect(executeTaskNodeCapabilityMock.mock.calls[1]?.[0].node.id).toBe("second_entry");
+
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(session.status).toBe("Active");
+    expect(session.currentNodeId).toBe("second_entry");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_entry", "succeeded"],
+      ["second_entry", "running"],
+    ]);
+  });
+
+  it("does not leave another entry idle when one entry provider completed before runtime sync", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "Provider returned final output but terminal tool submission failed",
+        evidence: { sessionId: "main-session", runId: "run_first_entry" },
+        output: {
+          runtimeRunRef: "runtime-first-entry",
+          outputText: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+        },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "Second entry runtime run started",
+        evidence: { sessionId: "main-session", runId: "run_second_entry" },
+        output: { runtimeRunRef: "runtime-second-entry" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner multiple entry provider completion gap");
+    const compiledPlan = makeTwoEntryTaskPlan("graph_two_entry_provider_completion_gap");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const started = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(started.status).toBe("running");
+    expect(started.currentNodeId).toBe("second_entry");
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_entry", "succeeded"],
+      ["second_entry", "running"],
+    ]);
+    expect(persisted?.results.find((result) => result.nodeId === "first_entry")).toMatchObject({
+      nodeId: "first_entry",
+      status: "current",
+      outputSummary: "Provider returned final output but terminal tool submission failed",
+    });
   });
 });

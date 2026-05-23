@@ -6,6 +6,7 @@ import type {
   ProviderRunEvent,
   ProviderRunSnapshot,
   ProviderRunInput,
+  ProviderRunRef,
   StartRunInput,
 } from "@chrona/providers-foundation";
 import { requireAiClient } from "../ai/runtime/client-resolution";
@@ -46,6 +47,15 @@ export type AiRuntimeInvocation = {
   response: ProviderRunSnapshot;
 };
 
+const TRANSIENT_PROVIDER_ERROR_CODES = new Set([
+  "aborted",
+  "network_error",
+  "provider_error",
+  "rate_limited",
+]);
+
+const PROVIDER_RETRY_BACKOFF_MS = 1_000;
+
 export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
     const task = await db.task.findUniqueOrThrow({
@@ -82,6 +92,7 @@ export class AiRuntimeInvoker {
         executionRuntime: input.runtimeName,
       });
       const response = await runProviderRequest(client.providerClient, request, {
+        runId: run.id,
         onRuntimeEvent: input.onRuntimeEvent,
         eventPersistence: {
           workspaceId: task.workspaceId,
@@ -145,19 +156,88 @@ async function runProviderRequest(
   providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
   request: ExecutionProviderRequest,
   options: {
+    runId?: string;
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     eventPersistence?: RuntimeEventPersistenceContext;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = toStartRunInput(request);
-  const run = await providerClient.startRun(startInput);
-  return collectProviderRunSnapshot(
-    providerClient.provider,
-    providerClient.streamRun({ runId: run.runId }),
-    run.sessionId,
-    run,
-    options,
-  );
+  const idempotencyKey = options.runId
+    ? `chrona-runtime:${options.runId}`
+    : undefined;
+  let run = await providerClient.startRun({
+    ...startInput,
+    idempotencyKey,
+  } as StartRunInput & { idempotencyKey?: string });
+  await persistRuntimeRunRef(options.runId, run);
+
+  try {
+    return await collectProviderRunSnapshot(
+      providerClient.provider,
+      providerClient.streamRun({ runId: run.runId }),
+      run.sessionId,
+      run,
+      options,
+    );
+  } catch (error) {
+    if (!isTransientProviderError(error)) throw error;
+    await delay(PROVIDER_RETRY_BACKOFF_MS);
+
+    try {
+      return await collectProviderRunSnapshot(
+        providerClient.provider,
+        providerClient.streamRun({ runId: run.runId }),
+        run.sessionId,
+        run,
+        options,
+      );
+    } catch (resumeError) {
+      if (!isTransientProviderError(resumeError)) throw resumeError;
+    }
+
+    run = await providerClient.startRun({
+      ...startInput,
+      idempotencyKey,
+    } as StartRunInput & { idempotencyKey?: string });
+    await persistRuntimeRunRef(options.runId, run);
+    return collectProviderRunSnapshot(
+      providerClient.provider,
+      providerClient.streamRun({ runId: run.runId }),
+      run.sessionId,
+      run,
+      options,
+    );
+  }
+}
+
+async function persistRuntimeRunRef(
+  runId: string | undefined,
+  run: ProviderRunRef,
+) {
+  if (!runId) return;
+  await db.run.update({
+    where: { id: runId },
+    data: {
+      runtimeRunRef: run.nativeRunId ?? run.runId,
+      runtimeSessionRef: run.sessionId,
+      status: RunStatus.Running,
+      syncStatus: "healthy",
+    },
+  });
+}
+
+function isTransientProviderError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const record = error as { code?: unknown; status?: unknown; retryable?: unknown };
+  if (record.retryable === true) return true;
+  if (typeof record.status === "number" && (record.status === 429 || record.status >= 500)) {
+    return true;
+  }
+  return typeof record.code === "string" && TRANSIENT_PROVIDER_ERROR_CODES.has(record.code);
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function collectProviderRunSnapshot(

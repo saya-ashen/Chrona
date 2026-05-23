@@ -9,6 +9,7 @@
     "@chrona/domain": "workspace:*",
     "@chrona/graph-runtime": "workspace:*",
     "@chrona/hermes": "workspace:*",
+    "@chrona/providers-debug": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
     "@chrona/shared": "workspace:*",
     "@chrona/runtime-core": "workspace:*"

@@ -1,71 +1,89 @@
 # Chrona Documentation
 
-> AI-native task control plane — plan, schedule, and execute work through AI agents.
+Chrona is an AI-native task control plane for turning work intent into scheduled tasks, executable plans, agent runs, and observable results.
 
-This documentation follows the [Diátaxis](https://diataxis.fr/) framework, organizing content by the reader's goal rather than by topic.
+Use this directory as the stable product and developer documentation set. Time-point audits, refactor notes, and design-debt records live under `docs/internal/` so public navigation stays evergreen.
 
-## Navigation by need
+## Start here
 
-| I want to... | Read this |
-|-------------|-----------|
-| **Get started** — install and run Chrona in 2 minutes | [Quick Start (EN)](./en/quick-start.md) \| [快速开始（中文）](./zh/quick-start.md) |
-| **Understand the design** — why CQRS, how layers connect | [Architecture](./architecture.md) |
-| **Trace backend execution** — task creation through plan execution completion | [Backend Execution Flow](./backend-execution-flow.md) |
-| **Continue task execution refactoring** — known debt, solved scope, next optimal splits | [Task Execution Refactor Debt](./task-execution-refactor-debt.md) |
-| **Understand package responsibilities** — what belongs in each package and why | [Package Boundaries](./package-boundaries.md) |
-| **Explore the database** — schema, relationships, enums | [Data Model](./data-model.md) |
-| **Integrate via API** — full REST endpoint reference | [API Reference](./api-reference.md) |
-| **See product direction** — what's shipped, what's next | [Roadmap (EN)](./en/roadmap.md) \| [路线图（中文）](./zh/roadmap.md) |
-| **Contribute code** — setup, conventions, PR workflow | [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Need | Document |
+| --- | --- |
+| Install and run Chrona | [Quick Start (English)](./en/quick-start.md) / [快速开始（中文）](./zh/quick-start.md) |
+| Understand the product surface | [English guide](./en/README.md) / [中文指南](./zh/README.md) |
+| See shipped and planned product areas | [Roadmap (English)](./en/roadmap.md) / [路线图（中文）](./zh/roadmap.md) |
+| Integrate over HTTP or MCP | [API Reference](./api-reference.md) |
+| Understand system architecture | [Architecture](./architecture.md) |
+| Trace execution internals | [Backend Execution Flow](./backend-execution-flow.md) |
+| Understand persistence | [Data Model](./data-model.md) |
+| Place code in the right package | [Package Boundaries](./package-boundaries.md) |
+| Extend AI/runtime providers | [Provider Boundary](./provider-boundary.md) |
+| Run tests | [中文测试指南](./zh/testing.md) |
 
-## Language
+## Current product areas
 
-| Language | Entry point |
-|----------|-------------|
-| English | [./en/README.md](./en/README.md) |
-| 中文 | [./zh/README.md](./zh/README.md) |
+Chrona currently centers on five workflows:
 
-## Diátaxis map
+1. Task management: create, edit, complete, reopen, delete, prioritize, tag, nest, and relate tasks.
+2. Plan generation: ask AI to draft a graph plan, then review, edit, accept, and materialize it.
+3. Plan execution: run task/checkpoint/condition/wait nodes with human checkpoints and AI-visible refs.
+4. Schedule cockpit: arrange time blocks, inspect conflicts, accept schedule proposals, and auto-start due work.
+5. Work page: observe latest results, plan graph, execution records, task details, and conversation/input context in one task-focused surface.
 
+Supporting surfaces include Inbox, Memory Console, Global AI Sidebar, Assistant Surface, Settings / AI Clients, and runtime/provider status.
+
+## Runtime shape
+
+Chrona is a Bun/TypeScript monorepo:
+
+| Area | Path | Role |
+| --- | --- | --- |
+| Web app | `apps/web` | Vite + React 19 + React Router SPA |
+| API server | `apps/server` | Hono routes on Bun |
+| CLI | `packages/cli` | Thin client for the API |
+| Contracts | `packages/contracts` | API schemas, AI feature specs, runtime event types, MCP tool schemas |
+| Engine | `packages/engine` | Business use cases for tasks, plans, execution, scheduling, projections, AI clients |
+| Graph runtime | `packages/graph-runtime` | Plan graph build/resolve/transition/command execution primitives |
+| Database | `packages/db` + `prisma` | SQLite and Prisma 7 schema/migrations/seed |
+| Providers | `packages/providers/*` | External runtime/provider protocol adapters |
+| Hermes plugin | `external-plugins/hermes` | Chrona tools exposed to Hermes Agent |
+
+## Common commands for repository development
+
+Run from the repository root:
+
+```bash
+bun install
+bun run dev
 ```
-                  ┌─────────────┐
-                  │   GETTING   │
-                  │   STARTED   │
-                  │ quick-start │
-                  └──────┬──────┘
-                         │
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-   ┌────────────┐ ┌────────────┐ ┌────────────┐
-   │ TUTORIALS  │ │ HOW-TO     │ │ EXPLANATION│
-   │ (learning) │ │ (solving)  │ │ (theory)   │
-   │            │ │            │ │            │
-   │ quick-start│ │ CLI docs   │ │ architecture│
-   │            │ │ API ref    │ │ data-model │
-   └────────────┘ └────────────┘ └────────────┘
-                         │
-                         ▼
-                  ┌────────────┐
-                  │ REFERENCE  │
-                  │ (looking   │
-                  │  up facts) │
-                  │            │
-                  │ api-ref    │
-                  │ data-model │
-                  └────────────┘
+
+Useful checks:
+
+```bash
+bun run typecheck
+bun run lint
+bun run test
+bun run test:bun
+bun run test:api
+bun run check:ui-foundation
+bun run check:boundaries
 ```
 
-## Core documents
+Long-lived server only:
 
-| Document | Category | Description |
-|----------|----------|-------------|
-| [Quick Start (EN)](./en/quick-start.md) | Tutorial | Install, configure, and run your first task |
-| [快速开始（中文）](./zh/quick-start.md) | Tutorial | 安装、配置和运行第一个任务 |
-| [Architecture](./architecture.md) | Explanation | CQRS + Event Sourcing design, data flow, modules |
-| [Backend Execution Flow](./backend-execution-flow.md) | Explanation | Backend task creation, plan generation, materialization, execution, pause/resume, and completion flow |
-| [Task Execution Refactor Debt](./task-execution-refactor-debt.md) | Explanation | Solved plan-execution scope, remaining hotspots, and optimal next refactor order |
-| [Package Boundaries](./package-boundaries.md) | Explanation | Package-by-package responsibilities, dependency direction, placement rules |
-| [Data Model](./data-model.md) | Reference | Full database schema, ERD, enums, indexes |
-| [API Reference](./api-reference.md) | Reference | All REST endpoints with curl examples |
-| [Roadmap (EN)](./en/roadmap.md) | Explanation | Product direction, phases, principles |
-| [路线图（中文）](./zh/roadmap.md) | Explanation | 产品方向、阶段、设计原则 |
+```bash
+bun run server:start
+```
+
+Web dev server only:
+
+```bash
+bun run dev:web
+```
+
+## Documentation maintenance rules
+
+- Keep install/run commands aligned with root `package.json`.
+- Keep API reference aligned with `apps/server/src/routes/**`.
+- Keep MCP tool docs aligned with `packages/contracts` and `apps/server/src/routes/mcp`.
+- Keep package boundary docs aligned with actual package directories.
+- Move dated audits, phase plans, and refactor-debt logs to `docs/internal/` instead of linking them as public guides.

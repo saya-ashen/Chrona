@@ -40,6 +40,16 @@ describe("generatePlanStream", () => {
     providerCallMock.mockClear();
     executeFeatureStreamMock.mockClear();
 
+    const createSessionMock = mock(() => Promise.resolve({
+      provider: "hermes",
+      sessionId: "session-1",
+    }));
+    const startRunMock = mock(() => Promise.resolve({
+      provider: "hermes",
+      runId: "run-1",
+      sessionId: "session-1",
+    }));
+
     const client = {
       record: {
         id: "client-1",
@@ -51,7 +61,11 @@ describe("generatePlanStream", () => {
         isDefault: true,
         enabled: true,
       },
-      providerClient: { streamRun: executeFeatureStreamMock } as unknown as EngineAiClient["providerClient"],
+      providerClient: {
+        createSession: createSessionMock,
+        startRun: startRunMock,
+        streamRun: executeFeatureStreamMock,
+      } as unknown as EngineAiClient["providerClient"],
     } as EngineAiClient;
 
     const events = [] as Array<{ type: string; message?: string }>;
@@ -127,7 +141,9 @@ describe("generatePlanStream", () => {
       } as never,
       userMessage: "Build plan",
     })) {
-      events.push(event as { type: string; text?: string; structured?: unknown; tool?: string; input?: Record<string, unknown> });
+      if (event.type !== "status") {
+        events.push(event as { type: string; text?: string; structured?: unknown; tool?: string; input?: Record<string, unknown> });
+      }
     }
 
     expect(createSessionMock).toHaveBeenCalledTimes(1);
@@ -186,7 +202,9 @@ describe("generatePlanStream", () => {
       input: { title: "Build plan" },
       userMessage: "Build plan",
     })) {
-      events.push(event as { type: string; tool?: string; input?: Record<string, unknown>; result?: string; error?: boolean; text?: string; structured?: unknown });
+      if (event.type !== "status") {
+        events.push(event as { type: string; tool?: string; input?: Record<string, unknown>; result?: string; error?: boolean; text?: string; structured?: unknown });
+      }
     }
 
     expect(events).toEqual([

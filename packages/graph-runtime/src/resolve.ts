@@ -301,9 +301,6 @@ function deriveNodeStatus(input: {
   if (input.result?.status === "rejected" && input.result.errorDetails === "degraded") {
     return "degraded";
   }
-  if (input.result?.status === "rejected" || input.activeAttempt?.status === "failed") {
-    return "failed";
-  }
   if (
     input.result?.outputSummary !== undefined ||
     input.result?.checkpointResponse !== undefined ||
@@ -313,6 +310,9 @@ function deriveNodeStatus(input: {
     input.activeAttempt?.status === "succeeded"
   ) {
     return "completed";
+  }
+  if (input.result?.status === "rejected" || input.activeAttempt?.status === "failed") {
+    return "failed";
   }
   return "pending";
 }

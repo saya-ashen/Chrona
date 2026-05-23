@@ -1,7 +1,10 @@
 import { HermesProviderError, type HermesProviderConfig } from "./types";
 
 export type HermesHttpClient = {
-  request(path: string, init?: RequestInit & { idempotencyKey?: string; timeoutMs?: number }): Promise<Response>;
+  request(
+    path: string,
+    init?: RequestInit & { idempotencyKey?: string; timeoutMs?: number },
+  ): Promise<Response>;
 };
 
 export function createHermesHttpClient(config: HermesProviderConfig): HermesHttpClient {
@@ -31,10 +34,11 @@ export function createHermesHttpClient(config: HermesProviderConfig): HermesHttp
         });
       } catch (error) {
         if (signal.aborted) {
+          const externalAbort = init.signal?.aborted === true;
           throw new HermesProviderError({
             message: "Hermes request aborted",
             code: "aborted",
-            retryable: false,
+            retryable: !externalAbort,
             raw: error,
           });
         }
