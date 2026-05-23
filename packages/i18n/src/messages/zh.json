@@ -341,7 +341,7 @@
       "weekOverview": "本周概览",
       "noTimelineDay": "当前没有可用的时间轴日期。",
       "unscheduledQueue": "待安排队列",
-      "unscheduledQueueDescription": "折叠的任务卡会停留在侧栏中。仅在需要时展开，或直接拖到时间轴上。",
+      "unscheduledQueueDescription": "紧凑任务卡随时可拖动。打开详情可查看任务状态、配置和计划上下文。",
       "noUnscheduledWork": "当前没有待安排的工作。失去计划或需要首次安排的新任务会出现在这里。",
       "dateSwitcher": "日期",
       "todayFocus": "今日重点",
@@ -1030,8 +1030,6 @@
       "scheduleAiTitle": "日程 AI 自动化",
       "scheduleAiDescription": "控制日程工作流中哪些 AI 动作可以自动运行。",
       "scheduleAiPanel": {
-        "autoSuggestions": "自动建议",
-        "autoSuggestionsDescription": "输入时建议任务标题和详情。默认关闭，避免未经请求的 AI 调用。",
         "autoPlanGeneration": "保存后自动生成计划",
         "autoPlanGenerationDescription": "保存任务后启动任务计划生成。默认开启；关闭后需手动重新生成。",
         "defaultAutoExecute": "默认自动执行",

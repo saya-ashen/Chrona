@@ -149,7 +149,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   noTimelineDay: "No timeline day is available right now.",
   unscheduledQueue: "Unscheduled Queue",
   unscheduledQueueDescription:
-    "Collapsed task cards stay in the side rail. Expand only when needed, or drag them directly into the timeline.",
+    "Compact task cards stay ready to drag. Open details for task status, config, and plan context.",
   noUnscheduledWork:
     "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
   dateSwitcher: "Date",

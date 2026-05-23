@@ -15,7 +15,6 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@chrona/i18n/react";
@@ -144,23 +143,34 @@ function TaskConfigSelect({
   onValueChange: (value: string) => void;
 }) {
   const triggerId = id ?? `task-config-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find((option) => option.value === value);
 
   return (
     <>
       <Input type="hidden" name={name} value={value} />
-      <Select value={value || undefined} onValueChange={onValueChange}>
+      <Select
+        open={isOpen}
+        value={value || undefined}
+        onOpenChange={setIsOpen}
+        onValueChange={onValueChange}
+      >
         <SelectTrigger id={triggerId} className="w-full">
-          <SelectValue placeholder={placeholder} />
+          <span data-slot="select-value" className={selectedOption ? undefined : "text-muted-foreground"}>
+            {selectedOption?.label ?? placeholder}
+          </span>
         </SelectTrigger>
-        <SelectContent className="z-[160]">
-          <SelectGroup>
-            {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
+        {isOpen ? (
+          <SelectContent className="z-[160]">
+            <SelectGroup>
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        ) : null}
       </Select>
     </>
   );

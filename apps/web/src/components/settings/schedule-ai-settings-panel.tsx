@@ -16,8 +16,6 @@ type ScheduleAiSettingsPanelProps = {
   title?: string;
   description?: string;
   copy?: {
-    autoSuggestions: string;
-    autoSuggestionsDescription: string;
     autoPlanGeneration: string;
     autoPlanGenerationDescription: string;
     defaultAutoExecute: string;
@@ -29,8 +27,6 @@ type ScheduleAiSettingsPanelProps = {
 };
 
 const fallbackCopy = {
-  autoSuggestions: "Auto suggestions",
-  autoSuggestionsDescription: "Suggest task titles/details while typing. Off by default to avoid unsolicited AI calls.",
   autoPlanGeneration: "Auto-generate plan after saving",
   autoPlanGenerationDescription: "Start task plan generation after saving a task. On by default; disable to require manual Regenerate.",
   defaultAutoExecute: "Default task auto-execution",
@@ -62,15 +58,6 @@ export function ScheduleAiSettingsPanel({
       </CardHeader>
       <CardContent>
         <FieldGroup className="gap-3">
-        <PreferenceToggle
-          label={copy.autoSuggestions}
-          description={copy.autoSuggestionsDescription}
-          checked={storedPreferences.autoSuggestionsEnabled}
-          defaultChecked={DEFAULT_SCHEDULE_AI_PREFERENCES.autoSuggestionsEnabled}
-          saving={savingKey === "autoSuggestionsEnabled"}
-          copy={copy}
-          onChange={(checked) => updatePreference("autoSuggestionsEnabled", checked)}
-        />
         <PreferenceToggle
           label={copy.autoPlanGeneration}
           description={copy.autoPlanGenerationDescription}

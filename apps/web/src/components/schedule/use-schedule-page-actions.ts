@@ -37,7 +37,6 @@ type UseSchedulePageActionsArgs = {
   draggedTask: DraggedTask;
   setDraggedTask: Dispatch<SetStateAction<DraggedTask>>;
   setViewData: Dispatch<SetStateAction<SchedulePageData>>;
-  setExpandedQueueTaskIds: Dispatch<SetStateAction<string[]>>;
   setLocalSelectedTaskId: Dispatch<SetStateAction<string | undefined>>;
   setErrorMessage: Dispatch<SetStateAction<string | null>>;
   setAnnouncement: Dispatch<SetStateAction<string>>;
@@ -61,7 +60,6 @@ export function useSchedulePageActions({
   draggedTask,
   setDraggedTask,
   setViewData,
-  setExpandedQueueTaskIds,
   setLocalSelectedTaskId,
   setErrorMessage,
   setAnnouncement,
@@ -117,8 +115,7 @@ export function useSchedulePageActions({
       locale,
       copy,
       applyOptimisticViewData: (updater) => setViewData(updater),
-      removeExpandedQueueTask: (taskId) =>
-        setExpandedQueueTaskIds((current) => current.filter((value) => value !== taskId)),
+      removeExpandedQueueTask: () => undefined,
       _setLocalSelectedTaskId: setLocalSelectedTaskId as (taskId: string) => void,
       setAnnouncement,
       setIsPending,
@@ -150,12 +147,6 @@ export function useSchedulePageActions({
       resetViewData: () => setViewData(hydratedData),
       actionFailedMessage,
     });
-  }
-
-  function toggleQueueCard(taskId: string) {
-    setExpandedQueueTaskIds((current) =>
-      current.includes(taskId) ? current.filter((id) => id !== taskId) : [...current, taskId],
-    );
   }
 
   async function handleTaskConfigSave(taskId: string, input: TaskConfigFormInput) {
@@ -193,7 +184,6 @@ export function useSchedulePageActions({
     handleScheduledDragStart,
     handleScheduleDrop,
     handleCreateTaskBlock,
-    toggleQueueCard,
     handleTaskConfigSave,
     handleDeleteTask,
   };

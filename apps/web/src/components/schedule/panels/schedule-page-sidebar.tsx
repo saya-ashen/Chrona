@@ -9,8 +9,7 @@ import type { ScheduleViewMode } from "@/components/schedule/schedule-page-types
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 
-import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "./schedule-panel-primitives";
 
 /**
@@ -84,35 +83,22 @@ export function ScheduleLeftSidebar({
 export function ScheduleRightSidebar({
   copy,
   viewData,
-  data,
   draggedTask,
-  expandedQueueTaskIds,
   isPending,
-  refreshProjection,
-  toggleQueueCard,
-  handleTaskConfigSave,
   handleQueueDragStart,
   handleQueueDragEnd,
-  onDeleteTask,
+  onOpenTaskDetails,
 }: {
   copy: SchedulePageCopy;
   viewData: SchedulePageData;
-  data: SchedulePageData;
   draggedTask: { kind: "queue" | "scheduled"; taskId: string } | null;
-  expandedQueueTaskIds: string[];
   isPending: boolean;
-  refreshProjection: () => Promise<void>;
-  toggleQueueCard: (taskId: string) => void;
-  handleTaskConfigSave: (
-    taskId: string,
-    input: TaskConfigFormInput,
-  ) => Promise<void>;
   handleQueueDragStart: (
     item: UnscheduledItem,
     event: React.DragEvent<HTMLElement>,
   ) => void;
   handleQueueDragEnd: () => void;
-  onDeleteTask: (taskId: string) => Promise<void>;
+  onOpenTaskDetails: (taskId: string) => void;
 }) {
   return (
     <aside className="min-h-0 overflow-visible xl:overflow-y-auto xl:pl-1">
@@ -121,32 +107,28 @@ export function ScheduleRightSidebar({
           <CardTitle>{copy.unscheduledQueue}</CardTitle>
           <CardDescription>{copy.unscheduledQueueDescription}</CardDescription>
         </CardHeader>
-        <div className="mt-3 max-h-[26rem] space-y-2 overflow-y-auto pr-1 xl:max-h-[calc(100vh-19rem)]">
+        <CardContent className="max-h-[26rem] overflow-y-auto pr-3 xl:max-h-[calc(100vh-19rem)]">
           {viewData.unscheduled.length === 0 ? (
             <EmptyState>{copy.noUnscheduledWork}</EmptyState>
           ) : (
-            viewData.unscheduled.map((item) => (
-              <QueueCard
-                key={item.taskId}
-                item={item}
-                executionRuntimes={data.executionRuntimes}
-                defaultExecutionRuntime={data.defaultExecutionRuntime}
-                isPending={isPending}
-                isDragging={
-                  draggedTask?.kind === "queue" &&
-                  draggedTask.taskId === item.taskId
-                }
-                isExpanded={expandedQueueTaskIds.includes(item.taskId)}
-                onToggle={() => toggleQueueCard(item.taskId)}
-                onMutatedAction={refreshProjection}
-                onSaveTaskConfigAction={handleTaskConfigSave}
-                onDragStart={handleQueueDragStart}
-                onDragEnd={handleQueueDragEnd}
-                onDeleteTask={onDeleteTask}
-              />
-            ))
+            <div className="flex flex-col gap-2">
+              {viewData.unscheduled.map((item) => (
+                <QueueCard
+                  key={item.taskId}
+                  item={item}
+                  isPending={isPending}
+                  isDragging={
+                    draggedTask?.kind === "queue" &&
+                    draggedTask.taskId === item.taskId
+                  }
+                  onDragStart={handleQueueDragStart}
+                  onDragEnd={handleQueueDragEnd}
+                  onOpenTaskDetails={onOpenTaskDetails}
+                />
+              ))}
+            </div>
           )}
-        </div>
+        </CardContent>
       </Card>
     </aside>
   );

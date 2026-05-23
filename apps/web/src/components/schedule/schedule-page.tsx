@@ -56,8 +56,6 @@ export function SchedulePage({
     setViewData,
     draggedTask,
     setDraggedTask,
-    expandedQueueTaskIds,
-    setExpandedQueueTaskIds,
     localSelectedTaskId,
     setLocalSelectedTaskId,
     errorMessage,
@@ -84,9 +82,9 @@ export function SchedulePage({
   const viewModel = useMemo(
     () =>
       buildSchedulePageViewModel({
-      viewData,
-      selectedDay,
-      selectedTaskId,
+        viewData,
+        selectedDay,
+        selectedTaskId,
         localSelectedTaskId,
         activeView,
         secondaryView,
@@ -111,7 +109,6 @@ export function SchedulePage({
     handleScheduledDragStart,
     handleScheduleDrop,
     handleCreateTaskBlock,
-    toggleQueueCard,
     handleTaskConfigSave,
     handleDeleteTask,
   } = useSchedulePageActions({
@@ -125,7 +122,6 @@ export function SchedulePage({
     draggedTask,
     setDraggedTask,
     setViewData,
-    setExpandedQueueTaskIds,
     setLocalSelectedTaskId,
     setErrorMessage,
     setAnnouncement,
@@ -176,7 +172,7 @@ export function SchedulePage({
         </div>
       ) : null}
 
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-visible rounded-[24px] bg-slate-50/70 p-2 lg:gap-4 lg:p-3 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.7fr)_minmax(260px,0.9fr)] xl:overflow-hidden">
+      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-visible rounded-[24px] bg-slate-50/70 p-2 lg:gap-4 lg:p-3 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
         <ScheduleLeftSidebar
           locale={locale}
           activeView={activeView}
@@ -208,16 +204,11 @@ export function SchedulePage({
         <ScheduleRightSidebar
           copy={copy}
           viewData={viewData}
-          data={data}
           draggedTask={draggedTask}
-          expandedQueueTaskIds={expandedQueueTaskIds}
           isPending={isPending}
-          refreshProjection={refreshProjection}
-          toggleQueueCard={toggleQueueCard}
-          handleTaskConfigSave={handleTaskConfigSave}
           handleQueueDragStart={handleQueueDragStart}
           handleQueueDragEnd={handleQueueDragEnd}
-          onDeleteTask={handleDeleteTask}
+          onOpenTaskDetails={setLocalSelectedTaskId}
         />
       </div>
 

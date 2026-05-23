@@ -25,10 +25,12 @@ if (DRAG_EMPTY_IMAGE) {
 
 export function TimelinePlacementCard({
   preview,
+  scrollTop = 0,
   title,
   kind,
 }: {
   preview: TimelinePlacementPreview;
+  scrollTop?: number;
   title: string;
   kind: "queue" | "scheduled";
 }) {
@@ -39,13 +41,13 @@ export function TimelinePlacementCard({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute left-3 right-3 rounded-2xl border p-3 shadow-[0_10px_24px_rgba(15,23,42,0.14)]",
+        "pointer-events-none absolute left-2 right-2 z-20 rounded-2xl border-2 p-3 shadow-[0_16px_34px_rgba(15,23,42,0.2)] ring-2 ring-white/80",
         preview.hasConflict
-          ? "border-red-300 bg-red-50/98"
-          : "border-dashed border-primary/50 bg-primary/12",
+          ? "border-red-400 bg-red-50/98"
+          : "border-dashed border-primary/80 bg-primary/18",
       )}
       style={{
-        top: `${preview.top}px`,
+        top: `${preview.top - scrollTop}px`,
         minHeight: "56px",
         height: `${preview.height}px`,
       }}
@@ -59,8 +61,10 @@ export function TimelinePlacementCard({
         />
         <div className="min-w-0 space-y-1">
           <p className="line-clamp-1 text-sm font-medium text-foreground">{title}</p>
+          <p className="inline-flex rounded-full bg-background/90 px-2 py-0.5 text-xs font-semibold text-foreground shadow-sm">
+            {formatTimeRange(preview.startAt, preview.endAt, locale, copy)}
+          </p>
           <p className="text-xs text-muted-foreground">
-            {formatTimeRange(preview.startAt, preview.endAt, locale, copy)} · {" "}
             {preview.source === "resize"
               ? copy.resizePreviewLabel
               : kind === "queue"

@@ -12,6 +12,7 @@ import type {
   EventContentArg,
   EventDropArg,
   EventInput,
+  AllowFunc,
 } from "@fullcalendar/core";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -49,6 +50,7 @@ import { cn } from "@/lib/utils";
 
 const TIMELINE_HOUR_HEIGHT = 56;
 const WORKDAY_START_HOUR = 8;
+const DEFAULT_TIMELINE_PIXELS_PER_MINUTE = TIMELINE_HOUR_HEIGHT / 60;
 
 function minutesFromDate(date: Date) {
   return date.getHours() * 60 + date.getMinutes();
@@ -163,10 +165,14 @@ export function DayTimeline({
   const [composerDraft, setComposerDraft] = useState<TimelinePlacementPreview | null>(null);
   const [dragPreview, setDragPreview] = useState<TimelinePlacementPreview | null>(null);
   const [hiddenTaskId, setHiddenTaskId] = useState<string | null>(null);
+  const [timelineScrollTop, setTimelineScrollTop] = useState(0);
+  const [timelinePixelsPerMinute, setTimelinePixelsPerMinute] = useState(
+    DEFAULT_TIMELINE_PIXELS_PER_MINUTE,
+  );
 
   const mapMinuteToY = (minute: number) => {
     const clamped = Math.min(Math.max(minute, 0), 24 * 60);
-    return (clamped / 60) * TIMELINE_HOUR_HEIGHT;
+    return clamped * timelinePixelsPerMinute;
   };
 
   const buildPlacementPreview = (
@@ -434,12 +440,51 @@ export function DayTimeline({
     await commitScheduledMove(item, info.event.start, info.event.end, info.revert);
   }
 
+  const handleEventAllow: AllowFunc = (span, movingEvent) => {
+    const taskId = movingEvent?.id;
+    const item = taskId ? selectedItemById.get(taskId) : null;
+
+    if (!taskId || !item || isPending) {
+      return false;
+    }
+
+    const startMinute = minutesFromDate(span.start);
+    const endMinute = minutesFromDate(span.end);
+    const preview = buildPlacementPreview(startMinute, endMinute, "drag", taskId);
+    setDragPreview(preview);
+    return !preview.hasConflict;
+  };
+
+  function syncTimelineScrollTop() {
+    const calendarScroller = dropZoneRef.current?.querySelector(".fc-scroller") as HTMLElement | null;
+    const slats = dropZoneRef.current?.querySelector(".fc-timegrid-slots") as HTMLElement | null;
+    const slatsHeight = slats?.getBoundingClientRect().height ?? 0;
+
+    if (slatsHeight > 0) {
+      setTimelinePixelsPerMinute(slatsHeight / (24 * 60));
+    }
+
+    setTimelineScrollTop(calendarScroller?.scrollTop ?? 0);
+  }
+
   function handleDatesSet(_info: DatesSetArg) {
     window.requestAnimationFrame(() => {
       const calendarScroller = dropZoneRef.current?.querySelector(".fc-scroller") as HTMLElement | null;
-      if (calendarScroller && calendarScroller.scrollTop < WORKDAY_START_HOUR * TIMELINE_HOUR_HEIGHT * 0.75) {
-        calendarScroller.scrollTop = WORKDAY_START_HOUR * TIMELINE_HOUR_HEIGHT;
+      const slats = dropZoneRef.current?.querySelector(".fc-timegrid-slots") as HTMLElement | null;
+      const slatsHeight = slats?.getBoundingClientRect().height ?? 0;
+      const pixelsPerMinute = slatsHeight > 0
+        ? slatsHeight / (24 * 60)
+        : DEFAULT_TIMELINE_PIXELS_PER_MINUTE;
+
+      if (slatsHeight > 0) {
+        setTimelinePixelsPerMinute(pixelsPerMinute);
       }
+
+      if (calendarScroller && calendarScroller.scrollTop < WORKDAY_START_HOUR * 60 * pixelsPerMinute * 0.75) {
+        calendarScroller.scrollTop = WORKDAY_START_HOUR * 60 * pixelsPerMinute;
+      }
+
+      setTimelineScrollTop(calendarScroller?.scrollTop ?? 0);
     });
   }
 
@@ -454,7 +499,14 @@ export function DayTimeline({
 
     return (
       <div
-        className="flex h-full min-h-0 gap-2 overflow-hidden p-2 text-left"
+        className={cn(
+          "flex h-full min-h-0 gap-2 overflow-hidden rounded-[0.85rem] border-2 p-2 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]",
+          hasConflict
+            ? "border-red-400 bg-red-50/95"
+            : isCurrent
+              ? "border-primary/70 bg-primary/18"
+              : "border-primary/45 bg-primary/12",
+        )}
         draggable={!isPending}
         onDragStart={() => {
           setHiddenTaskId(item.taskId);
@@ -516,6 +568,7 @@ export function DayTimeline({
           draggedItem && "chrona-fullcalendar-drop-mode",
         )}
         onDragOver={handleDragOver}
+        onScrollCapture={syncTimelineScrollTop}
         onDragLeave={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
             setDragPreview(null);
@@ -582,6 +635,7 @@ export function DayTimeline({
             eventDurationEditable={!isPending}
             eventStartEditable={!isPending}
             eventOverlap={false}
+            eventAllow={handleEventAllow}
             eventResizableFromStart={false}
             datesSet={handleDatesSet}
             dateClick={handleDateClick}
@@ -591,7 +645,10 @@ export function DayTimeline({
               onSelectTask(info.event.id);
             }}
             eventDragStart={(info) => setHiddenTaskId(info.event.id)}
-            eventDragStop={() => setHiddenTaskId(null)}
+            eventDragStop={() => {
+              setHiddenTaskId(null);
+              setDragPreview(null);
+            }}
             eventDrop={(info) => {
               void handleEventDrop(info);
             }}
@@ -607,6 +664,7 @@ export function DayTimeline({
             {draggedItem && dragPreview ? (
               <TimelinePlacementCard
                 preview={dragPreview}
+                scrollTop={timelineScrollTop}
                 title={draggedItem.title}
                 kind={draggedItem.kind}
               />
