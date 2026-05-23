@@ -15,6 +15,8 @@ import {
 } from "../execution/task-workspace-execution-overview";
 import {
   TaskWorkspaceNodeDetailPanel,
+  type NodeDrawerFrame,
+  type NodeDrawerSize,
   WorkspaceNodeActionControls,
 } from "../execution/task-workspace-node-detail-panel";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
@@ -120,7 +122,9 @@ export function TaskWorkspacePlanSection({
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
-  const [nodeDrawerSize, setNodeDrawerSize] = useState<"collapsed" | "half" | "expanded">("collapsed");
+  const [nodeDrawerSize, setNodeDrawerSize] = useState<NodeDrawerSize>("collapsed");
+  const [nodeDrawerFrame, setNodeDrawerFrame] = useState<NodeDrawerFrame | null>(null);
+  const nodeDrawerFrameRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoOpenDrawerRef = useRef(false);
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
@@ -283,7 +287,7 @@ export function TaskWorkspacePlanSection({
   ) => {
     handleSelectedPlanNodeChange(node, nodes);
     if (node && nodeDrawerSize === "collapsed" && shouldAutoOpenDrawerRef.current) {
-      setNodeDrawerSize("half");
+      setNodeDrawerSize("expanded");
     }
     shouldAutoOpenDrawerRef.current = false;
   }, [handleSelectedPlanNodeChange, nodeDrawerSize]);
@@ -293,7 +297,7 @@ export function TaskWorkspacePlanSection({
         graphPlan.nodes.find((candidate) => candidate.id === nodeId) ?? null;
       if (node) {
         handleSelectedPlanNodeChange(node, [node]);
-        if (nodeDrawerSize === "collapsed") setNodeDrawerSize("half");
+        if (nodeDrawerSize === "collapsed") setNodeDrawerSize("expanded");
       }
     }
     setPreferredNodeDetailTab("action");
@@ -319,6 +323,28 @@ export function TaskWorkspacePlanSection({
 
     return () => {
       document.removeEventListener("click", handleDocumentClick, { capture: true });
+    };
+  }, []);
+  useEffect(() => {
+    const frame = nodeDrawerFrameRef.current;
+    if (!frame) return;
+
+    const updateFrame = () => {
+      const rect = frame.getBoundingClientRect();
+      setNodeDrawerFrame({ left: rect.left, width: rect.width });
+    };
+
+    updateFrame();
+
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(updateFrame);
+    resizeObserver?.observe(frame);
+    window.addEventListener("resize", updateFrame);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateFrame);
     };
   }, []);
 
@@ -421,9 +447,9 @@ export function TaskWorkspacePlanSection({
           </aside>
         </div>
 
-        <div className="pointer-events-none relative z-20 grid h-[52px] shrink-0 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
-          <div className="relative min-w-0">
-            <div className="absolute inset-x-0 bottom-0">
+        <div className="pointer-events-none relative z-20 grid h-[60px] shrink-0 gap-2 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
+          <div ref={nodeDrawerFrameRef} className="relative min-w-0">
+            <div className="absolute inset-x-0 bottom-2">
               <TaskWorkspaceNodeDetailPanel
                 detail={consoleView.nodeDetail}
                 activity={nodeActivityQuery.data?.items ?? []}
@@ -431,6 +457,7 @@ export function TaskWorkspacePlanSection({
                 selectedNodes={selectedPlanNodes}
                 variant="drawer"
                 drawerSize={nodeDrawerSize}
+                drawerFrame={nodeDrawerFrame}
                 onDrawerSizeChange={setNodeDrawerSize}
                 preferredTab={preferredNodeDetailTab}
                 onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}

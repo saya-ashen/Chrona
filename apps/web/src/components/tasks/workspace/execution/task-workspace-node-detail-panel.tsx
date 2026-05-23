@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { ChevronDown, ChevronUp, Copy, Maximize2, Minimize2 } from "lucide-react";
+import { ChevronUp, Copy, X } from "lucide-react";
 import type { NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
@@ -32,6 +32,14 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
@@ -52,7 +60,8 @@ const TAB_LABELS: Record<NodeDetailPanelState["tabs"][number], string> = {
 };
 
 type NodeDetailVariant = "panel" | "rail" | "drawer";
-type NodeDrawerSize = "collapsed" | "half" | "expanded";
+export type NodeDrawerSize = "collapsed" | "expanded";
+export type NodeDrawerFrame = { left: number; width: number };
 
 const TAB_ORDER: NodeDetailPanelState["tabs"][number][] = [
   "result",
@@ -116,7 +125,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
   }
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+    <div className="grid gap-3">
       <div className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-slate-950">
@@ -505,7 +514,8 @@ export function TaskWorkspaceNodeDetailPanel({
   isActivityLoading,
   selectedNodes,
   variant = "panel",
-  drawerSize = "half",
+  drawerSize = "expanded",
+  drawerFrame,
   onDrawerSizeChange,
   preferredTab,
   onPreferredTabApplied,
@@ -517,6 +527,7 @@ export function TaskWorkspaceNodeDetailPanel({
   selectedNodes: PlanNodeDataModel[];
   variant?: NodeDetailVariant;
   drawerSize?: NodeDrawerSize;
+  drawerFrame?: NodeDrawerFrame | null;
   onDrawerSizeChange?: (size: NodeDrawerSize) => void;
   preferredTab?: NodeDetailPanelState["tabs"][number] | null;
   onPreferredTabApplied?: () => void;
@@ -552,151 +563,200 @@ export function TaskWorkspaceNodeDetailPanel({
   const node = currentNode;
   const orderedTabs = TAB_ORDER.filter((tab) => detail.tabs.includes(tab));
   const isDrawer = variant === "drawer";
-  const isCollapsedDrawer = isDrawer && drawerSize === "collapsed";
-  const drawerHeightClass =
-    drawerSize === "expanded"
-      ? "h-[min(62vh,560px)]"
-      : drawerSize === "half"
-        ? "h-[340px]"
-        : "h-[52px]";
-  const nextPrimaryDrawerSize: NodeDrawerSize =
-    drawerSize === "collapsed" ? "half" : "collapsed";
   const drawerNodeTitle = detail.title || node.title || "Selected node";
+  const tabs = (
+    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as NodeDetailPanelState["tabs"][number])} className="min-h-0 flex-1 gap-0">
+      <TabsList aria-label="Node detail tabs" className="flex h-auto justify-start gap-1 rounded-none border-b border-slate-200/80 bg-white/70 px-2.5 py-1.5">
+        {orderedTabs.map((tab) => (
+          <TabsTrigger key={tab} value={tab} className="flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold data-active:bg-slate-950 data-active:text-white data-active:shadow-sm" onClick={() => setActiveTab(tab)}>
+            {TAB_LABELS[tab]}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="result" aria-label={`${TAB_LABELS.result} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+        <ResultTab node={node} />
+      </TabsContent>
+      <TabsContent value="activity" aria-label={`${TAB_LABELS.activity} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+        <WorkspaceActivityFeed
+          activity={activity}
+          title={taskWorkspaceActivityMessages.nodeTitle}
+          emptyMessage={isActivityLoading ? "Loading node activity..." : taskWorkspaceActivityMessages.nodeEmpty}
+        />
+      </TabsContent>
+      <TabsContent value="action" aria-label={`${TAB_LABELS.action} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+        <WorkspaceNodeActionControls
+          node={node}
+          disabledActionReason={detail.disabledActionReason}
+          onSubmitCheckpointAction={onSubmitCheckpointAction}
+        />
+      </TabsContent>
+      <TabsContent value="configuration" aria-label={`${TAB_LABELS.configuration} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+        <ConfigurationTab node={node} nodes={selectedNodes} />
+      </TabsContent>
+    </Tabs>
+  );
+
+  if (isDrawer) {
+    if (drawerSize === "collapsed") {
+      return (
+        <button
+          id="task-workspace-node-actions"
+          type="button"
+          aria-label="Open selected node drawer"
+          data-node-detail-drawer="true"
+          onClick={() => onDrawerSizeChange?.("expanded")}
+          className="pointer-events-auto flex h-[52px] w-full min-w-0 items-center justify-between gap-2 rounded-[1.35rem] border border-slate-200/80 bg-white/95 px-2.5 py-1.5 text-left shadow-[0_18px_55px_rgba(15,23,42,0.12)] backdrop-blur transition hover:border-cyan-200 hover:bg-cyan-50/70"
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
+              Node
+            </span>
+            <span className="min-w-0 truncate text-sm font-semibold text-slate-950">
+              {drawerNodeTitle}
+            </span>
+            <Badge variant={statusTone(detail.status)}>
+              {detail.status ?? "waiting"}
+            </Badge>
+            <span className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+              Step {detail.stepPosition}
+            </span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
+            <span className="hidden sm:inline">Auto-refresh</span>
+            <span
+              className={cn(
+                "h-5 w-9 rounded-full p-0.5",
+                detail.autoRefreshEnabled ? "bg-slate-950" : "bg-slate-200",
+              )}
+            >
+              <span
+                className={cn(
+                  "block size-4 rounded-full bg-white transition-transform",
+                  detail.autoRefreshEnabled && "translate-x-4",
+                )}
+              />
+            </span>
+            <span className="flex size-7 items-center justify-center rounded-full border border-cyan-200 bg-cyan-50 text-cyan-700">
+              <ChevronUp />
+            </span>
+          </span>
+        </button>
+      );
+    }
+
+    return (
+      <Drawer
+        open
+        onOpenChange={(open) => onDrawerSizeChange?.(open ? "expanded" : "collapsed")}
+        direction="bottom"
+        modal={false}
+      >
+        <DrawerContent
+          id="task-workspace-node-actions"
+          aria-modal={false}
+          aria-label="Current node details"
+          data-node-detail-drawer="true"
+          className="inset-x-2 bottom-2 mx-auto h-[min(72vh,680px)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-white/95 shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur"
+          style={drawerFrame ? { left: drawerFrame.left, right: "auto", width: drawerFrame.width } : undefined}
+          overlayClassName="pointer-events-none bg-transparent backdrop-blur-0"
+        >
+          <DrawerHeader className="border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(236,254,255,0.72))] px-2.5 py-1.5 text-left">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
+                  Node
+                </span>
+                <DrawerTitle className="min-w-0 truncate text-sm font-semibold text-slate-950">
+                  Current node: {drawerNodeTitle}
+                </DrawerTitle>
+                <Badge variant={statusTone(detail.status)}>
+                  {detail.status ?? "waiting"}
+                </Badge>
+                <span className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                  Step {detail.stepPosition}
+                </span>
+                <DrawerDescription className="sr-only">
+                  Inspect result, activity, actions, and details for the selected plan node.
+                </DrawerDescription>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
+                <span className="hidden sm:inline">Auto-refresh</span>
+                <span
+                  className={cn(
+                    "h-5 w-9 rounded-full p-0.5",
+                    detail.autoRefreshEnabled ? "bg-slate-950" : "bg-slate-200",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "block size-4 rounded-full bg-white transition-transform",
+                      detail.autoRefreshEnabled && "translate-x-4",
+                    )}
+                  />
+                </span>
+              </div>
+              <DrawerClose asChild>
+                <Button type="button" variant="ghost" size="icon-xs" aria-label="Close selected node drawer" className="rounded-full">
+                  <X />
+                </Button>
+              </DrawerClose>
+            </div>
+          </DrawerHeader>
+          {tabs}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
 
   return (
     <section
       id="task-workspace-node-actions"
       aria-label="Current node details"
-      data-node-detail-drawer={isDrawer ? "true" : undefined}
       className={cn(
         "flex min-w-0 scroll-mt-2 flex-col overflow-hidden backdrop-blur",
         variant === "rail"
           ? "h-[420px] max-h-[55vh] rounded-[1.35rem] border border-slate-200/80 bg-white/88 shadow-[0_18px_55px_rgba(15,23,42,0.08)]"
-          : isDrawer
-            ? cn(
-              "pointer-events-auto w-full transition-[height,transform,opacity] duration-200 ease-out",
-              drawerHeightClass,
-              isCollapsedDrawer
-                ? "rounded-t-[1.1rem] border border-white/10 bg-slate-950/94 shadow-[0_-12px_42px_rgba(15,23,42,0.22)]"
-                : "rounded-[1.35rem] border border-slate-200/80 bg-white/88 shadow-[0_18px_55px_rgba(15,23,42,0.08)]",
-            )
           : "h-[380px] max-h-[calc(100vh-1rem)] rounded-[1.35rem] border border-slate-200/80 bg-white/88 shadow-[0_18px_55px_rgba(15,23,42,0.08)] md:h-[340px] xl:h-full xl:max-h-[calc(100vh-1.5rem)]",
       )}
     >
       <div className={cn(
         "flex items-center justify-between gap-2 border-b px-2.5",
-        isCollapsedDrawer
-          ? "border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(8,47,73,0.92))] py-2 text-slate-100"
-          : "border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(236,254,255,0.72))] py-1.5",
+        "border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(236,254,255,0.72))] py-1.5",
       )}>
-        {isDrawer ? (
-          <>
-            <h2 className="sr-only">Current node: {detail.title}</h2>
-            <button
-              type="button"
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <p className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
+            Node
+          </p>
+          <h2 aria-label={`Current node: ${detail.title}`} className="min-w-0 truncate text-sm font-semibold text-slate-950">
+            {detail.title}
+          </h2>
+          <Badge variant={statusTone(detail.status)}>
+            {detail.status ?? "waiting"}
+          </Badge>
+          <span className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+            Step {detail.stepPosition}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
+          <span className="hidden sm:inline">Auto-refresh</span>
+          <span
+            className={cn(
+              "h-5 w-9 rounded-full p-0.5",
+              detail.autoRefreshEnabled ? "bg-slate-950" : "bg-slate-200",
+            )}
+          >
+            <span
               className={cn(
-                "flex min-w-0 flex-1 items-center gap-2 rounded-full px-1.5 py-1 text-left transition-colors",
-                isCollapsedDrawer ? "hover:bg-white/10" : "hover:bg-white/70",
+                "block size-4 rounded-full bg-white transition-transform",
+                detail.autoRefreshEnabled && "translate-x-4",
               )}
-              aria-label={drawerSize === "collapsed" ? "Open selected node drawer" : "Collapse selected node drawer"}
-              onClick={() => onDrawerSizeChange?.(nextPrimaryDrawerSize)}
-            >
-              <span className={cn("shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em]", isCollapsedDrawer ? "text-cyan-200" : "text-cyan-700")}>
-                Node
-              </span>
-              <span className={cn("min-w-0 truncate text-sm font-semibold", isCollapsedDrawer ? "text-white" : "text-slate-950")}>
-                {drawerNodeTitle}
-              </span>
-            </button>
-            <div className={cn("flex shrink-0 items-center gap-1 rounded-full p-0.5 shadow-sm", isCollapsedDrawer ? "border border-white/10 bg-white/10" : "border border-slate-200 bg-white/80")}>
-              <button
-                type="button"
-                className={cn("inline-flex size-7 items-center justify-center rounded-full transition-colors", isCollapsedDrawer ? "text-white hover:bg-white/15" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950")}
-                aria-label="Toggle selected node drawer"
-                onClick={() => onDrawerSizeChange?.(nextPrimaryDrawerSize)}
-              >
-                {drawerSize === "collapsed" ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-              </button>
-              {isCollapsedDrawer ? null : (
-                <button
-                  type="button"
-                  className="inline-flex size-7 items-center justify-center rounded-full text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950"
-                  aria-label={drawerSize === "expanded" ? "Show half-height drawer" : "Expand selected node drawer"}
-                  onClick={() => onDrawerSizeChange?.(drawerSize === "expanded" ? "half" : "expanded")}
-                >
-                  {drawerSize === "expanded" ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-                </button>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <p className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
-                Node
-              </p>
-              <h2 aria-label={`Current node: ${detail.title}`} className="min-w-0 truncate text-sm font-semibold text-slate-950">
-                {detail.title}
-              </h2>
-              <Badge variant={statusTone(detail.status)}>
-                {detail.status ?? "waiting"}
-              </Badge>
-              <span className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                Step {detail.stepPosition}
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
-              <span className="hidden sm:inline">Auto-refresh</span>
-              <span
-                className={cn(
-                  "h-5 w-9 rounded-full p-0.5",
-                  detail.autoRefreshEnabled ? "bg-slate-950" : "bg-slate-200",
-                )}
-              >
-                <span
-                  className={cn(
-                    "block size-4 rounded-full bg-white transition-transform",
-                    detail.autoRefreshEnabled && "translate-x-4",
-                  )}
-                />
-              </span>
-            </div>
-          </>
-        )}
+            />
+          </span>
+        </div>
       </div>
 
-      {isCollapsedDrawer ? null : (
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as NodeDetailPanelState["tabs"][number])} className="min-h-0 flex-1 gap-0">
-          <TabsList aria-label="Node detail tabs" className="flex h-auto justify-start gap-1 rounded-none border-b border-slate-200/80 bg-white/70 px-2.5 py-1.5">
-            {orderedTabs.map((tab) => (
-              <TabsTrigger key={tab} value={tab} className="flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold data-active:bg-slate-950 data-active:text-white data-active:shadow-sm" onClick={() => setActiveTab(tab)}>
-                {TAB_LABELS[tab]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="result" aria-label={`${TAB_LABELS.result} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
-            <ResultTab node={node} />
-          </TabsContent>
-          <TabsContent value="activity" aria-label={`${TAB_LABELS.activity} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
-                <WorkspaceActivityFeed
-                  activity={activity}
-                  title={taskWorkspaceActivityMessages.nodeTitle}
-                  emptyMessage={isActivityLoading ? "Loading node activity..." : taskWorkspaceActivityMessages.nodeEmpty}
-                />
-          </TabsContent>
-          <TabsContent value="action" aria-label={`${TAB_LABELS.action} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
-            <WorkspaceNodeActionControls
-              node={node}
-              disabledActionReason={detail.disabledActionReason}
-              onSubmitCheckpointAction={onSubmitCheckpointAction}
-            />
-          </TabsContent>
-          <TabsContent value="configuration" aria-label={`${TAB_LABELS.configuration} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
-            <ConfigurationTab node={node} nodes={selectedNodes} />
-          </TabsContent>
-        </Tabs>
-      )}
+      {tabs}
 
     </section>
   );

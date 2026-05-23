@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/rpc-client";
+import { deleteTask } from "@/lib/task-actions-client";
 
 type UseTaskWorkspaceDeleteFlowInput = {
   taskId: string;
@@ -12,11 +12,7 @@ export function useTaskWorkspaceDeleteFlow({ taskId, setSaveError }: UseTaskWork
 
   const deleteTaskMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.tasks[":taskId"].$delete({ param: { taskId }, query: {} });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: "Failed to delete task" }));
-        throw new Error((err as { error?: string }).error ?? "Failed to delete task");
-      }
+      await deleteTask({ taskId });
     },
     onSuccess: () => {
       window.location.href = "/schedule";

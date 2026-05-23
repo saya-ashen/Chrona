@@ -19,7 +19,7 @@ import {
 } from "@/components/schedule/schedule-page-actions";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
-import { api } from "@/lib/rpc-client";
+import { deleteTask } from "@/lib/task-actions-client";
 
 type DraggedTask = {
   kind: "queue" | "scheduled";
@@ -165,10 +165,7 @@ export function useSchedulePageActions({
   async function handleDeleteTask(taskId: string) {
     await runSchedulePageAction({
       action: async () => {
-        const res = await api.tasks[":taskId"].$delete({ param: { taskId }, query: {} });
-        if (!res.ok) {
-          throw new Error(actionFailedMessage);
-        }
+        await deleteTask({ taskId });
       },
       setIsPending,
       setErrorMessage,
