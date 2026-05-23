@@ -199,20 +199,20 @@
 
   .chrona-fullcalendar .fc-event.chrona-calendar-event {
     margin-inline: 0.5rem;
-    border: 1px solid color-mix(in oklab, var(--border) 92%, var(--foreground));
+    border: 2px solid color-mix(in oklab, var(--primary) 42%, var(--border));
     border-radius: 1rem;
-    background: var(--background);
+    background: color-mix(in oklab, var(--primary-soft) 34%, var(--background));
     box-shadow:
-      inset 0 0 0 1px color-mix(in oklab, var(--background) 75%, transparent),
-      0 10px 24px rgb(15 23 42 / 0.16),
-      0 2px 5px rgb(15 23 42 / 0.1);
+      inset 0 0 0 1px color-mix(in oklab, var(--primary) 18%, transparent),
+      0 10px 22px rgb(15 23 42 / 0.14),
+      0 2px 5px rgb(15 23 42 / 0.12);
     color: var(--foreground);
     overflow: hidden;
     transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, background 160ms ease;
   }
 
   .chrona-fullcalendar .fc-event.chrona-calendar-event .fc-event-main {
-    background: var(--background);
+    background: color-mix(in oklab, var(--primary-soft) 34%, var(--background));
   }
 
   .chrona-fullcalendar .fc-event.chrona-calendar-event:hover,

@@ -1,11 +1,11 @@
-import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
+import type { ScheduleRecord } from "@/components/schedule/schedule-page-types";
 import type {
   TaskConfigExecutionRuntime,
   TaskConfigFormInput,
 } from "@/components/schedule/forms/task-config-form";
 
 export interface SelectedBlockSheetProps {
-  item: ScheduledItem;
+  item: ScheduleRecord;
   selectedDay: string;
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;

@@ -411,8 +411,11 @@ function buildTaskHeaderView(
     ? mapTaskWorkspaceStatus(pageData.task.executionSummary.executionState)
     : mapTaskWorkspaceStatus(pageData.task.status));
   const hasPlan = progress.totalSteps > 0 || Boolean(pageData.task.savedPlan);
+  const hasUnacceptedSavedPlan = Boolean(pageData.task.savedPlan && pageData.task.savedPlan.status !== "accepted");
   const cannotStartReason = !hasPlan
     ? "Generate and accept a plan before starting execution."
+    : hasUnacceptedSavedPlan
+      ? "Accept the generated plan before starting execution."
     : !pageData.task.isRunnable
       ? pageData.task.runnabilitySummary
       : workspaceStatus === "running"

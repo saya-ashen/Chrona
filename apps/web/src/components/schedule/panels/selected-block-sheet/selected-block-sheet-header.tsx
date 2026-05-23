@@ -1,7 +1,7 @@
 "use client";
 
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
+import type { ScheduleRecord } from "@/components/schedule/schedule-page-types";
 import { formatDateTime, formatTimeRange } from "@/components/schedule/schedule-page-utils";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ export function SelectedBlockSheetHeader({
   copy,
   onClose,
 }: {
-  item: ScheduledItem;
+  item: ScheduleRecord;
   locale: string;
   copy: SchedulePageCopy;
   onClose: () => void;

@@ -3,7 +3,7 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
-import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
+import type { ScheduleRecord } from "@/components/schedule/schedule-page-types";
 import { toTaskConfigInitialValues } from "@/components/schedule/schedule-page-utils";
 import {
   TaskConfigForm,
@@ -37,7 +37,7 @@ export function SelectedBlockMainColumn({
   onApplyPlan,
   onSaveConfigBeforeRegenerate,
 }: {
-  item: ScheduledItem;
+  item: ScheduleRecord;
   copy: SchedulePageCopy;
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;

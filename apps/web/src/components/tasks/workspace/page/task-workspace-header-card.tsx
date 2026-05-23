@@ -4,6 +4,14 @@ import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { TaskData, TaskHeaderAction, TaskHeaderView } from "../model/task-workspace-types";
 
 function priorityTone(priority: string) {
@@ -241,19 +249,17 @@ export function TaskWorkspaceHeaderCard({
                     {planAction.label}
                   </button>
                 ) : null}
-                {!showDeleteConfirm ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onStartDeleteConfirm();
-                      setShowMoreMenu(false);
-                    }}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="size-4" />
-                    Delete Task
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStartDeleteConfirm();
+                    setShowMoreMenu(false);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="size-4" />
+                  Delete Task
+                </button>
               </div>
             ) : null}
           </div>
@@ -266,37 +272,39 @@ export function TaskWorkspaceHeaderCard({
         </p>
       ) : null}
 
-      {showDeleteConfirm ? (
-        <div className="mt-1 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="space-y-0.5">
-              <p className="font-medium">Delete &ldquo;{task.title}&rdquo;?</p>
-              <p className="text-xs text-destructive/80">
-                This cannot be undone.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Button
-                type="button"
-                onClick={onDelete}
-                variant="destructive"
-                size="sm"
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Confirm delete"}
-              </Button>
-              <Button
-                type="button"
-                onClick={onCancelDeleteConfirm}
-                variant="ghost"
-                size="sm"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <Dialog
+        open={showDeleteConfirm}
+        onOpenChange={(open) => {
+          if (!open) onCancelDeleteConfirm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete &ldquo;{task.title}&rdquo;?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the task and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={onCancelDeleteConfirm}
+              variant="outline"
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={onDelete}
+              variant="destructive"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Delete task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

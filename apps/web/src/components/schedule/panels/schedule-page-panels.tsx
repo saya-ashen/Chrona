@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ChevronDown, GripVertical, Trash2 } from "lucide-react";
+import { Calendar, GripVertical, PanelRightOpen } from "lucide-react";
 import { type DragEvent, useState } from "react";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { UnscheduledItem } from "@/components/schedule/schedule-page-types";
@@ -8,55 +8,17 @@ import {
   formatDateTime,
   getPriorityAccent,
   getPriorityTone,
-  toTaskConfigInitialValues,
 } from "@/components/schedule/schedule-page-utils";
-import { ScheduleEditorForm } from "@/components/schedule/forms/schedule-editor-form";
 import { TimeslotSuggestionPanel } from "@/components/schedule/panels/timeslot-suggestion-panel";
-import {
-  TaskConfigForm,
-  type TaskConfigFormInput,
-  type TaskConfigExecutionRuntime,
-} from "@/components/schedule/forms/task-config-form";
 import { Badge } from "@/components/ui/badge";
-import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { ScheduleSlot } from "@chrona/contracts/ai";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
 export { DayTimelineSummary } from "./schedule-panel-primitives";
 export { SelectedBlockSheet } from "./selected-block-sheet";
-
-function QueueTaskConfigEditor({
-  item,
-  executionRuntimes,
-  defaultExecutionRuntime,
-  isPending,
-  onSaveTaskConfigAction,
-}: {
-  item: UnscheduledItem;
-  executionRuntimes: TaskConfigExecutionRuntime[];
-  defaultExecutionRuntime: string;
-  isPending: boolean;
-  onSaveTaskConfigAction: (
-    taskId: string,
-    input: TaskConfigFormInput,
-  ) => Promise<void>;
-}) {
-  const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
-
-  return (
-    <TaskConfigForm
-      executionRuntimes={executionRuntimes}
-      defaultExecutionRuntime={defaultExecutionRuntime}
-      isPending={isPending}
-      initialValues={toTaskConfigInitialValues(item)}
-      submitLabel={copy.saveTaskConfig}
-      pendingLabel={copy.saving}
-      onSubmitAction={(input) => onSaveTaskConfigAction(item.taskId, input)}
-    />
-  );
-}
 
 function getQueueSuggestedDuration(item: UnscheduledItem) {
   const value = (
@@ -72,35 +34,20 @@ function getQueueSuggestedDuration(item: UnscheduledItem) {
 
 export function QueueCard({
   item,
-  executionRuntimes,
-  defaultExecutionRuntime,
   isDragging,
   isPending,
-  isExpanded,
   currentSchedule,
-  onToggle,
-  onMutatedAction,
-  onSaveTaskConfigAction,
   onScheduleSlot,
-  onDeleteTask,
+  onOpenTaskDetails,
   onDragStart,
   onDragEnd,
 }: {
   item: UnscheduledItem;
-  executionRuntimes: TaskConfigExecutionRuntime[];
-  defaultExecutionRuntime: string;
   isDragging: boolean;
   isPending: boolean;
-  isExpanded: boolean;
   currentSchedule?: ScheduleSlot[];
-  onToggle: () => void;
-  onMutatedAction: () => Promise<void>;
-  onSaveTaskConfigAction: (
-    taskId: string,
-    input: TaskConfigFormInput,
-  ) => Promise<void>;
   onScheduleSlot?: (taskId: string, startAt: Date, endAt: Date) => void;
-  onDeleteTask?: (taskId: string) => void;
+  onOpenTaskDetails: (taskId: string) => void;
   onDragStart: (item: UnscheduledItem, event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
 }) {
@@ -109,133 +56,78 @@ export function QueueCard({
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
   const suggestedDurationMinutes = getQueueSuggestedDuration(item);
   const [showTimeslots, setShowTimeslots] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const accent = getPriorityAccent(item.priority);
 
   return (
-    <div
+    <Card
+      size="sm"
       className={cn(
-        "rounded-2xl border bg-white/98 shadow-[0_4px_12px_rgba(15,23,42,0.08)] transition-colors",
-        isDragging && "border-primary/40 bg-primary/5",
-        !isDragging && "border-border",
+        "gap-0 rounded-xl bg-card/95 py-0 shadow-[0_3px_12px_rgba(15,23,42,0.06)] ring-border/80 transition-[background,border-color,box-shadow,opacity,transform]",
+        isDragging && "scale-[0.99] border-primary/70 bg-primary/10 opacity-80 shadow-[0_0_0_2px_rgba(37,99,235,0.16),0_12px_28px_rgba(15,23,42,0.16)]",
       )}
     >
-      <div
+      <CardHeader
         draggable={!isPending}
         aria-label={`Drag ${item.title} to the timeline`}
         onDragStart={(event) => onDragStart(item, event)}
         onDragEnd={onDragEnd}
         className={cn(
-          "flex items-center gap-2.5 px-3 py-2.5 cursor-grab active:cursor-grabbing select-none",
+          "grid min-h-[4.25rem] cursor-grab select-none grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-2.5 active:cursor-grabbing",
           isPending && "cursor-not-allowed opacity-60",
         )}
       >
         <div className={`w-1 shrink-0 self-stretch rounded-full ${accent}`} />
 
         <GripVertical
-          className="size-3.5 text-muted-foreground/30 shrink-0"
+          className="shrink-0 text-muted-foreground/40"
           aria-hidden="true"
         />
 
-        <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-foreground">
-            {item.title}
-          </span>
-          <Badge
-            variant={getPriorityTone(item.priority)}
-            className="text-[10px] px-1.5 py-0.5"
-          >
-            {item.priority}
-          </Badge>
-          {item.dueAt ? (
-            <span className="text-[11px] text-muted-foreground shrink-0 hidden sm:inline">
-              {formatDateTime(item.dueAt, locale)}
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm font-medium leading-5 text-foreground">
+              {item.title}
             </span>
-          ) : null}
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <Badge variant={getPriorityTone(item.priority)}>
+              {item.priority}
+            </Badge>
+            {item.dueAt ? <span className="truncate">{formatDateTime(item.dueAt, locale)}</span> : null}
+          </div>
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0">
+        <div className="flex shrink-0 items-center gap-1">
           {suggestedDurationMinutes ? (
-            <button
+            <Button
               type="button"
+              variant={showTimeslots ? "secondary" : "ghost"}
+              size="icon-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowTimeslots((v) => !v);
               }}
-              className={cn(
-                "rounded-md p-1 transition-colors",
-                showTimeslots
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground/50 hover:text-foreground",
-              )}
               title="Suggest time slot"
             >
-              <Calendar className="size-3.5" />
-            </button>
+              <Calendar />
+              <span className="sr-only">Suggest time slot</span>
+            </Button>
           ) : null}
-          {onDeleteTask ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDeleteConfirm((v) => !v);
-              }}
-              className={cn(
-                "rounded-md p-1 transition-colors",
-                showDeleteConfirm
-                  ? "text-red-500 bg-red-50"
-                  : "text-muted-foreground/50 hover:text-red-500",
-              )}
-              title="Delete task"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          ) : null}
-          <button
+          <Button
             type="button"
-            onClick={onToggle}
-            className="rounded-md p-1 text-muted-foreground/50 hover:text-foreground transition-colors"
-            title={isExpanded ? "Collapse" : "Expand"}
+            variant="outline"
+            size="icon-sm"
+            onClick={() => onOpenTaskDetails(item.taskId)}
+            title={copy.taskDetails}
           >
-            <ChevronDown
-              className={cn(
-                "size-4 transition-transform",
-                isExpanded && "rotate-180",
-              )}
-            />
-          </button>
+            <PanelRightOpen />
+            <span className="sr-only">{copy.taskDetails}</span>
+          </Button>
         </div>
-      </div>
-
-      {showDeleteConfirm ? (
-        <div className="border-t border-red-100 bg-red-50/50 px-3 py-2">
-          <div className="flex items-center gap-2">
-            <span className="flex-1 text-[11px] text-red-600">
-              Delete "{item.title}"?
-            </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteTask?.(item.taskId);
-              }}
-              className="rounded-md bg-red-500 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-red-600 transition-colors"
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(false)}
-              className="rounded-md border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
+      </CardHeader>
 
       {showTimeslots ? (
-        <div className="border-t border-border/60 px-3 py-3">
+        <CardContent className="border-t border-border/60 px-3 py-3">
           <TimeslotSuggestionPanel
             taskId={item.taskId}
             title={item.title}
@@ -247,51 +139,10 @@ export function QueueCard({
               onScheduleSlot
                 ? (startAt, endAt) => onScheduleSlot(item.taskId, startAt, endAt)
                 : undefined
-            }
+              }
           />
-        </div>
+        </CardContent>
       ) : null}
-
-      {isExpanded ? (
-        <div className="border-t border-border/60 px-3 py-3 space-y-3">
-          {item.actionRequired ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              {item.actionRequired}
-            </div>
-          ) : null}
-
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Schedule
-            </p>
-            <ScheduleEditorForm
-              taskId={item.taskId}
-              dueAt={item.dueAt}
-              allowClear={false}
-              submitLabel={copy.scheduleTask}
-              onMutatedAction={onMutatedAction}
-            />
-          </div>
-
-          <details className="group">
-            <summary className="cursor-pointer text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-colors select-none">
-              Task config & links
-            </summary>
-            <div className="mt-2 space-y-2">
-              <QueueTaskConfigEditor
-                item={item}
-                executionRuntimes={executionRuntimes}
-                defaultExecutionRuntime={defaultExecutionRuntime}
-                isPending={isPending}
-                onSaveTaskConfigAction={onSaveTaskConfigAction}
-              />
-              <TaskContextLinks
-                taskId={item.taskId}
-              />
-            </div>
-          </details>
-        </div>
-      ) : null}
-    </div>
+    </Card>
   );
 }

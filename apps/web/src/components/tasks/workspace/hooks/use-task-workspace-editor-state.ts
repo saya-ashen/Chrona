@@ -17,9 +17,6 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
   const [hasUnsavedConfigChanges, setHasUnsavedConfigChanges] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isEditExpanded, setIsEditExpanded] = useState(
-    () => !(["Ready", "Completed", "Done"].includes(task.status) || task.aiPlanGenerationStatus === "accepted"),
-  );
 
   const taskConfigInitialValues = useMemo(() => taskToTaskConfigInitialValues(task), [
     task.title,
@@ -66,7 +63,7 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
   }), [draftEditableTask, task.status]);
 
   const handleTaskConfigDraftStateChange = useCallback((state: TaskConfigDraftState) => {
-    setTaskConfigDraft(state.values);
+    setTaskConfigDraft(state.isDirty ? state.values : null);
     setHasUnsavedConfigChanges(state.isDirty);
     setSaveSuccess(false);
   }, []);
@@ -157,8 +154,6 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
     setSaveError,
     saveSuccess,
     setSaveSuccess,
-    isEditExpanded,
-    setIsEditExpanded,
     taskConfigInitialValues,
     draftEditableTask,
     editSummary,

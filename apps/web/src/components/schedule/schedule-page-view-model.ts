@@ -14,6 +14,7 @@ import {
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type {
   SchedulePageData,
+  ScheduleRecord,
   ScheduleViewMode,
   SecondaryPlanningView,
 } from "@/components/schedule/schedule-page-types";
@@ -38,7 +39,7 @@ export type SchedulePageViewModel = {
   activeDayDate: Date;
   activeGroup: ReturnType<typeof buildWeekGroups>[number] | null;
   activeSelectedTaskId: string | undefined;
-  selectedItem: SchedulePageData["scheduled"][number] | null;
+  selectedItem: ScheduleRecord | null;
   todayFocusItems: ReturnType<typeof buildTodayFocusItems>;
   calendarMonthLabel: string;
   calendarDays: ScheduleCalendarDay[];
@@ -110,6 +111,7 @@ export function buildSchedulePageViewModel({
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;
   const selectedItem =
     activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ??
+    viewData.unscheduled.find((item) => item.taskId === activeSelectedTaskId) ??
     null;
   const todayFocusItems = buildTodayFocusItems(viewData, activeGroup, copy);
   const conflictTaskIds = new Set(viewData.risks.map((item) => item.taskId));

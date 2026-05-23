@@ -341,7 +341,7 @@
       "weekOverview": "Week Overview",
       "noTimelineDay": "No timeline day is available right now.",
       "unscheduledQueue": "Unscheduled Queue",
-      "unscheduledQueueDescription": "Collapsed task cards stay in the side rail. Expand only when needed, or drag them directly into the timeline.",
+      "unscheduledQueueDescription": "Compact task cards stay ready to drag. Open details for task status, config, and plan context.",
       "noUnscheduledWork": "No unscheduled work. New tasks that lose their plan or need initial placement will appear here.",
       "aiProposalsCompactEmpty": "No pending AI suggestions.",
       "taskPlanLabel": "Task Plan",
@@ -1030,8 +1030,6 @@
       "scheduleAiTitle": "Schedule AI automation",
       "scheduleAiDescription": "Control which AI actions may run automatically in the schedule workflow.",
       "scheduleAiPanel": {
-        "autoSuggestions": "Auto suggestions",
-        "autoSuggestionsDescription": "Suggest task titles/details while typing. Off by default to avoid unsolicited AI calls.",
         "autoPlanGeneration": "Auto-generate plan after saving",
         "autoPlanGenerationDescription": "Start task plan generation after saving a task. On by default; disable to require manual Regenerate.",
         "defaultAutoExecute": "Default task auto-execution",

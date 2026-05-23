@@ -46,9 +46,6 @@ export function useSchedulePageState({
     kind: "queue" | "scheduled";
     taskId: string;
   } | null>(null);
-  const [expandedQueueTaskIds, setExpandedQueueTaskIds] = useState<string[]>(
-    [],
-  );
   const [localSelectedTaskId, setLocalSelectedTaskId] = useState<
     string | undefined
   >(selectedTaskId);
@@ -109,8 +106,6 @@ export function useSchedulePageState({
     setViewData,
     draggedTask,
     setDraggedTask,
-    expandedQueueTaskIds,
-    setExpandedQueueTaskIds,
     localSelectedTaskId,
     setLocalSelectedTaskId,
     errorMessage,

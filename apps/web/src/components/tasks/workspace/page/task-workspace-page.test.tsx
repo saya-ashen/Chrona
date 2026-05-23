@@ -100,7 +100,7 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () 
 }));
 
 vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
-  TaskWorkspaceHeaderCard: ({ task, header, workspaceStateGuidance }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; workspaceStateGuidance?: string }) => (
+  TaskWorkspaceHeaderCard: ({ task, header, workspaceStateGuidance, planAction }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; workspaceStateGuidance?: string; planAction?: { label: string; disabled?: boolean; isLoading?: boolean } }) => (
     <header>
       <h1>{task.title}</h1>
       <section aria-label="Workspace state">
@@ -111,6 +111,7 @@ vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
       <p>workspace-status:{header.status}</p>
       <p>{workspaceStateGuidance}</p>
       <p>primary-action:{header.actions.find((action) => action.id !== "more")?.label ?? "none"}</p>
+      {planAction?.label === "Accept plan" ? <button type="button" disabled={planAction.disabled || planAction.isLoading}>{planAction.label}</button> : null}
       <button type="button">Edit</button>
       {header.actions.filter((action) => action.id !== "more").map((action) => (
         <button key={action.id} type="button" disabled={action.disabled}>{action.label}</button>
@@ -319,6 +320,8 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("generation:waiting_acceptance")).toBeInTheDocument();
     expect(screen.getByText("accept:enabled")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept plan" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
   it("renders accepted plans with completed progress", () => {
