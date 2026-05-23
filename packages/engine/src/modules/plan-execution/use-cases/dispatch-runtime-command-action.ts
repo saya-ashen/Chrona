@@ -3,6 +3,7 @@ import type {
   AdvanceRuntimeCommand,
   ExecutionActionWithContinuation,
   OrchestratorTrigger,
+  PlanExecutionControl,
   PlanExecutionObserver,
 } from "../types";
 import { ensurePlanMainSession } from "../plan-state-store";
@@ -15,6 +16,7 @@ type AdvancePlanExecution = (input: {
   mainSession: { id: string; taskId: string; sessionKey: string };
   executionSession: Awaited<ReturnType<typeof ensureExecutionSession>>;
   command: AdvanceRuntimeCommand;
+  control?: PlanExecutionControl;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
 
 type RuntimeCommandAction = Extract<
@@ -23,6 +25,7 @@ type RuntimeCommandAction = Extract<
   | { action: "block_current_node" }
   | { action: "fail_current_node" }
   | { action: "retry_node" }
+  | { action: "pause_session" }
   | { action: "cancel_session" }
 >;
 
@@ -80,6 +83,11 @@ function commandForAction(action: RuntimeCommandAction): AdvanceRuntimeCommand {
         reason: action.prompt ?? "Node retry requested",
         userInput: action.prompt,
       };
+    case "pause_session":
+      return {
+        type: "pause_session",
+        reason: action.reason ?? "Execution paused",
+      };
     case "cancel_session":
       return {
         type: "cancel_session",
@@ -92,6 +100,7 @@ export async function dispatchRuntimeCommandAction(input: {
   taskId: string;
   action: RuntimeCommandAction;
   advance: AdvancePlanExecution;
+  control?: PlanExecutionControl;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
@@ -119,6 +128,7 @@ export async function dispatchRuntimeCommandAction(input: {
     mainSession,
     executionSession,
     command: commandForAction(input.action),
+    control: input.control,
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,

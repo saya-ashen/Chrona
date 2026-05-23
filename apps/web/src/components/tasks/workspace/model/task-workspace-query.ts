@@ -430,6 +430,9 @@ function buildTaskHeaderView(
   const cannotStopReason = workspaceStatus === "running" || workspaceStatus === "approval-needed"
     ? undefined
     : "No running execution session to stop.";
+  const cannotPauseReason = workspaceStatus === "running"
+    ? undefined
+    : "No running execution session to pause.";
 
   return {
     breadcrumb: ["Tasks", pageData.task.title],
@@ -441,7 +444,7 @@ function buildTaskHeaderView(
     progressPercent: progress.percentComplete,
     actions: [
       { id: "start", label: "Start", disabled: Boolean(cannotStartReason), disabledReason: cannotStartReason },
-      { id: "pause", label: "Pause", disabled: true, disabledReason: "Pause is visible for task control, but the execution API does not expose pause yet." },
+      { id: "pause", label: "Pause", disabled: Boolean(cannotPauseReason), disabledReason: cannotPauseReason },
       { id: "stop", label: "Stop", disabled: Boolean(cannotStopReason), disabledReason: cannotStopReason },
       { id: "more", label: "More actions" },
     ],

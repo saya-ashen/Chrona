@@ -155,6 +155,7 @@ export type GraphNodeExecutorInput<TContext = unknown> = {
   userInput?: string;
   inputFields?: Record<string, string>;
   context: TContext;
+  signal?: AbortSignal;
 };
 
 export type GraphExecutionCallbacks<TContext = unknown> = {
@@ -163,6 +164,11 @@ export type GraphExecutionCallbacks<TContext = unknown> = {
   ): Promise<GraphNodeExecutionResult | null>;
   onEvent?(event: GraphExecutionEvent): Promise<void> | void;
   onStateChange?(state: GraphExecutionState): Promise<void> | void;
+};
+
+export type GraphExecutionControl = {
+  signal?: AbortSignal;
+  shouldPause?: () => boolean;
 };
 
 export type GraphNodeExecutor<TContext = unknown> = (
@@ -196,6 +202,7 @@ export type RunGraphExecutionInput<TContext = unknown> = {
   inputFields?: Record<string, string>;
   forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
   maxConcurrency?: number;
+  control?: GraphExecutionControl;
   now?: () => number;
   callbacks: GraphExecutionCallbacks<TContext>;
 };

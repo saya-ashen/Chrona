@@ -1,15 +1,24 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { HermesProviderClient, HermesProviderError } from "./index";
 
 const realFetch = globalThis.fetch;
 const realStrictUnknownEvents = process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS;
+const realHermesRecordDir = process.env.CHRONA_HERMES_RECORD_DIR;
 
-afterEach(() => {
+afterEach(async () => {
   globalThis.fetch = realFetch;
   if (realStrictUnknownEvents === undefined) {
     delete process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS;
   } else {
     process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS = realStrictUnknownEvents;
+  }
+  if (realHermesRecordDir === undefined) {
+    delete process.env.CHRONA_HERMES_RECORD_DIR;
+  } else {
+    process.env.CHRONA_HERMES_RECORD_DIR = realHermesRecordDir;
   }
 });
 
@@ -325,6 +334,40 @@ describe("HermesProviderClient", () => {
       { type: "run_completed", text: undefined, toolName: undefined, output: { text: "done" } },
     ]);
     expect(seenHeaders?.get("Accept")).toBe("text/event-stream");
+  });
+
+  it("records Hermes start and stream events for debug replay", async () => {
+    const replayDir = await mkdtemp(join(tmpdir(), "chrona-hermes-replay-"));
+    process.env.CHRONA_HERMES_RECORD_DIR = replayDir;
+    globalThis.fetch = mockFetch(async (url) => {
+      if (String(url).endsWith("/v1/runs")) {
+        return jsonResponse({ run_id: "run-1", status: "started" });
+      }
+      return new Response([
+        'data: {"type":"message.delta","delta":"Hi"}\n\n',
+        'data: {"type":"run.completed","output":"done"}\n\n',
+      ].join(""), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    });
+
+    const client = new HermesProviderClient();
+    await client.startRun({
+      sessionId: "session-1",
+      instructions: "go",
+      input: { type: "text", text: "Hello" },
+    });
+    for await (const _event of client.streamRun({ runId: "run-1" })) {
+      // consume stream to flush replay records
+    }
+
+    const content = await readFile(join(replayDir, "run-1.jsonl"), "utf8");
+    const records = content.trim().split("\n").map((line) => JSON.parse(line));
+    expect(records.map((record) => record.kind)).toEqual(["start", "event", "event"]);
+    expect(records[0].input.signal).toBeUndefined();
+    expect(records[2].event.type).toBe("run_completed");
+    await rm(replayDir, { recursive: true, force: true });
   });
 
   it("maps failed and cancelled terminal stream events", async () => {

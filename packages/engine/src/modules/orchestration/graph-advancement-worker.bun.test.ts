@@ -48,4 +48,48 @@ describe("runGraphAdvancementWorker", () => {
     const events = await db.schedulerEvent.findMany({ where: { taskId: task.id } });
     expect(events.map((event) => event.eventType)).toEqual(["scheduler.advance"]);
   });
+
+  it("does not auto-advance blocked tasks awaiting manual action", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Blocked Advance Worker", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Blocked task",
+        status: "Running",
+        priority: "High",
+        executionRuntime: "hermes",
+        executionConfig: { prompt: "Run" },
+      },
+    });
+    await db.executionSession.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_blocked",
+        status: "Paused",
+        currentNodeId: "node_blocked",
+        pauseReason: "manual_action",
+        completedNodeIds: "[]",
+      },
+    });
+    const startExecution = mock(async () => ({
+      taskId: task.id,
+      planId: "plan_blocked",
+      mainSessionId: "session_1",
+      status: "running" as const,
+      currentNodeId: "node_blocked",
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      checkpoint: null,
+      message: "Running",
+    }));
+
+    const result = await runGraphAdvancementWorker({ deps: { startExecution } });
+
+    expect(result.advanced).toEqual([]);
+    expect(startExecution).not.toHaveBeenCalled();
+  });
 });

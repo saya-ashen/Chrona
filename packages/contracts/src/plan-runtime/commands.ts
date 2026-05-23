@@ -23,6 +23,7 @@ export type ExecutionActionType =
   | "block_current_node"
   | "fail_current_node"
   | "retry_node"
+  | "pause_session"
   | "cancel_session";
 
 export type ExecutionActionInput =
@@ -94,6 +95,12 @@ export type ExecutionActionInput =
       sessionId?: string;
       nodeId: string;
       prompt?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "pause_session";
+      sessionId?: string;
+      reason?: string;
       idempotencyKey?: string;
     }
   | {

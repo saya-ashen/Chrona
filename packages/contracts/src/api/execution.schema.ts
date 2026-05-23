@@ -98,6 +98,12 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({
+    action: z.literal("pause_session"),
+    sessionId: sessionIdSchema.optional(),
+    reason: z.string().optional(),
+    idempotencyKey: idempotencyKeySchema.optional(),
+  }),
+  z.object({
     action: z.literal("cancel_session"),
     sessionId: sessionIdSchema.optional(),
     reason: z.string().optional(),

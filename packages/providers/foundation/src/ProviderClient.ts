@@ -40,3 +40,16 @@ export {
   startRunInputSchema,
   streamRunInputSchema,
 } from "./contracts/provider";
+
+export {
+  appendProviderReplayRecord,
+  providerReplayRecord,
+  readProviderReplayTape,
+  replayPathForRun,
+  terminalSnapshotFromEvents,
+  type ProviderReplayEventRecord,
+  type ProviderReplayRecord,
+  type ProviderReplaySnapshotRecord,
+  type ProviderReplayStartRecord,
+  type ProviderReplayTape,
+} from "./replay";

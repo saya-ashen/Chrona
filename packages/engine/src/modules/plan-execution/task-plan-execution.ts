@@ -28,6 +28,7 @@ import {
   type EngineRuntimeContext,
   type ExecutionActionWithContinuation,
   type OrchestratorTrigger,
+  type PlanExecutionControl,
   type PlanExecutionObserver,
 } from "./types";
 import {
@@ -55,10 +56,17 @@ import {
 import { buildAdvanceDispatchCommand } from "./runtime/advance-dispatch/build-advance-dispatch-command";
 import { createExecutionGraphCallbacks } from "./runtime/graph-runtime-callbacks";
 import {
+  abortTaskExecution,
+  clearTaskExecutionControl,
+  createTaskExecutionControl,
+  requestTaskExecutionPause,
+} from "./runtime/execution-control-registry";
+import {
   convergeExecutionToCommittedState,
 } from "./use-cases/execution-lifecycle";
 import { handleAdvanceOutcome } from "./use-cases/advance-outcome";
 import { dispatchRuntimeCommandAction } from "./use-cases/dispatch-runtime-command-action";
+import { getCurrentExecution } from "./use-cases/get-current-execution";
 import { resolveCheckpointTransition } from "./use-cases/checkpoint-transition/resolve-checkpoint-transition";
 export { syncPlanRunRuntimeResult } from "./use-cases/sync-runtime-result/sync-plan-run-runtime-result";
 export { getCurrentExecution } from "./use-cases/get-current-execution";
@@ -89,6 +97,7 @@ async function advancePlanExecution(input: {
   inputFields?: Record<string, string>;
   forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
   command?: AdvanceRuntimeCommand;
+  control?: PlanExecutionControl;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
@@ -112,11 +121,13 @@ async function advancePlanExecution(input: {
     taskId: input.taskId,
     planId: runtime.planId,
     mainSession: input.mainSession,
+    control: input.control,
   };
   const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
     taskId: input.taskId,
     runtimeName,
     policies: { maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS },
+    control: input.control,
     callbacks: createExecutionGraphCallbacks({
       taskId: input.taskId,
       planId: runtime.planId,
@@ -192,6 +203,18 @@ async function advancePlanExecution(input: {
   });
 }
 
+async function withTaskExecutionControl(
+  taskId: string,
+  run: (control: PlanExecutionControl) => Promise<PlanExecutionResult>,
+) {
+  const control = createTaskExecutionControl(taskId);
+  try {
+    return await run(control);
+  } finally {
+    clearTaskExecutionControl(taskId);
+  }
+}
+
 export async function startPlanExecution(input: {
   taskId: string;
   trigger: OrchestratorTrigger;
@@ -233,15 +256,18 @@ export async function startPlanExecution(input: {
     payload: { trigger: input.trigger, prompt: input.prompt },
   });
 
-  return advancePlanExecution({
-    taskId: input.taskId,
-    trigger: input.trigger,
-    mainSession,
-    executionSession,
-    onGraphEvent: input.onGraphEvent,
-    onRuntimeEvent: input.onRuntimeEvent,
-    onStateChange: input.onStateChange,
-  });
+  return withTaskExecutionControl(input.taskId, (control) =>
+    advancePlanExecution({
+      taskId: input.taskId,
+      trigger: input.trigger,
+      mainSession,
+      executionSession,
+      control,
+      onGraphEvent: input.onGraphEvent,
+      onRuntimeEvent: input.onRuntimeEvent,
+      onStateChange: input.onStateChange,
+    }),
+  );
 }
 
 export async function continuePlanExecution(input: {
@@ -314,19 +340,22 @@ export async function continuePlanExecution(input: {
     ? effective.nodes.find((node) => node.ready)
     : null;
 
-  return advancePlanExecution({
-    taskId: input.taskId,
-    trigger: "manual",
-    mainSession,
-    executionSession,
-    userInput: input.userInput,
-    inputFields: input.inputFields,
-    forcedNodeId: readyNode?.id ?? waitingNode?.id,
-    forcedReplaceStatus: "obsolete",
-    onGraphEvent: input.onGraphEvent,
-    onRuntimeEvent: input.onRuntimeEvent,
-    onStateChange: input.onStateChange,
-  });
+  return withTaskExecutionControl(input.taskId, (control) =>
+    advancePlanExecution({
+      taskId: input.taskId,
+      trigger: "manual",
+      mainSession,
+      executionSession,
+      userInput: input.userInput,
+      inputFields: input.inputFields,
+      forcedNodeId: readyNode?.id ?? waitingNode?.id,
+      forcedReplaceStatus: "obsolete",
+      control,
+      onGraphEvent: input.onGraphEvent,
+      onRuntimeEvent: input.onRuntimeEvent,
+      onStateChange: input.onStateChange,
+    }),
+  );
 }
 
 async function resumePlanExecutionWithApproval(input: {
@@ -402,21 +431,24 @@ async function resumePlanExecutionWithApproval(input: {
     },
   });
 
-  return advancePlanExecution({
-    taskId: input.taskId,
-    trigger: "manual",
-    mainSession,
-    executionSession,
-    command: {
-      type: "resume_with_approval",
-      nodeId: waitingNode.id,
-      approved: input.approved,
-      feedback: input.feedback,
-    },
-    onGraphEvent: input.onGraphEvent,
-    onRuntimeEvent: input.onRuntimeEvent,
-    onStateChange: input.onStateChange,
-  });
+  return withTaskExecutionControl(input.taskId, (control) =>
+    advancePlanExecution({
+      taskId: input.taskId,
+      trigger: "manual",
+      mainSession,
+      executionSession,
+      command: {
+        type: "resume_with_approval",
+        nodeId: waitingNode.id,
+        approved: input.approved,
+        feedback: input.feedback,
+      },
+      control,
+      onGraphEvent: input.onGraphEvent,
+      onRuntimeEvent: input.onRuntimeEvent,
+      onStateChange: input.onStateChange,
+    }),
+  );
 }
 
 export async function dispatchExecutionAction(input: {
@@ -476,36 +508,65 @@ export async function dispatchExecutionAction(input: {
         onStateChange: input.onStateChange,
       });
     case "complete_manual_node": {
-      return dispatchRuntimeCommandAction({
-        taskId: input.taskId,
-        action: input.action,
-        advance: advancePlanExecution,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      const action = input.action;
+      return withTaskExecutionControl(input.taskId, (control) =>
+        dispatchRuntimeCommandAction({
+          taskId: input.taskId,
+          action,
+          advance: advancePlanExecution,
+          control,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        }),
+      );
     }
     case "block_current_node": {
-      return dispatchRuntimeCommandAction({
-        taskId: input.taskId,
-        action: input.action,
-        advance: advancePlanExecution,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      const action = input.action;
+      return withTaskExecutionControl(input.taskId, (control) =>
+        dispatchRuntimeCommandAction({
+          taskId: input.taskId,
+          action,
+          advance: advancePlanExecution,
+          control,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        }),
+      );
     }
     case "fail_current_node": {
-      return dispatchRuntimeCommandAction({
-        taskId: input.taskId,
-        action: input.action,
-        advance: advancePlanExecution,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      const action = input.action;
+      return withTaskExecutionControl(input.taskId, (control) =>
+        dispatchRuntimeCommandAction({
+          taskId: input.taskId,
+          action,
+          advance: advancePlanExecution,
+          control,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        }),
+      );
     }
     case "retry_node": {
+      const action = input.action;
+      return withTaskExecutionControl(input.taskId, (control) =>
+        dispatchRuntimeCommandAction({
+          taskId: input.taskId,
+          action,
+          advance: advancePlanExecution,
+          control,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        }),
+      );
+    }
+    case "pause_session": {
+      if (requestTaskExecutionPause(input.taskId)) {
+        return getCurrentExecution({ taskId: input.taskId });
+      }
       return dispatchRuntimeCommandAction({
         taskId: input.taskId,
         action: input.action,
@@ -516,6 +577,10 @@ export async function dispatchExecutionAction(input: {
       });
     }
     case "cancel_session": {
+      abortTaskExecution({
+        taskId: input.taskId,
+        reason: input.action.reason,
+      });
       return dispatchRuntimeCommandAction({
         taskId: input.taskId,
         action: input.action,

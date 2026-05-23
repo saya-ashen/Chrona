@@ -302,6 +302,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });
             }
+            if (action.id === "pause") {
+              await dispatchExecutionAction({ action: "pause_session", reason: "Paused from task workspace" });
+            }
             if (action.id === "stop") {
               await dispatchExecutionAction({ action: "cancel_session", reason: "Stopped from task workspace" });
             }
