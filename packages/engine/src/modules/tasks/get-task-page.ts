@@ -16,19 +16,55 @@ type TaskPlanGenerationStatus =
 
 type WorkspaceActivityTimelineItem = {
   id: string;
+  kind: "assistant_message" | "reasoning" | "tool_started" | "tool_completed" | "provider_run" | "approval" | "node" | "task" | "artifact" | "schedule" | "raw";
   title: string;
+  summary: string;
   description: string;
-  tone: "success" | "warning" | "critical" | "info" | "neutral";
+  tone: "success" | "warning" | "danger" | "info" | "neutral";
   timestamp?: string | null;
+  sourceNodeId?: string;
+  sourceNodeTitle?: string;
+  provider?: string;
+  runtimeName?: string;
+  runId?: string;
+  nativeRunId?: string;
+  sequence?: number;
+  rawEventType?: string;
+  tool?: {
+    name?: string;
+    label?: string;
+    preview?: string;
+    inputSummary?: string;
+    durationMs?: number;
+    error?: string;
+    state: "started" | "completed" | "failed";
+  };
+  assistant?: {
+    text: string;
+    isReasoning: boolean;
+    isPartial?: boolean;
+  };
+  raw?: unknown;
 };
 
 type TaskActivityEvent = {
   id: string;
   eventType: string;
   source: string;
+  nodeId: string | null;
+  nodeTitle: string | null;
   payload: unknown;
   runtimeTs: Date | null;
   createdAt: Date;
+  ingestSequence?: number | bigint | null;
+};
+
+type TaskActivityPageInput = {
+  taskId: string;
+  scope?: "task" | "node";
+  nodeId?: string;
+  cursor?: string;
+  limit?: number;
 };
 
 function readBlockReason(task: {
@@ -106,6 +142,30 @@ function providerActivityDescription(event: Record<string, unknown>, fallback: s
   return fallback;
 }
 
+function providerActivityToolLabel(event: Record<string, unknown>, fallback: string) {
+  if (typeof event.label === "string" && event.label.trim()) return event.label.trim();
+  if (typeof event.toolName === "string" && event.toolName.trim()) return event.toolName.trim();
+  if (typeof event.tool === "string" && event.tool.trim()) return event.tool.trim();
+  return fallback;
+}
+
+function providerActivityError(event: Record<string, unknown>) {
+  if (typeof event.error === "string" && event.error.trim()) return event.error.trim();
+  const error = event.error;
+  if (error && typeof error === "object" && !Array.isArray(error) && typeof (error as { message?: unknown }).message === "string") {
+    return (error as { message: string }).message;
+  }
+  return undefined;
+}
+
+function optionalStringEventValue(event: Record<string, unknown>, key: string) {
+  return typeof event[key] === "string" && event[key].trim() ? event[key] as string : undefined;
+}
+
+function optionalNumberEventValue(event: Record<string, unknown>, key: string) {
+  return typeof event[key] === "number" ? event[key] as number : undefined;
+}
+
 function providerActivityText(event: Record<string, unknown>) {
   return typeof event.text === "string" ? event.text : null;
 }
@@ -123,6 +183,7 @@ function providerActivityMergeKey(event: TaskActivityEvent, eventType: string) {
     stringPayloadValue(event.payload, "provider") ?? "provider",
     stringPayloadValue(event.payload, "runId") ?? "run",
     stringPayloadValue(event.payload, "nativeRunId") ?? "native",
+    event.nodeId ?? "task",
   ].join(":");
 }
 
@@ -133,35 +194,58 @@ function isMergeableProviderTextEvent(eventType: string) {
 function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem {
   const payloadEvent = runtimePayloadEvent(event.payload);
   const provider = stringPayloadValue(event.payload, "provider") ?? stringPayloadValue(event.payload, "runtimeName") ?? "provider";
+  const runtimeName = stringPayloadValue(event.payload, "runtimeName") ?? undefined;
+  const runId = stringPayloadValue(event.payload, "runId") ?? undefined;
+  const nativeRunId = stringPayloadValue(event.payload, "nativeRunId") ?? undefined;
+  const sequence = numberPayloadValue(event.payload, "sequence") ?? undefined;
   const eventType = providerActivityEventType(event, payloadEvent);
   const timestamp = (event.runtimeTs ?? event.createdAt).toISOString();
+  const payloadRecord = payloadEvent ?? {};
+  const rawEventType = optionalStringEventValue(payloadRecord, "rawEventType") ?? eventType;
+  const withBase = (item: WorkspaceActivityTimelineItem): WorkspaceActivityTimelineItem => ({
+    ...item,
+    provider,
+    runtimeName,
+    runId,
+    nativeRunId,
+    sequence,
+    rawEventType,
+    raw: payloadEvent ?? event.payload,
+    ...(event.nodeId ? { sourceNodeId: event.nodeId } : {}),
+    ...(event.nodeTitle ? { sourceNodeTitle: event.nodeTitle } : {}),
+  });
 
   switch (eventType) {
     case "run_started":
-      return { id: event.id, title: "Provider run started", description: provider, tone: "info", timestamp };
+      return withBase({ id: event.id, kind: "provider_run", title: "Provider run started", summary: provider, description: provider, tone: "info", timestamp });
     case "text_delta":
-      return { id: event.id, title: "Assistant response", description: providerActivityDescription(payloadEvent ?? {}, "Assistant output streamed."), tone: "info", timestamp };
+      return withBase({ id: event.id, kind: "assistant_message", title: "Assistant response", summary: providerActivityDescription(payloadRecord, "Assistant output streamed."), description: providerActivityDescription(payloadRecord, "Assistant output streamed."), tone: "info", timestamp, assistant: { text: providerActivityDescription(payloadRecord, ""), isReasoning: false, isPartial: true } });
     case "reasoning_delta":
-      return { id: event.id, title: "Reasoning", description: providerActivityDescription(payloadEvent ?? {}, "Reasoning streamed."), tone: "neutral", timestamp };
+      return withBase({ id: event.id, kind: "reasoning", title: "Reasoning", summary: providerActivityDescription(payloadRecord, "Reasoning streamed."), description: providerActivityDescription(payloadRecord, "Reasoning streamed."), tone: "neutral", timestamp, assistant: { text: providerActivityDescription(payloadRecord, ""), isReasoning: true, isPartial: true } });
     case "tool_call":
     case "tool_started":
-      return { id: event.id, title: "Tool started", description: providerActivityDescription(payloadEvent ?? {}, "Provider tool started."), tone: "info", timestamp };
+      return withBase({ id: event.id, kind: "tool_started", title: "Tool started", summary: providerActivityDescription(payloadRecord, "Provider tool started."), description: providerActivityDescription(payloadRecord, "Provider tool started."), tone: "info", timestamp, tool: { name: optionalStringEventValue(payloadRecord, "toolName") ?? optionalStringEventValue(payloadRecord, "tool"), label: providerActivityToolLabel(payloadRecord, "Provider tool"), preview: optionalStringEventValue(payloadRecord, "preview"), inputSummary: optionalStringEventValue(payloadRecord, "inputSummary"), state: "started" } });
     case "tool_result":
     case "tool_completed": {
-      const hasError = Boolean(payloadEvent && "error" in payloadEvent && payloadEvent.error);
-      return { id: event.id, title: hasError ? "Tool failed" : "Tool completed", description: providerActivityDescription(payloadEvent ?? {}, "Provider tool completed."), tone: hasError ? "critical" : "success", timestamp };
+      const error = providerActivityError(payloadRecord);
+      const hasError = Boolean(error);
+      return withBase({ id: event.id, kind: "tool_completed", title: hasError ? "Tool failed" : "Tool completed", summary: providerActivityDescription(payloadRecord, "Provider tool completed."), description: providerActivityDescription(payloadRecord, "Provider tool completed."), tone: hasError ? "danger" : "success", timestamp, tool: { name: optionalStringEventValue(payloadRecord, "toolName") ?? optionalStringEventValue(payloadRecord, "tool"), label: providerActivityToolLabel(payloadRecord, "Provider tool"), preview: optionalStringEventValue(payloadRecord, "preview"), durationMs: optionalNumberEventValue(payloadRecord, "durationMs"), error, state: hasError ? "failed" : "completed" } });
     }
     case "approval_required":
-      return { id: event.id, title: "Approval required", description: provider, tone: "warning", timestamp };
+      return withBase({ id: event.id, kind: "approval", title: "Approval required", summary: provider, description: provider, tone: "warning", timestamp });
     case "run_completed":
-      return { id: event.id, title: "Provider run completed", description: provider, tone: "success", timestamp };
+      return withBase({ id: event.id, kind: "provider_run", title: "Provider run completed", summary: provider, description: provider, tone: "success", timestamp });
     case "run_failed":
-      return { id: event.id, title: "Provider run failed", description: providerActivityDescription(payloadEvent ?? {}, provider), tone: "critical", timestamp };
+      return withBase({ id: event.id, kind: "provider_run", title: "Provider run failed", summary: providerActivityDescription(payloadRecord, provider), description: providerActivityDescription(payloadRecord, provider), tone: "danger", timestamp });
     case "run_cancelled":
-      return { id: event.id, title: "Provider run cancelled", description: provider, tone: "warning", timestamp };
+      return withBase({ id: event.id, kind: "provider_run", title: "Provider run cancelled", summary: provider, description: provider, tone: "warning", timestamp });
     default:
-      return { id: event.id, title: "Provider event", description: providerActivityDescription(payloadEvent ?? {}, eventType), tone: "neutral", timestamp };
+      return withBase({ id: event.id, kind: "raw", title: "Provider event", summary: providerActivityDescription(payloadRecord, eventType), description: providerActivityDescription(payloadRecord, eventType), tone: "neutral", timestamp });
   }
+}
+
+function taskActivityItem(input: Omit<WorkspaceActivityTimelineItem, "summary"> & { summary?: string }) {
+  return { ...input, summary: input.summary ?? input.description } satisfies WorkspaceActivityTimelineItem;
 }
 
 function eventTimestamp(event: TaskActivityEvent) {
@@ -178,8 +262,9 @@ function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTime
 
   switch (event.eventType) {
     case "task.created":
-      return {
+      return taskActivityItem({
         id: event.id,
+        kind: "task",
         title: "Task created",
         description: compactParts([
           stringPayloadValue(payload, "title"),
@@ -188,29 +273,31 @@ function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTime
         ]) || "Task was created.",
         tone: "info",
         timestamp,
-      };
+      });
     case "task.updated": {
       const changedFields = arrayPayloadValue(payload, "changed_fields")?.filter((field): field is string => typeof field === "string") ?? [];
-      return {
+      return taskActivityItem({
         id: event.id,
+        kind: "task",
         title: "Task updated",
         description: changedFields.length > 0 ? `Updated ${changedFields.join(", ")}` : "Task fields changed.",
         tone: "info",
         timestamp,
-      };
+      });
     }
     case "task.deleted":
-      return { id: event.id, title: "Task deleted", description: "Task was deleted.", tone: "warning", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Task deleted", description: "Task was deleted.", tone: "warning", timestamp });
     case "task.result_accepted":
-      return { id: event.id, title: "Result accepted", description: stringPayloadValue(payload, "summary") ?? "Task result was accepted.", tone: "success", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Result accepted", description: stringPayloadValue(payload, "summary") ?? "Task result was accepted.", tone: "success", timestamp });
     case "task.reopened":
-      return { id: event.id, title: "Task reopened", description: stringPayloadValue(payload, "reason") ?? "Task was reopened.", tone: "warning", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Task reopened", description: stringPayloadValue(payload, "reason") ?? "Task was reopened.", tone: "warning", timestamp });
     case "task.done":
     case "task.marked_done":
-      return { id: event.id, title: "Task completed", description: stringPayloadValue(payload, "reason") ?? "Task was marked done.", tone: "success", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Task completed", description: stringPayloadValue(payload, "reason") ?? "Task was marked done.", tone: "success", timestamp });
     case "task.schedule_changed":
-      return {
+      return taskActivityItem({
         id: event.id,
+        kind: "schedule",
         title: "Schedule changed",
         description: compactParts([
           stringPayloadValue(payload, "scheduledStartAt"),
@@ -219,18 +306,19 @@ function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTime
         ]) || "Task schedule changed.",
         tone: "info",
         timestamp,
-      };
+      });
     case "task.schedule_proposed":
-      return { id: event.id, title: "Schedule proposed", description: stringPayloadValue(payload, "summary") ?? "A schedule was proposed.", tone: "info", timestamp };
+      return taskActivityItem({ id: event.id, kind: "schedule", title: "Schedule proposed", description: stringPayloadValue(payload, "summary") ?? "A schedule was proposed.", tone: "info", timestamp });
     case "task.auto_start.skipped":
-      return { id: event.id, title: "Auto-start skipped", description: stringPayloadValue(payload, "reason") ?? "Scheduled task was not auto-started.", tone: "warning", timestamp };
+      return taskActivityItem({ id: event.id, kind: "schedule", title: "Auto-start skipped", description: stringPayloadValue(payload, "reason") ?? "Scheduled task was not auto-started.", tone: "warning", timestamp });
     case "plan_generation.started":
-      return { id: event.id, title: "Plan generation started", description: stringPayloadValue(payload, "instruction") ?? "Generating a task plan.", tone: "info", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation started", description: stringPayloadValue(payload, "instruction") ?? "Generating a task plan.", tone: "info", timestamp });
     case "plan_generation.status":
-      return { id: event.id, title: "Plan generation update", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "phase") ?? "Plan generation progressed.", tone: "info", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation update", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "phase") ?? "Plan generation progressed.", tone: "info", timestamp });
     case "plan_generation.tool_called":
-      return {
+      return taskActivityItem({
         id: event.id,
+        kind: "task",
         title: "Plan tool called",
         description: compactParts([
           stringPayloadValue(payload, "tool"),
@@ -239,28 +327,28 @@ function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTime
         ]) || "AI produced a plan blueprint.",
         tone: "info",
         timestamp,
-      };
+      });
     case "plan_generation.draft_saved":
-      return { id: event.id, title: "Plan draft saved", description: stringPayloadValue(payload, "plan_title") ?? "Generated plan draft was saved.", tone: "success", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan draft saved", description: stringPayloadValue(payload, "plan_title") ?? "Generated plan draft was saved.", tone: "success", timestamp });
     case "plan_generation.completed":
-      return { id: event.id, title: "Plan generated", description: stringPayloadValue(payload, "plan_title") ?? "Plan generation completed.", tone: "success", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generated", description: stringPayloadValue(payload, "plan_title") ?? "Plan generation completed.", tone: "success", timestamp });
     case "plan_generation.failed":
-      return { id: event.id, title: "Plan generation failed", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "code") ?? "Plan generation failed.", tone: "critical", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation failed", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "code") ?? "Plan generation failed.", tone: "danger", timestamp });
     case "plan_generation.cancelled":
-      return { id: event.id, title: "Plan generation cancelled", description: "Plan generation was cancelled.", tone: "warning", timestamp };
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation cancelled", description: "Plan generation was cancelled.", tone: "warning", timestamp });
     default:
       if (event.eventType.startsWith("plan_execution.")) {
         const title = humanizeEventType(event.eventType);
         const status = stringPayloadValue(payload, "status");
         const description = compactParts([
-          stringPayloadValue(payload, "node_id"),
+          event.nodeTitle,
           stringPayloadValue(payload, "checkpoint_id"),
           status,
         ]) || event.eventType;
-        const tone = event.eventType.includes("failed") || status === "failed" ? "critical" : event.eventType.includes("completed") || status === "completed" ? "success" : "info";
-        return { id: event.id, title, description, tone, timestamp };
+        const tone = event.eventType.includes("failed") || status === "failed" ? "danger" : event.eventType.includes("completed") || status === "completed" ? "success" : "info";
+        return taskActivityItem({ id: event.id, kind: "node", title, description, tone, timestamp, sourceNodeId: event.nodeId ?? undefined, sourceNodeTitle: event.nodeTitle ?? undefined });
       }
-      return { id: event.id, title: "Task event", description: humanizeEventType(event.eventType), tone: "neutral", timestamp };
+      return taskActivityItem({ id: event.id, kind: "raw", title: "Task event", description: humanizeEventType(event.eventType), tone: "neutral", timestamp });
   }
 }
 
@@ -284,16 +372,67 @@ function buildActivityTimeline(events: TaskActivityEvent[]) {
 
     if (currentTextSegment !== null && currentTextSegment.key === key) {
       currentTextSegment.item.description = `${currentTextSegment.item.description}${text}`;
+      currentTextSegment.item.summary = currentTextSegment.item.description;
+      currentTextSegment.item.assistant = {
+        text: currentTextSegment.item.description,
+        isReasoning: eventType === "reasoning_delta",
+        isPartial: true,
+      };
       currentTextSegment.item.timestamp = nextItem.timestamp;
       continue;
     }
 
     nextItem.description = text || nextItem.description;
+    nextItem.summary = nextItem.description;
+    if (nextItem.assistant) nextItem.assistant.text = nextItem.description;
     items.push(nextItem);
     currentTextSegment = { key, item: nextItem };
   }
 
   return items;
+}
+
+function activitySortValue(item: WorkspaceActivityTimelineItem) {
+  return item.timestamp ? Date.parse(item.timestamp) : 0;
+}
+
+function orderActivityNewestFirst(items: WorkspaceActivityTimelineItem[]) {
+  return [...items].sort((a, b) => {
+    const timestampDelta = activitySortValue(b) - activitySortValue(a);
+    if (timestampDelta !== 0) return timestampDelta;
+    return (b.sequence ?? 0) - (a.sequence ?? 0);
+  });
+}
+
+export async function getTaskActivityPage(input: TaskActivityPageInput) {
+  const limit = Math.min(Math.max(input.limit ?? 100, 1), 3000);
+  const scope = input.scope ?? "task";
+  if (scope === "node" && !input.nodeId) {
+    throw new Error("nodeId is required for node activity");
+  }
+  const events = await db.event.findMany({
+    where: scope === "node"
+      ? { taskId: input.taskId, nodeId: input.nodeId }
+      : { taskId: input.taskId },
+    orderBy: { ingestSequence: "desc" },
+    take: limit + 1,
+    ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+  });
+  const pageEvents = events.slice(0, limit);
+  const activity = orderActivityNewestFirst(
+    buildActivityTimeline([...pageEvents].reverse()),
+  );
+
+  return {
+    items: activity,
+    nextCursor: events.length > limit ? pageEvents.at(-1)?.id : undefined,
+    scope: {
+      type: scope,
+      taskId: input.taskId,
+      ...(scope === "node" && input.nodeId ? { nodeId: input.nodeId } : {}),
+      limit,
+    },
+  };
 }
 
 export async function getTaskPage(taskId: string) {

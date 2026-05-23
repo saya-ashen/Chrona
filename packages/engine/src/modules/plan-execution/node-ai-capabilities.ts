@@ -61,6 +61,10 @@ export async function runTaskNodeFeature(
       taskSessionId: input.mainSession.id,
       runtimeName: input.runtimeName,
       runtimeSessionKey: input.mainSession.sessionKey,
+      nodeContext: {
+        nodeId: input.node.id,
+        nodeTitle: input.node.title,
+      },
       runtimeInput: input.providerInput,
       instructions: input.featureSpec.instructions,
       featureSpec: input.featureSpec,

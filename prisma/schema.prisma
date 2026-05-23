@@ -481,6 +481,8 @@ model Event {
   workspaceId    String
   taskId         String
   runId          String?
+  nodeId         String?
+  nodeTitle      String?
   actorType      String
   actorId        String
   source         String
@@ -494,6 +496,7 @@ model Event {
   run            Run?      @relation(fields: [runId], references: [id])
 
   @@index([taskId, ingestSequence])
+  @@index([taskId, nodeId, ingestSequence])
   @@index([runId, ingestSequence])
   @@index([workspaceId, eventType, ingestSequence])
 }

@@ -361,7 +361,9 @@ describe("TaskWorkspacePage", () => {
     const data = taskData();
     data.activityTimeline = [{
       id: "provider-run-completed",
+      kind: "provider_run",
       title: "Hermes reported blocked",
+      summary: "Node 7 blocked on weather API timeout",
       description: "Node 7 blocked on weather API timeout",
       tone: "warning",
       timestamp: "2026-05-20T14:43:08.000Z",

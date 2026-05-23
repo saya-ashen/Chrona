@@ -63,7 +63,7 @@ function runtimeTextMergeKey(event: WorkspaceRuntimeEvent) {
   ].join(":");
 }
 
-function appendRuntimeEvent(events: WorkspaceRuntimeEvent[], event: WorkspaceRuntimeEvent) {
+export function appendRuntimeEvent(events: WorkspaceRuntimeEvent[], event: WorkspaceRuntimeEvent) {
   const previous = events.at(-1);
   if (previous && isRuntimeTextDelta(previous) && isRuntimeTextDelta(event) && runtimeTextMergeKey(previous) === runtimeTextMergeKey(event)) {
     return [

@@ -16,6 +16,10 @@ import type {
   WorkspaceActivityItem,
   WorkspaceArtifactItem,
 } from "./task-workspace-types";
+import {
+  activityToneFromOverviewTone,
+  mergeWorkspaceActivity,
+} from "./task-workspace-activity";
 import { buildWorkspaceStateTreatment } from "./task-workspace-actions";
 
 export type TaskWorkspaceCommandAck = {
@@ -328,10 +332,12 @@ function buildArtifactItems(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan
 }
 
 function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null): WorkspaceActivityItem[] {
-  const providerActivity = (pageData.activityTimeline ?? []).slice(-20).reverse();
+  const providerActivity = pageData.activityTimeline ?? [];
   const approvalActivity = pageData.approvals.slice(0, 3).map((approval) => ({
     id: `approval-${approval.id}`,
+    kind: "approval" as const,
     title: approval.title,
+    summary: `Approval ${approval.status}`,
     description: `Approval ${approval.status}`,
     tone: approval.status === "Approved" || approval.status === "EditedAndApproved" ? "success" as const : "warning" as const,
     timestamp: approval.requestedAt,
@@ -339,7 +345,9 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
 
   const artifactActivity = pageData.artifacts.slice(0, 3).map((artifact) => ({
     id: `artifact-${artifact.id}`,
+    kind: "artifact" as const,
     title: artifact.title,
+    summary: `Artifact ${artifact.type}`,
     description: `Artifact ${artifact.type}`,
     tone: "info" as const,
   }));
@@ -349,7 +357,9 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
     .slice(0, 2)
     .map((proposal) => ({
       id: `schedule-proposal-${proposal.id}`,
+      kind: "schedule" as const,
       title: "Schedule proposal",
+      summary: proposal.summary,
       description: proposal.summary,
       tone: "warning" as const,
       timestamp: proposal.scheduledStartAt,
@@ -360,22 +370,30 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
     .slice(0, 5)
     .map((node) => ({
       id: `node-${node.id}`,
+      kind: "node" as const,
       title: node.title,
+      summary: node.statusLabel ?? node.status,
       description: node.statusLabel ?? node.status,
-      tone: overviewToneForNode(node),
+      tone: activityToneFromOverviewTone(overviewToneForNode(node)),
+      sourceNodeId: node.id,
+      sourceNodeTitle: node.title,
     }));
 
+  const fallbackActivity = [...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity] satisfies WorkspaceActivityItem[];
+
   if (pageData.latestRunSummary) {
-    return [...providerActivity, {
+    return mergeWorkspaceActivity([...providerActivity, {
       id: `run-${pageData.latestRunSummary.id}`,
+      kind: "provider_run" as const,
       title: "Latest run",
+      summary: pageData.latestRunSummary.status,
       description: pageData.latestRunSummary.status,
       tone: pageData.latestRunSummary.status === "Completed" ? "success" as const : "info" as const,
       timestamp: pageData.latestRunSummary.startedAt,
-    }, ...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity];
+    }, ...fallbackActivity]);
   }
 
-  return [...providerActivity, ...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity];
+  return mergeWorkspaceActivity([...providerActivity, ...fallbackActivity]);
 }
 
 function buildTaskHeaderView(
@@ -507,6 +525,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   const isPermissionLimited = !pageData.task.isRunnable && !pageData.task.blockReason;
   const isStale = pageData.latestRunSummary?.syncStatus === "stale";
   const errorMessage = input.graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null;
+  const activity = buildActivity(pageData, input.graphPlan);
 
   return {
     task,
@@ -523,7 +542,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
       status: currentNode ? mapTaskWorkspaceStatus(currentNode.status) : null,
       stepPosition: currentNode ? `${(input.graphPlan?.nodes ?? []).findIndex((node) => node.id === currentNode.id) + 1}/${input.graphPlan?.nodes.length ?? 0}` : "0/0",
       autoRefreshEnabled: currentNode ? ["running", "approval-needed"].includes(mapTaskWorkspaceStatus(currentNode.status)) : false,
-      tabs: ["result", "evidence", "action", "configuration"],
+      tabs: ["result", "activity", "action", "configuration"],
       disabledActionReason:
         currentNode &&
         (currentNode.availableActions?.length ?? 0) === 0 &&
@@ -536,7 +555,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
     latestResult: buildLatestResultCard(pageData, input.graphPlan),
     attention,
     artifacts: buildArtifactItems(pageData, input.graphPlan),
-    activity: buildActivity(pageData, input.graphPlan),
+    activity,
     states: {
       isEmpty: (input.graphPlan?.nodes.length ?? 0) === 0,
       isStale,

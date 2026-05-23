@@ -5,7 +5,6 @@ import type { NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/cont
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
 import {
-  evidenceLines,
   extractRunError,
   extractRunResult,
   ResultOutputCard,
@@ -33,6 +32,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
 import {
@@ -41,12 +41,13 @@ import {
   getWorkspaceActionDisabledReason,
   pickDefaultWorkspaceAction,
 } from "../model/task-workspace-actions";
-import type { NodeDetailPanelState } from "../model/task-workspace-types";
+import type { NodeDetailPanelState, WorkspaceActivityItem } from "../model/task-workspace-types";
+import { WorkspaceActivityFeed } from "./workspace-activity-feed";
 
 const TAB_LABELS: Record<NodeDetailPanelState["tabs"][number], string> = {
   result: "Result",
   action: "Action",
-  evidence: "Evidence",
+  activity: "Activity",
   configuration: "Details",
 };
 
@@ -55,8 +56,8 @@ type NodeDrawerSize = "collapsed" | "half" | "expanded";
 
 const TAB_ORDER: NodeDetailPanelState["tabs"][number][] = [
   "result",
+  "activity",
   "action",
-  "evidence",
   "configuration",
 ];
 
@@ -164,28 +165,6 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
           </p>
         )}
       </div>
-    </div>
-  );
-}
-
-function EvidenceTab({ node }: { node: PlanNodeDataModel }) {
-  const evidence = useMemo(
-    () => evidenceLines(node.resultEvidence),
-    [node.resultEvidence],
-  );
-
-  return (
-    <div className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
-      <p className="text-sm font-semibold text-slate-950">Evidence</p>
-      {evidence.length > 0 ? (
-        <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-slate-950/[0.035] p-3 text-xs leading-5 text-slate-600">
-          {evidence.join("\n")}
-        </pre>
-      ) : (
-        <p className="mt-2 text-sm text-slate-500">
-          No evidence or runtime metadata is attached to this node yet.
-        </p>
-      )}
     </div>
   );
 }
@@ -522,6 +501,8 @@ function ConfigurationTab({
 
 export function TaskWorkspaceNodeDetailPanel({
   detail,
+  activity,
+  isActivityLoading,
   selectedNodes,
   variant = "panel",
   drawerSize = "half",
@@ -531,6 +512,8 @@ export function TaskWorkspaceNodeDetailPanel({
   onSubmitCheckpointAction,
 }: {
   detail: NodeDetailPanelState;
+  activity: WorkspaceActivityItem[];
+  isActivityLoading?: boolean;
   selectedNodes: PlanNodeDataModel[];
   variant?: NodeDetailVariant;
   drawerSize?: NodeDrawerSize;
@@ -695,8 +678,12 @@ export function TaskWorkspaceNodeDetailPanel({
           <TabsContent value="result" aria-label={`${TAB_LABELS.result} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
             <ResultTab node={node} />
           </TabsContent>
-          <TabsContent value="evidence" aria-label={`${TAB_LABELS.evidence} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
-            <EvidenceTab node={node} />
+          <TabsContent value="activity" aria-label={`${TAB_LABELS.activity} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
+                <WorkspaceActivityFeed
+                  activity={activity}
+                  title={taskWorkspaceActivityMessages.nodeTitle}
+                  emptyMessage={isActivityLoading ? "Loading node activity..." : taskWorkspaceActivityMessages.nodeEmpty}
+                />
           </TabsContent>
           <TabsContent value="action" aria-label={`${TAB_LABELS.action} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
             <WorkspaceNodeActionControls

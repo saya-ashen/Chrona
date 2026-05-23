@@ -239,12 +239,67 @@ export type WorkspaceArtifactItem = {
   content?: string;
 };
 
+export type WorkspaceActivityKind =
+  | "assistant_message"
+  | "reasoning"
+  | "tool_started"
+  | "tool_completed"
+  | "provider_run"
+  | "approval"
+  | "node"
+  | "task"
+  | "artifact"
+  | "schedule"
+  | "raw";
+
+export type WorkspaceActivityTone = "neutral" | "info" | "success" | "warning" | "danger";
+
+export type WorkspaceToolActivity = {
+  name?: string;
+  label?: string;
+  preview?: string;
+  inputSummary?: string;
+  durationMs?: number;
+  error?: string;
+  state: "started" | "completed" | "failed";
+};
+
+export type WorkspaceAssistantActivity = {
+  text: string;
+  isReasoning: boolean;
+  isPartial?: boolean;
+};
+
 export type WorkspaceActivityItem = {
   id: string;
+  kind: WorkspaceActivityKind;
   title: string;
+  summary: string;
   description: string;
-  tone: ExecutionOverviewTone;
+  tone: WorkspaceActivityTone;
   timestamp?: string | null;
+  sourceNodeId?: string;
+  sourceNodeTitle?: string;
+  provider?: string;
+  runtimeName?: string;
+  runId?: string;
+  nativeRunId?: string;
+  sequence?: number;
+  rawEventType?: string;
+  tool?: WorkspaceToolActivity;
+  assistant?: WorkspaceAssistantActivity;
+  raw?: unknown;
+};
+
+export type WorkspaceActivityPage = {
+  items: WorkspaceActivityItem[];
+  nextCursor?: string;
+  scope: {
+    type: "task" | "node";
+    taskId: string;
+    nodeId?: string;
+    limit: number;
+  };
 };
 
 export type NodeDetailPanelState = {
@@ -255,7 +310,7 @@ export type NodeDetailPanelState = {
   status: TaskWorkspaceUserStatus | null;
   stepPosition: string;
   autoRefreshEnabled: boolean;
-  tabs: Array<"result" | "evidence" | "action" | "configuration">;
+  tabs: Array<"result" | "activity" | "action" | "configuration">;
   disabledActionReason?: string;
   isEmpty: boolean;
 };

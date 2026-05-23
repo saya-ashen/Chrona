@@ -40,6 +40,8 @@ export type EventMinAggregateOutputType = {
   workspaceId: string | null
   taskId: string | null
   runId: string | null
+  nodeId: string | null
+  nodeTitle: string | null
   actorType: string | null
   actorId: string | null
   source: string | null
@@ -55,6 +57,8 @@ export type EventMaxAggregateOutputType = {
   workspaceId: string | null
   taskId: string | null
   runId: string | null
+  nodeId: string | null
+  nodeTitle: string | null
   actorType: string | null
   actorId: string | null
   source: string | null
@@ -70,6 +74,8 @@ export type EventCountAggregateOutputType = {
   workspaceId: number
   taskId: number
   runId: number
+  nodeId: number
+  nodeTitle: number
   actorType: number
   actorId: number
   source: number
@@ -96,6 +102,8 @@ export type EventMinAggregateInputType = {
   workspaceId?: true
   taskId?: true
   runId?: true
+  nodeId?: true
+  nodeTitle?: true
   actorType?: true
   actorId?: true
   source?: true
@@ -111,6 +119,8 @@ export type EventMaxAggregateInputType = {
   workspaceId?: true
   taskId?: true
   runId?: true
+  nodeId?: true
+  nodeTitle?: true
   actorType?: true
   actorId?: true
   source?: true
@@ -126,6 +136,8 @@ export type EventCountAggregateInputType = {
   workspaceId?: true
   taskId?: true
   runId?: true
+  nodeId?: true
+  nodeTitle?: true
   actorType?: true
   actorId?: true
   source?: true
@@ -229,6 +241,8 @@ export type EventGroupByOutputType = {
   workspaceId: string
   taskId: string
   runId: string | null
+  nodeId: string | null
+  nodeTitle: string | null
   actorType: string
   actorId: string
   source: string
@@ -268,6 +282,8 @@ export type EventWhereInput = {
   workspaceId?: Prisma.StringFilter<"Event"> | string
   taskId?: Prisma.StringFilter<"Event"> | string
   runId?: Prisma.StringNullableFilter<"Event"> | string | null
+  nodeId?: Prisma.StringNullableFilter<"Event"> | string | null
+  nodeTitle?: Prisma.StringNullableFilter<"Event"> | string | null
   actorType?: Prisma.StringFilter<"Event"> | string
   actorId?: Prisma.StringFilter<"Event"> | string
   source?: Prisma.StringFilter<"Event"> | string
@@ -287,6 +303,8 @@ export type EventOrderByWithRelationInput = {
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runId?: Prisma.SortOrderInput | Prisma.SortOrder
+  nodeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  nodeTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   actorType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   source?: Prisma.SortOrder
@@ -310,6 +328,8 @@ export type EventWhereUniqueInput = Prisma.AtLeast<{
   workspaceId?: Prisma.StringFilter<"Event"> | string
   taskId?: Prisma.StringFilter<"Event"> | string
   runId?: Prisma.StringNullableFilter<"Event"> | string | null
+  nodeId?: Prisma.StringNullableFilter<"Event"> | string | null
+  nodeTitle?: Prisma.StringNullableFilter<"Event"> | string | null
   actorType?: Prisma.StringFilter<"Event"> | string
   actorId?: Prisma.StringFilter<"Event"> | string
   source?: Prisma.StringFilter<"Event"> | string
@@ -328,6 +348,8 @@ export type EventOrderByWithAggregationInput = {
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runId?: Prisma.SortOrderInput | Prisma.SortOrder
+  nodeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  nodeTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   actorType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   source?: Prisma.SortOrder
@@ -352,6 +374,8 @@ export type EventScalarWhereWithAggregatesInput = {
   workspaceId?: Prisma.StringWithAggregatesFilter<"Event"> | string
   taskId?: Prisma.StringWithAggregatesFilter<"Event"> | string
   runId?: Prisma.StringNullableWithAggregatesFilter<"Event"> | string | null
+  nodeId?: Prisma.StringNullableWithAggregatesFilter<"Event"> | string | null
+  nodeTitle?: Prisma.StringNullableWithAggregatesFilter<"Event"> | string | null
   actorType?: Prisma.StringWithAggregatesFilter<"Event"> | string
   actorId?: Prisma.StringWithAggregatesFilter<"Event"> | string
   source?: Prisma.StringWithAggregatesFilter<"Event"> | string
@@ -365,6 +389,8 @@ export type EventScalarWhereWithAggregatesInput = {
 export type EventCreateInput = {
   id?: string
   eventType: string
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -384,6 +410,8 @@ export type EventUncheckedCreateInput = {
   workspaceId: string
   taskId: string
   runId?: string | null
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -397,6 +425,8 @@ export type EventUncheckedCreateInput = {
 export type EventUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -416,6 +446,8 @@ export type EventUncheckedUpdateInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -432,6 +464,8 @@ export type EventCreateManyInput = {
   workspaceId: string
   taskId: string
   runId?: string | null
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -445,6 +479,8 @@ export type EventCreateManyInput = {
 export type EventUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -461,6 +497,8 @@ export type EventUncheckedUpdateManyInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -487,6 +525,8 @@ export type EventCountOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  nodeId?: Prisma.SortOrder
+  nodeTitle?: Prisma.SortOrder
   actorType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   source?: Prisma.SortOrder
@@ -507,6 +547,8 @@ export type EventMaxOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  nodeId?: Prisma.SortOrder
+  nodeTitle?: Prisma.SortOrder
   actorType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   source?: Prisma.SortOrder
@@ -522,6 +564,8 @@ export type EventMinOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
   runId?: Prisma.SortOrder
+  nodeId?: Prisma.SortOrder
+  nodeTitle?: Prisma.SortOrder
   actorType?: Prisma.SortOrder
   actorId?: Prisma.SortOrder
   source?: Prisma.SortOrder
@@ -664,6 +708,8 @@ export type EventUncheckedUpdateManyWithoutRunNestedInput = {
 export type EventCreateWithoutWorkspaceInput = {
   id?: string
   eventType: string
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -681,6 +727,8 @@ export type EventUncheckedCreateWithoutWorkspaceInput = {
   eventType: string
   taskId: string
   runId?: string | null
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -725,6 +773,8 @@ export type EventScalarWhereInput = {
   workspaceId?: Prisma.StringFilter<"Event"> | string
   taskId?: Prisma.StringFilter<"Event"> | string
   runId?: Prisma.StringNullableFilter<"Event"> | string | null
+  nodeId?: Prisma.StringNullableFilter<"Event"> | string | null
+  nodeTitle?: Prisma.StringNullableFilter<"Event"> | string | null
   actorType?: Prisma.StringFilter<"Event"> | string
   actorId?: Prisma.StringFilter<"Event"> | string
   source?: Prisma.StringFilter<"Event"> | string
@@ -738,6 +788,8 @@ export type EventScalarWhereInput = {
 export type EventCreateWithoutTaskInput = {
   id?: string
   eventType: string
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -755,6 +807,8 @@ export type EventUncheckedCreateWithoutTaskInput = {
   eventType: string
   workspaceId: string
   runId?: string | null
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -793,6 +847,8 @@ export type EventUpdateManyWithWhereWithoutTaskInput = {
 export type EventCreateWithoutRunInput = {
   id?: string
   eventType: string
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -810,6 +866,8 @@ export type EventUncheckedCreateWithoutRunInput = {
   eventType: string
   workspaceId: string
   taskId: string
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -850,6 +908,8 @@ export type EventCreateManyWorkspaceInput = {
   eventType: string
   taskId: string
   runId?: string | null
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -863,6 +923,8 @@ export type EventCreateManyWorkspaceInput = {
 export type EventUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -880,6 +942,8 @@ export type EventUncheckedUpdateWithoutWorkspaceInput = {
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -895,6 +959,8 @@ export type EventUncheckedUpdateManyWithoutWorkspaceInput = {
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -910,6 +976,8 @@ export type EventCreateManyTaskInput = {
   eventType: string
   workspaceId: string
   runId?: string | null
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -923,6 +991,8 @@ export type EventCreateManyTaskInput = {
 export type EventUpdateWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -940,6 +1010,8 @@ export type EventUncheckedUpdateWithoutTaskInput = {
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -955,6 +1027,8 @@ export type EventUncheckedUpdateManyWithoutTaskInput = {
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -970,6 +1044,8 @@ export type EventCreateManyRunInput = {
   eventType: string
   workspaceId: string
   taskId: string
+  nodeId?: string | null
+  nodeTitle?: string | null
   actorType: string
   actorId: string
   source: string
@@ -983,6 +1059,8 @@ export type EventCreateManyRunInput = {
 export type EventUpdateWithoutRunInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1000,6 +1078,8 @@ export type EventUncheckedUpdateWithoutRunInput = {
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1015,6 +1095,8 @@ export type EventUncheckedUpdateManyWithoutRunInput = {
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   actorType?: Prisma.StringFieldUpdateOperationsInput | string
   actorId?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1033,6 +1115,8 @@ export type EventSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   workspaceId?: boolean
   taskId?: boolean
   runId?: boolean
+  nodeId?: boolean
+  nodeTitle?: boolean
   actorType?: boolean
   actorId?: boolean
   source?: boolean
@@ -1052,6 +1136,8 @@ export type EventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   workspaceId?: boolean
   taskId?: boolean
   runId?: boolean
+  nodeId?: boolean
+  nodeTitle?: boolean
   actorType?: boolean
   actorId?: boolean
   source?: boolean
@@ -1071,6 +1157,8 @@ export type EventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   workspaceId?: boolean
   taskId?: boolean
   runId?: boolean
+  nodeId?: boolean
+  nodeTitle?: boolean
   actorType?: boolean
   actorId?: boolean
   source?: boolean
@@ -1090,6 +1178,8 @@ export type EventSelectScalar = {
   workspaceId?: boolean
   taskId?: boolean
   runId?: boolean
+  nodeId?: boolean
+  nodeTitle?: boolean
   actorType?: boolean
   actorId?: boolean
   source?: boolean
@@ -1100,7 +1190,7 @@ export type EventSelectScalar = {
   createdAt?: boolean
 }
 
-export type EventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventType" | "workspaceId" | "taskId" | "runId" | "actorType" | "actorId" | "source" | "payload" | "dedupeKey" | "runtimeTs" | "ingestSequence" | "createdAt", ExtArgs["result"]["event"]>
+export type EventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventType" | "workspaceId" | "taskId" | "runId" | "nodeId" | "nodeTitle" | "actorType" | "actorId" | "source" | "payload" | "dedupeKey" | "runtimeTs" | "ingestSequence" | "createdAt", ExtArgs["result"]["event"]>
 export type EventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1130,6 +1220,8 @@ export type $EventPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     workspaceId: string
     taskId: string
     runId: string | null
+    nodeId: string | null
+    nodeTitle: string | null
     actorType: string
     actorId: string
     source: string
@@ -1569,6 +1661,8 @@ export interface EventFieldRefs {
   readonly workspaceId: Prisma.FieldRef<"Event", 'String'>
   readonly taskId: Prisma.FieldRef<"Event", 'String'>
   readonly runId: Prisma.FieldRef<"Event", 'String'>
+  readonly nodeId: Prisma.FieldRef<"Event", 'String'>
+  readonly nodeTitle: Prisma.FieldRef<"Event", 'String'>
   readonly actorType: Prisma.FieldRef<"Event", 'String'>
   readonly actorId: Prisma.FieldRef<"Event", 'String'>
   readonly source: Prisma.FieldRef<"Event", 'String'>

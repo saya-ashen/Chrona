@@ -35,9 +35,9 @@ export async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "node_started",
+          nodeId: event.node.id,
+          nodeTitle: event.node.title,
           payload: {
-            nodeId: event.node.id,
-            nodeTitle: event.node.title,
             nodeType: event.node.type,
           },
         });
@@ -49,7 +49,9 @@ export async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "node_completed",
-          payload: { nodeId: event.node.id, summary: event.result.summary },
+          nodeId: event.node.id,
+          nodeTitle: event.node.title,
+          payload: { summary: event.result.summary },
         });
         break;
       case "node_waiting_for_user":
@@ -59,7 +61,9 @@ export async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "node_waiting_for_user",
-          payload: { nodeId: event.node.id, prompt: event.result.prompt },
+          nodeId: event.node.id,
+          nodeTitle: event.node.title,
+          payload: { prompt: event.result.prompt },
         });
         break;
       case "node_waiting_for_approval":
@@ -69,7 +73,9 @@ export async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "node_waiting_for_approval",
-          payload: { nodeId: event.node.id, prompt: event.result.prompt },
+          nodeId: event.node.id,
+          nodeTitle: event.node.title,
+          payload: { prompt: event.result.prompt },
         });
         break;
       case "node_blocked":
@@ -79,7 +85,9 @@ export async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "node_blocked",
-          payload: { nodeId: event.node.id, reason: event.result.reason },
+          nodeId: event.node.id,
+          nodeTitle: event.node.title,
+          payload: { reason: event.result.reason },
         });
         break;
       case "replan_proposed":
@@ -89,7 +97,9 @@ export async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "replan_proposed",
-          payload: { nodeId: event.node.id, reason: event.result.reason },
+          nodeId: event.node.id,
+          nodeTitle: event.node.title,
+          payload: { reason: event.result.reason },
         });
         break;
       case "graph_mutation_applied":
@@ -110,7 +120,8 @@ export async function appendGraphRuntimeEvents(input: {
           planId: input.planId,
           sessionId: input.sessionId,
           eventType: "external_result_synced",
-          payload: { nodeId: event.nodeId, status: event.status },
+          nodeId: event.nodeId,
+          payload: { status: event.status },
         });
         break;
     }
