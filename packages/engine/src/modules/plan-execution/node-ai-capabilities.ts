@@ -26,6 +26,7 @@ export type NodeAiCapabilityInput = {
   runtimeName: string;
   aiRuntimeInvoker: AiRuntimeInvoker;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
+  signal?: AbortSignal;
 };
 
 function buildFailureDetails(input: {
@@ -70,6 +71,7 @@ export async function runTaskNodeFeature(
       featureSpec: input.featureSpec,
       triggeredBy: "system",
       onRuntimeEvent: input.onRuntimeEvent,
+      signal: input.signal,
     });
 
     const evidence: NodeExecutionEvidence = {

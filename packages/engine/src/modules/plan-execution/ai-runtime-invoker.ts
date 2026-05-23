@@ -41,6 +41,7 @@ export type AiRuntimeInvocationInput = {
   triggeredBy: "system" | "user";
   clientId?: string | null;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
+  signal?: AbortSignal;
 };
 
 export type AiRuntimeInvocation = {
@@ -105,6 +106,7 @@ export class AiRuntimeInvoker {
           runtimeName: input.runtimeName,
           nodeContext: input.nodeContext,
         },
+        signal: input.signal,
       });
       const runtimeSessionKey = response.sessionId || input.runtimeSessionKey;
       const runtimeRunRef = response.nativeRunId ?? response.runId ?? null;
@@ -164,6 +166,7 @@ async function runProviderRequest(
     runId?: string;
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     eventPersistence?: RuntimeEventPersistenceContext;
+    signal?: AbortSignal;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = toStartRunInput(request);
@@ -172,6 +175,7 @@ async function runProviderRequest(
     : undefined;
   let run = await providerClient.startRun({
     ...startInput,
+    signal: options.signal,
     idempotencyKey,
   } as StartRunInput & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
@@ -179,7 +183,7 @@ async function runProviderRequest(
   try {
     return await collectProviderRunSnapshot(
       providerClient.provider,
-      providerClient.streamRun({ runId: run.runId }),
+      providerClient.streamRun({ runId: run.runId, signal: options.signal }),
       run.sessionId,
       run,
       options,
@@ -191,7 +195,7 @@ async function runProviderRequest(
     try {
       return await collectProviderRunSnapshot(
         providerClient.provider,
-        providerClient.streamRun({ runId: run.runId }),
+        providerClient.streamRun({ runId: run.runId, signal: options.signal }),
         run.sessionId,
         run,
         options,
@@ -202,12 +206,13 @@ async function runProviderRequest(
 
     run = await providerClient.startRun({
       ...startInput,
+      signal: options.signal,
       idempotencyKey,
     } as StartRunInput & { idempotencyKey?: string });
     await persistRuntimeRunRef(options.runId, run);
     return collectProviderRunSnapshot(
       providerClient.provider,
-      providerClient.streamRun({ runId: run.runId }),
+      providerClient.streamRun({ runId: run.runId, signal: options.signal }),
       run.sessionId,
       run,
       options,

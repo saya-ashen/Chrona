@@ -37,3 +37,16 @@ export {
   startRunInputSchema,
   streamRunInputSchema,
 } from "./ProviderClient";
+
+export {
+  appendProviderReplayRecord,
+  providerReplayRecord,
+  readProviderReplayTape,
+  replayPathForRun,
+  terminalSnapshotFromEvents,
+  type ProviderReplayEventRecord,
+  type ProviderReplayRecord,
+  type ProviderReplaySnapshotRecord,
+  type ProviderReplayStartRecord,
+  type ProviderReplayTape,
+} from "./ProviderClient";

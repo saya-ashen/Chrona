@@ -64,6 +64,13 @@ export type GraphRuntimeCommand =
       reason?: string;
     }
   | {
+      type: "pause_session";
+      state: GraphExecutionState;
+      trigger?: GraphExecutionTrigger;
+      context: unknown;
+      reason?: string;
+    }
+  | {
       type: "apply_mutation";
       state: GraphExecutionState;
       trigger?: GraphExecutionTrigger;
@@ -95,6 +102,7 @@ export type GraphRuntimeOptions<TContext = unknown> = {
   runtimeName: string;
   callbacks?: Partial<GraphExecutionCallbacks<TContext>>;
   executors?: GraphExecutorRegistry<TContext>;
+  control?: import("../execution/types").GraphExecutionControl;
   policies?: GraphRuntimePolicies;
   now?: () => number;
 };

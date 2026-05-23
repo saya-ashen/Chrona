@@ -1,7 +1,20 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { planBlueprintSchema } from "@chrona/contracts";
 
 import { ChronaDebugProviderClient } from "./ChronaDebugProviderClient";
+
+const realDebugReplayFile = process.env.CHRONA_DEBUG_REPLAY_FILE;
+
+afterEach(() => {
+  if (realDebugReplayFile === undefined) {
+    delete process.env.CHRONA_DEBUG_REPLAY_FILE;
+  } else {
+    process.env.CHRONA_DEBUG_REPLAY_FILE = realDebugReplayFile;
+  }
+});
 
 describe("ChronaDebugProviderClient", () => {
   it("emits a schema-valid boundary debug plan", async () => {
@@ -45,5 +58,77 @@ describe("ChronaDebugProviderClient", () => {
     expect(blueprint.nodes.some((node) => node.type === "wait" && node.timeout?.onTimeout === "notify_user")).toBe(true);
     expect(blueprint.nodes.some((node) => node.type === "condition" && node.branches.length >= 2)).toBe(true);
     expect(blueprint.edges.some((edge) => edge.label === "slow wait")).toBe(true);
+  });
+
+  it("replays recorded provider events from a Hermes tape", async () => {
+    const replayDir = await mkdtemp(join(tmpdir(), "chrona-debug-replay-"));
+    const replayFile = join(replayDir, "run-1.jsonl");
+    await writeFile(replayFile, [
+      JSON.stringify({
+        kind: "start",
+        provider: "hermes",
+        recordedAt: "2026-05-23T00:00:00.000Z",
+        run: {
+          provider: "hermes",
+          runId: "run-1",
+          sessionId: "session-1",
+          status: "running",
+        },
+      }),
+      JSON.stringify({
+        kind: "event",
+        provider: "hermes",
+        recordedAt: "2026-05-23T00:00:01.000Z",
+        event: {
+          provider: "hermes",
+          runId: "run-1",
+          sessionId: "session-1",
+          type: "text_delta",
+          text: "Hi",
+        },
+      }),
+      JSON.stringify({
+        kind: "event",
+        provider: "hermes",
+        recordedAt: "2026-05-23T00:00:02.000Z",
+        event: {
+          provider: "hermes",
+          runId: "run-1",
+          sessionId: "session-1",
+          type: "run_completed",
+          run: {
+            provider: "hermes",
+            runId: "run-1",
+            sessionId: "session-1",
+            status: "completed",
+          },
+          outputText: "done",
+        },
+      }),
+    ].join("\n"));
+    process.env.CHRONA_DEBUG_REPLAY_FILE = replayFile;
+
+    const client = new ChronaDebugProviderClient();
+    const run = await client.startRun({
+      sessionId: "ignored-session",
+      instructions: "ignored",
+      input: "ignored",
+    });
+    const events = [];
+    for await (const event of client.streamRun({ runId: run.runId })) {
+      events.push(event);
+    }
+    const snapshot = await client.getRun({ runId: run.runId });
+
+    expect(run).toMatchObject({ provider: "debug", runId: "run-1" });
+    expect(events.map((event) => event.type)).toEqual(["text_delta", "run_completed"]);
+    expect(events.every((event) => event.provider === "debug")).toBe(true);
+    expect(snapshot).toMatchObject({
+      provider: "debug",
+      runId: "run-1",
+      status: "completed",
+      outputText: "done",
+    });
+    await rm(replayDir, { recursive: true, force: true });
   });
 });

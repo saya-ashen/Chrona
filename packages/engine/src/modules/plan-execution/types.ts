@@ -22,10 +22,16 @@ export type PlanExecutionObserver = {
   onStateChange?: (effectivePlan: EffectivePlanGraph) => Promise<void> | void;
 };
 
+export type PlanExecutionControl = {
+  signal?: AbortSignal;
+  shouldPause?: () => boolean;
+};
+
 export type EngineRuntimeContext = {
   taskId: string;
   planId: string;
   mainSession: { id: string; taskId: string; sessionKey: string };
+  control?: PlanExecutionControl;
 };
 
 export type SyncPlanRunRuntimeResultInput = {
@@ -69,6 +75,7 @@ export type AdvanceRuntimeCommand =
       feedback?: string;
     }
   | { type: "retry_node"; nodeId: string; reason?: string; userInput?: string }
+  | { type: "pause_session"; reason?: string }
   | { type: "cancel_session"; reason?: string };
 
 export type ExecutionActionWithContinuation =

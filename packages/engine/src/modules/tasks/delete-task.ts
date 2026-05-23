@@ -1,5 +1,8 @@
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { createLogger } from "@chrona/shared/logger";
+
+const logger = createLogger("engine.tasks.delete");
 
 export async function deleteTask(taskId: string) {
   const task = await db.task.findUnique({
@@ -40,6 +43,12 @@ export async function deleteTask(taskId: string) {
       const runIds = runs.map((run) => run.id);
 
       if (runIds.length > 0) {
+        logger.warn("task.delete.removing_runs", {
+          requestedTaskId: taskId,
+          currentTaskId,
+          runIds,
+          stack: new Error("Run deletion trace").stack,
+        });
         await tx.runtimeCursor.deleteMany({ where: { runId: { in: runIds } } });
         await tx.toolCallDetail.deleteMany({ where: { runId: { in: runIds } } });
         await tx.conversationEntry.deleteMany({ where: { runId: { in: runIds } } });

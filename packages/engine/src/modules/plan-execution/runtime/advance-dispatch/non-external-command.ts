@@ -64,6 +64,14 @@ export function nonExternalCommand(
         context,
         reason: command.reason,
       };
+    case "pause_session":
+      return {
+        type: "pause_session",
+        state,
+        trigger,
+        context,
+        reason: command.reason,
+      };
     case "start":
       return { type: "start", state, trigger, context };
   }

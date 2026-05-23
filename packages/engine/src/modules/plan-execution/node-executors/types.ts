@@ -82,4 +82,5 @@ export interface NodeExecutorInput {
   userInput?: string;
   inputFields?: Record<string, string>;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
+  signal?: AbortSignal;
 }

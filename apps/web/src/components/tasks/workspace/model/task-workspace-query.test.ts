@@ -502,7 +502,7 @@ describe("task workspace execution console view model", () => {
         id: "pause",
         label: "Pause",
         disabled: true,
-        disabledReason: "Pause is visible for task control, but the execution API does not expose pause yet.",
+        disabledReason: "No running execution session to pause.",
       },
       {
         id: "stop",

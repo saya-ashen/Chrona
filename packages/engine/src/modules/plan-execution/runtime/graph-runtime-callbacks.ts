@@ -96,6 +96,7 @@ export function createExecutionGraphCallbacks(input: {
         runtimeName: input.runtimeName,
         userInput: executorInput.userInput,
         inputFields: executorInput.inputFields,
+        signal: executorInput.signal,
         onRuntimeEvent: input.onRuntimeEvent
           ? (event) => input.onRuntimeEvent?.({
               nodeId: engineNode.id,

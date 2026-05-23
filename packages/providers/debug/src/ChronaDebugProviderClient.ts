@@ -12,6 +12,10 @@ import type {
   StartRunInput,
   StreamRunInput,
 } from "@chrona/providers-foundation";
+import {
+  readProviderReplayTape,
+  terminalSnapshotFromEvents,
+} from "@chrona/providers-foundation";
 
 export const CHRONA_DEBUG_PROVIDER_TYPE = "debug";
 
@@ -255,6 +259,7 @@ async function pause(signal?: AbortSignal) {
 export class ChronaDebugProviderClient implements AgentProviderClient {
   readonly provider: string;
   private readonly runs = new Map<string, DebugRun>();
+  private replayTape?: Awaited<ReturnType<typeof readProviderReplayTape>>;
 
   constructor(provider = CHRONA_DEBUG_PROVIDER_TYPE) {
     this.provider = provider;
@@ -298,6 +303,22 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+    const replayTape = await this.loadReplayTape();
+    if (replayTape?.start) {
+      const replayRun = replayTape.start.run;
+      const run = createRun({
+        runId: replayRun.runId,
+        sessionId: replayRun.sessionId,
+        sessionKey: input.sessionKey,
+        startInput: input,
+      });
+      this.runs.set(run.runId, run);
+      return {
+        ...replayRun,
+        provider: this.provider,
+        sessionId: replayRun.sessionId ?? input.sessionId ?? run.sessionId,
+      };
+    }
     const run = createRun({
       sessionId: input.sessionId,
       sessionKey: input.sessionKey,
@@ -308,6 +329,16 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   }
 
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
+    const replayTape = await this.loadReplayTape();
+    if (replayTape) {
+      const signal = "signal" in input ? input.signal : undefined;
+      for (const event of replayTape.events) {
+        signal?.throwIfAborted();
+        yield { ...event, provider: this.provider };
+        await pause(signal);
+      }
+      return;
+    }
     const inputRunId = "runId" in input ? input.runId : undefined;
     const existingRun = inputRunId ? this.runs.get(inputRunId) : null;
     const run = existingRun ?? createRun({
@@ -413,6 +444,16 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   }
 
   async getRun(input: GetRunInput): Promise<ProviderRunSnapshot> {
+    const replayTape = await this.loadReplayTape();
+    const replaySnapshot = replayTape?.snapshot ?? terminalSnapshotFromEvents(replayTape?.events ?? []);
+    if (replaySnapshot) {
+      return {
+        ...replaySnapshot,
+        provider: this.provider,
+        runId: input.runId,
+        providerRunId: replaySnapshot.providerRunId ?? replaySnapshot.runId,
+      };
+    }
     const run = this.runs.get(input.runId);
     return {
       provider: this.provider,
@@ -440,5 +481,17 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       error: null,
       raw: { debugProvider: true, cancelled: true },
     };
+  }
+
+  private async loadReplayTape() {
+    if (this.replayTape) {
+      return this.replayTape;
+    }
+    const path = process.env.CHRONA_DEBUG_REPLAY_FILE?.trim();
+    if (!path) {
+      return undefined;
+    }
+    this.replayTape = await readProviderReplayTape(path);
+    return this.replayTape;
   }
 }

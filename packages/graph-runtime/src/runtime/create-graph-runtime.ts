@@ -4,6 +4,7 @@ import type { GraphExecutionCallbacks, GraphExecutionEvent } from "../execution/
 import { approveCurrentNodeCommand } from "../commands/approve-current-node";
 import { applyMutationCommand } from "../commands/apply-mutation";
 import { cancelSessionCommand } from "../commands/cancel-session";
+import { pauseSessionCommand } from "../commands/pause-session";
 import { retryNodeCommand } from "../commands/retry-node";
 import { syncExternalResultCommand } from "../commands/sync-external-result";
 import { validateCommandGraphState } from "../commands/validate-command";
@@ -46,6 +47,7 @@ export function createGraphRuntime<TContext = unknown>(
             context: command.context as TContext,
             maxSteps: options.policies?.maxSteps,
             maxConcurrency: options.policies?.maxConcurrency,
+            control: options.control,
             now: options.now,
             callbacks,
           });
@@ -64,6 +66,7 @@ export function createGraphRuntime<TContext = unknown>(
             userInput: command.input.value,
             inputFields: command.input.fields,
             forcedReplaceStatus: command.input.replaceStatus,
+            control: options.control,
             now: options.now,
             callbacks,
           });
@@ -79,6 +82,7 @@ export function createGraphRuntime<TContext = unknown>(
             maxSteps: options.policies?.maxSteps,
             maxConcurrency: options.policies?.maxConcurrency,
             forcedNodeId: command.nodeId,
+            control: options.control,
             now: options.now,
             callbacks,
           });
@@ -90,6 +94,8 @@ export function createGraphRuntime<TContext = unknown>(
           return retryNodeCommand({ command, options, callbacks, events });
         case "cancel_session":
           return cancelSessionCommand({ command, options, events });
+        case "pause_session":
+          return pauseSessionCommand({ command, options, events });
         case "apply_mutation":
           return applyMutationCommand({ command, options, events });
         case "sync_external_result":

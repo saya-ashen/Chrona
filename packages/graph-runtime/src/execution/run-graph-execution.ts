@@ -21,6 +21,11 @@ import type {
 
 const DEFAULT_MAX_STEPS = 10;
 
+function throwIfAborted(signal: AbortSignal | undefined) {
+  if (!signal?.aborted) return;
+  throw signal.reason ?? new Error("Graph execution aborted");
+}
+
 export async function runGraphExecution<TContext = unknown>(
   input: RunGraphExecutionInput<TContext>,
 ): Promise<GraphExecutionOutcome> {
@@ -32,6 +37,7 @@ export async function runGraphExecution<TContext = unknown>(
   let userInput = input.userInput;
 
   for (let step = 0; step < maxSteps; step++) {
+    throwIfAborted(input.control?.signal);
     const effective = resolveEffectivePlanGraph(state);
     await input.callbacks.onEvent?.({
       type: "executable_path_computed",
@@ -135,7 +141,9 @@ export async function runGraphExecution<TContext = unknown>(
         userInput: nodeUserInput,
         inputFields: nodeInputFields,
         context: input.context,
+        signal: input.control?.signal,
       });
+      throwIfAborted(input.control?.signal);
 
       const finishedAt = new Date(input.now?.() ?? Date.now()).toISOString();
       if (!result) {
@@ -266,6 +274,18 @@ export async function runGraphExecution<TContext = unknown>(
 
       executedNodeIds.push(nextNodeId);
       userInput = undefined;
+      if (input.control?.shouldPause?.()) {
+        const pausedEffective = resolveEffectivePlanGraph(state);
+        return {
+          status: "blocked",
+          currentNodeId: nextNodeId,
+          executedNodeIds,
+          effective: pausedEffective,
+          state,
+          waitKind: "manual_action",
+          message: "Execution paused by user request.",
+        };
+      }
     }
   }
 

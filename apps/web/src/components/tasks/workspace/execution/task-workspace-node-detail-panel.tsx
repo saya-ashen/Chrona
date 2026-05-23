@@ -648,6 +648,7 @@ export function TaskWorkspaceNodeDetailPanel({
     return (
       <Drawer
         open
+        handleOnly
         onOpenChange={(open) => onDrawerSizeChange?.(open ? "expanded" : "collapsed")}
         direction="bottom"
         modal={false}
@@ -657,7 +658,7 @@ export function TaskWorkspaceNodeDetailPanel({
           aria-modal={false}
           aria-label="Current node details"
           data-node-detail-drawer="true"
-          className="inset-x-2 bottom-2 mx-auto h-[min(72vh,680px)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-white/95 shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur"
+          className="pointer-events-auto inset-x-2 bottom-2 mx-auto h-[min(72vh,680px)] max-w-[calc(100vw-1rem)] select-text overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-white/95 shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur"
           style={drawerFrame ? { left: drawerFrame.left, right: "auto", width: drawerFrame.width } : undefined}
           overlayClassName="pointer-events-none bg-transparent backdrop-blur-0"
         >

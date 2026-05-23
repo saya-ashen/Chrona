@@ -1,6 +1,7 @@
 import { expect } from "bun:test";
 import { MemoryScope, MemorySourceType, MemoryStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
+import { assertSafeTestDatabaseUrl } from "./test-database-safety";
 
 // ---------------------------------------------------------------------------
 // Live smoke flag — skip live tests by default
@@ -13,6 +14,8 @@ export const runLiveHermes = process.env.CHRONA_LIVE_HERMES_TESTS === "1";
 // ---------------------------------------------------------------------------
 
 export async function resetTestDb() {
+  assertSafeTestDatabaseUrl(process.env.DATABASE_URL);
+
   await db.taskAssistantMessage.deleteMany();
   await db.scheduleProposal.deleteMany();
   await db.toolCallDetail.deleteMany();

@@ -14,6 +14,11 @@ import type {
   StreamRunInput,
 } from "@chrona/providers-foundation";
 import {
+  appendProviderReplayRecord,
+  providerReplayRecord,
+  replayPathForRun,
+} from "@chrona/providers-foundation";
+import {
   createHermesHttpClient,
   ensureHermesOk,
   readJson,
@@ -45,9 +50,11 @@ export class HermesProviderClient implements AgentProviderClient {
   readonly provider = "hermes";
 
   private readonly http: HermesHttpClient;
+  private readonly replayDirectory?: string;
 
   constructor(config: HermesProviderConfig = {}) {
     this.http = createHermesHttpClient(config);
+    this.replayDirectory = process.env.CHRONA_HERMES_RECORD_DIR?.trim() || undefined;
   }
 
   async getCapabilities(): Promise<ProviderCapabilities> {
@@ -199,7 +206,7 @@ export class HermesProviderClient implements AgentProviderClient {
       });
     }
 
-    return {
+    const run: ProviderRunRef = {
       provider: this.provider,
       runId,
       providerRunId: runId,
@@ -213,6 +220,14 @@ export class HermesProviderClient implements AgentProviderClient {
       },
       raw,
     };
+    const replayPath = this.replayPath(runId);
+    if (replayPath) {
+      await appendProviderReplayRecord(
+        replayPath,
+        providerReplayRecord(this.provider, run, input),
+      );
+    }
+    return run;
   }
 
   streamRun(input: ExistingRunStreamInput): AsyncIterable<ProviderRunEvent>;
@@ -251,6 +266,7 @@ export class HermesProviderClient implements AgentProviderClient {
 
     const includeRaw = "include" in input && input.include?.rawEvents === true;
     const strictUnknown = shouldThrowOnUnknownStreamEvent();
+    const replayPath = this.replayPath(runId);
     let sequence = 0;
     for await (const rawEvent of parseSseData(response.body)) {
       const event = mapHermesEvent(rawEvent, runId, {
@@ -261,6 +277,14 @@ export class HermesProviderClient implements AgentProviderClient {
 
       if (!event) {
         continue;
+      }
+      if (replayPath) {
+        await appendProviderReplayRecord(replayPath, {
+          kind: "event",
+          provider: this.provider,
+          recordedAt: new Date().toISOString(),
+          event,
+        });
       }
       yield event;
       if (
@@ -284,10 +308,20 @@ export class HermesProviderClient implements AgentProviderClient {
         timeoutMs: input.timeoutMs,
       },
     );
-    return mapSnapshot(
+    const snapshot = mapSnapshot(
       await ensureHermesOk(response, "get run"),
       input.include?.raw === true,
     );
+    const replayPath = this.replayPath(input.runId);
+    if (replayPath) {
+      await appendProviderReplayRecord(replayPath, {
+        kind: "snapshot",
+        provider: this.provider,
+        recordedAt: new Date().toISOString(),
+        snapshot,
+      });
+    }
+    return snapshot;
   }
 
   async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
@@ -300,6 +334,12 @@ export class HermesProviderClient implements AgentProviderClient {
       },
     );
     return mapSnapshot(await ensureHermesOk(response, "cancel run"), true);
+  }
+
+  private replayPath(runId: string): string | undefined {
+    return this.replayDirectory
+      ? replayPathForRun(this.replayDirectory, runId)
+      : undefined;
   }
 }
 
