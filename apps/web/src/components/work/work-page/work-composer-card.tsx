@@ -202,8 +202,8 @@ export function WorkComposerCard({
         )}
       >
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-xl font-semibold text-foreground">需要人工输入</h3>
-          <Badge variant="secondary">已同步</Badge>
+          <h3 className="text-xl font-semibold text-foreground">{copy.humanInputTitle}</h3>
+          <Badge variant="secondary">{copy.syncedBadge}</Badge>
         </div>
         <div className="mt-4 space-y-2 text-sm text-muted-foreground">
           <p>{passiveDescription}</p>
@@ -226,8 +226,8 @@ export function WorkComposerCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xl font-semibold text-foreground">需要人工输入</h3>
-            <Badge variant="secondary">阻塞中</Badge>
+            <h3 className="text-xl font-semibold text-foreground">{copy.humanInputTitle}</h3>
+            <Badge variant="secondary">{copy.blockedBadge}</Badge>
           </div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{composer.statusHint}</p>
         </div>
@@ -325,7 +325,7 @@ export function WorkComposerCard({
             size="default"
             className="h-11 rounded-xl"
           >
-            清空
+            {copy.clearInput}
           </Button>
         </div>
       </div>

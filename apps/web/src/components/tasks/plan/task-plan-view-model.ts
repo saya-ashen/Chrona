@@ -43,6 +43,66 @@ type PlanMetadata = {
 
 type NodeResultActionForm = NonNullable<EffectivePlanNode["result"]>["actionForm"];
 
+export type TaskPlanViewModelCopy = {
+  statusActive: string;
+  statusWaiting: string;
+  statusWaitingForUser: string;
+  statusWaitingForApproval: string;
+  statusBlocked: string;
+  statusFailed: string;
+  statusDegraded: string;
+  statusDone: string;
+  statusReady: string;
+  statusSkipped: string;
+  statusCancelled: string;
+  statusInvalidated: string;
+  statusIdle: string;
+  inputLabelPrefix: string;
+  decisionLabel: string;
+  approvalDecisionLabel: string;
+  resolveBlockerAction: string;
+  retryNodeAction: string;
+  approveAction: string;
+  submitChoiceAction: string;
+  submitEditAction: string;
+  submitInputAction: string;
+  startPlanAction: string;
+  continueRunAction: string;
+  branchLabelPrefix: string;
+};
+
+const DEFAULT_VIEW_MODEL_COPY: TaskPlanViewModelCopy = {
+  statusActive: "In progress",
+  statusWaiting: "Waiting",
+  statusWaitingForUser: "Waiting for input",
+  statusWaitingForApproval: "Waiting for approval",
+  statusBlocked: "Blocked",
+  statusFailed: "Failed",
+  statusDegraded: "Degraded",
+  statusDone: "Done",
+  statusReady: "Ready",
+  statusSkipped: "Skipped",
+  statusCancelled: "Cancelled",
+  statusInvalidated: "Invalidated",
+  statusIdle: "Not started",
+  inputLabelPrefix: "Input",
+  decisionLabel: "Decision",
+  approvalDecisionLabel: "Approval decision",
+  resolveBlockerAction: "Resolve blocker",
+  retryNodeAction: "Retry node",
+  approveAction: "Approve",
+  submitChoiceAction: "Submit choice",
+  submitEditAction: "Submit changes",
+  submitInputAction: "Submit input",
+  startPlanAction: "Start plan",
+  continueRunAction: "Continue run",
+  branchLabelPrefix: "Branch",
+};
+
+function resolveViewModelCopy(copy?: Partial<TaskPlanViewModelCopy>): TaskPlanViewModelCopy {
+  return { ...DEFAULT_VIEW_MODEL_COPY, ...copy };
+}
+
 function normalizePlanNodeKind(rawType: unknown): PlanNodeKind {
   switch (rawType) {
     case "task":
@@ -154,34 +214,34 @@ function inferInteractionType(input: {
   return "observe";
 }
 
-function statusLabel(status: PlanNodeStatus) {
+function statusLabel(status: PlanNodeStatus, copy: TaskPlanViewModelCopy) {
   switch (status) {
     case "active":
-      return "进行中";
+      return copy.statusActive;
     case "waiting":
-      return "待处理";
+      return copy.statusWaiting;
     case "waiting_for_user":
-      return "等待输入";
+      return copy.statusWaitingForUser;
     case "waiting_for_approval":
-      return "等待审批";
+      return copy.statusWaitingForApproval;
     case "blocked":
-      return "阻塞";
+      return copy.statusBlocked;
     case "failed":
-      return "失败";
+      return copy.statusFailed;
     case "degraded":
-      return "降级";
+      return copy.statusDegraded;
     case "done":
-      return "已完成";
+      return copy.statusDone;
     case "ready":
-      return "就绪";
+      return copy.statusReady;
     case "skipped":
-      return "已跳过";
+      return copy.statusSkipped;
     case "cancelled":
-      return "已取消";
+      return copy.statusCancelled;
     case "invalidated":
-      return "已失效";
+      return copy.statusInvalidated;
     default:
-      return "待开始";
+      return copy.statusIdle;
   }
 }
 
@@ -262,6 +322,7 @@ function buildInteractiveFields(node: {
   metadata: PlanMetadata;
   requiredInfo: string[];
   actionForm?: NodeResultActionForm | null;
+  copy: TaskPlanViewModelCopy;
 }): PlanNodeField[] {
   const fields: PlanNodeField[] = [];
 
@@ -269,7 +330,7 @@ function buildInteractiveFields(node: {
     for (const [index, input] of node.actionForm.inputFields.entries()) {
       fields.push({
         key: input.name || `blocker:${index}`,
-        label: input.label || `输入 ${index + 1}`,
+        label: input.label || `${node.copy.inputLabelPrefix} ${index + 1}`,
         value: "",
         control: input.type === "textarea" ? "textarea" : input.options?.length ? "select" : "text",
         required: input.required ?? false,
@@ -293,7 +354,7 @@ function buildInteractiveFields(node: {
     for (const [index, input] of node.metadata.inputFields.entries()) {
       fields.push({
         key: input.key ?? `checkpoint:${index}`,
-        label: input.label ?? `输入 ${index + 1}`,
+        label: input.label ?? `${node.copy.inputLabelPrefix} ${index + 1}`,
         value: "",
         control: input.type === "textarea" ? "textarea" : input.options?.length ? "select" : "text",
         required: input.required ?? false,
@@ -305,7 +366,7 @@ function buildInteractiveFields(node: {
   if (node.kind === "checkpoint" && node.metadata.options?.length) {
     fields.push({
       key: "checkpoint:decision",
-      label: "决策",
+      label: node.copy.decisionLabel,
       value: "",
       control: "approval",
       required: Boolean(node.metadata.required),
@@ -320,7 +381,7 @@ function buildInteractiveFields(node: {
   ) {
     fields.push({
       key: "checkpoint:decision",
-      label: "审批决策",
+      label: node.copy.approvalDecisionLabel,
       value: "",
       control: "approval",
       required: node.metadata.required ?? true,
@@ -336,19 +397,20 @@ function buildAvailableActions(node: {
   status: PlanNodeStatus;
   interactionType: PlanNodeInteractionType;
   hasInteractiveFields: boolean;
+  copy: TaskPlanViewModelCopy;
 }): PlanNodeAction[] {
   const actions: PlanNodeAction[] = [];
 
   if (node.interactionType === "retry") {
     actions.push({
       id: `${node.id}:resolve`,
-      label: "解决阻塞",
+      label: node.copy.resolveBlockerAction,
       kind: "resolve",
       emphasis: "primary",
     });
     actions.push({
       id: `${node.id}:retry`,
-      label: "重试节点",
+      label: node.copy.retryNodeAction,
       kind: "retry",
       emphasis: "warning",
     });
@@ -358,7 +420,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "approve") {
     actions.push({
       id: `${node.id}:approve`,
-      label: "审批",
+      label: node.copy.approveAction,
       kind: "approve",
       emphasis: "primary",
     });
@@ -368,7 +430,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "confirm") {
     actions.push({
       id: `${node.id}:confirm`,
-      label: "审批",
+      label: node.copy.approveAction,
       kind: "approve",
       emphasis: "primary",
     });
@@ -378,7 +440,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "choose") {
     actions.push({
       id: `${node.id}:choose`,
-      label: "提交选择",
+      label: node.copy.submitChoiceAction,
       kind: "choose",
       emphasis: "primary",
     });
@@ -388,7 +450,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "edit") {
     actions.push({
       id: `${node.id}:edit`,
-      label: "提交修改",
+      label: node.copy.submitEditAction,
       kind: "edit",
       emphasis: "primary",
     });
@@ -398,7 +460,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "input" || node.hasInteractiveFields) {
     actions.push({
       id: `${node.id}:input`,
-      label: "提交输入",
+      label: node.copy.submitInputAction,
       kind: "input",
       emphasis: "primary",
     });
@@ -408,7 +470,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "execute") {
     actions.push({
       id: `${node.id}:start`,
-      label: "启动计划",
+      label: node.copy.startPlanAction,
       kind: "trigger",
       emphasis: "primary",
     });
@@ -418,7 +480,7 @@ function buildAvailableActions(node: {
   if (node.interactionType === "observe" && (node.status === "ready" || node.status === "active")) {
     actions.push({
       id: `${node.id}:open`,
-      label: node.status === "ready" ? "启动计划" : "继续运行",
+      label: node.status === "ready" ? node.copy.startPlanAction : node.copy.continueRunAction,
       kind: node.status === "ready" ? "trigger" : "observe",
       emphasis: node.status === "ready" ? "primary" : "default",
     });
@@ -455,6 +517,7 @@ function toPlanNode(node: {
   result?: EffectivePlanNode["result"] | null;
   nextAction?: string | null;
   config: NodeConfig;
+  copy: TaskPlanViewModelCopy;
 }): PlanNodeDataModel {
   const kind = normalizePlanNodeKind(node.type);
   const metadata = nodeConfigToMetadata({
@@ -467,7 +530,7 @@ function toPlanNode(node: {
   const actionForm = node.result?.actionForm ?? null;
   const nextAction = status === "blocked" ? (actionForm?.instructions ?? resolveBlockedNodeAction(node)) : (node.nextAction ?? null);
   const requiredInfo = node.requiredInfo ?? [];
-  const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo, actionForm });
+  const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo, actionForm, copy: node.copy });
   const intent = inferIntent(kind, metadata, status);
   const interactionType = inferInteractionType({
     kind,
@@ -489,7 +552,7 @@ function toPlanNode(node: {
     intent,
     interactionType,
     group: statusGroup(status),
-    statusLabel: statusLabel(status),
+    statusLabel: statusLabel(status, node.copy),
     badges: [kind, intent, node.mode].filter((value): value is string => Boolean(value)),
     executionMode: node.mode ?? metadata.mode,
     executor: node.executor ?? metadata.executor,
@@ -506,7 +569,7 @@ function toPlanNode(node: {
     inputFields: node.result?.inputFields,
     resultOutputs: node.result?.outputs ?? [],
     resultEvidence: node.result?.evidence ?? null,
-    branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `分支 ${index + 1}`) ?? [],
+    branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `${node.copy.branchLabelPrefix} ${index + 1}`) ?? [],
     options: metadata.options ?? [],
     active: status === "active",
     blocked: isAttentionPlanStatus(status),
@@ -523,6 +586,7 @@ function toPlanNode(node: {
       status,
       interactionType,
       hasInteractiveFields: !isTerminalStatus(status) && interactiveFields.length > 0,
+      copy: node.copy,
     }),
     metadata: {
       ...(metadata as Record<string, unknown>),
@@ -727,8 +791,12 @@ function buildGraphPlan(input: {
   };
 }
 
-export function compiledPlanToGraphPlan(plan: CompiledPlan | null | undefined): TaskPlanGraphPlan | null {
+export function compiledPlanToGraphPlan(
+  plan: CompiledPlan | null | undefined,
+  copyOverrides?: Partial<TaskPlanViewModelCopy>,
+): TaskPlanGraphPlan | null {
   if (!plan?.nodes?.length) return null;
+  const copy = resolveViewModelCopy(copyOverrides);
 
   return buildGraphPlan({
     title: plan.title ?? null,
@@ -751,6 +819,7 @@ export function compiledPlanToGraphPlan(plan: CompiledPlan | null | undefined): 
         requiredInfo: [],
         nextAction: null,
         config: node.config,
+        copy,
       }),
     ),
     rawEdges: (plan.edges ?? []).map((edge) => ({
@@ -762,10 +831,15 @@ export function compiledPlanToGraphPlan(plan: CompiledPlan | null | undefined): 
   });
 }
 
-export function taskPlanReadModelToGraphPlan(readModel: TaskPlanReadModel | null | undefined): TaskPlanGraphPlan | null {
+export function taskPlanReadModelToGraphPlan(
+  readModel: TaskPlanReadModel | null | undefined,
+  copyOverrides?: Partial<TaskPlanViewModelCopy>,
+): TaskPlanGraphPlan | null {
   if (!readModel?.effectivePlan?.nodes?.length) {
-    return readModel?.compiledPlan ? compiledPlanToGraphPlan(readModel.compiledPlan) : null;
+    return readModel?.compiledPlan ? compiledPlanToGraphPlan(readModel.compiledPlan, copyOverrides) : null;
   }
+
+  const copy = resolveViewModelCopy(copyOverrides);
 
   const readRuntimeArray = (node: EffectivePlanNode, key: string) => {
     const value = (node as unknown as Record<string, unknown>)[key];
@@ -804,6 +878,7 @@ export function taskPlanReadModelToGraphPlan(readModel: TaskPlanReadModel | null
         result: node.result,
         nextAction: readRuntimeString(node, "nextAction"),
         config: node.config,
+        copy,
       }),
     ),
     rawEdges: readModel.effectivePlan.edges.map((edge) => ({

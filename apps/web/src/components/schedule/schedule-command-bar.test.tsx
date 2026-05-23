@@ -99,7 +99,7 @@ describe("schedule quick create AI-only path", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getAllByText(/AI 无法可靠理解该输入/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/AI could not safely interpret this input/i).length).toBeGreaterThan(0);
     });
     expect(onSubmit).not.toHaveBeenCalled();
   });

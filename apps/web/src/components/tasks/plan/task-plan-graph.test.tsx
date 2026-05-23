@@ -84,7 +84,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(screen.queryByLabelText("任务计划图")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Task plan graph")).not.toBeInTheDocument();
 
     rerender(
       <TaskPlanGraph
@@ -111,7 +111,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(screen.queryByLabelText("任务计划图")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Task plan graph")).not.toBeInTheDocument();
   });
 
   it("presents pending and accepted nodes with selectable execution-console states", async () => {
@@ -342,7 +342,7 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    const graph = await screen.findByLabelText("任务计划图");
+    const graph = await screen.findByLabelText("Task plan graph");
     expect(graph).toBeInTheDocument();
     expect(graph).toHaveAttribute("data-renderer", "react-flow");
     expect(graph).toHaveAttribute("data-layout-engine", "elk-layered");
@@ -367,13 +367,13 @@ describe("TaskPlanGraph", () => {
     expect(graph.querySelector(".react-flow__edgelabel-renderer")?.childElementCount ?? 0).toBe(0);
 
     const legend = within(graph).getByTestId("task-plan-graph-legend");
-    expect(legend).toHaveTextContent("顺序执行");
-    expect(legend).toHaveTextContent("依赖于");
-    expect(legend).toHaveTextContent("任务");
-    expect(legend).toHaveTextContent("检查点");
-    expect(legend).toHaveTextContent("条件判断");
-    expect(legend).toHaveTextContent("等待");
-    expect(legend).toHaveTextContent("已跳过");
+    expect(legend).toHaveTextContent("Sequential");
+    expect(legend).toHaveTextContent("Dependency");
+    expect(legend).toHaveTextContent("Task");
+    expect(legend).toHaveTextContent("Checkpoint");
+    expect(legend).toHaveTextContent("Condition");
+    expect(legend).toHaveTextContent("Waiting");
+    expect(legend).toHaveTextContent("Skipped");
     expect(within(legend).getByTestId("task-plan-graph-node-legend")).toBeInTheDocument();
     const legendOverlay = legend.parentElement as HTMLElement | null;
     expect(legendOverlay).not.toBeNull();
@@ -394,7 +394,7 @@ describe("TaskPlanGraph", () => {
     expect(canvas.style.minWidth).toBe("100%");
 
     const wheelHint = within(graph).getByTestId("task-plan-graph-wheel-hint");
-    expect(wheelHint).toHaveTextContent("按住 Ctrl/⌘ 并滚动可缩放画布");
+    expect(wheelHint).toHaveTextContent("Hold Ctrl/Cmd and scroll to zoom the canvas");
     expect(wheelHint.className).toContain("opacity-0");
     fireEvent.wheel(scrollShell, { deltaY: 120 });
     expect(wheelHint.className).toContain("opacity-100");
@@ -404,7 +404,7 @@ describe("TaskPlanGraph", () => {
     expect(currentNode.getAttribute("data-node-selected")).toBe("false");
     expect(currentNode.getAttribute("data-node-shape")).toBe("parallelogram");
     expect(currentNode.getAttribute("data-node-display-type")).toBe("checkpoint");
-    expect(currentNode).toHaveTextContent("检查点");
+    expect(currentNode).toHaveTextContent("Checkpoint");
     expect(currentNode).not.toHaveTextContent("你希望调整哪些参数？");
 
     const childNode = screen.getByTestId("task-plan-node-node-child");
@@ -465,7 +465,7 @@ describe("TaskPlanGraph", () => {
     expect(selectedNode).toHaveAttribute("data-node-selected", "true");
 
     fireEvent.click(within(controls).getByRole("button", { name: "Expand graph" }));
-    const dialog = screen.getByRole("dialog", { name: "完整任务计划图" });
+    const dialog = screen.getByRole("dialog", { name: "Full execution graph" });
     expect(within(dialog).getByTestId("task-plan-node-node-next")).toHaveAttribute("data-node-selected", "true");
   });
 
@@ -524,7 +524,7 @@ describe("TaskPlanGraph", () => {
       />
     );
 
-    const graph = await screen.findByLabelText("任务计划图");
+    const graph = await screen.findByLabelText("Task plan graph");
     const deliverableNode = await screen.findByTestId("task-plan-node-node-deliverable");
 
     fireEvent.click(deliverableNode);
@@ -995,7 +995,7 @@ describe("TaskPlanGraph", () => {
     const host = screen.getByTestId("wide-graph-host");
     Object.defineProperty(host, "clientWidth", { configurable: true, value: 960 });
 
-    const graph = await screen.findByLabelText("任务计划图");
+    const graph = await screen.findByLabelText("Task plan graph");
     expect(graph).toHaveAttribute("data-graph-mode", "full");
     expect(graph.querySelector(".react-flow")).not.toBeNull();
   });
@@ -1066,7 +1066,7 @@ describe("TaskPlanGraph", () => {
       />
     );
 
-    const graph = screen.getByLabelText("任务计划图");
+    const graph = screen.getByLabelText("Task plan graph");
     expect(graph).toHaveAttribute("data-graph-mode", "compact");
     expect(graph.querySelector(".react-flow")).toBeNull();
     expect(screen.queryByTestId("task-plan-graph-legend")).not.toBeInTheDocument();
@@ -1095,10 +1095,10 @@ describe("TaskPlanGraph", () => {
     const compactRail = screen.getByTestId("task-plan-compact-groups");
     expect(compactRail.className).toContain("border-l");
 
-    const openFullButton = screen.getByRole("button", { name: "查看完整图" });
+    const openFullButton = screen.getByRole("button", { name: "Open full graph" });
     fireEvent.click(openFullButton);
 
-    const dialog = screen.getByRole("dialog", { name: "完整任务计划图" });
+    const dialog = screen.getByRole("dialog", { name: "Full execution graph" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     const dialogGraph = await within(dialog).findByTestId("task-plan-graph-full-dialog");
     expect(dialogGraph).toBeInTheDocument();

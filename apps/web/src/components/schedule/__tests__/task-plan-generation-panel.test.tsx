@@ -191,7 +191,7 @@ describe("TaskPlanGenerationPanel", () => {
     );
 
     expect(screen.queryByText(/No plan yet/i)).not.toBeInTheDocument();
-    expect(await screen.findByLabelText("任务计划图")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Task plan graph")).toBeInTheDocument();
     expect(screen.getAllByText("Review existing documentation").length).toBeGreaterThan(0);
     expect(screen.getByText("120 min")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -240,7 +240,7 @@ describe("TaskPlanGenerationPanel", () => {
       );
     });
 
-    expect(await screen.findByLabelText("任务计划图")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Task plan graph")).toBeInTheDocument();
     expect(screen.getByText("Review existing documentation")).toBeInTheDocument();
   });
 

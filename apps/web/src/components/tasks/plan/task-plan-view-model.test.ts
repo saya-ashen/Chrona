@@ -90,11 +90,11 @@ describe("task-plan-view-model", () => {
 
     expect(graphPlan?.steps[0]).toMatchObject({
       interactionType: "confirm",
-      availableActions: [{ label: "审批", kind: "approve" }],
+      availableActions: [{ label: "Approve", kind: "approve" }],
       interactiveFields: [
         {
           key: "checkpoint:decision",
-          label: "审批决策",
+          label: "Approval decision",
           control: "approval",
           required: true,
           options: ["Approve", "Reject"],
@@ -425,7 +425,7 @@ describe("task-plan-view-model", () => {
     expect(graphPlan?.currentStepId).toBe("weather-script");
     expect(graphPlan?.steps[0]).toMatchObject({
       status: "blocked",
-      statusLabel: "阻塞",
+      statusLabel: "Blocked",
       readiness: "blocked",
       blocked: true,
       actionable: true,
@@ -435,8 +435,8 @@ describe("task-plan-view-model", () => {
         { key: "apiKey", label: "天气 API 密钥", value: "", control: "text", required: true, options: undefined },
       ],
       availableActions: [
-        { id: "weather-script:resolve", label: "解决阻塞", kind: "resolve", emphasis: "primary" },
-        { id: "weather-script:retry", label: "重试节点", kind: "retry", emphasis: "warning" },
+        { id: "weather-script:resolve", label: "Resolve blocker", kind: "resolve", emphasis: "primary" },
+        { id: "weather-script:retry", label: "Retry node", kind: "retry", emphasis: "warning" },
       ],
       result: { error: blocker, waitKind: "manual_action" },
     });

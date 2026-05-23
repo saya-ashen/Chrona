@@ -135,7 +135,7 @@ describe("TaskPlanSidePanel", () => {
       />,
     );
 
-    const graph = screen.getByLabelText("任务计划图");
+    const graph = screen.getByLabelText("Task plan graph");
     expect(graph).toBeInTheDocument();
     expect(graph).toHaveAttribute("data-graph-mode", "compact");
     expect(screen.getByText("物化可执行子任务")).toBeInTheDocument();

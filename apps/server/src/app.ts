@@ -91,8 +91,8 @@ export async function createServerApp() {
         return next();
       }
 
-      // Vite build 后的真实静态资源
-      // 例如 /assets/index-xxx.js、/assets/index-xxx.css、/favicon.ico
+      // Real static assets emitted by the Vite build.
+      // For example: /assets/index-xxx.js, /assets/index-xxx.css, /favicon.ico.
       if (isSpaAssetPath(pathname)) {
         return serveSpaAsset(c, next);
       }
@@ -108,8 +108,8 @@ export async function createServerApp() {
         );
       }
 
-      // 例如 /en、/en/settings、/zh/projects/123
-      // 这些都交给 React Router，所以返回 index.html
+      // For example: /en, /en/settings, /zh/projects/123.
+      // React Router owns these paths, so return index.html.
       return serveSpaIndex(c, next);
     });
   }

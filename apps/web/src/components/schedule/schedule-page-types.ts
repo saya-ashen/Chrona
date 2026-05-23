@@ -170,7 +170,7 @@ export type SecondaryPlanningView =
   | "conflicts";
 
 /**
- * 冲突类型
+ * Conflict type.
  */
 type ConflictType =
   | "time_overlap"
@@ -179,12 +179,12 @@ type ConflictType =
   | "dependency";
 
 /**
- * 冲突严重程度
+ * Conflict severity.
  */
 type ConflictSeverity = "low" | "medium" | "high";
 
 /**
- * 冲突详情
+ * Conflict details.
  */
 export type ScheduleConflict = {
   id: string;
@@ -200,12 +200,12 @@ export type ScheduleConflict = {
 };
 
 /**
- * 建议类型
+ * Suggestion type.
  */
 type SuggestionType = "reschedule" | "split" | "merge" | "defer" | "reorder";
 
 /**
- * 任务变更
+ * Task change.
  */
 type TaskChange = {
   taskId: string;
@@ -216,7 +216,7 @@ type TaskChange = {
 };
 
 /**
- * 建议详情
+ * Suggestion details.
  */
 export type ScheduleSuggestion = {
   id: string;
