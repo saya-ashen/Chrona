@@ -19,6 +19,7 @@ const messages = {
       typeLabel: "Type",
       llmCompatible: "LLM (OpenAI Compatible)",
       hermes: "Hermes",
+      debug: "Debug Provider",
       timeoutSeconds: "Timeout (seconds)",
       modelLabel: "Model",
       setAsDefault: "Set as default Client",
@@ -49,6 +50,11 @@ const providersResponse = {
       key: "hermes",
       label: "Hermes",
       features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
+    },
+    {
+      key: "debug",
+      label: "Debug Provider",
+      features: ["suggest", "generatePlan", "chat"],
     },
   ],
 };
@@ -160,6 +166,55 @@ describe("AiClientsManager", () => {
         apiKey: "hermes-token",
         timeoutMs: 45000,
       },
+    });
+  });
+
+  it("creates a debug client without provider config", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+
+    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+      target: { value: "Local Debug" },
+    });
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Debug Provider"));
+
+    expect(screen.queryByPlaceholderText("http://127.0.0.1:8642")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("optional for localhost")).not.toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ client: { id: "client_debug" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const createCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients" && call[1]?.method === "POST");
+    expect(JSON.parse(createCall?.[1]?.body as string)).toMatchObject({
+      name: "Local Debug",
+      type: "debug",
+      config: {},
     });
   });
 

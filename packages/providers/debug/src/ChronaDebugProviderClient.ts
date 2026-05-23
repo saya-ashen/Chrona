@@ -13,7 +13,7 @@ import type {
   StreamRunInput,
 } from "@chrona/providers-foundation";
 
-export const CHRONA_DEBUG_PROVIDER_URL = "chrona-debug://provider";
+export const CHRONA_DEBUG_PROVIDER_TYPE = "debug";
 
 const PLAN_TOOL = "chrona_plan_generate";
 const TASK_COMPLETE_TOOL = "chrona_task_complete";
@@ -22,17 +22,9 @@ type DebugRun = {
   runId: string;
   sessionId: string;
   sessionKey?: string;
+  input?: StartRunInput;
+  status: ProviderRunRef["status"];
 };
-
-export function isChronaDebugProviderUrl(value: unknown) {
-  return (
-    typeof value === "string" && value.trim() === CHRONA_DEBUG_PROVIDER_URL
-  );
-}
-
-export function isChronaDebugProviderConfig(config: { baseUrl?: string }) {
-  return isChronaDebugProviderUrl(config.baseUrl);
-}
 
 function now() {
   return new Date().toISOString();
@@ -42,12 +34,14 @@ function createRun(input: {
   runId?: string;
   sessionId?: string;
   sessionKey?: string;
+  startInput?: StartRunInput;
 }): DebugRun {
-  console.log("Creating debug run with input:", input);
   return {
     runId: input.runId ?? `chrona-debug-run-${crypto.randomUUID()}`,
     sessionId: input.sessionId ?? `chrona-debug-session-${crypto.randomUUID()}`,
     sessionKey: input.sessionKey,
+    input: input.startInput,
+    status: "running",
   };
 }
 
@@ -133,6 +127,12 @@ function isPlanGeneration(input: StreamRunInput) {
   return "instructions" in input && input.instructions.includes(PLAN_TOOL);
 }
 
+function streamInputForRun(run: DebugRun, input: StreamRunInput): StreamRunInput {
+  if ("instructions" in input) return input;
+  if (!run.input) return input;
+  return { ...run.input, runId: run.runId, signal: input.signal, stream: true };
+}
+
 function eventBase(provider: string, run: DebugRun, sequence: number) {
   return {
     provider,
@@ -152,8 +152,9 @@ async function pause(signal?: AbortSignal) {
 
 export class ChronaDebugProviderClient implements AgentProviderClient {
   readonly provider: string;
+  private readonly runs = new Map<string, DebugRun>();
 
-  constructor(provider = "chrona-debug") {
+  constructor(provider = CHRONA_DEBUG_PROVIDER_TYPE) {
     this.provider = provider;
   }
 
@@ -195,18 +196,27 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
-    return providerRunRef(
-      this.provider,
-      createRun({ sessionId: input.sessionId, sessionKey: input.sessionKey }),
-    );
+    const run = createRun({
+      sessionId: input.sessionId,
+      sessionKey: input.sessionKey,
+      startInput: input,
+    });
+    this.runs.set(run.runId, run);
+    return providerRunRef(this.provider, run);
   }
 
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
-    const run = createRun({
-      runId: "runId" in input ? input.runId : undefined,
+    const inputRunId = "runId" in input ? input.runId : undefined;
+    const existingRun = inputRunId ? this.runs.get(inputRunId) : null;
+    const run = existingRun ?? createRun({
+      runId: inputRunId,
       sessionId: "sessionId" in input ? input.sessionId : undefined,
       sessionKey: "sessionKey" in input ? input.sessionKey : undefined,
+      startInput: "instructions" in input ? input : undefined,
     });
+    this.runs.set(run.runId, run);
+    run.status = "running";
+    const streamInput = streamInputForRun(run, input);
     const signal = "signal" in input ? input.signal : undefined;
     let sequence = 0;
 
@@ -217,7 +227,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     };
     await pause(signal);
 
-    if (isPlanGeneration(input)) {
+    if (isPlanGeneration(streamInput)) {
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "reasoning_delta",
@@ -247,7 +257,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         result: { ok: true, message: "Debug plan emitted." },
       };
     } else {
-      const title = currentNodeTitle(input);
+      const title = currentNodeTitle(streamInput);
       const callId = `chrona-debug-complete-${sequence}`;
       yield {
         ...eventBase(this.provider, run, sequence++),
@@ -271,7 +281,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
           outputs: [
             {
               kind: "json",
-              value: { provider: "chrona-debug", nodeTitle: title },
+              value: { provider: this.provider, nodeTitle: title },
             },
           ],
         },
@@ -288,25 +298,27 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     }
 
     await pause(signal);
+    run.status = "completed";
     yield {
       ...eventBase(this.provider, run, sequence),
       type: "run_completed",
       run: providerRunRef(this.provider, run, "completed"),
-      outputText: isPlanGeneration(input)
+      outputText: isPlanGeneration(streamInput)
         ? "Debug plan generation completed."
-        : `Debug runtime run completed for ${currentNodeTitle(input)}.`,
+        : `Debug runtime run completed for ${currentNodeTitle(streamInput)}.`,
       usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
     };
   }
 
   async getRun(input: GetRunInput): Promise<ProviderRunSnapshot> {
+    const run = this.runs.get(input.runId);
     return {
       provider: this.provider,
       runId: input.runId,
       nativeRunId: input.runId,
       providerRunId: input.runId,
-      sessionId: input.sessionId ?? input.sessionKey ?? input.runId,
-      status: "completed",
+      sessionId: run?.sessionId ?? input.sessionId ?? input.sessionKey ?? input.runId,
+      status: run?.status ?? "completed",
       outputText: `Debug runtime run ${input.runId} completed during sync.`,
       error: null,
       raw: { debugProvider: true },
@@ -314,12 +326,14 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   }
 
   async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
+    const run = this.runs.get(input.runId);
+    if (run) run.status = "cancelled";
     return {
       provider: this.provider,
       runId: input.runId,
       nativeRunId: input.runId,
       providerRunId: input.runId,
-      sessionId: input.sessionId ?? input.runId,
+      sessionId: run?.sessionId ?? input.sessionId ?? input.runId,
       status: "cancelled",
       error: null,
       raw: { debugProvider: true, cancelled: true },

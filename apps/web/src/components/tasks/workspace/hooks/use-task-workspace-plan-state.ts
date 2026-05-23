@@ -159,6 +159,13 @@ function checkpointActionEmphasis(style: ExecutionCheckpoint["availableActions"]
   return "default" as const;
 }
 
+function checkpointActionKind(actionId: ExecutionCheckpoint["availableActions"][number]["id"]) {
+  if (actionId === "retry_node") return "retry" as const;
+  if (actionId === "resume_after_unblock") return "resolve" as const;
+  if (actionId === "cancel_session" || actionId === "fail_task") return "trigger" as const;
+  return "input" as const;
+}
+
 function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
   return checkpoint.form?.inputFields.map((field) => ({
     key: field.name,
@@ -195,7 +202,7 @@ function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, chec
     const actions = checkpoint.availableActions.map((action) => ({
       id: action.id,
       label: action.label,
-      kind: action.id === "retry_node" ? "retry" as const : action.id === "resume_after_unblock" ? "resolve" as const : "input" as const,
+      kind: checkpointActionKind(action.id),
       emphasis: checkpointActionEmphasis(action.style),
       checkpointId: checkpoint.id,
       checkpointAction: action.id,

@@ -1,203 +1,93 @@
 # Chrona 快速开始
 
-2 分钟跑起来。
+本指南包含两种路径：
 
-## Chrona 是什么
+1. 使用发布包 CLI：安装 `@chrona-org/cli`，然后运行 `chrona start`。
+2. 从仓库开发：使用 Bun 和 workspace scripts。
 
-Chrona 是一个 AI 原生任务控制台，核心由两个循环组成：
+## 路径 A：发布包 CLI
 
-- **排期** — 将模糊意图转化为具体时间块和结构化任务计划
-- **执行** — 让 AI 智能体按计划推进任务，并持续更新计划
+环境要求：
 
-## 环境要求
-
-| 要求 | 验证方式 |
-|------|---------|
-| **Node.js >= 20** | `node --version`（仅用于 npm 安装 — npm 包内置了 Bun 作为应用运行时） |
-| **npm** | `npm --version`（Node.js 自带） |
+- Node.js 20 或更新版本
+- npm 用于安装发布包
 
 ```bash
-# 验证 Node.js 版本（仅 npm 安装需要；运行时使用 Bun）
-node --version  # 必须 >= 20.0.0
-```
-
-Chrona 使用 **Bun** 作为应用运行时。npm 包内置了 Bun 二进制文件，无需单独安装 Bun。
-
-## 安装
-
-```bash
+node --version
+npm --version
 npm install -g @chrona-org/cli
-```
-
-全局安装 `chrona` 命令。
-
-## 启动
-
-```bash
 chrona start
 ```
 
-首次运行会自动完成所有初始化：
+`chrona start` 会启动本地 Chrona server，通常位于 `http://localhost:3101`，Web 应用也从同一地址提供服务。
 
-1. 创建数据目录（Linux: `~/.local/share/chrona/`）
-2. 创建配置文件（基于打包模板生成 `~/.config/chrona/.env`）
-3. 创建 SQLite 数据库并执行 schema 迁移
-4. 启动服务器于 `http://localhost:3101`
-
-在浏览器中打开 `http://localhost:3101`。Web 应用完全在本地运行——无需云端账号。
-
-### 数据目录
-
-| 平台 | 数据 | 配置 |
-|------|------|------|
-| Linux | `~/.local/share/chrona/` | `~/.config/chrona/` |
-| macOS | `~/Library/Application Support/chrona/` | `~/Library/Preferences/chrona/` |
-| Windows | `%APPDATA%/chrona/` | `%APPDATA%/chrona/` |
-
-可通过环境变量覆盖：
+Chrona 会把数据保存到平台默认应用目录。需要时可以覆盖：
 
 ```bash
-CHRONA_DATA_DIR=/自定义/路径/数据 chrona start
-CHRONA_CONFIG_DIR=/自定义/路径/配置 chrona start
+CHRONA_DATA_DIR=/custom/path/data chrona start
+CHRONA_CONFIG_DIR=/custom/path/config chrona start
 ```
 
-## 配置 AI 后端
+## 路径 B：仓库开发
 
-在 Web 应用的 **设置 > AI 客户端** 页面配置。
+环境要求：
 
-### 方案 A：LLM（推荐快速开始）
-
-使用任意 OpenRouter 兼容的 API。你需要：
-- LLM 提供商的 API key
-- 要使用的模型名称
-
-示例配置：
-```json
-{
-  "name": "我的 Claude",
-  "type": "llm",
-  "config": {
-    "apiKey": "sk-...",
-    "baseUrl": "https://api.openai.com/v1",
-    "model": "claude-sonnet-4-20250514"
-  }
-}
-```
-
-### 方案 B：Hermes 网关
-
-用于专用代理执行。你需要：
-- 运行中的 Hermes 网关（默认: `http://localhost:18789`）
-- 网关 token
-
-配置完成后可在设置页面测试连接。
-
-## CLI 用法
-
-`chrona` 命令同时也是一个 CLI 客户端：
+- Bun 1.3.x 或更新版本
+- Git
 
 ```bash
-# 任务操作
-chrona task list                                    # 列出任务
-chrona task create --title "调研竞品产品"            # 创建任务
-chrona task show <id>                               # 查看详情
-
-# 运行操作
-chrona run start <task-id>                          # 启动智能体运行
-
-# 排期操作
-chrona schedule list                                # 列出已排期任务
-
-# AI 操作
-chrona ai suggest --title "修复 bug"                 # AI 建议
+git clone https://github.com/saya-ashen/Chrona.git
+cd Chrona
+bun install
+bun run dev
 ```
 
-所有命令都支持 `--base-url` 参数指向其他 API 服务器：
+常用仓库命令：
 
 ```bash
-chrona task list --base-url http://其他机器:3101
+bun run server:start  # API + 静态 Web 应用 server
+bun run dev:web       # 仅 Vite Web dev server
+bun run typecheck
+bun run lint
+bun run test
+bun run test:bun
+bun run test:api
 ```
 
-## 第一个任务完整操作
+## 首次运行检查清单
 
-### 1. 创建任务
+1. 打开 `http://localhost:3101`。
+2. 打开 Settings / AI Clients。
+3. 添加 AI client。
+4. 将它绑定到需要的功能，例如 `generate_plan`、`suggest`、`chat`、`dispatch_task`。
+5. 创建任务。
+6. 生成计划。
+7. 审查并接受计划。
+8. 在任务工作区或 Work 页面启动执行。
 
-进入 **排期** 页面，点击"+"按钮，描述你的工作：
+## AI clients
 
-```
-标题：分析 Q4 销售数据
-描述：从分析数据库中拉取数据，识别趋势，生成包含图表的汇总报告
-```
+Chrona 将 AI clients 与 feature bindings 存在数据库中。常见 client 类型包括：
 
-### 2. 生成 AI 计划
+- `llm`：OpenAI/OpenRouter 兼容模型调用，用于轻量 AI 功能。
+- `hermes`：配置 Hermes bridge/provider 后，用于 Hermes-backed agent execution。
 
-点击任务的 **"生成计划"**。Chrona 会流式生成 AI 执行计划，包含类型化节点、依赖关系和工时估算。审阅计划，必要时编辑，然后 **"采纳"**。
+Feature binding 决定哪个 client 处理哪个能力。常见功能包括 `suggest`、`generate_plan`、`conflicts`、`timeslots`、`chat`、`dispatch_task`。
 
-### 3. 排期
+## Work 页面基础
 
-将任务拖放到日历上以分配时间段，或使用 **"AI 建议时间段"** 让 Chrona 找到最佳时间窗口。
+Work 页面是单个任务的主要执行界面，包含：
 
-### 4. 运行智能体
+- 最新结果
+- 已生成/已接受的计划图
+- 围绕 plan run 与 runtime event 组织的执行记录
+- 任务信息和排期状态
+- 对话与命令输入上下文
+- checkpoint、输入、审批、阻塞、失败恢复动作
 
-点击任务上的 **"开始运行"**。在 **工作** 视图中查看实时对话、工具调用和进度。智能体可能会请求输入或审批——你始终掌握控制权。
+## 排障
 
-### 5. 审阅与迭代
-
-运行完成后，审阅生成的产物。接受结果或创建后续任务。
-
-## 服务器选项
-
-```bash
-chrona start                     # 默认监听 127.0.0.1:3101
-PORT=3100 chrona start           # 自定义端口
-API_KEY=sk-chrona-local chrona start
-HOST=0.0.0.0 API_KEY=sk-chrona-local chrona start  # 绑定所有网络接口并启用 Access Key 保护
-```
-
-生产模式下，同一端口上的单个服务器同时托管 API 和静态 SPA。
-
-Chrona 默认绑定 `127.0.0.1`，避免个人本地部署被局域网或公网误访问。如需让其他设备访问，请显式设置 `HOST=0.0.0.0`，并强烈建议同时设置 `API_KEY`。设置 `API_KEY` 后，受保护 API 请求必须携带 `Authorization: Bearer <key>`；网页在收到 `401 Unauthorized` 后会显示 Access Key 解锁界面，key 默认只保存在内存中，勾选 **记住此设备** 后会保存在当前浏览器的 localStorage。
-
-为安全起见，`HOST=0.0.0.0` 且未设置 `API_KEY` 时服务端会拒绝启动。如需临时允许这种不安全模式，必须显式设置 `CHRONA_UNSAFE_PUBLIC_BIND=1`。
-
-## 故障排查
-
-### "command not found: chrona"
-
-确保 npm 全局 bin 目录在 PATH 中：
-
-```bash
-npm config get prefix          # 例如 /home/user/.npm-global
-export PATH="$PATH:$(npm config get prefix)/bin"
-```
-
-### 端口 3101 已被占用
-
-```bash
-chrona start
-# 错误: listen EADDRINUSE :::3101
-
-# 使用其他端口
-PORT=3102 chrona start
-```
-
-### AI 后端无响应
-
-1. 检查网络连通性：`curl -I https://api.openai.com/v1/models`
-2. 检查 API key 是否过期
-3. 在 **设置 > AI 客户端** → **测试连接** 中测试连通性
-
-### 数据库问题
-
-```bash
-# 重置所有数据（删除所有数据！）
-rm -rf ~/.local/share/chrona/chrona.db
-chrona start    # 重新创建数据库
-```
-
-## 下一步
-
-- [路线图](./roadmap.md) — 产品方向和阶段规划
-- [系统架构](../architecture.md) — CQRS + 事件溯源深入解析
-- [API 参考](../api-reference.md) — 完整 REST API 文档
-- [数据模型](../data-model.md) — 数据库 schema 参考
+- 如果 server 无法访问，确认进程监听在 `3101`，且端口未被其他服务占用。
+- 如果 AI 功能没有反应，检查 Settings / AI Clients 中是否有启用的 client 和 feature binding。
+- 如果执行暂停，在 Inbox 和 Work 页面查看等待输入、审批、阻塞或失败状态。
+- 本地开发时，如果 schema 或依赖变化，运行 `bun run setup`。在 NixOS 上，Prisma 可能需要自定义 engine 配置或设置 `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1`，因为上游可能缺少 `linux-nixos` engine target 的 checksum 文件。

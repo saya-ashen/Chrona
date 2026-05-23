@@ -39,7 +39,7 @@ export function getQuickCreateDefaults(data: SchedulePageData) {
     null;
 
   return {
-    executionRuntime: selectedRuntime?.key ?? data.defaultExecutionRuntime,
+    executionRuntime: selectedRuntime?.key ?? "",
   };
 }
 

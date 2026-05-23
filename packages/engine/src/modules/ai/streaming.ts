@@ -244,14 +244,21 @@ async function* agentProviderStream(
       yield { type: "status", message: "AI 正在思考..." };
       let fullText = "";
 
-      for await (const event of agentClient.providerClient.streamRun({
-        sessionId,
+      const session = await agentClient.providerClient.createSession({
+        sessionKey,
+      });
+      const run = await agentClient.providerClient.startRun({
+        sessionId: session.sessionId,
         sessionKey,
         instructions: input.instructions,
         input: input.input,
-        structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
         timeoutMs: timeout * 1000,
         stream: true,
+        signal: input.signal,
+      });
+
+      for await (const event of agentClient.providerClient.streamRun({
+        runId: run.runId,
         signal: input.signal,
       })) {
         const parsed = convertProviderEvent(event);
@@ -271,6 +278,10 @@ async function* agentProviderStream(
         });
         yield parsed;
         if (parsed.type === "error") {
+          await dump?.close();
+          return;
+        }
+        if (parsed.type === "done") {
           await dump?.close();
           return;
         }

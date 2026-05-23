@@ -1,109 +1,90 @@
 # Provider Boundary
 
-This document defines the refactor target for `packages/providers/*` and
-`packages/providers/foundation`.
+Providers are protocol adapters. They connect Chrona to external AI/runtime systems, but they do not own Chrona workflow semantics.
 
-## Core Rule
+## Core rule
 
-Providers are protocol adapters. They do not implement Chrona workflow
-semantics.
+Provider code may know how to:
 
-Provider code may know:
+- authenticate with an external provider
+- create, resume, or virtualize provider sessions
+- send requests and stream responses
+- parse provider-native tool calls, text deltas, approvals, and status events
+- normalize provider-native output into Chrona contracts
+- expose provider health/capabilities
 
-- how to authenticate with an external provider
-- how to create or resume a provider session
-- how to send a request
-- how to stream a response
-- how to normalize provider-native output
-- how to list provider-native approvals, history, and run status
-
-Provider code must not know:
+Provider code must not decide:
 
 - what a Chrona task means
-- what a plan node means
-- when a task should retry
-- how approval changes Chrona task state
-- how projections, block reasons, or workflow status are derived
+- how a plan node should progress
+- whether a task should retry, block, fail, or complete
+- how approvals change Chrona state
+- how projections, Work records, or schedule state are derived
 
-## Session Ownership
+Those decisions belong in `packages/engine`.
 
-`session` belongs to the provider boundary.
+## Current provider packages
 
-- If the provider has a native session concept, Chrona maps to it.
-- If the provider has no native session concept, the provider layer may
-  virtualize one.
-- The provider may store provider-native continuity state that only exists to
-  talk to the upstream API.
+| Package | Role |
+| --- | --- |
+| `packages/providers/foundation` | Provider-neutral contracts and shared adapter shapes |
+| `packages/providers/hermes` | Hermes-specific transport, session, event, and tool-call adaptation |
+| `packages/providers/debug` | Development/debug execution runtime, hidden unless explicitly enabled |
 
-Examples:
+## Session ownership
 
-- provider session id
-- provider-native response id
-- provider-native conversation continuation token
+External runtimes often have native session/run IDs. The provider layer may store and translate provider-native continuity state such as:
 
-Chrona business execution state stays above this boundary.
+- provider session ID
+- native run ID
+- response ID
+- conversation continuation token
+- provider approval ID
 
-Examples:
+Chrona business execution state stays above the provider boundary:
 
-- task id
-- execution session id
-- plan run id
+- task ID
+- task plan/run state
+- execution session state
+- node attempt state
 - task status
-- block reason
+- block/retry/failure reason
 
-## Standard Provider Surface
+## Standard provider responsibilities
 
-All providers should converge on the same capability groups:
+A provider integration should converge on these capabilities:
 
-1. identity and capability declaration
-2. session creation or virtualization
-3. request execution
-4. streaming execution
-5. message continuation inside a session
-6. run or response lookup
-7. history lookup
-8. approval listing and approval resolution
+1. declare identity and capabilities
+2. validate runtime configuration
+3. create or resume a session/run
+4. execute a request
+5. stream normalized runtime events
+6. expose run/response status when the upstream supports it
+7. expose or resolve provider-native approvals when applicable
+8. surface errors without leaking secrets
 
-This surface is defined in
-`packages/providers/foundation/src/contracts/provider.ts`.
+## Hermes-specific notes
 
-## What Moved Out
+Hermes may expose native concepts such as session keys, run refs, native run IDs, history entries, tool calls, and approvals. Hermes code should normalize these into Chrona runtime events and feature results before upper layers consume them.
 
-The provider layer must not expose high-level methods such as
-`executeTask()` that imply Chrona business orchestration.
+Hermes code should not expose a high-level `executeTask()` abstraction that embeds Chrona task lifecycle decisions. The engine starts/continues execution and decides what to do with provider events.
 
-The following logic belongs in `packages/engine` instead:
+## Boundary with AI clients
 
-- retry policy
-- polling strategy
-- wait-for-completion vs fire-and-forget decisions
-- approval strategy
-- task and plan lifecycle transitions
+Settings / AI Clients stores configured clients and feature bindings in the database. The engine loads the selected client for a feature such as `generate_plan`, `suggest`, `chat`, or `dispatch_task`, then calls provider/foundation-facing abstractions. There is no generic bridge chat endpoint standing in for every product capability; feature-specific flows should have explicit contracts.
 
-## Hermes-Specific Notes
+## Boundary with MCP tools
 
-Hermes is allowed to expose Hermes-native concepts such as:
+MCP tools are public agent-facing contracts. They submit Chrona execution outcomes with AI-visible refs and session metadata. MCP route/tool code should translate the external call into engine-level input, but the engine remains responsible for validation, idempotency, state transition, and projection updates.
 
-- session key
-- response id
-- run ref
-- approval id
-- history entries
-- tool calls
+## Design checklist for new providers
 
-Hermes is not allowed to expose Chrona-specific business concepts such as:
+Before adding provider code, decide:
 
-- task execution
-- plan progression
-- task closure semantics
+1. Is this a canonical Chrona schema? Put it in `packages/contracts`.
+2. Is this a provider-neutral adapter shape? Put it in `packages/providers/foundation`.
+3. Is this external protocol behavior? Put it in a concrete package under `packages/providers/`.
+4. Is this task/plan/schedule/execution policy? Put it in `packages/engine`.
+5. Is this only HTTP route wiring? Put it in `apps/server`.
 
-## Refactor Direction
-
-Near-term target:
-
-1. foundation exposes only provider-neutral contracts
-2. Hermes adapter exposes only session/request/response/status primitives
-3. engine owns orchestration and business state transitions
-
-This boundary intentionally breaks old abstractions that mixed provider access
-with Chrona runtime orchestration.
+If upper layers need to parse raw provider wire format, the boundary is wrong.

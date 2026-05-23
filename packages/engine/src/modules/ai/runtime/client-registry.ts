@@ -1,6 +1,9 @@
 import { HermesProviderClient } from "@chrona/hermes";
+import {
+  CHRONA_DEBUG_PROVIDER_TYPE,
+  ChronaDebugProviderClient,
+} from "@chrona/providers-debug";
 import { db } from "@/lib/db";
-import { ChronaDebugProviderClient, isChronaDebugProviderConfig } from "./debug-provider-client";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type {
   AgentProviderClientConfig,
@@ -40,6 +43,11 @@ export type EngineHermesClient = EngineAiClient & {
   providerClient: AgentProviderClient;
 };
 
+export type EngineDebugClient = EngineAiClient & {
+  record: AiClientRecord & { type: "debug"; config: Record<string, never> };
+  providerClient: AgentProviderClient;
+};
+
 const clients = new Map<string, EngineAiClient>();
 let defaultClientId: string | null = null;
 let loaded = false;
@@ -70,10 +78,6 @@ function createProviderClient(
 ): EngineAiClient["providerClient"] {
   if (record.type === "hermes") {
     const config = record.config as HermesClientConfig;
-    if (isChronaDebugProviderConfig(config)) {
-      return new ChronaDebugProviderClient();
-    }
-
     return new HermesProviderClient({
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
@@ -81,8 +85,10 @@ function createProviderClient(
     });
   }
 
-  const config = record.config as AgentProviderClientConfig;
-  if (isChronaDebugProviderConfig(config)) return new ChronaDebugProviderClient(record.type);
+  if (record.type === CHRONA_DEBUG_PROVIDER_TYPE) {
+    return new ChronaDebugProviderClient();
+  }
+
   return null;
 }
 
@@ -128,10 +134,7 @@ async function getAiClient(
 }
 
 function requireProviderClient(client: EngineAiClient): EngineProviderClient {
-  const isDebugProvider = isChronaDebugProviderConfig(
-    client.record.config as { baseUrl?: string },
-  );
-  if (!isDebugProvider && !client.providerClient) {
+  if (!client.providerClient) {
     throw new AiClientError(
       "Provider client is required",
       client.record.type,

@@ -41,6 +41,7 @@ import {
   toTimestamp,
   hydrateSchedulePageData,
 } from "@/components/schedule/schedule-page-utils";
+import { getQuickCreateDefaults } from "@/components/schedule/schedule-page-actions";
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 
 function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {
@@ -813,6 +814,36 @@ describe("toTaskConfigInitialValues", () => {
     expect(result.executionRuntime).toBe("hermes");
     expect(result.dueAt).toBe(due);
     expect(result.executionConfig).toEqual({ prompt: "Do stuff" });
+  });
+});
+
+describe("getQuickCreateDefaults", () => {
+  it("uses the first supported runtime when workspace default is stale", () => {
+    const data = {
+      scheduled: [],
+      unscheduled: [],
+      proposals: [],
+      risks: [],
+      defaultExecutionRuntime: "openclaw",
+      executionRuntimes: [{
+        key: "hermes",
+        label: "Hermes",
+        spec: {
+          runtime: "hermes",
+          version: "1",
+          fields: [],
+          runnability: { requiredPaths: [] },
+        },
+      }],
+      summary: {} as any,
+      planningSummary: {} as any,
+      focusZones: [],
+      automationCandidates: [],
+      listItems: [],
+      workBlocks: [],
+    };
+
+    expect(getQuickCreateDefaults(data).executionRuntime).toBe("hermes");
   });
 });
 

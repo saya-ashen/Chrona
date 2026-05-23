@@ -1,50 +1,99 @@
 # Chrona 文档 — 中文
 
-Chrona 是一个 AI 原生任务控制台，目标是把"想法、排期、执行"串成一个连续流程。
+Chrona 是一个本地优先的 AI 任务控制台。它把“想法”推进为任务、可编辑图计划、排期、AI/运行时执行节点，以及可观察的任务结果。
 
-**安装：** `npm install -g @chrona-org/cli`
+## 当前能做什么
 
-## Diátaxis 分类内容
+- 任务管理：创建、编辑、完成、重开、删除、优先级、标签、父子任务、依赖关系。
+- AI 计划生成：从任务生成 PlanBlueprint，流式查看进度，审查、编辑并接受计划。
+- 图计划执行：执行 task / checkpoint / condition / wait 节点，支持输入、审批、重试、阻塞、失败和完成。
+- Work 页面：在一个任务工作台中查看最新结果、计划图、执行记录、任务信息、对话上下文和命令输入区。
+- Schedule 页面：查看时间块、冲突、排期建议，接受建议，并在到期时自动启动工作。
+- Inbox：聚合审批、排期建议、等待输入、失败运行和取消运行。
+- AI 配置：Settings / AI Clients 使用数据库保存 AI client 与 feature binding。
+- 智能体集成：Hermes 插件通过 MCP 暴露 Chrona 工具，使用 AI-visible refs，而不是后端真实 ID。
 
-### 教程 — 边做边学
+## 从这里开始
 
-| 文档 | 学习目标 |
-|------|---------|
-| [快速开始](./quick-start.md) | 安装、配置 AI 后端、创建并运行第一个任务 |
+| 目标 | 文档 |
+| --- | --- |
+| 安装并运行 Chrona | [快速开始](./quick-start.md) |
+| 查看当前产品方向 | [路线图](./roadmap.md) |
+| 通过 HTTP 或 MCP 集成 | [API 参考](../api-reference.md) |
+| 理解系统架构 | [系统架构](../architecture.md) |
+| 跟踪执行内部流程 | [后端执行流程](../backend-execution-flow.md) |
+| 理解持久化模型 | [数据模型](../data-model.md) |
+| 判断代码应该放在哪里 | [包边界说明](../package-boundaries.md) |
+| 扩展 AI/运行时 provider | [Provider 边界](../provider-boundary.md) |
+| 运行测试 | [测试指南](./testing.md) |
 
-### 操作指南 — 解决具体问题
+## 主要用户流程
 
-| 文档 | 解决的问题 |
-|------|----------|
-| [API 参考](../api-reference.md) | 通过任意端点集成 — 每个操作都有 curl 示例 |
-| [CONTRIBUTING.md](../../CONTRIBUTING.md) | 搭建开发环境、运行测试、提交 PR |
+### 1. 任务 → 计划 → 执行
 
-### 解释 — 理解设计
+1. 创建或更新任务。
+2. 在任务工作区或 Work 页面生成 AI 计划。
+3. 审查并按需编辑生成的图计划。
+4. 接受计划。
+5. 手动启动执行，或让 scheduler 到点触发。
+6. 遇到 checkpoint、输入、审批、阻塞或失败时介入处理。
+7. 在 Work 页面查看最新结果与执行记录。
 
-| 文档 | 理解内容 |
-|------|---------|
-| [系统架构](../architecture.md) | CQRS + 事件溯源、数据流、模块依赖、设计决策 |
-| [包边界说明](../package-boundaries.md) | `packages/*` 各自负责什么、不负责什么，以及代码应该放哪里 |
-| [路线图](./roadmap.md) | 产品愿景、当前阶段、计划功能、设计原则 |
+### 2. 排期驱动执行
 
-### 参考 — 查阅事实
+1. 创建任务，可选设置截止时间。
+2. 直接设置时间块，或请求 AI 生成排期建议。
+3. 在 Schedule 或 Inbox 中接受/拒绝建议。
+4. 到期后 scheduler 可以自动启动 WorkBlock。
+5. 执行状态与任务投影同步回 Schedule、Inbox 和 Work。
 
-| 文档 | 查阅内容 |
-|------|---------|
-| [数据模型](../data-model.md) | 完整 schema：15 个模型、所有枚举、ERD、索引、状态机 |
-| [API 参考](../api-reference.md) | 每个端点的 HTTP 方法、路径、参数、请求/响应 schema |
-| [测试指南](./testing.md) | 测试运行器、覆盖范围、Mock 策略、编写新测试 |
+### 3. 智能体集成
 
-## 推荐阅读顺序
+外部智能体通过 MCP 工具调用 Chrona，例如 `chrona_plan_generate`、`chrona_task_complete`、`chrona_node_block`、`chrona_condition_select`。智能体只能使用 Chrona 提供的 AI 可见 node / branch refs 提交结果，不能编造后端 ID。
 
-1. [快速开始](./quick-start.md) — 2 分钟跑起来
-2. [系统架构](../architecture.md) — 理解系统设计
-3. [包边界说明](../package-boundaries.md) — 建立对 monorepo 分层的掌控感
-4. [API 参考](../api-reference.md) — 探索完整 API
+## 开发者地图
 
-## 快速链接
+| 区域 | 路径 | 职责 |
+| --- | --- | --- |
+| Web 应用 | `apps/web` | Vite + React 19 + React Router UI |
+| Server | `apps/server` | Bun 上的 Hono API 路由与静态资源服务 |
+| CLI | `packages/cli` | API 的轻量命令行客户端 |
+| Engine | `packages/engine` | 任务、计划、执行、排期、投影、AI client 用例 |
+| Contracts | `packages/contracts` | API schema、AI feature、运行时事件、MCP tool schema |
+| Graph runtime | `packages/graph-runtime` | 计划图解析、状态转换、命令执行原语 |
+| Database | `packages/db` + `prisma` | SQLite + Prisma 7 schema、迁移、种子数据 |
+| Providers | `packages/providers/*` | 运行时/provider 协议适配器 |
+| Hermes 插件 | `external-plugins/hermes` | 暴露给 Hermes Agent 的 Chrona MCP 工具 |
 
-- [根 README](../../README.md) — 项目概览和功能特性
-- [包边界说明](../package-boundaries.md) — 快速判断新代码应该放在哪个包
-- [数据模型](../data-model.md) — 数据库 schema 深入解析
-- [路线图](./roadmap.md) — 下阶段规划
+## 仓库开发命令
+
+在仓库根目录运行：
+
+```bash
+bun install
+bun run dev
+```
+
+常用检查：
+
+```bash
+bun run typecheck
+bun run lint
+bun run test
+bun run test:bun
+bun run test:api
+bun run check:ui-foundation
+bun run check:boundaries
+```
+
+仅启动后端服务：
+
+```bash
+bun run server:start
+```
+
+仅启动前端 dev server：
+
+```bash
+bun run dev:web
+```

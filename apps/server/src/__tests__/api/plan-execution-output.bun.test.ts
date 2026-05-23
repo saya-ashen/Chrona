@@ -15,12 +15,12 @@ import {
 } from "@chrona/db/generated/prisma/client";
 import type {
   AgentProviderClient,
+  ProviderRunEvent,
   ProviderCapabilities,
   ProviderHealth,
   ProviderRunRef,
   ProviderRunSnapshot,
   ProviderSessionRef,
-  StreamRunInput,
 } from "@chrona/providers-foundation";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
@@ -31,12 +31,7 @@ function createMockProviderClient(input: {
   runStarted?: boolean;
 }): TestProviderResponseClient {
   const messages: Array<{ role: string; content: string }> = [];
-
-  function isStartRunInput(
-    request: Parameters<AgentProviderClient["streamRun"]>[0],
-  ): request is Extract<StreamRunInput, { sessionId: string }> {
-    return "sessionId" in request && "instructions" in request && "input" in request;
-  }
+  let latestRun: ProviderRunRef | null = null;
 
   return {
     provider: "test-provider",
@@ -70,31 +65,30 @@ function createMockProviderClient(input: {
         messages.push({ role: "assistant", content: outputContent });
       }
 
-      const response: ProviderRunRef = {
+      latestRun = {
         provider: "test-provider",
         runId: input.runStarted === false ? "mock-failed-run" : `mock-run-ref-${Date.now()}`,
         nativeRunId: input.runStarted === false ? undefined : `mock-run-ref-${Date.now()}`,
         sessionId: request.sessionKey ?? "mock-session-key",
         status: input.runStarted === false ? "failed" : "completed",
       };
-      return response;
+      return latestRun;
     },
     async *streamRun(request) {
-      if (!isStartRunInput(request)) {
-        throw new Error("Mock provider streamRun requires a start input");
+      if (!("runId" in request) || !latestRun || request.runId !== latestRun.runId) {
+        throw new Error("Mock provider streamRun requires runId");
       }
-      const run = await this.startRun(request);
       if (input.runStarted === false) {
         yield {
           type: "run_failed" as const,
-          run,
+          run: latestRun,
           error: "provider refused to start",
         };
         return;
       }
       yield {
         type: "run_completed" as const,
-        run,
+        run: { ...latestRun, status: "running" as const },
         outputText: input.outputMessages.at(-1) ?? "",
       };
     },
@@ -169,7 +163,7 @@ function createMockHermesClient(input: {
           provider: "hermes",
           runId: "hermes-run-1",
           sessionId: "hermes-session-key",
-          status: "completed" as const,
+          status: "running" as const,
         },
         outputText: input.outputContent,
       };
@@ -185,6 +179,87 @@ function createMockHermesClient(input: {
       return {
         provider: "hermes",
         runId: "hermes-run-1",
+        status: "cancelled",
+      };
+    },
+  };
+
+  return { client, calls };
+}
+
+function createRecoverableHermesClient() {
+  const calls = {
+    startRun: [] as Array<Parameters<AgentProviderClient["startRun"]>[0]>,
+    streamRun: [] as Array<Parameters<AgentProviderClient["streamRun"]>[0]>,
+  };
+
+  let streamAttempts = 0;
+  const client: TestProviderResponseClient = {
+    provider: "hermes",
+    getCapabilities(): ProviderCapabilities {
+      return {
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: true,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: false,
+      };
+    },
+    async checkHealth(): Promise<ProviderHealth> {
+      return {
+        provider: "hermes",
+        ok: true,
+        checkedAt: new Date().toISOString(),
+      };
+    },
+    async createSession(): Promise<ProviderSessionRef> {
+      return {
+        provider: "hermes",
+        sessionId: "hermes-session-key",
+        createdAt: new Date().toISOString(),
+      };
+    },
+    async startRun(request): Promise<ProviderRunRef> {
+      calls.startRun.push(request);
+      return {
+        provider: "hermes",
+        runId: "hermes-run-recoverable",
+        sessionId: request.sessionId,
+        status: "running",
+      };
+    },
+    async *streamRun(request): AsyncIterable<ProviderRunEvent> {
+      calls.streamRun.push(request);
+      streamAttempts += 1;
+      if (streamAttempts === 1) {
+        throw Object.assign(new Error("Hermes request aborted"), {
+          code: "aborted",
+          retryable: true,
+        });
+      }
+      yield {
+        type: "run_completed" as const,
+        run: {
+          provider: "hermes",
+          runId: "hermes-run-recoverable",
+          sessionId: "hermes-session-key",
+          status: "running" as const,
+        },
+        outputText: "Recovered from existing Hermes run",
+      };
+    },
+    async getRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "hermes",
+        runId: "hermes-run-recoverable",
+        status: "completed",
+      };
+    },
+    async cancelRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "hermes",
+        runId: "hermes-run-recoverable",
         status: "cancelled",
       };
     },
@@ -528,6 +603,37 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(result.status).toBe("started");
     expect(calls.startRun).toHaveLength(1);
     expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+  });
+
+  it("recovers transient Hermes stream failures by reading the existing run first", async () => {
+    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { client, calls } = createRecoverableHermesClient();
+    installMockRegistryClient(client, "hermes");
+
+    const result = await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: planGraph.nodes[0] as any,
+      plan: planGraph as any,
+      runtimeName: "hermes",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    const persistedRun = await db.run.findUniqueOrThrow({
+      where: { id: result.evidence?.runId as string },
+    });
+
+    expect(result.status).toBe("started");
+    expect((result as { summary: string }).summary).toBe("Recovered from existing Hermes run");
+    expect(calls.startRun).toHaveLength(1);
+    expect(calls.startRun[0]).toMatchObject({
+      idempotencyKey: `chrona-runtime:${result.evidence?.runId}`,
+    });
+    expect(calls.streamRun).toEqual([
+      { runId: "hermes-run-recoverable" },
+      { runId: "hermes-run-recoverable" },
+    ]);
+    expect(persistedRun.runtimeRunRef).toBe("hermes-run-recoverable");
   });
 
   it("does not require structured tool result for Hermes task execution", async () => {

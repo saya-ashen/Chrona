@@ -1,205 +1,93 @@
 # Chrona Quick Start
 
-Get Chrona running in 2 minutes.
+This guide covers two paths:
 
-## What is Chrona
+1. Use the packaged CLI: install `@chrona-org/cli`, then run `chrona start`.
+2. Develop from the repository: use Bun and the workspace scripts.
 
-Chrona is an AI-native task control plane with two core loops:
+## Option A: packaged CLI
 
-- **Schedule** — turn rough intent into concrete time blocks and structured task plans
-- **Execute** — let AI agents carry tasks forward with continuously updated plans
+Prerequisites:
 
-## Prerequisites
-
-| Requirement | Check |
-|------------|-------|
-| **Node.js >= 20** | `node --version` (for npm install only — the npm package bundles Bun as the application runtime) |
-| **npm** | `npm --version` (bundled with Node.js) |
+- Node.js 20 or newer
+- npm for installing the published package
 
 ```bash
-# Verify your Node.js version (npm install only; runtime is Bun)
-node --version  # must be >= 20.0.0
-```
-
-Chrona uses **Bun** as its application runtime. The npm package ships
-with an embedded Bun binary — no separate Bun install is required.
-
-## Install
-
-```bash
+node --version
+npm --version
 npm install -g @chrona-org/cli
-```
-
-Installs the `chrona` command globally.
-
-## Start
-
-```bash
 chrona start
 ```
 
-First run does everything automatically:
+`chrona start` starts the local Chrona server, normally at `http://localhost:3101`, and serves the web app from the same origin.
 
-1. Creates data directory (`~/.local/share/chrona/` on Linux)
-2. Creates config file (`~/.config/chrona/.env` from bundled template)
-3. Creates SQLite database and runs schema migrations
-4. Starts the server at `http://localhost:3101`
-
-Open `http://localhost:3101` in your browser. The web app runs entirely locally — no cloud account, no SaaS.
-
-### Data directories
-
-| Platform | Data | Config |
-|----------|------|--------|
-| Linux | `~/.local/share/chrona/` | `~/.config/chrona/` |
-| macOS | `~/Library/Application Support/chrona/` | `~/Library/Preferences/chrona/` |
-| Windows | `%APPDATA%/chrona/` | `%APPDATA%/chrona/` |
-
-Override with environment variables:
+Chrona stores local data under platform-specific application directories. You can override them when needed:
 
 ```bash
 CHRONA_DATA_DIR=/custom/path/data chrona start
 CHRONA_CONFIG_DIR=/custom/path/config chrona start
 ```
 
-## Configure AI Backends
+## Option B: repository development
 
-Open **Settings > AI Clients** in the web app.
+Prerequisites:
 
-### Option A: LLM (recommended for quick start)
-
-Use any OpenRouter-compatible API. You need:
-- An API key from your LLM provider
-- The model name you want to use
-
-Example configuration:
-```json
-{
-  "name": "My Claude",
-  "type": "llm",
-  "config": {
-    "apiKey": "sk-...",
-    "baseUrl": "https://api.openai.com/v1",
-    "model": "claude-sonnet-4-20250514"
-  }
-}
-```
-
-### Option B: Hermes Gateway
-
-For dedicated agent execution. You need:
-- A running Hermes gateway (default: `http://localhost:18789`)
-- A gateway token
-
-Test connectivity from the Settings page after configuring.
-
-## CLI Usage
-
-The `chrona` command also works as a CLI client:
+- Bun 1.3.x or newer
+- Git
 
 ```bash
-# Task operations
-chrona task list                                    # List tasks
-chrona task create --title "Research competitor products"  # Create
-chrona task show <id>                               # Show details
-
-# Run operations
-chrona run start <task-id>                          # Start agent run
-
-# Schedule operations
-chrona schedule list                                # List scheduled tasks
-
-# AI operations
-chrona ai suggest --title "bug fix"                 # Get AI suggestions
+git clone https://github.com/saya-ashen/Chrona.git
+cd Chrona
+bun install
+bun run dev
 ```
 
-All commands accept `--base-url` to target a different API server:
+Common repository commands:
 
 ```bash
-chrona task list --base-url http://other-machine:3101
+bun run server:start  # API + static app server
+bun run dev:web       # Vite web dev server only
+bun run typecheck
+bun run lint
+bun run test
+bun run test:bun
+bun run test:api
 ```
 
-## Your First Task Walkthrough
+## First run checklist
 
-### 1. Create a task
+1. Open `http://localhost:3101`.
+2. Open Settings / AI Clients.
+3. Add an AI client.
+4. Bind it to the features you want to use, such as `generate_plan`, `suggest`, `chat`, or `dispatch_task`.
+5. Create a task.
+6. Generate a plan.
+7. Review and accept the plan.
+8. Start execution from the task workspace or Work page.
 
-Navigate to the **Schedule** page, click the "+" button, and describe your work:
+## AI clients
 
-```
-Title: Analyze Q4 sales data
-Description: Pull data from the analytics DB, identify trends,
-             and generate a summary report with charts
-```
+Chrona stores AI clients and feature bindings in the database. Supported client types include:
 
-### 2. Generate an AI plan
+- `llm`: OpenAI/OpenRouter-compatible model calls for lightweight AI features.
+- `hermes`: Hermes-backed agent execution when the Hermes bridge/provider is configured.
 
-Click **"Generate Plan"** for your task. Chrona streams an AI-generated execution plan with typed nodes, dependencies, and time estimates. Review the plan, edit if needed, then **Accept** it.
+Feature bindings decide which client handles which capability. Typical features are `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task`.
 
-### 3. Schedule the task
+## Work page basics
 
-Drag and drop the task onto the calendar to assign a time block. Or use **AI Suggest Timeslot** to let Chrona find an optimal window.
+The Work page is the main execution surface for a task. It combines:
 
-### 4. Run the agent
-
-Click **"Start Run"** on the task. Watch the live conversation, tool calls, and progress in the **Work** view. The agent may request input or approvals — you stay in control.
-
-### 5. Review and iterate
-
-When the run completes, review the generated artifacts. Accept the result or create a follow-up task.
-
-## Server Options
-
-```bash
-chrona start                     # Default on 127.0.0.1:3101
-PORT=3100 chrona start           # Custom port
-API_KEY=sk-chrona-local chrona start
-HOST=0.0.0.0 API_KEY=sk-chrona-local chrona start  # Bind to all interfaces with access-key protection
-```
-
-In production mode, a single server hosts both the API and the static SPA on the same port.
-
-Chrona binds to `127.0.0.1` by default so personal local deployments are not reachable from LAN or public networks. To expose Chrona to another device, set `HOST=0.0.0.0` intentionally and strongly prefer setting `API_KEY` at the same time. When `API_KEY` is set, protected API requests require `Authorization: Bearer <key>`; the web app prompts for an Access Key after a `401 Unauthorized` response and can keep it in memory or, if you choose **Remember this device**, in this browser's localStorage.
-
-For safety, `HOST=0.0.0.0` without `API_KEY` refuses to start. If you need to allow that insecure mode temporarily, set `CHRONA_UNSAFE_PUBLIC_BIND=1` explicitly.
+- latest result
+- accepted/generated plan graph
+- execution records grouped around plan runs and runtime events
+- task metadata and schedule status
+- conversation and command composer context
+- checkpoints, inputs, approvals, blocks, and failure recovery actions
 
 ## Troubleshooting
 
-### "command not found: chrona"
-
-Make sure npm's global bin directory is in your PATH:
-
-```bash
-npm config get prefix          # e.g. /home/user/.npm-global
-export PATH="$PATH:$(npm config get prefix)/bin"
-```
-
-### Port 3101 is already in use
-
-```bash
-chrona start
-# Error: listen EADDRINUSE :::3101
-
-# Use a different port
-PORT=3102 chrona start
-```
-
-### AI backend not responding
-
-1. Verify network connectivity: `curl -I https://api.openai.com/v1/models`
-2. Check your API key hasn't expired
-3. Test connectivity from **Settings > AI Clients** → **Test Connection**
-
-### Database issues
-
-```bash
-# Reset everything (deletes all data!)
-rm -rf ~/.local/share/chrona/chrona.db
-chrona start    # Recreates fresh DB
-```
-
-## Next Steps
-
-- [Roadmap](./roadmap.md) — product direction and phases
-- [Architecture](../architecture.md) — CQRS + Event Sourcing deep dive
-- [API Reference](../api-reference.md) — full REST API docs
-- [Data Model](../data-model.md) — database schema reference
+- If the server is unreachable, confirm the process is listening on port `3101` and that no other service is using it.
+- If AI features do nothing, verify Settings / AI Clients has an enabled client and feature binding.
+- If execution pauses, check Inbox and the Work page for waiting input, approval, block, or failure state.
+- If developing locally after schema or dependency changes, run `bun run setup`. On NixOS, Prisma may require custom engine configuration or `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1` because upstream checksum files can be unavailable for the `linux-nixos` engine target.

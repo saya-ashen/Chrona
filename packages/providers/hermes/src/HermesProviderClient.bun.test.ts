@@ -230,6 +230,47 @@ describe("HermesProviderClient", () => {
     } satisfies Partial<HermesProviderError>);
   });
 
+  it("marks Hermes timeout aborts as retryable", async () => {
+    globalThis.fetch = mockFetch(async (_url, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      init?.signal?.throwIfAborted();
+      return jsonResponse({ run_id: "run-1" });
+    });
+
+    const client = new HermesProviderClient({ timeoutMs: 1 });
+
+    await expect(client.startRun({
+      sessionId: "session-1",
+      instructions: "go",
+      input: { type: "text", text: "Hello" },
+    })).rejects.toMatchObject({
+      code: "aborted",
+      retryable: true,
+    } satisfies Partial<HermesProviderError>);
+  });
+
+  it("keeps caller-aborted Hermes requests non-retryable", async () => {
+    const controller = new AbortController();
+    globalThis.fetch = mockFetch(async (_url, init) => {
+      controller.abort();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      init?.signal?.throwIfAborted();
+      return jsonResponse({ run_id: "run-1" });
+    });
+
+    const client = new HermesProviderClient({ timeoutMs: 10_000 });
+
+    await expect(client.startRun({
+      sessionId: "session-1",
+      instructions: "go",
+      input: { type: "text", text: "Hello" },
+      signal: controller.signal,
+    })).rejects.toMatchObject({
+      code: "aborted",
+      retryable: false,
+    } satisfies Partial<HermesProviderError>);
+  });
+
   it("maps start run 401 to token misconfiguration", async () => {
     globalThis.fetch = mockFetch(async () => jsonResponse({ error: "invalid token" }, { status: 401 }));
 

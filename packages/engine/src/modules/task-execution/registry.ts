@@ -1,4 +1,5 @@
 import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
+import { CHRONA_DEBUG_PROVIDER_TYPE } from "@chrona/providers-debug";
 import type {
   RuntimeAdapterDefinition,
   RuntimeInput,
@@ -13,6 +14,13 @@ const HERMES_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
   runnability: { requiredPaths: [] },
 };
 
+const DEBUG_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
+  runtime: CHRONA_DEBUG_PROVIDER_TYPE,
+  version: "1",
+  fields: [],
+  runnability: { requiredPaths: [] },
+};
+
 const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
   [
     HERMES_EXECUTION_RUNTIME,
@@ -22,6 +30,16 @@ const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
       getTaskConfigSpec: () => HERMES_TASK_CONFIG_SPEC,
       validateTaskConfig: (input: unknown) =>
         validateTaskConfigAgainstSpec(HERMES_TASK_CONFIG_SPEC, input),
+    },
+  ],
+  [
+    CHRONA_DEBUG_PROVIDER_TYPE,
+    {
+      key: CHRONA_DEBUG_PROVIDER_TYPE,
+      inputVersion: DEBUG_TASK_CONFIG_SPEC.version,
+      getTaskConfigSpec: () => DEBUG_TASK_CONFIG_SPEC,
+      validateTaskConfig: (input: unknown) =>
+        validateTaskConfigAgainstSpec(DEBUG_TASK_CONFIG_SPEC, input),
     },
   ],
 ]);
@@ -42,15 +60,26 @@ export function getRuntimeAdapterDefinition(key: string) {
   return definition;
 }
 
+export function isKnownExecutionRuntime(key: string | null | undefined) {
+  const normalizedKey = key?.trim();
+  return !!normalizedKey && runtimeRegistry.has(normalizedKey);
+}
+
 export function resolveExecutionRuntime(input: {
   executionRuntime?: string | null;
   workspaceDefaultRuntime?: string | null;
-}) {
-  return (
-    input.executionRuntime?.trim() ||
-    input.workspaceDefaultRuntime?.trim() ||
-    HERMES_EXECUTION_RUNTIME
-  );
+}): string {
+  const explicitRuntime = input.executionRuntime?.trim();
+  if (explicitRuntime) {
+    return explicitRuntime;
+  }
+
+  const workspaceDefaultRuntime = input.workspaceDefaultRuntime?.trim();
+  if (workspaceDefaultRuntime && isKnownExecutionRuntime(workspaceDefaultRuntime)) {
+    return workspaceDefaultRuntime;
+  }
+
+  return HERMES_EXECUTION_RUNTIME;
 }
 
 export function getRuntimeTaskConfigSpec(key: string): RuntimeTaskConfigSpec {
@@ -65,5 +94,5 @@ export function validateRuntimeTaskConfig(
 }
 
 export function listExecutionRuntimes() {
-  return [HERMES_EXECUTION_RUNTIME];
+  return [HERMES_EXECUTION_RUNTIME, CHRONA_DEBUG_PROVIDER_TYPE];
 }

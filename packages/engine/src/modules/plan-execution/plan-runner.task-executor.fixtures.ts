@@ -152,6 +152,49 @@ export function makeTwoTaskPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
+export function makeTwoEntryTaskPlan(editablePlanId: string): CompiledPlan {
+  return {
+    id: `compiled_${editablePlanId}`,
+    editablePlanId,
+    sourceVersion: 1,
+    title: `Two entry task plan ${editablePlanId}`,
+    goal: "Run two independent runtime-backed entry tasks",
+    assumptions: [],
+    nodes: [
+      {
+        id: "first_entry",
+        localId: "first_entry",
+        type: "task",
+        title: "Collect architecture facts",
+        description: "First independent runtime-backed task executor",
+        config: { expectedOutput: "Architecture facts collected" } satisfies TaskConfig,
+        dependencies: [],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+      {
+        id: "second_entry",
+        localId: "second_entry",
+        type: "task",
+        title: "Collect documentation facts",
+        description: "Second independent runtime-backed task executor",
+        config: { expectedOutput: "Documentation facts collected" } satisfies TaskConfig,
+        dependencies: [],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+    ],
+    edges: [],
+    entryNodeIds: ["first_entry", "second_entry"],
+    terminalNodeIds: ["first_entry", "second_entry"],
+    topologicalOrder: ["first_entry", "second_entry"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
 export function makeManualThenTaskPlan(editablePlanId: string): CompiledPlan {
   return {
     id: `compiled_${editablePlanId}`,

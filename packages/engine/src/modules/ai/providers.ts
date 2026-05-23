@@ -1,4 +1,5 @@
 import { HermesProviderClient } from "@chrona/hermes";
+import { CHRONA_DEBUG_PROVIDER_TYPE } from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
   ProviderRunSnapshot,
@@ -7,7 +8,6 @@ import type {
 import type {
   AiClientRecord,
   AiFeature,
-  AgentProviderClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
@@ -16,7 +16,6 @@ import type {
 import { AiClientError, validatePreparedFeaturePayload } from "@chrona/contracts";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
-import { CHRONA_DEBUG_PROVIDER_URL, isChronaDebugProviderConfig } from "./runtime/debug-provider-client";
 
 const HERMES_API_SERVER_DOCS_URL =
   "https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server";
@@ -85,12 +84,15 @@ async function checkClientHealth(
       }
     }
 
+    if (client.type === CHRONA_DEBUG_PROVIDER_TYPE) {
+      return {
+        available: true,
+        reason: "Chrona debug provider is local and deterministic",
+      };
+    }
+
     if (client.type === "hermes") {
       const config = client.config as HermesClientConfig;
-      if (isChronaDebugProviderConfig(config)) {
-        return { available: true, reason: `Chrona debug provider enabled at ${CHRONA_DEBUG_PROVIDER_URL}` };
-      }
-
       const health = await new HermesProviderClient({
         baseUrl: config.baseUrl,
         apiKey: config.apiKey,
@@ -116,11 +118,6 @@ async function checkClientHealth(
         available: true,
         reason: health.reason ?? health.message ?? "Hermes API is reachable",
       };
-    }
-
-    const config = client.config as AgentProviderClientConfig;
-    if (isChronaDebugProviderConfig(config)) {
-      return { available: true, reason: `Chrona debug provider enabled at ${CHRONA_DEBUG_PROVIDER_URL}` };
     }
 
     return {

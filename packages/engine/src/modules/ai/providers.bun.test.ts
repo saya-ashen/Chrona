@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { testAiClientAvailability } from "./providers";
-import { CHRONA_DEBUG_PROVIDER_URL } from "./runtime/debug-provider-client";
 
 const originalFetch = globalThis.fetch;
 
@@ -9,20 +8,20 @@ afterEach(() => {
 });
 
 describe("AI provider availability", () => {
-  it("accepts the local Chrona debug provider through Hermes without network calls", async () => {
+  it("accepts the local Chrona debug provider without network calls", async () => {
     const fetchMock = mock((..._args: Parameters<typeof fetch>) =>
       Promise.resolve(new Response(null, { status: 500 })),
     );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const result = await testAiClientAvailability({
-      type: "hermes",
-      config: { baseUrl: CHRONA_DEBUG_PROVIDER_URL },
+      type: "debug",
+      config: {},
     });
 
     expect(result).toEqual({
       available: true,
-      reason: `Chrona debug provider enabled at ${CHRONA_DEBUG_PROVIDER_URL}`,
+      reason: "Chrona debug provider is local and deterministic",
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });

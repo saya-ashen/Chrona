@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
 
-type AiClientType = "llm" | "hermes" | (string & {});
+type AiClientType = "llm" | "hermes" | "debug" | (string & {});
 
 interface AiClientInfo {
   id: string;
@@ -31,6 +31,11 @@ type ClientFormPayload = {
   type: AiClientType;
   config: Record<string, unknown>;
   isDefault: boolean;
+};
+
+type RuntimeProviderInput = {
+  key?: unknown;
+  label?: string;
 };
 
 type ClientFormValues = {
@@ -62,6 +67,15 @@ function buildClientPayload(input: {
   baseUrl: string;
   apiKey: string;
 }): ClientFormPayload {
+  if (input.type === "debug") {
+    return {
+      name: input.name,
+      type: input.type,
+      config: {},
+      isDefault: input.isDefault,
+    };
+  }
+
   return {
     name: input.name,
     type: input.type,
@@ -74,16 +88,23 @@ function buildClientPayload(input: {
   };
 }
 
+function isDebugProviderVisible() {
+  return (
+    import.meta.env.DEV
+    || import.meta.env.VITE_ENABLE_DEBUG_PROVIDER === "true"
+  );
+}
+
 function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
   const providers = (input as { providers?: unknown[] }).providers ?? [];
   return providers
-    .filter((provider): provider is { key: AiClientType; label?: string } => {
+    .filter((provider): provider is RuntimeProviderInput & { key: AiClientType } => {
       const key = (provider as { key?: unknown }).key;
       return typeof key === "string" && key.trim().length > 0;
     })
     .map((provider) => ({
       key: provider.key,
-      label: provider.label ?? provider.key,
+      label: typeof provider.label === "string" ? provider.label : provider.key,
     }));
 }
 
@@ -144,6 +165,7 @@ const DEFAULTS: Record<string, string> = {
   hermes: "Hermes",
   timeoutSeconds: "Timeout (seconds)",
   modelLabel: "Model",
+  debug: "Debug Provider",
   setAsDefault: "Set as default Client",
   save: "Save",
   cancel: "Cancel",
@@ -190,6 +212,7 @@ function ClientForm({
     mode: "onChange",
   });
   const values = form.watch();
+  const isDebugClient = values.type === "debug";
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
 
@@ -244,38 +267,42 @@ function ClientForm({
             </Field>
           </div>
 
-          <Field>
-            <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
-            <Input
-              {...form.register("baseUrl")}
-              id="ai-client-base-url"
-              placeholder="http://127.0.0.1:8642"
-            />
-          </Field>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="ai-client-api-key">API Key</FieldLabel>
-              <Input
-                {...form.register("apiKey")}
-                id="ai-client-api-key"
-                type="password"
-                placeholder="optional for localhost"
-              />
-            </Field>
-            <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
-              <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
-              <Input
-                {...form.register("timeoutSeconds", {
-                  required: copy.timeoutSeconds,
-                  validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
-                })}
-                aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
-                id="ai-client-timeout"
-                type="number"
-              />
-              {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
-            </Field>
-          </div>
+          {!isDebugClient && (
+            <>
+              <Field>
+                <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
+                <Input
+                  {...form.register("baseUrl")}
+                  id="ai-client-base-url"
+                  placeholder="http://127.0.0.1:8642"
+                />
+              </Field>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="ai-client-api-key">API Key</FieldLabel>
+                  <Input
+                    {...form.register("apiKey")}
+                    id="ai-client-api-key"
+                    type="password"
+                    placeholder="optional for localhost"
+                  />
+                </Field>
+                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    {...form.register("timeoutSeconds", {
+                      required: copy.timeoutSeconds,
+                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                    })}
+                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                    id="ai-client-timeout"
+                    type="number"
+                  />
+                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                </Field>
+              </div>
+            </>
+          )}
 
           <Controller
             name="isDefault"
@@ -345,7 +372,9 @@ export function AiClientsManager() {
     ]);
     const clientsData = await clientsRes.json();
     const providersData = await providersRes.json();
-    const availableProviders = normalizeRuntimeProviders(providersData);
+    const availableProviders = normalizeRuntimeProviders(providersData).filter(
+      (provider) => provider.key !== "debug" || isDebugProviderVisible(),
+    );
     setProviders(availableProviders);
     setClients(
       "clients" in clientsData
@@ -463,7 +492,9 @@ export function AiClientsManager() {
                     {client.isDefault && <Badge variant="default">{copy.defaultBadge}</Badge>}
                   </div>
                   <CardDescription>
-                    {client.type === "hermes" ? (
+                    {client.type === "debug" ? (
+                      <span>Local deterministic debug provider</span>
+                    ) : client.type === "hermes" ? (
                       <span>Hermes: {(client.config as { baseUrl?: string }).baseUrl ?? "http://127.0.0.1:8642"}</span>
                     ) : (
                       <span>

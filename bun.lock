@@ -132,6 +132,7 @@
         "@chrona/domain": "workspace:*",
         "@chrona/graph-runtime": "workspace:*",
         "@chrona/hermes": "workspace:*",
+        "@chrona/providers-debug": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
         "@chrona/shared": "workspace:*",
@@ -150,6 +151,13 @@
       "version": "0.1.0",
       "dependencies": {
         "zod": "^4.4.3",
+      },
+    },
+    "packages/providers/debug": {
+      "name": "@chrona/providers-debug",
+      "version": "0.1.0",
+      "dependencies": {
+        "@chrona/providers-foundation": "workspace:*",
       },
     },
     "packages/providers/hermes": {
