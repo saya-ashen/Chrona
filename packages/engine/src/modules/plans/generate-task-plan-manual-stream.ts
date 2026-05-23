@@ -32,18 +32,18 @@ function getToolDisplayName(tool: string | undefined) {
   switch (tool) {
     case PLAN_GENERATE_TOOL_NAME:
     case INTERNAL_PLAN_GENERATE_TOOL_NAME:
-      return "生成计划结构";
+      return "generating plan structure";
     case "skill_view":
-      return "读取规划技能";
+      return "reading planning skill";
     default:
-      return tool ?? "AI 工具";
+      return tool ?? "AI tool";
   }
 }
 
 function getToolPreview(input: Record<string, unknown>) {
   const preview = input.preview;
   return typeof preview === "string" && preview.trim().length > 0
-    ? `：${preview}`
+    ? `: ${preview}`
     : "";
 }
 
@@ -397,7 +397,7 @@ export async function* generateTaskPlanManualStream(input: {
             const statusEvent: GeneratePlanSSEEvent = {
               type: "status",
               phase: "streaming",
-              message: `正在${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
+              message: `Using ${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
             };
             await recordPlanGenerationStatus({
               task,
@@ -413,7 +413,7 @@ export async function* generateTaskPlanManualStream(input: {
           const statusEvent: GeneratePlanSSEEvent = {
             type: "status",
             phase: "streaming",
-            message: `正在${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
+            message: `Using ${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
           };
           await recordPlanGenerationStatus({
             task,
@@ -523,7 +523,7 @@ export async function* generateTaskPlanManualStream(input: {
           const statusEvent: GeneratePlanSSEEvent = {
             type: "status",
             phase: "streaming",
-            message: `${getToolDisplayName(event.tool)}已完成。`,
+            message: `${getToolDisplayName(event.tool)} completed.`,
           };
           await recordPlanGenerationStatus({
             task,

@@ -56,6 +56,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   quickCreateSubmit: "Add block",
   quickCreateHint:
     "Examples: 'Write weekly report @ 14:30 for 90m !high' or just type a title for the next open slot.",
+  quickCreateUnsafeAiInput: "AI could not safely interpret this input. Add a clearer task description and try again. Local parser fallback was not used.",
   closeTaskDetails: "Close task details",
   taskDetails: "Task Details",
   taskDetailsDescription:

@@ -12,7 +12,56 @@ type TaskPlanGenerationProgressProps = {
   isStoppingGeneration: boolean;
   stopGenerationError: string | null;
   planningLabel: string;
+  copy?: Partial<TaskPlanGenerationProgressCopy>;
   onStop: () => void;
+};
+
+type TaskPlanGenerationProgressCopy = {
+  accessibleTitle: string;
+  connectingMessage: string;
+  savingMessage: string;
+  generatedMessage: string;
+  toolCallPrefix: string;
+  toolPlanGenerate: string;
+  toolSkillView: string;
+  usingToolPrefix: string;
+  draftReturned: string;
+  decomposingSteps: string;
+  prepareLabel: string;
+  prepareDetail: string;
+  generateLabel: string;
+  saveLabel: string;
+  saveDetail: string;
+  finishLabel: string;
+  finishDetail: string;
+  stop: string;
+  stopping: string;
+  completedSteps: string;
+  completed: string;
+};
+
+const DEFAULT_PROGRESS_COPY: TaskPlanGenerationProgressCopy = {
+  accessibleTitle: "AI Task Planning",
+  connectingMessage: "Connecting to AI and preparing the plan...",
+  savingMessage: "Organizing and saving the plan...",
+  generatedMessage: "Plan generated. Updating the view...",
+  toolCallPrefix: "Using tool: ",
+  toolPlanGenerate: "generating plan structure",
+  toolSkillView: "reading planning skill",
+  usingToolPrefix: "Using ",
+  draftReturned: "AI returned a plan draft",
+  decomposingSteps: "AI is decomposing task steps",
+  prepareLabel: "Prepare task context",
+  prepareDetail: "Reading task information and plan constraints",
+  generateLabel: "Generate work plan",
+  saveLabel: "Organize results",
+  saveDetail: "Saving the plan and preparing display",
+  finishLabel: "Finish display",
+  finishDetail: "Updating the frontend plan view",
+  stop: "Stop",
+  stopping: "Stopping...",
+  completedSteps: "Completed background steps",
+  completed: "Completed",
 };
 
 type ProgressStepState = "done" | "active" | "pending";
@@ -24,23 +73,23 @@ type ProgressStep = {
   state: ProgressStepState;
 };
 
-function normalizeStatusMessage(message: string | null, planningLabel: string) {
+function normalizeStatusMessage(message: string | null, planningLabel: string, copy: TaskPlanGenerationProgressCopy) {
   if (!message) return planningLabel;
-  if (message === "AI 正在生成建议...") return "正在连接 AI，准备生成计划...";
-  if (message === "Reading saved plan...") return "正在整理并保存计划...";
-  if (message === "Plan generated.") return "计划已生成，正在更新界面...";
+  if (message === "AI is generating suggestions...") return copy.connectingMessage;
+  if (message === "Reading saved plan...") return copy.savingMessage;
+  if (message === "Plan generated.") return copy.generatedMessage;
   if (message.startsWith("Tool call: ")) {
-    return `正在使用工具：${message.slice("Tool call: ".length)}`;
+    return `${copy.toolCallPrefix}${message.slice("Tool call: ".length)}`;
   }
   return message;
 }
 
-function summarizeToolName(tool: string) {
+function summarizeToolName(tool: string, copy: TaskPlanGenerationProgressCopy) {
   switch (tool) {
     case "chrona_plan_generate":
-      return "生成计划结构";
+      return copy.toolPlanGenerate;
     case "skill_view":
-      return "读取规划技能";
+      return copy.toolSkillView;
     default:
       return tool;
   }
@@ -55,11 +104,11 @@ function getGenerateStepState(hasProviderActivity: boolean, isSaving: boolean, i
   return hasProviderActivity ? "active" : "pending";
 }
 
-function getGenerateStepDetail(toolCalls: StreamToolCall[], toolResults: StreamToolResult[]) {
+function getGenerateStepDetail(toolCalls: StreamToolCall[], toolResults: StreamToolResult[], copy: TaskPlanGenerationProgressCopy) {
   const latestTool = toolCalls[toolCalls.length - 1]?.tool;
-  if (latestTool) return `正在${summarizeToolName(latestTool)}`;
-  if (toolResults.length > 0) return "AI 已返回计划草稿";
-  return "AI 正在拆解任务步骤";
+  if (latestTool) return `${copy.usingToolPrefix}${summarizeToolName(latestTool, copy)}`;
+  if (toolResults.length > 0) return copy.draftReturned;
+  return copy.decomposingSteps;
 }
 
 function hasProviderActivity(
@@ -73,7 +122,7 @@ function hasProviderActivity(
     Boolean(partialText) ||
     toolCalls.length > 0 ||
     toolResults.length > 0 ||
-    statusMessage === "AI 正在生成建议...";
+    statusMessage === "AI is generating suggestions...";
 }
 
 function buildProgressSteps({
@@ -82,10 +131,11 @@ function buildProgressSteps({
   partialText,
   toolCalls,
   toolResults,
+  copy,
 }: Pick<
   TaskPlanGenerationProgressProps,
   "phase" | "statusMessage" | "partialText" | "toolCalls" | "toolResults"
->): ProgressStep[] {
+> & { copy: TaskPlanGenerationProgressCopy }): ProgressStep[] {
   const hasActivity = hasProviderActivity(phase, statusMessage, partialText, toolCalls, toolResults);
   const isSaving = statusMessage === "Reading saved plan..." || statusMessage === "Plan generated.";
   const isDone = phase === "done" || statusMessage === "Plan generated.";
@@ -93,26 +143,26 @@ function buildProgressSteps({
   return [
     {
       key: "prepare",
-      label: "准备任务上下文",
-      detail: "读取任务信息和计划约束",
+      label: copy.prepareLabel,
+      detail: copy.prepareDetail,
       state: getPrepareStepState(hasActivity, isSaving, isDone),
     },
     {
       key: "generate",
-      label: "生成工作计划",
-      detail: getGenerateStepDetail(toolCalls, toolResults),
+      label: copy.generateLabel,
+      detail: getGenerateStepDetail(toolCalls, toolResults, copy),
       state: getGenerateStepState(hasActivity, isSaving, isDone),
     },
     {
       key: "save",
-      label: "整理结果",
-      detail: "保存计划并准备展示",
+      label: copy.saveLabel,
+      detail: copy.saveDetail,
       state: isDone ? "done" : isSaving || toolResults.length > 0 ? "active" : "pending",
     },
     {
       key: "finish",
-      label: "完成展示",
-      detail: "更新前端计划视图",
+      label: copy.finishLabel,
+      detail: copy.finishDetail,
       state: isDone ? "active" : "pending",
     },
   ];
@@ -138,21 +188,24 @@ export function TaskPlanGenerationProgress({
   isStoppingGeneration,
   stopGenerationError,
   planningLabel,
+  copy: copyOverrides,
   onStop,
 }: TaskPlanGenerationProgressProps) {
-  const currentMessage = normalizeStatusMessage(statusMessage, planningLabel);
+  const copy = { ...DEFAULT_PROGRESS_COPY, ...copyOverrides };
+  const currentMessage = normalizeStatusMessage(statusMessage, planningLabel, copy);
   const progressSteps = buildProgressSteps({
     phase,
     statusMessage,
     partialText,
     toolCalls,
     toolResults,
+    copy,
   });
 
   return (
     <div className="rounded-xl border border-transparent bg-transparent p-0">
       <div className="flex items-center justify-end gap-3">
-        <span className="sr-only">AI Task Planning</span>
+        <span className="sr-only">{copy.accessibleTitle}</span>
         {taskId ? (
           <button
             type="button"
@@ -161,7 +214,7 @@ export function TaskPlanGenerationProgress({
             className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/80 px-2.5 py-1 text-xs font-medium text-primary transition hover:bg-primary/10 disabled:opacity-60"
           >
             <Square className="size-3" />
-            {isStoppingGeneration ? "Stopping..." : "Stop"}
+            {isStoppingGeneration ? copy.stopping : copy.stop}
           </button>
         ) : null}
       </div>
@@ -195,13 +248,13 @@ export function TaskPlanGenerationProgress({
         ) : null}
         {toolResults.length > 0 ? (
           <div className="space-y-1 rounded-lg border border-border/40 bg-background/70 px-3 py-2">
-            <p className="font-medium text-foreground">已完成的后台步骤</p>
+            <p className="font-medium text-foreground">{copy.completedSteps}</p>
             {toolResults.map((toolResult, index) => (
               <div
                 key={`${toolResult.tool}-${index}`}
                 className="text-muted-foreground"
               >
-                {summarizeToolName(toolResult.tool)}：{toolResult.result === "completed" ? "已完成" : toolResult.result}
+                {summarizeToolName(toolResult.tool, copy)}: {toolResult.result === "completed" ? copy.completed : toolResult.result}
               </div>
             ))}
           </div>

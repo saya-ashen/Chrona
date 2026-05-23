@@ -48,6 +48,30 @@ const DEFAULT_DECOMP_COPY = {
   applyPlan: "Apply Plan",
 };
 
+const DEFAULT_PROGRESS_COPY = {
+  accessibleTitle: "AI Task Planning",
+  connectingMessage: "Connecting to AI and preparing the plan...",
+  savingMessage: "Organizing and saving the plan...",
+  generatedMessage: "Plan generated. Updating the view...",
+  toolCallPrefix: "Using tool: ",
+  toolPlanGenerate: "generating plan structure",
+  toolSkillView: "reading planning skill",
+  usingToolPrefix: "Using ",
+  draftReturned: "AI returned a plan draft",
+  decomposingSteps: "AI is decomposing task steps",
+  prepareLabel: "Prepare task context",
+  prepareDetail: "Reading task information and plan constraints",
+  generateLabel: "Generate work plan",
+  saveLabel: "Organize results",
+  saveDetail: "Saving the plan and preparing display",
+  finishLabel: "Finish display",
+  finishDetail: "Updating the frontend plan view",
+  stop: "Stop",
+  stopping: "Stopping...",
+  completedSteps: "Completed background steps",
+  completed: "Completed",
+};
+
 function toProgressPhase(
   phase: ReturnType<typeof useTaskPlanGeneration>["phase"],
 ): "idle" | "connecting" | "thinking" | "streaming" | "done" | "error" {
@@ -79,6 +103,13 @@ function getDecompCopy(messages: Record<string, unknown>) {
     (messages.components as Record<string, Record<string, string>> | undefined)
       ?.taskDecompositionPanel ?? {};
   return { ...DEFAULT_DECOMP_COPY, ...raw };
+}
+
+function getProgressCopy(messages: Record<string, unknown>) {
+  const raw =
+    (messages.components as Record<string, Record<string, string>> | undefined)
+      ?.taskPlanGenerationProgress ?? {};
+  return { ...DEFAULT_PROGRESS_COPY, ...raw };
 }
 
 export function TaskPlanGenerationPanel({
@@ -117,6 +148,9 @@ export function TaskPlanGenerationPanel({
   );
   const { messages } = useI18n();
   const decompCopy = getDecompCopy(messages as Record<string, unknown>);
+  const progressCopy = getProgressCopy(messages as Record<string, unknown>);
+  const viewModelCopy = (messages as { components?: { taskPlanViewModel?: Record<string, string> } })
+    .components?.taskPlanViewModel;
   const {
     result,
     isLoading,
@@ -140,9 +174,9 @@ export function TaskPlanGenerationPanel({
 
   const planGraph = useMemo(() => {
     return activeReadModel
-      ? taskPlanReadModelToGraphPlan(activeReadModel)
-      : compiledPlanToGraphPlan(compiledPlan);
-  }, [activeReadModel, compiledPlan]);
+      ? taskPlanReadModelToGraphPlan(activeReadModel, viewModelCopy)
+      : compiledPlanToGraphPlan(compiledPlan, viewModelCopy);
+  }, [activeReadModel, compiledPlan, viewModelCopy]);
 
   const graphSummary = useMemo(
     () => summarizeCompiledPlan(compiledPlan),
@@ -224,6 +258,7 @@ export function TaskPlanGenerationPanel({
         isStoppingGeneration={isStoppingGeneration}
         stopGenerationError={stopGenerationError}
         planningLabel={decompCopy.aiPlanning}
+        copy={progressCopy}
         onStop={() => void handleStopGeneration()}
       />
     );

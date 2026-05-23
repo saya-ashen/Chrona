@@ -218,7 +218,7 @@ async function* agentProviderStream(
     inputSummary: summarizeText(JSON.stringify(input.input), 160),
   });
 
-  yield { type: "status", message: "正在连接 AI 服务..." };
+  yield { type: "status", message: "Connecting to AI service..." };
 
   const streamableFeatures: AiFeature[] = ["suggest", "generate_plan"];
   if (streamableFeatures.includes(feature)) {
@@ -239,9 +239,9 @@ async function* agentProviderStream(
       await dump?.write({
         type: "yield",
         stage: "provider.status",
-        event: { type: "status", message: "AI 正在思考..." },
+        event: { type: "status", message: "AI is thinking..." },
       });
-      yield { type: "status", message: "AI 正在思考..." };
+      yield { type: "status", message: "AI is thinking..." };
       let fullText = "";
 
       const session = await agentClient.providerClient.createSession({
@@ -328,7 +328,7 @@ async function* agentProviderStream(
     }
   }
 
-  yield { type: "status", message: "AI 正在生成建议..." };
+  yield { type: "status", message: "AI is generating suggestions..." };
   try {
     const text = await providerCall(client, providerInput);
     yield { type: "partial", text };
@@ -351,7 +351,7 @@ async function* llmStream(
   const model = config.model ?? "gpt-4o-mini";
   const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
-  yield { type: "status", message: "正在连接 LLM..." };
+  yield { type: "status", message: "Connecting to LLM..." };
 
   const body: Record<string, unknown> = {
     model,
@@ -393,7 +393,7 @@ async function* llmStream(
     return;
   }
 
-  yield { type: "status", message: "AI 正在生成..." };
+  yield { type: "status", message: "AI is generating..." };
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

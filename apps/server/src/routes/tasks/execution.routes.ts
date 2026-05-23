@@ -53,15 +53,15 @@ function summarizeGraphEvent(event: GraphExecutionEvent): Extract<PlanExecutionS
 function toolLabel(toolName?: string): string {
   switch (toolName) {
     case "chrona_execution_dispatch":
-      return "正在更新执行状态";
+      return "Updating execution state";
     case "chrona_plan_read":
-      return "正在读取计划";
+      return "Reading plan";
     case "chrona_plan_mutate":
-      return "正在更新计划";
+      return "Updating plan";
     case "chrona_task_read":
-      return "正在读取任务";
+      return "Reading task";
     default:
-      return toolName ?? "运行工具";
+      return toolName ?? "Running tool";
   }
 }
 

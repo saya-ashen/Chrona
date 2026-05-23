@@ -47,7 +47,7 @@ function pickUserBranch(input: string | undefined, config: ConditionConfig) {
 
 function buildUserPrompt(node: EffectivePlanNode, config: ConditionConfig) {
   const branchOptions = config.branches.map((branch) => branch.label).join(" / ");
-  return `请选择条件节点“${node.title}”的分支：${branchOptions}${config.defaultNextNodeId ? " / default" : ""}`;
+  return `Select a branch for condition node "${node.title}": ${branchOptions}${config.defaultNextNodeId ? " / default" : ""}`;
 }
 
 function toCompiledBranchTarget(input: NodeExecutorInput, nextNodeId: string) {

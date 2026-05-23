@@ -53,7 +53,7 @@ const DEFAULT_COPY = {
   taskContextGroup: "Task Context",
   runGroupLatest: "Latest",
   runGroupCount: "Record Count",
-  startedByScheduler: "由调度器自动启动",
+  startedByScheduler: "Started automatically by scheduler",
 } as const;
 
 const KEY_MILESTONE_KINDS = ["approval", "input", "failure", "result", "output"] as const;

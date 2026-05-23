@@ -262,7 +262,7 @@ export function ScheduleCommandBar({
             ? autoCompleteError
             : aiLoading || phase === "connecting" || phase === "thinking" || phase === "streaming"
               ? "AI suggestions are still loading. Please wait a moment and submit again."
-              : "AI 无法可靠理解该输入，请补充更明确的任务描述后重试。未执行本地 parser 降级。\nAI could not safely interpret this input.",
+              : copy.quickCreateUnsafeAiInput,
         );
       }
 
