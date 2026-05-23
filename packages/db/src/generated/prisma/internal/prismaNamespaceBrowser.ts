@@ -368,6 +368,8 @@ export const EventScalarFieldEnum = {
   workspaceId: 'workspaceId',
   taskId: 'taskId',
   runId: 'runId',
+  nodeId: 'nodeId',
+  nodeTitle: 'nodeTitle',
   actorType: 'actorType',
   actorId: 'actorId',
   source: 'source',

@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { Archive, CalendarClock, FileText, Sparkles } from "lucide-react";
+import { Archive, FileText, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../model/task-workspace-types";
+import { WorkspaceActivityFeed } from "./workspace-activity-feed";
 
 type OverviewAction = (nodeId?: string) => void;
 type CommandCenterTab = "actions" | "result" | "artifacts" | "activity";
@@ -101,7 +102,7 @@ export function TaskWorkspaceExecutionOverview({
             <ArtifactsCard artifacts={artifacts} onAction={onAction} />
           </TabsContent>
           <TabsContent value="activity" className="space-y-2">
-            <ActivityCard activity={activity} runtimeEvents={runtimeEvents} />
+            <WorkspaceActivityFeed activity={activity} runtimeEvents={runtimeEvents} />
           </TabsContent>
         </Tabs>
       </div>
@@ -223,171 +224,4 @@ function ArtifactsCard({ artifacts, onAction }: { artifacts: WorkspaceArtifactIt
       )}
     </section>
   );
-}
-
-function dotClassName(tone: WorkspaceActivityItem["tone"]) {
-  if (tone === "success") return "bg-emerald-500";
-  if (tone === "warning") return "bg-orange-500";
-  if (tone === "critical") return "bg-red-500";
-  if (tone === "info") return "bg-blue-500";
-  return "bg-slate-300";
-}
-
-type RuntimeActivityFeedItem =
-  | {
-      kind: "text";
-      id: string;
-      type: "assistant_text_delta" | "reasoning_delta";
-      provider: string;
-      text: string;
-    }
-  | {
-      kind: "event";
-      id: string;
-      event: WorkspaceRuntimeEvent;
-    };
-
-function runtimeTextScopeKey(event: WorkspaceRuntimeEvent) {
-  return [
-    event.event.type,
-    event.action,
-    event.runId ?? "run",
-    event.nodeId ?? "node",
-    event.runtimeName,
-    event.provider,
-  ].join(":");
-}
-
-function buildRuntimeActivityFeed(runtimeEvents: WorkspaceRuntimeEvent[]) {
-  const feed: RuntimeActivityFeedItem[] = [];
-  let currentTextSegment: { key: string; item: Extract<RuntimeActivityFeedItem, { kind: "text" }> } | null = null;
-
-  runtimeEvents.forEach((event, index) => {
-    if (event.event.type !== "assistant_text_delta" && event.event.type !== "reasoning_delta") {
-      currentTextSegment = null;
-      feed.push({
-        kind: "event",
-        id: `${event.sequence ?? index}:${event.event.type}:${event.rawEventType ?? "event"}`,
-        event,
-      });
-      return;
-    }
-
-    const key = runtimeTextScopeKey(event);
-    if (currentTextSegment !== null && currentTextSegment.key === key) {
-      currentTextSegment.item.text += event.event.text;
-      return;
-    }
-
-    const item = {
-      kind: "text" as const,
-      id: `${event.sequence ?? index}:${event.event.type}:${event.runId ?? "run"}`,
-      type: event.event.type,
-      provider: event.provider,
-      text: event.event.text,
-    };
-    feed.push(item);
-    currentTextSegment = { key, item };
-  });
-
-  return feed.filter((item) => item.kind === "event" || item.text.trim()).slice(-12).reverse();
-}
-
-export function ActivityCard({ activity, runtimeEvents = [] }: { activity: WorkspaceActivityItem[]; runtimeEvents?: WorkspaceRuntimeEvent[] }) {
-  const runtimeFeedItems = buildRuntimeActivityFeed(runtimeEvents);
-  const items = activity.slice(0, 30);
-  const hasRuntimeActivity = runtimeFeedItems.length > 0;
-
-  return (
-    <section className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarClock className="size-4 text-cyan-700" />
-          <p className="text-sm font-semibold text-slate-950">Execution activity</p>
-        </div>
-        {runtimeEvents.length > 0 ? (
-          <span className="rounded-full border border-cyan-200/70 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800">
-            {runtimeEvents.at(-1)?.provider ?? "runtime"}
-          </span>
-        ) : null}
-      </div>
-      {runtimeFeedItems.length > 0 ? (
-        <div className="mt-2 space-y-1.5">
-          {runtimeFeedItems.map((item) => (
-            item.kind === "text"
-              ? <RuntimeTextActivityRow key={item.id} item={item} />
-              : <RuntimeActivityRow key={item.id} event={item.event} />
-          ))}
-        </div>
-      ) : null}
-      {items.length === 0 ? (
-        hasRuntimeActivity ? null : (
-          <p className="mt-1.5 text-[13px] text-slate-500">Activity will appear after planning or execution starts.</p>
-        )
-      ) : (
-        <div className={cn("space-y-1.5", hasRuntimeActivity ? "mt-3 border-t border-slate-200/70 pt-2" : "mt-1.5")}>
-          {items.map((item) => (
-            <div key={item.id} className="flex gap-2">
-              <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", dotClassName(item.tone))} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  {item.timestamp ? <span className="text-xs text-slate-500">{item.timestamp.slice(11, 16)}</span> : null}
-                  <p className="break-words text-sm font-medium text-slate-900">{item.title}</p>
-                </div>
-                <p className="mt-0.5 line-clamp-2 break-words text-xs leading-[1.35] text-slate-500">{item.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function RuntimeTextActivityRow({ item }: { item: Extract<RuntimeActivityFeedItem, { kind: "text" }> }) {
-  if (item.type === "reasoning_delta") {
-    return (
-      <details className="rounded-xl border border-slate-200/80 bg-white/70 px-2.5 py-2 text-xs text-slate-500 shadow-sm">
-        <summary className="cursor-pointer font-medium text-slate-800">Reasoning</summary>
-        <p className="mt-1 whitespace-pre-wrap leading-5">{item.text.trim()}</p>
-      </details>
-    );
-  }
-
-  return (
-    <div className="rounded-xl border border-slate-200/80 bg-white/85 px-2.5 py-2 text-sm leading-5 text-slate-800 shadow-inner">
-      <p className="mb-1 text-xs font-medium text-slate-500">Assistant response</p>
-      <p className="whitespace-pre-wrap">{item.text.trim()}</p>
-    </div>
-  );
-}
-
-function RuntimeActivityRow({ event }: { event: WorkspaceRuntimeEvent }) {
-  const value = event.event;
-  if (value.type === "tool_started") {
-    return (
-      <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs shadow-sm">
-        <span className="font-medium text-slate-900">{value.label}</span>
-        {typeof value.preview === "string" && value.preview ? <span className="ml-1 text-slate-500">{value.preview}</span> : null}
-      </div>
-    );
-  }
-  if (value.type === "tool_completed") {
-    return (
-      <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs shadow-sm">
-        <span className={value.error ? "font-medium text-red-700" : "font-medium text-emerald-700"}>
-          {value.error ? `${value.label} failed` : `${value.label} completed`}
-        </span>
-        {value.durationMs !== undefined ? <span className="ml-1 text-slate-500">{Math.round(value.durationMs)}ms</span> : null}
-        {value.error ? <span className="ml-1 text-red-700">{value.error.message}</span> : null}
-      </div>
-    );
-  }
-  if (value.type === "approval_required") {
-    return <div className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 shadow-sm">Approval required</div>;
-  }
-  if (value.type === "run_status") {
-    return <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs text-slate-500 shadow-sm">{value.message ?? value.status}</div>;
-  }
-  return <div className="rounded-xl border border-slate-200/80 bg-white/80 px-2.5 py-1.5 text-xs text-slate-500 shadow-sm">{value.type === "raw_event" ? value.rawEventType ?? "Raw provider event" : value.type}</div>;
 }

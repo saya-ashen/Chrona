@@ -441,6 +441,20 @@ describe("executeTaskNodeCapability output persistence", () => {
     });
     expect(run.status).toBe(RunStatus.Running);
     expect(run.runtimeRunRef).not.toBeNull();
+
+    const providerEvents = await db.event.findMany({
+      where: { runId: result.evidence?.runId, source: "provider" },
+      orderBy: { ingestSequence: "asc" },
+    });
+    expect(providerEvents.length).toBeGreaterThan(0);
+    expect(providerEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          nodeId: "node-1",
+          nodeTitle: "Echo step",
+        }),
+      }),
+    ]));
   });
 
   it("keeps the node running when the provider produces no output", async () => {

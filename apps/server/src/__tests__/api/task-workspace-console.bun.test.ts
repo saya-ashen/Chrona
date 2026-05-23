@@ -261,30 +261,45 @@ describe("task workspace console read data", () => {
     const page = await getTaskPage(taskId);
 
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "tool_started",
       title: "Tool started",
+      summary: "chrona_plan_read",
       description: "chrona_plan_read",
       tone: "info",
       timestamp: "2026-05-12T12:01:00.000Z",
+      provider: "hermes",
+      runtimeName: "hermes",
+      tool: expect.objectContaining({ name: "chrona_plan_read", state: "started" }),
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "assistant_message",
       title: "Assistant response",
+      summary: "Hello world",
       description: "Hello world",
       tone: "info",
       timestamp: "2026-05-12T12:01:02.000Z",
+      assistant: { text: "Hello world", isReasoning: false, isPartial: true },
     }));
     expect(page.activityTimeline.filter((item) => item.title === "Assistant response")).toHaveLength(1);
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "reasoning",
       title: "Reasoning",
+      summary: "Thinking",
       description: "Thinking",
       tone: "neutral",
+      assistant: { text: "Thinking", isReasoning: true, isPartial: true },
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "task",
       title: "Task updated",
+      summary: "Updated title, priority",
       description: "Updated title, priority",
       tone: "info",
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "schedule",
       title: "Schedule changed",
+      summary: "2026-05-13T09:00:00.000Z · 2026-05-13T10:00:00.000Z · manual",
       description: "2026-05-13T09:00:00.000Z · 2026-05-13T10:00:00.000Z · manual",
       tone: "info",
     }));

@@ -4,7 +4,53 @@ import type {
   PlanNodeDataModel,
   PlanNodeField,
 } from "@/components/tasks/plan/task-plan-graph/types";
-import type { ExecutionOverviewTone, WorkspaceStateTreatment } from "./task-workspace-types";
+import type { ExecutionOverviewTone, WorkspaceActivityPage, WorkspaceStateTreatment } from "./task-workspace-types";
+
+export type LoadWorkspaceActivityPageInput = {
+  taskId: string;
+  cursor?: string;
+  limit?: number;
+};
+
+export type LoadNodeWorkspaceActivityPageInput = LoadWorkspaceActivityPageInput & {
+  nodeId: string;
+};
+
+export async function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
+  const params = new URLSearchParams();
+  if (input.cursor) params.set("cursor", input.cursor);
+  if (input.limit !== undefined) params.set("limit", String(input.limit));
+
+  const response = await fetch(`/api/tasks/${input.taskId}/activity?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to load task activity" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to load task activity");
+  }
+
+  return await response.json() as WorkspaceActivityPage;
+}
+
+export async function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
+  const params = new URLSearchParams();
+  if (input.cursor) params.set("cursor", input.cursor);
+  if (input.limit !== undefined) params.set("limit", String(input.limit));
+
+  const response = await fetch(`/api/tasks/${input.taskId}/nodes/${input.nodeId}/activity?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Failed to load node activity" }));
+    throw new Error((err as { error?: string }).error ?? "Failed to load node activity");
+  }
+
+  return await response.json() as WorkspaceActivityPage;
+}
 
 type WorkspacePresentationInput = {
   currentNode: PlanNodeDataModel | null;

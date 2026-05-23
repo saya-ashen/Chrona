@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -21,6 +22,7 @@ import {
   createTaskWorkspaceExecutionConsoleView,
   type TaskExecutionDispatchResult,
 } from "../model/task-workspace-query";
+import { loadNodeWorkspaceActivityPage } from "../model/task-workspace-actions";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
   TaskPageData,
@@ -163,6 +165,16 @@ export function TaskWorkspacePlanSection({
   const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
   const currentOperationNode = operationConsoleView.nodeDetail.currentNode;
+  const selectedDetailNode = consoleView.nodeDetail.currentNode;
+  const nodeActivityQuery = useQuery({
+    queryKey: ["task-workspace-node-activity", pageData.task.id, selectedDetailNode?.id],
+    queryFn: () => loadNodeWorkspaceActivityPage({
+      taskId: pageData.task.id,
+      nodeId: selectedDetailNode?.id ?? "",
+      limit: 100,
+    }),
+    enabled: Boolean(selectedDetailNode?.id) && nodeDrawerSize !== "collapsed",
+  });
   const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
   const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
@@ -414,6 +426,8 @@ export function TaskWorkspacePlanSection({
             <div className="absolute inset-x-0 bottom-0">
               <TaskWorkspaceNodeDetailPanel
                 detail={consoleView.nodeDetail}
+                activity={nodeActivityQuery.data?.items ?? []}
+                isActivityLoading={nodeActivityQuery.isLoading || nodeActivityQuery.isFetching}
                 selectedNodes={selectedPlanNodes}
                 variant="drawer"
                 drawerSize={nodeDrawerSize}

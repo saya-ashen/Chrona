@@ -135,7 +135,7 @@ describe("task workspace execution console view model", () => {
     expect(view.readiness).toMatchObject({ title: "Current work", statusLabel: "Running", tone: "info", actionNodeId: "active" });
     expect(view.latestResult).toMatchObject({ title: "Latest run" });
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "artifact-1" }));
-    expect(view.activity[0]).toMatchObject({ id: "run-run-1", tone: "info" });
+    expect(view.activity).toEqual(expect.arrayContaining([expect.objectContaining({ id: "run-run-1", tone: "info" })]));
   });
 
   it("prioritizes persisted provider activity over summary activity", () => {
@@ -144,16 +144,20 @@ describe("task workspace execution console view model", () => {
         latestRunSummary: { id: "run-1", status: "Running", startedAt: "2026-05-12T10:00:00.000Z", syncStatus: "syncing" },
         activityTimeline: [{
           id: "provider-event-1",
+          kind: "tool_started",
           title: "Tool started",
+          summary: "chrona_plan_read",
           description: "chrona_plan_read",
           tone: "info",
           timestamp: "2026-05-12T10:01:00.000Z",
+          sourceNodeId: "active",
+          sourceNodeTitle: "Active node",
         }],
       }),
       graphPlan: graph([node({ id: "active", status: "active", statusLabel: "Running" })]),
     });
 
-    expect(view.activity[0]).toMatchObject({ id: "provider-event-1", title: "Tool started" });
+    expect(view.activity[0]).toMatchObject({ id: "provider-event-1", title: "Tool started", sourceNodeId: "active", sourceNodeTitle: "Active node" });
     expect(view.activity).toEqual(expect.arrayContaining([expect.objectContaining({ id: "run-run-1" })]));
   });
 
@@ -533,7 +537,7 @@ describe("task workspace execution console view model", () => {
       status: "approval-needed",
       stepPosition: "2/2",
       autoRefreshEnabled: true,
-      tabs: ["result", "evidence", "action", "configuration"],
+      tabs: ["result", "activity", "action", "configuration"],
       isEmpty: false,
     });
     expect(view.executionFlow.selectedNodeId).toBe("approval");

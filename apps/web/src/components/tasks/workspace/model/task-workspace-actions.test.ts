@@ -1,13 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import {
   buildDefaultWorkspaceActionFields,
   buildWorkspaceStateTreatment,
   buildWorkspaceCheckpointActionInput,
+  loadWorkspaceActivityPage,
+  loadNodeWorkspaceActivityPage,
   getMissingWorkspaceActionFields,
   getWorkspaceActionDisabledReason,
   pickDefaultWorkspaceAction,
-  } from "./task-workspace-actions";
+} from "./task-workspace-actions";
 
 const checkpoint = {
   id: "run-1:node-1:user_input",
@@ -36,6 +38,10 @@ function node(overrides: Partial<PlanNodeDataModel> = {}): PlanNodeDataModel {
 }
 
 describe("task workspace actions", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("derives shared workspace presentation treatment", () => {
     expect(buildWorkspaceStateTreatment({
       currentNode: node({ status: "active", nextAction: "Monitor run" }),
@@ -172,5 +178,33 @@ describe("task workspace actions", () => {
         message: "默认城市: 北京\n额外需求: 无",
       },
     });
+  });
+
+  it("loads paged node activity from the node activity endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      items: [],
+      nextCursor: "event-1",
+      scope: { type: "node", taskId: "task-1", nodeId: "node-1", limit: 50 },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const page = await loadNodeWorkspaceActivityPage({
+      taskId: "task-1",
+      nodeId: "node-1",
+      cursor: "event-0",
+      limit: 50,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tasks/task-1/nodes/node-1/activity?cursor=event-0&limit=50",
+      { method: "GET", headers: { Accept: "application/json" } },
+    );
+    expect(page).toMatchObject({ nextCursor: "event-1", scope: { type: "node", nodeId: "node-1" } });
+  });
+
+  it("reports activity history load failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "No activity" }), { status: 404 })));
+
+    await expect(loadWorkspaceActivityPage({ taskId: "missing" })).rejects.toThrow("No activity");
   });
 });

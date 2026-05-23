@@ -1,6 +1,6 @@
 import { createTask } from "./create-task";
 import { deleteTask } from "./delete-task";
-import { getTaskPage } from "./get-task-page";
+import { getTaskActivityPage, getTaskPage } from "./get-task-page";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
 import { markTaskDone } from "./mark-task-done";
@@ -31,6 +31,10 @@ export class Tasks {
 
   getPage(input: { taskId: string }) {
     return getTaskPage(input.taskId);
+  }
+
+  getActivityPage(input: Parameters<typeof getTaskActivityPage>[0]) {
+    return getTaskActivityPage(input);
   }
 
   list(input: Parameters<typeof listTasksByWorkspace>[0]) {

@@ -1,6 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement, ReactNode } from "react";
 
 vi.mock("elkjs/lib/elk.bundled.js", () => ({
   default: class ELKMock {
@@ -54,6 +56,20 @@ const checkpoint = {
 
 let TaskWorkspacePlanSection: typeof import("./task-workspace-plan-section").TaskWorkspacePlanSection;
 
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+  return render(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
+}
+
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: {} }),
 }));
@@ -78,6 +94,7 @@ beforeAll(async () => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   cleanup();
 });
 
@@ -129,7 +146,7 @@ describe("TaskWorkspacePlanSection", () => {
       interactiveFields: [{ key: "decision", label: "Decision", value: "", control: "text", required: true }],
     });
 
-    const view = render(
+    const view = renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={createTaskWorkspaceFixtureGraph([])}
@@ -272,7 +289,7 @@ describe("TaskWorkspacePlanSection", () => {
   it("adds generate plan as the command center operation when no plan exists", () => {
     const onGeneratePlan = vi.fn();
 
-    render(
+    renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={createTaskWorkspaceFixtureGraph([])}
@@ -306,13 +323,67 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
   });
 
+  it("wires selected-node activity into the node drawer", async () => {
+    const graphPlan = createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "node-a", title: "Node A", status: "active" }),
+      createTaskWorkspaceFixtureNode({ id: "node-b", title: "Node B", status: "ready" }),
+    ], "node-a");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      items: [{
+        id: "activity-node-a",
+        kind: "tool_started",
+        title: "Tool started",
+        summary: "Read node A",
+        description: "Read node A",
+        tone: "info",
+        timestamp: "2026-05-21T00:00:00.000Z",
+        sourceNodeId: "node-a",
+        sourceNodeTitle: "Node A",
+        tool: { label: "chrona_plan_read", state: "started" },
+      }],
+      nextCursor: null,
+      scope: { type: "node", taskId: "task-1", nodeId: "node-a", limit: 100 },
+    }), {
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData()}
+        plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
+        planGenerationStatus="idle"
+        acceptPlanError={null}
+        planningTaskDraft={{ title: "Review task output", description: "", priority: "Medium", dueAt: null, scheduledStartAt: null, scheduledEndAt: null }}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("task-plan-node-node-a"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Current node: Node A" })).toBeInTheDocument());
+    fireEvent.click(screen.getAllByRole("tab", { name: "Activity" }).at(-1)!);
+
+    expect(screen.getByText("Node activity")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Read node A")).toBeInTheDocument());
+    expect(screen.queryByText("Read node B")).not.toBeInTheDocument();
+  });
+
   it("adds start plan as the command center operation before execution starts", () => {
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({});
     const graphPlan = createTaskWorkspaceFixtureGraph([
       createTaskWorkspaceFixtureNode({ id: "ready", status: "ready", nextAction: "Start execution" }),
     ], "ready");
 
-    render(
+    renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={graphPlan}
@@ -360,7 +431,7 @@ describe("TaskWorkspacePlanSection", () => {
       createTaskWorkspaceFixtureNode({ id: "ready", status: "ready", nextAction: "Start execution" }),
     ], "ready");
 
-    render(
+    renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={graphPlan}
@@ -424,7 +495,7 @@ describe("TaskWorkspacePlanSection", () => {
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "checkpoint");
 
-    render(
+    renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={graphPlan}
@@ -481,7 +552,7 @@ describe("TaskWorkspacePlanSection", () => {
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "checkpoint");
 
-    render(
+    renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={graphPlan}
@@ -536,7 +607,7 @@ describe("TaskWorkspacePlanSection", () => {
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "weather-script");
 
-    render(
+    renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={graphPlan}
@@ -594,7 +665,7 @@ describe("TaskWorkspacePlanSection", () => {
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "weather-script");
 
-    render(
+    renderWithQueryClient(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={graphPlan}
@@ -639,7 +710,7 @@ describe("TaskWorkspacePlanSection", () => {
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "review");
 
-    render(
+    renderWithQueryClient(
       <>
         <button type="button">Top navigation action</button>
         <button type="button">Left navigation action</button>

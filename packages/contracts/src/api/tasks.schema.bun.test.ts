@@ -5,6 +5,9 @@ import {
   listTasksQuerySchema,
   updateTaskBodySchema,
   updateTaskBodySchemaForSupportedRuntimes,
+  workspaceActivityItemSchema,
+  workspaceActivityPageQuerySchema,
+  workspaceActivityPageSchema,
 } from "./tasks.schema";
 
 describe("task API schemas", () => {
@@ -98,5 +101,60 @@ describe("task API schemas", () => {
       limit: 1,
     });
     expect(() => listTasksQuerySchema.parse({ workspaceId: "workspace-1", status: "Unknown" })).toThrow();
+  });
+
+  it("validates structured workspace activity items", () => {
+    expect(workspaceActivityItemSchema.parse({
+      id: "event-1",
+      kind: "tool_completed",
+      title: "Tool completed",
+      summary: "chrona_plan_read completed",
+      description: "chrona_plan_read completed",
+      tone: "success",
+      timestamp: "2026-05-12T10:00:00.000Z",
+      sourceNodeId: "node-1",
+      sourceNodeTitle: "Read plan",
+      provider: "hermes",
+      runtimeName: "hermes",
+      runId: "run-1",
+      nativeRunId: "native-1",
+      sequence: 7,
+      rawEventType: "tool_completed",
+      tool: {
+        name: "chrona_plan_read",
+        label: "Read plan",
+        durationMs: 24,
+        state: "completed",
+      },
+    })).toMatchObject({ kind: "tool_completed", tone: "success", tool: { state: "completed" } });
+
+    expect(() => workspaceActivityItemSchema.parse({
+      id: "event-2",
+      kind: "tool_completed",
+      title: "Tool completed",
+      summary: "bad tone",
+      description: "bad tone",
+      tone: "critical",
+    })).toThrow();
+  });
+
+  it("validates activity page query and response contracts", () => {
+    expect(workspaceActivityPageQuerySchema.parse({ limit: "5000" })).toEqual({
+      limit: 3000,
+    });
+
+    expect(workspaceActivityPageSchema.parse({
+      items: [{
+        id: "assistant-1",
+        kind: "assistant_message",
+        title: "Assistant response",
+        summary: "Done",
+        description: "Done",
+        tone: "info",
+        assistant: { text: "Done", isReasoning: false },
+      }],
+      nextCursor: "cursor-2",
+      scope: { type: "task", taskId: "task-1", limit: 100 },
+    })).toMatchObject({ nextCursor: "cursor-2", scope: { type: "task" } });
   });
 });

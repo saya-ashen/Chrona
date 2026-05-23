@@ -30,7 +30,7 @@ function detail(overrides: Partial<NodeDetailPanelState> = {}): NodeDetailPanelS
     status: currentNode ? "waiting" : null,
     stepPosition: currentNode ? "1/1" : "0/0",
     autoRefreshEnabled: false,
-    tabs: ["result", "evidence", "action", "configuration"],
+    tabs: ["result", "activity", "action", "configuration"],
     isEmpty: !currentNode,
     ...overrides,
   };
@@ -58,14 +58,14 @@ if (!HTMLElement.prototype.scrollIntoView) {
 
 describe("TaskWorkspaceNodeDetailPanel", () => {
   it("renders the empty node detail state", () => {
-    render(<TaskWorkspaceNodeDetailPanel detail={detail()} selectedNodes={[]} onSubmitCheckpointAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail()} activity={[]} selectedNodes={[]} onSubmitCheckpointAction={vi.fn()} />);
 
     expect(screen.getByRole("region", { name: "Current node details" })).toBeInTheDocument();
     expect(screen.getByText("No active node selected")).toBeInTheDocument();
     expect(screen.getByText("Select a plan node, generate a plan, or wait for execution to expose the current node details here.")).toBeInTheDocument();
   });
 
-  it("renders result, evidence, action, and node details for a selected node", async () => {
+  it("renders result, activity, action, and node details for a selected node", async () => {
     const dispatchAction = vi.fn().mockResolvedValue({ message: "Action sent" });
     const node = createTaskWorkspaceFixtureNode({
       id: "approval",
@@ -87,7 +87,23 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       metadata: { dependencies: [{ id: "research", title: "Research current task workspace" }] },
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed", autoRefreshEnabled: true })} selectedNodes={[node]} onSubmitCheckpointAction={dispatchAction} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({
+      currentNode: node,
+      selectedNode: node,
+      status: "approval-needed",
+      autoRefreshEnabled: true,
+    })} activity={[{
+        id: "activity-1",
+        kind: "tool_started",
+        title: "Tool started",
+        summary: "chrona_plan_read",
+        description: "chrona_plan_read",
+        tone: "info",
+        timestamp: "2026-05-21T00:01:00.000Z",
+        sourceNodeId: "approval",
+        sourceNodeTitle: "Approve generated patch",
+        tool: { label: "chrona_plan_read", state: "started" },
+      }]} selectedNodes={[node]} onSubmitCheckpointAction={dispatchAction} />);
 
     expect(screen.getByRole("heading", { name: "Current node: Approve generated patch" })).toBeInTheDocument();
     expect(screen.getByText("Step 1/1")).toBeInTheDocument();
@@ -99,10 +115,11 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.queryByText("Execution panel")).not.toBeInTheDocument();
     expect(screen.queryByText("Current node")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Evidence" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
 
-    expect(screen.getAllByText("Evidence").length).toBeGreaterThan(0);
-    expect(screen.getByText(/runtime=hermes/)).toBeInTheDocument();
+    expect(screen.getByText("Node activity")).toBeInTheDocument();
+    expect(screen.getByText("chrona_plan_read")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Evidence" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
@@ -142,7 +159,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       nextAction: "Provide missing task details",
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed" })} selectedNodes={[node]} onSubmitCheckpointAction={dispatchAction} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "approval-needed" })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={dispatchAction} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
@@ -178,7 +195,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       nextAction: "Provide missing task details",
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
@@ -223,7 +240,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       }],
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 
@@ -252,7 +269,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       resultOutputs: [{ kind: "text", content: "Patch summary" }],
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy result" }));
 
@@ -271,7 +288,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       availableActions: [],
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, disabledActionReason: "No actions are available for this node." })} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, disabledActionReason: "No actions are available for this node." })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Action" }));
 

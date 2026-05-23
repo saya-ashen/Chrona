@@ -31,6 +31,13 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task");
       }
     },
+    async getActivityPage(input: Parameters<typeof tasks.getActivityPage>[0]) {
+      try {
+        return await tasks.getActivityPage(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task activity");
+      }
+    },
     async list(input: Parameters<typeof tasks.list>[0]) {
       try {
         return await tasks.list(input);

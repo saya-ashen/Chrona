@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import { getTaskPage } from "@/modules/tasks/get-task-page";
+import { getTaskActivityPage, getTaskPage } from "@/modules/tasks/get-task-page";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/plan-run-store";
 import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 
 async function resetDb() {
+  await db.event.deleteMany();
   await db.taskPlanRun.deleteMany();
   await db.taskPlan.deleteMany();
   await db.executionSession.deleteMany();
@@ -158,5 +159,228 @@ describe("getTaskPage orchestrator read model", () => {
       currentNodeId: "answer",
       issues: [],
     });
+  });
+
+  it("maps persisted provider events into structured activity items", async () => {
+    const { workspace, task } = await seedTask("Activity task");
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        runtimeRunRef: "native-run-1",
+        status: "Running",
+        triggeredBy: "agent",
+        startedAt: new Date("2026-05-21T00:00:00.000Z"),
+      },
+    });
+
+    await db.event.createMany({
+      data: [{
+        eventType: "provider.run_started",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        nodeId: "prepare",
+        nodeTitle: "Prepare context",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", nativeRunId: "native-run-1", event: { type: "run_started" } },
+        dedupeKey: "activity-run-started",
+        runtimeTs: new Date("2026-05-21T00:00:01.000Z"),
+        ingestSequence: 1,
+      }, {
+        eventType: "provider.text_delta",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        nodeId: "prepare",
+        nodeTitle: "Prepare context",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Hello " } },
+        dedupeKey: "activity-text-1",
+        runtimeTs: new Date("2026-05-21T00:00:02.000Z"),
+        ingestSequence: 2,
+      }, {
+        eventType: "provider.text_delta",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        nodeId: "prepare",
+        nodeTitle: "Prepare context",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "world" } },
+        dedupeKey: "activity-text-2",
+        runtimeTs: new Date("2026-05-21T00:00:03.000Z"),
+        ingestSequence: 3,
+      }, {
+        eventType: "provider.reasoning_delta",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        nodeId: "answer",
+        nodeTitle: "Provide answer",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "reasoning_delta", text: "Thinking" } },
+        dedupeKey: "activity-reasoning",
+        runtimeTs: new Date("2026-05-21T00:00:04.000Z"),
+        ingestSequence: 4,
+      }, {
+        eventType: "provider.approval_required",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        nodeId: "answer",
+        nodeTitle: "Provide answer",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "approval_required" } },
+        dedupeKey: "activity-approval",
+        runtimeTs: new Date("2026-05-21T00:00:05.000Z"),
+        ingestSequence: 5,
+      }, {
+        eventType: "provider.unknown",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        nodeId: "answer",
+        nodeTitle: "Provide answer",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "provider_opaque", rawEventType: "provider.opaque" } },
+        dedupeKey: "activity-raw",
+        runtimeTs: new Date("2026-05-21T00:00:06.000Z"),
+        ingestSequence: 6,
+      }],
+    });
+
+    const page = await getTaskPage(task.id);
+
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "provider_run",
+      title: "Provider run started",
+      provider: "anthropic",
+      runtimeName: "hermes",
+      runId: "run-1",
+      nativeRunId: "native-run-1",
+      sourceNodeId: "prepare",
+      sourceNodeTitle: "Prepare context",
+      rawEventType: "run_started",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "assistant_message",
+      title: "Assistant response",
+      summary: "Hello world",
+      assistant: { text: "Hello world", isReasoning: false, isPartial: true },
+      sourceNodeId: "prepare",
+    }));
+    expect(page.activityTimeline.filter((item) => item.kind === "assistant_message")).toHaveLength(1);
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "reasoning",
+      title: "Reasoning",
+      summary: "Thinking",
+      assistant: { text: "Thinking", isReasoning: true, isPartial: true },
+      sourceNodeId: "answer",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "approval",
+      title: "Approval required",
+      tone: "warning",
+      sourceNodeId: "answer",
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "raw",
+      title: "Provider event",
+      rawEventType: "provider.opaque",
+      sourceNodeId: "answer",
+    }));
+  });
+
+  it("preserves provider tool details and failure tone", async () => {
+    const { workspace, task } = await seedTask("Tool activity task");
+
+    await db.event.createMany({
+      data: [{
+        eventType: "provider.tool_started",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        nodeId: "prepare",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_started", toolName: "chrona_plan_read", label: "Read plan", inputSummary: "taskId=task-1", preview: "Loading graph" } },
+        dedupeKey: "tool-started-details",
+        runtimeTs: new Date("2026-05-21T00:01:00.000Z"),
+        ingestSequence: 1,
+      }, {
+        eventType: "provider.tool_completed",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        nodeId: "prepare",
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_completed", toolName: "chrona_plan_read", durationMs: 42, error: "Provider timeout" } },
+        dedupeKey: "tool-completed-details",
+        runtimeTs: new Date("2026-05-21T00:01:01.000Z"),
+        ingestSequence: 2,
+      }],
+    });
+
+    const page = await getTaskPage(task.id);
+
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "tool_started",
+      tool: expect.objectContaining({ label: "Read plan", inputSummary: "taskId=task-1", preview: "Loading graph", state: "started" }),
+    }));
+    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+      kind: "tool_completed",
+      tone: "danger",
+      tool: expect.objectContaining({ name: "chrona_plan_read", durationMs: 42, error: "Provider timeout", state: "failed" }),
+    }));
+  });
+
+  it("filters paged node activity only by explicit source node", async () => {
+    const { workspace, task } = await seedTask("Explicit node activity task");
+
+    await db.event.createMany({
+      data: [{
+        eventType: "provider.text_delta",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        nodeId: "prepare",
+        nodeTitle: "Prepare",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Prepare text" } },
+        dedupeKey: "explicit-node-prepare",
+        runtimeTs: new Date("2026-05-21T00:02:00.000Z"),
+        ingestSequence: 1,
+      }, {
+        eventType: "provider.text_delta",
+        workspaceId: workspace.id,
+        taskId: task.id,
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Unscoped nearby text" } },
+        dedupeKey: "explicit-node-unscoped",
+        runtimeTs: new Date("2026-05-21T00:02:01.000Z"),
+        ingestSequence: 2,
+      }],
+    });
+
+    const page = await getTaskActivityPage({ taskId: task.id, scope: "node", nodeId: "prepare", limit: 10 });
+
+    expect(page.items).toEqual([expect.objectContaining({ summary: "Prepare text", sourceNodeId: "prepare" })]);
   });
 });

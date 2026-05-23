@@ -6,6 +6,8 @@ type AppendCanonicalEventInput = {
   workspaceId: string;
   taskId: string;
   runId?: string | null;
+  nodeId?: string | null;
+  nodeTitle?: string | null;
   actorType: string;
   actorId: string;
   source: string;
@@ -25,6 +27,8 @@ export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
       workspaceId: input.workspaceId,
       taskId: input.taskId,
       runId: input.runId ?? null,
+      nodeId: input.nodeId ?? null,
+      nodeTitle: input.nodeTitle ?? null,
       actorType: input.actorType,
       actorId: input.actorId,
       source: input.source,

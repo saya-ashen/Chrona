@@ -86,6 +86,8 @@ export async function appendMainSessionEvent(input: {
   planId: string;
   sessionId: string;
   eventType: MainSessionEventType;
+  nodeId?: string | null;
+  nodeTitle?: string | null;
   payload: MainSessionEventPayload;
 }) {
   const task = await db.task.findUniqueOrThrow({
@@ -98,6 +100,8 @@ export async function appendMainSessionEvent(input: {
     workspaceId: task.workspaceId,
     taskId: input.taskId,
     runId: null,
+    nodeId: input.nodeId ?? null,
+    nodeTitle: input.nodeTitle ?? null,
     actorType: "system",
     actorId: "plan-orchestrator",
     source: "plan_execution",

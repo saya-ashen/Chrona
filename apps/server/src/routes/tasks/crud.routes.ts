@@ -5,10 +5,12 @@ import {
   listTasksQuerySchema,
   createTaskBodySchemaForSupportedRuntimes,
   taskDetailParamSchema,
+  taskNodeActivityParamSchema,
   updateTaskParamSchema,
   updateTaskBodySchemaForSupportedRuntimes,
   deleteTaskParamSchema,
   deleteTaskQuerySchema,
+  workspaceActivityPageQuerySchema,
 } from "@chrona/contracts/api";
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
@@ -75,6 +77,63 @@ export function createTasksRoutes(engine: ChronaEngine) {
         );
       }
     })
+    .get(
+      "/tasks/:taskId/activity",
+      zValidator("param", taskDetailParamSchema),
+      zValidator("query", workspaceActivityPageQuerySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const query = c.req.valid("query");
+          return json(c, await engine.tasks.getActivityPage({
+            taskId,
+            scope: "task",
+            cursor: query.cursor,
+            limit: query.limit,
+          }));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(
+            c,
+            "GET /api/tasks/:taskId/activity",
+            cause,
+            "Failed to get task activity",
+          );
+        }
+      },
+    )
+    .get(
+      "/tasks/:taskId/nodes/:nodeId/activity",
+      zValidator("param", taskNodeActivityParamSchema),
+      zValidator("query", workspaceActivityPageQuerySchema),
+      async (c) => {
+        try {
+          const { taskId, nodeId } = c.req.valid("param");
+          const query = c.req.valid("query");
+          return json(c, await engine.tasks.getActivityPage({
+            taskId,
+            scope: "node",
+            nodeId,
+            cursor: query.cursor,
+            limit: query.limit,
+          }));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(
+            c,
+            "GET /api/tasks/:taskId/nodes/:nodeId/activity",
+            cause,
+            "Failed to get node activity",
+          );
+        }
+      },
+    )
     .get(
       "/tasks/:taskId",
       zValidator("param", taskDetailParamSchema),

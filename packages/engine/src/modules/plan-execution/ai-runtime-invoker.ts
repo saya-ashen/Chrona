@@ -31,6 +31,10 @@ export type AiRuntimeInvocationInput = {
   taskSessionId: string;
   runtimeName: string;
   runtimeSessionKey: string;
+  nodeContext?: {
+    nodeId: string;
+    nodeTitle: string;
+  };
   runtimeInput: Record<string, unknown>;
   instructions: string;
   featureSpec: PreparedAiFeatureSpec;
@@ -99,6 +103,7 @@ export class AiRuntimeInvoker {
           taskId: input.taskId,
           runId: run.id,
           runtimeName: input.runtimeName,
+          nodeContext: input.nodeContext,
         },
       });
       const runtimeSessionKey = response.sessionId || input.runtimeSessionKey;
@@ -298,6 +303,10 @@ type RuntimeEventPersistenceContext = {
   taskId: string;
   runId: string;
   runtimeName: string;
+  nodeContext?: {
+    nodeId: string;
+    nodeTitle: string;
+  };
 };
 
 async function persistProviderRuntimeEvent(input: {
@@ -319,6 +328,8 @@ async function persistProviderRuntimeEvent(input: {
       workspaceId: context.workspaceId,
       taskId: context.taskId,
       runId: context.runId,
+      nodeId: context.nodeContext?.nodeId ?? null,
+      nodeTitle: context.nodeContext?.nodeTitle ?? null,
       actorType: "runtime",
       actorId: context.runtimeName,
       source: "provider",
