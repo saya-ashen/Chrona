@@ -62,6 +62,8 @@ export const ModelName = {
   TaskDependency: 'TaskDependency',
   TaskPlan: 'TaskPlan',
   TaskPlanRun: 'TaskPlanRun',
+  TaskPlanNodeAttempt: 'TaskPlanNodeAttempt',
+  TaskPlanProviderRun: 'TaskPlanProviderRun',
   TaskPlanLayer: 'TaskPlanLayer',
   Run: 'Run',
   Approval: 'Approval',
@@ -257,11 +259,58 @@ export const TaskPlanRunScalarFieldEnum = {
   taskId: 'taskId',
   planId: 'planId',
   planRun: 'planRun',
+  executionOwnerId: 'executionOwnerId',
+  executionOwnerScope: 'executionOwnerScope',
+  executionLeaseUntil: 'executionLeaseUntil',
+  executionEpoch: 'executionEpoch',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type TaskPlanRunScalarFieldEnum = (typeof TaskPlanRunScalarFieldEnum)[keyof typeof TaskPlanRunScalarFieldEnum]
+
+
+export const TaskPlanNodeAttemptScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeId: 'nodeId',
+  nodeLayerId: 'nodeLayerId',
+  executionContextSnapshotId: 'executionContextSnapshotId',
+  idempotencyKey: 'idempotencyKey',
+  attemptNumber: 'attemptNumber',
+  status: 'status',
+  executionEpoch: 'executionEpoch',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  error: 'error',
+  runtimeSnapshot: 'runtimeSnapshot',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskPlanNodeAttemptScalarFieldEnum = (typeof TaskPlanNodeAttemptScalarFieldEnum)[keyof typeof TaskPlanNodeAttemptScalarFieldEnum]
+
+
+export const TaskPlanProviderRunScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  idempotencyKey: 'idempotencyKey',
+  providerRunRef: 'providerRunRef',
+  status: 'status',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskPlanProviderRunScalarFieldEnum = (typeof TaskPlanProviderRunScalarFieldEnum)[keyof typeof TaskPlanProviderRunScalarFieldEnum]
 
 
 export const TaskPlanLayerScalarFieldEnum = {

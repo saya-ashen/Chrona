@@ -4,6 +4,7 @@ import type {
   EffectivePlanNode,
   NodeLayer,
   NodeResult,
+  PlanEdge,
   PlanNode,
   ResolveEffectivePlanGraphInput,
   WaitKind,
@@ -37,7 +38,7 @@ export function resolveEffectivePlanGraph(
     }
   }
 
-  applyConditionBranchSelections(nodeMap, edgeMap);
+  applyConditionBranchSelections(nodeMap, edgeMap, graph.edges);
   const entryNodeIds = computeGraphEntryNodeIds(nodeMap, edgeMap);
   const reachableNodeIds = computeReachableNodeIds(entryNodeIds, edgeMap);
   markUnreachableNodesSkipped(nodeMap, reachableNodeIds);
@@ -98,8 +99,12 @@ function buildEffectiveGraphSummary(input: {
     });
 
     node.dependenciesSatisfied = allDepsSatisfied;
+    const graphHasRunningNode = [...input.nodeMap.values()].some(
+      (candidate) => candidate.status === "running",
+    );
     node.ready =
       node.reachable &&
+      !graphHasRunningNode &&
       allDepsSatisfied &&
       (node.status === "pending" || node.status === "ready");
 
@@ -202,22 +207,32 @@ function buildEffectiveNodeFromGraphNode(
 
   const latestInvalidation = getLatestLayer(node.layers, "invalidation");
   const latestCancellation = getLatestLayer(node.layers, "cancellation");
-  const nodeResults = results.filter((result) => result.nodeId === node.id);
+  const nodeResults = results.filter(
+    (result) => result.nodeId === node.id && !isFailedSubmissionNodeResult(result),
+  );
   const currentResult =
     nodeResults.find(
       (result) =>
         result.nodeLayerId === activeDefinitionLayer.id &&
         result.status === "current",
     ) ??
-    [...nodeResults]
-      .filter((result) => result.nodeLayerId === activeDefinitionLayer.id)
-      .at(-1);
+    nodeResults.find(
+      (result) =>
+        result.nodeLayerId === activeDefinitionLayer.id &&
+        result.status === "rejected" &&
+        result.errorDetails === "degraded",
+    ) ??
+    nodeResults.find(
+      (result) =>
+        result.nodeLayerId === activeDefinitionLayer.id &&
+        result.status === "rejected",
+    );
   const activeAttempt = [...attempts]
     .filter(
       (attempt) =>
         attempt.nodeId === node.id && attempt.nodeLayerId === activeDefinitionLayer.id,
     )
-    .sort((a, b) => b.attemptNumber - a.attemptNumber)[0];
+    .sort(compareAttemptsForEffectiveState)[0];
   const semantics = activeDefinitionLayer.definition.semantics;
   const status = deriveNodeStatus({
     invalidated: Boolean(latestInvalidation),
@@ -265,6 +280,66 @@ function buildEffectiveNodeFromGraphNode(
   };
 }
 
+const FAILED_SUBMISSION_RESULT_PATTERNS = [
+  /Chrona\s*(?:节点)?结果提交(?:被后端拒绝|失败)/i,
+  /结果提交被后端拒绝/i,
+  /terminal tool submission failed/i,
+];
+
+function isFailedSubmissionNodeResult(result: NodeResult): boolean {
+  const text = [
+    result.outputSummary,
+    result.error,
+    ...(result.outputs ?? []).map(nodeResultOutputText),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join("\n");
+
+  return FAILED_SUBMISSION_RESULT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function nodeResultOutputText(output: NonNullable<NodeResult["outputs"]>[number]): string | undefined {
+  switch (output.kind) {
+    case "text":
+    case "markdown":
+      return output.content;
+    case "command":
+      return [output.stdout, output.stderr].filter(Boolean).join("\n");
+    case "json":
+      return stringifyJsonOutput(output.value);
+    default:
+      return undefined;
+  }
+}
+
+function stringifyJsonOutput(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function compareAttemptsForEffectiveState(a: NodeAttempt, b: NodeAttempt): number {
+  const statusDelta = attemptStatusPriority(b.status) - attemptStatusPriority(a.status);
+  if (statusDelta !== 0) return statusDelta;
+  return b.attemptNumber - a.attemptNumber;
+}
+
+function attemptStatusPriority(status: NodeAttempt["status"]): number {
+  switch (status) {
+    case "running":
+      return 4;
+    case "succeeded":
+      return 3;
+    case "failed":
+      return 2;
+    case "cancelled":
+      return 1;
+  }
+}
+
 function getActiveDefinitionLayer(layers: NodeLayer[]) {
   return [...layers]
     .reverse()
@@ -292,14 +367,17 @@ function deriveNodeStatus(input: {
   if (input.cancelled) {
     return "cancelled";
   }
-  if (input.activeAttempt?.status === "running") {
-    return "running";
-  }
   if (input.result?.waitKind) {
     return mapWaitKindToNodeStatus(input.result.waitKind);
   }
   if (input.result?.status === "rejected" && input.result.errorDetails === "degraded") {
     return "degraded";
+  }
+  if (input.result?.status === "rejected" || input.activeAttempt?.status === "failed") {
+    return "failed";
+  }
+  if (input.activeAttempt?.status === "running") {
+    return "running";
   }
   if (
     input.result?.outputSummary !== undefined ||
@@ -310,9 +388,6 @@ function deriveNodeStatus(input: {
     input.activeAttempt?.status === "succeeded"
   ) {
     return "completed";
-  }
-  if (input.result?.status === "rejected" || input.activeAttempt?.status === "failed") {
-    return "failed";
   }
   return "pending";
 }
@@ -374,14 +449,21 @@ function rebuildDependencies(
 function applyConditionBranchSelections(
   nodeMap: Map<string, EffectivePlanNode>,
   edgeMap: Map<string, EffectivePlanEdge>,
+  graphEdges: PlanEdge[],
 ) {
   for (const node of nodeMap.values()) {
     if (node.type !== "condition") continue;
+    if (node.status !== "completed") continue;
     const selectedNextNodeId = node.result?.selectedBranch?.nextNodeId;
-    if (!selectedNextNodeId) continue;
+    const branchEdgeIds = new Set(
+      graphEdges
+        .filter((edge) => edge.fromNodeId === node.id && edge.type === "branch")
+        .map((edge) => edge.id),
+    );
+    const branchEdges = [...edgeMap.values()].filter((edge) => branchEdgeIds.has(edge.id));
+    if (branchEdges.length === 0) continue;
 
-    for (const edge of edgeMap.values()) {
-      if (edge.from !== node.id) continue;
+    for (const edge of branchEdges) {
       edge.active = edge.to === selectedNextNodeId;
     }
   }

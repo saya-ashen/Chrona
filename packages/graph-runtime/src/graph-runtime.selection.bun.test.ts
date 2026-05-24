@@ -67,6 +67,49 @@ describe("graph-runtime selection", () => {
     expect(effective.completedNodeIds).toContain("configure");
   });
 
+  it("does not expose all branch targets when a completed condition result lacks selectedBranch", () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeForkedBranchingPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+
+    const effective = resolveEffectivePlanGraph({
+      graph,
+      attempts: [
+        {
+          id: "attempt_choose_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: activeDefinitionLayerId(graph, "choose"),
+          executionContextSnapshotId: "snapshot_choose_1",
+          status: "succeeded",
+          attemptNumber: 1,
+          idempotencyKey: "choose:1",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          finishedAt: "2026-01-01T00:00:01.000Z",
+        },
+      ],
+      results: [
+        {
+          id: "result_choose_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: activeDefinitionLayerId(graph, "choose"),
+          attemptId: "attempt_choose_1",
+          status: "current",
+          outputSummary: "已选择 skip config 分支。",
+        },
+      ],
+    });
+
+    expect(effective.readyNodeIds).toEqual([]);
+    expect(effective.nodes.find((node) => node.id === "configure")?.ready).toBe(false);
+    expect(effective.nodes.find((node) => node.id === "build")?.ready).toBe(false);
+  });
+
   it("resolves edge semantics and traverses dependencies", () => {
     const graph = createPlanGraphFromCompiledPlan({
       taskId: "task_1",

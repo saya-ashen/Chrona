@@ -308,7 +308,7 @@ describe("HermesProviderClient", () => {
         'data: {"type":"tool.started","tool":"shell","preview":"ls","input":{"cmd":"ls"}}\n\n',
         'data: {"type":"tool.completed","tool":"shell","error":false}\n\n',
         ": stream closed\n\n",
-        'data: {"type":"run.completed","output":"done","usage":{"input_tokens":1,"output_tokens":2,"total_tokens":3}}\n\n',
+        'data: {"type":"run.completed","session_id":"event-session","output":"done","usage":{"input_tokens":1,"output_tokens":2,"total_tokens":3}}\n\n',
         'data: {"type":"message.delta","delta":"ignored"}\n\n',
       ].join(""), {
         status: 200,
@@ -317,23 +317,45 @@ describe("HermesProviderClient", () => {
     });
 
     const client = new HermesProviderClient();
-    const events = [] as Array<{ type: string; text?: string; toolName?: string; output?: { text?: string } }>;
-    for await (const event of client.streamRun({ runId: "run-1" })) {
+    const events = [] as Array<{ type: string; text?: string; toolName?: string; output?: { text?: string }; sessionId?: string }>;
+    for await (const event of client.streamRun({ runId: "run-1", sessionId: "input-session" })) {
       events.push({
         type: event.type,
         text: event.type === "text_delta" ? event.text : undefined,
         toolName: event.type === "tool_started" || event.type === "tool_completed" ? event.toolName : undefined,
         output: event.type === "run_completed" ? event.output : undefined,
+        sessionId: event.sessionId,
       });
     }
 
     expect(events).toEqual([
-      { type: "text_delta", text: "Hi ", toolName: undefined, output: undefined },
-      { type: "tool_started", text: undefined, toolName: "shell", output: undefined },
-      { type: "tool_completed", text: undefined, toolName: "shell", output: undefined },
-      { type: "run_completed", text: undefined, toolName: undefined, output: { text: "done" } },
+      { type: "text_delta", text: "Hi ", toolName: undefined, output: undefined, sessionId: "input-session" },
+      { type: "tool_started", text: undefined, toolName: "shell", output: undefined, sessionId: "input-session" },
+      { type: "tool_completed", text: undefined, toolName: "shell", output: undefined, sessionId: "input-session" },
+      { type: "run_completed", text: undefined, toolName: undefined, output: { text: "done" }, sessionId: "input-session" },
     ]);
     expect(seenHeaders?.get("Accept")).toBe("text/event-stream");
+  });
+
+  it("uses stream input session when completed stream events omit session_id", async () => {
+    globalThis.fetch = mockFetch(async () => new Response(
+      'data: {"type":"run.completed","output":"done"}\n\n',
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    ));
+
+    const client = new HermesProviderClient();
+
+    const events = [];
+    for await (const event of client.streamRun({ runId: "run-1", sessionId: "input-session" })) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "run_completed",
+      sessionId: "input-session",
+      run: { sessionId: "input-session" },
+    });
   });
 
   it("records Hermes start and stream events for debug replay", async () => {
@@ -358,7 +380,7 @@ describe("HermesProviderClient", () => {
       instructions: "go",
       input: { type: "text", text: "Hello" },
     });
-    for await (const _event of client.streamRun({ runId: "run-1" })) {
+    for await (const _event of client.streamRun({ runId: "run-1", sessionId: "session-1" })) {
       // consume stream to flush replay records
     }
 

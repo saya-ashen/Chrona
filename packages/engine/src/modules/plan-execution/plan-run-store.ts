@@ -37,11 +37,16 @@ type PersistedPlanRunRecord = {
 };
 
 type SavedPlanRunState = {
+  id: string;
   planRun: PlanRun;
   graph: PlanGraph | null;
   attempts: NodeAttempt[];
   results: NodeResult[];
   executionContextSnapshots: ExecutionContextSnapshot[];
+  executionOwnerId: string | null;
+  executionOwnerScope: string | null;
+  executionLeaseUntil: Date | null;
+  executionEpoch: number;
 };
 
 function createEmptyPlanRun(compiledPlan: CompiledPlan): PlanRun {
@@ -205,22 +210,32 @@ export async function getPlanRun(
   const record = row.planRun as unknown as PersistedPlanRunRecord;
   if (record.mutableGraph) {
     return {
+      id: row.id,
       planRun: record.planRun,
       graph: record.mutableGraph.graph,
       attempts: record.mutableGraph.attempts,
       results: record.mutableGraph.results,
       executionContextSnapshots: record.mutableGraph.executionContextSnapshots,
+      executionOwnerId: row.executionOwnerId,
+      executionOwnerScope: row.executionOwnerScope,
+      executionLeaseUntil: row.executionLeaseUntil,
+      executionEpoch: row.executionEpoch,
     };
   }
 
   const compiledPlan = await loadCompiledPlanForRun(taskId, planId);
   if (!compiledPlan) {
     return {
+      id: row.id,
       planRun: record.planRun,
       graph: null,
       attempts: [],
       results: [],
       executionContextSnapshots: [],
+      executionOwnerId: row.executionOwnerId,
+      executionOwnerScope: row.executionOwnerScope,
+      executionLeaseUntil: row.executionLeaseUntil,
+      executionEpoch: row.executionEpoch,
     };
   }
 
@@ -244,10 +259,15 @@ export async function getPlanRun(
   });
 
   return {
+    id: row.id,
     planRun: record.planRun,
     graph: migrated.graph,
     attempts: migrated.attempts,
     results: migrated.results,
     executionContextSnapshots: migrated.executionContextSnapshots,
+    executionOwnerId: row.executionOwnerId,
+    executionOwnerScope: row.executionOwnerScope,
+    executionLeaseUntil: row.executionLeaseUntil,
+    executionEpoch: row.executionEpoch,
   };
 }

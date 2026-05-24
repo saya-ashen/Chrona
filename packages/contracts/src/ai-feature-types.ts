@@ -49,7 +49,7 @@ export interface HermesClientConfig {
   timeoutMs?: number;
 }
 
-export interface DebugClientConfig {}
+export type DebugClientConfig = Record<string, never>;
 
 type StructuredResultReliability = "business_tool" | "assistant_text";
 

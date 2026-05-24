@@ -180,7 +180,7 @@ After /clear or /compact: knowledge base and session stats preserved. Use
 
 For additional context about technologies to be used, project structure, shell
 commands, and other important information, read
-`specs/012-activity-feed/plan.md`
+`specs/013-harden-execution-kernel/plan.md`
 
 <!-- SPECKIT END -->
 

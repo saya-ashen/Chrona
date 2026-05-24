@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import {
   ensurePlanMainSession,
   appendMainSessionEvent,
@@ -38,6 +39,11 @@ import {
   type ExecutionSessionRow,
   ensureExecutionSession,
 } from "./persistence/execution-session-store";
+import {
+  acquireExecutionLease,
+  releaseExecutionLease,
+  type ExecutionLeaseScope,
+} from "./persistence/execution-lease-store";
 import { buildExecutionResponse } from "./projection/execution-response";
 import {
   ensureNativePlanRun,
@@ -203,6 +209,52 @@ async function advancePlanExecution(input: {
   });
 }
 
+async function withExecutionLease(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  ownerId: string;
+  scope: ExecutionLeaseScope;
+  run: () => Promise<PlanExecutionResult>;
+}) {
+  const lease = await acquireExecutionLease({
+    taskId: input.taskId,
+    planId: input.planId,
+    ownerId: input.ownerId,
+    scope: input.scope,
+  });
+
+  if (!lease) {
+    await appendCanonicalEvent({
+      eventType: "execution.lease_ignored",
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      actorType: "runtime",
+      actorId: input.scope,
+      source: "execution-kernel",
+      payload: {
+        planId: input.planId,
+        ownerId: input.ownerId,
+        scope: input.scope,
+        reason: "active_execution_owner",
+      },
+      dedupeKey: `execution.lease_ignored:${input.taskId}:${input.planId}:${input.ownerId}`,
+      runtimeTs: new Date(),
+    });
+    return getCurrentExecution({ taskId: input.taskId });
+  }
+
+  try {
+    return await input.run();
+  } finally {
+    await releaseExecutionLease({
+      planRunId: lease.planRunId,
+      ownerId: lease.ownerId,
+      epoch: lease.epoch,
+    });
+  }
+}
+
 async function withTaskExecutionControl(
   taskId: string,
   run: (control: PlanExecutionControl) => Promise<PlanExecutionResult>,
@@ -256,18 +308,26 @@ export async function startPlanExecution(input: {
     payload: { trigger: input.trigger, prompt: input.prompt },
   });
 
-  return withTaskExecutionControl(input.taskId, (control) =>
-    advancePlanExecution({
-      taskId: input.taskId,
-      trigger: input.trigger,
-      mainSession,
-      executionSession,
-      control,
-      onGraphEvent: input.onGraphEvent,
-      onRuntimeEvent: input.onRuntimeEvent,
-      onStateChange: input.onStateChange,
-    }),
-  );
+  return withExecutionLease({
+    workspaceId: runtime.workspaceId,
+    taskId: input.taskId,
+    planId: runtime.planId,
+    ownerId: executionSession.id,
+    scope: input.trigger === "scheduler" ? "system" : "manual",
+    run: () =>
+      withTaskExecutionControl(input.taskId, (control) =>
+        advancePlanExecution({
+          taskId: input.taskId,
+          trigger: input.trigger,
+          mainSession,
+          executionSession,
+          control,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        }),
+      ),
+  });
 }
 
 export async function continuePlanExecution(input: {
@@ -340,22 +400,30 @@ export async function continuePlanExecution(input: {
     ? effective.nodes.find((node) => node.ready)
     : null;
 
-  return withTaskExecutionControl(input.taskId, (control) =>
-    advancePlanExecution({
-      taskId: input.taskId,
-      trigger: "manual",
-      mainSession,
-      executionSession,
-      userInput: input.userInput,
-      inputFields: input.inputFields,
-      forcedNodeId: readyNode?.id ?? waitingNode?.id,
-      forcedReplaceStatus: "obsolete",
-      control,
-      onGraphEvent: input.onGraphEvent,
-      onRuntimeEvent: input.onRuntimeEvent,
-      onStateChange: input.onStateChange,
-    }),
-  );
+  return withExecutionLease({
+    workspaceId: runtime.workspaceId,
+    taskId: input.taskId,
+    planId: runtime.planId,
+    ownerId: executionSession.id,
+    scope: "manual",
+    run: () =>
+      withTaskExecutionControl(input.taskId, (control) =>
+        advancePlanExecution({
+          taskId: input.taskId,
+          trigger: "manual",
+          mainSession,
+          executionSession,
+          userInput: input.userInput,
+          inputFields: input.inputFields,
+          forcedNodeId: readyNode?.id ?? waitingNode?.id,
+          forcedReplaceStatus: "obsolete",
+          control,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        }),
+      ),
+  });
 }
 
 async function resumePlanExecutionWithApproval(input: {
@@ -431,24 +499,32 @@ async function resumePlanExecutionWithApproval(input: {
     },
   });
 
-  return withTaskExecutionControl(input.taskId, (control) =>
-    advancePlanExecution({
-      taskId: input.taskId,
-      trigger: "manual",
-      mainSession,
-      executionSession,
-      command: {
-        type: "resume_with_approval",
-        nodeId: waitingNode.id,
-        approved: input.approved,
-        feedback: input.feedback,
-      },
-      control,
-      onGraphEvent: input.onGraphEvent,
-      onRuntimeEvent: input.onRuntimeEvent,
-      onStateChange: input.onStateChange,
-    }),
-  );
+  return withExecutionLease({
+    workspaceId: runtime.workspaceId,
+    taskId: input.taskId,
+    planId: runtime.planId,
+    ownerId: executionSession.id,
+    scope: "manual",
+    run: () =>
+      withTaskExecutionControl(input.taskId, (control) =>
+        advancePlanExecution({
+          taskId: input.taskId,
+          trigger: "manual",
+          mainSession,
+          executionSession,
+          command: {
+            type: "resume_with_approval",
+            nodeId: waitingNode.id,
+            approved: input.approved,
+            feedback: input.feedback,
+          },
+          control,
+          onGraphEvent: input.onGraphEvent,
+          onRuntimeEvent: input.onRuntimeEvent,
+          onStateChange: input.onStateChange,
+        }),
+      ),
+  });
 }
 
 export async function dispatchExecutionAction(input: {
@@ -514,6 +590,7 @@ export async function dispatchExecutionAction(input: {
           taskId: input.taskId,
           action,
           advance: advancePlanExecution,
+          withExecutionLease,
           control,
           onGraphEvent: input.onGraphEvent,
           onRuntimeEvent: input.onRuntimeEvent,
@@ -528,6 +605,7 @@ export async function dispatchExecutionAction(input: {
           taskId: input.taskId,
           action,
           advance: advancePlanExecution,
+          withExecutionLease,
           control,
           onGraphEvent: input.onGraphEvent,
           onRuntimeEvent: input.onRuntimeEvent,
@@ -542,6 +620,7 @@ export async function dispatchExecutionAction(input: {
           taskId: input.taskId,
           action,
           advance: advancePlanExecution,
+          withExecutionLease,
           control,
           onGraphEvent: input.onGraphEvent,
           onRuntimeEvent: input.onRuntimeEvent,
@@ -556,6 +635,7 @@ export async function dispatchExecutionAction(input: {
           taskId: input.taskId,
           action,
           advance: advancePlanExecution,
+          withExecutionLease,
           control,
           onGraphEvent: input.onGraphEvent,
           onRuntimeEvent: input.onRuntimeEvent,
@@ -571,6 +651,7 @@ export async function dispatchExecutionAction(input: {
         taskId: input.taskId,
         action: input.action,
         advance: advancePlanExecution,
+        withExecutionLease,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -585,6 +666,7 @@ export async function dispatchExecutionAction(input: {
         taskId: input.taskId,
         action: input.action,
         advance: advancePlanExecution,
+        withExecutionLease,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,

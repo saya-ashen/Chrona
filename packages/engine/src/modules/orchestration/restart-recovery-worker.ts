@@ -15,7 +15,14 @@ export async function runRestartRecoveryWorker(input: {
   await db.schedulerLease.deleteMany({ where: { expiresAt: { lte: now } } });
 
   const activeSessions = await db.executionSession.findMany({
-    where: { status: "Active" },
+    where: {
+      status: "Active",
+      task: {
+        taskPlanRuns: {
+          some: { executionOwnerId: { not: null } },
+        },
+      },
+    },
     include: { task: { select: { workspaceId: true } } },
   });
   for (const session of activeSessions) {

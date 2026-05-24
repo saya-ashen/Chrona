@@ -17,7 +17,12 @@ export async function runGraphAdvancementWorker(input: {
     where: {
       status: { in: [TaskStatus.Queued, TaskStatus.Running] },
       runs: { none: { status: { in: ["Pending", "Running", "WaitingForInput", "WaitingForApproval"] } } },
-      executionSessions: { none: { status: { in: ["Active", "Paused"] } } },
+      executionSessions: { none: { status: { in: ["Active", "Paused", "Abandoned"] } } },
+      taskPlanRuns: {
+        some: {
+          executionOwnerId: null,
+        },
+      },
     },
     select: { id: true, workspaceId: true },
     orderBy: { updatedAt: "asc" },

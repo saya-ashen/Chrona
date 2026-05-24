@@ -22,6 +22,7 @@ import type {
   ProviderRunSnapshot,
   ProviderSessionRef,
 } from "@chrona/providers-foundation";
+import type { NodeAttempt } from "@chrona/contracts/ai";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 type TestProviderResponseClient = AgentProviderClient;
@@ -295,6 +296,25 @@ function createAiRuntimeInvoker() {
   return new AiRuntimeInvoker();
 }
 
+function createNodeAttempt(input: {
+  taskId: string;
+  planId: string;
+  nodeId: string;
+}): NodeAttempt {
+  return {
+    id: `attempt-${input.taskId}-${input.nodeId}`,
+    taskId: input.taskId,
+    graphId: input.planId,
+    nodeId: input.nodeId,
+    nodeLayerId: input.nodeId,
+    executionContextSnapshotId: `snapshot-${input.nodeId}`,
+    status: "running",
+    idempotencyKey: `${input.planId}:${input.nodeId}:1`,
+    attemptNumber: 1,
+    startedAt: new Date().toISOString(),
+  };
+}
+
 async function seedFullSetup() {
   const { workspaceId } = await seedWorkspace("PlanExecTest");
   const { taskId } = await seedTask(workspaceId, {
@@ -403,7 +423,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("persists assistant output as conversationEntry records in main_session execution", async () => {
     const outputContent = "Hello from the mock runtime! The task has been completed successfully.";
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
     const providerClient = createMockProviderClient({
       outputMessages: [outputContent],
@@ -415,6 +435,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -458,7 +479,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("keeps the node running when the provider produces no output", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const providerClient = createMockProviderClient({
       outputMessages: [],
     });
@@ -469,6 +490,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -489,7 +511,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("does not require structured output when text output is empty", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const providerClient = createMockProviderClient({
       outputMessages: [],
     });
@@ -500,6 +522,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -521,7 +544,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("does not let provider completion override Chrona task state", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const providerClient = createMockProviderClient({
       outputMessages: [],
     });
@@ -532,6 +555,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -543,7 +567,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("sets run status to Failed when the provider refuses to start", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const providerClient = createMockProviderClient({
       outputMessages: [],
       runStarted: false,
@@ -555,6 +579,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -564,7 +589,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("persists the final provider response when a response has multiple deltas", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
     const providerClient = createMockProviderClient({
       outputMessages: [
@@ -580,6 +605,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -599,7 +625,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("starts Hermes runs before streaming run events", async () => {
     const outputContent = "Hermes completed the task.";
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent,
     });
@@ -610,6 +636,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -620,7 +647,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("recovers transient Hermes stream failures by reading the existing run first", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const { client, calls } = createRecoverableHermesClient();
     installMockRegistryClient(client, "hermes");
 
@@ -629,6 +656,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -652,7 +680,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("does not require structured tool result for Hermes task execution", async () => {
     const outputContent = "Hermes advanced the node through Chrona MCP.";
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent,
     });
@@ -663,6 +691,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -675,7 +704,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("does not require legacy condition structured output for Hermes condition execution", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent: "Hermes will select the branch through Chrona MCP.",
     });
@@ -696,6 +725,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: conditionNode as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: conditionNode.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -708,7 +738,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("does not require legacy checkpoint structured output for Hermes checkpoint execution", async () => {
-    const { taskId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent: "Hermes will review the checkpoint through Chrona MCP.",
     });
@@ -729,6 +759,7 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: checkpointNode as any,
       plan: planGraph as any,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: checkpointNode.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });

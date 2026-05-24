@@ -6,13 +6,10 @@ import urllib.error
 import urllib.request
 from itertools import count
 from pathlib import Path
-from threading import Lock
 
 _JSON_RPC_IDS = count(1)
 _DEFAULT_MCP_URL = "http://127.0.0.1:3101/api/mcp"
 _CONFIG_PATH = Path(__file__).resolve().parent / "chrona_config.json"
-_SESSION_LOCK = Lock()
-_CURRENT_SESSION_CONTEXT = {}
 
 
 def _configured_mcp_url():
@@ -65,7 +62,11 @@ def _safe_json_rpc(method, params=None):
         return response.get("result", response)
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
-        return {"error": f"Chrona MCP HTTP {exc.code}", "details": details, "mcp_url": _mcp_url()}
+        return {
+            "error": f"Chrona MCP HTTP {exc.code}",
+            "details": details,
+            "mcp_url": _mcp_url(),
+        }
     except Exception as exc:
         return {"error": str(exc), "mcp_url": _mcp_url()}
 
@@ -74,11 +75,15 @@ def list_chrona_tools():
     """Fetch the current Chrona MCP tool list during Hermes plugin startup."""
     result = _safe_json_rpc("tools/list")
     if "error" in result:
-        raise RuntimeError(f"Unable to list Chrona tools: {json.dumps(result, ensure_ascii=False)}")
+        raise RuntimeError(
+            f"Unable to list Chrona tools: {json.dumps(result, ensure_ascii=False)}"
+        )
 
     tools = result.get("tools")
     if not isinstance(tools, list):
-        raise RuntimeError(f"Chrona tools/list returned invalid payload: {json.dumps(result, ensure_ascii=False)}")
+        raise RuntimeError(
+            f"Chrona tools/list returned invalid payload: {json.dumps(result, ensure_ascii=False)}"
+        )
     return tools
 
 
@@ -91,10 +96,14 @@ def schema_for_chrona_tool(tool):
     """Convert one MCP tool description into the Hermes tool schema shape."""
     name = tool.get("name")
     description = tool.get("description") or tool.get("title") or name
-    parameters = tool.get("inputSchema") or tool.get("parameters") or {
-        "type": "object",
-        "properties": {},
-    }
+    parameters = (
+        tool.get("inputSchema")
+        or tool.get("parameters")
+        or {
+            "type": "object",
+            "properties": {},
+        }
+    )
 
     return {
         "name": hermes_tool_name(name) if isinstance(name, str) else name,
@@ -108,7 +117,15 @@ def handler_for_chrona_tool(name):
 
     def _handler(args, **kwargs):
         if not isinstance(args, dict):
-            return json.dumps({"error": "tool arguments must be an object"}, ensure_ascii=False)
+            return json.dumps(
+                {"error": "tool arguments must be an object"}, ensure_ascii=False
+            )
+        session_id = _session_id_from_kwargs(kwargs)
+        if not session_id:
+            return json.dumps(
+                {"error": "Hermes session_id is required for Chrona tool calls"},
+                ensure_ascii=False,
+            )
         return json.dumps(
             _safe_json_rpc(
                 "tools/call",
@@ -120,25 +137,20 @@ def handler_for_chrona_tool(name):
     return _handler
 
 
-def capture_session_context(session_id, model=None, platform=None, **kwargs):
-    """Remember the current Hermes session for later tool calls."""
-    with _SESSION_LOCK:
-        _CURRENT_SESSION_CONTEXT.clear()
-        _CURRENT_SESSION_CONTEXT.update(
-            {
-                "session_id": session_id,
-                "model": model,
-                "platform": platform,
-            }
-        )
+def _session_id_from_kwargs(kwargs):
+    session_id = kwargs.get("session_id") or kwargs.get("task_id")
+    return session_id if isinstance(session_id, str) and session_id else None
 
 
 def _current_session_context(kwargs):
-    context = {}
-    with _SESSION_LOCK:
-        context.update(_CURRENT_SESSION_CONTEXT)
+    session_id = _session_id_from_kwargs(kwargs)
+    if not session_id:
+        return {}
 
-    for key in ("session_id", "task_id", "model", "platform"):
+    context = {}
+    context["session_id"] = session_id
+
+    for key in ("model", "platform"):
         value = kwargs.get(key)
         if value:
             context[key] = value
@@ -150,7 +162,7 @@ def _inject_session_context(arguments, kwargs):
     enriched = dict(arguments)
     context = _current_session_context(kwargs)
 
-    session_id = context.get("session_id") or context.get("task_id")
+    session_id = context.get("session_id")
     if session_id and "sessionId" not in enriched:
         enriched["sessionId"] = session_id
 

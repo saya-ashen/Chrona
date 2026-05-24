@@ -1,7 +1,9 @@
 import { RunStatus } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
+import type { NodeAttempt } from "@chrona/contracts/ai";
 import type {
   ProviderRunEvent,
   ProviderRunSnapshot,
@@ -35,6 +37,9 @@ export type AiRuntimeInvocationInput = {
     nodeId: string;
     nodeTitle: string;
   };
+  nodeAttemptId?: string;
+  nodeAttempt?: NodeAttempt;
+  providerRunIdempotencyKey?: string;
   runtimeInput: Record<string, unknown>;
   instructions: string;
   featureSpec: PreparedAiFeatureSpec;
@@ -96,8 +101,17 @@ export class AiRuntimeInvoker {
         sessionId: input.runtimeSessionKey,
         executionRuntime: input.runtimeName,
       });
+      const providerRun = await ensureProviderRunRecord({
+        taskId: input.taskId,
+        workspaceId: task.workspaceId,
+        nodeAttempt: input.nodeAttempt,
+        nodeAttemptId: input.nodeAttemptId,
+        providerRunIdempotencyKey: input.providerRunIdempotencyKey,
+      });
       const response = await runProviderRequest(client.providerClient, request, {
         runId: run.id,
+        idempotencyKey: input.providerRunIdempotencyKey,
+        providerRunRecordId: providerRun?.id,
         onRuntimeEvent: input.onRuntimeEvent,
         eventPersistence: {
           workspaceId: task.workspaceId,
@@ -108,7 +122,10 @@ export class AiRuntimeInvoker {
         },
         signal: input.signal,
       });
-      const runtimeSessionKey = response.sessionId || input.runtimeSessionKey;
+      const runtimeSessionKey = requireRuntimeSessionId(
+        response.sessionId,
+        "provider snapshot",
+      );
       const runtimeRunRef = response.nativeRunId ?? response.runId ?? null;
       const conversationEntryIds = await persistRuntimeHistory({
         runId: run.id,
@@ -126,6 +143,11 @@ export class AiRuntimeInvoker {
           errorSummary: response.error,
         },
       });
+      await updateProviderRunRecord(providerRun?.id, {
+        providerRunRef: runtimeRunRef,
+        status: response.error ? "failed" : response.status,
+        finishedAt: response.status === "completed" || response.error ? new Date() : null,
+      });
 
       return {
         runId: run.id,
@@ -140,6 +162,16 @@ export class AiRuntimeInvoker {
         where: { id: run.id },
         data: { status: RunStatus.Failed, errorSummary: message },
       });
+      if (input.providerRunIdempotencyKey) {
+        const existingProviderRun = await db.taskPlanProviderRun.findUnique({
+          where: { idempotencyKey: input.providerRunIdempotencyKey },
+          select: { id: true },
+        });
+        await updateProviderRunRecord(existingProviderRun?.id, {
+          status: "failed",
+          finishedAt: new Date(),
+        });
+      }
       throw error;
     }
   }
@@ -164,26 +196,36 @@ async function runProviderRequest(
   request: ExecutionProviderRequest,
   options: {
     runId?: string;
+    idempotencyKey?: string;
+    providerRunRecordId?: string;
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     eventPersistence?: RuntimeEventPersistenceContext;
     signal?: AbortSignal;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = toStartRunInput(request);
-  const idempotencyKey = options.runId
+  const idempotencyKey = options.idempotencyKey ?? (options.runId
     ? `chrona-runtime:${options.runId}`
-    : undefined;
+    : undefined);
   let run = await providerClient.startRun({
     ...startInput,
     signal: options.signal,
     idempotencyKey,
   } as StartRunInput & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
+  await updateProviderRunRecord(options.providerRunRecordId, {
+    providerRunRef: run.nativeRunId ?? run.runId,
+    status: run.status ?? "running",
+  });
 
   try {
     return await collectProviderRunSnapshot(
       providerClient.provider,
-      providerClient.streamRun({ runId: run.runId, signal: options.signal }),
+      providerClient.streamRun({
+        runId: run.runId,
+        sessionId: run.sessionId,
+        signal: options.signal,
+      }),
       run.sessionId,
       run,
       options,
@@ -195,7 +237,11 @@ async function runProviderRequest(
     try {
       return await collectProviderRunSnapshot(
         providerClient.provider,
-        providerClient.streamRun({ runId: run.runId, signal: options.signal }),
+        providerClient.streamRun({
+          runId: run.runId,
+          sessionId: run.sessionId,
+          signal: options.signal,
+        }),
         run.sessionId,
         run,
         options,
@@ -210,9 +256,17 @@ async function runProviderRequest(
       idempotencyKey,
     } as StartRunInput & { idempotencyKey?: string });
     await persistRuntimeRunRef(options.runId, run);
+    await updateProviderRunRecord(options.providerRunRecordId, {
+      providerRunRef: run.nativeRunId ?? run.runId,
+      status: run.status ?? "running",
+    });
     return collectProviderRunSnapshot(
       providerClient.provider,
-      providerClient.streamRun({ runId: run.runId, signal: options.signal }),
+      providerClient.streamRun({
+        runId: run.runId,
+        sessionId: run.sessionId,
+        signal: options.signal,
+      }),
       run.sessionId,
       run,
       options,
@@ -220,20 +274,119 @@ async function runProviderRequest(
   }
 }
 
+async function ensureProviderRunRecord(input: {
+  workspaceId: string;
+  taskId: string;
+  nodeAttempt?: NodeAttempt;
+  nodeAttemptId?: string;
+  providerRunIdempotencyKey?: string;
+}) {
+  if (!input.nodeAttempt || !input.providerRunIdempotencyKey) return null;
+
+  const planRun = await db.taskPlanRun.findUnique({
+    where: {
+      taskId_planId: {
+        taskId: input.taskId,
+        planId: input.nodeAttempt.graphId,
+      },
+    },
+    select: { id: true, executionEpoch: true },
+  });
+  if (!planRun) return null;
+
+  const nodeAttempt = await db.taskPlanNodeAttempt.upsert({
+    where: { idempotencyKey: input.nodeAttempt.idempotencyKey },
+    update: {
+      status: input.nodeAttempt.status,
+      runtimeSnapshot: toJsonInput(input.nodeAttempt.runtimeSnapshot),
+      finishedAt: input.nodeAttempt.finishedAt
+        ? new Date(input.nodeAttempt.finishedAt)
+        : null,
+      error: toJsonInput(input.nodeAttempt.error),
+    },
+    create: {
+      id: input.nodeAttempt.id,
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      planId: input.nodeAttempt.graphId,
+      planRunId: planRun.id,
+      nodeId: input.nodeAttempt.nodeId,
+      nodeLayerId: input.nodeAttempt.nodeLayerId,
+      executionContextSnapshotId: input.nodeAttempt.executionContextSnapshotId,
+      idempotencyKey: input.nodeAttempt.idempotencyKey,
+      attemptNumber: input.nodeAttempt.attemptNumber,
+      status: input.nodeAttempt.status,
+      executionEpoch: planRun.executionEpoch,
+      startedAt: new Date(input.nodeAttempt.startedAt),
+      finishedAt: input.nodeAttempt.finishedAt
+        ? new Date(input.nodeAttempt.finishedAt)
+        : null,
+      error: toJsonInput(input.nodeAttempt.error),
+      runtimeSnapshot: toJsonInput(input.nodeAttempt.runtimeSnapshot),
+    },
+    select: { id: true },
+  });
+
+  return db.taskPlanProviderRun.upsert({
+    where: { idempotencyKey: input.providerRunIdempotencyKey },
+    update: { status: "running" },
+    create: {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      planId: input.nodeAttempt.graphId,
+      planRunId: planRun.id,
+      nodeAttemptId: nodeAttempt.id,
+      idempotencyKey: input.providerRunIdempotencyKey,
+      status: "running",
+    },
+    select: { id: true },
+  });
+}
+
+function toJsonInput(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return Prisma.JsonNull;
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+async function updateProviderRunRecord(
+  providerRunRecordId: string | undefined,
+  data: {
+    providerRunRef?: string | null;
+    status: string;
+    finishedAt?: Date | null;
+  },
+) {
+  if (!providerRunRecordId) return;
+  await db.taskPlanProviderRun.update({
+    where: { id: providerRunRecordId },
+    data,
+  });
+}
+
 async function persistRuntimeRunRef(
   runId: string | undefined,
   run: ProviderRunRef,
 ) {
   if (!runId) return;
+  const runtimeSessionRef = requireRuntimeSessionId(run.sessionId, "provider run ref");
   await db.run.update({
     where: { id: runId },
     data: {
       runtimeRunRef: run.nativeRunId ?? run.runId,
-      runtimeSessionRef: run.sessionId,
+      runtimeSessionRef,
       status: RunStatus.Running,
       syncStatus: "healthy",
     },
   });
+}
+
+function requireRuntimeSessionId(value: string | undefined, source: string) {
+  const sessionId = value?.trim();
+  if (!sessionId || sessionId === "unknown") {
+    throw new Error(`Runtime ${source} missing sessionId`);
+  }
+  return sessionId;
 }
 
 function isTransientProviderError(error: unknown) {
@@ -271,11 +424,15 @@ async function collectProviderRunSnapshot(
       fallbackIndex: eventIndex,
     });
     if (event.type === "run_completed") {
+      const sessionId = requireRuntimeSessionId(
+        event.run.sessionId,
+        "completed event",
+      );
       snapshot = {
         provider,
         runId: event.run.runId,
         nativeRunId: event.run.nativeRunId,
-        sessionId: event.run.sessionId,
+        sessionId,
         status: event.run.status ?? "completed",
         outputText: event.outputText,
         structuredPayload: event.structuredPayload,

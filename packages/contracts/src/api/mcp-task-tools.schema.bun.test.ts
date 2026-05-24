@@ -148,6 +148,19 @@ describe("MCP task tool contracts", () => {
       }),
     ).toMatchObject({ action: "complete_manual_node" });
 
+    expect(
+      parseChronaToolPayload("chrona.execution.dispatch", {
+        action: "complete_manual_node",
+        terminalKind: "condition",
+        branchRef: "B20260524-08-A",
+        summary: "Condition selected the pass branch",
+      }),
+    ).toMatchObject({
+      action: "complete_manual_node",
+      terminalKind: "condition",
+      branchRef: "B20260524-08-A",
+    });
+
     expect(parseChronaToolPayload("chrona.node.read", undefined)).toEqual({});
     expect(parseChronaToolPayload("chrona.node.task_complete", { summary: "Done" })).toEqual({ summary: "Done" });
     expect(parseChronaToolPayload("chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Condition met" })).toEqual({ branchRef: "B20260516-01-A", summary: "Condition met" });

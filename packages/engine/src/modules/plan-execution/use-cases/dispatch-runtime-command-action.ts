@@ -6,6 +6,7 @@ import type {
   PlanExecutionControl,
   PlanExecutionObserver,
 } from "../types";
+import type { ExecutionLeaseScope } from "../persistence/execution-lease-store";
 import { ensurePlanMainSession } from "../plan-state-store";
 import { ensureExecutionSession } from "../persistence/execution-session-store";
 import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
@@ -18,6 +19,15 @@ type AdvancePlanExecution = (input: {
   command: AdvanceRuntimeCommand;
   control?: PlanExecutionControl;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
+
+type LeaseAdvance = (input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  ownerId: string;
+  scope: ExecutionLeaseScope;
+  run: () => Promise<PlanExecutionResult>;
+}) => Promise<PlanExecutionResult>;
 
 type RuntimeCommandAction = Extract<
   ExecutionActionWithContinuation,
@@ -100,6 +110,7 @@ export async function dispatchRuntimeCommandAction(input: {
   taskId: string;
   action: RuntimeCommandAction;
   advance: AdvancePlanExecution;
+  withExecutionLease?: LeaseAdvance;
   control?: PlanExecutionControl;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
@@ -122,7 +133,7 @@ export async function dispatchRuntimeCommandAction(input: {
     planId: runtime.planId,
   });
 
-  return input.advance({
+  const run = () => input.advance({
     taskId: input.taskId,
     trigger: "manual",
     mainSession,
@@ -132,5 +143,18 @@ export async function dispatchRuntimeCommandAction(input: {
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,
+  });
+
+  if (!input.withExecutionLease) {
+    return run();
+  }
+
+  return input.withExecutionLease({
+    workspaceId: runtime.workspaceId,
+    taskId: input.taskId,
+    planId: runtime.planId,
+    ownerId: executionSession.id,
+    scope: "manual",
+    run,
   });
 }

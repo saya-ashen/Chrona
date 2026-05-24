@@ -38,7 +38,7 @@ export function appendCurrentResult(input: {
   const nextResults = markNodeResults(
     input.results,
     input.result.nodeId ?? "",
-    input.replaceStatus ?? "obsolete",
+    input.replaceStatus ?? "stale",
   );
   nextResults.push(input.result);
   return nextResults;
