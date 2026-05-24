@@ -3,6 +3,11 @@ import {
   pickNextNodeId,
   updateAttemptStatus,
 } from "../execution-state";
+import {
+  explainNodeExecutionBlock,
+  findEffectiveGraphInvariantViolation,
+  normalizeNodeResult,
+} from "./guards";
 import { resolveEffectivePlanGraph } from "../resolve";
 import { mapTerminalReasonToGraphStatus, mapWaitKindToGraphStatus } from "../status";
 import type { NodeAttempt } from "../types";
@@ -44,6 +49,19 @@ export async function runGraphExecution<TContext = unknown>(
       effective,
     });
 
+    const invariantViolation = findEffectiveGraphInvariantViolation(effective);
+    if (invariantViolation) {
+      return {
+        status: "blocked",
+        currentNodeId: null,
+        executedNodeIds,
+        effective,
+        state,
+        waitKind: "manual_action",
+        message: invariantViolation,
+      };
+    }
+
     if (effective.readyNodeIds.length === 0 && !forcedNodeId) {
       const status = mapTerminalReasonToGraphStatus(effective);
       return {
@@ -57,8 +75,27 @@ export async function runGraphExecution<TContext = unknown>(
     }
 
     const forcedNextNodeId = forcedNodeId
-      ? pickNextNodeId(effective, forcedNodeId)
+      ? pickNextNodeId(effective, forcedNodeId, {
+        allowWaitingInputResume: Boolean(userInput),
+      })
       : null;
+    if (forcedNodeId && !forcedNextNodeId) {
+      const forcedNode = effective.nodes.find((node) => node.id === forcedNodeId);
+      return {
+        status: "blocked",
+        currentNodeId: forcedNodeId,
+        executedNodeIds,
+        effective,
+        state,
+        waitKind: "manual_action",
+        message: forcedNode
+          ? explainNodeExecutionBlock({
+            node: forcedNode,
+            allowWaitingInputResume: Boolean(userInput),
+          }) ?? `Node ${forcedNodeId} is not executable`
+          : `Node ${forcedNodeId} does not exist in the effective graph`,
+      };
+    }
     const nextNodeIds = forcedNextNodeId
       ? [forcedNextNodeId]
       : effective.readyNodeIds.slice(0, maxConcurrency);
@@ -80,6 +117,23 @@ export async function runGraphExecution<TContext = unknown>(
       if (!node || !node.activeLayerId) {
         throw new Error(`Effective node ${nextNodeId} is missing active layer`);
       }
+      const nodeUserInput = forcedNodeId === nextNodeId ? userInput : undefined;
+      const nodeInputFields = forcedNodeId === nextNodeId ? input.inputFields : undefined;
+      const executionBlock = explainNodeExecutionBlock({
+        node,
+        allowWaitingInputResume: Boolean(nodeUserInput),
+      });
+      if (executionBlock) {
+        return {
+          status: "blocked",
+          currentNodeId: nextNodeId,
+          executedNodeIds,
+          effective,
+          state,
+          waitKind: "manual_action",
+          message: executionBlock,
+        };
+      }
       const existingRunningAttempt = state.attempts.find(
         (attempt) =>
           attempt.nodeId === nextNodeId &&
@@ -96,8 +150,6 @@ export async function runGraphExecution<TContext = unknown>(
           message: `Node ${nextNodeId} is already running`,
         };
       }
-      const nodeUserInput = forcedNodeId === nextNodeId ? userInput : undefined;
-      const nodeInputFields = forcedNodeId === nextNodeId ? input.inputFields : undefined;
       forcedNodeId = undefined;
 
       if (nodeUserInput) {
@@ -149,7 +201,7 @@ export async function runGraphExecution<TContext = unknown>(
       await input.callbacks.onEvent?.({ type: "node_started", node, attempt });
       await input.callbacks.onStateChange?.(state);
 
-      const result = await input.callbacks.executeNode({
+      const rawResult = await input.callbacks.executeNode({
         node,
         plan: effective,
         attempt,
@@ -163,7 +215,7 @@ export async function runGraphExecution<TContext = unknown>(
       throwIfAborted(input.control?.signal);
 
       const finishedAt = new Date(input.now?.() ?? Date.now()).toISOString();
-      if (!result) {
+      if (!rawResult) {
         state = {
           ...state,
           attempts: updateAttemptStatus({
@@ -195,6 +247,8 @@ export async function runGraphExecution<TContext = unknown>(
           message: `No executor for node type: ${node.type}`,
         };
       }
+
+      const result = normalizeNodeResult({ node, result: rawResult });
 
       if (result.status === "started") {
         state = {

@@ -101,6 +101,7 @@ export class AiRuntimeInvoker {
         sessionId: input.runtimeSessionKey,
         executionRuntime: input.runtimeName,
       });
+      const terminalToolName = request.terminalToolName;
       const providerRun = await ensureProviderRunRecord({
         taskId: input.taskId,
         workspaceId: task.workspaceId,
@@ -113,6 +114,7 @@ export class AiRuntimeInvoker {
         idempotencyKey: input.providerRunIdempotencyKey,
         providerRunRecordId: providerRun?.id,
         onRuntimeEvent: input.onRuntimeEvent,
+        terminalToolName,
         eventPersistence: {
           workspaceId: task.workspaceId,
           taskId: input.taskId,
@@ -199,6 +201,7 @@ async function runProviderRequest(
     idempotencyKey?: string;
     providerRunRecordId?: string;
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
+    terminalToolName?: string;
     eventPersistence?: RuntimeEventPersistenceContext;
     signal?: AbortSignal;
   } = {},
@@ -411,10 +414,12 @@ async function collectProviderRunSnapshot(
   options: {
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     eventPersistence?: RuntimeEventPersistenceContext;
+    terminalToolName?: string;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   let snapshot: ProviderRunSnapshot | null = null;
   let eventIndex = 0;
+  let terminalToolName: string | undefined = options.terminalToolName;
   for await (const event of events) {
     eventIndex += 1;
     await options.onRuntimeEvent?.(event);
@@ -438,8 +443,13 @@ async function collectProviderRunSnapshot(
         structuredPayload: event.structuredPayload,
         usage: event.usage,
         error: null,
-        raw: event.raw,
+        raw: event.raw === undefined && terminalToolName === undefined
+          ? undefined
+          : { raw: event.raw, terminalToolName },
       };
+    }
+    if (event.type === "tool_completed") {
+      terminalToolName = event.toolName;
     }
     if (event.type === "run_failed") {
       const run = event.run ?? fallbackRun;

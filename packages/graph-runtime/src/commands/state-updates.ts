@@ -127,6 +127,10 @@ export function syncExternalResultState(input: {
   const node = effective.nodes.find(
     (candidate) => candidate.id === input.externalResult.nodeId,
   );
+  const conditionMissingBranch =
+    node?.type === "condition" &&
+    input.externalResult.status === "done" &&
+    !input.externalResult.selectedBranch;
   const currentAttempt = [...input.state.attempts]
     .reverse()
     .find(
@@ -172,15 +176,30 @@ export function syncExternalResultState(input: {
 
   switch (input.externalResult.status) {
     case "done":
-      syncedResult = {
-        ...baseResult,
-        status: "current",
-        outputSummary: input.externalResult.summary,
-        outputs: normalizeResultOutputs(input.externalResult.output),
-        evidence,
-        selectedBranch: input.externalResult.selectedBranch,
-      };
-      attemptStatus = "succeeded";
+      if (conditionMissingBranch) {
+        syncedResult = {
+          ...baseResult,
+          status: "current",
+          waitKind: "manual_action",
+          error: `Condition node ${input.externalResult.nodeId} completed without a structured selectedBranch`,
+          evidence,
+        };
+        attemptStatus = "failed";
+        attemptError = {
+          code: "CONDITION_BRANCH_MISSING",
+          message: syncedResult.error ?? "Condition selectedBranch is required",
+        };
+      } else {
+        syncedResult = {
+          ...baseResult,
+          status: "current",
+          outputSummary: input.externalResult.summary,
+          outputs: normalizeResultOutputs(input.externalResult.output),
+          evidence,
+          selectedBranch: input.externalResult.selectedBranch,
+        };
+        attemptStatus = "succeeded";
+      }
       break;
     case "failed":
       syncedResult = {
