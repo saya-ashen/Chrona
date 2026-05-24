@@ -11,7 +11,6 @@ flowchart TB
   Agent[External agent / Hermes] --> MCP[/api/mcp]
 
   Web --> API[apps/server Hono API]
-  CLI --> API
   MCP --> API
 
   API --> Engine[packages/engine]
@@ -37,7 +36,7 @@ flowchart TB
 | Graph runtime | `packages/graph-runtime` | Plan graph build, resolve, transition, and command primitives |
 | Providers | `packages/providers/*` | Protocol adapters for LLM/Hermes/runtime backends |
 | Database | `packages/db` + `prisma` | Prisma 7 + SQLite bootstrap, repositories, schema, migrations, seed |
-| CLI | `packages/cli` | Thin terminal client for the API |
+| CLI | `packages/cli` | Packaged entry point for starting Chrona |
 | External plugins | `external-plugins/hermes` | Hermes Agent integration and Chrona MCP tool exposure |
 
 ## Product surfaces

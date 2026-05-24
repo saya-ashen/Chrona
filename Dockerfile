@@ -22,7 +22,7 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3101
 ENV CHRONA_WEB_DIST=apps/web/dist
-ENV DATABASE_URL="file:./prisma/chrona.db"
+ENV DATABASE_URL="file:/data/chrona.db"
 
 COPY --from=spa-builder /app/apps/web/dist apps/web/dist
 COPY bun.lock package.json ./
@@ -32,13 +32,16 @@ RUN bun install --frozen-lockfile --production --ignore-scripts
 COPY apps/server apps/server
 COPY packages packages
 COPY prisma/schema.prisma prisma/
+COPY prisma/migrations prisma/migrations
+COPY scripts/init-sqlite-db.ts scripts/init-sqlite-db.ts
 COPY tsconfig.json .
 
 RUN bunx prisma generate
 
 EXPOSE 3101
+VOLUME ["/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD bun -e "const response = await fetch('http://localhost:3101/health'); process.exit(response.ok ? 0 : 1)"
 
-CMD ["sh", "-c", "if [ -z \"$API_KEY\" ]; then export API_KEY=$(bun -e \"console.log(crypto.randomUUID().replaceAll('-', ''))\"); echo \"Generated API_KEY for this container: $API_KEY\"; fi; bunx prisma migrate deploy && bun run apps/server/src/index.bun.ts"]
+CMD ["sh", "-c", "if [ -z \"$API_KEY\" ]; then export API_KEY=$(bun -e \"console.log(crypto.randomUUID().replaceAll('-', ''))\"); echo \"Generated API_KEY for this container: $API_KEY\"; fi; bun run apps/server/src/index.bun.ts"]

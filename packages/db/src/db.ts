@@ -1,6 +1,8 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
+import { resolveRuntimeDatabaseUrl, resolveSqliteAdapterUrl } from "./sqlite-url";
 
-const DATABASE_URL = process.env.DATABASE_URL || "file:./prisma/dev.db";
+const DATABASE_URL = resolveRuntimeDatabaseUrl(process.env);
 
 if (typeof globalThis.Bun === "undefined") {
   throw new Error(
@@ -9,23 +11,22 @@ if (typeof globalThis.Bun === "undefined") {
   );
 }
 
-async function createAdapter() {
-  const { PrismaBunSqlite } = await import("prisma-adapter-bun-sqlite");
-
+function createAdapter() {
   return new PrismaBunSqlite({
-    url: DATABASE_URL,
+    url: resolveSqliteAdapterUrl(DATABASE_URL),
   });
 }
 
-async function createDbClient() {
-  const adapter = await createAdapter();
+function createDbClient() {
+  const adapter = createAdapter();
 
   const client = new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 
-  await client.$executeRawUnsafe("PRAGMA foreign_keys = ON");
+  // Prisma adapter connections inherit this for subsequent operations in Bun SQLite.
+  client.$executeRawUnsafe("PRAGMA foreign_keys = ON").catch(() => undefined);
 
   return client;
 }
@@ -38,9 +39,8 @@ function hasRequiredDelegates(client: PrismaClient | undefined) {
   return typeof (client as PrismaClient & { taskSession?: unknown }).taskSession === "object";
 }
 
-async function resolveCachedClient(globalForPrisma: typeof globalThis & {
+function resolveCachedClient(globalForPrisma: typeof globalThis & {
   prisma?: PrismaClient;
-  prismaPromise?: Promise<PrismaClient>;
 }) {
   const cachedClient = globalForPrisma.prisma;
   if (hasRequiredDelegates(cachedClient)) {
@@ -48,43 +48,17 @@ async function resolveCachedClient(globalForPrisma: typeof globalThis & {
   }
 
   if (cachedClient) {
-    await cachedClient.$disconnect().catch(() => undefined);
     globalForPrisma.prisma = undefined;
-    globalForPrisma.prismaPromise = undefined;
   }
-
-  const cachedPromise = globalForPrisma.prismaPromise;
-  if (!cachedPromise) {
-    return undefined;
-  }
-
-  const promisedClient = await cachedPromise.catch(() => undefined);
-  if (hasRequiredDelegates(promisedClient)) {
-    return promisedClient;
-  }
-
-  if (promisedClient) {
-    await promisedClient.$disconnect().catch(() => undefined);
-  }
-
-  globalForPrisma.prisma = undefined;
-  globalForPrisma.prismaPromise = undefined;
   return undefined;
 }
 
 const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
-  prismaPromise?: Promise<PrismaClient>;
 };
 
-const prismaPromise = (async () => {
-  const cachedClient = await resolveCachedClient(globalForPrisma);
-  return cachedClient ?? createDbClient();
-})();
-
-export const db = await prismaPromise;
+export const db = resolveCachedClient(globalForPrisma) ?? createDbClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = db;
-  globalForPrisma.prismaPromise = Promise.resolve(db);
 }

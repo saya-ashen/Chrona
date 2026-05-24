@@ -6,6 +6,7 @@ describe("test database safety", () => {
     expect(isSafeTestDatabaseUrl(undefined)).toBe(false);
     expect(isSafeTestDatabaseUrl("file:./prisma/dev.db")).toBe(false);
     expect(isSafeTestDatabaseUrl("file:./prisma/chrona.db")).toBe(false);
+    expect(isSafeTestDatabaseUrl("file:/data/chrona.db")).toBe(false);
   });
 
   it("accepts isolated test database URLs", () => {

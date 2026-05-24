@@ -217,7 +217,7 @@ Copy `.env.example` if you want local overrides.
 
 | Variable | Purpose | Default / note |
 | --- | --- | --- |
-| `DATABASE_URL` | SQLite database URL | `file:./prisma/dev.db` |
+| `DATABASE_URL` | SQLite database URL | development default: `file:./prisma/dev.db`; Docker production: `file:/data/chrona.db`; CLI binary: OS data dir `chrona.db` |
 | `HOST` | API server bind host | defaults to local-only `127.0.0.1` |
 | `PORT` | API server port | `3101` |
 | `CHRONA_WEB_DIST` | Built web app directory for server/static mode | `apps/web/dist` |
@@ -238,6 +238,8 @@ bun run db:migrate
 ```
 
 `bun run setup` runs Prisma client generation and seed data when schema or dependency changes require it. On NixOS, Prisma may require custom engine configuration or `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1` because upstream checksum files can be unavailable for the `linux-nixos` engine target.
+
+Production SQLite data should live outside the application bundle. Docker uses `/data/chrona.db` and should mount `/data` as a persistent volume. Released CLI binaries create `chrona.db` under the platform data directory unless `DATABASE_URL` is set explicitly.
 
 ### AI clients
 

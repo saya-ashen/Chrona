@@ -3,12 +3,35 @@ import { db } from "@/lib/db";
 import { runRestartRecoveryWorker } from "./restart-recovery-worker";
 
 async function resetDb() {
-  await db.schedulerEvent.deleteMany();
-  await db.schedulerLease.deleteMany();
-  await db.executionSession.deleteMany();
-  await db.run.deleteMany();
-  await db.task.deleteMany();
-  await db.workspace.deleteMany();
+  try {
+    await db.$executeRaw`PRAGMA foreign_keys = OFF`;
+    await db.taskAssistantMessage.deleteMany();
+    await db.scheduleProposal.deleteMany();
+    await db.toolCallDetail.deleteMany();
+    await db.conversationEntry.deleteMany();
+    await db.runtimeCursor.deleteMany();
+    await db.schedulerEvent.deleteMany();
+    await db.schedulerLease.deleteMany();
+    await db.reconciliationEvent.deleteMany();
+    await db.graphMutationRecord.deleteMany();
+    await db.graphVersion.deleteMany();
+    await db.approval.deleteMany();
+    await db.artifact.deleteMany();
+    await db.executionSession.deleteMany();
+    await db.workBlock.deleteMany();
+    await db.taskProjection.deleteMany();
+    await db.run.deleteMany();
+    await db.taskPlanLayer.deleteMany();
+    await db.taskPlanRun.deleteMany();
+    await db.taskPlan.deleteMany();
+    await db.taskSession.deleteMany();
+    await db.taskDependency.deleteMany();
+    await db.memory.deleteMany();
+    await db.task.deleteMany();
+    await db.workspace.deleteMany();
+  } finally {
+    await db.$executeRaw`PRAGMA foreign_keys = ON`;
+  }
 }
 
 describe("runRestartRecoveryWorker", () => {
@@ -92,7 +115,12 @@ describe("runRestartRecoveryWorker", () => {
         retryable: true,
       },
     });
-    await db.task.delete({ where: { id: task.id } });
+    try {
+      await db.$executeRaw`PRAGMA foreign_keys = OFF`;
+      await db.task.delete({ where: { id: task.id } });
+    } finally {
+      await db.$executeRaw`PRAGMA foreign_keys = ON`;
+    }
 
     const result = await runRestartRecoveryWorker({ now: new Date("2026-05-17T00:01:00.000Z") });
 

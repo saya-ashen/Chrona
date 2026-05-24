@@ -161,6 +161,14 @@ async function buildBinary(target: string) {
     log("copy", "  .env.example → resources/.env.example");
   }
 
+  // Hermes plugin
+  const hermesPluginSrc = resolve(ROOT, "external-plugins/hermes");
+  const hermesPluginDst = resolve(resourcesDir, "external-plugins/hermes");
+  if (existsSync(hermesPluginSrc)) {
+    cpSync(hermesPluginSrc, hermesPluginDst, { recursive: true });
+    log("copy", "  external-plugins/hermes → resources/external-plugins/hermes");
+  }
+
   // Step 6: Generate archive
   console.log("");
   const tarPath = resolve(ROOT, "dist", "releases", `${releaseName}.tar.gz`);

@@ -1,18 +1,25 @@
 import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
+import { resolve } from "node:path";
+import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { createLogger } from "@chrona/shared/logger";
 import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolvePort } from "./config/env";
 
-const env = readEnv();
 const log = createLogger("apps.server");
-const host = env.HOST;
-const port = resolvePort(env);
 const SSE_REQUEST_TIMEOUT_SECONDS = 120;
-assertSafeBind(env);
 
 let isShuttingDown = false;
 
 export async function startBunServer() {
+  const env = readEnv();
+  const host = env.HOST;
+  const port = resolvePort(env);
+
+  assertSafeBind(env);
+  ensureSqliteDatabase({
+    databaseUrl: env.DATABASE_URL,
+    migrationsDir: process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations"),
+  });
   bootstrapServerRuntime();
 
   const app = await createServerApp();

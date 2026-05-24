@@ -39,7 +39,7 @@ Chrona is a Bun/TypeScript monorepo:
 | --- | --- | --- |
 | Web app | `apps/web` | Vite + React 19 + React Router SPA |
 | API server | `apps/server` | Hono routes on Bun |
-| CLI | `packages/cli` | Thin client for the API |
+| CLI | `packages/cli` | Packaged entry point for starting Chrona |
 | Contracts | `packages/contracts` | API schemas, AI feature specs, runtime event types, MCP tool schemas |
 | Engine | `packages/engine` | Business use cases for tasks, plans, execution, scheduling, projections, AI clients |
 | Graph runtime | `packages/graph-runtime` | Plan graph build/resolve/transition/command execution primitives |
