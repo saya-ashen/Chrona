@@ -151,3 +151,35 @@ export function makeParallelPlan(): CompiledPlan {
     entryNodeIds: ["left", "right"],
   };
 }
+
+export function makeLinearPlan(): CompiledPlan {
+  return {
+    id: "compiled_linear",
+    editablePlanId: "graph_linear",
+    sourceVersion: 1,
+    nodes: [
+      {
+        id: "first",
+        localId: "first",
+        type: "task",
+        title: "First",
+        description: "Required upstream task",
+        config: { expectedOutput: "First done" },
+        dependencies: [],
+        dependents: ["second"],
+      },
+      {
+        id: "second",
+        localId: "second",
+        type: "task",
+        title: "Second",
+        description: "Downstream task",
+        config: { expectedOutput: "Second done" },
+        dependencies: ["first"],
+        dependents: [],
+      },
+    ],
+    edges: [{ id: "edge_first_second", from: "first", to: "second" }],
+    entryNodeIds: ["first"],
+  };
+}

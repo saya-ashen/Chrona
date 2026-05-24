@@ -3,6 +3,7 @@ import type {
   EffectivePlanGraph,
   EffectivePlanNode,
   NodeLayer,
+  NodeDefinition,
   NodeResult,
   PlanEdge,
   PlanNode,
@@ -233,7 +234,8 @@ function buildEffectiveNodeFromGraphNode(
         attempt.nodeId === node.id && attempt.nodeLayerId === activeDefinitionLayer.id,
     )
     .sort(compareAttemptsForEffectiveState)[0];
-  const semantics = activeDefinitionLayer.definition.semantics;
+  const definition = activeDefinitionLayer.definition;
+  const semantics = definition.semantics;
   const status = deriveNodeStatus({
     invalidated: Boolean(latestInvalidation),
     cancelled: Boolean(latestCancellation),
@@ -246,21 +248,21 @@ function buildEffectiveNodeFromGraphNode(
     nodeId: node.id,
     activeLayerId: activeDefinitionLayer.id,
     semanticKey: node.semanticKey,
-    definition: activeDefinitionLayer.definition,
+    definition,
     invalidated: Boolean(latestInvalidation),
     invalidationReason: latestInvalidation?.reason,
     waitKind: currentResult?.waitKind,
-    reviewRequired: activeDefinitionLayer.definition.reviewRequired ?? false,
+    reviewRequired: definition.reviewRequired ?? false,
     localId: node.semanticKey,
     type: semantics.type,
-    title: activeDefinitionLayer.definition.title,
-    description: activeDefinitionLayer.definition.description,
+    title: definition.title,
+    description: definition.description,
     priority: semantics.priority,
     linkedTaskId: semantics.linkedTaskId,
-    config: (activeDefinitionLayer.definition.metadata ?? {}) as EffectivePlanNode["config"],
-    executor: activeDefinitionLayer.definition.executor,
+    config: nodeConfigFromDefinition(definition),
+    executor: definition.executor,
     mode: semantics.mode,
-    estimatedMinutes: activeDefinitionLayer.definition.estimatedMinutes,
+    estimatedMinutes: definition.estimatedMinutes,
     dependencies: [],
     dependents: [],
     status,
@@ -278,6 +280,19 @@ function buildEffectiveNodeFromGraphNode(
     ready: false,
     reachable: true,
   };
+}
+
+function nodeConfigFromDefinition(definition: NodeDefinition): EffectivePlanNode["config"] {
+  const directMetadata = isRecord(definition.metadata) ? definition.metadata : {};
+  const semanticsMetadata = isRecord(definition.semantics.metadata) ? definition.semantics.metadata : {};
+  const metadataConfig = isRecord(directMetadata.config) ? directMetadata.config : null;
+  const semanticsConfig = isRecord(semanticsMetadata.config) ? semanticsMetadata.config : null;
+
+  return (metadataConfig ?? semanticsConfig ?? directMetadata ?? semanticsMetadata) as EffectivePlanNode["config"];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 const FAILED_SUBMISSION_RESULT_PATTERNS = [
@@ -373,7 +388,7 @@ function deriveNodeStatus(input: {
   if (input.result?.status === "rejected" && input.result.errorDetails === "degraded") {
     return "degraded";
   }
-  if (input.result?.status === "rejected" || input.activeAttempt?.status === "failed") {
+  if (input.result?.status === "rejected") {
     return "failed";
   }
   if (input.activeAttempt?.status === "running") {
@@ -389,6 +404,9 @@ function deriveNodeStatus(input: {
   ) {
     return "completed";
   }
+  if (input.activeAttempt?.status === "failed") {
+    return "failed";
+  }
   return "pending";
 }
 
@@ -399,6 +417,9 @@ function mapWaitKindToNodeStatus(waitKind: WaitKind): EffectivePlanNode["status"
     case "approval":
     case "review":
       return "waiting_for_approval";
+    case "manual_action":
+    case "capability_unavailable":
+      return "blocked";
     default:
       return "waiting";
   }

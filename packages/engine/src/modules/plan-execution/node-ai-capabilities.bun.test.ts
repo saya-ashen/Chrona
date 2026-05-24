@@ -32,6 +32,50 @@ function makeTaskNode(): EffectivePlanNode {
   };
 }
 
+function makeConditionNode(): EffectivePlanNode {
+  return {
+    ...makeTaskNode(),
+    id: "condition_node",
+    nodeId: "condition_node",
+    semanticKey: "condition_node",
+    localId: "condition_node",
+    type: "condition",
+    title: "Choose delivery path",
+    definition: {
+      title: "Choose delivery path",
+      objective: "Choose delivery path",
+      semantics: { type: "condition" },
+    },
+    config: {
+      condition: "Which delivery path should continue?",
+      evaluationBy: "ai",
+      branches: [
+        { label: "Passed", nextNodeId: "passed_node" },
+        { label: "Needs fixes", nextNodeId: "fix_node" },
+      ],
+    },
+  };
+}
+
+function makeDownstreamNode(input: { id: string; localId: string; title: string }): EffectivePlanNode {
+  return {
+    ...makeTaskNode(),
+    id: input.id,
+    nodeId: input.id,
+    semanticKey: input.id,
+    localId: input.localId,
+    title: input.title,
+    definition: {
+      title: input.title,
+      objective: input.title,
+      semantics: { type: "task" },
+    },
+    dependencies: ["condition_node"],
+    dependenciesSatisfied: false,
+    ready: false,
+  };
+}
+
 function makePlan(node: EffectivePlanNode): EffectivePlanGraph {
   return {
     graphId: "graph_two_entry_provider_completion_gap",
@@ -55,6 +99,23 @@ function makePlan(node: EffectivePlanNode): EffectivePlanGraph {
     invalidatedNodeIds: [],
     failedNodeIds: [],
     pendingNodeIds: [node.id],
+  };
+}
+
+function makeConditionPlan(input: {
+  condition: EffectivePlanNode;
+  passed: EffectivePlanNode;
+  fixes: EffectivePlanNode;
+}): EffectivePlanGraph {
+  return {
+    ...makePlan(input.condition),
+    nodes: [input.condition, input.passed, input.fixes],
+    edges: [
+      { id: "edge-passed", from: input.condition.id, to: input.passed.id, label: "Passed", active: true },
+      { id: "edge-fixes", from: input.condition.id, to: input.fixes.id, label: "Needs fixes", active: true },
+    ],
+    terminalNodeIds: [input.passed.id, input.fixes.id],
+    pendingNodeIds: [input.condition.id, input.passed.id, input.fixes.id],
   };
 }
 
@@ -174,6 +235,187 @@ describe("runTaskNodeFeature", () => {
         runtimeName: "hermes",
         provider: "hermes",
         outputText: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+      },
+    });
+  });
+
+  it("maps condition branchRef structured payload to selectedBranch", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Node AI condition workspace",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-condition-branch-ref",
+        workspaceId: workspace.id,
+        title: "Node AI condition task",
+        status: TaskStatus.Running,
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "local-run-condition",
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date(),
+        syncStatus: "healthy",
+      },
+    });
+
+    const condition = makeConditionNode();
+    const passed = makeDownstreamNode({ id: "passed_node", localId: "passed_node", title: "Passed" });
+    const fixes = makeDownstreamNode({ id: "fix_node", localId: "fix_node", title: "Needs fixes" });
+    const plan = makeConditionPlan({ condition, passed, fixes });
+    const aiRuntimeInvoker = {
+      invoke: async () => ({
+        runId: "local-run-condition",
+        runtimeRunRef: "runtime-condition",
+        runtimeSessionKey: "main-session",
+        conversationEntryIds: ["conversation-entry-condition"],
+        response: {
+          provider: "hermes",
+          runId: "runtime-condition",
+          nativeRunId: "runtime-condition",
+          sessionId: "main-session",
+          status: "completed" as const,
+          outputText: "",
+          structuredPayload: {
+            branchRef: "B20260522-01-B",
+            summary: "Needs fixes selected",
+            outputs: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+          },
+          error: null,
+        },
+      }),
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+
+    const result = await runTaskNodeFeature({
+      taskId: task.id,
+      mainSession: {
+        id: "main-session",
+        taskId: task.id,
+        sessionKey: "chrona:task:task-condition-branch-ref:plan-1",
+      },
+      node: condition,
+      plan,
+      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+      featureSpec: {
+        feature: "evaluate_condition_node",
+        instructions: "Evaluate the current condition node.",
+        inputText: "{}",
+        terminalToolName: "chrona_condition_select",
+        structuredOutputSchema: undefined,
+      },
+      providerInput: {},
+    });
+
+    expect(result).toMatchObject({
+      status: "done",
+      summary: "Needs fixes selected",
+      selectedBranch: {
+        label: "Needs fixes",
+        nextNodeId: "fix_node",
+        source: "ai",
+      },
+      output: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+    });
+  });
+
+  it("keeps a completed provider run with chrona_node_block as blocked", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Node AI condition blocked workspace",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-condition-blocked",
+        workspaceId: workspace.id,
+        title: "Node AI condition blocked task",
+        status: TaskStatus.Running,
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "local-run-condition-blocked",
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date(),
+        syncStatus: "healthy",
+      },
+    });
+
+    const condition = makeConditionNode();
+    const passed = makeDownstreamNode({ id: "passed_node", localId: "passed_node", title: "Passed" });
+    const fixes = makeDownstreamNode({ id: "fix_node", localId: "fix_node", title: "Needs fixes" });
+    const plan = makeConditionPlan({ condition, passed, fixes });
+    const aiRuntimeInvoker = {
+      invoke: async () => ({
+        runId: "local-run-condition-blocked",
+        runtimeRunRef: "runtime-condition-blocked",
+        runtimeSessionKey: "main-session",
+        conversationEntryIds: ["conversation-entry-condition-blocked"],
+        response: {
+          provider: "hermes",
+          runId: "runtime-condition-blocked",
+          nativeRunId: "runtime-condition-blocked",
+          sessionId: "main-session",
+          status: "completed" as const,
+          outputText: "Need weather data source before selecting a branch.",
+          raw: { terminalToolName: "chrona_node_block" },
+          error: null,
+        },
+      }),
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+
+    const result = await runTaskNodeFeature({
+      taskId: task.id,
+      mainSession: {
+        id: "main-session",
+        taskId: task.id,
+        sessionKey: "chrona:task:task-condition-blocked:plan-1",
+      },
+      node: condition,
+      plan,
+      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+      featureSpec: {
+        feature: "evaluate_condition_node",
+        instructions: "Evaluate the current condition node.",
+        inputText: "{}",
+        terminalToolName: "chrona_condition_select",
+        structuredOutputSchema: undefined,
+      },
+      providerInput: {},
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      reason: "Need weather data source before selecting a branch.",
+      evidence: {
+        sessionId: "main-session",
+        runId: "local-run-condition-blocked",
+        runtimeName: "hermes",
+        runtimeRunRef: "runtime-condition-blocked",
+        conversationEntryIds: ["conversation-entry-condition-blocked"],
       },
     });
   });

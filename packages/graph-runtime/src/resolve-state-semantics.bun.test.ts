@@ -105,4 +105,54 @@ describe("resolveEffectivePlanGraph state semantics", () => {
     expect(effective.completedNodeIds).toContain("user");
     expect(effective.failedNodeIds).not.toContain("user");
   });
+
+  it("exposes condition branches when graph nodes use layered semantic metadata", () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: {
+        id: "compiled_condition_config",
+        editablePlanId: "graph_condition_config",
+        sourceVersion: 1,
+        nodes: [
+          {
+            id: "choose",
+            localId: "choose_source",
+            type: "condition",
+            title: "Choose source",
+            config: {
+              condition: "Pick a source",
+              evaluationBy: "user",
+              branches: [
+                { label: "Public API", nextNodeId: "public" },
+                { label: "Local mock", nextNodeId: "mock" },
+              ],
+              defaultNextNodeId: "public",
+            },
+            dependencies: [],
+            dependents: ["public", "mock"],
+          },
+          { id: "public", localId: "public", type: "task", title: "Public", config: {}, dependencies: ["choose"], dependents: [] },
+          { id: "mock", localId: "mock", type: "task", title: "Mock", config: {}, dependencies: ["choose"], dependents: [] },
+        ],
+        edges: [
+          { id: "choose_public", from: "choose", to: "public", label: "Public API" },
+          { id: "choose_mock", from: "choose", to: "mock", label: "Local mock" },
+        ],
+        entryNodeIds: ["choose"],
+      },
+      now,
+    });
+
+    const choose = resolveEffectivePlanGraph({ graph }).nodes.find((node) => node.id === "choose");
+
+    expect(choose?.config).toMatchObject({
+      condition: "Pick a source",
+      evaluationBy: "user",
+      branches: [
+        { label: "Public API", nextNodeId: "public" },
+        { label: "Local mock", nextNodeId: "mock" },
+      ],
+      defaultNextNodeId: "public",
+    });
+  });
 });

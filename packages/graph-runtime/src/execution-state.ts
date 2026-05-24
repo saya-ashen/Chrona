@@ -4,16 +4,23 @@ import type {
   NodeAttempt,
   NodeResult,
 } from "./types";
+import { explainNodeExecutionBlock } from "./execution/guards";
 
 export function pickNextNodeId(
   effective: EffectivePlanGraph,
   forcedNodeId?: string,
+  options: { allowWaitingInputResume?: boolean } = {},
 ): string | null {
   if (forcedNodeId) {
     const forced = effective.nodes.find((node) => node.id === forcedNodeId);
-    if (forced && forced.reachable) {
+    if (!forced) return null;
+    if (!explainNodeExecutionBlock({
+      node: forced,
+      allowWaitingInputResume: options.allowWaitingInputResume,
+    })) {
       return forcedNodeId;
     }
+    return null;
   }
   return effective.readyNodeIds.length > 0 ? effective.readyNodeIds[0] : null;
 }

@@ -8,11 +8,15 @@ import {
 } from "@chrona/contracts/ai";
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "./ai-runtime-invoker";
 import type { NodeExecutionResult } from "./node-executors/types";
-import type { ProviderRunEvent } from "@chrona/providers-foundation";
+import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
+import { branchBindingForRef } from "./node-runtime-refs";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
+>;
+type NodeExecutionSelectedBranch = NonNullable<
+  Extract<NodeExecutionResult, { status: "done" }>["selectedBranch"]
 >;
 
 export type NodeAiCapabilityInput = {
@@ -30,6 +34,121 @@ export type NodeAiCapabilityInput = {
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
   signal?: AbortSignal;
 };
+
+function recordValue(input: Record<string, unknown> | undefined, key: string): unknown {
+  return input && Object.prototype.hasOwnProperty.call(input, key) ? input[key] : undefined;
+}
+
+function structuredPayload(input: AiRuntimeInvocation): Record<string, unknown> | undefined {
+  const value = input.response.structuredPayload;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function outputFromStructuredPayload(input: {
+  structured: Record<string, unknown> | undefined;
+  fallback: unknown;
+}): unknown {
+  const outputs = recordValue(input.structured, "outputs");
+  return outputs === undefined ? input.fallback : outputs;
+}
+
+function terminalToolNameFromSnapshot(response: ProviderRunSnapshot): string | undefined {
+  const raw = asRecord(response.raw);
+  const toolName = recordValue(asRecord(recordValue(raw, "terminalTool")), "name")
+    ?? recordValue(asRecord(recordValue(raw, "terminal_tool")), "name")
+    ?? recordValue(raw, "terminalToolName")
+    ?? recordValue(raw, "terminal_tool_name")
+    ?? recordValue(response.structuredPayload && typeof response.structuredPayload === "object"
+      ? response.structuredPayload as Record<string, unknown>
+      : undefined, "terminalToolName");
+  return typeof toolName === "string" && toolName.trim() ? toolName : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function blockedReasonFromSnapshot(input: {
+  response: ProviderRunSnapshot;
+  structured: Record<string, unknown> | undefined;
+  summary?: string;
+}) {
+  const structuredReason = recordValue(input.structured, "reason");
+  if (typeof structuredReason === "string" && structuredReason.trim()) return structuredReason.trim();
+  const structuredMessage = recordValue(input.structured, "message");
+  if (typeof structuredMessage === "string" && structuredMessage.trim()) return structuredMessage.trim();
+  return input.summary || `Runtime run ${input.response.runId} blocked the node`;
+}
+
+function failedErrorFromSnapshot(input: {
+  response: ProviderRunSnapshot;
+  structured: Record<string, unknown> | undefined;
+  summary?: string;
+}) {
+  const structuredError = recordValue(input.structured, "error");
+  if (typeof structuredError === "string" && structuredError.trim()) return structuredError.trim();
+  const structuredMessage = recordValue(input.structured, "message");
+  if (typeof structuredMessage === "string" && structuredMessage.trim()) return structuredMessage.trim();
+  return input.summary || `Runtime run ${input.response.runId} failed the node`;
+}
+
+function terminalNodeResultFromSnapshot(input: {
+  invocation: AiRuntimeInvocation;
+  evidence: NodeExecutionEvidence;
+  structured: Record<string, unknown> | undefined;
+  summary?: string;
+}): NodeExecutionResult | undefined {
+  const terminalToolName = terminalToolNameFromSnapshot(input.invocation.response);
+  switch (terminalToolName) {
+    case "chrona_node_block":
+      return {
+        status: "blocked",
+        reason: blockedReasonFromSnapshot({
+          response: input.invocation.response,
+          structured: input.structured,
+          summary: input.summary,
+        }),
+        evidence: input.evidence,
+      };
+    case "chrona_node_fail":
+      return {
+        status: "failed",
+        error: failedErrorFromSnapshot({
+          response: input.invocation.response,
+          structured: input.structured,
+          summary: input.summary,
+        }),
+        evidence: input.evidence,
+      };
+    default:
+      return undefined;
+  }
+}
+
+function selectedBranchFromStructuredPayload(input: {
+  invocation: AiRuntimeInvocation;
+  node: EffectivePlanNode;
+  plan: EffectivePlanGraph;
+}): NodeExecutionSelectedBranch | undefined {
+  const structured = structuredPayload(input.invocation);
+  const branchRef = recordValue(structured, "branchRef");
+  if (typeof branchRef !== "string" || !branchRef.trim()) return undefined;
+
+  const binding = branchBindingForRef({
+    plan: input.plan,
+    node: input.node,
+    branchRef,
+  });
+  return {
+    label: binding.label,
+    nextNodeId: binding.nextNodeId!,
+    source: "ai",
+  };
+}
 
 function buildFailureDetails(input: {
   node: EffectivePlanNode;
@@ -104,6 +223,7 @@ export async function runTaskNodeFeature(
       };
     }
 
+    const structured = structuredPayload(invocation);
     const output = {
       runtimeRunRef: invocation.runtimeRunRef,
       runtimeName: input.runtimeName,
@@ -111,15 +231,28 @@ export async function runTaskNodeFeature(
       outputText: invocation.response.outputText,
       structuredPayload: invocation.response.structuredPayload,
     };
-    const summary = invocation.response.outputText?.trim();
-    const nodeResult: NodeExecutionResult = invocation.response.status === "completed"
+    const structuredSummary = recordValue(structured, "summary");
+    const summary = invocation.response.outputText?.trim() ||
+      (typeof structuredSummary === "string" ? structuredSummary.trim() : undefined);
+    const terminalNodeResult = invocation.response.status === "completed"
+      ? terminalNodeResultFromSnapshot({ invocation, evidence, structured, summary })
+      : undefined;
+    const selectedBranch = input.node.type === "condition"
+      ? selectedBranchFromStructuredPayload({
+          invocation,
+          node: input.node,
+          plan: input.plan,
+        })
+      : undefined;
+    const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed"
       ? {
           status: "done",
           summary:
             summary ||
             `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} completed`,
           evidence,
-          output,
+          output: outputFromStructuredPayload({ structured, fallback: output }),
+          selectedBranch,
         }
       : {
           status: "started",
@@ -128,7 +261,7 @@ export async function runTaskNodeFeature(
             `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} started`,
           evidence,
           output,
-        };
+        });
     await updateInvocationRunFromNodeResult(invocation, nodeResult);
     return nodeResult;
   } catch (error) {
