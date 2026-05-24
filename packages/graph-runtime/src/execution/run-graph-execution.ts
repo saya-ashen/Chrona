@@ -80,6 +80,22 @@ export async function runGraphExecution<TContext = unknown>(
       if (!node || !node.activeLayerId) {
         throw new Error(`Effective node ${nextNodeId} is missing active layer`);
       }
+      const existingRunningAttempt = state.attempts.find(
+        (attempt) =>
+          attempt.nodeId === nextNodeId &&
+          attempt.nodeLayerId === node.activeLayerId &&
+          attempt.status === "running",
+      );
+      if (existingRunningAttempt) {
+        return {
+          status: "running",
+          currentNodeId: nextNodeId,
+          executedNodeIds,
+          effective,
+          state,
+          message: `Node ${nextNodeId} is already running`,
+        };
+      }
       const nodeUserInput = forcedNodeId === nextNodeId ? userInput : undefined;
       const nodeInputFields = forcedNodeId === nextNodeId ? input.inputFields : undefined;
       forcedNodeId = undefined;
@@ -136,6 +152,7 @@ export async function runGraphExecution<TContext = unknown>(
       const result = await input.callbacks.executeNode({
         node,
         plan: effective,
+        attempt,
         trigger: input.trigger,
         runtimeName: input.runtimeName,
         userInput: nodeUserInput,

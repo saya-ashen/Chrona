@@ -116,4 +116,101 @@ describe("runGraphAdvancementWorker", () => {
     expect(result.advanced).toEqual([]);
     expect(startExecution).not.toHaveBeenCalled();
   });
+
+  it("does not auto-advance stopped tasks", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Stopped Advance Worker", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Stopped task",
+        status: "Running",
+        priority: "High",
+        executionRuntime: "hermes",
+        executionConfig: { prompt: "Run" },
+      },
+    });
+    await db.executionSession.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_stopped",
+        status: "Abandoned",
+        currentNodeId: null,
+        pauseReason: "cancelled",
+        completedNodeIds: "[]",
+      },
+    });
+    const startExecution = mock(async () => ({
+      taskId: task.id,
+      planId: "plan_stopped",
+      mainSessionId: "session_1",
+      status: "running" as const,
+      currentNodeId: "node_stopped",
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      checkpoint: null,
+      message: "Running",
+    }));
+
+    const result = await runGraphAdvancementWorker({ deps: { startExecution } });
+
+    expect(result.advanced).toEqual([]);
+    expect(startExecution).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-advance a task with an active execution owner", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Owned Advance Worker", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Owned task",
+        status: "Running",
+        priority: "High",
+        executionRuntime: "hermes",
+        executionConfig: { prompt: "Run" },
+      },
+    });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_owned",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_owned",
+        planRun: {},
+        executionOwnerId: "owner_active",
+        executionOwnerScope: "manual",
+      },
+    });
+    const startExecution = mock(async () => ({
+      taskId: task.id,
+      planId: "plan_owned",
+      mainSessionId: "session_1",
+      status: "running" as const,
+      currentNodeId: "node_owned",
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      checkpoint: null,
+      message: "Running",
+    }));
+
+    const result = await runGraphAdvancementWorker({ deps: { startExecution } });
+
+    expect(result.advanced).toEqual([]);
+    expect(startExecution).not.toHaveBeenCalled();
+  });
 });

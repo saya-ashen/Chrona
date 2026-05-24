@@ -12,10 +12,36 @@ import { toGraphExecutionState } from "../../runtime/graph-state";
 import { createExecutionGraphCallbacks } from "../../runtime/graph-runtime-callbacks";
 import { committedStateIfRunningNodeAdvanced } from "../../runtime/committed-state";
 import { handleAdvanceOutcome } from "../advance-outcome";
-import { runningAttemptForRuntimeRun } from "./attempts";
+import { attemptForRuntimeRun, runningAttemptForRuntimeRun } from "./attempts";
 import { externalResultForRuntimeRun } from "./external-result";
+import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { db } from "@/lib/db";
 
 const DEFAULT_MAX_STEPS = 10;
+
+async function recordIgnoredRuntimeSync(input: {
+  taskId: string;
+  workspaceId: string;
+  planId: string;
+  runtimeRunRef: string;
+  reason: string;
+}) {
+  await appendCanonicalEvent({
+    eventType: "execution.runtime_sync_ignored",
+    workspaceId: input.workspaceId,
+    taskId: input.taskId,
+    actorType: "runtime",
+    actorId: "runtime-sync",
+    source: "execution-kernel",
+    payload: {
+      planId: input.planId,
+      runtimeRunRef: input.runtimeRunRef,
+      reason: input.reason,
+    },
+    dedupeKey: `execution.runtime_sync_ignored:${input.taskId}:${input.planId}:${input.runtimeRunRef}:${input.reason}`,
+    runtimeTs: new Date(),
+  });
+}
 
 export async function syncPlanRunRuntimeResult(
   input: SyncPlanRunRuntimeResultInput,
@@ -28,7 +54,41 @@ export async function syncPlanRunRuntimeResult(
     attempts: state.attempts as unknown as NodeAttempt[],
     runtimeRunRef: input.runtimeRunRef,
   });
-  if (!attempt) return;
+  if (!attempt) {
+    const staleAttempt = attemptForRuntimeRun({
+      attempts: state.attempts as unknown as NodeAttempt[],
+      runtimeRunRef: input.runtimeRunRef,
+    });
+    if (staleAttempt) {
+      await recordIgnoredRuntimeSync({
+        taskId: input.taskId,
+        workspaceId: runtime.workspaceId,
+        planId: runtime.planId,
+        runtimeRunRef: input.runtimeRunRef,
+        reason: `stale_attempt_${staleAttempt.status}`,
+      });
+    }
+    return;
+  }
+
+  const activeSession = await db.executionSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      planId: runtime.planId,
+      status: "Active",
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+  if (!activeSession) {
+    await recordIgnoredRuntimeSync({
+      taskId: input.taskId,
+      workspaceId: runtime.workspaceId,
+      planId: runtime.planId,
+      runtimeRunRef: input.runtimeRunRef,
+      reason: "no_active_execution_session",
+    });
+    return;
+  }
 
   const runtimeName = await getRuntimeName(input.taskId);
   const mainSession = await ensurePlanMainSession({
@@ -41,6 +101,7 @@ export async function syncPlanRunRuntimeResult(
     taskId: input.taskId,
     planId: runtime.planId,
     trigger: "system",
+    sessionId: activeSession.id,
   });
   const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
     taskId: input.taskId,

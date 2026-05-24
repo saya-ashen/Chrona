@@ -10,11 +10,14 @@ import type {
   EffectivePlanGraph,
   ExecutionContextSnapshot,
   NodeAttempt,
+  NodeExecutionAttempt,
   NodeResult,
+  NodeRuntimeState,
   PlanExecutionStatus,
   PlanGraph,
   PlanRun,
 } from "@chrona/contracts/ai";
+import { toEffectivePlanGraph } from "../projection/execution-graph-selectors";
 
 export type PersistedPlanRun = NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
 
@@ -40,6 +43,68 @@ export function createPlanRunFromCompiledPlan(compiled: CompiledPlan): PlanRun {
     artifactRefs: [],
     attempts: [],
     createdAt,
+  };
+}
+
+function toLegacyNodeExecutionAttempt(attempt: NodeAttempt): NodeExecutionAttempt {
+  return {
+    id: attempt.id,
+    planRunId: attempt.graphId,
+    nodeId: attempt.nodeId,
+    nodeLayerId: attempt.nodeLayerId,
+    executionContextSnapshotId: attempt.executionContextSnapshotId,
+    idempotencyKey: attempt.idempotencyKey,
+    attemptNumber: attempt.attemptNumber,
+    status: attempt.status,
+    error: attempt.error,
+    startedAt: attempt.startedAt,
+    finishedAt: attempt.finishedAt,
+  };
+}
+
+function derivePlanRunFromRuntime(input: {
+  existingRun?: PlanRun;
+  compiledPlan: CompiledPlan;
+  graph: PlanGraph;
+  attempts: NodeAttempt[];
+  results: NodeResult[];
+  status?: PlanExecutionStatus;
+}): PlanRun {
+  const effective = toEffectivePlanGraph({
+    graph: input.graph,
+    attempts: input.attempts,
+    results: input.results,
+  });
+  const existingRun = input.existingRun ?? createPlanRunFromCompiledPlan(input.compiledPlan);
+  const now = new Date().toISOString();
+  const nodeStates = Object.fromEntries(
+    effective.nodes.map((node) => [
+      node.id,
+      {
+        nodeId: node.id,
+        status: node.status,
+        attempts: node.attempts,
+        ...(node.lastError ? { lastError: node.lastError } : {}),
+        ...(node.startedAt ? { startedAt: node.startedAt } : {}),
+        ...(node.completedAt ? { completedAt: node.completedAt } : {}),
+      } satisfies NodeRuntimeState,
+    ]),
+  );
+
+  return {
+    ...existingRun,
+    status: input.status
+      ? planRunStatusForExecutionStatus(input.status)
+      : existingRun.status,
+    nodeStates,
+    attempts: input.attempts.map(toLegacyNodeExecutionAttempt),
+    startedAt:
+      existingRun.startedAt ??
+      (input.attempts.length > 0 || effective.runningNodeIds.length > 0 ? now : undefined),
+    completedAt:
+      input.status === "completed"
+        ? (existingRun.completedAt ?? now)
+        : existingRun.completedAt,
   };
 }
 
@@ -99,7 +164,7 @@ export async function persistRuntimeState(input: {
     workspaceId: input.workspaceId,
     taskId: input.taskId,
     planId: input.planId,
-    run: input.existingRun ?? createPlanRunFromCompiledPlan(input.compiledPlan),
+    run: derivePlanRunFromRuntime(input),
     compiledPlan: input.compiledPlan,
     graph: input.graph,
     attempts: input.attempts,
@@ -117,12 +182,11 @@ export async function persistTerminalRuntimeState(input: {
   effective: EffectivePlanGraph;
   status: PlanExecutionStatus;
 }) {
-  const now = new Date().toISOString();
   const graph = input.persisted.graph
     ? {
         ...input.persisted.graph,
         status: graphStatusForExecutionStatus(input.status),
-        updatedAt: now,
+        updatedAt: new Date().toISOString(),
       }
     : null;
   if (!graph) return;
@@ -131,31 +195,14 @@ export async function persistTerminalRuntimeState(input: {
     workspaceId: input.workspaceId,
     taskId: input.taskId,
     planId: input.planId,
-    run: {
-      ...input.persisted.planRun,
-      status: planRunStatusForExecutionStatus(input.status),
-      nodeStates: Object.fromEntries(
-        input.effective.nodes.map((node) => {
-          const existing = input.persisted.planRun.nodeStates[node.id];
-          const attempts = input.persisted.attempts.filter(
-            (attempt) => attempt.nodeId === node.id,
-          );
-          return [
-            node.id,
-            {
-              ...existing,
-              nodeId: node.id,
-              status: node.status,
-              attempts: attempts.length,
-              ...(node.status === "completed" ? { completedAt: now } : {}),
-              ...(node.status === "running" ? { startedAt: now } : {}),
-            },
-          ];
-        }),
-      ),
-      startedAt: input.persisted.planRun.startedAt ?? now,
-      completedAt: input.status === "completed" ? now : input.persisted.planRun.completedAt,
-    },
+    run: derivePlanRunFromRuntime({
+      existingRun: input.persisted.planRun,
+      compiledPlan: input.compiledPlan,
+      graph,
+      attempts: input.persisted.attempts,
+      results: input.persisted.results,
+      status: input.status,
+    }),
     compiledPlan: input.compiledPlan,
     graph,
     attempts: input.persisted.attempts,

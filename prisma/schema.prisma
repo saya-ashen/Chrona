@@ -140,6 +140,8 @@ model Workspace {
   executionSessions ExecutionSession[]
   taskPlans         TaskPlan[]
   taskPlanRuns      TaskPlanRun[]
+  taskPlanNodeAttempts TaskPlanNodeAttempt[]
+  taskPlanProviderRuns TaskPlanProviderRun[]
   taskPlanLayers    TaskPlanLayer[]
   graphVersions     GraphVersion[]
   graphMutations    GraphMutationRecord[]
@@ -181,6 +183,8 @@ model Task {
   executionSessions   ExecutionSession[]
   taskPlans           TaskPlan[]
   taskPlanRuns        TaskPlanRun[]
+  taskPlanNodeAttempts TaskPlanNodeAttempt[]
+  taskPlanProviderRuns TaskPlanProviderRun[]
   taskPlanLayers      TaskPlanLayer[]
   graphVersions       GraphVersion[]
   graphMutations      GraphMutationRecord[]
@@ -340,19 +344,78 @@ model TaskPlan {
 }
 
 model TaskPlanRun {
-  id          String    @id @default(cuid())
-  workspaceId String
-  taskId      String
-  planId      String
-  planRun     Json
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  plan        TaskPlan  @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  id                  String                    @id @default(cuid())
+  workspaceId         String
+  taskId              String
+  planId              String
+  planRun             Json
+  executionOwnerId    String?
+  executionOwnerScope String?
+  executionLeaseUntil DateTime?
+  executionEpoch      Int                       @default(0)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  workspace           Workspace                 @relation(fields: [workspaceId], references: [id])
+  task                Task                      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  plan                TaskPlan                  @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  nodeAttempts        TaskPlanNodeAttempt[]
+  providerRuns        TaskPlanProviderRun[]
 
   @@unique([taskId, planId])
+  @@index([taskId, planId, executionOwnerId])
+  @@index([executionLeaseUntil])
   @@index([workspaceId, taskId, updatedAt])
+}
+
+model TaskPlanNodeAttempt {
+  id                         String                    @id @default(cuid())
+  workspaceId                String
+  taskId                     String
+  planId                     String
+  planRunId                  String
+  nodeId                     String
+  nodeLayerId                String
+  executionContextSnapshotId String?
+  idempotencyKey             String                    @unique
+  attemptNumber              Int
+  status                     String
+  executionEpoch             Int
+  startedAt                  DateTime                  @default(now())
+  finishedAt                 DateTime?
+  error                      Json?
+  runtimeSnapshot            Json?
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+  workspace                  Workspace                 @relation(fields: [workspaceId], references: [id])
+  task                       Task                      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  planRun                    TaskPlanRun               @relation(fields: [planRunId], references: [id], onDelete: Cascade)
+  providerRuns               TaskPlanProviderRun[]
+
+  @@index([taskId, planId, nodeId, status])
+  @@index([planRunId, nodeId, attemptNumber])
+}
+
+model TaskPlanProviderRun {
+  id             String              @id @default(cuid())
+  workspaceId    String
+  taskId         String
+  planId         String
+  planRunId      String
+  nodeAttemptId  String
+  idempotencyKey String              @unique
+  providerRunRef String?
+  status         String
+  startedAt      DateTime            @default(now())
+  finishedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id])
+  task           Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  planRun        TaskPlanRun         @relation(fields: [planRunId], references: [id], onDelete: Cascade)
+  nodeAttempt    TaskPlanNodeAttempt @relation(fields: [nodeAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, planId, status])
+  @@index([nodeAttemptId, status])
 }
 
 model TaskPlanLayer {

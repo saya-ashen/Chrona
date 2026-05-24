@@ -191,7 +191,7 @@ describe("graph-runtime dispatch", () => {
     expect(second.state.results).toHaveLength(1);
   });
 
-  it("cancels a session by cancelling running attempts and obsoleting current results", async () => {
+  it("cancels a session by cancelling running attempts and obsoleting active results", async () => {
     const graph = createPlanGraphFromCompiledPlan({
       taskId: "task_1",
       compiledPlan: makeBranchingPlan(),
@@ -218,8 +218,24 @@ describe("graph-runtime dispatch", () => {
           attemptNumber: 1,
           startedAt: "2026-01-01T00:00:00.000Z",
         },
+        {
+          id: "attempt_2",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "done",
+          nodeLayerId: graph.nodes[1]?.layers[0]?.id ?? "layer_2",
+          executionContextSnapshotId: "ctx_2",
+          status: "succeeded",
+          idempotencyKey: "key_2",
+          attemptNumber: 1,
+          startedAt: "2026-01-01T00:00:00.000Z",
+          finishedAt: "2026-01-01T00:00:01.000Z",
+        },
       ],
-      results: [{ nodeId: "choose", status: "current", waitKind: "manual_action" }],
+      results: [
+        { nodeId: "choose", status: "current", waitKind: "manual_action" },
+        { nodeId: "done", status: "current", outputSummary: "completed" },
+      ],
       executionContextSnapshots: [],
     };
 
@@ -233,7 +249,9 @@ describe("graph-runtime dispatch", () => {
     expect(outcome.status).toBe("cancelled");
     expect(outcome.state.graph.status).toBe("cancelled");
     expect(outcome.state.attempts[0]?.status).toBe("cancelled");
+    expect(outcome.state.attempts[1]?.status).toBe("succeeded");
     expect(outcome.state.results[0]?.status).toBe("obsolete");
+    expect(outcome.state.results[1]?.status).toBe("current");
   });
 
   it("blocks runtime commands when graph validation fails", async () => {

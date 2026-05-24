@@ -19,3 +19,12 @@ export function runningAttemptForRuntimeRun(input: {
       runtimeRunRefFromAttempt(attempt) === input.runtimeRunRef,
   );
 }
+
+export function attemptForRuntimeRun(input: {
+  attempts: NodeAttempt[];
+  runtimeRunRef: string;
+}) {
+  return input.attempts.find(
+    (attempt) => runtimeRunRefFromAttempt(attempt) === input.runtimeRunRef,
+  );
+}

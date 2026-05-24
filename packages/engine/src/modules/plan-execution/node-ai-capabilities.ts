@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import {
   type EffectivePlanGraph,
   type EffectivePlanNode,
+  type NodeAttempt,
   type PreparedAiFeatureSpec,
 } from "@chrona/contracts/ai";
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "./ai-runtime-invoker";
@@ -23,6 +24,7 @@ export type NodeAiCapabilityInput = {
   };
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
+  attempt: NodeAttempt;
   runtimeName: string;
   aiRuntimeInvoker: AiRuntimeInvoker;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
@@ -66,6 +68,9 @@ export async function runTaskNodeFeature(
         nodeId: input.node.id,
         nodeTitle: input.node.title,
       },
+      nodeAttemptId: input.attempt.id,
+      nodeAttempt: input.attempt,
+      providerRunIdempotencyKey: `provider-run:${input.attempt.idempotencyKey}`,
       runtimeInput: input.providerInput,
       instructions: input.featureSpec.instructions,
       featureSpec: input.featureSpec,

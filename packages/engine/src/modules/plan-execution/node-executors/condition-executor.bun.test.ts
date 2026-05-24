@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
+import type { EffectivePlanGraph, EffectivePlanNode, NodeAttempt } from "@chrona/contracts/ai";
 import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 import { ConditionNodeExecutor } from "./condition-executor";
 
@@ -73,6 +73,21 @@ function makePlan(nodes: EffectivePlanNode[]): EffectivePlanGraph {
   };
 }
 
+function makeAttempt(nodeId: string): NodeAttempt {
+  return {
+    id: `attempt-${nodeId}`,
+    taskId: "task-1",
+    graphId: "graph-1",
+    nodeId,
+    nodeLayerId: nodeId,
+    executionContextSnapshotId: `snapshot-${nodeId}`,
+    status: "running",
+    idempotencyKey: `graph-1:${nodeId}:1`,
+    attemptNumber: 1,
+    startedAt: "2026-04-20T09:00:00.000Z",
+  };
+}
+
 describe("ConditionNodeExecutor", () => {
   it("waits for explicit user branch selection", async () => {
     const executor = new ConditionNodeExecutor(aiRuntimeInvoker);
@@ -88,6 +103,7 @@ describe("ConditionNodeExecutor", () => {
       mainSession: { id: "session-1", taskId: "task-1", sessionKey: "session-key" },
       node: condition,
       plan,
+      attempt: makeAttempt(condition.id),
       trigger: "manual",
       runtimeName: "hermes",
     });
@@ -152,6 +168,7 @@ describe("ConditionNodeExecutor", () => {
       mainSession: { id: "session-1", taskId: "task-1", sessionKey: "session-key" },
       node: condition,
       plan: makePlan([condition, yesNode, noNode]),
+      attempt: makeAttempt(condition.id),
       trigger: "manual",
       runtimeName: "hermes",
       userInput: "是",

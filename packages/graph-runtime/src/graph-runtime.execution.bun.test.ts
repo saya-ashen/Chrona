@@ -4,9 +4,14 @@ import {
   createPlanGraphFromCompiledPlan,
   executeBuiltinGraphNode,
   runGraphExecution,
+  resolveEffectivePlanGraph,
 } from "./index";
 import type { GraphExecutionState } from "./index";
-import { makeBranchingPlan, makeParallelPlan } from "./graph-runtime.test-fixtures";
+import {
+  activeDefinitionLayerId,
+  makeBranchingPlan,
+  makeParallelPlan,
+} from "./graph-runtime.test-fixtures";
 
 describe("graph-runtime execution", () => {
   it("builds, pauses, resumes, and advances a dynamic graph without engine dependencies", async () => {
@@ -136,7 +141,20 @@ describe("graph-runtime execution", () => {
     let tick = 50;
     const state: GraphExecutionState = {
       graph,
-      attempts: [],
+      attempts: [
+        {
+          id: "external_attempt_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: graph.nodes[0]?.layers[0]?.id ?? "choose_layer",
+          executionContextSnapshotId: "ctx_external_1",
+          idempotencyKey: "external_1",
+          attemptNumber: 1,
+          status: "running",
+          startedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
       results: [
         {
           id: "result_pending_external",
@@ -177,7 +195,7 @@ describe("graph-runtime execution", () => {
     expect(second.status).toBe("waiting_for_user");
     expect(second.currentNodeId).toBe("done");
     expect(second.state.results.map((result) => [result.nodeId, result.status])).toEqual([
-      ["choose", "obsolete"],
+      ["choose", "stale"],
       ["choose", "current"],
       ["done", "current"],
     ]);
@@ -203,7 +221,20 @@ describe("graph-runtime execution", () => {
     let tick = 80;
     const state: GraphExecutionState = {
       graph,
-      attempts: [],
+      attempts: [
+        {
+          id: "external_attempt_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: graph.nodes[0]?.layers[0]?.id ?? "choose_layer",
+          executionContextSnapshotId: "ctx_external_1",
+          idempotencyKey: "external_1",
+          attemptNumber: 1,
+          status: "running",
+          startedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
       results: [
         {
           id: "result_pending_external",
@@ -242,13 +273,107 @@ describe("graph-runtime execution", () => {
 
     expect(result.status).toBe("running");
     expect(result.state.results.map((entry) => [entry.nodeId, entry.status])).toEqual([
-      ["choose", "obsolete"],
+      ["choose", "stale"],
       ["choose", "current"],
     ]);
     expect(result.events.map((event) => event.type)).toEqual([
       "command_received",
       "external_result_synced",
     ]);
+  });
+
+  it("does not count failed Chrona submissions as node results", () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeParallelPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const nodeLayerId = activeDefinitionLayerId(graph, "left");
+
+    const effective = resolveEffectivePlanGraph({
+      graph,
+      attempts: [
+        {
+          id: "attempt_left_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "left",
+          nodeLayerId,
+          executionContextSnapshotId: "ctx_left_1",
+          idempotencyKey: "left_1",
+          attemptNumber: 1,
+          status: "succeeded",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          finishedAt: "2026-01-01T00:00:01.000Z",
+        },
+      ],
+      results: [
+        {
+          id: "result_left_failed_submission",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "left",
+          nodeLayerId,
+          attemptId: "attempt_left_1",
+          status: "current",
+          outputSummary: "Provider returned final output but terminal tool submission failed",
+          outputs: [
+            {
+              kind: "text",
+              content: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+            },
+          ],
+        },
+      ],
+    });
+
+    const leftNode = effective.nodes.find((node) => node.id === "left");
+    expect(leftNode?.status).toBe("completed");
+    expect(leftNode?.result).toBeUndefined();
+  });
+
+  it("surfaces rejected results even when an attempt is still marked running", () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeParallelPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const nodeLayerId = activeDefinitionLayerId(graph, "left");
+
+    const effective = resolveEffectivePlanGraph({
+      graph,
+      attempts: [
+        {
+          id: "attempt_left_1",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "left",
+          nodeLayerId,
+          executionContextSnapshotId: "ctx_left_1",
+          idempotencyKey: "left_1",
+          attemptNumber: 1,
+          status: "running",
+          startedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      results: [
+        {
+          id: "result_left_failed",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "left",
+          nodeLayerId,
+          attemptId: "attempt_left_1",
+          status: "rejected",
+          error: "Hermes run.completed event missing session_id",
+        },
+      ],
+    });
+
+    const leftNode = effective.nodes.find((node) => node.id === "left");
+    expect(leftNode?.status).toBe("failed");
+    expect(leftNode?.lastError).toBe("Hermes run.completed event missing session_id");
+    expect(leftNode?.result?.status).toBe("rejected");
   });
 
   it("executes multiple ready nodes when maxConcurrency allows it", async () => {
@@ -281,5 +406,46 @@ describe("graph-runtime execution", () => {
       ["left", "current"],
       ["right", "current"],
     ]);
+  });
+
+  it("does not expose another ready branch while one branch attempt is running", async () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeParallelPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    let tick = 700;
+    const runtime = createGraphRuntime({
+      taskId: "task_1",
+      runtimeName: "test",
+      now: () => tick++,
+      executors: {
+        task: async ({ node }) => ({
+          status: "started",
+          summary: `${node.id} started`,
+          evidence: {},
+          output: { runtimeRunRef: `runtime-${node.id}` },
+        }),
+      },
+    });
+
+    const first = await runtime.dispatch({
+      type: "start",
+      state: { graph, attempts: [], results: [], executionContextSnapshots: [] },
+      trigger: "manual",
+      context: null,
+    });
+    const second = await runtime.dispatch({
+      type: "start",
+      state: first.state,
+      trigger: "manual",
+      context: null,
+    });
+
+    expect(first.status).toBe("running");
+    expect(second.status).toBe("running");
+    expect(second.state.attempts).toHaveLength(1);
+    expect(second.effective.readyNodeIds).toEqual([]);
+    expect(second.effective.runningNodeIds).toHaveLength(1);
   });
 });

@@ -2,6 +2,7 @@ import type {
   EffectivePlanNode,
   EffectivePlanGraph,
   NodeActionForm,
+  NodeAttempt,
   PlanPatch,
 } from "@chrona/contracts/ai";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
@@ -77,6 +78,7 @@ export interface NodeExecutorInput {
   };
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
+  attempt: NodeAttempt;
   trigger: "manual" | "scheduler" | "system" | "auto";
   runtimeName: string;
   userInput?: string;

@@ -68,6 +68,11 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     nodeId: nodeIdSchema.optional(),
     summary: z.string().optional(),
     output: z.unknown().optional(),
+    terminalKind: z.enum(["task", "condition", "checkpoint", "wait"]).optional(),
+    branchRef: z.string().min(1).optional(),
+    decision: z.enum(["approved", "rejected", "needs_input", "completed"]).optional(),
+    feedback: z.string().optional(),
+    prompt: z.string().optional(),
     selectedBranch: z.object({
       label: z.string().min(1),
       nextNodeId: z.string().min(1),

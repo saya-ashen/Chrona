@@ -310,6 +310,35 @@ describe("MCP routes", () => {
     expect(JSON.stringify(body.result.structuredContent)).not.toContain("idempotencyKey");
   });
 
+  it("fails fast when mutating Chrona tools are called without sessionId", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona_task_complete",
+        arguments: { summary: "Done" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(JSON.stringify(body)).toContain("chrona.node.task_complete requires sessionId for idempotency");
+  });
+
+  it("fails fast when Chrona tool context uses unsupported session_id", async () => {
+    const response = await postRpc(
+      rpc("tools/call", {
+        name: "chrona_task_complete",
+        arguments: {
+          summary: "Done",
+          _meta: { session_id: "chrona:task:task-1:execute" },
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(JSON.stringify(body)).toContain("arguments._meta.session_id is not supported; expected sessionId");
+  });
+
   it("accepts hidden context injected into plan generation arguments", async () => {
     const blueprint = {
       title: "Generated MCP plan",

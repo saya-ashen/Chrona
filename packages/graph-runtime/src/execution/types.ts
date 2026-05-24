@@ -150,6 +150,7 @@ export type GraphExecutionEvent =
 export type GraphNodeExecutorInput<TContext = unknown> = {
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
+  attempt: NodeAttempt;
   trigger: GraphExecutionTrigger;
   runtimeName: string;
   userInput?: string;

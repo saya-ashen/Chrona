@@ -195,6 +195,66 @@ export function makeTwoEntryTaskPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
+export function makeIndependentBranchesAfterManualPlan(editablePlanId: string): CompiledPlan {
+  return {
+    id: `compiled_${editablePlanId}`,
+    editablePlanId,
+    sourceVersion: 1,
+    title: `Independent branch plan ${editablePlanId}`,
+    goal: "Complete a manual gate, then run two independent provider-backed branches serially",
+    assumptions: [],
+    nodes: [
+      {
+        id: "manual_gate",
+        localId: "manual_gate",
+        type: "condition",
+        title: "Manual branch gate",
+        description: "Agent-submitted branch result unlocks independent branches",
+        config: {
+          condition: "Continue to independent branches",
+          evaluationBy: "user",
+          branches: [{ label: "continue", nextNodeId: "left_task" }],
+        } satisfies ConditionConfig,
+        dependencies: [],
+        dependents: ["left_task", "right_task"],
+      },
+      {
+        id: "left_task",
+        localId: "left_task",
+        type: "task",
+        title: "Left provider branch",
+        description: "First independent provider-backed task",
+        config: { expectedOutput: "Left branch output" } satisfies TaskConfig,
+        dependencies: ["manual_gate"],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+      {
+        id: "right_task",
+        localId: "right_task",
+        type: "task",
+        title: "Right provider branch",
+        description: "Second independent provider-backed task",
+        config: { expectedOutput: "Right branch output" } satisfies TaskConfig,
+        dependencies: ["manual_gate"],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+    ],
+    edges: [
+      { id: "edge_gate_to_left", from: "manual_gate", to: "left_task" },
+      { id: "edge_gate_to_right", from: "manual_gate", to: "right_task" },
+    ],
+    entryNodeIds: ["manual_gate"],
+    terminalNodeIds: ["left_task", "right_task"],
+    topologicalOrder: ["manual_gate", "left_task", "right_task"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
 export function makeManualThenTaskPlan(editablePlanId: string): CompiledPlan {
   return {
     id: `compiled_${editablePlanId}`,

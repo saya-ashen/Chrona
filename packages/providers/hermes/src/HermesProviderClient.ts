@@ -272,6 +272,7 @@ export class HermesProviderClient implements AgentProviderClient {
       const event = mapHermesEvent(rawEvent, runId, {
         includeRaw,
         strictUnknown,
+        sessionId: "sessionId" in input ? input.sessionId : undefined,
         sequence: sequence++,
       });
 

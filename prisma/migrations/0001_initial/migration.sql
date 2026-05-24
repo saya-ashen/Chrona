@@ -146,11 +146,59 @@ CREATE TABLE "TaskPlanRun" (
     "taskId" TEXT NOT NULL,
     "planId" TEXT NOT NULL,
     "planRun" TEXT NOT NULL,
+    "executionOwnerId" TEXT,
+    "executionOwnerScope" TEXT,
+    "executionLeaseUntil" DATETIME,
+    "executionEpoch" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "TaskPlanRun_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "TaskPlanRun_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "TaskPlanRun_planId_fkey" FOREIGN KEY ("planId") REFERENCES "TaskPlan" ("planId") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE "TaskPlanNodeAttempt" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "taskId" TEXT NOT NULL,
+    "planId" TEXT NOT NULL,
+    "planRunId" TEXT NOT NULL,
+    "nodeId" TEXT NOT NULL,
+    "nodeLayerId" TEXT NOT NULL,
+    "executionContextSnapshotId" TEXT,
+    "idempotencyKey" TEXT NOT NULL,
+    "attemptNumber" INTEGER NOT NULL,
+    "status" TEXT NOT NULL,
+    "executionEpoch" INTEGER NOT NULL,
+    "startedAt" DATETIME NOT NULL,
+    "finishedAt" DATETIME,
+    "error" TEXT,
+    "runtimeSnapshot" TEXT,
+    "createdAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "TaskPlanNodeAttempt_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanNodeAttempt_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanNodeAttempt_planRunId_fkey" FOREIGN KEY ("planRunId") REFERENCES "TaskPlanRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE "TaskPlanProviderRun" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "taskId" TEXT NOT NULL,
+    "planId" TEXT NOT NULL,
+    "planRunId" TEXT NOT NULL,
+    "nodeAttemptId" TEXT NOT NULL,
+    "idempotencyKey" TEXT NOT NULL,
+    "providerRunRef" TEXT,
+    "status" TEXT NOT NULL,
+    "startedAt" DATETIME NOT NULL,
+    "finishedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "TaskPlanProviderRun_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanProviderRun_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanProviderRun_planRunId_fkey" FOREIGN KEY ("planRunId") REFERENCES "TaskPlanRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanProviderRun_nodeAttemptId_fkey" FOREIGN KEY ("nodeAttemptId") REFERENCES "TaskPlanNodeAttempt" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE "TaskPlanLayer" (
@@ -442,7 +490,15 @@ CREATE UNIQUE INDEX "TaskPlan_planId_key" ON "TaskPlan"("planId");
 CREATE INDEX "TaskPlan_workspaceId_taskId_updatedAt_idx" ON "TaskPlan"("workspaceId", "taskId", "updatedAt");
 CREATE INDEX "TaskPlan_taskId_status_updatedAt_idx" ON "TaskPlan"("taskId", "status", "updatedAt");
 CREATE UNIQUE INDEX "TaskPlanRun_taskId_planId_key" ON "TaskPlanRun"("taskId", "planId");
+CREATE INDEX "TaskPlanRun_taskId_planId_executionOwnerId_idx" ON "TaskPlanRun"("taskId", "planId", "executionOwnerId");
+CREATE INDEX "TaskPlanRun_executionLeaseUntil_idx" ON "TaskPlanRun"("executionLeaseUntil");
 CREATE INDEX "TaskPlanRun_workspaceId_taskId_updatedAt_idx" ON "TaskPlanRun"("workspaceId", "taskId", "updatedAt");
+CREATE UNIQUE INDEX "TaskPlanNodeAttempt_idempotencyKey_key" ON "TaskPlanNodeAttempt"("idempotencyKey");
+CREATE INDEX "TaskPlanNodeAttempt_taskId_planId_nodeId_status_idx" ON "TaskPlanNodeAttempt"("taskId", "planId", "nodeId", "status");
+CREATE INDEX "TaskPlanNodeAttempt_planRunId_nodeId_attemptNumber_idx" ON "TaskPlanNodeAttempt"("planRunId", "nodeId", "attemptNumber");
+CREATE UNIQUE INDEX "TaskPlanProviderRun_idempotencyKey_key" ON "TaskPlanProviderRun"("idempotencyKey");
+CREATE INDEX "TaskPlanProviderRun_taskId_planId_status_idx" ON "TaskPlanProviderRun"("taskId", "planId", "status");
+CREATE INDEX "TaskPlanProviderRun_nodeAttemptId_status_idx" ON "TaskPlanProviderRun"("nodeAttemptId", "status");
 CREATE UNIQUE INDEX "TaskPlanLayer_layerId_key" ON "TaskPlanLayer"("layerId");
 CREATE INDEX "TaskPlanLayer_taskId_planId_version_idx" ON "TaskPlanLayer"("taskId", "planId", "version");
 CREATE INDEX "TaskPlanLayer_workspaceId_taskId_createdAt_idx" ON "TaskPlanLayer"("workspaceId", "taskId", "createdAt");

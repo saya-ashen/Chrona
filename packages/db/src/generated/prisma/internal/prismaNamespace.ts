@@ -395,6 +395,8 @@ export const ModelName = {
   TaskDependency: 'TaskDependency',
   TaskPlan: 'TaskPlan',
   TaskPlanRun: 'TaskPlanRun',
+  TaskPlanNodeAttempt: 'TaskPlanNodeAttempt',
+  TaskPlanProviderRun: 'TaskPlanProviderRun',
   TaskPlanLayer: 'TaskPlanLayer',
   Run: 'Run',
   Approval: 'Approval',
@@ -426,7 +428,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
+    modelProps: "workspace" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanNodeAttempt" | "taskPlanProviderRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1241,6 +1243,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.TaskPlanRunCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.TaskPlanRunCountAggregateOutputType> | number
+        }
+      }
+    }
+    TaskPlanNodeAttempt: {
+      payload: Prisma.$TaskPlanNodeAttemptPayload<ExtArgs>
+      fields: Prisma.TaskPlanNodeAttemptFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TaskPlanNodeAttemptFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TaskPlanNodeAttemptFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>
+        }
+        findFirst: {
+          args: Prisma.TaskPlanNodeAttemptFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TaskPlanNodeAttemptFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>
+        }
+        findMany: {
+          args: Prisma.TaskPlanNodeAttemptFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>[]
+        }
+        create: {
+          args: Prisma.TaskPlanNodeAttemptCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>
+        }
+        createMany: {
+          args: Prisma.TaskPlanNodeAttemptCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TaskPlanNodeAttemptCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>[]
+        }
+        delete: {
+          args: Prisma.TaskPlanNodeAttemptDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>
+        }
+        update: {
+          args: Prisma.TaskPlanNodeAttemptUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>
+        }
+        deleteMany: {
+          args: Prisma.TaskPlanNodeAttemptDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TaskPlanNodeAttemptUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TaskPlanNodeAttemptUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>[]
+        }
+        upsert: {
+          args: Prisma.TaskPlanNodeAttemptUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanNodeAttemptPayload>
+        }
+        aggregate: {
+          args: Prisma.TaskPlanNodeAttemptAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTaskPlanNodeAttempt>
+        }
+        groupBy: {
+          args: Prisma.TaskPlanNodeAttemptGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskPlanNodeAttemptGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TaskPlanNodeAttemptCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskPlanNodeAttemptCountAggregateOutputType> | number
+        }
+      }
+    }
+    TaskPlanProviderRun: {
+      payload: Prisma.$TaskPlanProviderRunPayload<ExtArgs>
+      fields: Prisma.TaskPlanProviderRunFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TaskPlanProviderRunFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TaskPlanProviderRunFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>
+        }
+        findFirst: {
+          args: Prisma.TaskPlanProviderRunFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TaskPlanProviderRunFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>
+        }
+        findMany: {
+          args: Prisma.TaskPlanProviderRunFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>[]
+        }
+        create: {
+          args: Prisma.TaskPlanProviderRunCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>
+        }
+        createMany: {
+          args: Prisma.TaskPlanProviderRunCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TaskPlanProviderRunCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>[]
+        }
+        delete: {
+          args: Prisma.TaskPlanProviderRunDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>
+        }
+        update: {
+          args: Prisma.TaskPlanProviderRunUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>
+        }
+        deleteMany: {
+          args: Prisma.TaskPlanProviderRunDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TaskPlanProviderRunUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TaskPlanProviderRunUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>[]
+        }
+        upsert: {
+          args: Prisma.TaskPlanProviderRunUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderRunPayload>
+        }
+        aggregate: {
+          args: Prisma.TaskPlanProviderRunAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTaskPlanProviderRun>
+        }
+        groupBy: {
+          args: Prisma.TaskPlanProviderRunGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskPlanProviderRunGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TaskPlanProviderRunCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskPlanProviderRunCountAggregateOutputType> | number
         }
       }
     }
@@ -2628,11 +2778,58 @@ export const TaskPlanRunScalarFieldEnum = {
   taskId: 'taskId',
   planId: 'planId',
   planRun: 'planRun',
+  executionOwnerId: 'executionOwnerId',
+  executionOwnerScope: 'executionOwnerScope',
+  executionLeaseUntil: 'executionLeaseUntil',
+  executionEpoch: 'executionEpoch',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type TaskPlanRunScalarFieldEnum = (typeof TaskPlanRunScalarFieldEnum)[keyof typeof TaskPlanRunScalarFieldEnum]
+
+
+export const TaskPlanNodeAttemptScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeId: 'nodeId',
+  nodeLayerId: 'nodeLayerId',
+  executionContextSnapshotId: 'executionContextSnapshotId',
+  idempotencyKey: 'idempotencyKey',
+  attemptNumber: 'attemptNumber',
+  status: 'status',
+  executionEpoch: 'executionEpoch',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  error: 'error',
+  runtimeSnapshot: 'runtimeSnapshot',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskPlanNodeAttemptScalarFieldEnum = (typeof TaskPlanNodeAttemptScalarFieldEnum)[keyof typeof TaskPlanNodeAttemptScalarFieldEnum]
+
+
+export const TaskPlanProviderRunScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  idempotencyKey: 'idempotencyKey',
+  providerRunRef: 'providerRunRef',
+  status: 'status',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskPlanProviderRunScalarFieldEnum = (typeof TaskPlanProviderRunScalarFieldEnum)[keyof typeof TaskPlanProviderRunScalarFieldEnum]
 
 
 export const TaskPlanLayerScalarFieldEnum = {
@@ -3261,6 +3458,8 @@ export type GlobalOmitConfig = {
   taskDependency?: Prisma.TaskDependencyOmit
   taskPlan?: Prisma.TaskPlanOmit
   taskPlanRun?: Prisma.TaskPlanRunOmit
+  taskPlanNodeAttempt?: Prisma.TaskPlanNodeAttemptOmit
+  taskPlanProviderRun?: Prisma.TaskPlanProviderRunOmit
   taskPlanLayer?: Prisma.TaskPlanLayerOmit
   run?: Prisma.RunOmit
   approval?: Prisma.ApprovalOmit

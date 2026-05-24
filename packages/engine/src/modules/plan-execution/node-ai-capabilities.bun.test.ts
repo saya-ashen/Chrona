@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
+import type { EffectivePlanGraph, EffectivePlanNode, NodeAttempt } from "@chrona/contracts/ai";
 import { runTaskNodeFeature } from "./node-ai-capabilities";
 import type { AiRuntimeInvoker } from "./ai-runtime-invoker";
 
@@ -55,6 +55,21 @@ function makePlan(node: EffectivePlanNode): EffectivePlanGraph {
     invalidatedNodeIds: [],
     failedNodeIds: [],
     pendingNodeIds: [node.id],
+  };
+}
+
+function makeAttempt(input: { taskId: string; graphId: string; nodeId: string }): NodeAttempt {
+  return {
+    id: `attempt-${input.nodeId}`,
+    taskId: input.taskId,
+    graphId: input.graphId,
+    nodeId: input.nodeId,
+    nodeLayerId: input.nodeId,
+    executionContextSnapshotId: `snapshot-${input.nodeId}`,
+    status: "running",
+    idempotencyKey: `${input.graphId}:${input.nodeId}:1`,
+    attemptNumber: 1,
+    startedAt: "2026-05-22T00:00:00.000Z",
   };
 }
 
@@ -121,6 +136,7 @@ describe("runTaskNodeFeature", () => {
       }),
     } satisfies Pick<AiRuntimeInvoker, "invoke">;
 
+    const plan = makePlan(node);
     const result = await runTaskNodeFeature({
       taskId: "task-1",
       mainSession: {
@@ -129,7 +145,8 @@ describe("runTaskNodeFeature", () => {
         sessionKey: "chrona:task:task-1:plan-1",
       },
       node,
-      plan: makePlan(node),
+      plan,
+      attempt: makeAttempt({ taskId: "task-1", graphId: plan.graphId, nodeId: node.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       featureSpec: {

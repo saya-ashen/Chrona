@@ -134,6 +134,8 @@ export const startRunInputSchema = z
 export const existingRunStreamInputSchema = z
   .object({
     runId: z.string().min(1),
+    sessionId: z.string().min(1).optional(),
+    sessionKey: z.string().min(1).optional(),
     signal: z.custom<AbortSignal>().optional(),
     include: z
       .object({

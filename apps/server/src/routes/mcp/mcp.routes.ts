@@ -113,10 +113,30 @@ const externalTools = {
 function sessionIdFrom(input: Record<string, unknown>, extra?: RequestHandlerExtra<ServerRequest, ServerNotification>) {
   const meta = input._meta && typeof input._meta === "object" ? input._meta as Record<string, unknown> : undefined;
   const extraMeta = extra?._meta as Record<string, unknown> | undefined;
+  assertNoSnakeSessionId(input, "arguments");
+  if (meta) assertNoSnakeSessionId(meta, "arguments._meta");
+  if (extraMeta) assertNoSnakeSessionId(extraMeta, "extra._meta");
+  assertValidSessionId(input.sessionId, "arguments.sessionId");
+  assertValidSessionId(meta?.sessionId, "arguments._meta.sessionId");
+  assertValidSessionId(extraMeta?.sessionId, "extra._meta.sessionId");
+  assertValidSessionId(extra?.sessionId, "extra.sessionId");
   const sessionId = typeof input.sessionId === "string"
     ? input.sessionId
     : meta?.sessionId ?? extraMeta?.sessionId ?? extra?.sessionId;
   return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined;
+}
+
+function assertNoSnakeSessionId(input: Record<string, unknown>, source: string) {
+  if (Object.prototype.hasOwnProperty.call(input, "session_id")) {
+    throw new Error(`${source}.session_id is not supported; expected sessionId`);
+  }
+}
+
+function assertValidSessionId(value: unknown, source: string) {
+  if (value === undefined || value === null) return;
+  if (typeof value !== "string" || value.trim().length === 0 || value === "unknown") {
+    throw new Error(`${source} is invalid`);
+  }
 }
 
 function metaFrom(input: Record<string, unknown>, extra?: RequestHandlerExtra<ServerRequest, ServerNotification>) {
@@ -149,7 +169,10 @@ function idempotencyKeyFrom(input: Record<string, unknown>, toolName: ChronaTool
     if (typeof explicitKey === "string" && explicitKey.length > 0) {
       return explicitKey;
     }
-    const sessionId = sessionIdFrom(input, extra) ?? "no-session";
+    const sessionId = sessionIdFrom(input, extra);
+    if (!sessionId) {
+      throw new Error(`${toolName} requires sessionId for idempotency`);
+    }
     const hash = createHash("sha256")
       .update(stableJson({ sessionId, toolName, payload }))
       .digest("hex")

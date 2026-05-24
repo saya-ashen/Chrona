@@ -92,6 +92,7 @@ export function createExecutionGraphCallbacks(input: {
         mainSession: input.mainSession,
         node: engineNode,
         plan: enginePlan,
+        attempt: executorInput.attempt as unknown as NodeAttempt,
         trigger: executorInput.trigger,
         runtimeName: input.runtimeName,
         userInput: executorInput.userInput,

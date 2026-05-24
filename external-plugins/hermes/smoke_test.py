@@ -81,13 +81,11 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
         self.original_safe_json_rpc = tools._safe_json_rpc
         self.original_list_chrona_tools = tools.list_chrona_tools
         self.original_config_path = tools._CONFIG_PATH
-        tools.capture_session_context("", model=None, platform=None)
 
     def tearDown(self):
         tools._safe_json_rpc = self.original_safe_json_rpc
         tools.list_chrona_tools = self.original_list_chrona_tools
         tools._CONFIG_PATH = self.original_config_path
-        tools.capture_session_context("", model=None, platform=None)
 
     def test_schema_conversion_preserves_chrona_input_schema(self):
         schema = tools.schema_for_chrona_tool(SAMPLE_CHRONA_TOOLS[1])
@@ -103,7 +101,7 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
         plugin.register(ctx)
 
         registered_names = [tool["name"] for tool in ctx.tools]
-        self.assertEqual([hook["name"] for hook in ctx.hooks], ["pre_llm_call"])
+        self.assertEqual(ctx.hooks, [])
         self.assertEqual(registered_names, ["chrona_task_read", "chrona_task_update"])
         self.assertNotIn("chrona_tools_list", registered_names)
         self.assertNotIn("chrona_tool_call", registered_names)
@@ -139,6 +137,21 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
         self.assertEqual(result["arguments"]["evidence"]["hermes"]["model"], "hermes-model")
         self.assertEqual(result["arguments"]["evidence"]["hermes"]["platform"], "cli")
 
+    def test_handler_returns_error_when_session_id_missing(self):
+        calls = []
+
+        def fake_json_rpc(method, params=None):
+            calls.append({"method": method, "params": params})
+            return {"status": "should-not-call"}
+
+        tools._safe_json_rpc = fake_json_rpc
+        handler = tools.handler_for_chrona_tool("chrona.task.update")
+
+        result = json.loads(handler({"workspaceId": "workspace-1"}, task_id="task-run-1"))
+
+        self.assertEqual(calls, [])
+        self.assertEqual(result["error"], "Hermes session_id is required for Chrona tool calls")
+
     def test_handler_preserves_non_ascii_tool_results(self):
         tools._safe_json_rpc = lambda method, params=None: {
             "status": "accepted",
@@ -147,7 +160,7 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
         }
         handler = tools.handler_for_chrona_tool("chrona.task.read")
 
-        raw = handler({"taskId": "task-1"})
+        raw = handler({"taskId": "task-1"}, session_id="session-1")
         result = json.loads(raw)
 
         self.assertIn("制作一个汉堡", raw)

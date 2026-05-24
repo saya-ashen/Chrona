@@ -102,13 +102,14 @@ export function mapSnapshot(raw: unknown, includeRaw = false): ProviderRunSnapsh
 export function mapHermesEvent(
   event: unknown,
   runId: string,
-  options: { includeRaw: boolean; strictUnknown?: boolean; sequence?: number },
+  options: { includeRaw: boolean; strictUnknown?: boolean; sequence?: number; sessionId?: string },
 ): ProviderRunEvent | undefined {
   const body = asRecord(event);
   const type = stringValue(body.type) ?? stringValue(body.event);
   const metadata = buildEventMetadata({
     body,
     fallbackRunId: runId,
+    sessionId: options.sessionId,
     sequence: options.sequence,
   });
   const raw = options.includeRaw ? event : undefined;
@@ -167,7 +168,7 @@ export function mapHermesEvent(
         run: {
           provider: "hermes",
           runId: metadata.runId ?? runId,
-          sessionId: stringValue(body.session_id) ?? "unknown",
+          sessionId: metadata.sessionId ?? "unknown",
           providerRunId: metadata.runId ?? runId,
           status: "completed",
         },
@@ -202,6 +203,7 @@ export function mapHermesEvent(
 function buildEventMetadata(input: {
   body: Record<string, unknown>;
   fallbackRunId: string;
+  sessionId?: string;
   sequence?: number;
 }) {
   const rawEventType = stringValue(input.body.type) ?? stringValue(input.body.event);
@@ -210,7 +212,7 @@ function buildEventMetadata(input: {
   return {
     provider: "hermes",
     runId: stringValue(input.body.run_id) ?? input.fallbackRunId,
-    sessionId: stringValue(input.body.session_id),
+    sessionId: input.sessionId,
     sequence: input.sequence,
     timestamp: timestampValue,
     rawEventType,
