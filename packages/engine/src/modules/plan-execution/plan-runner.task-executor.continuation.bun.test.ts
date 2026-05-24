@@ -227,6 +227,54 @@ describe("plan-runner task executor continuation", () => {
     ]);
   });
 
+  it("does not start the same ready entry twice when execution is triggered concurrently", async () => {
+    let releaseProviderRun!: () => void;
+    let firstInvocationObserved!: () => void;
+    const providerRunCanFinish = new Promise<void>((resolve) => {
+      releaseProviderRun = resolve;
+    });
+    const firstInvocation = new Promise<void>((resolve) => {
+      firstInvocationObserved = resolve;
+    });
+    const invokedNodeIds: string[] = [];
+    executeTaskNodeCapabilityMock.mockImplementation(async (input) => {
+      invokedNodeIds.push(input.node.id);
+      firstInvocationObserved();
+      await providerRunCanFinish;
+      return {
+        status: "started",
+        summary: `${input.node.id} runtime run started`,
+        evidence: { sessionId: "main-session", runId: `run_${input.node.id}_${invokedNodeIds.length}` },
+        output: { runtimeRunRef: `runtime-${input.node.id}-${invokedNodeIds.length}` },
+      };
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner duplicate concurrent entry start");
+    const compiledPlan = makeTwoEntryTaskPlan("graph_duplicate_concurrent_entry_start");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const firstStart = taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    await firstInvocation;
+    const secondStart = taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    releaseProviderRun();
+    await Promise.all([firstStart, secondStart]);
+
+    expect(invokedNodeIds).toEqual(["first_entry"]);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_entry", "running"],
+    ]);
+  });
+
   it("does not leave another entry idle when one entry provider completed before runtime sync", async () => {
     executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({

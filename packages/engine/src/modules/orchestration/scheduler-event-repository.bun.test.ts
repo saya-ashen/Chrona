@@ -6,9 +6,34 @@ import {
 } from "@/modules/orchestration/scheduler-event-repository";
 
 async function resetDb() {
-  await db.schedulerEvent.deleteMany();
-  await db.task.deleteMany();
-  await db.workspace.deleteMany();
+  try {
+    await db.$executeRaw`PRAGMA foreign_keys = OFF`;
+    await db.taskAssistantMessage.deleteMany();
+    await db.scheduleProposal.deleteMany();
+    await db.toolCallDetail.deleteMany();
+    await db.conversationEntry.deleteMany();
+    await db.runtimeCursor.deleteMany();
+    await db.schedulerEvent.deleteMany();
+    await db.reconciliationEvent.deleteMany();
+    await db.graphMutationRecord.deleteMany();
+    await db.graphVersion.deleteMany();
+    await db.approval.deleteMany();
+    await db.artifact.deleteMany();
+    await db.executionSession.deleteMany();
+    await db.workBlock.deleteMany();
+    await db.taskProjection.deleteMany();
+    await db.run.deleteMany();
+    await db.taskPlanLayer.deleteMany();
+    await db.taskPlanRun.deleteMany();
+    await db.taskPlan.deleteMany();
+    await db.taskSession.deleteMany();
+    await db.taskDependency.deleteMany();
+    await db.memory.deleteMany();
+    await db.task.deleteMany();
+    await db.workspace.deleteMany();
+  } finally {
+    await db.$executeRaw`PRAGMA foreign_keys = ON`;
+  }
 }
 
 async function createTask() {

@@ -49,7 +49,7 @@
 - npm package `@chrona-org/cli` — install via `npm install -g` and run `chrona start`
 - Bun runtime embedded via npm binary — no separate Bun install required for users
 - Auto-setup on first launch: creates data/config directories, SQLite database, runs migrations
-- Single binary entry point: `chrona start` (server) + `chrona task|run|schedule|ai` (CLI client)
+- Single binary entry point: `chrona start` launches the packaged server
 - OS-standard data directories (XDG on Linux, App Support on macOS, %APPDATA% on Windows)
 - Static assets served with correct MIME types (JS, CSS, HTML, ICO)
 

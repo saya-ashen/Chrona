@@ -57,7 +57,7 @@ Chrona 是一个本地优先的 AI 任务控制台。它把“想法”推进为
 | --- | --- | --- |
 | Web 应用 | `apps/web` | Vite + React 19 + React Router UI |
 | Server | `apps/server` | Bun 上的 Hono API 路由与静态资源服务 |
-| CLI | `packages/cli` | API 的轻量命令行客户端 |
+| CLI | `packages/cli` | 用于启动 Chrona 的打包入口 |
 | Engine | `packages/engine` | 任务、计划、执行、排期、投影、AI client 用例 |
 | Contracts | `packages/contracts` | API schema、AI feature、运行时事件、MCP tool schema |
 | Graph runtime | `packages/graph-runtime` | 计划图解析、状态转换、命令执行原语 |

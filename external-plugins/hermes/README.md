@@ -11,20 +11,37 @@ From the Chrona repository root, run:
 bun run install:hermes-plugin
 ```
 
+Or from the packaged Chrona CLI:
+
+```sh
+chrona hermes plugin install
+```
+
 By default this installs to `~/.hermes/plugins/chrona` and runs
-`hermes plugins enable chrona` if the Hermes CLI is available.
+`hermes plugins enable chrona` if the Hermes CLI is available. It also writes
+`chrona_config.json` with the Chrona MCP URL and bundled plugin version used by
+the plugin.
 
 To install to a different Hermes home or plugin directory:
 
 ```sh
 HERMES_HOME=/path/to/.hermes bun run install:hermes-plugin
 CHRONA_HERMES_PLUGIN_DIR=/path/to/.hermes/plugins/chrona bun run install:hermes-plugin
+chrona hermes plugin install --hermes-home /path/to/.hermes
+chrona hermes plugin install --plugin-dir /path/to/.hermes/plugins/chrona
+```
+
+To point the plugin at a non-default Chrona MCP endpoint:
+
+```sh
+chrona hermes plugin install --mcp-url http://192.168.1.1:3101/api/mcp
 ```
 
 To copy the plugin without enabling it immediately:
 
 ```sh
 CHRONA_HERMES_SKIP_ENABLE=1 bun run install:hermes-plugin
+chrona hermes plugin install --skip-enable
 ```
 
 Manual install:
@@ -45,6 +62,17 @@ Point the plugin at Chrona if it is not using the default endpoint:
 ```sh
 export CHRONA_MCP_URL="http://127.0.0.1:3101/api/mcp"
 ```
+
+`CHRONA_MCP_URL` overrides the installed `chrona_config.json` value. Without the
+environment variable, the plugin reads `chrona_config.json`, then falls back to
+`http://127.0.0.1:3101/api/mcp`.
+
+When `chrona start` runs locally, Chrona checks local integrations before the
+server starts. If Hermes is installed locally and the Chrona plugin is missing,
+outdated, or points at the wrong MCP URL, interactive terminals can install or
+update it from the startup prompt. Non-interactive terminals print the command to
+run later. If Hermes is not installed locally, Chrona prints the MCP URL for
+manual remote Hermes configuration.
 
 ## Tools
 

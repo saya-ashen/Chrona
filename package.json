@@ -10,6 +10,7 @@
   "files": [
     "dist",
     "apps/web/dist",
+    "external-plugins/hermes",
     "prisma/schema.prisma",
     "prisma/migrations",
     ".env.example"

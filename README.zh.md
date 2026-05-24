@@ -217,7 +217,7 @@ Chrona engine
 
 | 变量 | 用途 | 默认值 / 说明 |
 | --- | --- | --- |
-| `DATABASE_URL` | SQLite database URL | `file:./prisma/dev.db` |
+| `DATABASE_URL` | SQLite database URL | 开发默认：`file:./prisma/dev.db`；Docker 生产：`file:/data/chrona.db`；CLI binary：系统数据目录下的 `chrona.db` |
 | `HOST` | API server 绑定地址 | 默认 local-only `127.0.0.1` |
 | `PORT` | API server 端口 | `3101` |
 | `CHRONA_WEB_DIST` | server/static 模式下的前端构建目录 | `apps/web/dist` |
@@ -238,6 +238,8 @@ bun run db:migrate
 ```
 
 `bun run setup` 会在 schema 或依赖变化需要时运行 Prisma client generation 和 seed data。在 NixOS 上，Prisma 可能需要自定义 engine 配置或设置 `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1`，因为上游可能缺少 `linux-nixos` engine target 的 checksum 文件。
+
+生产 SQLite 数据应位于应用包外部。Docker 使用 `/data/chrona.db`，部署时应把 `/data` 挂载为持久化 volume。正式 CLI binary 默认在平台数据目录创建 `chrona.db`，除非显式设置 `DATABASE_URL`。
 
 ### AI clients
 

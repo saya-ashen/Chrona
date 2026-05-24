@@ -43,7 +43,7 @@ export function assertSafeTestDatabaseUrl(databaseUrl: string | undefined) {
   throw new Error(
     [
       "Refusing to reset the database for Bun tests because DATABASE_URL does not point to an isolated test SQLite database.",
-      `Current DATABASE_URL: ${databaseUrl ?? "(unset, defaults to file:./prisma/dev.db)"}`,
+      `Current DATABASE_URL: ${databaseUrl ?? "(unset)"}`,
       "Run `bun run test:bun` or set `DATABASE_URL=file:./.tmp/bun-test.db` before running destructive Bun tests.",
     ].join(" "),
   );

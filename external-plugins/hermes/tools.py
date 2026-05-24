@@ -5,16 +5,34 @@ import os
 import urllib.error
 import urllib.request
 from itertools import count
+from pathlib import Path
 from threading import Lock
 
 _JSON_RPC_IDS = count(1)
 _DEFAULT_MCP_URL = "http://127.0.0.1:3101/api/mcp"
+_CONFIG_PATH = Path(__file__).resolve().parent / "chrona_config.json"
 _SESSION_LOCK = Lock()
 _CURRENT_SESSION_CONTEXT = {}
 
 
+def _configured_mcp_url():
+    if not _CONFIG_PATH.exists():
+        return None
+
+    try:
+        config = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    if not isinstance(config, dict):
+        return None
+
+    mcp_url = config.get("mcpUrl")
+    return mcp_url if isinstance(mcp_url, str) and mcp_url else None
+
+
 def _mcp_url():
-    return os.environ.get("CHRONA_MCP_URL", _DEFAULT_MCP_URL)
+    return os.environ.get("CHRONA_MCP_URL") or _configured_mcp_url() or _DEFAULT_MCP_URL
 
 
 def _post_json_rpc(method, params=None):

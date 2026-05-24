@@ -80,11 +80,13 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
     def setUp(self):
         self.original_safe_json_rpc = tools._safe_json_rpc
         self.original_list_chrona_tools = tools.list_chrona_tools
+        self.original_config_path = tools._CONFIG_PATH
         tools.capture_session_context("", model=None, platform=None)
 
     def tearDown(self):
         tools._safe_json_rpc = self.original_safe_json_rpc
         tools.list_chrona_tools = self.original_list_chrona_tools
+        tools._CONFIG_PATH = self.original_config_path
         tools.capture_session_context("", model=None, platform=None)
 
     def test_schema_conversion_preserves_chrona_input_schema(self):
@@ -175,6 +177,43 @@ class ChronaHermesPluginSmokeTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "invalid payload"):
             tools.list_chrona_tools()
+
+    def test_mcp_url_uses_installed_config_when_env_is_unset(self):
+        config_path = PLUGIN_DIR / ".chrona_config_test.json"
+        original_env = os.environ.pop("CHRONA_MCP_URL", None)
+        try:
+            config_path.write_text(
+                json.dumps({"mcpUrl": "http://192.168.1.1:3101/api/mcp"}),
+                encoding="utf-8",
+            )
+            tools._CONFIG_PATH = config_path
+
+            self.assertEqual(tools._mcp_url(), "http://192.168.1.1:3101/api/mcp")
+        finally:
+            if original_env is not None:
+                os.environ["CHRONA_MCP_URL"] = original_env
+            if config_path.exists():
+                config_path.unlink()
+
+    def test_mcp_url_env_overrides_installed_config(self):
+        config_path = PLUGIN_DIR / ".chrona_config_test.json"
+        original_env = os.environ.get("CHRONA_MCP_URL")
+        try:
+            config_path.write_text(
+                json.dumps({"mcpUrl": "http://192.168.1.1:3101/api/mcp"}),
+                encoding="utf-8",
+            )
+            tools._CONFIG_PATH = config_path
+            os.environ["CHRONA_MCP_URL"] = "http://127.0.0.1:3200/api/mcp"
+
+            self.assertEqual(tools._mcp_url(), "http://127.0.0.1:3200/api/mcp")
+        finally:
+            if original_env is None:
+                os.environ.pop("CHRONA_MCP_URL", None)
+            else:
+                os.environ["CHRONA_MCP_URL"] = original_env
+            if config_path.exists():
+                config_path.unlink()
 
 
 def run_live_smoke():

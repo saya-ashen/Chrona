@@ -1,5 +1,5 @@
 name: chrona
-version: 0.1.0
+version: 0.1.1
 description: Dynamically registers Chrona MCP tools in Hermes
 provides_hooks:
   - pre_llm_call

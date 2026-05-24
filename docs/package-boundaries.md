@@ -201,12 +201,11 @@ Keep it small. If code answers “what should Chrona do next?”, it belongs in 
 
 Put here:
 
-- command tree
-- terminal UX
-- API client calls
-- output formatting
+- packaged CLI launcher
+- start command argument handling
+- runtime/bootstrap setup needed before server start
 
-The CLI is a separate client entrypoint, like `apps/web`, not a shared helper bucket.
+The CLI is a server launcher, not a second API client surface or shared helper bucket.
 
 ## `packages/i18n` and `packages/shared`
 

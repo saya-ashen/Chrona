@@ -1,26 +1,44 @@
 import { Command } from "commander";
-import { registerTaskCommands } from "./commands/task.js";
-import { registerRunCommands } from "./commands/run.js";
-import { registerScheduleCommands } from "./commands/schedule.js";
-import { registerAiCommands } from "./commands/ai.js";
-import { createClientOptions, createClientResolver } from "./commands/shared.js";
+import { installHermesPlugin, type InstallHermesPluginOptions } from "./hermes-plugin.js";
 
 export function createProgram(): Command {
   const program = new Command();
 
   program
     .name("chrona")
-    .description("Chrona CLI: thin command-line client for the Chrona app API.")
+    .description("Chrona CLI: starts the Chrona app server.")
     .version("0.2.0");
 
-  createClientOptions(program);
+  const hermes = program
+    .command("hermes")
+    .description("Hermes integration commands");
 
-  const resolveClient = createClientResolver(program);
+  const hermesPlugin = hermes
+    .command("plugin")
+    .description("Hermes plugin commands");
 
-  registerTaskCommands(program, resolveClient);
-  registerRunCommands(program, resolveClient);
-  registerScheduleCommands(program, resolveClient);
-  registerAiCommands(program, resolveClient);
+  hermesPlugin
+    .command("install")
+    .description("Install the Chrona Hermes plugin")
+    .option("--hermes-home <path>", "Hermes home directory")
+    .option("--mcp-url <url>", "Chrona MCP endpoint for the plugin")
+    .option("--plugin-dir <path>", "Hermes plugin install directory")
+    .option("--skip-enable", "Copy the plugin without enabling it", false)
+    .action(async (options: InstallHermesPluginOptions) => {
+      const result = await installHermesPlugin(options);
+      console.log(`Chrona Hermes plugin installed to ${result.installDir}`);
+      console.log(`Chrona MCP URL configured as ${result.mcpUrl}`);
+      console.log(`Chrona Hermes plugin version ${result.pluginVersion}`);
+
+      if (options.skipEnable || process.env.CHRONA_HERMES_SKIP_ENABLE === "1") {
+        console.log("Skipped Hermes enable step. Enable later with: hermes plugins enable chrona");
+      } else if (result.enabled) {
+        console.log("Chrona Hermes plugin enabled.");
+      } else {
+        console.log("Chrona Hermes plugin copied, but Hermes CLI was unavailable or enable failed.");
+        console.log("Enable later with: hermes plugins enable chrona");
+      }
+    });
 
   return program;
 }

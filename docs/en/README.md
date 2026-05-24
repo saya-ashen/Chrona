@@ -56,7 +56,7 @@ External agents call Chrona through MCP tools such as `chrona_plan_generate`, `c
 | --- | --- | --- |
 | Web app | `apps/web` | Vite + React 19 + React Router UI |
 | Server | `apps/server` | Hono API routes and static app serving on Bun |
-| CLI | `packages/cli` | Thin command-line client for the API |
+| CLI | `packages/cli` | Packaged entry point for starting Chrona |
 | Engine | `packages/engine` | Tasks, plans, execution, scheduling, projections, AI client use cases |
 | Contracts | `packages/contracts` | API schemas, AI feature specs, runtime events, MCP tool schemas |
 | Graph runtime | `packages/graph-runtime` | Plan graph resolve/transition/command primitives |
