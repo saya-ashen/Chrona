@@ -1,5 +1,5 @@
 import type { AdvanceRuntimeCommand } from "../../types";
-import type { ExternalResultAdvanceCommand } from "./types";
+import type { NodeResultAdvanceCommand } from "./types";
 
 export function commandNeedsCurrentNode(command: AdvanceRuntimeCommand) {
   return (
@@ -9,8 +9,8 @@ export function commandNeedsCurrentNode(command: AdvanceRuntimeCommand) {
   );
 }
 
-export function isExternalResultCommand(
+export function isNodeResultCommand(
   command: AdvanceRuntimeCommand,
-): command is ExternalResultAdvanceCommand {
+): command is NodeResultAdvanceCommand {
   return commandNeedsCurrentNode(command);
 }

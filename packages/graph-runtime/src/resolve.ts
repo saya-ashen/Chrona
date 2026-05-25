@@ -211,23 +211,15 @@ function buildEffectiveNodeFromGraphNode(
   const nodeResults = results.filter(
     (result) => result.nodeId === node.id && !isFailedSubmissionNodeResult(result),
   );
+  const activeLayerResults = [...nodeResults]
+    .reverse()
+    .filter((result) => result.nodeLayerId === activeDefinitionLayer.id);
   const currentResult =
-    nodeResults.find(
-      (result) =>
-        result.nodeLayerId === activeDefinitionLayer.id &&
-        result.status === "current",
+    activeLayerResults.find((result) => result.status === "current") ??
+    activeLayerResults.find(
+      (result) => result.status === "rejected" && result.errorDetails === "degraded",
     ) ??
-    nodeResults.find(
-      (result) =>
-        result.nodeLayerId === activeDefinitionLayer.id &&
-        result.status === "rejected" &&
-        result.errorDetails === "degraded",
-    ) ??
-    nodeResults.find(
-      (result) =>
-        result.nodeLayerId === activeDefinitionLayer.id &&
-        result.status === "rejected",
-    );
+    activeLayerResults.find((result) => result.status === "rejected");
   const activeAttempt = [...attempts]
     .filter(
       (attempt) =>

@@ -121,6 +121,7 @@ export async function pauseExecution(input: {
   message: string;
   errorDetails?: unknown;
 }) {
+  const latestEvidence = await latestPlanExecutionEvidence(input.taskId);
   const executionStatus = input.status ?? executionStatusFromWaitKind(input.waitKind);
   const transition = executionTransition({
     status: executionStatus,
@@ -135,6 +136,10 @@ export async function pauseExecution(input: {
     currentNodeId: input.currentNodeId,
     pauseReason: transition.pauseReason,
     completedNodeIds: completedExecutionNodeIds(input.effective),
+    pausedByEventId: latestEvidence?.id ?? null,
+    pausedByRawEventId: latestEvidence?.rawEventId ?? null,
+    latestEventId: latestEvidence?.id ?? null,
+    latestRawEventId: latestEvidence?.rawEventId ?? null,
   });
 
   await db.task.update({
@@ -175,6 +180,7 @@ export async function completeExecution(input: {
   executedNodeIds: string[];
   message: string;
 }) {
+  const latestEvidence = await latestPlanExecutionEvidence(input.taskId);
   const status = executionStatusFromEffectiveGraph(input.effective);
   const transition = executionTransition({
     status,
@@ -197,6 +203,8 @@ export async function completeExecution(input: {
     currentNodeId: null,
     pauseReason: transition.pauseReason,
     completedNodeIds: completedExecutionNodeIds(input.effective),
+    latestEventId: latestEvidence?.id ?? null,
+    latestRawEventId: latestEvidence?.rawEventId ?? null,
   });
 
   if (status === "completed") {
@@ -234,5 +242,13 @@ export async function completeExecution(input: {
     currentNodeId: null,
     executedNodeIds: input.executedNodeIds,
     message: input.message,
+  });
+}
+
+async function latestPlanExecutionEvidence(taskId: string) {
+  return db.event.findFirst({
+    where: { taskId, source: "plan_execution" },
+    orderBy: [{ ingestSequence: "desc" }],
+    select: { id: true, rawEventId: true },
   });
 }

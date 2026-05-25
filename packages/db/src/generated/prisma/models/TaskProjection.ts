@@ -55,6 +55,12 @@ export type TaskProjectionMinAggregateOutputType = {
   scheduleProposalCount: number | null
   latestArtifactTitle: string | null
   lastActivityAt: Date | null
+  latestEventId: string | null
+  latestRawEventId: string | null
+  blockedByEventId: string | null
+  blockedByRawEventId: string | null
+  currentNodeId: string | null
+  currentNodeTitle: string | null
   updatedAt: Date | null
 }
 
@@ -77,6 +83,12 @@ export type TaskProjectionMaxAggregateOutputType = {
   scheduleProposalCount: number | null
   latestArtifactTitle: string | null
   lastActivityAt: Date | null
+  latestEventId: string | null
+  latestRawEventId: string | null
+  blockedByEventId: string | null
+  blockedByRawEventId: string | null
+  currentNodeId: string | null
+  currentNodeTitle: string | null
   updatedAt: Date | null
 }
 
@@ -99,6 +111,12 @@ export type TaskProjectionCountAggregateOutputType = {
   scheduleProposalCount: number
   latestArtifactTitle: number
   lastActivityAt: number
+  latestEventId: number
+  latestRawEventId: number
+  blockedByEventId: number
+  blockedByRawEventId: number
+  currentNodeId: number
+  currentNodeTitle: number
   updatedAt: number
   _all: number
 }
@@ -133,6 +151,12 @@ export type TaskProjectionMinAggregateInputType = {
   scheduleProposalCount?: true
   latestArtifactTitle?: true
   lastActivityAt?: true
+  latestEventId?: true
+  latestRawEventId?: true
+  blockedByEventId?: true
+  blockedByRawEventId?: true
+  currentNodeId?: true
+  currentNodeTitle?: true
   updatedAt?: true
 }
 
@@ -155,6 +179,12 @@ export type TaskProjectionMaxAggregateInputType = {
   scheduleProposalCount?: true
   latestArtifactTitle?: true
   lastActivityAt?: true
+  latestEventId?: true
+  latestRawEventId?: true
+  blockedByEventId?: true
+  blockedByRawEventId?: true
+  currentNodeId?: true
+  currentNodeTitle?: true
   updatedAt?: true
 }
 
@@ -177,6 +207,12 @@ export type TaskProjectionCountAggregateInputType = {
   scheduleProposalCount?: true
   latestArtifactTitle?: true
   lastActivityAt?: true
+  latestEventId?: true
+  latestRawEventId?: true
+  blockedByEventId?: true
+  blockedByRawEventId?: true
+  currentNodeId?: true
+  currentNodeTitle?: true
   updatedAt?: true
   _all?: true
 }
@@ -286,6 +322,12 @@ export type TaskProjectionGroupByOutputType = {
   scheduleProposalCount: number
   latestArtifactTitle: string | null
   lastActivityAt: Date | null
+  latestEventId: string | null
+  latestRawEventId: string | null
+  blockedByEventId: string | null
+  blockedByRawEventId: string | null
+  currentNodeId: string | null
+  currentNodeTitle: string | null
   updatedAt: Date
   _count: TaskProjectionCountAggregateOutputType | null
   _avg: TaskProjectionAvgAggregateOutputType | null
@@ -331,6 +373,12 @@ export type TaskProjectionWhereInput = {
   scheduleProposalCount?: Prisma.IntFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
+  latestEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  currentNodeId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  currentNodeTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   updatedAt?: Prisma.DateTimeFilter<"TaskProjection"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
@@ -355,6 +403,12 @@ export type TaskProjectionOrderByWithRelationInput = {
   scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentNodeTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   workspace?: Prisma.WorkspaceOrderByWithRelationInput
   task?: Prisma.TaskOrderByWithRelationInput
@@ -382,6 +436,12 @@ export type TaskProjectionWhereUniqueInput = Prisma.AtLeast<{
   scheduleProposalCount?: Prisma.IntFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
+  latestEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  currentNodeId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  currentNodeTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   updatedAt?: Prisma.DateTimeFilter<"TaskProjection"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
@@ -406,6 +466,12 @@ export type TaskProjectionOrderByWithAggregationInput = {
   scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentNodeTitle?: Prisma.SortOrderInput | Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.TaskProjectionCountOrderByAggregateInput
   _avg?: Prisma.TaskProjectionAvgOrderByAggregateInput
@@ -436,6 +502,12 @@ export type TaskProjectionScalarWhereWithAggregatesInput = {
   scheduleProposalCount?: Prisma.IntWithAggregatesFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskProjection"> | Date | string | null
+  latestEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  latestRawEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  blockedByEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  currentNodeId?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  currentNodeTitle?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"TaskProjection"> | Date | string
 }
 
@@ -456,6 +528,12 @@ export type TaskProjectionCreateInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskProjectionsInput
   task: Prisma.TaskCreateNestedOneWithoutProjectionInput
@@ -480,6 +558,12 @@ export type TaskProjectionUncheckedCreateInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
 }
 
@@ -500,6 +584,12 @@ export type TaskProjectionUpdateInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskProjectionsNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutProjectionNestedInput
@@ -524,6 +614,12 @@ export type TaskProjectionUncheckedUpdateInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -546,6 +642,12 @@ export type TaskProjectionCreateManyInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
 }
 
@@ -566,6 +668,12 @@ export type TaskProjectionUpdateManyMutationInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -588,6 +696,12 @@ export type TaskProjectionUncheckedUpdateManyInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -625,6 +739,12 @@ export type TaskProjectionCountOrderByAggregateInput = {
   scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrder
+  currentNodeId?: Prisma.SortOrder
+  currentNodeTitle?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -652,6 +772,12 @@ export type TaskProjectionMaxOrderByAggregateInput = {
   scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrder
+  currentNodeId?: Prisma.SortOrder
+  currentNodeTitle?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -674,6 +800,12 @@ export type TaskProjectionMinOrderByAggregateInput = {
   scheduleProposalCount?: Prisma.SortOrder
   latestArtifactTitle?: Prisma.SortOrder
   lastActivityAt?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrder
+  currentNodeId?: Prisma.SortOrder
+  currentNodeTitle?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
@@ -773,6 +905,12 @@ export type TaskProjectionCreateWithoutWorkspaceInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutProjectionInput
 }
@@ -795,6 +933,12 @@ export type TaskProjectionUncheckedCreateWithoutWorkspaceInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
 }
 
@@ -845,6 +989,12 @@ export type TaskProjectionScalarWhereInput = {
   scheduleProposalCount?: Prisma.IntFilter<"TaskProjection"> | number
   latestArtifactTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   lastActivityAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
+  latestEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  currentNodeId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  currentNodeTitle?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   updatedAt?: Prisma.DateTimeFilter<"TaskProjection"> | Date | string
 }
 
@@ -865,6 +1015,12 @@ export type TaskProjectionCreateWithoutTaskInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskProjectionsInput
 }
@@ -887,6 +1043,12 @@ export type TaskProjectionUncheckedCreateWithoutTaskInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
 }
 
@@ -923,6 +1085,12 @@ export type TaskProjectionUpdateWithoutTaskInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskProjectionsNestedInput
 }
@@ -945,6 +1113,12 @@ export type TaskProjectionUncheckedUpdateWithoutTaskInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -966,6 +1140,12 @@ export type TaskProjectionCreateManyWorkspaceInput = {
   scheduleProposalCount?: number
   latestArtifactTitle?: string | null
   lastActivityAt?: Date | string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  currentNodeId?: string | null
+  currentNodeTitle?: string | null
   updatedAt?: Date | string
 }
 
@@ -986,6 +1166,12 @@ export type TaskProjectionUpdateWithoutWorkspaceInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutProjectionNestedInput
 }
@@ -1008,6 +1194,12 @@ export type TaskProjectionUncheckedUpdateWithoutWorkspaceInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1029,6 +1221,12 @@ export type TaskProjectionUncheckedUpdateManyWithoutWorkspaceInput = {
   scheduleProposalCount?: Prisma.IntFieldUpdateOperationsInput | number
   latestArtifactTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastActivityAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1053,6 +1251,12 @@ export type TaskProjectionSelect<ExtArgs extends runtime.Types.Extensions.Intern
   scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
+  currentNodeId?: boolean
+  currentNodeTitle?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1077,6 +1281,12 @@ export type TaskProjectionSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
+  currentNodeId?: boolean
+  currentNodeTitle?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1101,6 +1311,12 @@ export type TaskProjectionSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
+  currentNodeId?: boolean
+  currentNodeTitle?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1125,10 +1341,16 @@ export type TaskProjectionSelectScalar = {
   scheduleProposalCount?: boolean
   latestArtifactTitle?: boolean
   lastActivityAt?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
+  currentNodeId?: boolean
+  currentNodeTitle?: boolean
   updatedAt?: boolean
 }
 
-export type TaskProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"taskId" | "workspaceId" | "persistedStatus" | "displayState" | "blockType" | "blockScope" | "blockSince" | "actionRequired" | "latestRunStatus" | "approvalPendingCount" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "scheduleProposalCount" | "latestArtifactTitle" | "lastActivityAt" | "updatedAt", ExtArgs["result"]["taskProjection"]>
+export type TaskProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"taskId" | "workspaceId" | "persistedStatus" | "displayState" | "blockType" | "blockScope" | "blockSince" | "actionRequired" | "latestRunStatus" | "approvalPendingCount" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "scheduleProposalCount" | "latestArtifactTitle" | "lastActivityAt" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "currentNodeId" | "currentNodeTitle" | "updatedAt", ExtArgs["result"]["taskProjection"]>
 export type TaskProjectionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1167,6 +1389,12 @@ export type $TaskProjectionPayload<ExtArgs extends runtime.Types.Extensions.Inte
     scheduleProposalCount: number
     latestArtifactTitle: string | null
     lastActivityAt: Date | null
+    latestEventId: string | null
+    latestRawEventId: string | null
+    blockedByEventId: string | null
+    blockedByRawEventId: string | null
+    currentNodeId: string | null
+    currentNodeTitle: string | null
     updatedAt: Date
   }, ExtArgs["result"]["taskProjection"]>
   composites: {}
@@ -1611,6 +1839,12 @@ export interface TaskProjectionFieldRefs {
   readonly scheduleProposalCount: Prisma.FieldRef<"TaskProjection", 'Int'>
   readonly latestArtifactTitle: Prisma.FieldRef<"TaskProjection", 'String'>
   readonly lastActivityAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>
+  readonly latestEventId: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly latestRawEventId: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly blockedByEventId: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly blockedByRawEventId: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly currentNodeId: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly currentNodeTitle: Prisma.FieldRef<"TaskProjection", 'String'>
   readonly updatedAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>
 }
     

@@ -1,7 +1,10 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import {
+  appendCanonicalEvent,
+  appendRawEventLog,
+} from "@/modules/events/append-canonical-event";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
 import type { NodeAttempt } from "@chrona/contracts/ai";
 import type {
@@ -120,6 +123,10 @@ export class AiRuntimeInvoker {
           taskId: input.taskId,
           runId: run.id,
           runtimeName: input.runtimeName,
+          taskSessionId: input.taskSessionId,
+          nodeAttemptId: input.nodeAttemptId,
+          providerRunId: providerRun?.id,
+          planId: input.nodeAttempt?.graphId,
           nodeContext: input.nodeContext,
         },
         signal: input.signal,
@@ -147,6 +154,8 @@ export class AiRuntimeInvoker {
       });
       await updateProviderRunRecord(providerRun?.id, {
         providerRunRef: runtimeRunRef,
+        runtimeName: input.runtimeName,
+        nativeRunId: response.nativeRunId ?? null,
         status: response.error ? "failed" : response.status,
         finishedAt: response.status === "completed" || response.error ? new Date() : null,
       });
@@ -216,10 +225,11 @@ async function runProviderRequest(
     idempotencyKey,
   } as StartRunInput & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
-  await updateProviderRunRecord(options.providerRunRecordId, {
-    providerRunRef: run.nativeRunId ?? run.runId,
-    status: run.status ?? "running",
-  });
+      await updateProviderRunRecord(options.providerRunRecordId, {
+        providerRunRef: run.nativeRunId ?? run.runId,
+        nativeRunId: run.nativeRunId ?? null,
+        status: run.status ?? "running",
+      });
 
   try {
     return await collectProviderRunSnapshot(
@@ -261,6 +271,7 @@ async function runProviderRequest(
     await persistRuntimeRunRef(options.runId, run);
     await updateProviderRunRecord(options.providerRunRecordId, {
       providerRunRef: run.nativeRunId ?? run.runId,
+      nativeRunId: run.nativeRunId ?? null,
       status: run.status ?? "running",
     });
     return collectProviderRunSnapshot(
@@ -356,6 +367,13 @@ async function updateProviderRunRecord(
   providerRunRecordId: string | undefined,
   data: {
     providerRunRef?: string | null;
+    runtimeName?: string | null;
+    nativeRunId?: string | null;
+    firstRawEventId?: string | null;
+    lastRawEventId?: string | null;
+    completedByEventId?: string | null;
+    failedByEventId?: string | null;
+    correlationId?: string | null;
     status: string;
     finishedAt?: Date | null;
   },
@@ -474,6 +492,10 @@ type RuntimeEventPersistenceContext = {
   workspaceId: string;
   taskId: string;
   runId: string;
+  taskSessionId?: string | null;
+  planId?: string | null;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
   runtimeName: string;
   nodeContext?: {
     nodeId: string;
@@ -490,18 +512,50 @@ async function persistProviderRuntimeEvent(input: {
   if (!context) return;
 
   try {
-    const runtimeTs = typeof input.event.timestamp === "string"
+    const occurredAt = typeof input.event.timestamp === "string"
       ? new Date(input.event.timestamp)
       : new Date();
     const sequence = input.event.sequence ?? input.fallbackIndex;
+    const eventTime = Number.isNaN(occurredAt.getTime()) ? new Date() : occurredAt;
+    const rawEvent = await appendRawEventLog({
+      workspaceId: context.workspaceId,
+      taskId: context.taskId,
+      runId: context.runId,
+      taskSessionId: context.taskSessionId ?? null,
+      planId: context.planId ?? null,
+      nodeAttemptId: context.nodeAttemptId ?? null,
+      providerRunId: context.providerRunId ?? null,
+      nodeId: context.nodeContext?.nodeId ?? null,
+      nodeTitle: context.nodeContext?.nodeTitle ?? null,
+      source: "provider",
+      direction: "inbound",
+      rawType: input.event.rawEventType ?? input.event.type,
+      provider: input.event.provider,
+      runtimeName: context.runtimeName,
+      rawPayload: rawPayloadForProviderEvent(input.event),
+      metadata: hasRawProviderPayload(input.event)
+        ? { normalizedEvent: input.event }
+        : null,
+      nativeRunId: input.event.nativeRunId ?? input.event.runId,
+      externalRef: `provider.runtime:${context.runId}:${sequence}:${input.event.type}:${input.event.rawEventType ?? "event"}`,
+      sequence,
+      correlationId: context.providerRunId ?? context.runId,
+      occurredAt: eventTime,
+    });
 
-    await appendCanonicalEvent({
+    const event = await appendCanonicalEvent({
       eventType: `provider.${input.event.type}`,
       workspaceId: context.workspaceId,
       taskId: context.taskId,
       runId: context.runId,
+      taskSessionId: context.taskSessionId ?? null,
+      planId: context.planId ?? null,
+      nodeAttemptId: context.nodeAttemptId ?? null,
+      providerRunId: context.providerRunId ?? null,
       nodeId: context.nodeContext?.nodeId ?? null,
       nodeTitle: context.nodeContext?.nodeTitle ?? null,
+      rawEventId: rawEvent.id,
+      correlationId: context.providerRunId ?? context.runId,
       actorType: "runtime",
       actorId: context.runtimeName,
       source: "provider",
@@ -514,12 +568,71 @@ async function persistProviderRuntimeEvent(input: {
         rawEventType: input.event.rawEventType,
         event: input.event,
       },
+      summary: summaryForProviderEvent(input.event),
       dedupeKey: `provider.runtime:${context.runId}:${sequence}:${input.event.type}:${input.event.rawEventType ?? "event"}`,
-      runtimeTs: Number.isNaN(runtimeTs.getTime()) ? new Date() : runtimeTs,
+      occurredAt: eventTime,
+    });
+    await db.task.update({
+      where: { id: context.taskId },
+      data: { latestEventId: event.id, latestRawEventId: rawEvent.id },
+    }).catch(() => undefined);
+    await updateProviderRunAuditRefs({
+      providerRunRecordId: context.providerRunId,
+      rawEventId: rawEvent.id,
+      eventId: event.id,
+      eventType: input.event.type,
+      nativeRunId: input.event.nativeRunId ?? input.event.runId ?? null,
+      runtimeName: context.runtimeName,
+      correlationId: context.providerRunId ?? context.runId,
     });
   } catch {
     // Runtime event persistence must not interrupt provider streaming.
   }
+}
+
+async function updateProviderRunAuditRefs(input: {
+  providerRunRecordId?: string | null;
+  rawEventId: string;
+  eventId: string;
+  eventType: string;
+  nativeRunId?: string | null;
+  runtimeName: string;
+  correlationId: string;
+}) {
+  if (!input.providerRunRecordId) return;
+  const existing = await db.taskPlanProviderRun.findUnique({
+    where: { id: input.providerRunRecordId },
+    select: { firstRawEventId: true },
+  });
+  await db.taskPlanProviderRun.update({
+    where: { id: input.providerRunRecordId },
+    data: {
+      runtimeName: input.runtimeName,
+      nativeRunId: input.nativeRunId ?? undefined,
+      firstRawEventId: existing?.firstRawEventId ?? input.rawEventId,
+      lastRawEventId: input.rawEventId,
+      completedByEventId: input.eventType === "run_completed" ? input.eventId : undefined,
+      failedByEventId: input.eventType === "run_failed" ? input.eventId : undefined,
+      correlationId: input.correlationId,
+    },
+  });
+}
+
+function summaryForProviderEvent(event: ProviderRunEvent) {
+  if (event.type === "tool_started" || event.type === "tool_completed") {
+    const toolName = "toolName" in event ? event.toolName : undefined;
+    return typeof toolName === "string" ? toolName : event.type;
+  }
+  if (event.type === "run_failed") return event.error;
+  return event.type;
+}
+
+function hasRawProviderPayload(event: ProviderRunEvent): event is ProviderRunEvent & { raw: unknown } {
+  return "raw" in event && event.raw !== undefined;
+}
+
+function rawPayloadForProviderEvent(event: ProviderRunEvent) {
+  return hasRawProviderPayload(event) ? event.raw : event;
 }
 
 function buildExecutionGatewayRequest(input: {

@@ -305,6 +305,7 @@ export type {
   AiClientRecord,
   AiClientType,
   AiFeature,
+  DebugProviderProfile,
   HermesClientConfig,
   DebugClientConfig,
   LLMClientConfig,

@@ -18,9 +18,22 @@ import {
 } from "@chrona/providers-foundation";
 
 export const CHRONA_DEBUG_PROVIDER_TYPE = "debug";
+export const DEBUG_PROVIDER_PROFILES = [
+  "deterministic",
+  "tool-submit",
+  "hermes-like",
+] as const;
+
+export type DebugProviderProfile = typeof DEBUG_PROVIDER_PROFILES[number];
+
+export type ChronaDebugProviderConfig = {
+  provider?: string;
+  profile?: DebugProviderProfile;
+};
 
 const PLAN_TOOL = "chrona_plan_generate";
 const TASK_COMPLETE_TOOL = "chrona_task_complete";
+const DEFAULT_DEBUG_PROVIDER_PROFILE: DebugProviderProfile = "deterministic";
 
 type DebugRun = {
   runId: string;
@@ -64,6 +77,12 @@ function providerRunRef(
     startedAt: now(),
     stream: { supported: true, reconnectable: true },
   };
+}
+
+export function normalizeDebugProviderProfile(input: unknown): DebugProviderProfile {
+  return DEBUG_PROVIDER_PROFILES.includes(input as DebugProviderProfile)
+    ? input as DebugProviderProfile
+    : DEFAULT_DEBUG_PROVIDER_PROFILE;
 }
 
 function debugPlanBlueprint() {
@@ -258,11 +277,16 @@ async function pause(signal?: AbortSignal) {
 
 export class ChronaDebugProviderClient implements AgentProviderClient {
   readonly provider: string;
+  readonly profile: DebugProviderProfile;
   private readonly runs = new Map<string, DebugRun>();
   private replayTape?: Awaited<ReturnType<typeof readProviderReplayTape>>;
 
-  constructor(provider = CHRONA_DEBUG_PROVIDER_TYPE) {
-    this.provider = provider;
+  constructor(config: ChronaDebugProviderConfig | string = {}) {
+    const resolvedConfig = typeof config === "string" ? { provider: config } : config;
+    this.provider = resolvedConfig.provider ?? CHRONA_DEBUG_PROVIDER_TYPE;
+    this.profile = normalizeDebugProviderProfile(
+      resolvedConfig.profile ?? process.env.CHRONA_DEBUG_PROFILE,
+    );
   }
 
   async getCapabilities(): Promise<ProviderCapabilities> {
@@ -273,7 +297,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
-      reason: "Chrona local deterministic debug provider",
+      reason: `Chrona local debug provider (${this.profile})`,
     };
   }
 
@@ -284,7 +308,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       checkedAt: now(),
       latencyMs: 0,
       status: "ok",
-      reason: "Chrona debug provider is local and deterministic",
+      reason: `Chrona debug provider is local (${this.profile})`,
     };
   }
 
@@ -428,6 +452,23 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         callId,
         result: { ok: true, message: `Debug provider completed ${title}.` },
       };
+      if (this.profile !== "deterministic") {
+        await pause(signal);
+        yield {
+          ...eventBase(this.provider, run, sequence++),
+          type: "tool_completed",
+          toolName: TASK_COMPLETE_TOOL,
+          raw: { debugProvider: true, profile: this.profile },
+        };
+      }
+      if (this.profile === "hermes-like") {
+        await pause(signal);
+        yield {
+          ...eventBase(this.provider, run, sequence++),
+          type: "text_delta",
+          text: `Hermes-like debug profile accepted ${title} through Chrona tools.\n`,
+        };
+      }
     }
 
     await pause(signal);
@@ -438,8 +479,18 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       run: providerRunRef(this.provider, run, "completed"),
       outputText: isPlanGeneration(streamInput)
         ? "Debug plan generation completed."
-        : `Debug runtime run completed for ${currentNodeTitle(streamInput)}.`,
+        : this.profile === "hermes-like"
+          ? `Hermes-like debug runtime run completed for ${currentNodeTitle(streamInput)}.`
+          : `Debug runtime run completed for ${currentNodeTitle(streamInput)}.`,
+      output: isPlanGeneration(streamInput)
+        ? undefined
+        : {
+            text: this.profile === "hermes-like"
+              ? `Hermes-like debug runtime run completed for ${currentNodeTitle(streamInput)}.`
+              : `Debug runtime run completed for ${currentNodeTitle(streamInput)}.`,
+          },
       usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+      raw: { debugProvider: true, profile: this.profile },
     };
   }
 
@@ -462,9 +513,11 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       providerRunId: input.runId,
       sessionId: run?.sessionId ?? input.sessionId ?? input.sessionKey ?? input.runId,
       status: run?.status ?? "completed",
-      outputText: `Debug runtime run ${input.runId} completed during sync.`,
+      outputText: this.profile === "hermes-like"
+        ? `Hermes-like debug runtime run ${input.runId} completed during sync.`
+        : `Debug runtime run ${input.runId} completed during sync.`,
       error: null,
-      raw: { debugProvider: true },
+      raw: { debugProvider: true, profile: this.profile },
     };
   }
 

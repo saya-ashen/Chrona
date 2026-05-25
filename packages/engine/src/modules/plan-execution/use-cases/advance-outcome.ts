@@ -31,6 +31,7 @@ import {
   completeExecution,
   pauseExecution,
 } from "./execution-lifecycle";
+import type { PlanGraphCommandEnvelope } from "../types";
 
 type NativePlanRuntime = NonNullable<Awaited<ReturnType<typeof ensureNativePlanRun>>>;
 
@@ -39,6 +40,7 @@ async function persistAdvanceOutcome(input: {
   mainSessionId: string;
   runtime: NativePlanRuntime;
   outcome: GraphDispatchOutcome;
+  envelope: PlanGraphCommandEnvelope;
 }) {
   await persistRuntimeState({
     workspaceId: input.runtime.workspaceId,
@@ -57,6 +59,7 @@ async function persistAdvanceOutcome(input: {
     planId: input.runtime.planId,
     sessionId: input.mainSessionId,
     events: input.outcome.events,
+    envelope: input.envelope,
   });
 }
 
@@ -67,6 +70,7 @@ async function cancelledAdvanceResponse(input: {
   executionSession: ExecutionSessionRow;
   outcome: GraphDispatchOutcome;
 }) {
+  const latestEvidence = await latestPlanExecutionEvidence(input.taskId);
   const transition = executionTransition({
     status: "cancelled",
     message: input.outcome.message,
@@ -77,6 +81,8 @@ async function cancelledAdvanceResponse(input: {
     currentNodeId: null,
     pauseReason: transition.pauseReason,
     completedNodeIds: input.outcome.effective.completedNodeIds,
+    latestEventId: latestEvidence?.id ?? null,
+    latestRawEventId: latestEvidence?.rawEventId ?? null,
   });
   await cancelWorkBlock(input.taskId, input.executionSession.workBlockId);
   await db.task.update({
@@ -188,6 +194,7 @@ export async function handleAdvanceOutcome(input: {
   runtime: NativePlanRuntime;
   executionSession: ExecutionSessionRow;
   outcome: GraphDispatchOutcome;
+  envelope: PlanGraphCommandEnvelope;
 }): Promise<PlanExecutionResult> {
   await persistAdvanceOutcome(input);
 
@@ -204,4 +211,12 @@ export async function handleAdvanceOutcome(input: {
   }
 
   return pausedAdvanceResponse(input);
+}
+
+async function latestPlanExecutionEvidence(taskId: string) {
+  return db.event.findFirst({
+    where: { taskId, source: "plan_execution" },
+    orderBy: [{ ingestSequence: "desc" }],
+    select: { id: true, rawEventId: true },
+  });
 }

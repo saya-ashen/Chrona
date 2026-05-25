@@ -4,15 +4,21 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { planBlueprintSchema } from "@chrona/contracts";
 
-import { ChronaDebugProviderClient } from "./ChronaDebugProviderClient";
+import { ChronaDebugProviderClient, normalizeDebugProviderProfile } from "./ChronaDebugProviderClient";
 
 const realDebugReplayFile = process.env.CHRONA_DEBUG_REPLAY_FILE;
+const realDebugProfile = process.env.CHRONA_DEBUG_PROFILE;
 
 afterEach(() => {
   if (realDebugReplayFile === undefined) {
     delete process.env.CHRONA_DEBUG_REPLAY_FILE;
   } else {
     process.env.CHRONA_DEBUG_REPLAY_FILE = realDebugReplayFile;
+  }
+  if (realDebugProfile === undefined) {
+    delete process.env.CHRONA_DEBUG_PROFILE;
+  } else {
+    process.env.CHRONA_DEBUG_PROFILE = realDebugProfile;
   }
 });
 
@@ -130,5 +136,67 @@ describe("ChronaDebugProviderClient", () => {
       outputText: "done",
     });
     await rm(replayDir, { recursive: true, force: true });
+  });
+
+  it("normalizes configured profiles", () => {
+    process.env.CHRONA_DEBUG_PROFILE = "tool-submit";
+
+    expect(normalizeDebugProviderProfile("hermes-like")).toBe("hermes-like");
+    expect(normalizeDebugProviderProfile("unknown")).toBe("deterministic");
+    expect(new ChronaDebugProviderClient().profile).toBe("tool-submit");
+    expect(new ChronaDebugProviderClient({ profile: "hermes-like" }).profile).toBe("hermes-like");
+  });
+
+  it("emits profile metadata for Hermes-like task execution streams", async () => {
+    const client = new ChronaDebugProviderClient({ profile: "hermes-like" });
+    const events = [];
+
+    for await (const event of client.streamRun({
+      sessionId: "debug-task-session",
+      instructions: "Complete the current task node.",
+      input: {
+        node: {
+          title: "Write weather script",
+        },
+      },
+      stream: true,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.map((event) => event.type)).toContain("tool_completed");
+    expect(events.some(
+      (event) => event.type === "text_delta" && event.text.includes("Hermes-like debug profile accepted"),
+    )).toBe(true);
+
+    const terminalEvent = events.find((event) => event.type === "run_completed");
+    expect(terminalEvent).toMatchObject({
+      type: "run_completed",
+      raw: { debugProvider: true, profile: "hermes-like" },
+      output: { text: "Hermes-like debug runtime run completed for Write weather script." },
+    });
+  });
+
+  it("keeps the deterministic profile on the direct-return path", async () => {
+    const client = new ChronaDebugProviderClient();
+    const events = [];
+
+    for await (const event of client.streamRun({
+      sessionId: "debug-task-session",
+      instructions: "Complete the current task node.",
+      input: {
+        node: {
+          title: "Direct debug node",
+        },
+      },
+      stream: true,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.map((event) => event.type)).not.toContain("tool_completed");
+    expect(events.some(
+      (event) => event.type === "text_delta" && event.text.includes("Hermes-like debug profile accepted"),
+    )).toBe(false);
   });
 });

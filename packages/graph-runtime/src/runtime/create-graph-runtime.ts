@@ -6,7 +6,7 @@ import { applyMutationCommand } from "../commands/apply-mutation";
 import { cancelSessionCommand } from "../commands/cancel-session";
 import { pauseSessionCommand } from "../commands/pause-session";
 import { retryNodeCommand } from "../commands/retry-node";
-import { syncExternalResultCommand } from "../commands/sync-external-result";
+import { submitNodeResultCommand } from "../commands/submit-node-result";
 import { validateCommandGraphState } from "../commands/validate-command";
 import type { GraphRuntime, GraphRuntimeOptions } from "../commands/types";
 
@@ -30,6 +30,7 @@ export function createGraphRuntime<TContext = unknown>(
       }
       const callbacks: GraphExecutionCallbacks<TContext> = {
         executeNode: createRegistryExecutor(options),
+        resolveSubmittedNodeState: options.callbacks?.resolveSubmittedNodeState,
         onStateChange: options.callbacks?.onStateChange,
         onEvent: async (event) => {
           events.push(event);
@@ -98,8 +99,8 @@ export function createGraphRuntime<TContext = unknown>(
           return pauseSessionCommand({ command, options, events });
         case "apply_mutation":
           return applyMutationCommand({ command, options, events });
-        case "sync_external_result":
-          return syncExternalResultCommand({ command, options, callbacks, events });
+        case "submit_node_result":
+          return submitNodeResultCommand({ command, options, callbacks, events });
       }
     },
   };

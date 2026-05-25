@@ -15,8 +15,11 @@ import {
   startPlanAccept,
 } from "../model/task-workspace-plan-flow-machine";
 import type { TaskData } from "../model/task-workspace-types";
-import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
+
+const STARTING_NODE_STATUS_LABEL = "Starting";
+const STARTING_NODE_NEXT_ACTION = "Starting execution...";
 
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 type WorkspaceRuntimeTextEvent = WorkspaceRuntimeEvent & { event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" | "reasoning_delta" }> };
@@ -225,6 +228,53 @@ function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, chec
   } satisfies TaskPlanGraphPlan;
 }
 
+function withStartingReadyNode(graphPlan: TaskPlanGraphPlan | null, currentExecution: PlanExecutionResult | null) {
+  if (!graphPlan || !currentExecution) return graphPlan;
+  if (currentExecution.status !== "running" && currentExecution.status !== "started") return graphPlan;
+  if (graphPlan.nodes.some((node) => node.status === "active" || node.status === "in_progress")) return graphPlan;
+
+  const startingNodeId = currentExecution.currentNodeId
+    ?? graphPlan.currentStepId
+    ?? graphPlan.nodes.find((node) => node.status === "ready")?.id
+    ?? null;
+  if (!startingNodeId) return graphPlan;
+
+  const target = graphPlan.nodes.find((node) => node.id === startingNodeId);
+  if (!target || target.status !== "ready") return graphPlan;
+
+  const decorateNode = (node: TaskPlanGraphPlan["nodes"][number]) => {
+    if (node.id !== startingNodeId) return node;
+    return {
+      ...node,
+      status: "active" as const,
+      group: "active" as const,
+      statusLabel: STARTING_NODE_STATUS_LABEL,
+      nextAction: STARTING_NODE_NEXT_ACTION,
+      interactionType: "observe" as const,
+      active: true,
+      actionable: false,
+      availableActions: [],
+      metadata: {
+        ...node.metadata,
+        launchState: "starting",
+      },
+    } satisfies TaskPlanGraphPlan["nodes"][number];
+  };
+  const activeNodeIds = Array.from(new Set([startingNodeId, ...graphPlan.analytics.activeNodeIds]));
+
+  return {
+    ...graphPlan,
+    nodes: graphPlan.nodes.map(decorateNode),
+    steps: graphPlan.steps.map(decorateNode),
+    currentStepId: startingNodeId,
+    analytics: {
+      ...graphPlan.analytics,
+      activeNodeIds,
+      reachableFromActiveIds: Array.from(new Set([startingNodeId, ...graphPlan.analytics.reachableFromActiveIds])),
+    },
+  } satisfies TaskPlanGraphPlan;
+}
+
 function samePlanFlowSnapshot(
   left: ReturnType<typeof createPlanFlowFromSnapshot>,
   right: ReturnType<typeof createPlanFlowFromSnapshot>,
@@ -408,7 +458,10 @@ export function useTaskWorkspacePlanState(
     let cancelled = false;
     setIsGraphPlanPending(true);
     const timeoutId = window.setTimeout(() => {
-        const nextGraphPlan = withCanonicalExecutionActions(taskPlanReadModelToGraphPlan(plan), latestCheckpoint);
+      const nextGraphPlan = withStartingReadyNode(
+        withCanonicalExecutionActions(taskPlanReadModelToGraphPlan(plan), latestCheckpoint),
+        currentExecution,
+      );
       if (cancelled) return;
       startTransition(() => {
         setGraphPlan(nextGraphPlan);
@@ -420,7 +473,7 @@ export function useTaskWorkspacePlanState(
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [latestCheckpoint, plan]);
+  }, [currentExecution, latestCheckpoint, plan]);
 
   const setPlan = useCallback((value: SetStateAction<TaskData["savedPlan"] | null>) => {
     queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {

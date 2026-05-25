@@ -20,6 +20,10 @@ const messages = {
       llmCompatible: "LLM (OpenAI Compatible)",
       hermes: "Hermes",
       debug: "Debug Provider",
+      debugProfileLabel: "Debug profile",
+      debugProfileDeterministic: "Deterministic",
+      debugProfileToolSubmit: "Tool submit",
+      debugProfileHermesLike: "Hermes-like",
       timeoutSeconds: "Timeout (seconds)",
       modelLabel: "Model",
       setAsDefault: "Set as default Client",
@@ -169,7 +173,7 @@ describe("AiClientsManager", () => {
     });
   });
 
-  it("creates a debug client without provider config", async () => {
+  it("creates a debug client with the deterministic profile by default", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -190,6 +194,7 @@ describe("AiClientsManager", () => {
 
     expect(screen.queryByPlaceholderText("http://127.0.0.1:8642")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("optional for localhost")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Debug profile" })).toHaveTextContent("Deterministic");
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -214,7 +219,55 @@ describe("AiClientsManager", () => {
     expect(JSON.parse(createCall?.[1]?.body as string)).toMatchObject({
       name: "Local Debug",
       type: "debug",
-      config: {},
+      config: { profile: "deterministic" },
+    });
+  });
+
+  it("creates a debug client with a selected simulation profile", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+
+    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+      target: { value: "Hermes-like Debug" },
+    });
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Debug Provider"));
+    await user.click(screen.getByRole("combobox", { name: "Debug profile" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Hermes-like"));
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ client: { id: "client_debug" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const createCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients" && call[1]?.method === "POST");
+    expect(JSON.parse(createCall?.[1]?.body as string)).toMatchObject({
+      name: "Hermes-like Debug",
+      type: "debug",
+      config: { profile: "hermes-like" },
     });
   });
 

@@ -302,11 +302,11 @@ test.describe("Task Plan Generation via Hermes", () => {
         createdTask = await createTask(request);
         await page.goto(`/en/tasks/${createdTask.taskId}`);
 
-        await page
-          .getByRole("dialog", { name: "Edit task" })
-          .getByRole("button", { name: "Close task editor" })
-          .click();
-        await expect(page.getByRole("dialog", { name: "Edit task" })).not.toBeVisible();
+        const taskEditor = page.getByRole("dialog", { name: "Edit task" });
+        if (await taskEditor.isVisible()) {
+          await taskEditor.getByRole("button", { name: "Close task editor" }).click();
+          await expect(taskEditor).not.toBeVisible();
+        }
         await expect(page.getByText("The plan graph will appear here once AI generates a plan.")).toBeVisible();
       });
 

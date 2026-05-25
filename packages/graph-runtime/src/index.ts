@@ -62,7 +62,7 @@ export type {
   GraphExecutionOutcome,
   GraphExecutionState,
   GraphExecutionTrigger,
-  GraphExternalSyncResult,
+  GraphSubmittedNodeResult,
   GraphNodeExecutionResult,
   GraphNodeExecutorInput,
   GraphExecutorRegistry,

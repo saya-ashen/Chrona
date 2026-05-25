@@ -37,6 +37,10 @@ export type TaskMinAggregateOutputType = {
   dueAt: Date | null
   defaultSessionId: string | null
   latestRunId: string | null
+  latestEventId: string | null
+  latestRawEventId: string | null
+  blockedByEventId: string | null
+  blockedByRawEventId: string | null
   createdAt: Date | null
   updatedAt: Date | null
   completedAt: Date | null
@@ -55,6 +59,10 @@ export type TaskMaxAggregateOutputType = {
   dueAt: Date | null
   defaultSessionId: string | null
   latestRunId: string | null
+  latestEventId: string | null
+  latestRawEventId: string | null
+  blockedByEventId: string | null
+  blockedByRawEventId: string | null
   createdAt: Date | null
   updatedAt: Date | null
   completedAt: Date | null
@@ -75,6 +83,10 @@ export type TaskCountAggregateOutputType = {
   blockReason: number
   defaultSessionId: number
   latestRunId: number
+  latestEventId: number
+  latestRawEventId: number
+  blockedByEventId: number
+  blockedByRawEventId: number
   createdAt: number
   updatedAt: number
   completedAt: number
@@ -95,6 +107,10 @@ export type TaskMinAggregateInputType = {
   dueAt?: true
   defaultSessionId?: true
   latestRunId?: true
+  latestEventId?: true
+  latestRawEventId?: true
+  blockedByEventId?: true
+  blockedByRawEventId?: true
   createdAt?: true
   updatedAt?: true
   completedAt?: true
@@ -113,6 +129,10 @@ export type TaskMaxAggregateInputType = {
   dueAt?: true
   defaultSessionId?: true
   latestRunId?: true
+  latestEventId?: true
+  latestRawEventId?: true
+  blockedByEventId?: true
+  blockedByRawEventId?: true
   createdAt?: true
   updatedAt?: true
   completedAt?: true
@@ -133,6 +153,10 @@ export type TaskCountAggregateInputType = {
   blockReason?: true
   defaultSessionId?: true
   latestRunId?: true
+  latestEventId?: true
+  latestRawEventId?: true
+  blockedByEventId?: true
+  blockedByRawEventId?: true
   createdAt?: true
   updatedAt?: true
   completedAt?: true
@@ -226,6 +250,10 @@ export type TaskGroupByOutputType = {
   blockReason: runtime.JsonValue | null
   defaultSessionId: string | null
   latestRunId: string | null
+  latestEventId: string | null
+  latestRawEventId: string | null
+  blockedByEventId: string | null
+  blockedByRawEventId: string | null
   createdAt: Date
   updatedAt: Date
   completedAt: Date | null
@@ -267,6 +295,10 @@ export type TaskWhereInput = {
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
+  latestEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableFilter<"Task"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Task"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Task"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
@@ -277,6 +309,9 @@ export type TaskWhereInput = {
   artifacts?: Prisma.ArtifactListRelationFilter
   memories?: Prisma.MemoryListRelationFilter
   events?: Prisma.EventListRelationFilter
+  rawEventLogs?: Prisma.RawEventLogListRelationFilter
+  toolInvocations?: Prisma.ToolInvocationListRelationFilter
+  timelineItems?: Prisma.TaskTimelineItemListRelationFilter
   projection?: Prisma.XOR<Prisma.TaskProjectionNullableScalarRelationFilter, Prisma.TaskProjectionWhereInput> | null
   dependencies?: Prisma.TaskDependencyListRelationFilter
   dependentTasks?: Prisma.TaskDependencyListRelationFilter
@@ -310,6 +345,10 @@ export type TaskOrderByWithRelationInput = {
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -320,6 +359,9 @@ export type TaskOrderByWithRelationInput = {
   artifacts?: Prisma.ArtifactOrderByRelationAggregateInput
   memories?: Prisma.MemoryOrderByRelationAggregateInput
   events?: Prisma.EventOrderByRelationAggregateInput
+  rawEventLogs?: Prisma.RawEventLogOrderByRelationAggregateInput
+  toolInvocations?: Prisma.ToolInvocationOrderByRelationAggregateInput
+  timelineItems?: Prisma.TaskTimelineItemOrderByRelationAggregateInput
   projection?: Prisma.TaskProjectionOrderByWithRelationInput
   dependencies?: Prisma.TaskDependencyOrderByRelationAggregateInput
   dependentTasks?: Prisma.TaskDependencyOrderByRelationAggregateInput
@@ -356,6 +398,10 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
+  latestEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableFilter<"Task"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Task"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Task"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
@@ -366,6 +412,9 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   artifacts?: Prisma.ArtifactListRelationFilter
   memories?: Prisma.MemoryListRelationFilter
   events?: Prisma.EventListRelationFilter
+  rawEventLogs?: Prisma.RawEventLogListRelationFilter
+  toolInvocations?: Prisma.ToolInvocationListRelationFilter
+  timelineItems?: Prisma.TaskTimelineItemListRelationFilter
   projection?: Prisma.XOR<Prisma.TaskProjectionNullableScalarRelationFilter, Prisma.TaskProjectionWhereInput> | null
   dependencies?: Prisma.TaskDependencyListRelationFilter
   dependentTasks?: Prisma.TaskDependencyListRelationFilter
@@ -399,6 +448,10 @@ export type TaskOrderByWithAggregationInput = {
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -425,6 +478,10 @@ export type TaskScalarWhereWithAggregatesInput = {
   blockReason?: Prisma.JsonNullableWithAggregatesFilter<"Task">
   defaultSessionId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  latestEventId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  latestRawEventId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  blockedByEventId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Task"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Task"> | Date | string
   completedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
@@ -444,6 +501,10 @@ export type TaskCreateInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -454,6 +515,9 @@ export type TaskCreateInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -487,6 +551,10 @@ export type TaskUncheckedCreateInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -496,6 +564,9 @@ export type TaskUncheckedCreateInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -528,6 +599,10 @@ export type TaskUpdateInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -538,6 +613,9 @@ export type TaskUpdateInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -571,6 +649,10 @@ export type TaskUncheckedUpdateInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -580,6 +662,9 @@ export type TaskUncheckedUpdateInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -613,6 +698,10 @@ export type TaskCreateManyInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -632,6 +721,10 @@ export type TaskUpdateManyMutationInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -652,6 +745,10 @@ export type TaskUncheckedUpdateManyInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -682,6 +779,10 @@ export type TaskCountOrderByAggregateInput = {
   blockReason?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
@@ -700,6 +801,10 @@ export type TaskMaxOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
@@ -718,6 +823,10 @@ export type TaskMinOrderByAggregateInput = {
   dueAt?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
   latestRunId?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  blockedByRawEventId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
@@ -1023,12 +1132,60 @@ export type TaskCreateNestedOneWithoutEventsInput = {
   connect?: Prisma.TaskWhereUniqueInput
 }
 
-export type TaskUpdateOneRequiredWithoutEventsNestedInput = {
+export type TaskUpdateOneWithoutEventsNestedInput = {
   create?: Prisma.XOR<Prisma.TaskCreateWithoutEventsInput, Prisma.TaskUncheckedCreateWithoutEventsInput>
   connectOrCreate?: Prisma.TaskCreateOrConnectWithoutEventsInput
   upsert?: Prisma.TaskUpsertWithoutEventsInput
+  disconnect?: Prisma.TaskWhereInput | boolean
+  delete?: Prisma.TaskWhereInput | boolean
   connect?: Prisma.TaskWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutEventsInput, Prisma.TaskUpdateWithoutEventsInput>, Prisma.TaskUncheckedUpdateWithoutEventsInput>
+}
+
+export type TaskCreateNestedOneWithoutRawEventLogsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutRawEventLogsInput, Prisma.TaskUncheckedCreateWithoutRawEventLogsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutRawEventLogsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneWithoutRawEventLogsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutRawEventLogsInput, Prisma.TaskUncheckedCreateWithoutRawEventLogsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutRawEventLogsInput
+  upsert?: Prisma.TaskUpsertWithoutRawEventLogsInput
+  disconnect?: Prisma.TaskWhereInput | boolean
+  delete?: Prisma.TaskWhereInput | boolean
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutRawEventLogsInput, Prisma.TaskUpdateWithoutRawEventLogsInput>, Prisma.TaskUncheckedUpdateWithoutRawEventLogsInput>
+}
+
+export type TaskCreateNestedOneWithoutToolInvocationsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutToolInvocationsInput, Prisma.TaskUncheckedCreateWithoutToolInvocationsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutToolInvocationsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneWithoutToolInvocationsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutToolInvocationsInput, Prisma.TaskUncheckedCreateWithoutToolInvocationsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutToolInvocationsInput
+  upsert?: Prisma.TaskUpsertWithoutToolInvocationsInput
+  disconnect?: Prisma.TaskWhereInput | boolean
+  delete?: Prisma.TaskWhereInput | boolean
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutToolInvocationsInput, Prisma.TaskUpdateWithoutToolInvocationsInput>, Prisma.TaskUncheckedUpdateWithoutToolInvocationsInput>
+}
+
+export type TaskCreateNestedOneWithoutTimelineItemsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTimelineItemsInput, Prisma.TaskUncheckedCreateWithoutTimelineItemsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTimelineItemsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutTimelineItemsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTimelineItemsInput, Prisma.TaskUncheckedCreateWithoutTimelineItemsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTimelineItemsInput
+  upsert?: Prisma.TaskUpsertWithoutTimelineItemsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutTimelineItemsInput, Prisma.TaskUpdateWithoutTimelineItemsInput>, Prisma.TaskUncheckedUpdateWithoutTimelineItemsInput>
 }
 
 export type TaskCreateNestedOneWithoutProjectionInput = {
@@ -1115,6 +1272,10 @@ export type TaskCreateWithoutWorkspaceInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1124,6 +1285,9 @@ export type TaskCreateWithoutWorkspaceInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -1156,6 +1320,10 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1165,6 +1333,9 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -1226,6 +1397,10 @@ export type TaskScalarWhereInput = {
   blockReason?: Prisma.JsonNullableFilter<"Task">
   defaultSessionId?: Prisma.StringNullableFilter<"Task"> | string | null
   latestRunId?: Prisma.StringNullableFilter<"Task"> | string | null
+  latestEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"Task"> | string | null
+  blockedByRawEventId?: Prisma.StringNullableFilter<"Task"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Task"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Task"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
@@ -1245,6 +1420,10 @@ export type TaskCreateWithoutGraphVersionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1255,6 +1434,9 @@ export type TaskCreateWithoutGraphVersionsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -1287,6 +1469,10 @@ export type TaskUncheckedCreateWithoutGraphVersionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1296,6 +1482,9 @@ export type TaskUncheckedCreateWithoutGraphVersionsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -1343,6 +1532,10 @@ export type TaskUpdateWithoutGraphVersionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1353,6 +1546,9 @@ export type TaskUpdateWithoutGraphVersionsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -1385,6 +1581,10 @@ export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1394,6 +1594,9 @@ export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -1425,6 +1628,10 @@ export type TaskCreateWithoutGraphMutationsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1435,6 +1642,9 @@ export type TaskCreateWithoutGraphMutationsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -1467,6 +1677,10 @@ export type TaskUncheckedCreateWithoutGraphMutationsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1476,6 +1690,9 @@ export type TaskUncheckedCreateWithoutGraphMutationsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -1523,6 +1740,10 @@ export type TaskUpdateWithoutGraphMutationsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1533,6 +1754,9 @@ export type TaskUpdateWithoutGraphMutationsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -1565,6 +1789,10 @@ export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1574,6 +1802,9 @@ export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -1605,6 +1836,10 @@ export type TaskCreateWithoutReconciliationEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1615,6 +1850,9 @@ export type TaskCreateWithoutReconciliationEventsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -1647,6 +1885,10 @@ export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1656,6 +1898,9 @@ export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -1703,6 +1948,10 @@ export type TaskUpdateWithoutReconciliationEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1713,6 +1962,9 @@ export type TaskUpdateWithoutReconciliationEventsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -1745,6 +1997,10 @@ export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1754,6 +2010,9 @@ export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -1785,6 +2044,10 @@ export type TaskCreateWithoutSchedulerEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1795,6 +2058,9 @@ export type TaskCreateWithoutSchedulerEventsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -1827,6 +2093,10 @@ export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1836,6 +2106,9 @@ export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -1883,6 +2156,10 @@ export type TaskUpdateWithoutSchedulerEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1893,6 +2170,9 @@ export type TaskUpdateWithoutSchedulerEventsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -1925,6 +2205,10 @@ export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1934,6 +2218,9 @@ export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -1965,6 +2252,10 @@ export type TaskCreateWithoutSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -1974,6 +2265,9 @@ export type TaskCreateWithoutSessionsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -2007,6 +2301,10 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2015,6 +2313,9 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -2063,6 +2364,10 @@ export type TaskUpdateWithoutSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2072,6 +2377,9 @@ export type TaskUpdateWithoutSessionsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -2105,6 +2413,10 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2113,6 +2425,9 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -2145,6 +2460,10 @@ export type TaskCreateWithoutDependenciesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2155,6 +2474,9 @@ export type TaskCreateWithoutDependenciesInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
@@ -2187,6 +2509,10 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2196,6 +2522,9 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
@@ -2232,6 +2561,10 @@ export type TaskCreateWithoutDependentTasksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2242,6 +2575,9 @@ export type TaskCreateWithoutDependentTasksInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
@@ -2274,6 +2610,10 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2283,6 +2623,9 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
@@ -2330,6 +2673,10 @@ export type TaskUpdateWithoutDependenciesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2340,6 +2687,9 @@ export type TaskUpdateWithoutDependenciesInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
@@ -2372,6 +2722,10 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2381,6 +2735,9 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
@@ -2423,6 +2780,10 @@ export type TaskUpdateWithoutDependentTasksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2433,6 +2794,9 @@ export type TaskUpdateWithoutDependentTasksInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
@@ -2465,6 +2829,10 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2474,6 +2842,9 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
@@ -2505,6 +2876,10 @@ export type TaskCreateWithoutTaskPlansInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2515,6 +2890,9 @@ export type TaskCreateWithoutTaskPlansInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -2547,6 +2925,10 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2556,6 +2938,9 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -2603,6 +2988,10 @@ export type TaskUpdateWithoutTaskPlansInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2613,6 +3002,9 @@ export type TaskUpdateWithoutTaskPlansInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -2645,6 +3037,10 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2654,6 +3050,9 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -2685,6 +3084,10 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2695,6 +3098,9 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -2727,6 +3133,10 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2736,6 +3146,9 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -2783,6 +3196,10 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2793,6 +3210,9 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -2825,6 +3245,10 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2834,6 +3258,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -2865,6 +3292,10 @@ export type TaskCreateWithoutTaskPlanNodeAttemptsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2875,6 +3306,9 @@ export type TaskCreateWithoutTaskPlanNodeAttemptsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -2907,6 +3341,10 @@ export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -2916,6 +3354,9 @@ export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -2963,6 +3404,10 @@ export type TaskUpdateWithoutTaskPlanNodeAttemptsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2973,6 +3418,9 @@ export type TaskUpdateWithoutTaskPlanNodeAttemptsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -3005,6 +3453,10 @@ export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3014,6 +3466,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -3045,6 +3500,10 @@ export type TaskCreateWithoutTaskPlanProviderRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3055,6 +3514,9 @@ export type TaskCreateWithoutTaskPlanProviderRunsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -3087,6 +3549,10 @@ export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3096,6 +3562,9 @@ export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -3143,6 +3612,10 @@ export type TaskUpdateWithoutTaskPlanProviderRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3153,6 +3626,9 @@ export type TaskUpdateWithoutTaskPlanProviderRunsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -3185,6 +3661,10 @@ export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3194,6 +3674,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -3225,6 +3708,10 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3235,6 +3722,9 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -3267,6 +3757,10 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3276,6 +3770,9 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -3323,6 +3820,10 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3333,6 +3834,9 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -3365,6 +3869,10 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3374,6 +3882,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -3405,6 +3916,10 @@ export type TaskCreateWithoutRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3414,6 +3929,9 @@ export type TaskCreateWithoutRunsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -3447,6 +3965,10 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3455,6 +3977,9 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -3503,6 +4028,10 @@ export type TaskUpdateWithoutRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3512,6 +4041,9 @@ export type TaskUpdateWithoutRunsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -3545,6 +4077,10 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3553,6 +4089,9 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -3585,6 +4124,10 @@ export type TaskCreateWithoutApprovalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3594,6 +4137,9 @@ export type TaskCreateWithoutApprovalsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -3627,6 +4173,10 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3635,6 +4185,9 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -3683,6 +4236,10 @@ export type TaskUpdateWithoutApprovalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3692,6 +4249,9 @@ export type TaskUpdateWithoutApprovalsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -3725,6 +4285,10 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3733,6 +4297,9 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -3765,6 +4332,10 @@ export type TaskCreateWithoutArtifactsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3774,6 +4345,9 @@ export type TaskCreateWithoutArtifactsInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -3807,6 +4381,10 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3815,6 +4393,9 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -3863,6 +4444,10 @@ export type TaskUpdateWithoutArtifactsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3872,6 +4457,9 @@ export type TaskUpdateWithoutArtifactsInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -3905,6 +4493,10 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -3913,6 +4505,9 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -3945,6 +4540,10 @@ export type TaskCreateWithoutMemoriesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3954,6 +4553,9 @@ export type TaskCreateWithoutMemoriesInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -3987,6 +4589,10 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -3995,6 +4601,9 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -4043,6 +4652,10 @@ export type TaskUpdateWithoutMemoriesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4052,6 +4665,9 @@ export type TaskUpdateWithoutMemoriesInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -4085,6 +4701,10 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4093,6 +4713,9 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -4125,6 +4748,10 @@ export type TaskCreateWithoutEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4134,6 +4761,9 @@ export type TaskCreateWithoutEventsInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -4167,6 +4797,10 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4175,6 +4809,9 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -4223,6 +4860,10 @@ export type TaskUpdateWithoutEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4232,6 +4873,9 @@ export type TaskUpdateWithoutEventsInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -4265,6 +4909,10 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4273,6 +4921,633 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutRawEventLogsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoExecute?: boolean
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutRawEventLogsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoExecute?: boolean
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutRawEventLogsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutRawEventLogsInput, Prisma.TaskUncheckedCreateWithoutRawEventLogsInput>
+}
+
+export type TaskUpsertWithoutRawEventLogsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutRawEventLogsInput, Prisma.TaskUncheckedUpdateWithoutRawEventLogsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutRawEventLogsInput, Prisma.TaskUncheckedCreateWithoutRawEventLogsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutRawEventLogsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutRawEventLogsInput, Prisma.TaskUncheckedUpdateWithoutRawEventLogsInput>
+}
+
+export type TaskUpdateWithoutRawEventLogsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutRawEventLogsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutToolInvocationsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoExecute?: boolean
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutToolInvocationsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoExecute?: boolean
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutToolInvocationsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutToolInvocationsInput, Prisma.TaskUncheckedCreateWithoutToolInvocationsInput>
+}
+
+export type TaskUpsertWithoutToolInvocationsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutToolInvocationsInput, Prisma.TaskUncheckedUpdateWithoutToolInvocationsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutToolInvocationsInput, Prisma.TaskUncheckedCreateWithoutToolInvocationsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutToolInvocationsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutToolInvocationsInput, Prisma.TaskUncheckedUpdateWithoutToolInvocationsInput>
+}
+
+export type TaskUpdateWithoutToolInvocationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutToolInvocationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutTimelineItemsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoExecute?: boolean
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutTimelineItemsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoExecute?: boolean
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutTimelineItemsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTimelineItemsInput, Prisma.TaskUncheckedCreateWithoutTimelineItemsInput>
+}
+
+export type TaskUpsertWithoutTimelineItemsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutTimelineItemsInput, Prisma.TaskUncheckedUpdateWithoutTimelineItemsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTimelineItemsInput, Prisma.TaskUncheckedCreateWithoutTimelineItemsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutTimelineItemsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutTimelineItemsInput, Prisma.TaskUncheckedUpdateWithoutTimelineItemsInput>
+}
+
+export type TaskUpdateWithoutTimelineItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutTimelineItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -4305,6 +5580,10 @@ export type TaskCreateWithoutProjectionInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4315,6 +5594,9 @@ export type TaskCreateWithoutProjectionInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
   scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
@@ -4347,6 +5629,10 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4356,6 +5642,9 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
@@ -4403,6 +5692,10 @@ export type TaskUpdateWithoutProjectionInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4413,6 +5706,9 @@ export type TaskUpdateWithoutProjectionInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
@@ -4445,6 +5741,10 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4454,6 +5754,9 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
   scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
@@ -4485,6 +5788,10 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4495,6 +5802,9 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -4527,6 +5837,10 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4536,6 +5850,9 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -4583,6 +5900,10 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4593,6 +5914,9 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -4625,6 +5949,10 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4634,6 +5962,9 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -4665,6 +5996,10 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4675,6 +6010,9 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -4707,6 +6045,10 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4716,6 +6058,9 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -4763,6 +6108,10 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4773,6 +6122,9 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -4805,6 +6157,10 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4814,6 +6170,9 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -4845,6 +6204,10 @@ export type TaskCreateWithoutWorkBlocksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4855,6 +6218,9 @@ export type TaskCreateWithoutWorkBlocksInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -4887,6 +6253,10 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -4896,6 +6266,9 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -4943,6 +6316,10 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4953,6 +6330,9 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -4985,6 +6365,10 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4994,6 +6378,9 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -5025,6 +6412,10 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -5035,6 +6426,9 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
   events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
@@ -5067,6 +6461,10 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -5076,6 +6474,9 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
   memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
   projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
   dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
   dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
@@ -5123,6 +6524,10 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -5133,6 +6538,9 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -5165,6 +6573,10 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -5174,6 +6586,9 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -5205,6 +6620,10 @@ export type TaskCreateManyWorkspaceInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: string | null
   latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
@@ -5224,6 +6643,10 @@ export type TaskUpdateWithoutWorkspaceInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -5233,6 +6656,9 @@ export type TaskUpdateWithoutWorkspaceInput = {
   artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
@@ -5265,6 +6691,10 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -5274,6 +6704,9 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
   memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
   projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
   dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
   dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
@@ -5306,6 +6739,10 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -5323,6 +6760,9 @@ export type TaskCountOutputType = {
   artifacts: number
   memories: number
   events: number
+  rawEventLogs: number
+  toolInvocations: number
+  timelineItems: number
   dependencies: number
   dependentTasks: number
   scheduleProposals: number
@@ -5347,6 +6787,9 @@ export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   artifacts?: boolean | TaskCountOutputTypeCountArtifactsArgs
   memories?: boolean | TaskCountOutputTypeCountMemoriesArgs
   events?: boolean | TaskCountOutputTypeCountEventsArgs
+  rawEventLogs?: boolean | TaskCountOutputTypeCountRawEventLogsArgs
+  toolInvocations?: boolean | TaskCountOutputTypeCountToolInvocationsArgs
+  timelineItems?: boolean | TaskCountOutputTypeCountTimelineItemsArgs
   dependencies?: boolean | TaskCountOutputTypeCountDependenciesArgs
   dependentTasks?: boolean | TaskCountOutputTypeCountDependentTasksArgs
   scheduleProposals?: boolean | TaskCountOutputTypeCountScheduleProposalsArgs
@@ -5414,6 +6857,27 @@ export type TaskCountOutputTypeCountMemoriesArgs<ExtArgs extends runtime.Types.E
  */
 export type TaskCountOutputTypeCountEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.EventWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountRawEventLogsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RawEventLogWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountToolInvocationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ToolInvocationWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountTimelineItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskTimelineItemWhereInput
 }
 
 /**
@@ -5537,6 +7001,10 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   completedAt?: boolean
@@ -5547,6 +7015,9 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   artifacts?: boolean | Prisma.Task$artifactsArgs<ExtArgs>
   memories?: boolean | Prisma.Task$memoriesArgs<ExtArgs>
   events?: boolean | Prisma.Task$eventsArgs<ExtArgs>
+  rawEventLogs?: boolean | Prisma.Task$rawEventLogsArgs<ExtArgs>
+  toolInvocations?: boolean | Prisma.Task$toolInvocationsArgs<ExtArgs>
+  timelineItems?: boolean | Prisma.Task$timelineItemsArgs<ExtArgs>
   projection?: boolean | Prisma.Task$projectionArgs<ExtArgs>
   dependencies?: boolean | Prisma.Task$dependenciesArgs<ExtArgs>
   dependentTasks?: boolean | Prisma.Task$dependentTasksArgs<ExtArgs>
@@ -5581,6 +7052,10 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   completedAt?: boolean
@@ -5602,6 +7077,10 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   completedAt?: boolean
@@ -5623,12 +7102,16 @@ export type TaskSelectScalar = {
   blockReason?: boolean
   defaultSessionId?: boolean
   latestRunId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
+  blockedByEventId?: boolean
+  blockedByRawEventId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoExecute" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoExecute" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -5637,6 +7120,9 @@ export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   artifacts?: boolean | Prisma.Task$artifactsArgs<ExtArgs>
   memories?: boolean | Prisma.Task$memoriesArgs<ExtArgs>
   events?: boolean | Prisma.Task$eventsArgs<ExtArgs>
+  rawEventLogs?: boolean | Prisma.Task$rawEventLogsArgs<ExtArgs>
+  toolInvocations?: boolean | Prisma.Task$toolInvocationsArgs<ExtArgs>
+  timelineItems?: boolean | Prisma.Task$timelineItemsArgs<ExtArgs>
   projection?: boolean | Prisma.Task$projectionArgs<ExtArgs>
   dependencies?: boolean | Prisma.Task$dependenciesArgs<ExtArgs>
   dependentTasks?: boolean | Prisma.Task$dependentTasksArgs<ExtArgs>
@@ -5672,6 +7158,9 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     artifacts: Prisma.$ArtifactPayload<ExtArgs>[]
     memories: Prisma.$MemoryPayload<ExtArgs>[]
     events: Prisma.$EventPayload<ExtArgs>[]
+    rawEventLogs: Prisma.$RawEventLogPayload<ExtArgs>[]
+    toolInvocations: Prisma.$ToolInvocationPayload<ExtArgs>[]
+    timelineItems: Prisma.$TaskTimelineItemPayload<ExtArgs>[]
     projection: Prisma.$TaskProjectionPayload<ExtArgs> | null
     dependencies: Prisma.$TaskDependencyPayload<ExtArgs>[]
     dependentTasks: Prisma.$TaskDependencyPayload<ExtArgs>[]
@@ -5704,6 +7193,10 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     blockReason: runtime.JsonValue | null
     defaultSessionId: string | null
     latestRunId: string | null
+    latestEventId: string | null
+    latestRawEventId: string | null
+    blockedByEventId: string | null
+    blockedByRawEventId: string | null
     createdAt: Date
     updatedAt: Date
     completedAt: Date | null
@@ -6108,6 +7601,9 @@ export interface Prisma__TaskClient<T, Null = never, ExtArgs extends runtime.Typ
   artifacts<T extends Prisma.Task$artifactsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$artifactsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   memories<T extends Prisma.Task$memoriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$memoriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MemoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   events<T extends Prisma.Task$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  rawEventLogs<T extends Prisma.Task$rawEventLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$rawEventLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RawEventLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  toolInvocations<T extends Prisma.Task$toolInvocationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$toolInvocationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ToolInvocationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  timelineItems<T extends Prisma.Task$timelineItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$timelineItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskTimelineItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   projection<T extends Prisma.Task$projectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$projectionArgs<ExtArgs>>): Prisma.Prisma__TaskProjectionClient<runtime.Types.Result.GetResult<Prisma.$TaskProjectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   dependencies<T extends Prisma.Task$dependenciesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$dependenciesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskDependencyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   dependentTasks<T extends Prisma.Task$dependentTasksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$dependentTasksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskDependencyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -6167,6 +7663,10 @@ export interface TaskFieldRefs {
   readonly blockReason: Prisma.FieldRef<"Task", 'Json'>
   readonly defaultSessionId: Prisma.FieldRef<"Task", 'String'>
   readonly latestRunId: Prisma.FieldRef<"Task", 'String'>
+  readonly latestEventId: Prisma.FieldRef<"Task", 'String'>
+  readonly latestRawEventId: Prisma.FieldRef<"Task", 'String'>
+  readonly blockedByEventId: Prisma.FieldRef<"Task", 'String'>
+  readonly blockedByRawEventId: Prisma.FieldRef<"Task", 'String'>
   readonly createdAt: Prisma.FieldRef<"Task", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Task", 'DateTime'>
   readonly completedAt: Prisma.FieldRef<"Task", 'DateTime'>
@@ -6710,6 +8210,78 @@ export type Task$eventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
   take?: number
   skip?: number
   distinct?: Prisma.EventScalarFieldEnum | Prisma.EventScalarFieldEnum[]
+}
+
+/**
+ * Task.rawEventLogs
+ */
+export type Task$rawEventLogsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RawEventLog
+   */
+  select?: Prisma.RawEventLogSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RawEventLog
+   */
+  omit?: Prisma.RawEventLogOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RawEventLogInclude<ExtArgs> | null
+  where?: Prisma.RawEventLogWhereInput
+  orderBy?: Prisma.RawEventLogOrderByWithRelationInput | Prisma.RawEventLogOrderByWithRelationInput[]
+  cursor?: Prisma.RawEventLogWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RawEventLogScalarFieldEnum | Prisma.RawEventLogScalarFieldEnum[]
+}
+
+/**
+ * Task.toolInvocations
+ */
+export type Task$toolInvocationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ToolInvocation
+   */
+  select?: Prisma.ToolInvocationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ToolInvocation
+   */
+  omit?: Prisma.ToolInvocationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ToolInvocationInclude<ExtArgs> | null
+  where?: Prisma.ToolInvocationWhereInput
+  orderBy?: Prisma.ToolInvocationOrderByWithRelationInput | Prisma.ToolInvocationOrderByWithRelationInput[]
+  cursor?: Prisma.ToolInvocationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ToolInvocationScalarFieldEnum | Prisma.ToolInvocationScalarFieldEnum[]
+}
+
+/**
+ * Task.timelineItems
+ */
+export type Task$timelineItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskTimelineItem
+   */
+  select?: Prisma.TaskTimelineItemSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskTimelineItem
+   */
+  omit?: Prisma.TaskTimelineItemOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskTimelineItemInclude<ExtArgs> | null
+  where?: Prisma.TaskTimelineItemWhereInput
+  orderBy?: Prisma.TaskTimelineItemOrderByWithRelationInput | Prisma.TaskTimelineItemOrderByWithRelationInput[]
+  cursor?: Prisma.TaskTimelineItemWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskTimelineItemScalarFieldEnum | Prisma.TaskTimelineItemScalarFieldEnum[]
 }
 
 /**

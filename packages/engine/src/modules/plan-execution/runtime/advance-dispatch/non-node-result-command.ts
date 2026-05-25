@@ -2,7 +2,7 @@ import type { GraphRuntimeCommand } from "@chrona/graph-runtime";
 import type { AdvanceRuntimeCommand } from "../../types";
 import type { AdvanceDispatchCommandBase } from "./types";
 
-export function nonExternalCommand(
+export function nonNodeResultCommand(
   input: AdvanceDispatchCommandBase & { command: AdvanceRuntimeCommand },
 ): GraphRuntimeCommand {
   const { command, state, trigger, context } = input;
@@ -45,7 +45,7 @@ export function nonExternalCommand(
     case "complete_manual_node":
     case "block_current_node":
     case "fail_current_node":
-      throw new Error("External result commands must be resolved before dispatch.");
+      throw new Error("Node result commands must be resolved before dispatch.");
     case "retry_node":
       return {
         type: "retry_node",

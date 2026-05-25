@@ -5,7 +5,7 @@ import type {
   GraphExecutionState,
   GraphExecutionTrigger,
   GraphExecutorRegistry,
-  GraphExternalSyncResult,
+  GraphSubmittedNodeResult,
 } from "../execution/types";
 import type { GraphMutationOperation, NodeResult } from "../types";
 
@@ -82,11 +82,11 @@ export type GraphRuntimeCommand =
       };
     }
   | {
-      type: "sync_external_result";
+      type: "submit_node_result";
       state: GraphExecutionState;
       trigger?: GraphExecutionTrigger;
       context: unknown;
-      externalResult: GraphExternalSyncResult;
+      nodeResult: GraphSubmittedNodeResult;
       continueExecution?: boolean;
     };
 

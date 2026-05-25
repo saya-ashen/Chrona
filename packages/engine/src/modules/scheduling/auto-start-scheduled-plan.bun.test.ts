@@ -19,7 +19,7 @@ const { autoStartScheduledPlanTasks } = await import("@/modules/scheduling/auto-
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
-  await db.toolCallDetail.deleteMany();
+  await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();
   await db.event.deleteMany();

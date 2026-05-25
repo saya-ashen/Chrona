@@ -32,6 +32,27 @@ export async function committedStateIfNodeAdvanced(input: {
   return committed;
 }
 
+export async function committedStateForSubmittedNode(input: {
+  taskId: string;
+  planId: string;
+  nodeId: string;
+  attemptId: string;
+}) {
+  const committed = await getPlanRun(input.taskId, input.planId);
+  if (!committed?.graph) return null;
+  const submittedResult = committed.results.find(
+    (result) =>
+      result.nodeId === input.nodeId &&
+      result.attemptId === input.attemptId &&
+      (result.status === "current" || result.status === "rejected"),
+  );
+  if (!submittedResult) {
+    return null;
+  }
+
+  return committed;
+}
+
 export async function committedStateIfRunningNodeAdvanced(input: {
   taskId: string;
   planId: string;

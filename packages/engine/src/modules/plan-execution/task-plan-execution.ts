@@ -28,7 +28,9 @@ import {
   type AdvanceRuntimeCommand,
   type EngineRuntimeContext,
   type ExecutionActionWithContinuation,
+  type ExecutionDispatchContext,
   type OrchestratorTrigger,
+  type PlanGraphCommandEnvelope,
   type PlanExecutionControl,
   type PlanExecutionObserver,
 } from "./types";
@@ -56,9 +58,11 @@ import {
 import { getRuntimeName } from "./persistence/task-runtime-store";
 import { toGraphExecutionState } from "./runtime/graph-state";
 import {
+  committedStateForSubmittedNode,
   committedStateIfNodeAdvanced,
   committedStateIfRunningNodeAdvanced,
 } from "./runtime/committed-state";
+import { buildPlanGraphCommandEnvelope } from "./runtime/command-envelope";
 import { buildAdvanceDispatchCommand } from "./runtime/advance-dispatch/build-advance-dispatch-command";
 import { createExecutionGraphCallbacks } from "./runtime/graph-runtime-callbacks";
 import {
@@ -98,11 +102,7 @@ async function advancePlanExecution(input: {
   mainSession: { id: string; taskId: string; sessionKey: string };
   executionSession: ExecutionSessionRow;
   maxSteps?: number;
-  forcedNodeId?: string;
-  userInput?: string;
-  inputFields?: Record<string, string>;
-  forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
-  command?: AdvanceRuntimeCommand;
+  envelope: PlanGraphCommandEnvelope;
   control?: PlanExecutionControl;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
@@ -145,6 +145,7 @@ async function advancePlanExecution(input: {
       mainSession: input.mainSession,
       executionSession: input.executionSession,
       committedStateIfRunningNodeAdvanced,
+      committedStateForSubmittedNode,
       onGraphEvent: input.onGraphEvent,
       onRuntimeEvent: input.onRuntimeEvent,
       onStateChange: input.onStateChange,
@@ -155,11 +156,7 @@ async function advancePlanExecution(input: {
     trigger: input.trigger,
     context,
     executionSession: input.executionSession,
-    forcedNodeId: input.forcedNodeId,
-    userInput: input.userInput,
-    inputFields: input.inputFields,
-    forcedReplaceStatus: input.forcedReplaceStatus,
-    command: input.command,
+    command: input.envelope.command,
   });
   if (dispatchResolution.type === "already_completed") {
     return buildExecutionResponse({
@@ -206,6 +203,7 @@ async function advancePlanExecution(input: {
     runtime,
     executionSession: input.executionSession,
     outcome,
+    envelope: input.envelope,
   });
 }
 
@@ -239,7 +237,7 @@ async function withExecutionLease(input: {
         reason: "active_execution_owner",
       },
       dedupeKey: `execution.lease_ignored:${input.taskId}:${input.planId}:${input.ownerId}`,
-      runtimeTs: new Date(),
+      occurredAt: new Date(),
     });
     return getCurrentExecution({ taskId: input.taskId });
   }
@@ -321,6 +319,14 @@ export async function startPlanExecution(input: {
           trigger: input.trigger,
           mainSession,
           executionSession,
+          envelope: buildPlanGraphCommandEnvelope({
+            taskId: input.taskId,
+            planId: runtime.planId,
+            mainSessionId: mainSession.id,
+            executionSessionId: executionSession.id,
+            command: { type: "start" },
+            trigger: input.trigger,
+          }),
           control,
           onGraphEvent: input.onGraphEvent,
           onRuntimeEvent: input.onRuntimeEvent,
@@ -400,6 +406,23 @@ export async function continuePlanExecution(input: {
     ? effective.nodes.find((node) => node.ready)
     : null;
 
+  const resumeNodeId = input.resumeReadyNode
+    ? readyNode?.id ?? waitingNode?.id
+    : waitingNode?.id;
+
+  const command: AdvanceRuntimeCommand = input.userInput && waitingNode
+    ? {
+        type: "resume_with_input",
+        nodeId: waitingNode.id,
+        value: input.userInput,
+        fields: input.inputFields ?? {},
+        replaceStatus: "obsolete",
+      }
+    : {
+        type: "resume_after_unblock",
+        nodeId: resumeNodeId,
+      };
+
   return withExecutionLease({
     workspaceId: runtime.workspaceId,
     taskId: input.taskId,
@@ -413,10 +436,14 @@ export async function continuePlanExecution(input: {
           trigger: "manual",
           mainSession,
           executionSession,
-          userInput: input.userInput,
-          inputFields: input.inputFields,
-          forcedNodeId: readyNode?.id ?? waitingNode?.id,
-          forcedReplaceStatus: "obsolete",
+          envelope: buildPlanGraphCommandEnvelope({
+            taskId: input.taskId,
+            planId: runtime.planId,
+            mainSessionId: mainSession.id,
+            executionSessionId: executionSession.id,
+            command,
+            trigger: "manual",
+          }),
           control,
           onGraphEvent: input.onGraphEvent,
           onRuntimeEvent: input.onRuntimeEvent,
@@ -512,12 +539,19 @@ async function resumePlanExecutionWithApproval(input: {
           trigger: "manual",
           mainSession,
           executionSession,
-          command: {
+          envelope: buildPlanGraphCommandEnvelope({
+            taskId: input.taskId,
+            planId: runtime.planId,
+            mainSessionId: mainSession.id,
+            executionSessionId: executionSession.id,
+            trigger: "manual",
+            command: {
             type: "resume_with_approval",
             nodeId: waitingNode.id,
             approved: input.approved,
             feedback: input.feedback,
-          },
+            },
+          }),
           control,
           onGraphEvent: input.onGraphEvent,
           onRuntimeEvent: input.onRuntimeEvent,
@@ -530,6 +564,7 @@ async function resumePlanExecutionWithApproval(input: {
 export async function dispatchExecutionAction(input: {
   taskId: string;
   action: ExecutionActionWithContinuation;
+  commandContext?: ExecutionDispatchContext;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   switch (input.action.action) {
     case "start_manual":
@@ -589,6 +624,7 @@ export async function dispatchExecutionAction(input: {
         dispatchRuntimeCommandAction({
           taskId: input.taskId,
           action,
+          ...input.commandContext,
           advance: advancePlanExecution,
           withExecutionLease,
           control,
@@ -604,6 +640,7 @@ export async function dispatchExecutionAction(input: {
         dispatchRuntimeCommandAction({
           taskId: input.taskId,
           action,
+          ...input.commandContext,
           advance: advancePlanExecution,
           withExecutionLease,
           control,
@@ -619,6 +656,7 @@ export async function dispatchExecutionAction(input: {
         dispatchRuntimeCommandAction({
           taskId: input.taskId,
           action,
+          ...input.commandContext,
           advance: advancePlanExecution,
           withExecutionLease,
           control,
@@ -634,6 +672,7 @@ export async function dispatchExecutionAction(input: {
         dispatchRuntimeCommandAction({
           taskId: input.taskId,
           action,
+          ...input.commandContext,
           advance: advancePlanExecution,
           withExecutionLease,
           control,
@@ -650,6 +689,7 @@ export async function dispatchExecutionAction(input: {
       return dispatchRuntimeCommandAction({
         taskId: input.taskId,
         action: input.action,
+        ...input.commandContext,
         advance: advancePlanExecution,
         withExecutionLease,
         onGraphEvent: input.onGraphEvent,
@@ -665,6 +705,7 @@ export async function dispatchExecutionAction(input: {
       return dispatchRuntimeCommandAction({
         taskId: input.taskId,
         action: input.action,
+        ...input.commandContext,
         advance: advancePlanExecution,
         withExecutionLease,
         onGraphEvent: input.onGraphEvent,

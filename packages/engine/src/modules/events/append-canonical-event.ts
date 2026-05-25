@@ -1,41 +1,204 @@
+import { createHash } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 
-type AppendCanonicalEventInput = {
-  eventType: string;
+type EventContext = {
   workspaceId: string;
-  taskId: string;
+  taskId?: string | null;
   runId?: string | null;
+  taskSessionId?: string | null;
+  executionSessionId?: string | null;
+  planId?: string | null;
+  planRunId?: string | null;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
   nodeId?: string | null;
   nodeTitle?: string | null;
+  correlationId?: string | null;
+};
+
+export type AppendRawEventLogInput = EventContext & {
+  source: string;
+  direction: string;
+  rawType: string;
+  provider?: string | null;
+  runtimeName?: string | null;
+  rawPayload?: unknown;
+  rawText?: string | null;
+  metadata?: Record<string, unknown> | null;
+  nativeRunId?: string | null;
+  nativeEventId?: string | null;
+  nativeToolCallId?: string | null;
+  externalRef?: string | null;
+  sequence?: number | null;
+  parentRawEventId?: string | null;
+  causationRawEventId?: string | null;
+  occurredAt?: Date | null;
+};
+
+export type AppendCanonicalEventInput = EventContext & {
+  eventType: string;
+  eventVersion?: number;
+  rawEventId?: string | null;
+  parentEventId?: string | null;
+  causationEventId?: string | null;
   actorType: string;
-  actorId: string;
+  actorId?: string | null;
   source: string;
   payload: Record<string, unknown>;
-  dedupeKey: string;
-  runtimeTs?: Date | null;
+  summary?: string | null;
+  severity?: string | null;
+  dedupeKey?: string | null;
+  occurredAt?: Date | null;
 };
+
+export type AppendTaskTimelineItemInput = EventContext & {
+  taskId: string;
+  kind: string;
+  title: string;
+  body?: string | null;
+  severity?: string | null;
+  status?: string | null;
+  eventId?: string | null;
+  rawEventId?: string | null;
+  toolInvocationId?: string | null;
+  sortTime?: Date | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export async function appendRawEventLog(input: AppendRawEventLogInput) {
+  const payloadHash = hashEventPayload({
+    rawPayload: input.rawPayload ?? null,
+    rawText: input.rawText ?? null,
+    metadata: input.metadata ?? null,
+  });
+
+  const createData = {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId ?? null,
+      runId: input.runId ?? null,
+      taskSessionId: input.taskSessionId ?? null,
+      executionSessionId: input.executionSessionId ?? null,
+      planId: input.planId ?? null,
+      planRunId: input.planRunId ?? null,
+      nodeAttemptId: input.nodeAttemptId ?? null,
+      providerRunId: input.providerRunId ?? null,
+      nodeId: input.nodeId ?? null,
+      nodeTitle: input.nodeTitle ?? null,
+      source: input.source,
+      direction: input.direction,
+      rawType: input.rawType,
+      provider: input.provider ?? null,
+      runtimeName: input.runtimeName ?? null,
+      rawPayload: toJsonInput(input.rawPayload),
+      rawText: input.rawText ?? null,
+      metadata: toJsonInput(input.metadata),
+      nativeRunId: input.nativeRunId ?? null,
+      nativeEventId: input.nativeEventId ?? null,
+      nativeToolCallId: input.nativeToolCallId ?? null,
+      externalRef: input.externalRef ?? null,
+      sequence: input.sequence ?? null,
+      correlationId: input.correlationId ?? null,
+      parentRawEventId: input.parentRawEventId ?? null,
+      causationRawEventId: input.causationRawEventId ?? null,
+      payloadHash,
+      occurredAt: input.occurredAt ?? null,
+  };
+
+  if (input.externalRef) {
+    return db.rawEventLog.upsert({
+      where: { source_externalRef: { source: input.source, externalRef: input.externalRef } },
+      update: {},
+      create: createData,
+    });
+  }
+
+  return db.rawEventLog.create({ data: createData });
+}
 
 export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
   const latest = await db.event.aggregate({ _max: { ingestSequence: true } });
+  const createData = {
+    eventType: input.eventType,
+    eventVersion: input.eventVersion ?? 1,
+    workspaceId: input.workspaceId,
+    taskId: input.taskId ?? null,
+    runId: input.runId ?? null,
+    taskSessionId: input.taskSessionId ?? null,
+    executionSessionId: input.executionSessionId ?? null,
+    planId: input.planId ?? null,
+    planRunId: input.planRunId ?? null,
+    nodeAttemptId: input.nodeAttemptId ?? null,
+    providerRunId: input.providerRunId ?? null,
+    nodeId: input.nodeId ?? null,
+    nodeTitle: input.nodeTitle ?? null,
+    rawEventId: input.rawEventId ?? null,
+    parentEventId: input.parentEventId ?? null,
+    causationEventId: input.causationEventId ?? null,
+    correlationId: input.correlationId ?? null,
+    actorType: input.actorType,
+    actorId: input.actorId ?? null,
+    source: input.source,
+    payload: toJsonInput(input.payload) ?? Prisma.JsonNull,
+    summary: input.summary ?? null,
+    severity: input.severity ?? null,
+    dedupeKey: input.dedupeKey ?? null,
+    occurredAt: input.occurredAt ?? null,
+    ingestSequence: (latest._max.ingestSequence ?? 0) + 1,
+  };
+
+  if (!input.dedupeKey) {
+    return db.event.create({ data: createData });
+  }
 
   return db.event.upsert({
     where: { dedupeKey: input.dedupeKey },
     update: {},
-    create: {
-      eventType: input.eventType,
+    create: createData,
+  });
+}
+
+export async function appendTaskTimelineItem(input: AppendTaskTimelineItemInput) {
+  return db.taskTimelineItem.create({
+    data: {
       workspaceId: input.workspaceId,
       taskId: input.taskId,
       runId: input.runId ?? null,
+      executionSessionId: input.executionSessionId ?? null,
       nodeId: input.nodeId ?? null,
-      nodeTitle: input.nodeTitle ?? null,
-      actorType: input.actorType,
-      actorId: input.actorId,
-      source: input.source,
-      payload: input.payload as Prisma.InputJsonValue,
-      dedupeKey: input.dedupeKey,
-      runtimeTs: input.runtimeTs ?? null,
-      ingestSequence: (latest._max.ingestSequence ?? 0) + 1,
+      nodeAttemptId: input.nodeAttemptId ?? null,
+      kind: input.kind,
+      title: input.title,
+      body: input.body ?? null,
+      severity: input.severity ?? null,
+      status: input.status ?? null,
+      eventId: input.eventId ?? null,
+      rawEventId: input.rawEventId ?? null,
+      toolInvocationId: input.toolInvocationId ?? null,
+      sortTime: input.sortTime ?? new Date(),
+      metadata: toJsonInput(input.metadata),
     },
   });
+}
+
+export function toJsonInput(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return Prisma.JsonNull;
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function hashEventPayload(value: unknown) {
+  return createHash("sha256")
+    .update(stableStringify(value))
+    .digest("hex");
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(",")}}`;
 }

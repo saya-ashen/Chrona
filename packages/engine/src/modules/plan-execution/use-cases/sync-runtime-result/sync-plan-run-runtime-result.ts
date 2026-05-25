@@ -1,4 +1,4 @@
-import { createGraphRuntime } from "@chrona/graph-runtime";
+import { createGraphRuntime, resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type { NodeAttempt } from "@chrona/contracts/ai";
 import type {
   EngineRuntimeContext,
@@ -10,10 +10,14 @@ import { getRuntimeName } from "../../persistence/task-runtime-store";
 import { ensureExecutionSession } from "../../persistence/execution-session-store";
 import { toGraphExecutionState } from "../../runtime/graph-state";
 import { createExecutionGraphCallbacks } from "../../runtime/graph-runtime-callbacks";
-import { committedStateIfRunningNodeAdvanced } from "../../runtime/committed-state";
+import { buildPlanGraphCommandEnvelope } from "../../runtime/command-envelope";
+import {
+  committedStateForSubmittedNode,
+  committedStateIfRunningNodeAdvanced,
+} from "../../runtime/committed-state";
 import { handleAdvanceOutcome } from "../advance-outcome";
 import { attemptForRuntimeRun, runningAttemptForRuntimeRun } from "./attempts";
-import { externalResultForRuntimeRun } from "./external-result";
+import { nodeResultForRuntimeRun } from "./node-result";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { db } from "@/lib/db";
 
@@ -39,7 +43,18 @@ async function recordIgnoredRuntimeSync(input: {
       reason: input.reason,
     },
     dedupeKey: `execution.runtime_sync_ignored:${input.taskId}:${input.planId}:${input.runtimeRunRef}:${input.reason}`,
-    runtimeTs: new Date(),
+    occurredAt: new Date(),
+  });
+}
+
+async function activeExecutionSession(input: { taskId: string; planId: string }) {
+  return db.executionSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      planId: input.planId,
+      status: "Active",
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
 }
 
@@ -55,6 +70,81 @@ export async function syncPlanRunRuntimeResult(
     runtimeRunRef: input.runtimeRunRef,
   });
   if (!attempt) {
+    const activeSession = await activeExecutionSession({
+      taskId: input.taskId,
+      planId: runtime.planId,
+    });
+    const effective = resolveEffectivePlanGraph(state);
+    const readyNodeId = effective.readyNodeIds[0] ?? null;
+    if (input.status === "Completed" && activeSession && readyNodeId) {
+      const runtimeName = await getRuntimeName(input.taskId);
+      const mainSession = await ensurePlanMainSession({
+        taskId: input.taskId,
+        planId: runtime.planId,
+        runtimeName,
+      });
+      const executionSession = await ensureExecutionSession({
+        workspaceId: runtime.workspaceId,
+        taskId: input.taskId,
+        planId: runtime.planId,
+        trigger: "system",
+        sessionId: activeSession.id,
+      });
+      const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
+        taskId: input.taskId,
+        runtimeName,
+        policies: { maxSteps: DEFAULT_MAX_STEPS },
+        callbacks: createExecutionGraphCallbacks({
+          taskId: input.taskId,
+          planId: runtime.planId,
+          workspaceId: runtime.workspaceId,
+          compiledPlan: runtime.compiledPlan,
+          persisted: runtime.persisted,
+          runtimeName,
+          trigger: "system",
+          mainSession,
+          executionSession,
+          committedStateIfRunningNodeAdvanced,
+          committedStateForSubmittedNode,
+        }),
+      });
+      const context: EngineRuntimeContext = {
+        taskId: input.taskId,
+        planId: runtime.planId,
+        mainSession,
+      };
+      const outcome = await graphRuntime.dispatch({
+        type: "resume_after_unblock",
+        state,
+        trigger: "system",
+        context,
+        nodeId: readyNodeId,
+      });
+
+      await handleAdvanceOutcome({
+        taskId: input.taskId,
+        mainSessionId: mainSession.id,
+        runtime,
+        executionSession,
+        outcome,
+        envelope: buildPlanGraphCommandEnvelope({
+          taskId: input.taskId,
+          planId: runtime.planId,
+          mainSessionId: mainSession.id,
+          executionSessionId: executionSession.id,
+          command: { type: "resume_after_unblock", nodeId: readyNodeId },
+          trigger: "system",
+          actor: {
+            type: "system",
+            service: "runtime-sync",
+            reason: "ready-node-recovery",
+          },
+          origin: { channel: "provider_stream" },
+        }),
+      });
+      return;
+    }
+
     const staleAttempt = attemptForRuntimeRun({
       attempts: state.attempts as unknown as NodeAttempt[],
       runtimeRunRef: input.runtimeRunRef,
@@ -71,13 +161,9 @@ export async function syncPlanRunRuntimeResult(
     return;
   }
 
-  const activeSession = await db.executionSession.findFirst({
-    where: {
-      taskId: input.taskId,
-      planId: runtime.planId,
-      status: "Active",
-    },
-    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  const activeSession = await activeExecutionSession({
+    taskId: input.taskId,
+    planId: runtime.planId,
   });
   if (!activeSession) {
     await recordIgnoredRuntimeSync({
@@ -118,6 +204,7 @@ export async function syncPlanRunRuntimeResult(
       mainSession,
       executionSession,
       committedStateIfRunningNodeAdvanced,
+      committedStateForSubmittedNode,
     }),
   });
   const context: EngineRuntimeContext = {
@@ -125,7 +212,7 @@ export async function syncPlanRunRuntimeResult(
     planId: runtime.planId,
     mainSession,
   };
-  const externalResult = externalResultForRuntimeRun({
+  const nodeResult = nodeResultForRuntimeRun({
     attempt,
     mainSessionId: mainSession.id,
     runtimeRunRef: input.runtimeRunRef,
@@ -135,11 +222,11 @@ export async function syncPlanRunRuntimeResult(
     error: input.error ?? undefined,
   });
   const outcome = await graphRuntime.dispatch({
-    type: "sync_external_result",
+    type: "submit_node_result",
     state,
     trigger: "system",
     context,
-    externalResult,
+    nodeResult,
   });
 
   await handleAdvanceOutcome({
@@ -148,5 +235,19 @@ export async function syncPlanRunRuntimeResult(
     runtime,
     executionSession,
     outcome,
+    envelope: buildPlanGraphCommandEnvelope({
+      taskId: input.taskId,
+      planId: runtime.planId,
+      mainSessionId: mainSession.id,
+      executionSessionId: executionSession.id,
+      command: { type: "complete_manual_node", nodeId: attempt.nodeId },
+      trigger: "system",
+      actor: {
+        type: "system",
+        service: "runtime-sync",
+        reason: input.status.toLowerCase(),
+      },
+      origin: { channel: "provider_stream" },
+    }),
   });
 }

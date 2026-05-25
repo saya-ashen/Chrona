@@ -49,7 +49,11 @@ export interface HermesClientConfig {
   timeoutMs?: number;
 }
 
-export type DebugClientConfig = Record<string, never>;
+export type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
+
+export interface DebugClientConfig {
+  profile?: DebugProviderProfile;
+}
 
 type StructuredResultReliability = "business_tool" | "assistant_text";
 

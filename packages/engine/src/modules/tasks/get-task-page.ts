@@ -54,9 +54,21 @@ type TaskActivityEvent = {
   nodeId: string | null;
   nodeTitle: string | null;
   payload: unknown;
-  runtimeTs: Date | null;
+  occurredAt: Date | null;
   createdAt: Date;
   ingestSequence?: number | bigint | null;
+};
+
+type TaskTimelineActivityItem = {
+  id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  severity: string | null;
+  status: string | null;
+  nodeId: string | null;
+  sortTime: Date;
+  metadata: unknown;
 };
 
 type TaskActivityPageInput = {
@@ -199,7 +211,7 @@ function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivity
   const nativeRunId = stringPayloadValue(event.payload, "nativeRunId") ?? undefined;
   const sequence = numberPayloadValue(event.payload, "sequence") ?? undefined;
   const eventType = providerActivityEventType(event, payloadEvent);
-  const timestamp = (event.runtimeTs ?? event.createdAt).toISOString();
+  const timestamp = (event.occurredAt ?? event.createdAt).toISOString();
   const payloadRecord = payloadEvent ?? {};
   const rawEventType = optionalStringEventValue(payloadRecord, "rawEventType") ?? eventType;
   const withBase = (item: WorkspaceActivityTimelineItem): WorkspaceActivityTimelineItem => ({
@@ -249,7 +261,7 @@ function taskActivityItem(input: Omit<WorkspaceActivityTimelineItem, "summary"> 
 }
 
 function eventTimestamp(event: TaskActivityEvent) {
-  return (event.runtimeTs ?? event.createdAt).toISOString();
+  return (event.occurredAt ?? event.createdAt).toISOString();
 }
 
 function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem {
@@ -404,12 +416,55 @@ function orderActivityNewestFirst(items: WorkspaceActivityTimelineItem[]) {
   });
 }
 
+function timelineTone(severity: string | null): WorkspaceActivityTimelineItem["tone"] {
+  if (severity === "warning") return "warning";
+  if (severity === "danger" || severity === "error") return "danger";
+  if (severity === "success") return "success";
+  if (severity === "info") return "info";
+  return "neutral";
+}
+
+function mapTimelineItemToActivity(item: TaskTimelineActivityItem): WorkspaceActivityTimelineItem {
+  return taskActivityItem({
+    id: item.id,
+    kind: item.kind.startsWith("plan_execution.") ? "node" : "task",
+    title: item.title,
+    description: item.body ?? item.status ?? item.kind,
+    tone: timelineTone(item.severity),
+    timestamp: item.sortTime.toISOString(),
+    sourceNodeId: item.nodeId ?? undefined,
+    raw: item.metadata,
+  });
+}
+
 export async function getTaskActivityPage(input: TaskActivityPageInput) {
   const limit = Math.min(Math.max(input.limit ?? 100, 1), 3000);
   const scope = input.scope ?? "task";
   if (scope === "node" && !input.nodeId) {
     throw new Error("nodeId is required for node activity");
   }
+  const timelineItems = await db.taskTimelineItem.findMany({
+    where: scope === "node"
+      ? { taskId: input.taskId, nodeId: input.nodeId }
+      : { taskId: input.taskId },
+    orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
+    take: limit + 1,
+    ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+  });
+  const pageTimelineItems = timelineItems.slice(0, limit);
+  if (pageTimelineItems.length > 0) {
+    return {
+      items: orderActivityNewestFirst(pageTimelineItems.map(mapTimelineItemToActivity)),
+      nextCursor: timelineItems.length > limit ? pageTimelineItems.at(-1)?.id : undefined,
+      scope: {
+        type: scope,
+        taskId: input.taskId,
+        ...(scope === "node" && input.nodeId ? { nodeId: input.nodeId } : {}),
+        limit,
+      },
+    };
+  }
+
   const events = await db.event.findMany({
     where: scope === "node"
       ? { taskId: input.taskId, nodeId: input.nodeId }
@@ -453,6 +508,10 @@ export async function getTaskPage(taskId: string) {
       runs: { orderBy: { createdAt: "desc" }, take: 1 },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
+      timelineItems: {
+        orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
+        take: 100,
+      },
       events: {
         orderBy: { ingestSequence: "desc" },
         take: 100,
@@ -557,6 +616,8 @@ export async function getTaskPage(taskId: string) {
       type: artifact.type,
       uri: artifact.uri,
     })),
-    activityTimeline: buildActivityTimeline([...task.events].reverse()),
+    activityTimeline: task.timelineItems.length > 0
+      ? orderActivityNewestFirst(task.timelineItems.map(mapTimelineItemToActivity))
+      : buildActivityTimeline([...task.events].reverse()),
   };
 }

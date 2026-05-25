@@ -2,10 +2,16 @@ import { describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
+import type { CompiledPlan, ConditionConfig, TaskConfig } from "@chrona/contracts/ai";
+import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type { NodeExecutionResult } from "./node-executors/types";
+import { buildSemanticRefHistory } from "./node-runtime-refs";
 import {
   executeTaskNodeCapabilityMock,
+  evaluateConditionNodeCapabilityMock,
+  makeManualThenTaskPlan,
   makeSingleTaskPlan,
+  makeTwoTaskPlan,
   seedAcceptedCompiledPlan,
   seedWorkspaceAndTask,
   setupPlanRunnerTaskExecutorTest,
@@ -23,7 +29,7 @@ describe("plan-runner task executor external results", () => {
       });
       expect(activeSession.currentNodeId).toBe("task_node");
 
-      const externalResult = await taskPlanExecution.dispatch({
+      const submittedResult = await taskPlanExecution.dispatch({
         taskId: input.taskId,
         action: {
           action: "complete_manual_node",
@@ -31,7 +37,7 @@ describe("plan-runner task executor external results", () => {
           output: { source: "hermes" },
         },
       });
-      expect(externalResult.status).toBe("completed");
+      expect(submittedResult.status).toBe("completed");
 
       return {
         status: "started",
@@ -103,25 +109,254 @@ describe("plan-runner task executor external results", () => {
     expect(reprojection.persistedStatus).toBe(TaskStatus.Completed);
     expect(reprojection.latestRunStatus).toBe("Completed");
 
-    const events = await db.event.findMany({
+    const eventsBeforeReplay = await db.event.findMany({
       where: { taskId: task.id },
       orderBy: { ingestSequence: "asc" },
       select: { eventType: true, payload: true },
     });
-    const completionIndex = events.findIndex(
+    const completionIndex = eventsBeforeReplay.findIndex(
       (event) => event.eventType === "plan_execution.execution_completed",
     );
     expect(completionIndex).toBeGreaterThanOrEqual(0);
-    expect(
-      events.slice(completionIndex + 1).find(
-        (event) => event.eventType === "plan_execution.node_started",
-      ),
-    ).toBeUndefined();
+    const attemptCountBeforeReplay = await db.taskPlanNodeAttempt.count({
+      where: { taskId: task.id, nodeId: "task_node" },
+    });
+    await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    const attemptCountAfterReplay = await db.taskPlanNodeAttempt.count({
+      where: { taskId: task.id, nodeId: "task_node" },
+    });
+    expect(attemptCountAfterReplay).toBe(attemptCountBeforeReplay);
+  });
+
+  it("continues to downstream work when a running task submits its own terminal result", async () => {
+    executeTaskNodeCapabilityMock
+      .mockImplementationOnce(async (input) => {
+        const submittedResult = await taskPlanExecution.submitNodeResult({
+          taskId: input.taskId,
+          action: {
+            action: "complete_manual_node",
+            sessionId: "provider-runtime-session",
+            summary: "Runtime tool completed first task",
+            output: { source: "chrona_task_complete" },
+          },
+        });
+        expect(submittedResult.status).toBe("running");
+
+        return {
+          status: "started",
+          summary: "Provider stream observed external task completion",
+          evidence: { sessionId: input.mainSession.id },
+          output: { runtimeRunRef: "runtime-first-stale-after-tool" },
+        } satisfies NodeExecutionResult;
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "Second runtime run started",
+        evidence: { runId: "second-run" },
+        output: { runtimeRunRef: "runtime-second" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner external terminal continuation");
+    const compiledPlan = makeTwoTaskPlan("graph_external_terminal_continuation");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("running");
+    await waitForTaskNodeCalls(["first_task", "second_task"]);
+
+    expect(executeTaskNodeCapabilityMock.mock.calls.map((call) => call[0].node.id)).toEqual([
+      "first_task",
+      "second_task",
+    ]);
+
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id, status: "Active" },
+      orderBy: { updatedAt: "desc" },
+    });
+    expect(session.currentNodeId).toBe("second_task");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_task", "succeeded"],
+      ["second_task", "running"],
+    ]);
+    expect(persisted?.results.find((result) => result.nodeId === "first_task")).toMatchObject({
+      status: "current",
+      outputSummary: "Runtime tool completed first task",
+    });
+  });
+
+  it("submits condition branch selections through the unified graph command", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "done",
+      summary: "Follow-up task completed",
+      evidence: { runId: "follow-up-run" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner condition node result");
+    const compiledPlan = makeManualThenTaskPlan("graph_condition_node_result");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const started = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(started.status).toBe("waiting_for_user");
+    expect(started.currentNodeId).toBe("manual_task");
+
+    const initial = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    const initialEffective = resolveEffectivePlanGraph({
+      graph: initial!.graph!,
+      attempts: initial!.attempts,
+      results: initial!.results,
+    });
+    const branchRef = buildSemanticRefHistory(initialEffective).branchRefs.find(
+      (binding) => binding.nodeId === "manual_task",
+    )!.ref;
+
+    const branchSelected = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: {
+        action: "complete_manual_node",
+        terminalKind: "condition",
+        branchRef,
+        summary: "Condition selected continue branch",
+        continueExecution: false,
+      },
+    });
+
+    expect(branchSelected.status).toBe("running");
+    expect(branchSelected.currentNodeId).toBeNull();
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["manual_task", "succeeded"],
+    ]);
+    const manualResult = [...(persisted?.results ?? [])].reverse().find(
+      (result) => result.nodeId === "manual_task" && result.status === "current",
+    );
+    expect(manualResult).toMatchObject({
+      nodeId: "manual_task",
+      status: "current",
+      selectedBranch: {
+        ref: branchRef,
+        label: "continue",
+        nextNodeId: "auto_task",
+        source: "ai",
+      },
+    });
+    const effectiveAfterSelection = resolveEffectivePlanGraph({
+      graph: persisted!.graph!,
+      attempts: persisted!.attempts,
+      results: persisted!.results,
+    });
+    expect(effectiveAfterSelection.nodes.find((node) => node.id === "auto_task")).toMatchObject({
+      ready: true,
+      status: "ready",
+    });
+
+    const events = await db.event.findMany({
+      where: { taskId: task.id },
+      orderBy: { ingestSequence: "asc" },
+      select: { actorType: true, eventType: true, nodeId: true, payload: true },
+    });
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actorType: "user",
+          eventType: "plan_execution.node_result_submitted",
+          nodeId: "manual_task",
+          payload: expect.objectContaining({
+            command: "complete_manual_node",
+            actor: expect.objectContaining({ type: "user" }),
+            origin: expect.objectContaining({ channel: "api" }),
+            correlation: expect.objectContaining({ taskId: task.id, planId: compiledPlan.editablePlanId }),
+          }),
+        }),
+      ]),
+    );
+  });
+
+  it("converges when an AI condition submits a branch through the graph command", async () => {
+    evaluateConditionNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      const planRun = await getPlanRun(input.taskId, "graph_ai_condition_command_result");
+      const effective = resolveEffectivePlanGraph({
+        graph: planRun!.graph!,
+        attempts: planRun!.attempts,
+        results: planRun!.results,
+      });
+      const branchRef = buildSemanticRefHistory(effective).branchRefs.find(
+        (binding) => binding.nodeId === "ai_condition",
+      )!.ref;
+
+      await taskPlanExecution.dispatch({
+        taskId: input.taskId,
+        action: {
+          action: "complete_manual_node",
+          terminalKind: "condition",
+          branchRef,
+          summary: "AI selected command branch",
+          continueExecution: false,
+        },
+      });
+
+      return {
+        status: "done",
+        summary: "Provider completion has no branch and must not drive graph state",
+        evidence: { sessionId: input.mainSession.id, runId: "provider-without-branch" },
+      } satisfies NodeExecutionResult;
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner AI condition command result");
+    const compiledPlan = makeAiConditionThenTaskPlan("graph_ai_condition_command_result");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("running");
+    expect(result.message).toContain("result was submitted through graph command");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    const conditionResult = [...(persisted?.results ?? [])].reverse().find(
+      (nodeResult) => nodeResult.nodeId === "ai_condition" && nodeResult.status === "current",
+    );
+    expect(conditionResult).toMatchObject({
+      nodeId: "ai_condition",
+      outputSummary: "AI selected command branch",
+      selectedBranch: {
+        label: "continue",
+        nextNodeId: "auto_task",
+        source: "ai",
+      },
+    });
+    const effectiveAfterSelection = resolveEffectivePlanGraph({
+      graph: persisted!.graph!,
+      attempts: persisted!.attempts,
+      results: persisted!.results,
+    });
+    expect(effectiveAfterSelection.nodes.find((node) => node.id === "auto_task")).toMatchObject({
+      ready: true,
+      status: "ready",
+    });
+    const blockedEvent = await db.event.findFirst({
+      where: { taskId: task.id, eventType: "plan_execution.node_blocked" },
+    });
+    expect(blockedEvent).toBeNull();
   });
 
   it("does not let a provider started result overwrite an external blocked result", async () => {
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
-      const externalResult = await taskPlanExecution.dispatch({
+      const submittedResult = await taskPlanExecution.dispatch({
         taskId: input.taskId,
         action: {
           action: "block_current_node",
@@ -132,7 +367,7 @@ describe("plan-runner task executor external results", () => {
           },
         },
       });
-      expect(externalResult.status).toBe("blocked");
+      expect(submittedResult.status).toBe("blocked");
 
       return {
         status: "started",
@@ -274,3 +509,60 @@ describe("plan-runner task executor external results", () => {
     expect(updatedTask.blockReason).toBeNull();
   });
 });
+
+async function waitForTaskNodeCalls(expectedNodeIds: string[]) {
+  const expected = JSON.stringify(expectedNodeIds);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const actual = JSON.stringify(
+      executeTaskNodeCapabilityMock.mock.calls.map((call) => call[0].node.id),
+    );
+    if (actual === expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+function makeAiConditionThenTaskPlan(editablePlanId: string): CompiledPlan {
+  return {
+    id: `compiled_${editablePlanId}`,
+    editablePlanId,
+    sourceVersion: 1,
+    title: `AI condition handoff ${editablePlanId}`,
+    goal: "AI condition submits branch through graph command",
+    assumptions: [],
+    nodes: [
+      {
+        id: "ai_condition",
+        localId: "ai_condition",
+        type: "condition",
+        title: "AI condition",
+        description: "AI condition terminal tool selects branch",
+        config: {
+          condition: "Choose whether to continue",
+          evaluationBy: "ai",
+          branches: [{ label: "continue", nextNodeId: "auto_task" }],
+        } satisfies ConditionConfig,
+        dependencies: [],
+        dependents: ["auto_task"],
+        executor: "ai",
+      },
+      {
+        id: "auto_task",
+        localId: "auto_task",
+        type: "task",
+        title: "Automatic follow-up",
+        description: "Should be ready after condition command result",
+        config: { expectedOutput: "Automatic output" } satisfies TaskConfig,
+        dependencies: ["ai_condition"],
+        dependents: [],
+        mode: "auto",
+        executor: "ai",
+      },
+    ],
+    edges: [{ id: "edge_ai_condition_to_auto", from: "ai_condition", to: "auto_task" }],
+    entryNodeIds: ["ai_condition"],
+    terminalNodeIds: ["auto_task"],
+    topologicalOrder: ["ai_condition", "auto_task"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}

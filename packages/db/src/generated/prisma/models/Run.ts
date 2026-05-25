@@ -327,8 +327,10 @@ export type RunWhereInput = {
   approvals?: Prisma.ApprovalListRelationFilter
   artifacts?: Prisma.ArtifactListRelationFilter
   events?: Prisma.EventListRelationFilter
+  rawEventLogs?: Prisma.RawEventLogListRelationFilter
+  toolInvocations?: Prisma.ToolInvocationListRelationFilter
+  timelineItems?: Prisma.TaskTimelineItemListRelationFilter
   conversationEntries?: Prisma.ConversationEntryListRelationFilter
-  toolCallDetails?: Prisma.ToolCallDetailListRelationFilter
   runtimeCursor?: Prisma.XOR<Prisma.RuntimeCursorNullableScalarRelationFilter, Prisma.RuntimeCursorWhereInput> | null
 }
 
@@ -361,8 +363,10 @@ export type RunOrderByWithRelationInput = {
   approvals?: Prisma.ApprovalOrderByRelationAggregateInput
   artifacts?: Prisma.ArtifactOrderByRelationAggregateInput
   events?: Prisma.EventOrderByRelationAggregateInput
+  rawEventLogs?: Prisma.RawEventLogOrderByRelationAggregateInput
+  toolInvocations?: Prisma.ToolInvocationOrderByRelationAggregateInput
+  timelineItems?: Prisma.TaskTimelineItemOrderByRelationAggregateInput
   conversationEntries?: Prisma.ConversationEntryOrderByRelationAggregateInput
-  toolCallDetails?: Prisma.ToolCallDetailOrderByRelationAggregateInput
   runtimeCursor?: Prisma.RuntimeCursorOrderByWithRelationInput
 }
 
@@ -398,8 +402,10 @@ export type RunWhereUniqueInput = Prisma.AtLeast<{
   approvals?: Prisma.ApprovalListRelationFilter
   artifacts?: Prisma.ArtifactListRelationFilter
   events?: Prisma.EventListRelationFilter
+  rawEventLogs?: Prisma.RawEventLogListRelationFilter
+  toolInvocations?: Prisma.ToolInvocationListRelationFilter
+  timelineItems?: Prisma.TaskTimelineItemListRelationFilter
   conversationEntries?: Prisma.ConversationEntryListRelationFilter
-  toolCallDetails?: Prisma.ToolCallDetailListRelationFilter
   runtimeCursor?: Prisma.XOR<Prisma.RuntimeCursorNullableScalarRelationFilter, Prisma.RuntimeCursorWhereInput> | null
 }, "id" | "runtimeRunRef">
 
@@ -488,8 +494,10 @@ export type RunCreateInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
@@ -520,8 +528,10 @@ export type RunUncheckedCreateInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
@@ -552,8 +562,10 @@ export type RunUpdateInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
@@ -584,8 +596,10 @@ export type RunUncheckedUpdateInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
 
@@ -893,6 +907,22 @@ export type RunUpdateOneWithoutEventsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.RunUpdateToOneWithWhereWithoutEventsInput, Prisma.RunUpdateWithoutEventsInput>, Prisma.RunUncheckedUpdateWithoutEventsInput>
 }
 
+export type RunCreateNestedOneWithoutRawEventLogsInput = {
+  create?: Prisma.XOR<Prisma.RunCreateWithoutRawEventLogsInput, Prisma.RunUncheckedCreateWithoutRawEventLogsInput>
+  connectOrCreate?: Prisma.RunCreateOrConnectWithoutRawEventLogsInput
+  connect?: Prisma.RunWhereUniqueInput
+}
+
+export type RunUpdateOneWithoutRawEventLogsNestedInput = {
+  create?: Prisma.XOR<Prisma.RunCreateWithoutRawEventLogsInput, Prisma.RunUncheckedCreateWithoutRawEventLogsInput>
+  connectOrCreate?: Prisma.RunCreateOrConnectWithoutRawEventLogsInput
+  upsert?: Prisma.RunUpsertWithoutRawEventLogsInput
+  disconnect?: Prisma.RunWhereInput | boolean
+  delete?: Prisma.RunWhereInput | boolean
+  connect?: Prisma.RunWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.RunUpdateToOneWithWhereWithoutRawEventLogsInput, Prisma.RunUpdateWithoutRawEventLogsInput>, Prisma.RunUncheckedUpdateWithoutRawEventLogsInput>
+}
+
 export type RunCreateNestedOneWithoutConversationEntriesInput = {
   create?: Prisma.XOR<Prisma.RunCreateWithoutConversationEntriesInput, Prisma.RunUncheckedCreateWithoutConversationEntriesInput>
   connectOrCreate?: Prisma.RunCreateOrConnectWithoutConversationEntriesInput
@@ -907,18 +937,36 @@ export type RunUpdateOneRequiredWithoutConversationEntriesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.RunUpdateToOneWithWhereWithoutConversationEntriesInput, Prisma.RunUpdateWithoutConversationEntriesInput>, Prisma.RunUncheckedUpdateWithoutConversationEntriesInput>
 }
 
-export type RunCreateNestedOneWithoutToolCallDetailsInput = {
-  create?: Prisma.XOR<Prisma.RunCreateWithoutToolCallDetailsInput, Prisma.RunUncheckedCreateWithoutToolCallDetailsInput>
-  connectOrCreate?: Prisma.RunCreateOrConnectWithoutToolCallDetailsInput
+export type RunCreateNestedOneWithoutToolInvocationsInput = {
+  create?: Prisma.XOR<Prisma.RunCreateWithoutToolInvocationsInput, Prisma.RunUncheckedCreateWithoutToolInvocationsInput>
+  connectOrCreate?: Prisma.RunCreateOrConnectWithoutToolInvocationsInput
   connect?: Prisma.RunWhereUniqueInput
 }
 
-export type RunUpdateOneRequiredWithoutToolCallDetailsNestedInput = {
-  create?: Prisma.XOR<Prisma.RunCreateWithoutToolCallDetailsInput, Prisma.RunUncheckedCreateWithoutToolCallDetailsInput>
-  connectOrCreate?: Prisma.RunCreateOrConnectWithoutToolCallDetailsInput
-  upsert?: Prisma.RunUpsertWithoutToolCallDetailsInput
+export type RunUpdateOneWithoutToolInvocationsNestedInput = {
+  create?: Prisma.XOR<Prisma.RunCreateWithoutToolInvocationsInput, Prisma.RunUncheckedCreateWithoutToolInvocationsInput>
+  connectOrCreate?: Prisma.RunCreateOrConnectWithoutToolInvocationsInput
+  upsert?: Prisma.RunUpsertWithoutToolInvocationsInput
+  disconnect?: Prisma.RunWhereInput | boolean
+  delete?: Prisma.RunWhereInput | boolean
   connect?: Prisma.RunWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.RunUpdateToOneWithWhereWithoutToolCallDetailsInput, Prisma.RunUpdateWithoutToolCallDetailsInput>, Prisma.RunUncheckedUpdateWithoutToolCallDetailsInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.RunUpdateToOneWithWhereWithoutToolInvocationsInput, Prisma.RunUpdateWithoutToolInvocationsInput>, Prisma.RunUncheckedUpdateWithoutToolInvocationsInput>
+}
+
+export type RunCreateNestedOneWithoutTimelineItemsInput = {
+  create?: Prisma.XOR<Prisma.RunCreateWithoutTimelineItemsInput, Prisma.RunUncheckedCreateWithoutTimelineItemsInput>
+  connectOrCreate?: Prisma.RunCreateOrConnectWithoutTimelineItemsInput
+  connect?: Prisma.RunWhereUniqueInput
+}
+
+export type RunUpdateOneWithoutTimelineItemsNestedInput = {
+  create?: Prisma.XOR<Prisma.RunCreateWithoutTimelineItemsInput, Prisma.RunUncheckedCreateWithoutTimelineItemsInput>
+  connectOrCreate?: Prisma.RunCreateOrConnectWithoutTimelineItemsInput
+  upsert?: Prisma.RunUpsertWithoutTimelineItemsInput
+  disconnect?: Prisma.RunWhereInput | boolean
+  delete?: Prisma.RunWhereInput | boolean
+  connect?: Prisma.RunWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.RunUpdateToOneWithWhereWithoutTimelineItemsInput, Prisma.RunUpdateWithoutTimelineItemsInput>, Prisma.RunUncheckedUpdateWithoutTimelineItemsInput>
 }
 
 export type RunCreateNestedOneWithoutRuntimeCursorInput = {
@@ -961,8 +1009,10 @@ export type RunCreateWithoutTaskInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
@@ -992,8 +1042,10 @@ export type RunUncheckedCreateWithoutTaskInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
@@ -1077,8 +1129,10 @@ export type RunCreateWithoutTaskSessionInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
@@ -1108,8 +1162,10 @@ export type RunUncheckedCreateWithoutTaskSessionInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
@@ -1164,8 +1220,10 @@ export type RunCreateWithoutApprovalsInput = {
   taskSession?: Prisma.TaskSessionCreateNestedOneWithoutRunsInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
@@ -1195,8 +1253,10 @@ export type RunUncheckedCreateWithoutApprovalsInput = {
   updatedAt?: Date | string
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
@@ -1242,8 +1302,10 @@ export type RunUpdateWithoutApprovalsInput = {
   taskSession?: Prisma.TaskSessionUpdateOneWithoutRunsNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
@@ -1273,8 +1335,10 @@ export type RunUncheckedUpdateWithoutApprovalsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
 
@@ -1304,8 +1368,10 @@ export type RunCreateWithoutArtifactsInput = {
   taskSession?: Prisma.TaskSessionCreateNestedOneWithoutRunsInput
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
@@ -1335,8 +1401,10 @@ export type RunUncheckedCreateWithoutArtifactsInput = {
   updatedAt?: Date | string
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
@@ -1382,8 +1450,10 @@ export type RunUpdateWithoutArtifactsInput = {
   taskSession?: Prisma.TaskSessionUpdateOneWithoutRunsNestedInput
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
@@ -1413,8 +1483,10 @@ export type RunUncheckedUpdateWithoutArtifactsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
 
@@ -1444,8 +1516,10 @@ export type RunCreateWithoutEventsInput = {
   taskSession?: Prisma.TaskSessionCreateNestedOneWithoutRunsInput
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
@@ -1475,8 +1549,10 @@ export type RunUncheckedCreateWithoutEventsInput = {
   updatedAt?: Date | string
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
@@ -1522,8 +1598,10 @@ export type RunUpdateWithoutEventsInput = {
   taskSession?: Prisma.TaskSessionUpdateOneWithoutRunsNestedInput
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
@@ -1553,8 +1631,158 @@ export type RunUncheckedUpdateWithoutEventsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
+  runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
+}
+
+export type RunCreateWithoutRawEventLogsInput = {
+  id?: string
+  runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
+  runtimeRunRef?: string | null
+  runtimeSessionRef?: string | null
+  status: $Enums.RunStatus
+  startedAt?: Date | string | null
+  endedAt?: Date | string | null
+  errorSummary?: string | null
+  resumeToken?: string | null
+  triggeredBy: string
+  retryable?: boolean
+  resumeSupported?: boolean
+  pendingInputPrompt?: string | null
+  pendingInputType?: string | null
+  lastSyncedAt?: Date | string | null
+  syncStatus?: string
+  mappingPartial?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  task: Prisma.TaskCreateNestedOneWithoutRunsInput
+  taskSession?: Prisma.TaskSessionCreateNestedOneWithoutRunsInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
+  events?: Prisma.EventCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
+  conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
+  runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
+}
+
+export type RunUncheckedCreateWithoutRawEventLogsInput = {
+  id?: string
+  taskId: string
+  taskSessionId?: string | null
+  runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
+  runtimeRunRef?: string | null
+  runtimeSessionRef?: string | null
+  status: $Enums.RunStatus
+  startedAt?: Date | string | null
+  endedAt?: Date | string | null
+  errorSummary?: string | null
+  resumeToken?: string | null
+  triggeredBy: string
+  retryable?: boolean
+  resumeSupported?: boolean
+  pendingInputPrompt?: string | null
+  pendingInputType?: string | null
+  lastSyncedAt?: Date | string | null
+  syncStatus?: string
+  mappingPartial?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
+  conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
+  runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
+}
+
+export type RunCreateOrConnectWithoutRawEventLogsInput = {
+  where: Prisma.RunWhereUniqueInput
+  create: Prisma.XOR<Prisma.RunCreateWithoutRawEventLogsInput, Prisma.RunUncheckedCreateWithoutRawEventLogsInput>
+}
+
+export type RunUpsertWithoutRawEventLogsInput = {
+  update: Prisma.XOR<Prisma.RunUpdateWithoutRawEventLogsInput, Prisma.RunUncheckedUpdateWithoutRawEventLogsInput>
+  create: Prisma.XOR<Prisma.RunCreateWithoutRawEventLogsInput, Prisma.RunUncheckedCreateWithoutRawEventLogsInput>
+  where?: Prisma.RunWhereInput
+}
+
+export type RunUpdateToOneWithWhereWithoutRawEventLogsInput = {
+  where?: Prisma.RunWhereInput
+  data: Prisma.XOR<Prisma.RunUpdateWithoutRawEventLogsInput, Prisma.RunUncheckedUpdateWithoutRawEventLogsInput>
+}
+
+export type RunUpdateWithoutRawEventLogsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  errorSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resumeToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggeredBy?: Prisma.StringFieldUpdateOperationsInput | string
+  retryable?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  resumeSupported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pendingInputPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pendingInputType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
+  mappingPartial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  task?: Prisma.TaskUpdateOneRequiredWithoutRunsNestedInput
+  taskSession?: Prisma.TaskSessionUpdateOneWithoutRunsNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
+  events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
+  conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
+  runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
+}
+
+export type RunUncheckedUpdateWithoutRawEventLogsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  errorSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resumeToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggeredBy?: Prisma.StringFieldUpdateOperationsInput | string
+  retryable?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  resumeSupported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pendingInputPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pendingInputType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
+  mappingPartial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
+  conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
 
@@ -1585,7 +1813,9 @@ export type RunCreateWithoutConversationEntriesInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
@@ -1616,7 +1846,9 @@ export type RunUncheckedCreateWithoutConversationEntriesInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
@@ -1663,7 +1895,9 @@ export type RunUpdateWithoutConversationEntriesInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
@@ -1694,11 +1928,13 @@ export type RunUncheckedUpdateWithoutConversationEntriesInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
 
-export type RunCreateWithoutToolCallDetailsInput = {
+export type RunCreateWithoutToolInvocationsInput = {
   id?: string
   runtimeName: string
   runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1725,11 +1961,13 @@ export type RunCreateWithoutToolCallDetailsInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
 }
 
-export type RunUncheckedCreateWithoutToolCallDetailsInput = {
+export type RunUncheckedCreateWithoutToolInvocationsInput = {
   id?: string
   taskId: string
   taskSessionId?: string | null
@@ -1756,27 +1994,29 @@ export type RunUncheckedCreateWithoutToolCallDetailsInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
 }
 
-export type RunCreateOrConnectWithoutToolCallDetailsInput = {
+export type RunCreateOrConnectWithoutToolInvocationsInput = {
   where: Prisma.RunWhereUniqueInput
-  create: Prisma.XOR<Prisma.RunCreateWithoutToolCallDetailsInput, Prisma.RunUncheckedCreateWithoutToolCallDetailsInput>
+  create: Prisma.XOR<Prisma.RunCreateWithoutToolInvocationsInput, Prisma.RunUncheckedCreateWithoutToolInvocationsInput>
 }
 
-export type RunUpsertWithoutToolCallDetailsInput = {
-  update: Prisma.XOR<Prisma.RunUpdateWithoutToolCallDetailsInput, Prisma.RunUncheckedUpdateWithoutToolCallDetailsInput>
-  create: Prisma.XOR<Prisma.RunCreateWithoutToolCallDetailsInput, Prisma.RunUncheckedCreateWithoutToolCallDetailsInput>
+export type RunUpsertWithoutToolInvocationsInput = {
+  update: Prisma.XOR<Prisma.RunUpdateWithoutToolInvocationsInput, Prisma.RunUncheckedUpdateWithoutToolInvocationsInput>
+  create: Prisma.XOR<Prisma.RunCreateWithoutToolInvocationsInput, Prisma.RunUncheckedCreateWithoutToolInvocationsInput>
   where?: Prisma.RunWhereInput
 }
 
-export type RunUpdateToOneWithWhereWithoutToolCallDetailsInput = {
+export type RunUpdateToOneWithWhereWithoutToolInvocationsInput = {
   where?: Prisma.RunWhereInput
-  data: Prisma.XOR<Prisma.RunUpdateWithoutToolCallDetailsInput, Prisma.RunUncheckedUpdateWithoutToolCallDetailsInput>
+  data: Prisma.XOR<Prisma.RunUpdateWithoutToolInvocationsInput, Prisma.RunUncheckedUpdateWithoutToolInvocationsInput>
 }
 
-export type RunUpdateWithoutToolCallDetailsInput = {
+export type RunUpdateWithoutToolInvocationsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
   runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1803,11 +2043,13 @@ export type RunUpdateWithoutToolCallDetailsInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
-export type RunUncheckedUpdateWithoutToolCallDetailsInput = {
+export type RunUncheckedUpdateWithoutToolInvocationsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
   taskSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1834,6 +2076,156 @@ export type RunUncheckedUpdateWithoutToolCallDetailsInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
+  conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
+  runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
+}
+
+export type RunCreateWithoutTimelineItemsInput = {
+  id?: string
+  runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
+  runtimeRunRef?: string | null
+  runtimeSessionRef?: string | null
+  status: $Enums.RunStatus
+  startedAt?: Date | string | null
+  endedAt?: Date | string | null
+  errorSummary?: string | null
+  resumeToken?: string | null
+  triggeredBy: string
+  retryable?: boolean
+  resumeSupported?: boolean
+  pendingInputPrompt?: string | null
+  pendingInputType?: string | null
+  lastSyncedAt?: Date | string | null
+  syncStatus?: string
+  mappingPartial?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  task: Prisma.TaskCreateNestedOneWithoutRunsInput
+  taskSession?: Prisma.TaskSessionCreateNestedOneWithoutRunsInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
+  events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
+  runtimeCursor?: Prisma.RuntimeCursorCreateNestedOneWithoutRunInput
+}
+
+export type RunUncheckedCreateWithoutTimelineItemsInput = {
+  id?: string
+  taskId: string
+  taskSessionId?: string | null
+  runtimeName: string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: string | null
+  runtimeRunRef?: string | null
+  runtimeSessionRef?: string | null
+  status: $Enums.RunStatus
+  startedAt?: Date | string | null
+  endedAt?: Date | string | null
+  errorSummary?: string | null
+  resumeToken?: string | null
+  triggeredBy: string
+  retryable?: boolean
+  resumeSupported?: boolean
+  pendingInputPrompt?: string | null
+  pendingInputType?: string | null
+  lastSyncedAt?: Date | string | null
+  syncStatus?: string
+  mappingPartial?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
+  runtimeCursor?: Prisma.RuntimeCursorUncheckedCreateNestedOneWithoutRunInput
+}
+
+export type RunCreateOrConnectWithoutTimelineItemsInput = {
+  where: Prisma.RunWhereUniqueInput
+  create: Prisma.XOR<Prisma.RunCreateWithoutTimelineItemsInput, Prisma.RunUncheckedCreateWithoutTimelineItemsInput>
+}
+
+export type RunUpsertWithoutTimelineItemsInput = {
+  update: Prisma.XOR<Prisma.RunUpdateWithoutTimelineItemsInput, Prisma.RunUncheckedUpdateWithoutTimelineItemsInput>
+  create: Prisma.XOR<Prisma.RunCreateWithoutTimelineItemsInput, Prisma.RunUncheckedCreateWithoutTimelineItemsInput>
+  where?: Prisma.RunWhereInput
+}
+
+export type RunUpdateToOneWithWhereWithoutTimelineItemsInput = {
+  where?: Prisma.RunWhereInput
+  data: Prisma.XOR<Prisma.RunUpdateWithoutTimelineItemsInput, Prisma.RunUncheckedUpdateWithoutTimelineItemsInput>
+}
+
+export type RunUpdateWithoutTimelineItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  errorSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resumeToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggeredBy?: Prisma.StringFieldUpdateOperationsInput | string
+  retryable?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  resumeSupported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pendingInputPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pendingInputType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
+  mappingPartial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  task?: Prisma.TaskUpdateOneRequiredWithoutRunsNestedInput
+  taskSession?: Prisma.TaskSessionUpdateOneWithoutRunsNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
+  events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
+  runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
+}
+
+export type RunUncheckedUpdateWithoutTimelineItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeConfigSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeConfigVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeSessionRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRunStatusFieldUpdateOperationsInput | $Enums.RunStatus
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  errorSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resumeToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggeredBy?: Prisma.StringFieldUpdateOperationsInput | string
+  retryable?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  resumeSupported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  pendingInputPrompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pendingInputType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
+  mappingPartial?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
@@ -1865,8 +2257,10 @@ export type RunCreateWithoutRuntimeCursorInput = {
   approvals?: Prisma.ApprovalCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactCreateNestedManyWithoutRunInput
   events?: Prisma.EventCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailCreateNestedManyWithoutRunInput
 }
 
 export type RunUncheckedCreateWithoutRuntimeCursorInput = {
@@ -1896,8 +2290,10 @@ export type RunUncheckedCreateWithoutRuntimeCursorInput = {
   approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutRunInput
   artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutRunInput
   events?: Prisma.EventUncheckedCreateNestedManyWithoutRunInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutRunInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutRunInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutRunInput
   conversationEntries?: Prisma.ConversationEntryUncheckedCreateNestedManyWithoutRunInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedCreateNestedManyWithoutRunInput
 }
 
 export type RunCreateOrConnectWithoutRuntimeCursorInput = {
@@ -1943,8 +2339,10 @@ export type RunUpdateWithoutRuntimeCursorInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
 }
 
 export type RunUncheckedUpdateWithoutRuntimeCursorInput = {
@@ -1974,8 +2372,10 @@ export type RunUncheckedUpdateWithoutRuntimeCursorInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
 }
 
 export type RunCreateManyTaskInput = {
@@ -2029,8 +2429,10 @@ export type RunUpdateWithoutTaskInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
@@ -2060,8 +2462,10 @@ export type RunUncheckedUpdateWithoutTaskInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
 
@@ -2141,8 +2545,10 @@ export type RunUpdateWithoutTaskSessionInput = {
   approvals?: Prisma.ApprovalUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUpdateOneWithoutRunNestedInput
 }
 
@@ -2172,8 +2578,10 @@ export type RunUncheckedUpdateWithoutTaskSessionInput = {
   approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutRunNestedInput
   artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutRunNestedInput
   events?: Prisma.EventUncheckedUpdateManyWithoutRunNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutRunNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutRunNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRunNestedInput
   conversationEntries?: Prisma.ConversationEntryUncheckedUpdateManyWithoutRunNestedInput
-  toolCallDetails?: Prisma.ToolCallDetailUncheckedUpdateManyWithoutRunNestedInput
   runtimeCursor?: Prisma.RuntimeCursorUncheckedUpdateOneWithoutRunNestedInput
 }
 
@@ -2211,16 +2619,20 @@ export type RunCountOutputType = {
   approvals: number
   artifacts: number
   events: number
+  rawEventLogs: number
+  toolInvocations: number
+  timelineItems: number
   conversationEntries: number
-  toolCallDetails: number
 }
 
 export type RunCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   approvals?: boolean | RunCountOutputTypeCountApprovalsArgs
   artifacts?: boolean | RunCountOutputTypeCountArtifactsArgs
   events?: boolean | RunCountOutputTypeCountEventsArgs
+  rawEventLogs?: boolean | RunCountOutputTypeCountRawEventLogsArgs
+  toolInvocations?: boolean | RunCountOutputTypeCountToolInvocationsArgs
+  timelineItems?: boolean | RunCountOutputTypeCountTimelineItemsArgs
   conversationEntries?: boolean | RunCountOutputTypeCountConversationEntriesArgs
-  toolCallDetails?: boolean | RunCountOutputTypeCountToolCallDetailsArgs
 }
 
 /**
@@ -2257,15 +2669,29 @@ export type RunCountOutputTypeCountEventsArgs<ExtArgs extends runtime.Types.Exte
 /**
  * RunCountOutputType without action
  */
-export type RunCountOutputTypeCountConversationEntriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.ConversationEntryWhereInput
+export type RunCountOutputTypeCountRawEventLogsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RawEventLogWhereInput
 }
 
 /**
  * RunCountOutputType without action
  */
-export type RunCountOutputTypeCountToolCallDetailsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.ToolCallDetailWhereInput
+export type RunCountOutputTypeCountToolInvocationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ToolInvocationWhereInput
+}
+
+/**
+ * RunCountOutputType without action
+ */
+export type RunCountOutputTypeCountTimelineItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskTimelineItemWhereInput
+}
+
+/**
+ * RunCountOutputType without action
+ */
+export type RunCountOutputTypeCountConversationEntriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ConversationEntryWhereInput
 }
 
 
@@ -2298,8 +2724,10 @@ export type RunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = ru
   approvals?: boolean | Prisma.Run$approvalsArgs<ExtArgs>
   artifacts?: boolean | Prisma.Run$artifactsArgs<ExtArgs>
   events?: boolean | Prisma.Run$eventsArgs<ExtArgs>
+  rawEventLogs?: boolean | Prisma.Run$rawEventLogsArgs<ExtArgs>
+  toolInvocations?: boolean | Prisma.Run$toolInvocationsArgs<ExtArgs>
+  timelineItems?: boolean | Prisma.Run$timelineItemsArgs<ExtArgs>
   conversationEntries?: boolean | Prisma.Run$conversationEntriesArgs<ExtArgs>
-  toolCallDetails?: boolean | Prisma.Run$toolCallDetailsArgs<ExtArgs>
   runtimeCursor?: boolean | Prisma.Run$runtimeCursorArgs<ExtArgs>
   _count?: boolean | Prisma.RunCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["run"]>
@@ -2393,8 +2821,10 @@ export type RunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   approvals?: boolean | Prisma.Run$approvalsArgs<ExtArgs>
   artifacts?: boolean | Prisma.Run$artifactsArgs<ExtArgs>
   events?: boolean | Prisma.Run$eventsArgs<ExtArgs>
+  rawEventLogs?: boolean | Prisma.Run$rawEventLogsArgs<ExtArgs>
+  toolInvocations?: boolean | Prisma.Run$toolInvocationsArgs<ExtArgs>
+  timelineItems?: boolean | Prisma.Run$timelineItemsArgs<ExtArgs>
   conversationEntries?: boolean | Prisma.Run$conversationEntriesArgs<ExtArgs>
-  toolCallDetails?: boolean | Prisma.Run$toolCallDetailsArgs<ExtArgs>
   runtimeCursor?: boolean | Prisma.Run$runtimeCursorArgs<ExtArgs>
   _count?: boolean | Prisma.RunCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -2415,8 +2845,10 @@ export type $RunPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
     approvals: Prisma.$ApprovalPayload<ExtArgs>[]
     artifacts: Prisma.$ArtifactPayload<ExtArgs>[]
     events: Prisma.$EventPayload<ExtArgs>[]
+    rawEventLogs: Prisma.$RawEventLogPayload<ExtArgs>[]
+    toolInvocations: Prisma.$ToolInvocationPayload<ExtArgs>[]
+    timelineItems: Prisma.$TaskTimelineItemPayload<ExtArgs>[]
     conversationEntries: Prisma.$ConversationEntryPayload<ExtArgs>[]
-    toolCallDetails: Prisma.$ToolCallDetailPayload<ExtArgs>[]
     runtimeCursor: Prisma.$RuntimeCursorPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -2842,8 +3274,10 @@ export interface Prisma__RunClient<T, Null = never, ExtArgs extends runtime.Type
   approvals<T extends Prisma.Run$approvalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$approvalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ApprovalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   artifacts<T extends Prisma.Run$artifactsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$artifactsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   events<T extends Prisma.Run$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  rawEventLogs<T extends Prisma.Run$rawEventLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$rawEventLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RawEventLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  toolInvocations<T extends Prisma.Run$toolInvocationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$toolInvocationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ToolInvocationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  timelineItems<T extends Prisma.Run$timelineItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$timelineItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskTimelineItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   conversationEntries<T extends Prisma.Run$conversationEntriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$conversationEntriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConversationEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  toolCallDetails<T extends Prisma.Run$toolCallDetailsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$toolCallDetailsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ToolCallDetailPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   runtimeCursor<T extends Prisma.Run$runtimeCursorArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Run$runtimeCursorArgs<ExtArgs>>): Prisma.Prisma__RuntimeCursorClient<runtime.Types.Result.GetResult<Prisma.$RuntimeCursorPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -3387,6 +3821,78 @@ export type Run$eventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
 }
 
 /**
+ * Run.rawEventLogs
+ */
+export type Run$rawEventLogsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RawEventLog
+   */
+  select?: Prisma.RawEventLogSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RawEventLog
+   */
+  omit?: Prisma.RawEventLogOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RawEventLogInclude<ExtArgs> | null
+  where?: Prisma.RawEventLogWhereInput
+  orderBy?: Prisma.RawEventLogOrderByWithRelationInput | Prisma.RawEventLogOrderByWithRelationInput[]
+  cursor?: Prisma.RawEventLogWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RawEventLogScalarFieldEnum | Prisma.RawEventLogScalarFieldEnum[]
+}
+
+/**
+ * Run.toolInvocations
+ */
+export type Run$toolInvocationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ToolInvocation
+   */
+  select?: Prisma.ToolInvocationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ToolInvocation
+   */
+  omit?: Prisma.ToolInvocationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ToolInvocationInclude<ExtArgs> | null
+  where?: Prisma.ToolInvocationWhereInput
+  orderBy?: Prisma.ToolInvocationOrderByWithRelationInput | Prisma.ToolInvocationOrderByWithRelationInput[]
+  cursor?: Prisma.ToolInvocationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ToolInvocationScalarFieldEnum | Prisma.ToolInvocationScalarFieldEnum[]
+}
+
+/**
+ * Run.timelineItems
+ */
+export type Run$timelineItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskTimelineItem
+   */
+  select?: Prisma.TaskTimelineItemSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskTimelineItem
+   */
+  omit?: Prisma.TaskTimelineItemOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskTimelineItemInclude<ExtArgs> | null
+  where?: Prisma.TaskTimelineItemWhereInput
+  orderBy?: Prisma.TaskTimelineItemOrderByWithRelationInput | Prisma.TaskTimelineItemOrderByWithRelationInput[]
+  cursor?: Prisma.TaskTimelineItemWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskTimelineItemScalarFieldEnum | Prisma.TaskTimelineItemScalarFieldEnum[]
+}
+
+/**
  * Run.conversationEntries
  */
 export type Run$conversationEntriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3408,30 +3914,6 @@ export type Run$conversationEntriesArgs<ExtArgs extends runtime.Types.Extensions
   take?: number
   skip?: number
   distinct?: Prisma.ConversationEntryScalarFieldEnum | Prisma.ConversationEntryScalarFieldEnum[]
-}
-
-/**
- * Run.toolCallDetails
- */
-export type Run$toolCallDetailsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ToolCallDetail
-   */
-  select?: Prisma.ToolCallDetailSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the ToolCallDetail
-   */
-  omit?: Prisma.ToolCallDetailOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ToolCallDetailInclude<ExtArgs> | null
-  where?: Prisma.ToolCallDetailWhereInput
-  orderBy?: Prisma.ToolCallDetailOrderByWithRelationInput | Prisma.ToolCallDetailOrderByWithRelationInput[]
-  cursor?: Prisma.ToolCallDetailWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.ToolCallDetailScalarFieldEnum | Prisma.ToolCallDetailScalarFieldEnum[]
 }
 
 /**

@@ -25,6 +25,10 @@ CREATE TABLE "Task" (
     "blockReason" TEXT,
     "defaultSessionId" TEXT,
     "latestRunId" TEXT,
+    "latestEventId" TEXT,
+    "latestRawEventId" TEXT,
+    "blockedByEventId" TEXT,
+    "blockedByRawEventId" TEXT,
     "createdAt" DATETIME NOT NULL,
     "updatedAt" DATETIME NOT NULL,
     "completedAt" DATETIME,
@@ -150,6 +154,8 @@ CREATE TABLE "TaskPlanRun" (
     "executionOwnerScope" TEXT,
     "executionLeaseUntil" DATETIME,
     "executionEpoch" INTEGER NOT NULL DEFAULT 0,
+    "latestEventId" TEXT,
+    "latestRawEventId" TEXT,
     "createdAt" DATETIME NOT NULL,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "TaskPlanRun_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -174,6 +180,15 @@ CREATE TABLE "TaskPlanNodeAttempt" (
     "finishedAt" DATETIME,
     "error" TEXT,
     "runtimeSnapshot" TEXT,
+    "startedByEventId" TEXT,
+    "completedByEventId" TEXT,
+    "failedByEventId" TEXT,
+    "blockedByEventId" TEXT,
+    "inputRawEventId" TEXT,
+    "outputRawEventId" TEXT,
+    "errorRawEventId" TEXT,
+    "selectedBranchRef" TEXT,
+    "selectedNextNodeId" TEXT,
     "createdAt" DATETIME NOT NULL,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "TaskPlanNodeAttempt_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -190,7 +205,14 @@ CREATE TABLE "TaskPlanProviderRun" (
     "nodeAttemptId" TEXT NOT NULL,
     "idempotencyKey" TEXT NOT NULL,
     "providerRunRef" TEXT,
+    "runtimeName" TEXT,
+    "nativeRunId" TEXT,
     "status" TEXT NOT NULL,
+    "firstRawEventId" TEXT,
+    "lastRawEventId" TEXT,
+    "completedByEventId" TEXT,
+    "failedByEventId" TEXT,
+    "correlationId" TEXT,
     "startedAt" DATETIME NOT NULL,
     "finishedAt" DATETIME,
     "createdAt" DATETIME NOT NULL,
@@ -300,22 +322,76 @@ CREATE TABLE "Memory" (
 CREATE TABLE "Event" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "eventType" TEXT NOT NULL,
+    "eventVersion" INTEGER NOT NULL DEFAULT 1,
     "workspaceId" TEXT NOT NULL,
-    "taskId" TEXT NOT NULL,
+    "taskId" TEXT,
     "runId" TEXT,
+    "taskSessionId" TEXT,
+    "executionSessionId" TEXT,
+    "planId" TEXT,
+    "planRunId" TEXT,
+    "nodeAttemptId" TEXT,
+    "providerRunId" TEXT,
     "nodeId" TEXT,
     "nodeTitle" TEXT,
+    "rawEventId" TEXT,
+    "parentEventId" TEXT,
+    "causationEventId" TEXT,
+    "correlationId" TEXT,
     "actorType" TEXT NOT NULL,
-    "actorId" TEXT NOT NULL,
+    "actorId" TEXT,
     "source" TEXT NOT NULL,
     "payload" TEXT NOT NULL,
-    "dedupeKey" TEXT NOT NULL,
-    "runtimeTs" DATETIME,
+    "summary" TEXT,
+    "severity" TEXT,
+    "dedupeKey" TEXT,
+    "occurredAt" DATETIME,
+    "ingestedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "ingestSequence" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL,
     CONSTRAINT "Event_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Event_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Event_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "Event_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE "RawEventLog" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "taskId" TEXT,
+    "runId" TEXT,
+    "taskSessionId" TEXT,
+    "executionSessionId" TEXT,
+    "planId" TEXT,
+    "planRunId" TEXT,
+    "nodeAttemptId" TEXT,
+    "providerRunId" TEXT,
+    "nodeId" TEXT,
+    "nodeTitle" TEXT,
+    "source" TEXT NOT NULL,
+    "direction" TEXT NOT NULL,
+    "rawType" TEXT NOT NULL,
+    "provider" TEXT,
+    "runtimeName" TEXT,
+    "rawPayload" TEXT,
+    "rawText" TEXT,
+    "metadata" TEXT,
+    "nativeRunId" TEXT,
+    "nativeEventId" TEXT,
+    "nativeToolCallId" TEXT,
+    "externalRef" TEXT,
+    "sequence" INTEGER,
+    "correlationId" TEXT,
+    "parentRawEventId" TEXT,
+    "causationRawEventId" TEXT,
+    "payloadHash" TEXT NOT NULL,
+    "redactionState" TEXT NOT NULL DEFAULT 'none',
+    "redactionMetadata" TEXT,
+    "occurredAt" DATETIME,
+    "receivedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RawEventLog_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "RawEventLog_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "RawEventLog_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 CREATE TABLE "ConversationEntry" (
@@ -330,18 +406,66 @@ CREATE TABLE "ConversationEntry" (
     CONSTRAINT "ConversationEntry_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE "ToolCallDetail" (
+CREATE TABLE "ToolInvocation" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "runId" TEXT NOT NULL,
+    "workspaceId" TEXT NOT NULL,
+    "taskId" TEXT,
+    "runId" TEXT,
+    "executionSessionId" TEXT,
+    "planId" TEXT,
+    "planRunId" TEXT,
+    "nodeAttemptId" TEXT,
+    "providerRunId" TEXT,
+    "nodeId" TEXT,
     "toolName" TEXT NOT NULL,
+    "toolKind" TEXT,
     "status" TEXT NOT NULL,
-    "argumentsSummary" TEXT,
-    "resultSummary" TEXT,
+    "inputRawEventId" TEXT,
+    "outputRawEventId" TEXT,
+    "errorRawEventId" TEXT,
+    "canonicalEventId" TEXT,
+    "inputPayload" TEXT,
+    "outputPayload" TEXT,
+    "errorPayload" TEXT,
+    "inputSummary" TEXT,
+    "outputSummary" TEXT,
     "errorSummary" TEXT,
-    "runtimeTs" DATETIME,
+    "nativeToolCallId" TEXT,
     "externalRef" TEXT,
-    "createdAt" DATETIME NOT NULL,
-    CONSTRAINT "ToolCallDetail_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "correlationId" TEXT,
+    "startedAt" DATETIME,
+    "completedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "ToolInvocation_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "ToolInvocation_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "ToolInvocation_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE "TaskTimelineItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "taskId" TEXT NOT NULL,
+    "runId" TEXT,
+    "executionSessionId" TEXT,
+    "nodeId" TEXT,
+    "nodeAttemptId" TEXT,
+    "kind" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT,
+    "severity" TEXT,
+    "status" TEXT,
+    "eventId" TEXT,
+    "rawEventId" TEXT,
+    "toolInvocationId" TEXT,
+    "sortTime" DATETIME NOT NULL,
+    "metadata" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "TaskTimelineItem_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "TaskTimelineItem_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "TaskTimelineItem_runId_fkey" FOREIGN KEY ("runId") REFERENCES "Run" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "TaskTimelineItem_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "Event" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "TaskTimelineItem_rawEventId_fkey" FOREIGN KEY ("rawEventId") REFERENCES "RawEventLog" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 CREATE TABLE "TaskProjection" (
@@ -363,6 +487,12 @@ CREATE TABLE "TaskProjection" (
     "scheduleProposalCount" INTEGER NOT NULL DEFAULT 0,
     "latestArtifactTitle" TEXT,
     "lastActivityAt" DATETIME,
+    "latestEventId" TEXT,
+    "latestRawEventId" TEXT,
+    "blockedByEventId" TEXT,
+    "blockedByRawEventId" TEXT,
+    "currentNodeId" TEXT,
+    "currentNodeTitle" TEXT,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "TaskProjection_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "TaskProjection_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -455,8 +585,13 @@ CREATE TABLE "ExecutionSession" (
     "planId" TEXT,
     "status" TEXT NOT NULL,
     "currentNodeId" TEXT,
+    "currentNodeAttemptId" TEXT,
     "pauseReason" TEXT,
     "completedNodeIds" TEXT NOT NULL DEFAULT '[]',
+    "pausedByEventId" TEXT,
+    "pausedByRawEventId" TEXT,
+    "latestEventId" TEXT,
+    "latestRawEventId" TEXT,
     "startedAt" DATETIME NOT NULL,
     "pausedAt" DATETIME,
     "completedAt" DATETIME,
@@ -518,11 +653,28 @@ CREATE UNIQUE INDEX "Event_dedupeKey_key" ON "Event"("dedupeKey");
 CREATE INDEX "Event_taskId_ingestSequence_idx" ON "Event"("taskId", "ingestSequence");
 CREATE INDEX "Event_taskId_nodeId_ingestSequence_idx" ON "Event"("taskId", "nodeId", "ingestSequence");
 CREATE INDEX "Event_runId_ingestSequence_idx" ON "Event"("runId", "ingestSequence");
+CREATE INDEX "Event_nodeAttemptId_ingestSequence_idx" ON "Event"("nodeAttemptId", "ingestSequence");
+CREATE INDEX "Event_correlationId_ingestSequence_idx" ON "Event"("correlationId", "ingestSequence");
 CREATE INDEX "Event_workspaceId_eventType_ingestSequence_idx" ON "Event"("workspaceId", "eventType", "ingestSequence");
+CREATE UNIQUE INDEX "RawEventLog_source_externalRef_key" ON "RawEventLog"("source", "externalRef");
+CREATE INDEX "RawEventLog_taskId_receivedAt_idx" ON "RawEventLog"("taskId", "receivedAt");
+CREATE INDEX "RawEventLog_runId_sequence_idx" ON "RawEventLog"("runId", "sequence");
+CREATE INDEX "RawEventLog_nodeAttemptId_receivedAt_idx" ON "RawEventLog"("nodeAttemptId", "receivedAt");
+CREATE INDEX "RawEventLog_correlationId_receivedAt_idx" ON "RawEventLog"("correlationId", "receivedAt");
+CREATE INDEX "RawEventLog_nativeToolCallId_idx" ON "RawEventLog"("nativeToolCallId");
+CREATE INDEX "RawEventLog_workspaceId_source_receivedAt_idx" ON "RawEventLog"("workspaceId", "source", "receivedAt");
 CREATE UNIQUE INDEX "ConversationEntry_externalRef_key" ON "ConversationEntry"("externalRef");
 CREATE INDEX "ConversationEntry_runId_sequence_idx" ON "ConversationEntry"("runId", "sequence");
-CREATE UNIQUE INDEX "ToolCallDetail_externalRef_key" ON "ToolCallDetail"("externalRef");
-CREATE INDEX "ToolCallDetail_runId_createdAt_idx" ON "ToolCallDetail"("runId", "createdAt");
+CREATE UNIQUE INDEX "ToolInvocation_runId_nativeToolCallId_key" ON "ToolInvocation"("runId", "nativeToolCallId");
+CREATE INDEX "ToolInvocation_taskId_createdAt_idx" ON "ToolInvocation"("taskId", "createdAt");
+CREATE INDEX "ToolInvocation_runId_createdAt_idx" ON "ToolInvocation"("runId", "createdAt");
+CREATE INDEX "ToolInvocation_nodeAttemptId_createdAt_idx" ON "ToolInvocation"("nodeAttemptId", "createdAt");
+CREATE INDEX "ToolInvocation_toolName_status_idx" ON "ToolInvocation"("toolName", "status");
+CREATE INDEX "ToolInvocation_correlationId_idx" ON "ToolInvocation"("correlationId");
+CREATE INDEX "TaskTimelineItem_taskId_sortTime_idx" ON "TaskTimelineItem"("taskId", "sortTime");
+CREATE INDEX "TaskTimelineItem_taskId_nodeId_sortTime_idx" ON "TaskTimelineItem"("taskId", "nodeId", "sortTime");
+CREATE INDEX "TaskTimelineItem_runId_sortTime_idx" ON "TaskTimelineItem"("runId", "sortTime");
+CREATE INDEX "TaskTimelineItem_eventId_idx" ON "TaskTimelineItem"("eventId");
 CREATE INDEX "TaskProjection_workspaceId_persistedStatus_idx" ON "TaskProjection"("workspaceId", "persistedStatus");
 CREATE INDEX "TaskProjection_workspaceId_displayState_idx" ON "TaskProjection"("workspaceId", "displayState");
 CREATE INDEX "ScheduleProposal_workspaceId_status_idx" ON "ScheduleProposal"("workspaceId", "status");

@@ -214,6 +214,30 @@ export async function runGraphExecution<TContext = unknown>(
       });
       throwIfAborted(input.control?.signal);
 
+      const submittedState = await input.callbacks.resolveSubmittedNodeState?.({
+        node,
+        attempt,
+        state,
+      });
+      if (submittedState) {
+        state = submittedState;
+        const submittedEffective = resolveEffectivePlanGraph(state);
+        const status = mapTerminalReasonToGraphStatus(submittedEffective);
+        if (status === "running" && submittedEffective.readyNodeIds.length > 0) {
+          executedNodeIds.push(node.id);
+          userInput = undefined;
+          continue;
+        }
+        return {
+          status,
+          currentNodeId: status === "running" ? null : node.id,
+          executedNodeIds,
+          effective: submittedEffective,
+          state,
+          message: `Node ${node.id} result was submitted through graph command.`,
+        };
+      }
+
       const finishedAt = new Date(input.now?.() ?? Date.now()).toISOString();
       if (!rawResult) {
         state = {

@@ -2,6 +2,7 @@
 
 import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { Database } from "bun:sqlite";
 
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 
@@ -26,8 +27,10 @@ if (reset && existsSync(dbPath)) {
 
 if (templatePath && existsSync(templatePath)) {
   mkdirSync(dirname(dbPath), { recursive: true });
-  copyFileSync(templatePath, dbPath);
-  process.exit(0);
+  if (templateHasCurrentSchema(templatePath)) {
+    copyFileSync(templatePath, dbPath);
+    process.exit(0);
+  }
 }
 
 ensureSqliteDatabase({
@@ -35,3 +38,25 @@ ensureSqliteDatabase({
   migrationsDir,
   reset,
 });
+
+function templateHasCurrentSchema(path: string): boolean {
+  try {
+    const db = new Database(path, { readonly: true });
+    try {
+      const latestEventColumn = db
+        .query<{ name: string }, []>("SELECT name FROM pragma_table_info('Task') WHERE name = 'latestEventId'")
+        .get();
+      const rawEventTable = db
+        .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'RawEventLog'")
+        .get();
+      const toolInvocationTable = db
+        .query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ToolInvocation'")
+        .get();
+      return Boolean(latestEventColumn && rawEventTable && toolInvocationTable);
+    } finally {
+      db.close();
+    }
+  } catch {
+    return false;
+  }
+}

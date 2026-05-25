@@ -33,7 +33,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     where: { id: taskId },
     include: {
       projection: true,
-      events: { orderBy: [{ runtimeTs: "asc" }, { ingestSequence: "asc" }], take: 100 },
+      events: { orderBy: [{ occurredAt: "asc" }, { ingestSequence: "asc" }], take: 100 },
       runs: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -41,7 +41,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
           approvals: { where: { status: "Pending" }, orderBy: { requestedAt: "desc" } },
           artifacts: { orderBy: { createdAt: "desc" } },
           conversationEntries: { orderBy: { sequence: "asc" } },
-          toolCallDetails: { orderBy: { createdAt: "asc" } },
+          toolInvocations: { orderBy: { createdAt: "asc" } },
         },
       },
     },
@@ -142,12 +142,12 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       createdAt: toIsoString(artifact.createdAt),
     })) ?? [];
   const toolCalls =
-    currentRun?.toolCallDetails.map((tool) => ({
+    currentRun?.toolInvocations.map((tool) => ({
       id: tool.id,
       toolName: tool.toolName,
       status: tool.status,
-      argumentsSummary: tool.argumentsSummary,
-      resultSummary: tool.resultSummary,
+      argumentsSummary: tool.inputSummary,
+      resultSummary: tool.outputSummary,
       errorSummary: tool.errorSummary,
     })) ?? [];
   const workstreamItems = task.events.map((event) => {
@@ -159,7 +159,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       title: formatEventTitle(event.eventType),
       summary: summarizePayload(event.payload as Record<string, unknown>),
       payload: event.payload as Record<string, unknown>,
-      runtimeTs: toIsoString(event.runtimeTs),
+      runtimeTs: toIsoString(event.occurredAt),
       runId: event.runId,
       kind: eventInfo.kind,
       badge: eventInfo.badge,

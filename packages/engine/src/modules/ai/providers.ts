@@ -1,5 +1,5 @@
 import { HermesProviderClient } from "@chrona/hermes";
-import { CHRONA_DEBUG_PROVIDER_TYPE } from "@chrona/providers-debug";
+import { CHRONA_DEBUG_PROVIDER_TYPE, normalizeDebugProviderProfile } from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
   ProviderRunSnapshot,
@@ -12,6 +12,7 @@ import type {
   LLMClientConfig,
   PreparedAiFeatureSpec,
   StructuredDebugInfo,
+  DebugClientConfig,
 } from "@chrona/contracts";
 import { AiClientError, validatePreparedFeaturePayload } from "@chrona/contracts";
 import type { EngineAiClient } from "./runtime/client-registry";
@@ -85,9 +86,11 @@ async function checkClientHealth(
     }
 
     if (client.type === CHRONA_DEBUG_PROVIDER_TYPE) {
+      const config = client.config as DebugClientConfig;
+      const profile = normalizeDebugProviderProfile(config.profile);
       return {
         available: true,
-        reason: "Chrona debug provider is local and deterministic",
+        reason: `Chrona debug provider is local (${profile})`,
       };
     }
 

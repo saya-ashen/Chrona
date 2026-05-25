@@ -239,7 +239,7 @@ describe("runTaskNodeFeature", () => {
     });
   });
 
-  it("maps condition branchRef structured payload to selectedBranch", async () => {
+  it("does not use provider branchRef structured payload as condition routing authority", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Node AI condition workspace",
@@ -322,13 +322,9 @@ describe("runTaskNodeFeature", () => {
     expect(result).toMatchObject({
       status: "done",
       summary: "Needs fixes selected",
-      selectedBranch: {
-        label: "Needs fixes",
-        nextNodeId: "fix_node",
-        source: "ai",
-      },
       output: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
     });
+    expect(result.status === "done" ? result.selectedBranch : undefined).toBeUndefined();
   });
 
   it("keeps a completed provider run with chrona_node_block as blocked", async () => {

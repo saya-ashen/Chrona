@@ -32,8 +32,13 @@ export type ExecutionSessionMinAggregateOutputType = {
   planId: string | null
   status: $Enums.ExecutionSessionStatus | null
   currentNodeId: string | null
+  currentNodeAttemptId: string | null
   pauseReason: string | null
   completedNodeIds: string | null
+  pausedByEventId: string | null
+  pausedByRawEventId: string | null
+  latestEventId: string | null
+  latestRawEventId: string | null
   startedAt: Date | null
   pausedAt: Date | null
   completedAt: Date | null
@@ -49,8 +54,13 @@ export type ExecutionSessionMaxAggregateOutputType = {
   planId: string | null
   status: $Enums.ExecutionSessionStatus | null
   currentNodeId: string | null
+  currentNodeAttemptId: string | null
   pauseReason: string | null
   completedNodeIds: string | null
+  pausedByEventId: string | null
+  pausedByRawEventId: string | null
+  latestEventId: string | null
+  latestRawEventId: string | null
   startedAt: Date | null
   pausedAt: Date | null
   completedAt: Date | null
@@ -66,8 +76,13 @@ export type ExecutionSessionCountAggregateOutputType = {
   planId: number
   status: number
   currentNodeId: number
+  currentNodeAttemptId: number
   pauseReason: number
   completedNodeIds: number
+  pausedByEventId: number
+  pausedByRawEventId: number
+  latestEventId: number
+  latestRawEventId: number
   startedAt: number
   pausedAt: number
   completedAt: number
@@ -85,8 +100,13 @@ export type ExecutionSessionMinAggregateInputType = {
   planId?: true
   status?: true
   currentNodeId?: true
+  currentNodeAttemptId?: true
   pauseReason?: true
   completedNodeIds?: true
+  pausedByEventId?: true
+  pausedByRawEventId?: true
+  latestEventId?: true
+  latestRawEventId?: true
   startedAt?: true
   pausedAt?: true
   completedAt?: true
@@ -102,8 +122,13 @@ export type ExecutionSessionMaxAggregateInputType = {
   planId?: true
   status?: true
   currentNodeId?: true
+  currentNodeAttemptId?: true
   pauseReason?: true
   completedNodeIds?: true
+  pausedByEventId?: true
+  pausedByRawEventId?: true
+  latestEventId?: true
+  latestRawEventId?: true
   startedAt?: true
   pausedAt?: true
   completedAt?: true
@@ -119,8 +144,13 @@ export type ExecutionSessionCountAggregateInputType = {
   planId?: true
   status?: true
   currentNodeId?: true
+  currentNodeAttemptId?: true
   pauseReason?: true
   completedNodeIds?: true
+  pausedByEventId?: true
+  pausedByRawEventId?: true
+  latestEventId?: true
+  latestRawEventId?: true
   startedAt?: true
   pausedAt?: true
   completedAt?: true
@@ -209,8 +239,13 @@ export type ExecutionSessionGroupByOutputType = {
   planId: string | null
   status: $Enums.ExecutionSessionStatus
   currentNodeId: string | null
+  currentNodeAttemptId: string | null
   pauseReason: string | null
   completedNodeIds: string
+  pausedByEventId: string | null
+  pausedByRawEventId: string | null
+  latestEventId: string | null
+  latestRawEventId: string | null
   startedAt: Date
   pausedAt: Date | null
   completedAt: Date | null
@@ -247,8 +282,13 @@ export type ExecutionSessionWhereInput = {
   planId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   status?: Prisma.EnumExecutionSessionStatusFilter<"ExecutionSession"> | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  currentNodeAttemptId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   pauseReason?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   completedNodeIds?: Prisma.StringFilter<"ExecutionSession"> | string
+  pausedByEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  pausedByRawEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  latestEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   startedAt?: Prisma.DateTimeFilter<"ExecutionSession"> | Date | string
   pausedAt?: Prisma.DateTimeNullableFilter<"ExecutionSession"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableFilter<"ExecutionSession"> | Date | string | null
@@ -267,8 +307,13 @@ export type ExecutionSessionOrderByWithRelationInput = {
   planId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   currentNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentNodeAttemptId?: Prisma.SortOrderInput | Prisma.SortOrder
   pauseReason?: Prisma.SortOrderInput | Prisma.SortOrder
   completedNodeIds?: Prisma.SortOrder
+  pausedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  pausedByRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -290,8 +335,13 @@ export type ExecutionSessionWhereUniqueInput = Prisma.AtLeast<{
   planId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   status?: Prisma.EnumExecutionSessionStatusFilter<"ExecutionSession"> | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  currentNodeAttemptId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   pauseReason?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   completedNodeIds?: Prisma.StringFilter<"ExecutionSession"> | string
+  pausedByEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  pausedByRawEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  latestEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   startedAt?: Prisma.DateTimeFilter<"ExecutionSession"> | Date | string
   pausedAt?: Prisma.DateTimeNullableFilter<"ExecutionSession"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableFilter<"ExecutionSession"> | Date | string | null
@@ -310,8 +360,13 @@ export type ExecutionSessionOrderByWithAggregationInput = {
   planId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   currentNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  currentNodeAttemptId?: Prisma.SortOrderInput | Prisma.SortOrder
   pauseReason?: Prisma.SortOrderInput | Prisma.SortOrder
   completedNodeIds?: Prisma.SortOrder
+  pausedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  pausedByRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -333,8 +388,13 @@ export type ExecutionSessionScalarWhereWithAggregatesInput = {
   planId?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
   status?: Prisma.EnumExecutionSessionStatusWithAggregatesFilter<"ExecutionSession"> | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
+  currentNodeAttemptId?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
   pauseReason?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
   completedNodeIds?: Prisma.StringWithAggregatesFilter<"ExecutionSession"> | string
+  pausedByEventId?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
+  pausedByRawEventId?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
+  latestEventId?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
+  latestRawEventId?: Prisma.StringNullableWithAggregatesFilter<"ExecutionSession"> | string | null
   startedAt?: Prisma.DateTimeWithAggregatesFilter<"ExecutionSession"> | Date | string
   pausedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ExecutionSession"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ExecutionSession"> | Date | string | null
@@ -347,8 +407,13 @@ export type ExecutionSessionCreateInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -367,8 +432,13 @@ export type ExecutionSessionUncheckedCreateInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -381,8 +451,13 @@ export type ExecutionSessionUpdateInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -401,8 +476,13 @@ export type ExecutionSessionUncheckedUpdateInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -418,8 +498,13 @@ export type ExecutionSessionCreateManyInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -432,8 +517,13 @@ export type ExecutionSessionUpdateManyMutationInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -449,8 +539,13 @@ export type ExecutionSessionUncheckedUpdateManyInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -476,8 +571,13 @@ export type ExecutionSessionCountOrderByAggregateInput = {
   planId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   currentNodeId?: Prisma.SortOrder
+  currentNodeAttemptId?: Prisma.SortOrder
   pauseReason?: Prisma.SortOrder
   completedNodeIds?: Prisma.SortOrder
+  pausedByEventId?: Prisma.SortOrder
+  pausedByRawEventId?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
@@ -493,8 +593,13 @@ export type ExecutionSessionMaxOrderByAggregateInput = {
   planId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   currentNodeId?: Prisma.SortOrder
+  currentNodeAttemptId?: Prisma.SortOrder
   pauseReason?: Prisma.SortOrder
   completedNodeIds?: Prisma.SortOrder
+  pausedByEventId?: Prisma.SortOrder
+  pausedByRawEventId?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
@@ -510,8 +615,13 @@ export type ExecutionSessionMinOrderByAggregateInput = {
   planId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   currentNodeId?: Prisma.SortOrder
+  currentNodeAttemptId?: Prisma.SortOrder
   pauseReason?: Prisma.SortOrder
   completedNodeIds?: Prisma.SortOrder
+  pausedByEventId?: Prisma.SortOrder
+  pausedByRawEventId?: Prisma.SortOrder
+  latestEventId?: Prisma.SortOrder
+  latestRawEventId?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
@@ -654,8 +764,13 @@ export type ExecutionSessionCreateWithoutWorkspaceInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -672,8 +787,13 @@ export type ExecutionSessionUncheckedCreateWithoutWorkspaceInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -717,8 +837,13 @@ export type ExecutionSessionScalarWhereInput = {
   planId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   status?: Prisma.EnumExecutionSessionStatusFilter<"ExecutionSession"> | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  currentNodeAttemptId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   pauseReason?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   completedNodeIds?: Prisma.StringFilter<"ExecutionSession"> | string
+  pausedByEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  pausedByRawEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  latestEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
+  latestRawEventId?: Prisma.StringNullableFilter<"ExecutionSession"> | string | null
   startedAt?: Prisma.DateTimeFilter<"ExecutionSession"> | Date | string
   pausedAt?: Prisma.DateTimeNullableFilter<"ExecutionSession"> | Date | string | null
   completedAt?: Prisma.DateTimeNullableFilter<"ExecutionSession"> | Date | string | null
@@ -731,8 +856,13 @@ export type ExecutionSessionCreateWithoutTaskInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -749,8 +879,13 @@ export type ExecutionSessionUncheckedCreateWithoutTaskInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -788,8 +923,13 @@ export type ExecutionSessionCreateWithoutWorkBlockInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -806,8 +946,13 @@ export type ExecutionSessionUncheckedCreateWithoutWorkBlockInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -847,8 +992,13 @@ export type ExecutionSessionCreateManyWorkspaceInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -861,8 +1011,13 @@ export type ExecutionSessionUpdateWithoutWorkspaceInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -879,8 +1034,13 @@ export type ExecutionSessionUncheckedUpdateWithoutWorkspaceInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -895,8 +1055,13 @@ export type ExecutionSessionUncheckedUpdateManyWithoutWorkspaceInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -911,8 +1076,13 @@ export type ExecutionSessionCreateManyTaskInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -925,8 +1095,13 @@ export type ExecutionSessionUpdateWithoutTaskInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -943,8 +1118,13 @@ export type ExecutionSessionUncheckedUpdateWithoutTaskInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -959,8 +1139,13 @@ export type ExecutionSessionUncheckedUpdateManyWithoutTaskInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -975,8 +1160,13 @@ export type ExecutionSessionCreateManyWorkBlockInput = {
   planId?: string | null
   status?: $Enums.ExecutionSessionStatus
   currentNodeId?: string | null
+  currentNodeAttemptId?: string | null
   pauseReason?: string | null
   completedNodeIds?: string
+  pausedByEventId?: string | null
+  pausedByRawEventId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
   startedAt?: Date | string
   pausedAt?: Date | string | null
   completedAt?: Date | string | null
@@ -989,8 +1179,13 @@ export type ExecutionSessionUpdateWithoutWorkBlockInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1007,8 +1202,13 @@ export type ExecutionSessionUncheckedUpdateWithoutWorkBlockInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1023,8 +1223,13 @@ export type ExecutionSessionUncheckedUpdateManyWithoutWorkBlockInput = {
   planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumExecutionSessionStatusFieldUpdateOperationsInput | $Enums.ExecutionSessionStatus
   currentNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  currentNodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   completedNodeIds?: Prisma.StringFieldUpdateOperationsInput | string
+  pausedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pausedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1042,8 +1247,13 @@ export type ExecutionSessionSelect<ExtArgs extends runtime.Types.Extensions.Inte
   planId?: boolean
   status?: boolean
   currentNodeId?: boolean
+  currentNodeAttemptId?: boolean
   pauseReason?: boolean
   completedNodeIds?: boolean
+  pausedByEventId?: boolean
+  pausedByRawEventId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
   startedAt?: boolean
   pausedAt?: boolean
   completedAt?: boolean
@@ -1062,8 +1272,13 @@ export type ExecutionSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   planId?: boolean
   status?: boolean
   currentNodeId?: boolean
+  currentNodeAttemptId?: boolean
   pauseReason?: boolean
   completedNodeIds?: boolean
+  pausedByEventId?: boolean
+  pausedByRawEventId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
   startedAt?: boolean
   pausedAt?: boolean
   completedAt?: boolean
@@ -1082,8 +1297,13 @@ export type ExecutionSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   planId?: boolean
   status?: boolean
   currentNodeId?: boolean
+  currentNodeAttemptId?: boolean
   pauseReason?: boolean
   completedNodeIds?: boolean
+  pausedByEventId?: boolean
+  pausedByRawEventId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
   startedAt?: boolean
   pausedAt?: boolean
   completedAt?: boolean
@@ -1102,8 +1322,13 @@ export type ExecutionSessionSelectScalar = {
   planId?: boolean
   status?: boolean
   currentNodeId?: boolean
+  currentNodeAttemptId?: boolean
   pauseReason?: boolean
   completedNodeIds?: boolean
+  pausedByEventId?: boolean
+  pausedByRawEventId?: boolean
+  latestEventId?: boolean
+  latestRawEventId?: boolean
   startedAt?: boolean
   pausedAt?: boolean
   completedAt?: boolean
@@ -1111,7 +1336,7 @@ export type ExecutionSessionSelectScalar = {
   updatedAt?: boolean
 }
 
-export type ExecutionSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "workBlockId" | "planId" | "status" | "currentNodeId" | "pauseReason" | "completedNodeIds" | "startedAt" | "pausedAt" | "completedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["executionSession"]>
+export type ExecutionSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "workBlockId" | "planId" | "status" | "currentNodeId" | "currentNodeAttemptId" | "pauseReason" | "completedNodeIds" | "pausedByEventId" | "pausedByRawEventId" | "latestEventId" | "latestRawEventId" | "startedAt" | "pausedAt" | "completedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["executionSession"]>
 export type ExecutionSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1143,11 +1368,16 @@ export type $ExecutionSessionPayload<ExtArgs extends runtime.Types.Extensions.In
     planId: string | null
     status: $Enums.ExecutionSessionStatus
     currentNodeId: string | null
+    currentNodeAttemptId: string | null
     pauseReason: string | null
     /**
      * JSON array of completed node IDs
      */
     completedNodeIds: string
+    pausedByEventId: string | null
+    pausedByRawEventId: string | null
+    latestEventId: string | null
+    latestRawEventId: string | null
     startedAt: Date
     pausedAt: Date | null
     completedAt: Date | null
@@ -1586,8 +1816,13 @@ export interface ExecutionSessionFieldRefs {
   readonly planId: Prisma.FieldRef<"ExecutionSession", 'String'>
   readonly status: Prisma.FieldRef<"ExecutionSession", 'ExecutionSessionStatus'>
   readonly currentNodeId: Prisma.FieldRef<"ExecutionSession", 'String'>
+  readonly currentNodeAttemptId: Prisma.FieldRef<"ExecutionSession", 'String'>
   readonly pauseReason: Prisma.FieldRef<"ExecutionSession", 'String'>
   readonly completedNodeIds: Prisma.FieldRef<"ExecutionSession", 'String'>
+  readonly pausedByEventId: Prisma.FieldRef<"ExecutionSession", 'String'>
+  readonly pausedByRawEventId: Prisma.FieldRef<"ExecutionSession", 'String'>
+  readonly latestEventId: Prisma.FieldRef<"ExecutionSession", 'String'>
+  readonly latestRawEventId: Prisma.FieldRef<"ExecutionSession", 'String'>
   readonly startedAt: Prisma.FieldRef<"ExecutionSession", 'DateTime'>
   readonly pausedAt: Prisma.FieldRef<"ExecutionSession", 'DateTime'>
   readonly completedAt: Prisma.FieldRef<"ExecutionSession", 'DateTime'>

@@ -59,19 +59,29 @@ export async function setExecutionSessionState(input: {
   sessionId: string;
   status: "Active" | "Paused" | "Completed" | "Abandoned";
   currentNodeId?: string | null;
+  currentNodeAttemptId?: string | null;
   pauseReason?: string | null;
   completedNodeIds?: string[];
+  pausedByEventId?: string | null;
+  pausedByRawEventId?: string | null;
+  latestEventId?: string | null;
+  latestRawEventId?: string | null;
 }) {
   return db.executionSession.update({
     where: { id: input.sessionId },
     data: {
       status: input.status,
       currentNodeId: input.currentNodeId,
+      currentNodeAttemptId: input.currentNodeAttemptId,
       pauseReason: input.pauseReason,
       completedNodeIds: input.completedNodeIds
         ? JSON.stringify(input.completedNodeIds)
         : undefined,
       pausedAt: input.status === "Paused" ? new Date() : null,
+      pausedByEventId: input.status === "Paused" ? input.pausedByEventId : null,
+      pausedByRawEventId: input.status === "Paused" ? input.pausedByRawEventId : null,
+      latestEventId: input.latestEventId,
+      latestRawEventId: input.latestRawEventId,
       completedAt:
         input.status === "Completed" || input.status === "Abandoned"
           ? new Date()
