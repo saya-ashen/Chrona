@@ -342,7 +342,10 @@ describe("plan-runner native execution actions", () => {
     expect(resumed.status).toBe("blocked");
     expect(resumed.currentNodeId).toBe("cond_system");
     expect(resumed.executedNodeIds).toContain("cond_user");
-    expect(resumed.waitingNodeIds).toContain("cond_system");
+    expect(resumed.checkpoint).toMatchObject({
+      kind: "manual_recovery",
+      nodeId: "cond_system",
+    });
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind])).toEqual([
@@ -554,7 +557,10 @@ describe("plan-runner native execution actions", () => {
 
     expect(retried.status).toBe("blocked");
     expect(retried.currentNodeId).toBe("cond_blocked");
-    expect(retried.waitingNodeIds).toContain("cond_blocked");
+    expect(retried.checkpoint).toMatchObject({
+      kind: "manual_recovery",
+      nodeId: "cond_blocked",
+    });
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind])).toEqual([
@@ -562,7 +568,7 @@ describe("plan-runner native execution actions", () => {
       ["cond_blocked", "current", "manual_action"],
     ]);
     expect(persisted?.attempts).toHaveLength(2);
-    expect(persisted?.attempts.every((attempt) => attempt.status === "failed")).toBe(true);
+    expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["cancelled", "failed"]);
     expect(persisted?.executionContextSnapshots).toHaveLength(2);
     expect(
       persisted?.executionContextSnapshots.some(
@@ -611,7 +617,11 @@ describe("plan-runner native execution actions", () => {
       action: { action: "start_manual" },
     });
     expect(blocked.status).toBe("blocked");
-    expect(blocked.waitingNodeIds).toContain("cond_blocked");
+    expect(blocked.currentNodeId).toBe("cond_blocked");
+    expect(blocked.checkpoint).toMatchObject({
+      kind: "manual_recovery",
+      nodeId: "cond_blocked",
+    });
 
     const blockedTask = await db.task.findUniqueOrThrow({ where: { id: blockedFlow.task.id } });
     expect(blockedTask.status).toBe(TaskStatus.Blocked);

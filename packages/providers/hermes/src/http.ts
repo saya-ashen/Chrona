@@ -105,7 +105,9 @@ export async function ensureHermesOk(response: Response, operation: string): Pro
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
   const normalized = baseUrl?.trim().replace(/\/+$/, "") ?? "";
-  return normalized || "http://127.0.0.1:8642";
+  if (!normalized) return "http://127.0.0.1:8642";
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  return `http://${normalized}`;
 }
 
 function mergeSignals(primary: AbortSignal, secondary?: AbortSignal): AbortSignal {

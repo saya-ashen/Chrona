@@ -64,6 +64,27 @@ describe("runRestartRecoveryWorker", () => {
     await db.executionSession.create({
       data: { workspaceId: workspace.id, taskId: task.id, status: "Active", planId: "plan_1" },
     });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        planRun: {},
+        executionOwnerId: "stale-owner",
+        executionEpoch: 1,
+        executionLeaseUntil: new Date("2026-05-17T00:00:01.000Z"),
+      },
+    });
     await db.run.create({
       data: {
         taskId: task.id,
@@ -104,6 +125,27 @@ describe("runRestartRecoveryWorker", () => {
     await db.executionSession.create({
       data: { workspaceId: workspace.id, taskId: task.id, status: "Active", planId: "plan_1" },
     });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        planRun: {},
+        executionOwnerId: "stale-owner",
+        executionEpoch: 1,
+        executionLeaseUntil: new Date("2026-05-17T00:00:01.000Z"),
+      },
+    });
     await db.run.create({
       data: {
         taskId: task.id,
@@ -124,7 +166,7 @@ describe("runRestartRecoveryWorker", () => {
 
     const result = await runRestartRecoveryWorker({ now: new Date("2026-05-17T00:01:00.000Z") });
 
-    expect(result).toEqual({ expiredLeaseCount: 0, activeSessionCount: 1, degradedRunCount: 1 });
+    expect(result).toEqual({ expiredLeaseCount: 0, activeSessionCount: 0, degradedRunCount: 1 });
     expect(await db.schedulerEvent.count()).toBe(0);
   });
 });

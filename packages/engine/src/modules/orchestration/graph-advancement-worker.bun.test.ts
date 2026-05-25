@@ -52,6 +52,24 @@ describe("runGraphAdvancementWorker", () => {
         executionConfig: { prompt: "Run" },
       },
     });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        planRun: {},
+      },
+    });
     const startExecution = mock(async () => ({
       taskId: task.id,
       planId: "plan_1",

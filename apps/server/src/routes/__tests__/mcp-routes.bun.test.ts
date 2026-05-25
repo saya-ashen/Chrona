@@ -32,6 +32,14 @@ const hiddenContextArguments = {
   evidence: { providerText: "generated plan" },
 };
 
+const blockPayload = {
+  reason: "Waiting on API",
+  actionForm: {
+    instructions: "Provide the missing API details.",
+    inputFields: [{ name: "apiDetails", label: "API details" }],
+  },
+};
+
 function app(rejected = false, operations: CapturedToolOperation[] = []) {
   const engine = {
     agentTools: {
@@ -266,7 +274,7 @@ describe("MCP routes", () => {
       ["chrona_node_read", "chrona.node.read", {}, {}],
       ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Yes" }, { branchRef: "B20260516-01-A", summary: "Yes" }],
-      ["chrona_node_block", "chrona.node.block", { reason: "Waiting on API" }, { reason: "Waiting on API" }],
+      ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
       ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
       ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
     ] as const;
@@ -387,7 +395,7 @@ describe("MCP routes", () => {
       ["chrona_node_read", "chrona.node.read", {}, {}],
       ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Yes" }, { branchRef: "B20260516-01-A", summary: "Yes" }],
-      ["chrona_node_block", "chrona.node.block", { reason: "Waiting on API" }, { reason: "Waiting on API" }],
+      ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
       ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
       ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
     ] as const;

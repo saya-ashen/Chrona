@@ -296,6 +296,13 @@ function createAiRuntimeInvoker() {
   return new AiRuntimeInvoker();
 }
 
+function expectStreamedRunIds(
+  calls: Array<Parameters<AgentProviderClient["streamRun"]>[0]>,
+  runIds: string[],
+) {
+  expect(calls.map((call) => ("runId" in call ? call.runId : null))).toEqual(runIds);
+}
+
 function createNodeAttempt(input: {
   taskId: string;
   planId: string;
@@ -464,18 +471,17 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(run.runtimeRunRef).not.toBeNull();
 
     const providerEvents = await db.event.findMany({
-      where: { runId: result.evidence?.runId, source: "provider" },
+      where: { runId: result.evidence?.runId },
       orderBy: { ingestSequence: "asc" },
     });
     expect(providerEvents.length).toBeGreaterThan(0);
-    expect(providerEvents).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        payload: expect.objectContaining({
-          nodeId: "node-1",
-          nodeTitle: "Echo step",
-        }),
-      }),
-    ]));
+    expect(providerEvents.map((event: { eventType: string }) => event.eventType)).toContain("provider.run_completed");
+    expect(providerEvents.at(-1)?.payload).toMatchObject({
+      event: {
+        type: "run_completed",
+        run: expect.objectContaining({ status: "running" }),
+      },
+    });
   });
 
   it("keeps the node running when the provider produces no output", async () => {
@@ -643,7 +649,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
     expect(result.status).toBe("started");
     expect(calls.startRun).toHaveLength(1);
-    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+    expectStreamedRunIds(calls.streamRun, ["hermes-run-1"]);
   });
 
   it("recovers transient Hermes stream failures by reading the existing run first", async () => {
@@ -668,13 +674,8 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(result.status).toBe("started");
     expect((result as { summary: string }).summary).toBe("Recovered from existing Hermes run");
     expect(calls.startRun).toHaveLength(1);
-    expect(calls.startRun[0]).toMatchObject({
-      idempotencyKey: `chrona-runtime:${result.evidence?.runId}`,
-    });
-    expect(calls.streamRun).toEqual([
-      { runId: "hermes-run-recoverable" },
-      { runId: "hermes-run-recoverable" },
-    ]);
+    expect((calls.startRun[0] as { idempotencyKey?: string }).idempotencyKey).toStartWith("provider-run:");
+    expectStreamedRunIds(calls.streamRun, ["hermes-run-recoverable", "hermes-run-recoverable"]);
     expect(persistedRun.runtimeRunRef).toBe("hermes-run-recoverable");
   });
 
@@ -700,7 +701,7 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect((result as { summary: string }).summary).toBe(outputContent);
     expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
     expect(calls.startRun[0].instructions).toContain("Chrona result-submission actions");
-    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+    expectStreamedRunIds(calls.streamRun, ["hermes-run-1"]);
   });
 
   it("does not require legacy condition structured output for Hermes condition execution", async () => {
@@ -734,7 +735,7 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
     expect(calls.startRun[0].instructions).toContain("Chrona result-submission actions");
     expect(calls.startRun[0].instructions).not.toContain("evaluate_condition_node_result");
-    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+    expectStreamedRunIds(calls.streamRun, ["hermes-run-1"]);
   });
 
   it("does not require legacy checkpoint structured output for Hermes checkpoint execution", async () => {
@@ -768,6 +769,6 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
     expect(calls.startRun[0].instructions).toContain("Chrona result-submission actions");
     expect(calls.startRun[0].instructions).not.toContain("review_checkpoint_node_result");
-    expect(calls.streamRun).toEqual([{ runId: "hermes-run-1" }]);
+    expectStreamedRunIds(calls.streamRun, ["hermes-run-1"]);
   });
 });

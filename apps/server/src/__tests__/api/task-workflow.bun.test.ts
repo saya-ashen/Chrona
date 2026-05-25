@@ -13,6 +13,10 @@ import { Hono } from "hono";
 import { db } from "@chrona/db";
 import type { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
+import {
+  createTaskBodySchema,
+  updateTaskBodySchema,
+} from "@chrona/contracts/api";
 import { createTask } from "@chrona/engine/modules/tasks/create-task";
 import { updateTask } from "@chrona/engine/modules/tasks/update-task";
 import { appendCanonicalEvent } from "@chrona/engine/modules/events/append-canonical-event";
@@ -25,13 +29,14 @@ type TransactionClient = Omit<
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
-async function deleteTaskWithRelations(taskId: string) {
+async function deleteTaskWithRelations(taskId: string, workspaceId?: string) {
   const task = await db.task.findUnique({
     where: { id: taskId },
     select: { id: true, workspaceId: true, title: true },
   });
 
   if (!task) throw new HttpError(404, "Task not found");
+  if (workspaceId && task.workspaceId !== workspaceId) throw new HttpError(404, "Task not found");
 
   await appendCanonicalEvent({
     eventType: "task.deleted",
@@ -124,19 +129,32 @@ function createTaskRouter() {
   api.post("/tasks", async (c) => {
     try {
       const body = await c.req.json();
-      const workspaceId = body.workspaceId;
-      const title = body.title;
+      const parsed = createTaskBodySchema.safeParse(body);
 
-      if (!workspaceId) return error(c, "workspaceId is required", 400);
-      if (!title || (typeof title === "string" && !title.trim())) return error(c, "title is required", 400);
+      if (!parsed.success) {
+        return error(c, parsed.error.issues.map((issue) => issue.message).join("; "), 400);
+      }
+
+      const { workspaceId, title } = parsed.data;
+
+      if (!title.trim()) {
+        return error(c, "title is required", 400);
+      }
+
+      const workspace = await db.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { id: true },
+      });
+
+      if (!workspace) return error(c, "Workspace not found", 404);
 
       const result = await createTask({
         workspaceId,
-        title,
-        description: body.description,
-        priority: body.priority,
-        executionRuntime: body.executionRuntime,
-        executionConfig: body.executionConfig,
+        title: title.trim(),
+        description: parsed.data.description,
+        priority: parsed.data.priority,
+        executionRuntime: parsed.data.executionRuntime,
+        executionConfig: parsed.data.executionConfig,
       });
 
       return json(c, result, 201);
@@ -148,11 +166,13 @@ function createTaskRouter() {
   api.get("/tasks/:taskId", async (c) => {
     try {
       const taskId = c.req.param("taskId");
+      const workspaceId = c.req.query("workspaceId");
       const task = await db.task.findUnique({
         where: { id: taskId },
         include: { projection: true, runs: { orderBy: { startedAt: "desc" }, take: 5 } },
       });
       if (!task) return error(c, "Task not found", 404);
+      if (workspaceId && task.workspaceId !== workspaceId) return error(c, "Task not found", 404);
       return json(c, { task });
     } catch (cause) {
       return internalServerError(c, "GET /api/tasks/:taskId", cause, "Failed to get task");
@@ -163,14 +183,20 @@ function createTaskRouter() {
     try {
       const taskId = c.req.param("taskId");
       const body = await c.req.json();
+      const parsed = updateTaskBodySchema.safeParse(body);
+
+      if (!parsed.success) {
+        return error(c, parsed.error.issues.map((issue) => issue.message).join("; "), 400);
+      }
+
       const result = await updateTask({
         taskId,
-        title: body.title,
-        description: body.description,
-        priority: body.priority,
-        status: body.status,
-        executionRuntime: body.executionRuntime,
-        executionConfig: body.executionConfig,
+        title: parsed.data.title,
+        description: parsed.data.description,
+        priority: parsed.data.priority,
+        status: parsed.data.status,
+        executionRuntime: parsed.data.executionRuntime,
+        executionConfig: parsed.data.executionConfig,
       });
       return json(c, result);
     } catch (cause) {
@@ -184,7 +210,7 @@ function createTaskRouter() {
 
   api.delete("/tasks/:taskId", async (c) => {
     try {
-      return json(c, await deleteTaskWithRelations(c.req.param("taskId")));
+      return json(c, await deleteTaskWithRelations(c.req.param("taskId"), c.req.query("workspaceId")));
     } catch (cause) {
       const httpError = toHttpError(cause);
       if (httpError) return error(c, httpError.message, httpError.status);
@@ -404,35 +430,41 @@ describe("Task CRUD workflow", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 500 when creating a task for a missing workspace", async () => {
+  it("returns 404 when creating a task for a missing workspace", async () => {
     const res = await app().request("http://local/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ workspaceId: "missing-workspace", title: "Ghost task" }),
     });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
     const body = await res.json() as any;
-    expect(typeof body.error).toBe("string");
-    expect(body.error.length).toBeGreaterThan(0);
+    expect(body.error).toBe("Workspace not found");
   });
 
-  it("creates a task even when scheduled fields are ignored by the inline router", async () => {
+  it("creates task records without schedule state", async () => {
     const res = await app().request("http://local/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         workspaceId,
-        title: "Bad schedule",
-        scheduledStartAt: "2026-05-10T12:00:00.000Z",
-        scheduledEndAt: "2026-05-10T11:00:00.000Z",
+        title: "Unscheduled task",
       }),
     });
 
     expect(res.status).toBe(201);
+    const body = await res.json() as any;
+    const task = await expectTaskExists(body.taskId);
+    const projection = await db.taskProjection.findUnique({ where: { taskId: body.taskId } });
+
+    expect(task.dueAt).toBeNull();
+    expect(projection).not.toBeNull();
+    expect(projection!.scheduleStatus).toBe("Unscheduled");
+    expect(projection!.scheduledStartAt).toBeNull();
+    expect(projection!.scheduledEndAt).toBeNull();
   });
 
-  it("ignores unsupported status updates in the inline router", async () => {
+  it("rejects unsupported status updates", async () => {
     const { taskId } = await seedTask(workspaceId, { title: "Invalid status target" });
 
     const res = await app().request(`http://local/api/tasks/${taskId}`, {
@@ -441,10 +473,12 @@ describe("Task CRUD workflow", () => {
       body: JSON.stringify({ status: "NotAStatus" }),
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    const task = await expectTaskExists(taskId);
+    expect(task.status).not.toBe("NotAStatus");
   });
 
-  it("gets task detail even when workspace isolation query does not match in the inline router", async () => {
+  it("returns 404 when task detail workspace isolation query does not match", async () => {
     const other = await seedWorkspace("Other Workspace");
     const { taskId } = await seedTask(workspaceId, { title: "Isolated task" });
 
@@ -452,10 +486,10 @@ describe("Task CRUD workflow", () => {
       `http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 
-  it("deletes a task even when workspace isolation query does not match in the inline router", async () => {
+  it("returns 404 when delete workspace isolation query does not match", async () => {
     const other = await seedWorkspace("Delete Isolation Workspace");
     const { taskId } = await seedTask(workspaceId, { title: "Protected task" });
 
@@ -464,7 +498,8 @@ describe("Task CRUD workflow", () => {
       { method: "DELETE" },
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
+    await expectTaskExists(taskId);
   });
 
   it("returns 404 when getting detail for a nonexistent task", async () => {

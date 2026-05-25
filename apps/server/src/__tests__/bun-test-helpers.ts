@@ -33,6 +33,8 @@ export async function resetTestDb() {
   await db.memory.deleteMany();
   await db.task.deleteMany();
   await db.workspace.deleteMany();
+  await db.aiFeatureBinding.deleteMany();
+  await db.aiClient.deleteMany();
 }
 
 // ---------------------------------------------------------------------------
