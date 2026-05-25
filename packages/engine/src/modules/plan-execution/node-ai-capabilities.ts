@@ -10,13 +10,9 @@ import type { AiRuntimeInvocation, AiRuntimeInvoker } from "./ai-runtime-invoker
 import type { NodeExecutionResult } from "./node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
-import { branchBindingForRef } from "./node-runtime-refs";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
->;
-type NodeExecutionSelectedBranch = NonNullable<
-  Extract<NodeExecutionResult, { status: "done" }>["selectedBranch"]
 >;
 
 export type NodeAiCapabilityInput = {
@@ -129,27 +125,6 @@ function terminalNodeResultFromSnapshot(input: {
   }
 }
 
-function selectedBranchFromStructuredPayload(input: {
-  invocation: AiRuntimeInvocation;
-  node: EffectivePlanNode;
-  plan: EffectivePlanGraph;
-}): NodeExecutionSelectedBranch | undefined {
-  const structured = structuredPayload(input.invocation);
-  const branchRef = recordValue(structured, "branchRef");
-  if (typeof branchRef !== "string" || !branchRef.trim()) return undefined;
-
-  const binding = branchBindingForRef({
-    plan: input.plan,
-    node: input.node,
-    branchRef,
-  });
-  return {
-    label: binding.label,
-    nextNodeId: binding.nextNodeId!,
-    source: "ai",
-  };
-}
-
 function buildFailureDetails(input: {
   node: EffectivePlanNode;
   runtimeName: string;
@@ -237,13 +212,6 @@ export async function runTaskNodeFeature(
     const terminalNodeResult = invocation.response.status === "completed"
       ? terminalNodeResultFromSnapshot({ invocation, evidence, structured, summary })
       : undefined;
-    const selectedBranch = input.node.type === "condition"
-      ? selectedBranchFromStructuredPayload({
-          invocation,
-          node: input.node,
-          plan: input.plan,
-        })
-      : undefined;
     const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed"
       ? {
           status: "done",
@@ -252,7 +220,6 @@ export async function runTaskNodeFeature(
             `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} completed`,
           evidence,
           output: outputFromStructuredPayload({ structured, fallback: output }),
-          selectedBranch,
         }
       : {
           status: "started",

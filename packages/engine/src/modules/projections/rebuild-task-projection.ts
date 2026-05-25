@@ -17,6 +17,7 @@ export async function rebuildTaskProjection(taskId: string) {
         orderBy: { startedAt: "desc" },
         take: 1,
       },
+      events: { orderBy: { ingestSequence: "desc" }, take: 1 },
       workBlocks: {
         where: { status: { in: ["Scheduled", "Active"] } },
         orderBy: { scheduledStartAt: "asc" },
@@ -31,6 +32,22 @@ export async function rebuildTaskProjection(taskId: string) {
 
   const activeSession = task.executionSessions[0] ?? null;
   const currentWorkBlock = task.workBlocks[0] ?? null;
+  const latestEvent = task.events[0] ?? null;
+  const currentNode = activeSession?.currentNodeId && activeSession.planId
+    ? await db.taskPlanRun.findUnique({
+        where: {
+          taskId_planId: {
+            taskId: task.id,
+            planId: activeSession.planId,
+          },
+        },
+        select: { planRun: true },
+      })
+    : null;
+  const currentNodeTitle = currentNodeTitleFromPlanRun(
+    currentNode?.planRun,
+    activeSession?.currentNodeId,
+  );
 
   const derived = deriveTaskState({
     task: { status: task.status, latestRunId: task.latestRunId },
@@ -75,6 +92,10 @@ export async function rebuildTaskProjection(taskId: string) {
   const shouldClearBlockReason = !derived.blockReason && task.blockReason !== null;
   const updateData: Record<string, unknown> = {
     status: derived.persistedStatus,
+    latestEventId: latestEvent?.id ?? task.latestEventId ?? null,
+    latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
+    blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
+    blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
   };
   if (derived.blockReason) {
     updateData.blockReason = derived.blockReason as Prisma.InputJsonValue;
@@ -113,6 +134,12 @@ export async function rebuildTaskProjection(taskId: string) {
       scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
       lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
+      latestEventId: latestEvent?.id ?? task.latestEventId ?? null,
+      latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
+      blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
+      blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
+      currentNodeId: activeSession?.currentNodeId ?? null,
+      currentNodeTitle,
     },
     create: {
       taskId: task.id,
@@ -138,6 +165,12 @@ export async function rebuildTaskProjection(taskId: string) {
       scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
       lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
+      latestEventId: latestEvent?.id ?? task.latestEventId ?? null,
+      latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
+      blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
+      blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
+      currentNodeId: activeSession?.currentNodeId ?? null,
+      currentNodeTitle,
     },
   });
 
@@ -150,4 +183,18 @@ export async function rebuildTaskProjection(taskId: string) {
   });
 
   return projection;
+}
+
+function currentNodeTitleFromPlanRun(planRun: unknown, currentNodeId?: string | null) {
+  if (!currentNodeId || !planRun || typeof planRun !== "object") return null;
+  const mutableGraph = (planRun as { mutableGraph?: { graph?: { nodes?: unknown[] } } }).mutableGraph;
+  const nodes = mutableGraph?.graph?.nodes;
+  if (!Array.isArray(nodes)) return null;
+  const node = nodes.find(
+    (candidate): candidate is { id: string; title?: string } =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      (candidate as { id?: unknown }).id === currentNodeId,
+  );
+  return node?.title ?? null;
 }

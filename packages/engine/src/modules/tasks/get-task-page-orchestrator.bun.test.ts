@@ -187,7 +187,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", nativeRunId: "native-run-1", event: { type: "run_started" } },
         dedupeKey: "activity-run-started",
-        runtimeTs: new Date("2026-05-21T00:00:01.000Z"),
+        occurredAt: new Date("2026-05-21T00:00:01.000Z"),
         ingestSequence: 1,
       }, {
         eventType: "provider.text_delta",
@@ -201,7 +201,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Hello " } },
         dedupeKey: "activity-text-1",
-        runtimeTs: new Date("2026-05-21T00:00:02.000Z"),
+        occurredAt: new Date("2026-05-21T00:00:02.000Z"),
         ingestSequence: 2,
       }, {
         eventType: "provider.text_delta",
@@ -215,7 +215,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "world" } },
         dedupeKey: "activity-text-2",
-        runtimeTs: new Date("2026-05-21T00:00:03.000Z"),
+        occurredAt: new Date("2026-05-21T00:00:03.000Z"),
         ingestSequence: 3,
       }, {
         eventType: "provider.reasoning_delta",
@@ -229,7 +229,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "reasoning_delta", text: "Thinking" } },
         dedupeKey: "activity-reasoning",
-        runtimeTs: new Date("2026-05-21T00:00:04.000Z"),
+        occurredAt: new Date("2026-05-21T00:00:04.000Z"),
         ingestSequence: 4,
       }, {
         eventType: "provider.approval_required",
@@ -243,7 +243,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "approval_required" } },
         dedupeKey: "activity-approval",
-        runtimeTs: new Date("2026-05-21T00:00:05.000Z"),
+        occurredAt: new Date("2026-05-21T00:00:05.000Z"),
         ingestSequence: 5,
       }, {
         eventType: "provider.unknown",
@@ -257,7 +257,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "provider_opaque", rawEventType: "provider.opaque" } },
         dedupeKey: "activity-raw",
-        runtimeTs: new Date("2026-05-21T00:00:06.000Z"),
+        occurredAt: new Date("2026-05-21T00:00:06.000Z"),
         ingestSequence: 6,
       }],
     });
@@ -318,7 +318,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_started", toolName: "chrona_plan_read", label: "Read plan", inputSummary: "taskId=task-1", preview: "Loading graph" } },
         dedupeKey: "tool-started-details",
-        runtimeTs: new Date("2026-05-21T00:01:00.000Z"),
+        occurredAt: new Date("2026-05-21T00:01:00.000Z"),
         ingestSequence: 1,
       }, {
         eventType: "provider.tool_completed",
@@ -330,7 +330,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_completed", toolName: "chrona_plan_read", durationMs: 42, error: "Provider timeout" } },
         dedupeKey: "tool-completed-details",
-        runtimeTs: new Date("2026-05-21T00:01:01.000Z"),
+        occurredAt: new Date("2026-05-21T00:01:01.000Z"),
         ingestSequence: 2,
       }],
     });
@@ -363,7 +363,7 @@ describe("getTaskPage orchestrator read model", () => {
         nodeTitle: "Prepare",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Prepare text" } },
         dedupeKey: "explicit-node-prepare",
-        runtimeTs: new Date("2026-05-21T00:02:00.000Z"),
+          occurredAt: new Date("2026-05-21T00:02:00.000Z"),
         ingestSequence: 1,
       }, {
         eventType: "provider.text_delta",
@@ -374,7 +374,7 @@ describe("getTaskPage orchestrator read model", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Unscoped nearby text" } },
         dedupeKey: "explicit-node-unscoped",
-        runtimeTs: new Date("2026-05-21T00:02:01.000Z"),
+          occurredAt: new Date("2026-05-21T00:02:01.000Z"),
         ingestSequence: 2,
       }],
     });

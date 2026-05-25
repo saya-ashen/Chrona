@@ -121,75 +121,85 @@ enum TaskDependencyType {
 }
 
 model Workspace {
-  id                String             @id @default(cuid())
-  name              String
-  description       String?
-  defaultRuntime    String
-  status            WorkspaceStatus
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  tasks             Task[]
-  approvals         Approval[]
-  artifacts         Artifact[]
-  memories          Memory[]
-  events            Event[]
-  taskDependencies  TaskDependency[]
-  taskProjections   TaskProjection[]
-  scheduleProposals ScheduleProposal[]
-  workBlocks        WorkBlock[]
-  executionSessions ExecutionSession[]
-  taskPlans         TaskPlan[]
-  taskPlanRuns      TaskPlanRun[]
+  id                   String                @id @default(cuid())
+  name                 String
+  description          String?
+  defaultRuntime       String
+  status               WorkspaceStatus
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  tasks                Task[]
+  approvals            Approval[]
+  artifacts            Artifact[]
+  memories             Memory[]
+  events               Event[]
+  rawEventLogs         RawEventLog[]
+  toolInvocations      ToolInvocation[]
+  taskTimelineItems    TaskTimelineItem[]
+  taskDependencies     TaskDependency[]
+  taskProjections      TaskProjection[]
+  scheduleProposals    ScheduleProposal[]
+  workBlocks           WorkBlock[]
+  executionSessions    ExecutionSession[]
+  taskPlans            TaskPlan[]
+  taskPlanRuns         TaskPlanRun[]
   taskPlanNodeAttempts TaskPlanNodeAttempt[]
   taskPlanProviderRuns TaskPlanProviderRun[]
-  taskPlanLayers    TaskPlanLayer[]
-  graphVersions     GraphVersion[]
-  graphMutations    GraphMutationRecord[]
+  taskPlanLayers       TaskPlanLayer[]
+  graphVersions        GraphVersion[]
+  graphMutations       GraphMutationRecord[]
   reconciliationEvents ReconciliationEvent[]
-  schedulerEvents   SchedulerEvent[]
+  schedulerEvents      SchedulerEvent[]
 }
 
 model Task {
-  id                  String                 @id @default(cuid())
-  workspaceId         String
-  title               String
-  description         String?
-  executionRuntime    String
-  executionConfig     Json
-  status              TaskStatus
-  priority            TaskPriority
-  autoExecute         Boolean                @default(false)
-  parentTaskId        String?
-  dueAt               DateTime?
-  blockReason         Json?
-  defaultSessionId    String?
-  latestRunId         String?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
-  completedAt         DateTime?
-  workspace           Workspace              @relation(fields: [workspaceId], references: [id])
-  runs                Run[]
-  sessions            TaskSession[]          @relation("TaskSessions")
-  approvals           Approval[]
-  artifacts           Artifact[]
-  memories            Memory[]
-  events              Event[]
-  projection          TaskProjection?
-  dependencies        TaskDependency[]       @relation("TaskDependencies")
-  dependentTasks      TaskDependency[]       @relation("TaskDependents")
-  scheduleProposals   ScheduleProposal[]
-  assistantMessages   TaskAssistantMessage[]
-  workBlocks          WorkBlock[]
-  executionSessions   ExecutionSession[]
-  taskPlans           TaskPlan[]
-  taskPlanRuns        TaskPlanRun[]
+  id                   String                 @id @default(cuid())
+  workspaceId          String
+  title                String
+  description          String?
+  executionRuntime     String
+  executionConfig      Json
+  status               TaskStatus
+  priority             TaskPriority
+  autoExecute          Boolean                @default(false)
+  parentTaskId         String?
+  dueAt                DateTime?
+  blockReason          Json?
+  defaultSessionId     String?
+  latestRunId          String?
+  latestEventId        String?
+  latestRawEventId     String?
+  blockedByEventId     String?
+  blockedByRawEventId  String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  completedAt          DateTime?
+  workspace            Workspace              @relation(fields: [workspaceId], references: [id])
+  runs                 Run[]
+  sessions             TaskSession[]          @relation("TaskSessions")
+  approvals            Approval[]
+  artifacts            Artifact[]
+  memories             Memory[]
+  events               Event[]
+  rawEventLogs         RawEventLog[]
+  toolInvocations      ToolInvocation[]
+  timelineItems        TaskTimelineItem[]
+  projection           TaskProjection?
+  dependencies         TaskDependency[]       @relation("TaskDependencies")
+  dependentTasks       TaskDependency[]       @relation("TaskDependents")
+  scheduleProposals    ScheduleProposal[]
+  assistantMessages    TaskAssistantMessage[]
+  workBlocks           WorkBlock[]
+  executionSessions    ExecutionSession[]
+  taskPlans            TaskPlan[]
+  taskPlanRuns         TaskPlanRun[]
   taskPlanNodeAttempts TaskPlanNodeAttempt[]
   taskPlanProviderRuns TaskPlanProviderRun[]
-  taskPlanLayers      TaskPlanLayer[]
-  graphVersions       GraphVersion[]
-  graphMutations      GraphMutationRecord[]
+  taskPlanLayers       TaskPlanLayer[]
+  graphVersions        GraphVersion[]
+  graphMutations       GraphMutationRecord[]
   reconciliationEvents ReconciliationEvent[]
-  schedulerEvents     SchedulerEvent[]
+  schedulerEvents      SchedulerEvent[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
@@ -232,51 +242,51 @@ model GraphVersion {
 }
 
 model GraphMutationRecord {
-  id                 String              @id @default(cuid())
-  workspaceId        String
-  taskId             String
-  baseGraphVersion   Int
-  operation          String
-  status             GraphMutationStatus @default(Pending)
-  payload            Json
-  validationResult   Json?
-  affectedNodeIds    Json?
-  createdBy          String
-  createdAt          DateTime            @default(now())
-  appliedAt          DateTime?
-  workspace          Workspace           @relation(fields: [workspaceId], references: [id])
-  task               Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id               String              @id @default(cuid())
+  workspaceId      String
+  taskId           String
+  baseGraphVersion Int
+  operation        String
+  status           GraphMutationStatus @default(Pending)
+  payload          Json
+  validationResult Json?
+  affectedNodeIds  Json?
+  createdBy        String
+  createdAt        DateTime            @default(now())
+  appliedAt        DateTime?
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id])
+  task             Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, status, createdAt])
   @@index([taskId, baseGraphVersion, status])
 }
 
 model ReconciliationEvent {
-  id            String   @id @default(cuid())
-  workspaceId   String
-  taskId        String
-  graphVersion  Int
+  id             String    @id @default(cuid())
+  workspaceId    String
+  taskId         String
+  graphVersion   Int
   executionState String
-  currentNodeId String?
-  issues        Json?
-  repairActions Json?
-  createdAt     DateTime @default(now())
-  workspace     Workspace @relation(fields: [workspaceId], references: [id])
-  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  currentNodeId  String?
+  issues         Json?
+  repairActions  Json?
+  createdAt      DateTime  @default(now())
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
+  task           Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, createdAt])
   @@index([taskId, graphVersion, createdAt])
 }
 
 model SchedulerEvent {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   workspaceId  String
   taskId       String
   graphVersion Int?
   eventType    String
   reason       String?
   payload      Json?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
   workspace    Workspace @relation(fields: [workspaceId], references: [id])
   task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
@@ -321,10 +331,10 @@ model TaskDependency {
 }
 
 model TaskPlan {
-  id           String         @id @default(cuid())
+  id           String          @id @default(cuid())
   workspaceId  String
   taskId       String
-  planId       String         @unique
+  planId       String          @unique
   revision     Int
   status       TaskPlanStatus
   prompt       String?
@@ -332,10 +342,10 @@ model TaskPlan {
   generatedBy  String?
   compiledPlan Json
   editablePlan Json?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  workspace    Workspace      @relation(fields: [workspaceId], references: [id])
-  task         Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id])
+  task         Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
   runs         TaskPlanRun[]
   layers       TaskPlanLayer[]
 
@@ -344,7 +354,7 @@ model TaskPlan {
 }
 
 model TaskPlanRun {
-  id                  String                    @id @default(cuid())
+  id                  String                @id @default(cuid())
   workspaceId         String
   taskId              String
   planId              String
@@ -352,12 +362,14 @@ model TaskPlanRun {
   executionOwnerId    String?
   executionOwnerScope String?
   executionLeaseUntil DateTime?
-  executionEpoch      Int                       @default(0)
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
-  workspace           Workspace                 @relation(fields: [workspaceId], references: [id])
-  task                Task                      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  plan                TaskPlan                  @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  executionEpoch      Int                   @default(0)
+  latestEventId       String?
+  latestRawEventId    String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  workspace           Workspace             @relation(fields: [workspaceId], references: [id])
+  task                Task                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  plan                TaskPlan              @relation(fields: [planId], references: [planId], onDelete: Cascade)
   nodeAttempts        TaskPlanNodeAttempt[]
   providerRuns        TaskPlanProviderRun[]
 
@@ -368,7 +380,7 @@ model TaskPlanRun {
 }
 
 model TaskPlanNodeAttempt {
-  id                         String                    @id @default(cuid())
+  id                         String                @id @default(cuid())
   workspaceId                String
   taskId                     String
   planId                     String
@@ -376,19 +388,28 @@ model TaskPlanNodeAttempt {
   nodeId                     String
   nodeLayerId                String
   executionContextSnapshotId String?
-  idempotencyKey             String                    @unique
+  idempotencyKey             String                @unique
   attemptNumber              Int
   status                     String
   executionEpoch             Int
-  startedAt                  DateTime                  @default(now())
+  startedAt                  DateTime              @default(now())
   finishedAt                 DateTime?
   error                      Json?
   runtimeSnapshot            Json?
-  createdAt                  DateTime                  @default(now())
-  updatedAt                  DateTime                  @updatedAt
-  workspace                  Workspace                 @relation(fields: [workspaceId], references: [id])
-  task                       Task                      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  planRun                    TaskPlanRun               @relation(fields: [planRunId], references: [id], onDelete: Cascade)
+  startedByEventId           String?
+  completedByEventId         String?
+  failedByEventId            String?
+  blockedByEventId           String?
+  inputRawEventId            String?
+  outputRawEventId           String?
+  errorRawEventId            String?
+  selectedBranchRef          String?
+  selectedNextNodeId         String?
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
+  workspace                  Workspace             @relation(fields: [workspaceId], references: [id])
+  task                       Task                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  planRun                    TaskPlanRun           @relation(fields: [planRunId], references: [id], onDelete: Cascade)
   providerRuns               TaskPlanProviderRun[]
 
   @@index([taskId, planId, nodeId, status])
@@ -396,23 +417,30 @@ model TaskPlanNodeAttempt {
 }
 
 model TaskPlanProviderRun {
-  id             String              @id @default(cuid())
-  workspaceId    String
-  taskId         String
-  planId         String
-  planRunId      String
-  nodeAttemptId  String
-  idempotencyKey String              @unique
-  providerRunRef String?
-  status         String
-  startedAt      DateTime            @default(now())
-  finishedAt     DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  workspace      Workspace           @relation(fields: [workspaceId], references: [id])
-  task           Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  planRun        TaskPlanRun         @relation(fields: [planRunId], references: [id], onDelete: Cascade)
-  nodeAttempt    TaskPlanNodeAttempt @relation(fields: [nodeAttemptId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(cuid())
+  workspaceId        String
+  taskId             String
+  planId             String
+  planRunId          String
+  nodeAttemptId      String
+  idempotencyKey     String              @unique
+  providerRunRef     String?
+  runtimeName        String?
+  nativeRunId        String?
+  firstRawEventId    String?
+  lastRawEventId     String?
+  completedByEventId String?
+  failedByEventId    String?
+  correlationId      String?
+  status             String
+  startedAt          DateTime            @default(now())
+  finishedAt         DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id])
+  task               Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  planRun            TaskPlanRun         @relation(fields: [planRunId], references: [id], onDelete: Cascade)
+  nodeAttempt        TaskPlanNodeAttempt @relation(fields: [nodeAttemptId], references: [id], onDelete: Cascade)
 
   @@index([taskId, planId, status])
   @@index([nodeAttemptId, status])
@@ -465,8 +493,10 @@ model Run {
   approvals             Approval[]
   artifacts             Artifact[]
   events                Event[]
+  rawEventLogs          RawEventLog[]
+  toolInvocations       ToolInvocation[]
+  timelineItems         TaskTimelineItem[]
   conversationEntries   ConversationEntry[]
-  toolCallDetails       ToolCallDetail[]
   runtimeCursor         RuntimeCursor?
 
   @@index([taskId, status])
@@ -539,29 +569,97 @@ model Memory {
 }
 
 model Event {
-  id             String    @id @default(cuid())
-  eventType      String
-  workspaceId    String
-  taskId         String
-  runId          String?
-  nodeId         String?
-  nodeTitle      String?
-  actorType      String
-  actorId        String
-  source         String
-  payload        Json
-  dedupeKey      String    @unique
-  runtimeTs      DateTime?
-  ingestSequence Int
-  createdAt      DateTime  @default(now())
-  workspace      Workspace @relation(fields: [workspaceId], references: [id])
-  task           Task      @relation(fields: [taskId], references: [id])
-  run            Run?      @relation(fields: [runId], references: [id])
+  id                 String             @id @default(cuid())
+  eventType          String
+  eventVersion       Int                @default(1)
+  workspaceId        String
+  taskId             String?
+  runId              String?
+  taskSessionId      String?
+  executionSessionId String?
+  planId             String?
+  planRunId          String?
+  nodeAttemptId      String?
+  providerRunId      String?
+  nodeId             String?
+  nodeTitle          String?
+  rawEventId         String?
+  parentEventId      String?
+  causationEventId   String?
+  correlationId      String?
+  actorType          String
+  actorId            String?
+  source             String
+  payload            Json
+  summary            String?
+  severity           String?
+  dedupeKey          String?            @unique
+  occurredAt         DateTime?
+  ingestedAt         DateTime           @default(now())
+  ingestSequence     Int
+  createdAt          DateTime           @default(now())
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id])
+  task               Task?              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run                Run?               @relation(fields: [runId], references: [id], onDelete: Cascade)
+  rawEvent           RawEventLog?       @relation(fields: [rawEventId], references: [id], onDelete: SetNull)
+  timelineItems      TaskTimelineItem[]
 
   @@index([taskId, ingestSequence])
   @@index([taskId, nodeId, ingestSequence])
   @@index([runId, ingestSequence])
+  @@index([nodeAttemptId, ingestSequence])
+  @@index([correlationId, ingestSequence])
   @@index([workspaceId, eventType, ingestSequence])
+}
+
+model RawEventLog {
+  id                  String             @id @default(cuid())
+  workspaceId         String
+  taskId              String?
+  runId               String?
+  taskSessionId       String?
+  executionSessionId  String?
+  planId              String?
+  planRunId           String?
+  nodeAttemptId       String?
+  providerRunId       String?
+  nodeId              String?
+  nodeTitle           String?
+  source              String
+  direction           String
+  rawType             String
+  provider            String?
+  runtimeName         String?
+  rawPayload          Json?
+  rawText             String?
+  metadata            Json?
+  nativeRunId         String?
+  nativeEventId       String?
+  nativeToolCallId    String?
+  externalRef         String?
+  sequence            Int?
+  correlationId       String?
+  parentRawEventId    String?
+  causationRawEventId String?
+  payloadHash         String
+  redactionState      String             @default("none")
+  redactionMetadata   Json?
+  occurredAt          DateTime?
+  receivedAt          DateTime           @default(now())
+  createdAt           DateTime           @default(now())
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id])
+  task                Task?              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run                 Run?               @relation(fields: [runId], references: [id], onDelete: Cascade)
+  events              Event[]
+  timelineItems       TaskTimelineItem[]
+
+  @@unique([source, externalRef])
+  @@index([taskId, receivedAt])
+  @@index([runId, sequence])
+  @@index([nodeAttemptId, receivedAt])
+  @@index([correlationId, receivedAt])
+  @@index([nativeToolCallId])
+  @@index([workspaceId, source, receivedAt])
 }
 
 model ConversationEntry {
@@ -578,20 +676,78 @@ model ConversationEntry {
   @@index([runId, sequence])
 }
 
-model ToolCallDetail {
-  id               String    @id @default(cuid())
-  runId            String
-  toolName         String
-  status           String
-  argumentsSummary String?
-  resultSummary    String?
-  errorSummary     String?
-  runtimeTs        DateTime?
-  externalRef      String?   @unique
-  createdAt        DateTime  @default(now())
-  run              Run       @relation(fields: [runId], references: [id])
+model ToolInvocation {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  taskId             String?
+  runId              String?
+  executionSessionId String?
+  planId             String?
+  planRunId          String?
+  nodeAttemptId      String?
+  providerRunId      String?
+  nodeId             String?
+  toolName           String
+  toolKind           String?
+  status             String
+  inputRawEventId    String?
+  outputRawEventId   String?
+  errorRawEventId    String?
+  canonicalEventId   String?
+  inputPayload       Json?
+  outputPayload      Json?
+  errorPayload       Json?
+  inputSummary       String?
+  outputSummary      String?
+  errorSummary       String?
+  nativeToolCallId   String?
+  externalRef        String?
+  correlationId      String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  workspace          Workspace @relation(fields: [workspaceId], references: [id])
+  task               Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run                Run?      @relation(fields: [runId], references: [id], onDelete: Cascade)
 
+  @@unique([runId, nativeToolCallId])
+  @@index([taskId, createdAt])
   @@index([runId, createdAt])
+  @@index([nodeAttemptId, createdAt])
+  @@index([toolName, status])
+  @@index([correlationId])
+}
+
+model TaskTimelineItem {
+  id                 String       @id @default(cuid())
+  workspaceId        String
+  taskId             String
+  runId              String?
+  executionSessionId String?
+  nodeId             String?
+  nodeAttemptId      String?
+  kind               String
+  title              String
+  body               String?
+  severity           String?
+  status             String?
+  eventId            String?
+  rawEventId         String?
+  toolInvocationId   String?
+  sortTime           DateTime
+  metadata           Json?
+  createdAt          DateTime     @default(now())
+  workspace          Workspace    @relation(fields: [workspaceId], references: [id])
+  task               Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run                Run?         @relation(fields: [runId], references: [id], onDelete: Cascade)
+  event              Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  rawEvent           RawEventLog? @relation(fields: [rawEventId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, sortTime])
+  @@index([taskId, nodeId, sortTime])
+  @@index([runId, sortTime])
+  @@index([eventId])
 }
 
 model TaskProjection {
@@ -613,6 +769,12 @@ model TaskProjection {
   scheduleProposalCount Int       @default(0)
   latestArtifactTitle   String?
   lastActivityAt        DateTime?
+  latestEventId         String?
+  latestRawEventId      String?
+  blockedByEventId      String?
+  blockedByRawEventId   String?
+  currentNodeId         String?
+  currentNodeTitle      String?
   updatedAt             DateTime  @updatedAt
   workspace             Workspace @relation(fields: [workspaceId], references: [id])
   task                  Task      @relation(fields: [taskId], references: [id])
@@ -730,21 +892,21 @@ model TaskAssistantMessage {
 // ────────────────────────────────────────────────────────────────────
 
 model WorkBlock {
-  id               String           @id @default(cuid())
-  workspaceId      String
-  taskId           String
-  planId           String?
-  title            String
-  status           WorkBlockStatus  @default(Scheduled)
-  scheduledStartAt DateTime
-  scheduledEndAt   DateTime
-  startedAt        DateTime?
-  completedAt      DateTime?
-  trigger          WorkBlockTrigger @default(scheduled)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  workspace        Workspace        @relation(fields: [workspaceId], references: [id])
-  task             Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id                String             @id @default(cuid())
+  workspaceId       String
+  taskId            String
+  planId            String?
+  title             String
+  status            WorkBlockStatus    @default(Scheduled)
+  scheduledStartAt  DateTime
+  scheduledEndAt    DateTime
+  startedAt         DateTime?
+  completedAt       DateTime?
+  trigger           WorkBlockTrigger   @default(scheduled)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id])
+  task              Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
   executionSessions ExecutionSession[]
 
   @@index([workspaceId, status])
@@ -753,23 +915,28 @@ model WorkBlock {
 }
 
 model ExecutionSession {
-  id               String                  @id @default(cuid())
-  workspaceId      String
-  taskId           String
-  workBlockId      String?
-  planId           String?
-  status           ExecutionSessionStatus  @default(Active)
-  currentNodeId    String?
-  pauseReason      String?
-  completedNodeIds String                  @default("[]") /// JSON array of completed node IDs
-  startedAt        DateTime                @default(now())
-  pausedAt         DateTime?
-  completedAt      DateTime?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  workspace        Workspace               @relation(fields: [workspaceId], references: [id])
-  task             Task                    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  workBlock        WorkBlock?              @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
+  id                   String                 @id @default(cuid())
+  workspaceId          String
+  taskId               String
+  workBlockId          String?
+  planId               String?
+  status               ExecutionSessionStatus @default(Active)
+  currentNodeId        String?
+  currentNodeAttemptId String?
+  pauseReason          String?
+  completedNodeIds     String                 @default("[]") /// JSON array of completed node IDs
+  pausedByEventId      String?
+  pausedByRawEventId   String?
+  latestEventId        String?
+  latestRawEventId     String?
+  startedAt            DateTime               @default(now())
+  pausedAt             DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  workspace            Workspace              @relation(fields: [workspaceId], references: [id])
+  task                 Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workBlock            WorkBlock?             @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, status])
   @@index([taskId, status])

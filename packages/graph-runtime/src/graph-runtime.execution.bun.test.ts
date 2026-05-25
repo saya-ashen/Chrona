@@ -10,6 +10,7 @@ import type { GraphExecutionState } from "./index";
 import {
   activeDefinitionLayerId,
   makeBranchingPlan,
+  makeLinearPlan,
   makeParallelPlan,
 } from "./graph-runtime.test-fixtures";
 
@@ -179,10 +180,10 @@ describe("graph-runtime execution", () => {
     });
 
     const second = await runtime.dispatch({
-      type: "sync_external_result",
+      type: "submit_node_result",
       state,
       context: null,
-      externalResult: {
+      nodeResult: {
         nodeId: "choose",
         status: "done",
         summary: "External run completed",
@@ -205,7 +206,7 @@ describe("graph-runtime execution", () => {
     });
     expect(second.events.map((event) => event.type)).toEqual([
       "command_received",
-      "external_result_synced",
+      "node_result_submitted",
       "executable_path_computed",
       "node_started",
       "node_waiting_for_user",
@@ -259,11 +260,11 @@ describe("graph-runtime execution", () => {
     });
 
     const result = await runtime.dispatch({
-      type: "sync_external_result",
+      type: "submit_node_result",
       state,
       context: null,
       continueExecution: false,
-      externalResult: {
+      nodeResult: {
         nodeId: "choose",
         status: "done",
         summary: "External run completed",
@@ -278,8 +279,74 @@ describe("graph-runtime execution", () => {
     ]);
     expect(result.events.map((event) => event.type)).toEqual([
       "command_received",
-      "external_result_synced",
+      "node_result_submitted",
     ]);
+  });
+
+  it("continues after a node submits its result through a graph command", async () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeLinearPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const firstLayerId = activeDefinitionLayerId(graph, "first");
+    const secondLayerId = activeDefinitionLayerId(graph, "second");
+    let tick = 90;
+
+    const outcome = await runGraphExecution({
+      taskId: "task_1",
+      runtimeName: "test",
+      trigger: "manual",
+      state: { graph, attempts: [], results: [], executionContextSnapshots: [] },
+      context: null,
+      now: () => tick++,
+      callbacks: {
+        executeNode: async ({ node }) => ({
+          status: "done",
+          summary: `${node.id} done`,
+          evidence: {},
+        }),
+        resolveSubmittedNodeState: async ({ node, attempt, state }) => {
+          if (node.id !== "first") return null;
+          return {
+            ...state,
+            attempts: state.attempts.map((entry) =>
+              entry.id === attempt.id
+                ? {
+                    ...entry,
+                    status: "succeeded",
+                    finishedAt: "2026-01-01T00:00:01.000Z",
+                  }
+                : entry,
+            ),
+            results: [
+              {
+                id: "result_first_submitted",
+                taskId: "task_1",
+                graphId: graph.id,
+                nodeId: "first",
+                nodeLayerId: firstLayerId,
+                attemptId: attempt.id,
+                status: "current",
+                outputSummary: "first submitted",
+              },
+            ],
+          };
+        },
+      },
+    });
+
+    expect(outcome.status).toBe("completed");
+    expect(outcome.executedNodeIds).toEqual(["first", "second"]);
+    expect(outcome.state.results.map((result) => [result.nodeId, result.status])).toEqual([
+      ["first", "current"],
+      ["second", "current"],
+    ]);
+    expect(outcome.state.results[1]).toMatchObject({
+      nodeId: "second",
+      nodeLayerId: secondLayerId,
+      outputSummary: "second done",
+    });
   });
 
   it("does not count failed Chrona submissions as node results", () => {

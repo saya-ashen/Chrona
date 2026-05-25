@@ -1,7 +1,7 @@
 import type { NodeAttempt } from "@chrona/contracts/ai";
 import type { SyncPlanRunRuntimeResultInput } from "../../types";
 
-export function externalResultForRuntimeRun(input: {
+export function nodeResultForRuntimeRun(input: {
   attempt: NodeAttempt;
   mainSessionId: string;
   runtimeRunRef: string;

@@ -2,6 +2,7 @@ import { HermesProviderClient } from "@chrona/hermes";
 import {
   CHRONA_DEBUG_PROVIDER_TYPE,
   ChronaDebugProviderClient,
+  normalizeDebugProviderProfile,
 } from "@chrona/providers-debug";
 import { db } from "@/lib/db";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
@@ -11,6 +12,8 @@ import type {
   AiClientType,
   HermesClientConfig,
   LLMClientConfig,
+  DebugClientConfig,
+  DebugProviderProfile,
 } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 
@@ -23,9 +26,13 @@ type StoredAiClient = {
   enabled: boolean;
 };
 
+export type DebugProfiledProviderClient = AgentProviderClient & {
+  debugProfile?: DebugProviderProfile;
+};
+
 export type EngineAiClient = {
   record: AiClientRecord;
-  providerClient: AgentProviderClient | null;
+  providerClient: DebugProfiledProviderClient | null;
 };
 
 export type EngineProviderClient = EngineAiClient & {
@@ -44,7 +51,7 @@ export type EngineHermesClient = EngineAiClient & {
 };
 
 export type EngineDebugClient = EngineAiClient & {
-  record: AiClientRecord & { type: "debug"; config: Record<string, never> };
+  record: AiClientRecord & { type: "debug"; config: DebugClientConfig };
   providerClient: AgentProviderClient;
 };
 
@@ -86,7 +93,11 @@ function createProviderClient(
   }
 
   if (record.type === CHRONA_DEBUG_PROVIDER_TYPE) {
-    return new ChronaDebugProviderClient();
+    const config = record.config as DebugClientConfig;
+    const client = new ChronaDebugProviderClient({
+      profile: normalizeDebugProviderProfile(config.profile),
+    });
+    return Object.assign(client, { debugProfile: client.profile });
   }
 
   return null;

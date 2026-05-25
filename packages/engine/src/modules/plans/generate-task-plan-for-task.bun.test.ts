@@ -62,7 +62,7 @@ mock.module("@/modules/ai/runtime/ai-service", () => ({
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
-  await db.toolCallDetail.deleteMany();
+  await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();
   await db.event.deleteMany();

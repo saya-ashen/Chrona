@@ -3,8 +3,13 @@ import {
   ensureDefaultTaskSession,
   buildDefaultTaskSessionKey,
 } from "@/modules/task-execution/task-sessions";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import {
+  appendCanonicalEvent,
+  appendRawEventLog,
+  appendTaskTimelineItem,
+} from "@/modules/events/append-canonical-event";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
+import type { PlanGraphCommandEnvelope } from "./types";
 
 type MainSessionEventType =
   | "execution_started"
@@ -15,7 +20,7 @@ type MainSessionEventType =
   | "node_waiting_for_approval"
   | "node_blocked"
   | "graph_mutation_applied"
-  | "external_result_synced"
+  | "node_result_submitted"
   | "replan_proposed"
   | "execution_completed"
   | "user_input_received"
@@ -89,29 +94,104 @@ export async function appendMainSessionEvent(input: {
   nodeId?: string | null;
   nodeTitle?: string | null;
   payload: MainSessionEventPayload;
+  rawEvent?: unknown;
+  envelope?: PlanGraphCommandEnvelope;
 }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
     select: { workspaceId: true },
   });
 
-  await appendCanonicalEvent({
+  const occurredAt = new Date();
+  const rawEvent = await appendRawEventLog({
+    workspaceId: task.workspaceId,
+    taskId: input.taskId,
+    taskSessionId: input.sessionId,
+    planId: input.planId,
+    nodeId: input.nodeId ?? null,
+    nodeTitle: input.nodeTitle ?? null,
+    source: "graph_runtime",
+    direction: "inbound",
+    rawType: input.eventType,
+    rawPayload: input.rawEvent ?? {
+      type: input.eventType,
+      payload: input.payload,
+    },
+    metadata: {
+      planId: input.planId,
+      sessionId: input.sessionId,
+      command: input.envelope?.command.type,
+      actor: input.envelope?.actor,
+      origin: input.envelope?.origin,
+      correlation: input.envelope?.correlation,
+    },
+    externalRef: `graph_runtime:${input.taskId}:${input.sessionId}:${input.eventType}:${Object.values(input.payload).join(",").slice(0, 64)}`,
+    correlationId: input.sessionId,
+    occurredAt,
+  });
+
+  const event = await appendCanonicalEvent({
     eventType: `plan_execution.${input.eventType}`,
     workspaceId: task.workspaceId,
     taskId: input.taskId,
+    taskSessionId: input.sessionId,
+    planId: input.planId,
     runId: null,
     nodeId: input.nodeId ?? null,
     nodeTitle: input.nodeTitle ?? null,
-    actorType: "system",
-    actorId: "plan-orchestrator",
+    rawEventId: rawEvent.id,
+    correlationId: input.envelope?.origin.requestId ?? input.sessionId,
+    actorType: actorTypeForEnvelope(input.envelope),
+    actorId: actorIdForEnvelope(input.envelope),
     source: "plan_execution",
     payload: {
       session_id: input.sessionId,
       plan_id: input.planId,
+      command: input.envelope?.command.type,
+      actor: input.envelope?.actor,
+      origin: input.envelope?.origin,
+      correlation: input.envelope?.correlation,
       ...input.payload,
     },
     dedupeKey: `plan_execution.${input.eventType}:${input.taskId}:${input.sessionId}:${Object.values(input.payload).join(",").slice(0, 64)}`,
-    runtimeTs: new Date(),
+    summary: timelineTitle(input.eventType, input.nodeTitle),
+    severity: input.eventType === "node_blocked" ? "warning" : "info",
+    occurredAt,
+  });
+
+  await appendTaskTimelineItem({
+    workspaceId: task.workspaceId,
+    taskId: input.taskId,
+    taskSessionId: input.sessionId,
+    planId: input.planId,
+    nodeId: input.nodeId ?? null,
+    nodeTitle: input.nodeTitle ?? null,
+    kind: `plan_execution.${input.eventType}`,
+    title: timelineTitle(input.eventType, input.nodeTitle),
+    body: timelineBody(input.payload),
+    severity: input.eventType === "node_blocked" ? "warning" : "info",
+    status: input.eventType,
+    eventId: event.id,
+    rawEventId: rawEvent.id,
+    sortTime: occurredAt,
+    metadata: {
+      planId: input.planId,
+      sessionId: input.sessionId,
+      command: input.envelope?.command.type,
+      actor: input.envelope?.actor,
+      origin: input.envelope?.origin,
+      correlation: input.envelope?.correlation,
+    },
+  });
+
+  await db.task.update({
+    where: { id: input.taskId },
+    data: {
+      latestEventId: event.id,
+      latestRawEventId: rawEvent.id,
+      blockedByEventId: input.eventType === "node_blocked" ? event.id : undefined,
+      blockedByRawEventId: input.eventType === "node_blocked" ? rawEvent.id : undefined,
+    },
   });
 
   publishTaskWorkspaceUpdatedEvent({
@@ -119,4 +199,27 @@ export async function appendMainSessionEvent(input: {
     workspaceId: task.workspaceId,
     reason: `plan_execution.${input.eventType}`,
   });
+}
+
+function timelineTitle(eventType: MainSessionEventType, nodeTitle?: string | null) {
+  if (nodeTitle) return `${nodeTitle}: ${eventType}`;
+  return eventType;
+}
+
+function timelineBody(payload: MainSessionEventPayload) {
+  const summary = payload.summary ?? payload.reason ?? payload.prompt ?? payload.status;
+  return typeof summary === "string" ? summary : null;
+}
+
+function actorTypeForEnvelope(envelope?: PlanGraphCommandEnvelope) {
+  return envelope?.actor.type ?? "system";
+}
+
+function actorIdForEnvelope(envelope?: PlanGraphCommandEnvelope) {
+  const actor = envelope?.actor;
+  if (!actor) return "plan-orchestrator";
+  if (actor.type === "user") return actor.userId ?? null;
+  if (actor.type === "agent") return actor.actorId ?? actor.toolInvocationId ?? actor.providerRunId ?? null;
+  if (actor.type === "system") return actor.service;
+  return actor.integration;
 }

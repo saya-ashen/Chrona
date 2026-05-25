@@ -51,6 +51,15 @@ export type TaskPlanNodeAttemptMinAggregateOutputType = {
   executionEpoch: number | null
   startedAt: Date | null
   finishedAt: Date | null
+  startedByEventId: string | null
+  completedByEventId: string | null
+  failedByEventId: string | null
+  blockedByEventId: string | null
+  inputRawEventId: string | null
+  outputRawEventId: string | null
+  errorRawEventId: string | null
+  selectedBranchRef: string | null
+  selectedNextNodeId: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -70,6 +79,15 @@ export type TaskPlanNodeAttemptMaxAggregateOutputType = {
   executionEpoch: number | null
   startedAt: Date | null
   finishedAt: Date | null
+  startedByEventId: string | null
+  completedByEventId: string | null
+  failedByEventId: string | null
+  blockedByEventId: string | null
+  inputRawEventId: string | null
+  outputRawEventId: string | null
+  errorRawEventId: string | null
+  selectedBranchRef: string | null
+  selectedNextNodeId: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -91,6 +109,15 @@ export type TaskPlanNodeAttemptCountAggregateOutputType = {
   finishedAt: number
   error: number
   runtimeSnapshot: number
+  startedByEventId: number
+  completedByEventId: number
+  failedByEventId: number
+  blockedByEventId: number
+  inputRawEventId: number
+  outputRawEventId: number
+  errorRawEventId: number
+  selectedBranchRef: number
+  selectedNextNodeId: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -122,6 +149,15 @@ export type TaskPlanNodeAttemptMinAggregateInputType = {
   executionEpoch?: true
   startedAt?: true
   finishedAt?: true
+  startedByEventId?: true
+  completedByEventId?: true
+  failedByEventId?: true
+  blockedByEventId?: true
+  inputRawEventId?: true
+  outputRawEventId?: true
+  errorRawEventId?: true
+  selectedBranchRef?: true
+  selectedNextNodeId?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -141,6 +177,15 @@ export type TaskPlanNodeAttemptMaxAggregateInputType = {
   executionEpoch?: true
   startedAt?: true
   finishedAt?: true
+  startedByEventId?: true
+  completedByEventId?: true
+  failedByEventId?: true
+  blockedByEventId?: true
+  inputRawEventId?: true
+  outputRawEventId?: true
+  errorRawEventId?: true
+  selectedBranchRef?: true
+  selectedNextNodeId?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -162,6 +207,15 @@ export type TaskPlanNodeAttemptCountAggregateInputType = {
   finishedAt?: true
   error?: true
   runtimeSnapshot?: true
+  startedByEventId?: true
+  completedByEventId?: true
+  failedByEventId?: true
+  blockedByEventId?: true
+  inputRawEventId?: true
+  outputRawEventId?: true
+  errorRawEventId?: true
+  selectedBranchRef?: true
+  selectedNextNodeId?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -270,6 +324,15 @@ export type TaskPlanNodeAttemptGroupByOutputType = {
   finishedAt: Date | null
   error: runtime.JsonValue | null
   runtimeSnapshot: runtime.JsonValue | null
+  startedByEventId: string | null
+  completedByEventId: string | null
+  failedByEventId: string | null
+  blockedByEventId: string | null
+  inputRawEventId: string | null
+  outputRawEventId: string | null
+  errorRawEventId: string | null
+  selectedBranchRef: string | null
+  selectedNextNodeId: string | null
   createdAt: Date
   updatedAt: Date
   _count: TaskPlanNodeAttemptCountAggregateOutputType | null
@@ -314,6 +377,15 @@ export type TaskPlanNodeAttemptWhereInput = {
   finishedAt?: Prisma.DateTimeNullableFilter<"TaskPlanNodeAttempt"> | Date | string | null
   error?: Prisma.JsonNullableFilter<"TaskPlanNodeAttempt">
   runtimeSnapshot?: Prisma.JsonNullableFilter<"TaskPlanNodeAttempt">
+  startedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  completedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  failedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  inputRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  outputRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  errorRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedBranchRef?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedNextNodeId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
   createdAt?: Prisma.DateTimeFilter<"TaskPlanNodeAttempt"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"TaskPlanNodeAttempt"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
@@ -339,6 +411,15 @@ export type TaskPlanNodeAttemptOrderByWithRelationInput = {
   finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   error?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  startedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  inputRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  outputRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  errorRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  selectedBranchRef?: Prisma.SortOrderInput | Prisma.SortOrder
+  selectedNextNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   workspace?: Prisma.WorkspaceOrderByWithRelationInput
@@ -367,6 +448,15 @@ export type TaskPlanNodeAttemptWhereUniqueInput = Prisma.AtLeast<{
   finishedAt?: Prisma.DateTimeNullableFilter<"TaskPlanNodeAttempt"> | Date | string | null
   error?: Prisma.JsonNullableFilter<"TaskPlanNodeAttempt">
   runtimeSnapshot?: Prisma.JsonNullableFilter<"TaskPlanNodeAttempt">
+  startedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  completedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  failedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  inputRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  outputRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  errorRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedBranchRef?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedNextNodeId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
   createdAt?: Prisma.DateTimeFilter<"TaskPlanNodeAttempt"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"TaskPlanNodeAttempt"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
@@ -392,6 +482,15 @@ export type TaskPlanNodeAttemptOrderByWithAggregationInput = {
   finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   error?: Prisma.SortOrderInput | Prisma.SortOrder
   runtimeSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  startedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  inputRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  outputRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  errorRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  selectedBranchRef?: Prisma.SortOrderInput | Prisma.SortOrder
+  selectedNextNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.TaskPlanNodeAttemptCountOrderByAggregateInput
@@ -421,6 +520,15 @@ export type TaskPlanNodeAttemptScalarWhereWithAggregatesInput = {
   finishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | Date | string | null
   error?: Prisma.JsonNullableWithAggregatesFilter<"TaskPlanNodeAttempt">
   runtimeSnapshot?: Prisma.JsonNullableWithAggregatesFilter<"TaskPlanNodeAttempt">
+  startedByEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  completedByEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  failedByEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  blockedByEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  inputRawEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  outputRawEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  errorRawEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedBranchRef?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedNextNodeId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanNodeAttempt"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"TaskPlanNodeAttempt"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"TaskPlanNodeAttempt"> | Date | string
 }
@@ -439,6 +547,15 @@ export type TaskPlanNodeAttemptCreateInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
@@ -464,6 +581,15 @@ export type TaskPlanNodeAttemptUncheckedCreateInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
@@ -483,6 +609,15 @@ export type TaskPlanNodeAttemptUpdateInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
@@ -508,6 +643,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
@@ -530,6 +674,15 @@ export type TaskPlanNodeAttemptCreateManyInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -548,6 +701,15 @@ export type TaskPlanNodeAttemptUpdateManyMutationInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -569,6 +731,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateManyInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -600,6 +771,15 @@ export type TaskPlanNodeAttemptCountOrderByAggregateInput = {
   finishedAt?: Prisma.SortOrder
   error?: Prisma.SortOrder
   runtimeSnapshot?: Prisma.SortOrder
+  startedByEventId?: Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  inputRawEventId?: Prisma.SortOrder
+  outputRawEventId?: Prisma.SortOrder
+  errorRawEventId?: Prisma.SortOrder
+  selectedBranchRef?: Prisma.SortOrder
+  selectedNextNodeId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -624,6 +804,15 @@ export type TaskPlanNodeAttemptMaxOrderByAggregateInput = {
   executionEpoch?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   finishedAt?: Prisma.SortOrder
+  startedByEventId?: Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  inputRawEventId?: Prisma.SortOrder
+  outputRawEventId?: Prisma.SortOrder
+  errorRawEventId?: Prisma.SortOrder
+  selectedBranchRef?: Prisma.SortOrder
+  selectedNextNodeId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -643,6 +832,15 @@ export type TaskPlanNodeAttemptMinOrderByAggregateInput = {
   executionEpoch?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   finishedAt?: Prisma.SortOrder
+  startedByEventId?: Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrder
+  blockedByEventId?: Prisma.SortOrder
+  inputRawEventId?: Prisma.SortOrder
+  outputRawEventId?: Prisma.SortOrder
+  errorRawEventId?: Prisma.SortOrder
+  selectedBranchRef?: Prisma.SortOrder
+  selectedNextNodeId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -811,6 +1009,15 @@ export type TaskPlanNodeAttemptCreateWithoutWorkspaceInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutTaskPlanNodeAttemptsInput
@@ -834,6 +1041,15 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutWorkspaceInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
@@ -884,6 +1100,15 @@ export type TaskPlanNodeAttemptScalarWhereInput = {
   finishedAt?: Prisma.DateTimeNullableFilter<"TaskPlanNodeAttempt"> | Date | string | null
   error?: Prisma.JsonNullableFilter<"TaskPlanNodeAttempt">
   runtimeSnapshot?: Prisma.JsonNullableFilter<"TaskPlanNodeAttempt">
+  startedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  completedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  failedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  blockedByEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  inputRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  outputRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  errorRawEventId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedBranchRef?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
+  selectedNextNodeId?: Prisma.StringNullableFilter<"TaskPlanNodeAttempt"> | string | null
   createdAt?: Prisma.DateTimeFilter<"TaskPlanNodeAttempt"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"TaskPlanNodeAttempt"> | Date | string
 }
@@ -902,6 +1127,15 @@ export type TaskPlanNodeAttemptCreateWithoutTaskInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
@@ -925,6 +1159,15 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutTaskInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
@@ -969,6 +1212,15 @@ export type TaskPlanNodeAttemptCreateWithoutPlanRunInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
@@ -992,6 +1244,15 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutPlanRunInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
@@ -1036,6 +1297,15 @@ export type TaskPlanNodeAttemptCreateWithoutProviderRunsInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
@@ -1060,6 +1330,15 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutProviderRunsInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1094,6 +1373,15 @@ export type TaskPlanNodeAttemptUpdateWithoutProviderRunsInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
@@ -1118,6 +1406,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutProviderRunsInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1138,6 +1435,15 @@ export type TaskPlanNodeAttemptCreateManyWorkspaceInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1156,6 +1462,15 @@ export type TaskPlanNodeAttemptUpdateWithoutWorkspaceInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
@@ -1179,6 +1494,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutWorkspaceInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
@@ -1200,6 +1524,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateManyWithoutWorkspaceInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1220,6 +1553,15 @@ export type TaskPlanNodeAttemptCreateManyTaskInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1238,6 +1580,15 @@ export type TaskPlanNodeAttemptUpdateWithoutTaskInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
@@ -1261,6 +1612,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutTaskInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
@@ -1282,6 +1642,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1302,6 +1671,15 @@ export type TaskPlanNodeAttemptCreateManyPlanRunInput = {
   finishedAt?: Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1320,6 +1698,15 @@ export type TaskPlanNodeAttemptUpdateWithoutPlanRunInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
@@ -1343,6 +1730,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutPlanRunInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
@@ -1364,6 +1760,15 @@ export type TaskPlanNodeAttemptUncheckedUpdateManyWithoutPlanRunInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1416,6 +1821,15 @@ export type TaskPlanNodeAttemptSelect<ExtArgs extends runtime.Types.Extensions.I
   finishedAt?: boolean
   error?: boolean
   runtimeSnapshot?: boolean
+  startedByEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  blockedByEventId?: boolean
+  inputRawEventId?: boolean
+  outputRawEventId?: boolean
+  errorRawEventId?: boolean
+  selectedBranchRef?: boolean
+  selectedNextNodeId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
@@ -1442,6 +1856,15 @@ export type TaskPlanNodeAttemptSelectCreateManyAndReturn<ExtArgs extends runtime
   finishedAt?: boolean
   error?: boolean
   runtimeSnapshot?: boolean
+  startedByEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  blockedByEventId?: boolean
+  inputRawEventId?: boolean
+  outputRawEventId?: boolean
+  errorRawEventId?: boolean
+  selectedBranchRef?: boolean
+  selectedNextNodeId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
@@ -1466,6 +1889,15 @@ export type TaskPlanNodeAttemptSelectUpdateManyAndReturn<ExtArgs extends runtime
   finishedAt?: boolean
   error?: boolean
   runtimeSnapshot?: boolean
+  startedByEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  blockedByEventId?: boolean
+  inputRawEventId?: boolean
+  outputRawEventId?: boolean
+  errorRawEventId?: boolean
+  selectedBranchRef?: boolean
+  selectedNextNodeId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
@@ -1490,11 +1922,20 @@ export type TaskPlanNodeAttemptSelectScalar = {
   finishedAt?: boolean
   error?: boolean
   runtimeSnapshot?: boolean
+  startedByEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  blockedByEventId?: boolean
+  inputRawEventId?: boolean
+  outputRawEventId?: boolean
+  errorRawEventId?: boolean
+  selectedBranchRef?: boolean
+  selectedNextNodeId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type TaskPlanNodeAttemptOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "planId" | "planRunId" | "nodeId" | "nodeLayerId" | "executionContextSnapshotId" | "idempotencyKey" | "attemptNumber" | "status" | "executionEpoch" | "startedAt" | "finishedAt" | "error" | "runtimeSnapshot" | "createdAt" | "updatedAt", ExtArgs["result"]["taskPlanNodeAttempt"]>
+export type TaskPlanNodeAttemptOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "planId" | "planRunId" | "nodeId" | "nodeLayerId" | "executionContextSnapshotId" | "idempotencyKey" | "attemptNumber" | "status" | "executionEpoch" | "startedAt" | "finishedAt" | "error" | "runtimeSnapshot" | "startedByEventId" | "completedByEventId" | "failedByEventId" | "blockedByEventId" | "inputRawEventId" | "outputRawEventId" | "errorRawEventId" | "selectedBranchRef" | "selectedNextNodeId" | "createdAt" | "updatedAt", ExtArgs["result"]["taskPlanNodeAttempt"]>
 export type TaskPlanNodeAttemptInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1538,6 +1979,15 @@ export type $TaskPlanNodeAttemptPayload<ExtArgs extends runtime.Types.Extensions
     finishedAt: Date | null
     error: runtime.JsonValue | null
     runtimeSnapshot: runtime.JsonValue | null
+    startedByEventId: string | null
+    completedByEventId: string | null
+    failedByEventId: string | null
+    blockedByEventId: string | null
+    inputRawEventId: string | null
+    outputRawEventId: string | null
+    errorRawEventId: string | null
+    selectedBranchRef: string | null
+    selectedNextNodeId: string | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["taskPlanNodeAttempt"]>
@@ -1983,6 +2433,15 @@ export interface TaskPlanNodeAttemptFieldRefs {
   readonly finishedAt: Prisma.FieldRef<"TaskPlanNodeAttempt", 'DateTime'>
   readonly error: Prisma.FieldRef<"TaskPlanNodeAttempt", 'Json'>
   readonly runtimeSnapshot: Prisma.FieldRef<"TaskPlanNodeAttempt", 'Json'>
+  readonly startedByEventId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly completedByEventId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly failedByEventId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly blockedByEventId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly inputRawEventId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly outputRawEventId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly errorRawEventId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly selectedBranchRef: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
+  readonly selectedNextNodeId: Prisma.FieldRef<"TaskPlanNodeAttempt", 'String'>
   readonly createdAt: Prisma.FieldRef<"TaskPlanNodeAttempt", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"TaskPlanNodeAttempt", 'DateTime'>
 }

@@ -10,10 +10,10 @@ import {
 } from "../terminal-command";
 import { resolveCurrentCommandNode } from "./current-node";
 import { isTerminalStatus } from "./terminal-state";
-import type { AdvanceDispatchResolution, ExternalResultAdvanceCommand } from "./types";
+import type { AdvanceDispatchResolution, NodeResultAdvanceCommand } from "./types";
 
-function externalResultCommand(input: {
-  command: ExternalResultAdvanceCommand;
+function nodeResultCommand(input: {
+  command: NodeResultAdvanceCommand;
   commandNode: EffectivePlanNode;
   effective: EffectivePlanGraph;
   state: GraphExecutionState;
@@ -21,7 +21,7 @@ function externalResultCommand(input: {
   context: EngineRuntimeContext;
 }): GraphRuntimeCommand {
   const base = {
-    type: "sync_external_result" as const,
+    type: "submit_node_result" as const,
     state: input.state,
     trigger: input.trigger,
     context: input.context,
@@ -31,7 +31,7 @@ function externalResultCommand(input: {
     case "complete_manual_node":
       return {
         ...base,
-        externalResult: {
+        nodeResult: {
           nodeId: input.commandNode.id,
           status: "done",
           summary: summaryForTerminalCommand({
@@ -50,7 +50,7 @@ function externalResultCommand(input: {
     case "block_current_node":
       return {
         ...base,
-        externalResult: {
+        nodeResult: {
           nodeId: input.commandNode.id,
           status: "blocked",
           reason: input.command.reason,
@@ -60,7 +60,7 @@ function externalResultCommand(input: {
     case "fail_current_node":
       return {
         ...base,
-        externalResult: {
+        nodeResult: {
           nodeId: input.commandNode.id,
           status: "failed",
           error: input.command.error,
@@ -69,8 +69,8 @@ function externalResultCommand(input: {
   }
 }
 
-export function externalCommandResolution(input: {
-  command: ExternalResultAdvanceCommand;
+export function nodeResultCommandResolution(input: {
+  command: NodeResultAdvanceCommand;
   state: GraphExecutionState;
   trigger: OrchestratorTrigger;
   context: EngineRuntimeContext;
@@ -93,7 +93,7 @@ export function externalCommandResolution(input: {
 
   return {
     type: "dispatch",
-    command: externalResultCommand({
+    command: nodeResultCommand({
       command: input.command,
       commandNode,
       effective,

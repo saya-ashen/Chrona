@@ -1,8 +1,8 @@
 import type { AdvanceRuntimeCommand } from "../../types";
 import type { ExecutionSessionRow } from "../../persistence/execution-session-store";
-import { isExternalResultCommand } from "./command-kind";
-import { externalCommandResolution } from "./external-result-command";
-import { nonExternalCommand } from "./non-external-command";
+import { isNodeResultCommand } from "./command-kind";
+import { nodeResultCommandResolution } from "./node-result-command";
+import { nonNodeResultCommand } from "./non-node-result-command";
 import type { AdvanceDispatchCommandBase, AdvanceDispatchResolution } from "./types";
 
 export function explicitCommand(
@@ -11,8 +11,8 @@ export function explicitCommand(
     executionSession: ExecutionSessionRow;
   },
 ): AdvanceDispatchResolution {
-  if (isExternalResultCommand(input.command)) {
-    return externalCommandResolution({
+  if (isNodeResultCommand(input.command)) {
+    return nodeResultCommandResolution({
       command: input.command,
       state: input.state,
       trigger: input.trigger,
@@ -23,6 +23,6 @@ export function explicitCommand(
 
   return {
     type: "dispatch",
-    command: nonExternalCommand(input),
+    command: nonNodeResultCommand(input),
   };
 }

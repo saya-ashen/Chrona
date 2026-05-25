@@ -3,6 +3,9 @@ import type {
   AdvanceRuntimeCommand,
   ExecutionActionWithContinuation,
   OrchestratorTrigger,
+  PlanGraphCommandActor,
+  PlanGraphCommandEnvelope,
+  PlanGraphCommandOrigin,
   PlanExecutionControl,
   PlanExecutionObserver,
 } from "../types";
@@ -10,13 +13,14 @@ import type { ExecutionLeaseScope } from "../persistence/execution-lease-store";
 import { ensurePlanMainSession } from "../plan-state-store";
 import { ensureExecutionSession } from "../persistence/execution-session-store";
 import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
+import { buildPlanGraphCommandEnvelope } from "../runtime/command-envelope";
 
 type AdvancePlanExecution = (input: {
   taskId: string;
   trigger: OrchestratorTrigger;
   mainSession: { id: string; taskId: string; sessionKey: string };
   executionSession: Awaited<ReturnType<typeof ensureExecutionSession>>;
-  command: AdvanceRuntimeCommand;
+  envelope: PlanGraphCommandEnvelope;
   control?: PlanExecutionControl;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
 
@@ -109,6 +113,12 @@ function commandForAction(action: RuntimeCommandAction): AdvanceRuntimeCommand {
 export async function dispatchRuntimeCommandAction(input: {
   taskId: string;
   action: RuntimeCommandAction;
+  actor?: PlanGraphCommandActor;
+  origin?: PlanGraphCommandOrigin;
+  toolInvocationId?: string | null;
+  providerRunId?: string | null;
+  causationEventId?: string | null;
+  causationRawEventId?: string | null;
   advance: AdvancePlanExecution;
   withExecutionLease?: LeaseAdvance;
   control?: PlanExecutionControl;
@@ -133,12 +143,26 @@ export async function dispatchRuntimeCommandAction(input: {
     planId: runtime.planId,
   });
 
+  const command = commandForAction(input.action);
   const run = () => input.advance({
     taskId: input.taskId,
     trigger: "manual",
     mainSession,
     executionSession,
-    command: commandForAction(input.action),
+    envelope: buildPlanGraphCommandEnvelope({
+      taskId: input.taskId,
+      planId: runtime.planId,
+      mainSessionId: mainSession.id,
+      executionSessionId: executionSession.id,
+      command,
+      trigger: "manual",
+      actor: input.actor,
+      origin: input.origin,
+      toolInvocationId: input.toolInvocationId,
+      providerRunId: input.providerRunId,
+      causationEventId: input.causationEventId,
+      causationRawEventId: input.causationRawEventId,
+    }),
     control: input.control,
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,

@@ -10,6 +10,11 @@ import {
 } from "@chrona/contracts";
 import { PlanCompileError } from "@chrona/contracts/ai";
 import { db } from "@/lib/db";
+import {
+  appendCanonicalEvent,
+  appendRawEventLog,
+  appendTaskTimelineItem,
+} from "@/modules/events/append-canonical-event";
 import { getDefaultWorkspace } from "@/modules/workspaces/get-default-workspace";
 import type { createTaskExecutionService } from "./task-execution.service";
 import type { createTaskPlanService } from "./task-plan.service";
@@ -32,6 +37,33 @@ type AgentToolOperationsDeps = {
   plan: ReturnType<typeof createTaskPlanService>;
   schedule: ReturnType<typeof createTaskScheduleService>;
   execution: ReturnType<typeof createTaskExecutionService>;
+};
+
+type ToolAuditContext = {
+  operationId: string;
+  toolName: ChronaToolName;
+  workspaceId: string;
+  taskId?: string | null;
+  runId?: string | null;
+  executionSessionId?: string | null;
+  planId?: string | null;
+  planRunId?: string | null;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
+  nodeId?: string | null;
+  nodeTitle?: string | null;
+  inputRawEventId?: string | null;
+  invocationId?: string | null;
+};
+
+type ToolAuditScope = {
+  runId?: string | null;
+  executionSessionId?: string | null;
+  planId?: string | null;
+  planRunId?: string | null;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
+  nodeId?: string | null;
 };
 
 const toolDescriptions: Record<ChronaToolName, string> = {
@@ -348,23 +380,26 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
       const id = operationId();
       const { toolName, input } = operation;
       const mutates = isChronaToolMutating(toolName);
+      const audit = await startToolAudit({ operationId: id, operation }).catch(() => null);
 
       if (mutates && !input.idempotencyKey) {
-        return validationErrorToolResult({
+        const result = validationErrorToolResult({
           operationId: id,
           toolName,
           message: "idempotencyKey is required for mutating Chrona tool calls.",
           affected: affectedFrom(input),
-          auditRef: id,
+          auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
           recovery: { nextTool: toolName, details: { required: "idempotencyKey" } },
           evidence: operationEvidence(input),
         });
+        await finishToolAudit(audit, operation, result, "validation_error");
+        return result;
       }
 
       const key = duplicateKey(operation);
       if (mutates && idempotentResults.has(key)) {
         const original = idempotentResults.get(key)!;
-        return duplicateOperationToolResult({
+        const result = duplicateOperationToolResult({
           operationId: id,
           toolName,
           message: "Duplicate operation replayed without new side effects.",
@@ -373,20 +408,24 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
           auditRef: original.auditRef,
           recovery: original.recovery,
         });
+        await finishToolAudit(audit, operation, result, "duplicate");
+        return result;
       }
 
       let payload: unknown;
       try {
         payload = parseChronaToolPayload(toolName, input.payload);
       } catch (cause) {
-        return validationErrorToolResult({
+        const result = validationErrorToolResult({
           operationId: id,
           toolName,
           message: cause instanceof Error ? cause.message : "Tool payload validation failed.",
           affected: affectedFrom(input),
-          auditRef: id,
+          auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
           evidence: operationEvidence(input),
         });
+        await finishToolAudit(audit, operation, result, "validation_error");
+        return result;
       }
 
       try {
@@ -394,34 +433,38 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
           ? await ensureFreshBeforeMutation(deps, operation)
           : null;
         if (staleBeforeMutation) {
-          return rejectedToolResult({
+          const result = rejectedToolResult({
             operationId: id,
             toolName,
             reasonCode: "STALE_STATE",
             message: "Expected revision does not match current Chrona state.",
             affected: affectedFrom(input),
             state: staleBeforeMutation.state,
-            auditRef: id,
+            auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
             recovery: { nextTool: readToolFor(toolName), details: staleBeforeMutation.stale },
             evidence: operationEvidence(input),
           });
+          await finishToolAudit(audit, operation, result, "rejected");
+          return result;
         }
 
-        const result = await executeValidatedTool(deps, operation, payload);
+        const result = await executeValidatedTool(deps, operation, payload, audit);
         const state = summarizeUnknownState(result);
         const stale = mutates ? null : ensureExpectedState(operation, state);
         if (stale) {
-          return rejectedToolResult({
+          const result = rejectedToolResult({
             operationId: id,
             toolName,
             reasonCode: "STALE_STATE",
             message: "Expected revision does not match current Chrona state.",
             affected: affectedFrom(input),
             state,
-            auditRef: id,
+            auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
             recovery: { nextTool: readToolFor(toolName), details: stale },
             evidence: operationEvidence(input),
           });
+          await finishToolAudit(audit, operation, result, "rejected");
+          return result;
         }
 
         const accepted = acceptedToolResult({
@@ -433,27 +476,394 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
             taskId: input.taskId ?? (result as { task?: { id?: string } }).task?.id,
           }),
           state,
-          auditRef: id,
+          auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
           evidence: operationEvidence(input),
         });
         if (mutates) {
           idempotentResults.set(key, accepted);
         }
+        await finishToolAudit(audit, operation, accepted, "accepted");
         return accepted;
       } catch (cause) {
         const diagnostics = rejectionDiagnostics(cause);
-        return rejectedToolResult({
+        const result = rejectedToolResult({
           operationId: id,
           toolName,
           reasonCode: reasonCodeFromError(cause),
           message: diagnostics.message,
           affected: affectedFrom(input),
-          auditRef: id,
+          auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
           recovery: { nextTool: readToolFor(toolName), details: diagnostics.details },
           evidence: { ...operationEvidence(input), ...diagnostics.evidence },
         });
+        await finishToolAudit(audit, operation, result, "rejected");
+        return result;
       }
     },
+  };
+}
+
+async function startToolAudit(input: {
+  operationId: string;
+  operation: ChronaToolOperation;
+}): Promise<ToolAuditContext | null> {
+  const { operation } = input;
+  const workspaceId = operation.input.workspaceId;
+  if (!workspaceId) return null;
+  const taskId = operation.input.taskId ?? null;
+  const auditScope = await resolveToolAuditScope({
+    taskId,
+    sessionId: operation.input.sessionId ?? null,
+  });
+  const node = auditScope.nodeId
+    ? await nodeTitleForExecutionSession(taskId, auditScope.planId ?? null, auditScope.nodeId)
+    : null;
+  const raw = await appendRawEventLog({
+    workspaceId,
+    taskId,
+    runId: auditScope.runId ?? null,
+    taskSessionId: operation.input.sessionId ?? null,
+    executionSessionId: auditScope.executionSessionId ?? null,
+    planId: auditScope.planId ?? null,
+    planRunId: auditScope.planRunId ?? null,
+    nodeAttemptId: auditScope.nodeAttemptId ?? null,
+    providerRunId: auditScope.providerRunId ?? null,
+    nodeId: auditScope.nodeId ?? null,
+    nodeTitle: node?.title ?? null,
+    source: "chrona_tool",
+    direction: "inbound",
+    rawType: operation.toolName,
+    rawPayload: operation,
+    metadata: { operationId: input.operationId, idempotencyKey: operation.input.idempotencyKey },
+    nativeToolCallId: input.operationId,
+    externalRef: `chrona_tool.input:${input.operationId}`,
+    correlationId: input.operationId,
+    occurredAt: new Date(),
+  });
+  const invocation = await db.toolInvocation.create({
+    data: {
+      workspaceId,
+      taskId,
+      runId: auditScope.runId ?? null,
+      executionSessionId: auditScope.executionSessionId ?? null,
+      planId: auditScope.planId ?? null,
+      planRunId: auditScope.planRunId ?? null,
+      nodeAttemptId: auditScope.nodeAttemptId ?? null,
+      providerRunId: auditScope.providerRunId ?? null,
+      nodeId: auditScope.nodeId ?? null,
+      toolName: operation.toolName,
+      toolKind: operation.toolName.startsWith("chrona.node.") ? "node" : "chrona",
+      status: "started",
+      inputRawEventId: raw.id,
+      inputPayload: operation.input.payload as never,
+      inputSummary: summarizeToolInput(operation),
+      nativeToolCallId: input.operationId,
+      externalRef: input.operationId,
+      correlationId: input.operationId,
+      startedAt: new Date(),
+    },
+    select: { id: true },
+  });
+  return {
+    operationId: input.operationId,
+    toolName: operation.toolName,
+    workspaceId,
+    taskId,
+    runId: auditScope.runId ?? null,
+    executionSessionId: auditScope.executionSessionId ?? null,
+    planId: auditScope.planId ?? null,
+    planRunId: auditScope.planRunId ?? null,
+    nodeAttemptId: auditScope.nodeAttemptId ?? null,
+    providerRunId: auditScope.providerRunId ?? null,
+    nodeId: auditScope.nodeId ?? null,
+    nodeTitle: node?.title ?? null,
+    inputRawEventId: raw.id,
+    invocationId: invocation.id,
+  };
+}
+
+async function resolveToolAuditScope(input: {
+  taskId: string | null;
+  sessionId: string | null;
+}): Promise<ToolAuditScope> {
+  const run = await findToolAuditRun(input.sessionId);
+  const providerRun = await findToolAuditProviderRun(input.taskId, fieldValue(run, "runtimeRunRef"));
+  const session = await findToolAuditExecutionSession(input.taskId, input.sessionId);
+  const nodeAttemptId = firstValue(
+    fieldValue(providerRun, "nodeAttemptId"),
+    fieldValue(session, "currentNodeAttemptId"),
+  );
+  const nodeAttempt = await findToolAuditNodeAttempt(input.taskId, nodeAttemptId);
+
+  return {
+    runId: fieldValue(run, "id"),
+    executionSessionId: fieldValue(session, "id"),
+    planId: firstValue(
+      fieldValue(providerRun, "planId"),
+      fieldValue(nodeAttempt, "planId"),
+      fieldValue(session, "planId"),
+    ),
+    planRunId: firstValue(fieldValue(providerRun, "planRunId"), fieldValue(nodeAttempt, "planRunId")),
+    nodeAttemptId,
+    providerRunId: fieldValue(providerRun, "id"),
+    nodeId: firstValue(fieldValue(nodeAttempt, "nodeId"), fieldValue(session, "currentNodeId")),
+  };
+}
+
+function firstValue(...values: Array<string | null | undefined>) {
+  return values.find((value) => value !== null && value !== undefined) ?? null;
+}
+
+function fieldValue<T extends Record<string, string | null>, K extends keyof T>(
+  value: T | null,
+  key: K,
+) {
+  return value?.[key] ?? null;
+}
+
+async function findToolAuditRun(sessionId: string | null) {
+  if (!sessionId) return null;
+  return db.run.findFirst({
+    where: {
+      OR: [{ id: sessionId }, { runtimeSessionRef: sessionId }, { runtimeRunRef: sessionId }],
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, runtimeRunRef: true },
+  });
+}
+
+async function findToolAuditProviderRun(taskId: string | null, providerRunRef: string | null) {
+  if (!taskId || !providerRunRef) return null;
+  return db.taskPlanProviderRun.findFirst({
+    where: { taskId, providerRunRef },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, planId: true, planRunId: true, nodeAttemptId: true },
+  });
+}
+
+async function findToolAuditExecutionSession(taskId: string | null, sessionId: string | null) {
+  if (!taskId) return null;
+  const select = { id: true, planId: true, currentNodeId: true, currentNodeAttemptId: true };
+  const exactSession = sessionId
+    ? await db.executionSession.findFirst({
+        where: { taskId, id: sessionId, status: { in: ["Active", "Paused"] } },
+        orderBy: { updatedAt: "desc" },
+        select,
+      })
+    : null;
+  if (exactSession) return exactSession;
+  return db.executionSession.findFirst({
+    where: { taskId, status: { in: ["Active", "Paused"] } },
+    orderBy: { updatedAt: "desc" },
+    select,
+  });
+}
+
+async function findToolAuditNodeAttempt(taskId: string | null, nodeAttemptId: string | null) {
+  if (!taskId || !nodeAttemptId) return null;
+  return db.taskPlanNodeAttempt.findFirst({
+    where: { taskId, id: nodeAttemptId },
+    select: { planId: true, planRunId: true, nodeId: true },
+  });
+}
+
+async function finishToolAudit(
+  audit: ToolAuditContext | null,
+  operation: ChronaToolOperation,
+  result: ChronaToolResult,
+  status: "accepted" | "rejected" | "validation_error" | "duplicate",
+) {
+  if (!audit) return;
+  const now = new Date();
+  const raw = await appendRawEventLog({
+    workspaceId: audit.workspaceId,
+    taskId: audit.taskId ?? null,
+    runId: audit.runId ?? null,
+    taskSessionId: operation.input.sessionId ?? null,
+    executionSessionId: audit.executionSessionId ?? null,
+    planId: audit.planId ?? null,
+    planRunId: audit.planRunId ?? null,
+    nodeAttemptId: audit.nodeAttemptId ?? null,
+    providerRunId: audit.providerRunId ?? null,
+    nodeId: audit.nodeId ?? null,
+    nodeTitle: audit.nodeTitle ?? null,
+    source: "chrona_tool",
+    direction: "outbound",
+    rawType: `${operation.toolName}.${status}`,
+    rawPayload: result,
+    nativeToolCallId: audit.operationId,
+    externalRef: `chrona_tool.result:${audit.operationId}`,
+    correlationId: audit.operationId,
+    causationRawEventId: audit.inputRawEventId ?? null,
+    occurredAt: now,
+  });
+  const event = await appendCanonicalEvent({
+    eventType: `tool.${status}`,
+    workspaceId: audit.workspaceId,
+    taskId: audit.taskId ?? null,
+    runId: audit.runId ?? null,
+    taskSessionId: operation.input.sessionId ?? null,
+    executionSessionId: audit.executionSessionId ?? null,
+    planId: audit.planId ?? null,
+    planRunId: audit.planRunId ?? null,
+    nodeAttemptId: audit.nodeAttemptId ?? null,
+    providerRunId: audit.providerRunId ?? null,
+    nodeId: audit.nodeId ?? null,
+    nodeTitle: audit.nodeTitle ?? null,
+    rawEventId: raw.id,
+    correlationId: audit.operationId,
+    actorType: operation.input.actorType,
+    actorId: operation.input.actorId ?? null,
+    source: "chrona_tool",
+    payload: {
+      toolName: operation.toolName,
+      status,
+      resultStatus: result.status,
+      branchRef: branchRefFromOperation(operation),
+      message: result.message,
+    },
+    summary: result.message,
+    severity: status === "accepted" || status === "duplicate" ? "info" : "warning",
+    dedupeKey: `chrona_tool.${status}:${audit.operationId}`,
+    occurredAt: now,
+  });
+  await db.toolInvocation.update({
+    where: { id: audit.invocationId ?? audit.operationId },
+    data: {
+      status,
+      outputRawEventId: raw.id,
+      canonicalEventId: event.id,
+      outputPayload: result as never,
+      outputSummary: result.message,
+      completedAt: now,
+    },
+  }).catch(() => undefined);
+  if (audit.taskId) {
+    await appendTaskTimelineItem({
+      workspaceId: audit.workspaceId,
+      taskId: audit.taskId,
+      runId: audit.runId ?? null,
+      taskSessionId: operation.input.sessionId ?? null,
+      executionSessionId: audit.executionSessionId ?? null,
+      planId: audit.planId ?? null,
+      planRunId: audit.planRunId ?? null,
+      nodeAttemptId: audit.nodeAttemptId ?? null,
+      providerRunId: audit.providerRunId ?? null,
+      nodeId: audit.nodeId ?? null,
+      nodeTitle: audit.nodeTitle ?? null,
+      kind: `tool.${status}`,
+      title: operation.toolName,
+      body: result.message,
+      severity: status === "accepted" || status === "duplicate" ? "info" : "warning",
+      status,
+      eventId: event.id,
+      rawEventId: raw.id,
+      toolInvocationId: audit.invocationId ?? null,
+      sortTime: now,
+      metadata: { resultStatus: result.status, branchRef: branchRefFromOperation(operation) },
+    });
+    await db.task.update({
+      where: { id: audit.taskId },
+      data: { latestEventId: event.id, latestRawEventId: raw.id },
+    }).catch(() => undefined);
+  }
+  if (operation.toolName === "chrona.node.condition_select" && status === "accepted") {
+    const branchRef = branchRefFromOperation(operation);
+    const selectedEvent = await appendCanonicalEvent({
+      eventType: "condition.selected",
+      workspaceId: audit.workspaceId,
+      taskId: audit.taskId ?? null,
+      runId: audit.runId ?? null,
+      taskSessionId: operation.input.sessionId ?? null,
+      executionSessionId: audit.executionSessionId ?? null,
+      planId: audit.planId ?? null,
+      planRunId: audit.planRunId ?? null,
+      nodeAttemptId: audit.nodeAttemptId ?? null,
+      providerRunId: audit.providerRunId ?? null,
+      nodeId: audit.nodeId ?? null,
+      nodeTitle: audit.nodeTitle ?? null,
+      rawEventId: audit.inputRawEventId ?? raw.id,
+      correlationId: audit.operationId,
+      actorType: operation.input.actorType,
+      actorId: operation.input.actorId ?? null,
+      source: "chrona_tool",
+      payload: {
+        toolName: operation.toolName,
+        branchRef,
+        summary: summaryFromOperationPayload(operation),
+      },
+      summary: branchRef ? `Selected ${branchRef}` : "Condition branch selected",
+      dedupeKey: `condition.selected:${audit.operationId}`,
+      occurredAt: now,
+    });
+    if (audit.invocationId) {
+      await db.toolInvocation.update({
+        where: { id: audit.invocationId },
+        data: { canonicalEventId: selectedEvent.id },
+      }).catch(() => undefined);
+    }
+  }
+}
+
+async function nodeTitleForExecutionSession(
+  taskId: string | null,
+  planId: string | null,
+  nodeId: string | null,
+) {
+  if (!taskId || !planId || !nodeId) return null;
+  const planRun = await db.taskPlanRun.findUnique({
+    where: { taskId_planId: { taskId, planId } },
+    select: { planRun: true },
+  });
+  const nodes = (planRun?.planRun as { mutableGraph?: { graph?: { nodes?: unknown[] } } } | null)
+    ?.mutableGraph?.graph?.nodes;
+  if (!Array.isArray(nodes)) return null;
+  const node = nodes.find(
+    (candidate): candidate is { id: string; title?: string } =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      (candidate as { id?: unknown }).id === nodeId,
+  );
+  return node ?? null;
+}
+
+function summarizeToolInput(operation: ChronaToolOperation) {
+  const branchRef = branchRefFromOperation(operation);
+  const summary = summaryFromOperationPayload(operation);
+  return [operation.toolName, branchRef, summary].filter(Boolean).join(" · ");
+}
+
+function branchRefFromOperation(operation: ChronaToolOperation) {
+  const payload = operation.input.payload;
+  return payload && typeof payload === "object" && !Array.isArray(payload) && typeof (payload as { branchRef?: unknown }).branchRef === "string"
+    ? (payload as { branchRef: string }).branchRef
+    : undefined;
+}
+
+function summaryFromOperationPayload(operation: ChronaToolOperation) {
+  const payload = operation.input.payload;
+  return payload && typeof payload === "object" && !Array.isArray(payload) && typeof (payload as { summary?: unknown }).summary === "string"
+    ? (payload as { summary: string }).summary
+    : undefined;
+}
+
+function toolCommandContext(operation: ChronaToolOperation, audit?: ToolAuditContext | null) {
+  return {
+    actor: {
+      type: "agent" as const,
+      actorId: operation.input.actorId ?? null,
+      providerRunId: audit?.providerRunId ?? null,
+      toolInvocationId: audit?.invocationId ?? null,
+    },
+    origin: {
+      channel: "mcp_tool" as const,
+      requestId: audit?.operationId ?? null,
+      rawEventId: audit?.inputRawEventId ?? null,
+    },
+    nodeAttemptId: audit?.nodeAttemptId ?? null,
+    providerRunId: audit?.providerRunId ?? null,
+    toolInvocationId: audit?.invocationId ?? null,
+    causationRawEventId: audit?.inputRawEventId ?? null,
   };
 }
 
@@ -461,6 +871,7 @@ async function executeValidatedTool(
   deps: AgentToolOperationsDeps,
   operation: ChronaToolOperation,
   payload: unknown,
+  audit?: ToolAuditContext | null,
 ) {
   const { input, toolName } = operation;
   switch (toolName) {
@@ -549,6 +960,7 @@ async function executeValidatedTool(
             : "task";
       return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
+        commandContext: toolCommandContext(operation, audit),
         action: {
           action: "complete_manual_node" as const,
           sessionId: input.sessionId,
@@ -569,6 +981,7 @@ async function executeValidatedTool(
       };
       return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
+        commandContext: toolCommandContext(operation, audit),
         action: {
           action: "block_current_node" as const,
           sessionId: input.sessionId,
@@ -581,6 +994,7 @@ async function executeValidatedTool(
       const body = payload as { error: string };
       return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
+        commandContext: toolCommandContext(operation, audit),
         action: {
           action: "fail_current_node" as const,
           sessionId: input.sessionId,

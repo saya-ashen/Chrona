@@ -22,6 +22,36 @@ export type PlanExecutionObserver = {
   onStateChange?: (effectivePlan: EffectivePlanGraph) => Promise<void> | void;
 };
 
+export type PlanGraphCommandActor =
+  | { type: "user"; userId?: string | null; workspaceId?: string | null }
+  | {
+      type: "agent";
+      actorId?: string | null;
+      providerRunId?: string | null;
+      runtimeRunId?: string | null;
+      toolInvocationId?: string | null;
+      model?: string | null;
+    }
+  | { type: "system"; service: string; reason?: string | null }
+  | { type: "integration"; integration: string; externalRef?: string | null };
+
+export type PlanGraphCommandOrigin = {
+  channel: "web" | "api" | "mcp_tool" | "provider_stream" | "scheduler" | "internal";
+  requestId?: string | null;
+  rawEventId?: string | null;
+  eventId?: string | null;
+};
+
+export type PlanGraphCommandContext = {
+  actor?: PlanGraphCommandActor;
+  origin?: PlanGraphCommandOrigin;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
+  toolInvocationId?: string | null;
+  causationEventId?: string | null;
+  causationRawEventId?: string | null;
+};
+
 export type PlanExecutionControl = {
   signal?: AbortSignal;
   shouldPause?: () => boolean;
@@ -32,6 +62,26 @@ export type EngineRuntimeContext = {
   planId: string;
   mainSession: { id: string; taskId: string; sessionKey: string };
   control?: PlanExecutionControl;
+};
+
+export type PlanGraphCommandCorrelation = {
+  taskId: string;
+  planId: string;
+  mainSessionId?: string | null;
+  executionSessionId?: string | null;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
+  toolInvocationId?: string | null;
+  causationEventId?: string | null;
+  causationRawEventId?: string | null;
+};
+
+export type PlanGraphCommandEnvelope<TCommand = AdvanceRuntimeCommand> = {
+  command: TCommand;
+  actor: PlanGraphCommandActor;
+  origin: PlanGraphCommandOrigin;
+  correlation: PlanGraphCommandCorrelation;
+  policy?: { requireActiveSession?: boolean };
 };
 
 export type SyncPlanRunRuntimeResultInput = {
@@ -83,3 +133,5 @@ export type ExecutionActionWithContinuation =
   | (Extract<ExecutionActionInput, { action: "complete_manual_node" }> & {
       continueExecution?: boolean;
     });
+
+export type ExecutionDispatchContext = PlanGraphCommandContext;

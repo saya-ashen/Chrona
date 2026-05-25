@@ -140,7 +140,7 @@ describe("task workspace console read data", () => {
           event: { type: "tool_started", toolName: "chrona_plan_read" },
         },
         dedupeKey: "provider-runtime-test-event",
-        runtimeTs: new Date("2026-05-12T12:01:00.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:00.000Z"),
         ingestSequence: 1,
       },
     });
@@ -160,7 +160,7 @@ describe("task workspace console read data", () => {
           event: { type: "text_delta", text: "Hello " },
         },
         dedupeKey: "provider-runtime-test-text-1",
-        runtimeTs: new Date("2026-05-12T12:01:01.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:01.000Z"),
         ingestSequence: 2,
       }, {
         eventType: "provider.text_delta",
@@ -177,7 +177,7 @@ describe("task workspace console read data", () => {
           event: { type: "text_delta", text: "world" },
         },
         dedupeKey: "provider-runtime-test-text-2",
-        runtimeTs: new Date("2026-05-12T12:01:02.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:02.000Z"),
         ingestSequence: 3,
       }, {
         eventType: "provider.reasoning_delta",
@@ -194,7 +194,7 @@ describe("task workspace console read data", () => {
           event: { type: "reasoning_delta", text: "Thinking" },
         },
         dedupeKey: "provider-runtime-test-reasoning-1",
-        runtimeTs: new Date("2026-05-12T12:01:03.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:03.000Z"),
         ingestSequence: 4,
       }, {
         eventType: "task.updated",
@@ -205,7 +205,7 @@ describe("task workspace console read data", () => {
         source: "ui",
         payload: { changed_fields: ["title", "priority"] },
         dedupeKey: "task-activity-test-updated",
-        runtimeTs: new Date("2026-05-12T12:01:04.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:04.000Z"),
         ingestSequence: 5,
       }, {
         eventType: "task.schedule_changed",
@@ -220,7 +220,7 @@ describe("task workspace console read data", () => {
           source: "manual",
         },
         dedupeKey: "task-activity-test-schedule",
-        runtimeTs: new Date("2026-05-12T12:01:05.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:05.000Z"),
         ingestSequence: 6,
       }, {
         eventType: "plan_generation.started",
@@ -231,7 +231,7 @@ describe("task workspace console read data", () => {
         source: "plan_generation",
         payload: { generation_id: "generation-test", instruction: "Make a plan" },
         dedupeKey: "task-activity-test-plan-started",
-        runtimeTs: new Date("2026-05-12T12:01:06.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:06.000Z"),
         ingestSequence: 7,
       }, {
         eventType: "plan_generation.status",
@@ -242,7 +242,7 @@ describe("task workspace console read data", () => {
         source: "plan_generation",
         payload: { generation_id: "generation-test", phase: "requesting_provider", message: "Requesting AI provider..." },
         dedupeKey: "task-activity-test-plan-status",
-        runtimeTs: new Date("2026-05-12T12:01:06.500Z"),
+        occurredAt: new Date("2026-05-12T12:01:06.500Z"),
         ingestSequence: 8,
       }, {
         eventType: "plan_generation.completed",
@@ -253,7 +253,7 @@ describe("task workspace console read data", () => {
         source: "plan_generation",
         payload: { generation_id: "generation-test", plan_title: "Generated plan" },
         dedupeKey: "task-activity-test-plan-completed",
-        runtimeTs: new Date("2026-05-12T12:01:07.000Z"),
+        occurredAt: new Date("2026-05-12T12:01:07.000Z"),
         ingestSequence: 9,
       }],
     });

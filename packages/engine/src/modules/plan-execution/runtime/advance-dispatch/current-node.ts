@@ -1,10 +1,10 @@
 import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
 import { currentNodeFromState } from "../../projection/execution-graph-selectors";
 import type { ExecutionSessionRow } from "../../persistence/execution-session-store";
-import type { ExternalResultAdvanceCommand } from "./types";
+import type { NodeResultAdvanceCommand } from "./types";
 
 export function resolveCurrentCommandNode(input: {
-  command: ExternalResultAdvanceCommand;
+  command: NodeResultAdvanceCommand;
   effective: EffectivePlanGraph;
   executionSession: ExecutionSessionRow;
 }): EffectivePlanNode {

@@ -124,6 +124,112 @@ function serviceWithDispatchError(code: keyof typeof ENGINE_ERROR_CODES) {
   } as unknown as Parameters<typeof createAgentToolOperationsService>[0]);
 }
 
+async function seedNodeToolAuditRuntime(taskId: string) {
+  await db.taskSession.create({
+    data: {
+      id: "task-session-audit",
+      taskId,
+      runtimeName: "hermes",
+      sessionKey: "runtime-session-audit",
+      label: "Audit session",
+    },
+  });
+  await db.run.create({
+    data: {
+      id: "run-audit",
+      taskId,
+      taskSessionId: "task-session-audit",
+      runtimeName: "hermes",
+      runtimeRunRef: "runtime-run-audit",
+      runtimeSessionRef: "runtime-session-audit",
+      status: "Running",
+      triggeredBy: "agent",
+    },
+  });
+  await db.taskPlanProviderRun.create({
+    data: {
+      id: "provider-run-audit",
+      workspaceId: "workspace-audit",
+      taskId,
+      planId: "plan-audit",
+      planRunId: "plan-run-audit",
+      nodeAttemptId: "attempt-condition",
+      idempotencyKey: "provider-run-key",
+      providerRunRef: "runtime-run-audit",
+      runtimeName: "hermes",
+      status: "running",
+      correlationId: "provider-run-audit",
+      startedAt: new Date(),
+    },
+  });
+}
+
+async function seedNodeToolAuditFixture() {
+  const workspace = await db.workspace.create({
+    data: { id: "workspace-audit", name: "Audit Workspace", status: "Active", defaultRuntime: "hermes" },
+  });
+  const task = await db.task.create({
+    data: {
+      id: "task-audit",
+      workspaceId: workspace.id,
+      title: "Audit task",
+      status: "Ready",
+      priority: "Medium",
+      executionRuntime: "hermes",
+      executionConfig: {},
+    },
+  });
+  await db.taskPlan.create({
+    data: {
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: "plan-audit",
+      revision: 1,
+      status: "Accepted",
+      compiledPlan: {},
+    },
+  });
+  await db.taskPlanRun.create({
+    data: {
+      id: "plan-run-audit",
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: "plan-audit",
+      planRun: { mutableGraph: { graph: { nodes: [{ id: "node-condition", title: "Choose branch" }] } } },
+    },
+  });
+  await db.executionSession.create({
+    data: {
+      id: "execution-session-audit",
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: "plan-audit",
+      status: "Active",
+      currentNodeId: "node-condition",
+      currentNodeAttemptId: "attempt-condition",
+      startedAt: new Date(),
+    },
+  });
+  await db.taskPlanNodeAttempt.create({
+    data: {
+      id: "attempt-condition",
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: "plan-audit",
+      planRunId: "plan-run-audit",
+      nodeId: "node-condition",
+      nodeLayerId: "layer-condition",
+      idempotencyKey: "attempt-condition-key",
+      attemptNumber: 1,
+      status: "running",
+      executionEpoch: 1,
+      startedAt: new Date(),
+    },
+  });
+  await seedNodeToolAuditRuntime(task.id);
+  return task;
+}
+
 describe("agent tool operations service", () => {
   beforeEach(async () => {
     await db.run.deleteMany();
@@ -494,6 +600,59 @@ describe("agent tool operations service", () => {
         error: "Command failed",
       },
     ]);
+  });
+
+  it("correlates node tool audit records to the active plan node attempt", async () => {
+    const task = await seedNodeToolAuditFixture();
+
+    await expect(
+      service().execute({
+        toolName: "chrona.node.condition_select",
+        input: {
+          workspaceId: "workspace-audit",
+          taskId: task.id,
+          sessionId: "runtime-run-audit",
+          actorType: "agent",
+          idempotencyKey: "condition-audit-key",
+          payload: { branchRef: "branch-a", summary: "Select A" },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted" });
+
+    const invocation = await db.toolInvocation.findFirstOrThrow({
+      where: { toolName: "chrona.node.condition_select", taskId: task.id },
+    });
+    expect(invocation).toMatchObject({
+      runId: "run-audit",
+      executionSessionId: "execution-session-audit",
+      planId: "plan-audit",
+      planRunId: "plan-run-audit",
+      nodeAttemptId: "attempt-condition",
+      providerRunId: "provider-run-audit",
+      nodeId: "node-condition",
+    });
+
+    const raw = await db.rawEventLog.findFirstOrThrow({
+      where: { id: invocation.inputRawEventId ?? undefined },
+    });
+    expect(raw).toMatchObject({
+      planId: "plan-audit",
+      planRunId: "plan-run-audit",
+      nodeAttemptId: "attempt-condition",
+      providerRunId: "provider-run-audit",
+      nodeId: "node-condition",
+    });
+
+    const selected = await db.event.findFirstOrThrow({
+      where: { eventType: "condition.selected", taskId: task.id },
+    });
+    expect(selected).toMatchObject({
+      planId: "plan-audit",
+      planRunId: "plan-run-audit",
+      nodeAttemptId: "attempt-condition",
+      providerRunId: "provider-run-audit",
+      nodeId: "node-condition",
+    });
   });
 
   it("replays duplicate mutating operations without duplicate side effects", async () => {

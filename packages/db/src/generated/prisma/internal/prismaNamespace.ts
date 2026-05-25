@@ -403,8 +403,10 @@ export const ModelName = {
   Artifact: 'Artifact',
   Memory: 'Memory',
   Event: 'Event',
+  RawEventLog: 'RawEventLog',
   ConversationEntry: 'ConversationEntry',
-  ToolCallDetail: 'ToolCallDetail',
+  ToolInvocation: 'ToolInvocation',
+  TaskTimelineItem: 'TaskTimelineItem',
   TaskProjection: 'TaskProjection',
   ScheduleProposal: 'ScheduleProposal',
   RuntimeCursor: 'RuntimeCursor',
@@ -428,7 +430,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanNodeAttempt" | "taskPlanProviderRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "conversationEntry" | "toolCallDetail" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
+    modelProps: "workspace" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanNodeAttempt" | "taskPlanProviderRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "rawEventLog" | "conversationEntry" | "toolInvocation" | "taskTimelineItem" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1838,6 +1840,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    RawEventLog: {
+      payload: Prisma.$RawEventLogPayload<ExtArgs>
+      fields: Prisma.RawEventLogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RawEventLogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RawEventLogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>
+        }
+        findFirst: {
+          args: Prisma.RawEventLogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RawEventLogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>
+        }
+        findMany: {
+          args: Prisma.RawEventLogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>[]
+        }
+        create: {
+          args: Prisma.RawEventLogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>
+        }
+        createMany: {
+          args: Prisma.RawEventLogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RawEventLogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>[]
+        }
+        delete: {
+          args: Prisma.RawEventLogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>
+        }
+        update: {
+          args: Prisma.RawEventLogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>
+        }
+        deleteMany: {
+          args: Prisma.RawEventLogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RawEventLogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RawEventLogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>[]
+        }
+        upsert: {
+          args: Prisma.RawEventLogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RawEventLogPayload>
+        }
+        aggregate: {
+          args: Prisma.RawEventLogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRawEventLog>
+        }
+        groupBy: {
+          args: Prisma.RawEventLogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RawEventLogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RawEventLogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RawEventLogCountAggregateOutputType> | number
+        }
+      }
+    }
     ConversationEntry: {
       payload: Prisma.$ConversationEntryPayload<ExtArgs>
       fields: Prisma.ConversationEntryFieldRefs
@@ -1912,77 +1988,151 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    ToolCallDetail: {
-      payload: Prisma.$ToolCallDetailPayload<ExtArgs>
-      fields: Prisma.ToolCallDetailFieldRefs
+    ToolInvocation: {
+      payload: Prisma.$ToolInvocationPayload<ExtArgs>
+      fields: Prisma.ToolInvocationFieldRefs
       operations: {
         findUnique: {
-          args: Prisma.ToolCallDetailFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload> | null
+          args: Prisma.ToolInvocationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload> | null
         }
         findUniqueOrThrow: {
-          args: Prisma.ToolCallDetailFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>
+          args: Prisma.ToolInvocationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>
         }
         findFirst: {
-          args: Prisma.ToolCallDetailFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload> | null
+          args: Prisma.ToolInvocationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload> | null
         }
         findFirstOrThrow: {
-          args: Prisma.ToolCallDetailFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>
+          args: Prisma.ToolInvocationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>
         }
         findMany: {
-          args: Prisma.ToolCallDetailFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>[]
+          args: Prisma.ToolInvocationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>[]
         }
         create: {
-          args: Prisma.ToolCallDetailCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>
+          args: Prisma.ToolInvocationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>
         }
         createMany: {
-          args: Prisma.ToolCallDetailCreateManyArgs<ExtArgs>
+          args: Prisma.ToolInvocationCreateManyArgs<ExtArgs>
           result: BatchPayload
         }
         createManyAndReturn: {
-          args: Prisma.ToolCallDetailCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>[]
+          args: Prisma.ToolInvocationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>[]
         }
         delete: {
-          args: Prisma.ToolCallDetailDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>
+          args: Prisma.ToolInvocationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>
         }
         update: {
-          args: Prisma.ToolCallDetailUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>
+          args: Prisma.ToolInvocationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>
         }
         deleteMany: {
-          args: Prisma.ToolCallDetailDeleteManyArgs<ExtArgs>
+          args: Prisma.ToolInvocationDeleteManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateMany: {
-          args: Prisma.ToolCallDetailUpdateManyArgs<ExtArgs>
+          args: Prisma.ToolInvocationUpdateManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateManyAndReturn: {
-          args: Prisma.ToolCallDetailUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>[]
+          args: Prisma.ToolInvocationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>[]
         }
         upsert: {
-          args: Prisma.ToolCallDetailUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolCallDetailPayload>
+          args: Prisma.ToolInvocationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ToolInvocationPayload>
         }
         aggregate: {
-          args: Prisma.ToolCallDetailAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateToolCallDetail>
+          args: Prisma.ToolInvocationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateToolInvocation>
         }
         groupBy: {
-          args: Prisma.ToolCallDetailGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ToolCallDetailGroupByOutputType>[]
+          args: Prisma.ToolInvocationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ToolInvocationGroupByOutputType>[]
         }
         count: {
-          args: Prisma.ToolCallDetailCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ToolCallDetailCountAggregateOutputType> | number
+          args: Prisma.ToolInvocationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ToolInvocationCountAggregateOutputType> | number
+        }
+      }
+    }
+    TaskTimelineItem: {
+      payload: Prisma.$TaskTimelineItemPayload<ExtArgs>
+      fields: Prisma.TaskTimelineItemFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TaskTimelineItemFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TaskTimelineItemFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>
+        }
+        findFirst: {
+          args: Prisma.TaskTimelineItemFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TaskTimelineItemFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>
+        }
+        findMany: {
+          args: Prisma.TaskTimelineItemFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>[]
+        }
+        create: {
+          args: Prisma.TaskTimelineItemCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>
+        }
+        createMany: {
+          args: Prisma.TaskTimelineItemCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TaskTimelineItemCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>[]
+        }
+        delete: {
+          args: Prisma.TaskTimelineItemDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>
+        }
+        update: {
+          args: Prisma.TaskTimelineItemUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>
+        }
+        deleteMany: {
+          args: Prisma.TaskTimelineItemDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TaskTimelineItemUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TaskTimelineItemUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>[]
+        }
+        upsert: {
+          args: Prisma.TaskTimelineItemUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskTimelineItemPayload>
+        }
+        aggregate: {
+          args: Prisma.TaskTimelineItemAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTaskTimelineItem>
+        }
+        groupBy: {
+          args: Prisma.TaskTimelineItemGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskTimelineItemGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TaskTimelineItemCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskTimelineItemCountAggregateOutputType> | number
         }
       }
     }
@@ -2642,6 +2792,10 @@ export const TaskScalarFieldEnum = {
   blockReason: 'blockReason',
   defaultSessionId: 'defaultSessionId',
   latestRunId: 'latestRunId',
+  latestEventId: 'latestEventId',
+  latestRawEventId: 'latestRawEventId',
+  blockedByEventId: 'blockedByEventId',
+  blockedByRawEventId: 'blockedByRawEventId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   completedAt: 'completedAt'
@@ -2782,6 +2936,8 @@ export const TaskPlanRunScalarFieldEnum = {
   executionOwnerScope: 'executionOwnerScope',
   executionLeaseUntil: 'executionLeaseUntil',
   executionEpoch: 'executionEpoch',
+  latestEventId: 'latestEventId',
+  latestRawEventId: 'latestRawEventId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -2806,6 +2962,15 @@ export const TaskPlanNodeAttemptScalarFieldEnum = {
   finishedAt: 'finishedAt',
   error: 'error',
   runtimeSnapshot: 'runtimeSnapshot',
+  startedByEventId: 'startedByEventId',
+  completedByEventId: 'completedByEventId',
+  failedByEventId: 'failedByEventId',
+  blockedByEventId: 'blockedByEventId',
+  inputRawEventId: 'inputRawEventId',
+  outputRawEventId: 'outputRawEventId',
+  errorRawEventId: 'errorRawEventId',
+  selectedBranchRef: 'selectedBranchRef',
+  selectedNextNodeId: 'selectedNextNodeId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -2822,6 +2987,13 @@ export const TaskPlanProviderRunScalarFieldEnum = {
   nodeAttemptId: 'nodeAttemptId',
   idempotencyKey: 'idempotencyKey',
   providerRunRef: 'providerRunRef',
+  runtimeName: 'runtimeName',
+  nativeRunId: 'nativeRunId',
+  firstRawEventId: 'firstRawEventId',
+  lastRawEventId: 'lastRawEventId',
+  completedByEventId: 'completedByEventId',
+  failedByEventId: 'failedByEventId',
+  correlationId: 'correlationId',
   status: 'status',
   startedAt: 'startedAt',
   finishedAt: 'finishedAt',
@@ -2933,22 +3105,76 @@ export type MemoryScalarFieldEnum = (typeof MemoryScalarFieldEnum)[keyof typeof 
 export const EventScalarFieldEnum = {
   id: 'id',
   eventType: 'eventType',
+  eventVersion: 'eventVersion',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
   runId: 'runId',
+  taskSessionId: 'taskSessionId',
+  executionSessionId: 'executionSessionId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  providerRunId: 'providerRunId',
   nodeId: 'nodeId',
   nodeTitle: 'nodeTitle',
+  rawEventId: 'rawEventId',
+  parentEventId: 'parentEventId',
+  causationEventId: 'causationEventId',
+  correlationId: 'correlationId',
   actorType: 'actorType',
   actorId: 'actorId',
   source: 'source',
   payload: 'payload',
+  summary: 'summary',
+  severity: 'severity',
   dedupeKey: 'dedupeKey',
-  runtimeTs: 'runtimeTs',
+  occurredAt: 'occurredAt',
+  ingestedAt: 'ingestedAt',
   ingestSequence: 'ingestSequence',
   createdAt: 'createdAt'
 } as const
 
 export type EventScalarFieldEnum = (typeof EventScalarFieldEnum)[keyof typeof EventScalarFieldEnum]
+
+
+export const RawEventLogScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  runId: 'runId',
+  taskSessionId: 'taskSessionId',
+  executionSessionId: 'executionSessionId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  providerRunId: 'providerRunId',
+  nodeId: 'nodeId',
+  nodeTitle: 'nodeTitle',
+  source: 'source',
+  direction: 'direction',
+  rawType: 'rawType',
+  provider: 'provider',
+  runtimeName: 'runtimeName',
+  rawPayload: 'rawPayload',
+  rawText: 'rawText',
+  metadata: 'metadata',
+  nativeRunId: 'nativeRunId',
+  nativeEventId: 'nativeEventId',
+  nativeToolCallId: 'nativeToolCallId',
+  externalRef: 'externalRef',
+  sequence: 'sequence',
+  correlationId: 'correlationId',
+  parentRawEventId: 'parentRawEventId',
+  causationRawEventId: 'causationRawEventId',
+  payloadHash: 'payloadHash',
+  redactionState: 'redactionState',
+  redactionMetadata: 'redactionMetadata',
+  occurredAt: 'occurredAt',
+  receivedAt: 'receivedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type RawEventLogScalarFieldEnum = (typeof RawEventLogScalarFieldEnum)[keyof typeof RawEventLogScalarFieldEnum]
 
 
 export const ConversationEntryScalarFieldEnum = {
@@ -2965,20 +3191,64 @@ export const ConversationEntryScalarFieldEnum = {
 export type ConversationEntryScalarFieldEnum = (typeof ConversationEntryScalarFieldEnum)[keyof typeof ConversationEntryScalarFieldEnum]
 
 
-export const ToolCallDetailScalarFieldEnum = {
+export const ToolInvocationScalarFieldEnum = {
   id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
   runId: 'runId',
+  executionSessionId: 'executionSessionId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  providerRunId: 'providerRunId',
+  nodeId: 'nodeId',
   toolName: 'toolName',
+  toolKind: 'toolKind',
   status: 'status',
-  argumentsSummary: 'argumentsSummary',
-  resultSummary: 'resultSummary',
+  inputRawEventId: 'inputRawEventId',
+  outputRawEventId: 'outputRawEventId',
+  errorRawEventId: 'errorRawEventId',
+  canonicalEventId: 'canonicalEventId',
+  inputPayload: 'inputPayload',
+  outputPayload: 'outputPayload',
+  errorPayload: 'errorPayload',
+  inputSummary: 'inputSummary',
+  outputSummary: 'outputSummary',
   errorSummary: 'errorSummary',
-  runtimeTs: 'runtimeTs',
+  nativeToolCallId: 'nativeToolCallId',
   externalRef: 'externalRef',
+  correlationId: 'correlationId',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ToolInvocationScalarFieldEnum = (typeof ToolInvocationScalarFieldEnum)[keyof typeof ToolInvocationScalarFieldEnum]
+
+
+export const TaskTimelineItemScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  runId: 'runId',
+  executionSessionId: 'executionSessionId',
+  nodeId: 'nodeId',
+  nodeAttemptId: 'nodeAttemptId',
+  kind: 'kind',
+  title: 'title',
+  body: 'body',
+  severity: 'severity',
+  status: 'status',
+  eventId: 'eventId',
+  rawEventId: 'rawEventId',
+  toolInvocationId: 'toolInvocationId',
+  sortTime: 'sortTime',
+  metadata: 'metadata',
   createdAt: 'createdAt'
 } as const
 
-export type ToolCallDetailScalarFieldEnum = (typeof ToolCallDetailScalarFieldEnum)[keyof typeof ToolCallDetailScalarFieldEnum]
+export type TaskTimelineItemScalarFieldEnum = (typeof TaskTimelineItemScalarFieldEnum)[keyof typeof TaskTimelineItemScalarFieldEnum]
 
 
 export const TaskProjectionScalarFieldEnum = {
@@ -3000,6 +3270,12 @@ export const TaskProjectionScalarFieldEnum = {
   scheduleProposalCount: 'scheduleProposalCount',
   latestArtifactTitle: 'latestArtifactTitle',
   lastActivityAt: 'lastActivityAt',
+  latestEventId: 'latestEventId',
+  latestRawEventId: 'latestRawEventId',
+  blockedByEventId: 'blockedByEventId',
+  blockedByRawEventId: 'blockedByRawEventId',
+  currentNodeId: 'currentNodeId',
+  currentNodeTitle: 'currentNodeTitle',
   updatedAt: 'updatedAt'
 } as const
 
@@ -3104,8 +3380,13 @@ export const ExecutionSessionScalarFieldEnum = {
   planId: 'planId',
   status: 'status',
   currentNodeId: 'currentNodeId',
+  currentNodeAttemptId: 'currentNodeAttemptId',
   pauseReason: 'pauseReason',
   completedNodeIds: 'completedNodeIds',
+  pausedByEventId: 'pausedByEventId',
+  pausedByRawEventId: 'pausedByRawEventId',
+  latestEventId: 'latestEventId',
+  latestRawEventId: 'latestRawEventId',
   startedAt: 'startedAt',
   pausedAt: 'pausedAt',
   completedAt: 'completedAt',
@@ -3466,8 +3747,10 @@ export type GlobalOmitConfig = {
   artifact?: Prisma.ArtifactOmit
   memory?: Prisma.MemoryOmit
   event?: Prisma.EventOmit
+  rawEventLog?: Prisma.RawEventLogOmit
   conversationEntry?: Prisma.ConversationEntryOmit
-  toolCallDetail?: Prisma.ToolCallDetailOmit
+  toolInvocation?: Prisma.ToolInvocationOmit
+  taskTimelineItem?: Prisma.TaskTimelineItemOmit
   taskProjection?: Prisma.TaskProjectionOmit
   scheduleProposal?: Prisma.ScheduleProposalOmit
   runtimeCursor?: Prisma.RuntimeCursorOmit

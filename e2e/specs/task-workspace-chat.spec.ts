@@ -57,8 +57,8 @@ test.describe("Task Workspace Assistant Surface", () => {
       await expect(taskEditor).not.toBeVisible();
     }
 
-    const trigger = page.locator('[data-assistant-surface-trigger="true"]');
+    const trigger = page.getByRole("button", { name: "Open Chrona AI dropdown" });
     await trigger.click();
-    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("dialog", { name: "Task context" })).toBeVisible();
   });
 });

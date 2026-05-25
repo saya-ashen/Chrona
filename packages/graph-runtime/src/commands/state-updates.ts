@@ -1,7 +1,7 @@
 import { appendCurrentResult, markNodeResults, updateAttemptStatus } from "../execution-state";
 import { normalizeResultEvidence } from "../evidence";
 import { resolveEffectivePlanGraph } from "../resolve";
-import type { GraphExecutionState, GraphExternalSyncResult } from "../execution/types";
+import type { GraphExecutionState, GraphSubmittedNodeResult } from "../execution/types";
 import type { NodeAttempt, NodeResult } from "../types";
 import { normalizeResultOutputs } from "../execution/result-normalization";
 
@@ -117,44 +117,54 @@ export function cancelSessionState(input: {
   };
 }
 
-export function syncExternalResultState(input: {
+export function submitNodeResultState(input: {
   taskId: string;
   state: GraphExecutionState;
-  externalResult: GraphExternalSyncResult;
-  syncedAt: string;
+  nodeResult: GraphSubmittedNodeResult;
+  submittedAt: string;
 }): GraphExecutionState {
   const effective = resolveEffectivePlanGraph(input.state);
   const node = effective.nodes.find(
-    (candidate) => candidate.id === input.externalResult.nodeId,
+    (candidate) => candidate.id === input.nodeResult.nodeId,
   );
   const conditionMissingBranch =
     node?.type === "condition" &&
-    input.externalResult.status === "done" &&
-    !input.externalResult.selectedBranch;
+    input.nodeResult.status === "done" &&
+    !input.nodeResult.selectedBranch;
+  const currentResult = [...input.state.results]
+    .reverse()
+    .find(
+      (result) =>
+        result.nodeId === input.nodeResult.nodeId &&
+        result.status === "current",
+    );
   const currentAttempt = [...input.state.attempts]
     .reverse()
     .find(
       (attempt) =>
-        attempt.nodeId === input.externalResult.nodeId &&
-        attempt.status === "running",
+        attempt.nodeId === input.nodeResult.nodeId &&
+        (
+          attempt.status === "running" ||
+          (currentResult?.attemptId === attempt.id && currentResult.waitKind)
+        ),
     );
   if (!currentAttempt) {
     const staleResult: NodeResult = {
-      id: `result_${input.state.graph.id}_${input.externalResult.nodeId}_${input.syncedAt}_stale`,
+      id: `result_${input.state.graph.id}_${input.nodeResult.nodeId}_${input.submittedAt}_stale`,
       taskId: input.taskId,
       graphId: input.state.graph.id,
-      nodeId: input.externalResult.nodeId,
+      nodeId: input.nodeResult.nodeId,
       nodeLayerId: node?.activeLayerId ?? undefined,
       status: "stale",
-      outputSummary: input.externalResult.status === "done" ? input.externalResult.summary : undefined,
-      outputs: input.externalResult.status === "done" ? normalizeResultOutputs(input.externalResult.output) : undefined,
-      error: input.externalResult.status === "failed"
-        ? input.externalResult.error
-        : input.externalResult.status === "cancelled" || input.externalResult.status === "blocked"
-          ? input.externalResult.reason
+      outputSummary: input.nodeResult.status === "done" ? input.nodeResult.summary : undefined,
+      outputs: input.nodeResult.status === "done" ? normalizeResultOutputs(input.nodeResult.output) : undefined,
+      error: input.nodeResult.status === "failed"
+        ? input.nodeResult.error
+        : input.nodeResult.status === "cancelled" || input.nodeResult.status === "blocked"
+          ? input.nodeResult.reason
           : undefined,
-      evidence: normalizeResultEvidence(input.externalResult.evidence),
-      selectedBranch: input.externalResult.status === "done" ? input.externalResult.selectedBranch : undefined,
+      evidence: normalizeResultEvidence(input.nodeResult.evidence),
+      selectedBranch: input.nodeResult.status === "done" ? input.nodeResult.selectedBranch : undefined,
     };
     return {
       ...input.state,
@@ -162,26 +172,26 @@ export function syncExternalResultState(input: {
     };
   }
   const baseResult = {
-    id: `result_${input.state.graph.id}_${input.externalResult.nodeId}_${input.syncedAt}`,
+    id: `result_${input.state.graph.id}_${input.nodeResult.nodeId}_${input.submittedAt}`,
     taskId: input.taskId,
     graphId: input.state.graph.id,
-    nodeId: input.externalResult.nodeId,
+    nodeId: input.nodeResult.nodeId,
     nodeLayerId: node?.activeLayerId ?? undefined,
     attemptId: currentAttempt.id,
   } satisfies NodeResult;
-  const evidence = normalizeResultEvidence(input.externalResult.evidence);
+  const evidence = normalizeResultEvidence(input.nodeResult.evidence);
   let syncedResult: NodeResult;
   let attemptStatus: NodeAttempt["status"] | null = null;
   let attemptError: NodeAttempt["error"] | undefined;
 
-  switch (input.externalResult.status) {
+  switch (input.nodeResult.status) {
     case "done":
       if (conditionMissingBranch) {
         syncedResult = {
           ...baseResult,
           status: "current",
           waitKind: "manual_action",
-          error: `Condition node ${input.externalResult.nodeId} completed without a structured selectedBranch`,
+          error: `Condition node ${input.nodeResult.nodeId} completed without a structured selectedBranch`,
           evidence,
         };
         attemptStatus = "failed";
@@ -193,10 +203,10 @@ export function syncExternalResultState(input: {
         syncedResult = {
           ...baseResult,
           status: "current",
-          outputSummary: input.externalResult.summary,
-          outputs: normalizeResultOutputs(input.externalResult.output),
+          outputSummary: input.nodeResult.summary,
+          outputs: normalizeResultOutputs(input.nodeResult.output),
           evidence,
-          selectedBranch: input.externalResult.selectedBranch,
+          selectedBranch: input.nodeResult.selectedBranch,
         };
         attemptStatus = "succeeded";
       }
@@ -205,13 +215,13 @@ export function syncExternalResultState(input: {
       syncedResult = {
         ...baseResult,
         status: "rejected",
-        error: input.externalResult.error,
+        error: input.nodeResult.error,
         evidence,
       };
       attemptStatus = "failed";
       attemptError = {
         code: "EXTERNAL_RESULT_FAILED",
-        message: input.externalResult.error,
+        message: input.nodeResult.error,
       };
       break;
     case "blocked":
@@ -219,27 +229,27 @@ export function syncExternalResultState(input: {
         ...baseResult,
         status: "current",
         waitKind: "manual_action",
-        error: input.externalResult.reason,
-        actionForm: input.externalResult.actionForm,
+        error: input.nodeResult.reason,
+        actionForm: input.nodeResult.actionForm,
         evidence,
       };
       attemptStatus = "failed";
       attemptError = {
         code: "EXTERNAL_RESULT_BLOCKED",
-        message: input.externalResult.reason,
+        message: input.nodeResult.reason,
       };
       break;
     case "cancelled":
       syncedResult = {
         ...baseResult,
         status: "rejected",
-        error: input.externalResult.reason ?? "External work cancelled",
+        error: input.nodeResult.reason ?? "External work cancelled",
         evidence,
       };
       attemptStatus = "cancelled";
       attemptError = {
         code: "EXTERNAL_RESULT_CANCELLED",
-        message: input.externalResult.reason ?? "External work cancelled",
+        message: input.nodeResult.reason ?? "External work cancelled",
       };
       break;
   }
@@ -251,7 +261,7 @@ export function syncExternalResultState(input: {
         attempts: input.state.attempts,
         attemptId: currentAttempt.id,
         status: attemptStatus,
-        finishedAt: input.syncedAt,
+        finishedAt: input.submittedAt,
         error: attemptError,
       }),
     results: appendCurrentResult({

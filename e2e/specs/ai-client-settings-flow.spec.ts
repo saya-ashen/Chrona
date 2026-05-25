@@ -171,23 +171,8 @@ test.describe("AI Client Settings", () => {
     await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://mock.ai/v1");
     await page.getByPlaceholder("optional for localhost").fill("sk-test");
 
-    // Try save — it should not send a request (frontend validation)
-    // Or the backend should reject with 400
     const saveBtn = page.getByRole("button", { name: /^save$/i });
-    const isDisabled = await saveBtn.isDisabled();
-
-    // Either it's disabled (frontend validation) or it sends and gets 400
-    if (!isDisabled) {
-      const resp = page.waitForResponse(
-        (res) =>
-          res.url().includes("/api/ai/clients") &&
-          res.request().method() === "POST",
-      );
-      await saveBtn.click();
-      const r = await resp;
-      // Backend rejects with 400 for missing name
-      expect(r.status()).toBe(400);
-    }
-    // If disabled, that's also valid — form validation worked
+    await saveBtn.click();
+    await expect(page.getByRole("alert").filter({ hasText: "Name" })).toBeVisible();
   });
 });

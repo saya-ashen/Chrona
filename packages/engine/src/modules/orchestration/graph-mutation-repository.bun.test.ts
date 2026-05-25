@@ -13,7 +13,7 @@ async function resetDb() {
     await db.$executeRaw`PRAGMA foreign_keys = OFF`;
     await db.taskAssistantMessage.deleteMany();
     await db.scheduleProposal.deleteMany();
-    await db.toolCallDetail.deleteMany();
+    await db.toolInvocation.deleteMany();
     await db.conversationEntry.deleteMany();
     await db.runtimeCursor.deleteMany();
     await db.schedulerEvent.deleteMany();

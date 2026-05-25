@@ -30,6 +30,13 @@ type CommittedStateLookup = (input: {
   state: GraphRuntimeState;
 }) => Promise<PersistedPlanRun | null>;
 
+type SubmittedNodeStateLookup = (input: {
+  taskId: string;
+  planId: string;
+  nodeId: string;
+  attemptId: string;
+}) => Promise<PersistedPlanRun | null>;
+
 export function createExecutionGraphCallbacks(input: {
   taskId: string;
   planId: string;
@@ -41,6 +48,7 @@ export function createExecutionGraphCallbacks(input: {
   mainSession: EngineRuntimeContext["mainSession"];
   executionSession: ExecutionSessionRow;
   committedStateIfRunningNodeAdvanced: CommittedStateLookup;
+  committedStateForSubmittedNode: SubmittedNodeStateLookup;
 } & PlanExecutionObserver): Partial<GraphExecutionCallbacks<EngineRuntimeContext>> {
   return {
     onEvent: async (event) => {
@@ -107,6 +115,21 @@ export function createExecutionGraphCallbacks(input: {
             })
           : undefined,
       }) as ReturnType<typeof executor.execute>;
+    },
+    resolveSubmittedNodeState: async (executorInput) => {
+      const committed = await input.committedStateForSubmittedNode({
+        taskId: input.taskId,
+        planId: input.planId,
+        nodeId: executorInput.node.id,
+        attemptId: executorInput.attempt.id,
+      });
+      if (!committed?.graph) return null;
+      return {
+        graph: structuredClone(committed.graph),
+        attempts: structuredClone(committed.attempts),
+        results: structuredClone(committed.results),
+        executionContextSnapshots: structuredClone(committed.executionContextSnapshots),
+      };
     },
   };
 }

@@ -21,9 +21,21 @@ describe("AI provider availability", () => {
 
     expect(result).toEqual({
       available: true,
-      reason: "Chrona debug provider is local and deterministic",
+      reason: "Chrona debug provider is local (deterministic)",
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports the configured Chrona debug provider profile", async () => {
+    const result = await testAiClientAvailability({
+      type: "debug",
+      config: { profile: "hermes-like" },
+    });
+
+    expect(result).toEqual({
+      available: true,
+      reason: "Chrona debug provider is local (hermes-like)",
+    });
   });
 
   it("uses legacy Hermes baseUrl as gateway URL", async () => {

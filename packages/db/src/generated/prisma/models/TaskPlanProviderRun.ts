@@ -33,6 +33,13 @@ export type TaskPlanProviderRunMinAggregateOutputType = {
   nodeAttemptId: string | null
   idempotencyKey: string | null
   providerRunRef: string | null
+  runtimeName: string | null
+  nativeRunId: string | null
+  firstRawEventId: string | null
+  lastRawEventId: string | null
+  completedByEventId: string | null
+  failedByEventId: string | null
+  correlationId: string | null
   status: string | null
   startedAt: Date | null
   finishedAt: Date | null
@@ -49,6 +56,13 @@ export type TaskPlanProviderRunMaxAggregateOutputType = {
   nodeAttemptId: string | null
   idempotencyKey: string | null
   providerRunRef: string | null
+  runtimeName: string | null
+  nativeRunId: string | null
+  firstRawEventId: string | null
+  lastRawEventId: string | null
+  completedByEventId: string | null
+  failedByEventId: string | null
+  correlationId: string | null
   status: string | null
   startedAt: Date | null
   finishedAt: Date | null
@@ -65,6 +79,13 @@ export type TaskPlanProviderRunCountAggregateOutputType = {
   nodeAttemptId: number
   idempotencyKey: number
   providerRunRef: number
+  runtimeName: number
+  nativeRunId: number
+  firstRawEventId: number
+  lastRawEventId: number
+  completedByEventId: number
+  failedByEventId: number
+  correlationId: number
   status: number
   startedAt: number
   finishedAt: number
@@ -83,6 +104,13 @@ export type TaskPlanProviderRunMinAggregateInputType = {
   nodeAttemptId?: true
   idempotencyKey?: true
   providerRunRef?: true
+  runtimeName?: true
+  nativeRunId?: true
+  firstRawEventId?: true
+  lastRawEventId?: true
+  completedByEventId?: true
+  failedByEventId?: true
+  correlationId?: true
   status?: true
   startedAt?: true
   finishedAt?: true
@@ -99,6 +127,13 @@ export type TaskPlanProviderRunMaxAggregateInputType = {
   nodeAttemptId?: true
   idempotencyKey?: true
   providerRunRef?: true
+  runtimeName?: true
+  nativeRunId?: true
+  firstRawEventId?: true
+  lastRawEventId?: true
+  completedByEventId?: true
+  failedByEventId?: true
+  correlationId?: true
   status?: true
   startedAt?: true
   finishedAt?: true
@@ -115,6 +150,13 @@ export type TaskPlanProviderRunCountAggregateInputType = {
   nodeAttemptId?: true
   idempotencyKey?: true
   providerRunRef?: true
+  runtimeName?: true
+  nativeRunId?: true
+  firstRawEventId?: true
+  lastRawEventId?: true
+  completedByEventId?: true
+  failedByEventId?: true
+  correlationId?: true
   status?: true
   startedAt?: true
   finishedAt?: true
@@ -204,6 +246,13 @@ export type TaskPlanProviderRunGroupByOutputType = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef: string | null
+  runtimeName: string | null
+  nativeRunId: string | null
+  firstRawEventId: string | null
+  lastRawEventId: string | null
+  completedByEventId: string | null
+  failedByEventId: string | null
+  correlationId: string | null
   status: string
   startedAt: Date
   finishedAt: Date | null
@@ -241,6 +290,13 @@ export type TaskPlanProviderRunWhereInput = {
   nodeAttemptId?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   idempotencyKey?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   providerRunRef?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  runtimeName?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  nativeRunId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  firstRawEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  lastRawEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  completedByEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  failedByEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  correlationId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
   status?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   startedAt?: Prisma.DateTimeFilter<"TaskPlanProviderRun"> | Date | string
   finishedAt?: Prisma.DateTimeNullableFilter<"TaskPlanProviderRun"> | Date | string | null
@@ -261,6 +317,13 @@ export type TaskPlanProviderRunOrderByWithRelationInput = {
   nodeAttemptId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
   providerRunRef?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeName?: Prisma.SortOrderInput | Prisma.SortOrder
+  nativeRunId?: Prisma.SortOrderInput | Prisma.SortOrder
+  firstRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  correlationId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -284,6 +347,13 @@ export type TaskPlanProviderRunWhereUniqueInput = Prisma.AtLeast<{
   planRunId?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   nodeAttemptId?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   providerRunRef?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  runtimeName?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  nativeRunId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  firstRawEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  lastRawEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  completedByEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  failedByEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  correlationId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
   status?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   startedAt?: Prisma.DateTimeFilter<"TaskPlanProviderRun"> | Date | string
   finishedAt?: Prisma.DateTimeNullableFilter<"TaskPlanProviderRun"> | Date | string | null
@@ -304,6 +374,13 @@ export type TaskPlanProviderRunOrderByWithAggregationInput = {
   nodeAttemptId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
   providerRunRef?: Prisma.SortOrderInput | Prisma.SortOrder
+  runtimeName?: Prisma.SortOrderInput | Prisma.SortOrder
+  nativeRunId?: Prisma.SortOrderInput | Prisma.SortOrder
+  firstRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastRawEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrderInput | Prisma.SortOrder
+  correlationId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -326,6 +403,13 @@ export type TaskPlanProviderRunScalarWhereWithAggregatesInput = {
   nodeAttemptId?: Prisma.StringWithAggregatesFilter<"TaskPlanProviderRun"> | string
   idempotencyKey?: Prisma.StringWithAggregatesFilter<"TaskPlanProviderRun"> | string
   providerRunRef?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
+  runtimeName?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
+  nativeRunId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
+  firstRawEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
+  lastRawEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
+  completedByEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
+  failedByEventId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
+  correlationId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlanProviderRun"> | string | null
   status?: Prisma.StringWithAggregatesFilter<"TaskPlanProviderRun"> | string
   startedAt?: Prisma.DateTimeWithAggregatesFilter<"TaskPlanProviderRun"> | Date | string
   finishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskPlanProviderRun"> | Date | string | null
@@ -338,6 +422,13 @@ export type TaskPlanProviderRunCreateInput = {
   planId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -358,6 +449,13 @@ export type TaskPlanProviderRunUncheckedCreateInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -370,6 +468,13 @@ export type TaskPlanProviderRunUpdateInput = {
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -390,6 +495,13 @@ export type TaskPlanProviderRunUncheckedUpdateInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -406,6 +518,13 @@ export type TaskPlanProviderRunCreateManyInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -418,6 +537,13 @@ export type TaskPlanProviderRunUpdateManyMutationInput = {
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -434,6 +560,13 @@ export type TaskPlanProviderRunUncheckedUpdateManyInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -460,6 +593,13 @@ export type TaskPlanProviderRunCountOrderByAggregateInput = {
   nodeAttemptId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
   providerRunRef?: Prisma.SortOrder
+  runtimeName?: Prisma.SortOrder
+  nativeRunId?: Prisma.SortOrder
+  firstRawEventId?: Prisma.SortOrder
+  lastRawEventId?: Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrder
+  correlationId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   finishedAt?: Prisma.SortOrder
@@ -476,6 +616,13 @@ export type TaskPlanProviderRunMaxOrderByAggregateInput = {
   nodeAttemptId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
   providerRunRef?: Prisma.SortOrder
+  runtimeName?: Prisma.SortOrder
+  nativeRunId?: Prisma.SortOrder
+  firstRawEventId?: Prisma.SortOrder
+  lastRawEventId?: Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrder
+  correlationId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   finishedAt?: Prisma.SortOrder
@@ -492,6 +639,13 @@ export type TaskPlanProviderRunMinOrderByAggregateInput = {
   nodeAttemptId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
   providerRunRef?: Prisma.SortOrder
+  runtimeName?: Prisma.SortOrder
+  nativeRunId?: Prisma.SortOrder
+  firstRawEventId?: Prisma.SortOrder
+  lastRawEventId?: Prisma.SortOrder
+  completedByEventId?: Prisma.SortOrder
+  failedByEventId?: Prisma.SortOrder
+  correlationId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   finishedAt?: Prisma.SortOrder
@@ -672,6 +826,13 @@ export type TaskPlanProviderRunCreateWithoutWorkspaceInput = {
   planId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -690,6 +851,13 @@ export type TaskPlanProviderRunUncheckedCreateWithoutWorkspaceInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -734,6 +902,13 @@ export type TaskPlanProviderRunScalarWhereInput = {
   nodeAttemptId?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   idempotencyKey?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   providerRunRef?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  runtimeName?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  nativeRunId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  firstRawEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  lastRawEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  completedByEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  failedByEventId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
+  correlationId?: Prisma.StringNullableFilter<"TaskPlanProviderRun"> | string | null
   status?: Prisma.StringFilter<"TaskPlanProviderRun"> | string
   startedAt?: Prisma.DateTimeFilter<"TaskPlanProviderRun"> | Date | string
   finishedAt?: Prisma.DateTimeNullableFilter<"TaskPlanProviderRun"> | Date | string | null
@@ -746,6 +921,13 @@ export type TaskPlanProviderRunCreateWithoutTaskInput = {
   planId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -764,6 +946,13 @@ export type TaskPlanProviderRunUncheckedCreateWithoutTaskInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -801,6 +990,13 @@ export type TaskPlanProviderRunCreateWithoutPlanRunInput = {
   planId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -819,6 +1015,13 @@ export type TaskPlanProviderRunUncheckedCreateWithoutPlanRunInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -856,6 +1059,13 @@ export type TaskPlanProviderRunCreateWithoutNodeAttemptInput = {
   planId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -874,6 +1084,13 @@ export type TaskPlanProviderRunUncheckedCreateWithoutNodeAttemptInput = {
   planRunId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -914,6 +1131,13 @@ export type TaskPlanProviderRunCreateManyWorkspaceInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -926,6 +1150,13 @@ export type TaskPlanProviderRunUpdateWithoutWorkspaceInput = {
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -944,6 +1175,13 @@ export type TaskPlanProviderRunUncheckedUpdateWithoutWorkspaceInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -959,6 +1197,13 @@ export type TaskPlanProviderRunUncheckedUpdateManyWithoutWorkspaceInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -974,6 +1219,13 @@ export type TaskPlanProviderRunCreateManyTaskInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -986,6 +1238,13 @@ export type TaskPlanProviderRunUpdateWithoutTaskInput = {
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1004,6 +1263,13 @@ export type TaskPlanProviderRunUncheckedUpdateWithoutTaskInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1019,6 +1285,13 @@ export type TaskPlanProviderRunUncheckedUpdateManyWithoutTaskInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1034,6 +1307,13 @@ export type TaskPlanProviderRunCreateManyPlanRunInput = {
   nodeAttemptId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -1046,6 +1326,13 @@ export type TaskPlanProviderRunUpdateWithoutPlanRunInput = {
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1064,6 +1351,13 @@ export type TaskPlanProviderRunUncheckedUpdateWithoutPlanRunInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1079,6 +1373,13 @@ export type TaskPlanProviderRunUncheckedUpdateManyWithoutPlanRunInput = {
   nodeAttemptId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1094,6 +1395,13 @@ export type TaskPlanProviderRunCreateManyNodeAttemptInput = {
   planRunId: string
   idempotencyKey: string
   providerRunRef?: string | null
+  runtimeName?: string | null
+  nativeRunId?: string | null
+  firstRawEventId?: string | null
+  lastRawEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  correlationId?: string | null
   status: string
   startedAt?: Date | string
   finishedAt?: Date | string | null
@@ -1106,6 +1414,13 @@ export type TaskPlanProviderRunUpdateWithoutNodeAttemptInput = {
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1124,6 +1439,13 @@ export type TaskPlanProviderRunUncheckedUpdateWithoutNodeAttemptInput = {
   planRunId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1139,6 +1461,13 @@ export type TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptInput = {
   planRunId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
   providerRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  runtimeName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nativeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  firstRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  correlationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1157,6 +1486,13 @@ export type TaskPlanProviderRunSelect<ExtArgs extends runtime.Types.Extensions.I
   nodeAttemptId?: boolean
   idempotencyKey?: boolean
   providerRunRef?: boolean
+  runtimeName?: boolean
+  nativeRunId?: boolean
+  firstRawEventId?: boolean
+  lastRawEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  correlationId?: boolean
   status?: boolean
   startedAt?: boolean
   finishedAt?: boolean
@@ -1177,6 +1513,13 @@ export type TaskPlanProviderRunSelectCreateManyAndReturn<ExtArgs extends runtime
   nodeAttemptId?: boolean
   idempotencyKey?: boolean
   providerRunRef?: boolean
+  runtimeName?: boolean
+  nativeRunId?: boolean
+  firstRawEventId?: boolean
+  lastRawEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  correlationId?: boolean
   status?: boolean
   startedAt?: boolean
   finishedAt?: boolean
@@ -1197,6 +1540,13 @@ export type TaskPlanProviderRunSelectUpdateManyAndReturn<ExtArgs extends runtime
   nodeAttemptId?: boolean
   idempotencyKey?: boolean
   providerRunRef?: boolean
+  runtimeName?: boolean
+  nativeRunId?: boolean
+  firstRawEventId?: boolean
+  lastRawEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  correlationId?: boolean
   status?: boolean
   startedAt?: boolean
   finishedAt?: boolean
@@ -1217,6 +1567,13 @@ export type TaskPlanProviderRunSelectScalar = {
   nodeAttemptId?: boolean
   idempotencyKey?: boolean
   providerRunRef?: boolean
+  runtimeName?: boolean
+  nativeRunId?: boolean
+  firstRawEventId?: boolean
+  lastRawEventId?: boolean
+  completedByEventId?: boolean
+  failedByEventId?: boolean
+  correlationId?: boolean
   status?: boolean
   startedAt?: boolean
   finishedAt?: boolean
@@ -1224,7 +1581,7 @@ export type TaskPlanProviderRunSelectScalar = {
   updatedAt?: boolean
 }
 
-export type TaskPlanProviderRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "planId" | "planRunId" | "nodeAttemptId" | "idempotencyKey" | "providerRunRef" | "status" | "startedAt" | "finishedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskPlanProviderRun"]>
+export type TaskPlanProviderRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "planId" | "planRunId" | "nodeAttemptId" | "idempotencyKey" | "providerRunRef" | "runtimeName" | "nativeRunId" | "firstRawEventId" | "lastRawEventId" | "completedByEventId" | "failedByEventId" | "correlationId" | "status" | "startedAt" | "finishedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["taskPlanProviderRun"]>
 export type TaskPlanProviderRunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1261,6 +1618,13 @@ export type $TaskPlanProviderRunPayload<ExtArgs extends runtime.Types.Extensions
     nodeAttemptId: string
     idempotencyKey: string
     providerRunRef: string | null
+    runtimeName: string | null
+    nativeRunId: string | null
+    firstRawEventId: string | null
+    lastRawEventId: string | null
+    completedByEventId: string | null
+    failedByEventId: string | null
+    correlationId: string | null
     status: string
     startedAt: Date
     finishedAt: Date | null
@@ -1701,6 +2065,13 @@ export interface TaskPlanProviderRunFieldRefs {
   readonly nodeAttemptId: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
   readonly idempotencyKey: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
   readonly providerRunRef: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
+  readonly runtimeName: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
+  readonly nativeRunId: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
+  readonly firstRawEventId: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
+  readonly lastRawEventId: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
+  readonly completedByEventId: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
+  readonly failedByEventId: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
+  readonly correlationId: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
   readonly status: Prisma.FieldRef<"TaskPlanProviderRun", 'String'>
   readonly startedAt: Prisma.FieldRef<"TaskPlanProviderRun", 'DateTime'>
   readonly finishedAt: Prisma.FieldRef<"TaskPlanProviderRun", 'DateTime'>

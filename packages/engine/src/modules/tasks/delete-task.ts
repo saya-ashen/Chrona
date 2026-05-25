@@ -50,7 +50,7 @@ export async function deleteTask(taskId: string) {
           stack: new Error("Run deletion trace").stack,
         });
         await tx.runtimeCursor.deleteMany({ where: { runId: { in: runIds } } });
-        await tx.toolCallDetail.deleteMany({ where: { runId: { in: runIds } } });
+        await tx.toolInvocation.deleteMany({ where: { runId: { in: runIds } } });
         await tx.conversationEntry.deleteMany({ where: { runId: { in: runIds } } });
       }
 
@@ -67,7 +67,9 @@ export async function deleteTask(taskId: string) {
       await tx.approval.deleteMany({ where: { taskId: currentTaskId } });
       await tx.artifact.deleteMany({ where: { taskId: currentTaskId } });
       await tx.memory.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.taskTimelineItem.deleteMany({ where: { taskId: currentTaskId } });
       await tx.event.deleteMany({ where: { taskId: currentTaskId } });
+      await tx.rawEventLog.deleteMany({ where: { taskId: currentTaskId } });
       await tx.taskDependency.deleteMany({
         where: { OR: [{ taskId: currentTaskId }, { dependsOnTaskId: currentTaskId }] },
       });

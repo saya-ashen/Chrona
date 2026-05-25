@@ -61,7 +61,7 @@ export type GraphNodeExecutionResult =
       details?: unknown;
     };
 
-export type GraphExternalSyncResult =
+export type GraphSubmittedNodeResult =
   | {
       nodeId: string;
       status: "done";
@@ -115,9 +115,9 @@ export type GraphExecutionEvent =
       affectedNodeIds: string[];
     }
   | {
-      type: "external_result_synced";
+      type: "node_result_submitted";
       nodeId: string;
-      status: GraphExternalSyncResult["status"];
+      status: GraphSubmittedNodeResult["status"];
     }
   | { type: "executable_path_computed"; effective: EffectivePlanGraph }
   | { type: "node_started"; node: EffectivePlanNode; attempt: NodeAttempt }
@@ -163,6 +163,11 @@ export type GraphExecutionCallbacks<TContext = unknown> = {
   executeNode(
     input: GraphNodeExecutorInput<TContext>,
   ): Promise<GraphNodeExecutionResult | null>;
+  resolveSubmittedNodeState?(input: {
+    node: EffectivePlanNode;
+    attempt: NodeAttempt;
+    state: GraphExecutionState;
+  }): Promise<GraphExecutionState | null> | GraphExecutionState | null;
   onEvent?(event: GraphExecutionEvent): Promise<void> | void;
   onStateChange?(state: GraphExecutionState): Promise<void> | void;
 };

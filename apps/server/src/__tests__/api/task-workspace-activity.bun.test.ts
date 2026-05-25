@@ -30,7 +30,7 @@ describe("task workspace activity endpoint", () => {
         source: "ui",
         payload: { changed_fields: [`field_${index}`] },
         dedupeKey: `activity-history-${index}`,
-        runtimeTs: new Date(`2026-05-22T00:00:0${index}.000Z`),
+        occurredAt: new Date(`2026-05-22T00:00:0${index}.000Z`),
         ingestSequence: index + 1,
       })),
     });
@@ -61,7 +61,7 @@ describe("task workspace activity endpoint", () => {
         nodeTitle: "Node A",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Node A" } },
         dedupeKey: "activity-node-a",
-        runtimeTs: new Date("2026-05-22T00:00:01.000Z"),
+        occurredAt: new Date("2026-05-22T00:00:01.000Z"),
         ingestSequence: 1,
       }, {
         eventType: "provider.text_delta",
@@ -72,7 +72,7 @@ describe("task workspace activity endpoint", () => {
         source: "provider",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "No node" } },
         dedupeKey: "activity-no-node",
-        runtimeTs: new Date("2026-05-22T00:00:02.000Z"),
+        occurredAt: new Date("2026-05-22T00:00:02.000Z"),
         ingestSequence: 2,
       }, {
         eventType: "provider.text_delta",
@@ -85,7 +85,7 @@ describe("task workspace activity endpoint", () => {
         nodeTitle: "Node B",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Node B" } },
         dedupeKey: "activity-node-b",
-        runtimeTs: new Date("2026-05-22T00:00:03.000Z"),
+        occurredAt: new Date("2026-05-22T00:00:03.000Z"),
         ingestSequence: 3,
       }],
     });

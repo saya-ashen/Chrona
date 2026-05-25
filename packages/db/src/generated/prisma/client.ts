@@ -137,15 +137,25 @@ export type Memory = Prisma.MemoryModel
  */
 export type Event = Prisma.EventModel
 /**
+ * Model RawEventLog
+ * 
+ */
+export type RawEventLog = Prisma.RawEventLogModel
+/**
  * Model ConversationEntry
  * 
  */
 export type ConversationEntry = Prisma.ConversationEntryModel
 /**
- * Model ToolCallDetail
+ * Model ToolInvocation
  * 
  */
-export type ToolCallDetail = Prisma.ToolCallDetailModel
+export type ToolInvocation = Prisma.ToolInvocationModel
+/**
+ * Model TaskTimelineItem
+ * 
+ */
+export type TaskTimelineItem = Prisma.TaskTimelineItemModel
 /**
  * Model TaskProjection
  * 

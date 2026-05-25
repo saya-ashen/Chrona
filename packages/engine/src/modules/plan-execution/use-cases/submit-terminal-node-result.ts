@@ -1,6 +1,7 @@
 import { createLogger } from "@chrona/shared/logger";
 import type { ExecutionActionInput, PlanExecutionResult } from "@chrona/contracts/ai";
 import { db } from "@/lib/db";
+import type { ExecutionDispatchContext } from "../types";
 import {
   continuePlanExecution,
   dispatchExecutionAction,
@@ -12,20 +13,23 @@ async function canContinueTerminalResult(input: {
   taskId: string;
   sessionId?: string;
 }) {
-  const session = input.sessionId
-    ? await db.executionSession.findFirst({
-        where: { id: input.sessionId, taskId: input.taskId },
-      })
-    : await db.executionSession.findFirst({
-        where: { taskId: input.taskId, status: "Active" },
-        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-      });
+  const session = await db.executionSession.findFirst({
+    where: input.sessionId
+      ? {
+          taskId: input.taskId,
+          status: "Active",
+          OR: [{ id: input.sessionId }, { currentNodeId: { not: null } }],
+        }
+      : { taskId: input.taskId, status: "Active" },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
 
   return session?.status === "Active";
 }
 
 export async function submitTerminalNodeResult(input: {
   taskId: string;
+  commandContext?: ExecutionDispatchContext;
   action: Extract<ExecutionActionInput, {
     action: "complete_manual_node" | "block_current_node" | "fail_current_node";
   }>;
@@ -35,11 +39,12 @@ export async function submitTerminalNodeResult(input: {
     action: input.action.action === "complete_manual_node"
       ? { ...input.action, continueExecution: false }
       : input.action,
+    commandContext: input.commandContext,
   });
 
   if (input.action.action === "complete_manual_node" && result.status === "running") {
     const sessionId = input.action.sessionId;
-    queueMicrotask(() => {
+    setTimeout(() => {
       void canContinueTerminalResult({ taskId: input.taskId, sessionId })
         .then((canContinue) => {
           if (!canContinue) return;

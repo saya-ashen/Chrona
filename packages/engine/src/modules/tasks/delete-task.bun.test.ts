@@ -13,10 +13,12 @@ async function resetDb() {
   await db.taskPlanRun.deleteMany();
   await db.taskPlan.deleteMany();
   await db.scheduleProposal.deleteMany();
-  await db.toolCallDetail.deleteMany();
+  await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();
+  await db.taskTimelineItem.deleteMany();
   await db.event.deleteMany();
+  await db.rawEventLog.deleteMany();
   await db.approval.deleteMany();
   await db.artifact.deleteMany();
   await db.taskProjection.deleteMany();
@@ -79,8 +81,8 @@ describe("deleteTask", () => {
     await db.conversationEntry.create({
       data: { runId: run.id, role: "assistant", content: "hello", sequence: 1 },
     });
-    await db.toolCallDetail.create({
-      data: { runId: run.id, toolName: "shell", status: "completed" },
+    await db.toolInvocation.create({
+      data: { workspaceId: workspace.id, taskId: child.id, runId: run.id, toolName: "shell", status: "completed" },
     });
     await db.workBlock.create({
       data: {
@@ -105,7 +107,7 @@ describe("deleteTask", () => {
     expect(await db.run.count()).toBe(0);
     expect(await db.runtimeCursor.count()).toBe(0);
     expect(await db.conversationEntry.count()).toBe(0);
-    expect(await db.toolCallDetail.count()).toBe(0);
+    expect(await db.toolInvocation.count()).toBe(0);
     expect(await db.workBlock.count()).toBe(0);
     expect(await db.executionSession.count()).toBe(0);
     expect(await db.schedulerEvent.count()).toBe(0);

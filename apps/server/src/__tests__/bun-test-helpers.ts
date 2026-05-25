@@ -18,10 +18,12 @@ export async function resetTestDb() {
 
   await db.taskAssistantMessage.deleteMany();
   await db.scheduleProposal.deleteMany();
-  await db.toolCallDetail.deleteMany();
+  await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();
+  await db.taskTimelineItem.deleteMany();
   await db.event.deleteMany();
+  await db.rawEventLog.deleteMany();
   await db.approval.deleteMany();
   await db.artifact.deleteMany();
   await db.executionSession.deleteMany();

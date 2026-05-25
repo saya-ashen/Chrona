@@ -1,68 +1,67 @@
 import { resolveEffectivePlanGraph } from "../resolve";
 import { runGraphExecution } from "../execution/run-graph-execution";
 import { mapTerminalReasonToGraphStatus } from "../status";
-import { syncExternalResultState } from "./state-updates";
+import { submitNodeResultState } from "./state-updates";
 import type { GraphExecutionCallbacks, GraphExecutionEvent } from "../execution/types";
 import type { GraphDispatchOutcome, GraphRuntimeCommand, GraphRuntimeOptions } from "./types";
 
-export async function syncExternalResultCommand<TContext>(input: {
-  command: Extract<GraphRuntimeCommand, { type: "sync_external_result" }>;
+export async function submitNodeResultCommand<TContext>(input: {
+  command: Extract<GraphRuntimeCommand, { type: "submit_node_result" }>;
   options: GraphRuntimeOptions<TContext>;
   callbacks: GraphExecutionCallbacks<TContext>;
   events: GraphExecutionEvent[];
 }): Promise<GraphDispatchOutcome> {
-  const syncedAt = new Date(
+  const submittedAt = new Date(
     input.options.now?.() ?? Date.now(),
   ).toISOString();
-  const syncedState = syncExternalResultState({
+  const submittedState = submitNodeResultState({
     taskId: input.options.taskId,
     state: input.command.state,
-    externalResult: input.command.externalResult,
-    syncedAt,
+    nodeResult: input.command.nodeResult,
+    submittedAt,
   });
   input.events.push({
-    type: "external_result_synced",
-    nodeId: input.command.externalResult.nodeId,
-    status: input.command.externalResult.status,
+    type: "node_result_submitted",
+    nodeId: input.command.nodeResult.nodeId,
+    status: input.command.nodeResult.status,
   });
-  if (input.command.externalResult.status !== "done" || input.command.continueExecution === false) {
-    const effective = resolveEffectivePlanGraph(syncedState);
+  if (input.command.nodeResult.status !== "done" || input.command.continueExecution === false) {
+    const effective = resolveEffectivePlanGraph(submittedState);
     const waitKind =
-      input.command.externalResult.status === "blocked"
+      input.command.nodeResult.status === "blocked"
         ? "manual_action"
         : undefined;
     const terminalStatus = mapTerminalReasonToGraphStatus(effective);
     return {
       status:
-        input.command.externalResult.status === "done"
+        input.command.nodeResult.status === "done"
           ? terminalStatus === "completed"
             ? "completed"
             : "running"
-          : input.command.externalResult.status === "blocked"
+          : input.command.nodeResult.status === "blocked"
             ? "blocked"
             : "failed",
-      currentNodeId: input.command.externalResult.status === "done" ? null : input.command.externalResult.nodeId,
+      currentNodeId: input.command.nodeResult.status === "done" ? null : input.command.nodeResult.nodeId,
       executedNodeIds: [],
       effective,
-      state: syncedState,
+      state: submittedState,
       events: input.events,
       waitKind,
       message:
-        input.command.externalResult.status === "done"
-          ? "External result accepted. Continuation pending."
-          : input.command.externalResult.status === "failed"
-            ? input.command.externalResult.error
-            : input.command.externalResult.status === "cancelled"
-              ? (input.command.externalResult.reason ??
-                "External work cancelled")
-              : input.command.externalResult.reason,
+        input.command.nodeResult.status === "done"
+          ? "Node result accepted. Continuation pending."
+          : input.command.nodeResult.status === "failed"
+            ? input.command.nodeResult.error
+            : input.command.nodeResult.status === "cancelled"
+              ? (input.command.nodeResult.reason ?? "External work cancelled")
+              : input.command.nodeResult.reason,
     };
   }
   const outcome = await runGraphExecution({
     taskId: input.options.taskId,
     runtimeName: input.options.runtimeName,
     trigger: input.command.trigger ?? "system",
-    state: syncedState,
+    state: submittedState,
     context: input.command.context as TContext,
     maxSteps: input.options.policies?.maxSteps,
     maxConcurrency: input.options.policies?.maxConcurrency,

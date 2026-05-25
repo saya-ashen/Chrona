@@ -45,7 +45,22 @@ type ClientFormValues = {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  debugProfile: DebugProviderProfile;
 };
+
+type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
+
+const DEBUG_PROVIDER_PROFILES = [
+  "deterministic",
+  "tool-submit",
+  "hermes-like",
+] as const satisfies readonly DebugProviderProfile[];
+
+function normalizeDebugProfile(input: unknown): DebugProviderProfile {
+  return DEBUG_PROVIDER_PROFILES.includes(input as DebugProviderProfile)
+    ? input as DebugProviderProfile
+    : "deterministic";
+}
 
 type TestStatus = "idle" | "testing" | "available" | "unavailable";
 
@@ -66,12 +81,13 @@ function buildClientPayload(input: {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  debugProfile: DebugProviderProfile;
 }): ClientFormPayload {
   if (input.type === "debug") {
     return {
       name: input.name,
       type: input.type,
-      config: {},
+      config: { profile: input.debugProfile },
       isDefault: input.isDefault,
     };
   }
@@ -166,6 +182,10 @@ const DEFAULTS: Record<string, string> = {
   timeoutSeconds: "Timeout (seconds)",
   modelLabel: "Model",
   debug: "Debug Provider",
+  debugProfileLabel: "Debug profile",
+  debugProfileDeterministic: "Deterministic",
+  debugProfileToolSubmit: "Tool submit",
+  debugProfileHermesLike: "Hermes-like",
   setAsDefault: "Set as default Client",
   save: "Save",
   cancel: "Cancel",
@@ -206,6 +226,7 @@ function ClientForm({
     ),
     baseUrl: (initial?.config as { baseUrl?: string })?.baseUrl ?? "http://127.0.0.1:8642",
     apiKey: (initial?.config as { apiKey?: string })?.apiKey ?? "",
+    debugProfile: normalizeDebugProfile((initial?.config as { profile?: unknown })?.profile),
   }), [fallbackType, initial, providers]);
   const form = useForm<ClientFormValues>({
     defaultValues,
@@ -230,125 +251,149 @@ function ClientForm({
     <Card size="sm">
       <CardContent>
         <form className="flex flex-col gap-4" onSubmit={(event) => void form.handleSubmit(handleSave)(event)}>
-        <FieldGroup className="gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field data-invalid={Boolean(form.formState.errors.name)}>
-              <FieldLabel htmlFor="ai-client-name">{copy.nameLabel}</FieldLabel>
-              <Input
-                {...form.register("name", { required: copy.nameLabel })}
-                aria-invalid={Boolean(form.formState.errors.name)}
-                id="ai-client-name"
-                placeholder="My Hermes Client"
-              />
-              {form.formState.errors.name ? <FieldError errors={[form.formState.errors.name]} /> : null}
-            </Field>
-            <Field>
-              <FieldLabel>{copy.typeLabel}</FieldLabel>
-              <Controller
-                name="type"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label={copy.typeLabel}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {providers.map((provider) => (
-                          <SelectItem key={provider.key} value={provider.key}>
-                            {provider.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-          </div>
-
-          {!isDebugClient && (
-            <>
-              <Field>
-                <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
+          <FieldGroup className="gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field data-invalid={Boolean(form.formState.errors.name)}>
+                <FieldLabel htmlFor="ai-client-name">{copy.nameLabel}</FieldLabel>
                 <Input
-                  {...form.register("baseUrl")}
-                  id="ai-client-base-url"
-                  placeholder="http://127.0.0.1:8642"
+                  {...form.register("name", { required: copy.nameLabel })}
+                  aria-invalid={Boolean(form.formState.errors.name)}
+                  id="ai-client-name"
+                  placeholder="My Hermes Client"
+                />
+                {form.formState.errors.name ? <FieldError errors={[form.formState.errors.name]} /> : null}
+              </Field>
+              <Field>
+                <FieldLabel>{copy.typeLabel}</FieldLabel>
+                <Controller
+                  name="type"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label={copy.typeLabel}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {providers.map((provider) => (
+                            <SelectItem key={provider.key} value={provider.key}>
+                              {provider.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
                 />
               </Field>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="ai-client-api-key">API Key</FieldLabel>
-                  <Input
-                    {...form.register("apiKey")}
-                    id="ai-client-api-key"
-                    type="password"
-                    placeholder="optional for localhost"
-                  />
-                </Field>
-                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
-                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
-                  <Input
-                    {...form.register("timeoutSeconds", {
-                      required: copy.timeoutSeconds,
-                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
-                    })}
-                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
-                    id="ai-client-timeout"
-                    type="number"
-                  />
-                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
-                </Field>
-              </div>
-            </>
-          )}
+            </div>
 
-          <Controller
-            name="isDefault"
-            control={form.control}
-            render={({ field }) => (
-              <Field orientation="horizontal">
-                <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
-                <FieldContent>
-                  <FieldLabel>{copy.setAsDefault}</FieldLabel>
-                </FieldContent>
+            {!isDebugClient && (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
+                  <Input
+                    {...form.register("baseUrl")}
+                    id="ai-client-base-url"
+                    placeholder="http://127.0.0.1:8642"
+                  />
+                </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-api-key">API Key</FieldLabel>
+                    <Input
+                      {...form.register("apiKey")}
+                      id="ai-client-api-key"
+                      type="password"
+                      placeholder="optional for localhost"
+                    />
+                  </Field>
+                  <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                    <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                    <Input
+                      {...form.register("timeoutSeconds", {
+                        required: copy.timeoutSeconds,
+                        validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                      })}
+                      aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                      id="ai-client-timeout"
+                      type="number"
+                    />
+                    {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                  </Field>
+                </div>
+              </>
+            )}
+
+            {isDebugClient && (
+              <Field>
+                <FieldLabel>{copy.debugProfileLabel}</FieldLabel>
+                <Controller
+                  name="debugProfile"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label={copy.debugProfileLabel}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="deterministic">{copy.debugProfileDeterministic}</SelectItem>
+                          <SelectItem value="tool-submit">{copy.debugProfileToolSubmit}</SelectItem>
+                          <SelectItem value="hermes-like">{copy.debugProfileHermesLike}</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </Field>
             )}
-          />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-          onClick={async () => {
-            setTestStatus("testing");
-            setTestReason(null);
-            try {
-              const result = await testClientAvailability(payload);
-              setTestStatus(result.status);
-              setTestReason(result.reason);
-            } catch (error) {
-              setTestStatus("unavailable");
-              setTestReason(error instanceof Error ? error.message : copy.reasonUnknown);
-            }
-          }}
-        >
-          {copy.testAvailability}
-            </Button>
-            <Badge variant={getStatusVariant(testStatus)}>{getStatusLabel(copy, testStatus)}</Badge>
-            <span className="text-xs text-muted-foreground">{testReason ?? copy.reasonUnknown}</span>
-          </div>
+            <Controller
+              name="isDefault"
+              control={form.control}
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                  <FieldContent>
+                    <FieldLabel>{copy.setAsDefault}</FieldLabel>
+                  </FieldContent>
+                </Field>
+              )}
+            />
 
-          <div className="flex gap-2">
-            <Button type="submit">
-              {copy.save}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              {copy.cancel}
-            </Button>
-          </div>
-        </FieldGroup>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  setTestStatus("testing");
+                  setTestReason(null);
+                  try {
+                    const result = await testClientAvailability(payload);
+                    setTestStatus(result.status);
+                    setTestReason(result.reason);
+                  } catch (error) {
+                    setTestStatus("unavailable");
+                    setTestReason(error instanceof Error ? error.message : copy.reasonUnknown);
+                  }
+                }}
+              >
+                {copy.testAvailability}
+              </Button>
+              <Badge variant={getStatusVariant(testStatus)}>{getStatusLabel(copy, testStatus)}</Badge>
+              <span className="text-xs text-muted-foreground">{testReason ?? copy.reasonUnknown}</span>
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="submit">
+                {copy.save}
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancel}>
+                {copy.cancel}
+              </Button>
+            </div>
+          </FieldGroup>
         </form>
       </CardContent>
     </Card>
@@ -493,7 +538,7 @@ export function AiClientsManager() {
                   </div>
                   <CardDescription>
                     {client.type === "debug" ? (
-                      <span>Local deterministic debug provider</span>
+                      <span>Local debug provider: {normalizeDebugProfile((client.config as { profile?: unknown }).profile)}</span>
                     ) : client.type === "hermes" ? (
                       <span>Hermes: {(client.config as { baseUrl?: string }).baseUrl ?? "http://127.0.0.1:8642"}</span>
                     ) : (

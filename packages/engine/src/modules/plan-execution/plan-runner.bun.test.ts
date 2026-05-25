@@ -9,7 +9,7 @@ import type { CheckpointConfig, CompiledPlan, ConditionConfig } from "@chrona/co
 async function resetDb() {
   await db.taskAssistantMessage.deleteMany();
   await db.scheduleProposal.deleteMany();
-  await db.toolCallDetail.deleteMany();
+  await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();
   await db.event.deleteMany();
