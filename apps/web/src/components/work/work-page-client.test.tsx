@@ -234,7 +234,7 @@ describe("WorkPageClient", () => {
     expect(screen.getByText("Execution Record")).toBeInTheDocument();
   });
 
-  it("renames the plan rail around current and upcoming task steps", () => {
+  it("renames the plan rail around current and upcoming task steps", async () => {
     vi.mocked(useWorkPageController).mockReturnValue({
       data: baseData,
       isPending: false,
@@ -259,9 +259,13 @@ describe("WorkPageClient", () => {
     render(<WorkPageClient initialData={baseData} />);
 
     expect(screen.getAllByText("Task Plan").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("tab", { name: "Task Plan" })[0]!);
+    expect(screen.getByText("Current Plan - 1/3 completed")).toBeInTheDocument();
+    expect(screen.getAllByText("整理页面骨架").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("确认下一步").length).toBeGreaterThan(0);
   });
 
-  it("keeps the collaboration tab focused on conversation messages while the composer stays docked at the bottom", () => {
+  it("keeps the collaboration tab focused on conversation messages while the composer stays docked at the bottom", async () => {
     const waitingInputData: WorkPageData = {
       ...baseData,
       currentRun: {
@@ -333,10 +337,16 @@ describe("WorkPageClient", () => {
 
     expect(screen.getAllByText("起草任务驱动 Agent 面板").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Add Input").length).toBeGreaterThan(0);
+    expect(screen.getByText("请确认不可变约束和输出格式")).toBeInTheDocument();
+    expect(screen.getAllByText("补充缺失信息").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("button", { name: /Add Input.*Expand/i }).at(-1)!);
+    expect(screen.getAllByText("Add Input").length).toBeGreaterThan(0);
+    expect(screen.getByText("先补齐 Agent 缺失的信息，再继续当前步骤。")).toBeInTheDocument();
+    expect(screen.getByText("输出格式与不可改动范围")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("这些是不可变约束：...")).toBeInTheDocument();
   });
 
   it("keeps the execution record view scrollable inside the work page", async () => {
-    const _user = userEvent.setup();
     const originalInnerWidth = window.innerWidth;
     const originalInnerHeight = window.innerHeight;
     const rectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
@@ -494,6 +504,13 @@ describe("WorkPageClient", () => {
 
     expect(screen.getAllByText("起草任务驱动 Agent 面板").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Add Input").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("tab", { name: "Execution Record" })[0]!);
+    expect(screen.getByText("Current Run")).toBeInTheDocument();
+    expect(screen.getByText("Previous Run 1")).toBeInTheDocument();
+    expect(screen.getByText("Task Context")).toBeInTheDocument();
+    expect(screen.getByText("等待补充约束")).toBeInTheDocument();
+    expect(screen.getByText("上一轮输出首稿")).toBeInTheDocument();
+    expect(screen.getByText("Expand 1 more background records")).toBeInTheDocument();
 
     rectSpy.mockRestore();
     Object.defineProperty(window, "innerWidth", {
@@ -506,7 +523,7 @@ describe("WorkPageClient", () => {
     });
   });
 
-  it("renders approval-specific action workspace guidance when the current step is waiting for approval", () => {
+  it("renders approval-specific action workspace guidance when the current step is waiting for approval", async () => {
     const approvalData: WorkPageData = {
       ...baseData,
       currentRun: {
@@ -562,5 +579,11 @@ describe("WorkPageClient", () => {
 
     expect(screen.getAllByText("起草任务驱动 Agent 面板").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Add Input").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("处理当前审批").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("button", { name: /Add Input.*Expand/i }).at(-1)!);
+    expect(screen.getAllByText("Add Input").length).toBeGreaterThan(0);
+    expect(screen.getByText("Agent 需要你确认这轮变更是否可以执行。")).toBeInTheDocument();
+    expect(screen.getByText("允许替换当前协作主区结构")).toBeInTheDocument();
+    expect(screen.getByText("只改 work 页，不扩散到 schedule。")).toBeInTheDocument();
   });
 });

@@ -35,8 +35,20 @@ vi.mock("@/lib/task-actions-client", () => ({
 }));
 
 vi.mock("@/components/schedule/panels/planning-header", () => ({
-  PlanningHeader: ({ actions }: { actions?: Array<{ label: string; onClick?: () => void }> }) => (
+  PlanningHeader: ({
+    actions,
+    metrics,
+  }: {
+    actions?: Array<{ label: string; onClick?: () => void }>;
+    metrics?: Array<{ label: string; value: string }>;
+  }) => (
     <div data-testid="planning-header">
+      {metrics?.map((metric) => (
+        <div key={metric.label} data-testid={`metric-${metric.label}`}>
+          <span>{metric.label}</span>
+          <span>{metric.value}</span>
+        </div>
+      ))}
       {actions?.map((action) => (
         <button key={action.label} type="button" onClick={action.onClick}>
           {action.label}
@@ -48,9 +60,19 @@ vi.mock("@/components/schedule/panels/planning-header", () => ({
 
 vi.mock("@/components/schedule/panels/schedule-page-panels", () => ({
   EmptyState: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  ProposalCard: () => <div data-testid="proposal-card" />,
+  ProposalCard: ({ proposal }: { proposal: { title: string; summary?: string | null } }) => (
+    <div data-testid="proposal-card">
+      <span>{proposal.title}</span>
+      {proposal.summary ? <span>{proposal.summary}</span> : null}
+    </div>
+  ),
   QueueCard: () => <div data-testid="queue-card" />,
-  RiskCard: () => <div data-testid="risk-card" />,
+  RiskCard: ({ item }: { item: { title: string; runnabilitySummary?: string | null } }) => (
+    <div data-testid="risk-card">
+      <span>{item.title}</span>
+      {item.runnabilitySummary ? <span>{item.runnabilitySummary}</span> : null}
+    </div>
+  ),
   SelectedBlockSheet: () => <div data-testid="selected-block-sheet" />,
   TodayFocusCard: () => <div data-testid="today-focus-card" />,
   AutomationCandidateCard: ({
@@ -86,7 +108,16 @@ vi.mock("@/components/schedule/schedule-action-rail", () => ({
   }: {
     activeTab: string;
     sections: Array<{ value: string; body: React.ReactNode }>;
-  }) => <div data-testid="schedule-action-rail">{sections.find((section) => section.value === activeTab)?.body}</div>,
+  }) => (
+    <div data-testid="schedule-action-rail">
+      <span data-testid="active-rail-tab">{activeTab}</span>
+      {sections.map((section) => (
+        <section key={section.value} data-testid={`rail-section-${section.value}`}>
+          {section.body}
+        </section>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock("@/components/schedule/schedule-task-list", () => ({
@@ -374,7 +405,7 @@ describe("SchedulePage view modes", () => {
 });
 
 describe("SchedulePage data display", () => {
-  it("renders normally when automation candidates exist", () => {
+  it("renders automation candidates in the suggestions metric", () => {
     const data = createData();
     data.automationCandidates = [
       {
@@ -396,11 +427,11 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("planning-header")).toBeInTheDocument();
-    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
+    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("AI suggestions");
+    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("1");
   });
 
-  it("renders normally when proposals exist", () => {
+  it("renders proposals in the suggestions metric", () => {
     const data = createData();
     data.proposals = [
       {
@@ -429,11 +460,11 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("planning-header")).toBeInTheDocument();
-    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
+    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("AI suggestions");
+    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("2");
   });
 
-  it("renders normally when risks exist", () => {
+  it("renders risks in the risk metric", () => {
     const data = createData();
     data.risks = [
       {
@@ -474,8 +505,8 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("planning-header")).toBeInTheDocument();
-    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
+    expect(screen.getByTestId("metric-Risks")).toHaveTextContent("Risks");
+    expect(screen.getByTestId("metric-Risks")).toHaveTextContent("1");
   });
 
   it("renders queue cards in action rail for unscheduled items", () => {

@@ -40,6 +40,24 @@ vi.mock("@/lib/utils", () => ({
   cn: (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(" "),
 }));
 
+vi.mock("@/components/tasks/plan/task-plan-graph", () => ({
+  TaskPlanGraph: ({ mode, plan }: { mode?: string; plan: TaskPlanGraphPlan }) => (
+    <div aria-label="Task plan graph" data-graph-mode={mode === "auto" ? "compact" : mode}>
+      {plan.nodes.map((node) => (
+        <div
+          data-node-tone={node.linkedTaskId ? "child-task" : undefined}
+          data-testid={`task-plan-outline-node-${node.id}`}
+          key={node.id}
+        >
+          {node.title}
+        </div>
+      ))}
+      {plan.analytics.attentionNodeIds.length ? <span>Needs action</span> : null}
+      {plan.analytics.activeNodeIds.length ? <span>Current progress</span> : null}
+    </div>
+  ),
+}));
+
 import { TaskPlanSidePanel } from "@/components/work/task-plan-side-panel";
 import { DEFAULT_WORK_PAGE_COPY } from "@/components/work/work-page/work-page-copy";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";

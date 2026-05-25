@@ -11,6 +11,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { db } from "@chrona/db";
 import { ScheduleSource } from "@chrona/db/generated/prisma/client";
+import { scheduleProposalBodySchema } from "@chrona/contracts/api";
 import { decideScheduleProposal } from "@chrona/engine/modules/scheduling/decide-schedule-proposal";
 import { proposeSchedule } from "@chrona/engine/modules/scheduling/propose-schedule";
 import { resetTestDb, seedScheduleProposal, seedWorkspace, seedTask } from "../bun-test-helpers";
@@ -42,16 +43,32 @@ function createScheduleProposalRouter() {
     try {
       const taskId = c.req.param("taskId");
       const body = await c.req.json();
+      const parsed = scheduleProposalBodySchema.safeParse(body);
+
+      if (!parsed.success) {
+        return err(c, parsed.error.issues.map((issue) => issue.message).join("; "), 400);
+      }
+
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        select: { workspaceId: true },
+      });
+
+      if (!task) return err(c, "Task not found", 404);
+      if (parsed.data.workspaceId && parsed.data.workspaceId !== task.workspaceId) {
+        return err(c, "Task not found", 404);
+      }
+
       return json(
         c,
         await proposeSchedule({
           taskId,
-          source: body.source as ScheduleSource,
-          proposedBy: body.proposedBy ?? "test",
-          summary: body.summary ?? "",
-          dueAt: toDateOrNull(body.dueAt),
-          scheduledStartAt: toDateOrNull(body.scheduledStartAt),
-          scheduledEndAt: toDateOrNull(body.scheduledEndAt),
+          source: (parsed.data.source ?? "system") as ScheduleSource,
+          proposedBy: parsed.data.proposedBy ?? "test",
+          summary: parsed.data.summary ?? "",
+          dueAt: toDateOrNull(parsed.data.dueAt),
+          scheduledStartAt: toDateOrNull(parsed.data.scheduledStartAt),
+          scheduledEndAt: toDateOrNull(parsed.data.scheduledEndAt),
         }),
         201,
       );
@@ -370,7 +387,7 @@ describe("Schedule proposal workflow", () => {
     expect(body.error).toContain("pending");
   });
 
-  it("creates a proposal even when workspace isolation does not match in the inline router", async () => {
+  it("returns 404 when proposal workspace isolation does not match", async () => {
     const ws = await seedWorkspace();
     const other = await seedWorkspace("Other schedule workspace");
     const { taskId } = await seedTask(ws.workspaceId);
@@ -381,7 +398,9 @@ describe("Schedule proposal workflow", () => {
       body: JSON.stringify({ workspaceId: other.workspaceId, source: "ai", proposedBy: "planner", summary: "Nope" }),
     });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(404);
+    const proposals = await db.scheduleProposal.findMany({ where: { taskId } });
+    expect(proposals).toHaveLength(0);
   });
 
   it("returns 400 when deciding an already-resolved proposal", async () => {
@@ -398,7 +417,7 @@ describe("Schedule proposal workflow", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 500 for invalid proposal date strings in the inline router", async () => {
+  it("returns 400 for invalid proposal date strings", async () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
@@ -413,7 +432,9 @@ describe("Schedule proposal workflow", () => {
       }),
     });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+    const body = await res.json() as any;
+    expect(body.error).toContain("valid ISO-8601 date string");
   });
 
   // -----------------------------------------------------------------------

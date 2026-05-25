@@ -27,9 +27,26 @@ describe("AI provider availability", () => {
   });
 
   it("uses legacy Hermes baseUrl as gateway URL", async () => {
-    const fetchMock = mock((..._args: Parameters<typeof fetch>) =>
-      Promise.resolve(new Response(null, { status: 200 })),
-    );
+    const fetchMock = mock((url: Parameters<typeof fetch>[0]) => {
+      if (String(url).endsWith("/v1/capabilities")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          features: {
+            run_submission: true,
+            run_status: true,
+            run_events_sse: true,
+            run_stop: true,
+          },
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }));
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const result = await testAiClientAvailability({
@@ -37,8 +54,11 @@ describe("AI provider availability", () => {
       config: { baseUrl: "127.0.0.1:8642", bridgeToken: "" },
     });
 
-    expect(result).toEqual({ available: true, reason: "Gateway is reachable" });
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("http://127.0.0.1:8642/v1/health");
+    expect(result).toEqual({ available: true, reason: "Hermes API is reachable" });
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "http://127.0.0.1:8642/health/detailed",
+      "http://127.0.0.1:8642/v1/capabilities",
+    ]);
   });
 
   it("tests Hermes token against an authenticated endpoint", async () => {

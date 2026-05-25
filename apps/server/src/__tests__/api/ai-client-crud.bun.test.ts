@@ -375,7 +375,7 @@ describe("AI Client CRUD", () => {
   });
 
   it("POST /ai/clients invalid type returns 400", async () => {
-    const res = await createClient({ name: "Bad Type", type: "gpt" });
+    const res = await createClient({ name: "Bad Type", type: "   " });
     await expectApiError(res, 400);
   });
 

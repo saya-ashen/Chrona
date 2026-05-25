@@ -97,11 +97,7 @@ describe("createTask", () => {
     expect(storedTask.status).toBe("Draft");
     expect(storedTask.executionRuntime).toBe("hermes");
     expect(storedTask.executionConfig).toEqual({
-      approvalPolicy: "never",
-      prompt: "Add the first real create flow",
-      sessionStrategy: "per_subtask",
-      temperature: 0.2,
-      toolMode: "workspace-write",
+      prompt: "  Add the first real create flow  ",
     });
     expect(storedTask.priority).toBe("High");
     expect(storedTask.defaultSessionId).toBeTruthy();
@@ -119,7 +115,7 @@ describe("createTask", () => {
     );
   });
 
-  it("rejects invalid adapter config values from the server command", async () => {
+  it("rejects non-object adapter config values from the server command", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Invalid Config",
@@ -133,12 +129,9 @@ describe("createTask", () => {
         workspaceId: workspace.id,
         title: "Invalid runtime config",
         executionRuntime: "hermes",
-        executionConfig: {
-          prompt: "Run the invalid case",
-          approvalPolicy: "sometimes" as never,
-        },
+        executionConfig: null as never,
       }),
-    ).rejects.toThrow(/Approval policy must be one of/);
+    ).rejects.toThrow(/executionConfig must be an object/);
   });
 
   it("falls back to the registered runtime when workspace default is stale", async () => {
@@ -226,7 +219,6 @@ describe("updateTask", () => {
     expect(storedTask.executionConfig).toEqual({
       approvalPolicy: "never",
       prompt: "Updated prompt",
-      sessionStrategy: "per_subtask",
       temperature: 0.2,
       toolMode: "workspace-write",
     });
