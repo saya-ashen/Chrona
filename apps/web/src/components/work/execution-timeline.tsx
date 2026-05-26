@@ -337,30 +337,8 @@ export function ExecutionTimeline({
   const latestTimestamp = sortedEvents[0]?.runtimeTs;
 
   return (
-    <div className="space-y-4 text-sm text-muted-foreground">
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">
-          {title === DEFAULT_COPY.title ? copy.title : title}
-        </h3>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <div className="rounded-2xl border border-border/70 bg-card/60 px-3 py-3">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">{copy.latestActivity}</p>
-            <p className="mt-1 text-sm font-medium text-foreground">{formatDate(latestTimestamp)}</p>
-          </div>
-          <div className="rounded-2xl border border-border/70 bg-card/60 px-3 py-3">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">{copy.keyMilestones}</p>
-            <p className="mt-1 text-sm font-medium text-foreground">
-              {sortedEvents.filter((event) => isKeyMilestone(event)).length}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-border/70 bg-card/60 px-3 py-3">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">{copy.attentionNeeded}</p>
-            <p className="mt-1 text-sm font-medium text-foreground">{attentionCount}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-5">
+    <div className="grid min-h-0 gap-4 text-sm text-muted-foreground xl:grid-cols-[minmax(0,1fr)_280px]">
+      <section aria-label="Execution Stream" className="min-h-0 space-y-5 overflow-auto">
         {groupedEvents.map((group) => {
           const expanded = expandedGroups[group.key] ?? false;
           const latestGroupTimestamp = group.events[0]?.runtimeTs ?? null;
@@ -405,7 +383,31 @@ export function ExecutionTimeline({
             </section>
           );
         })}
-      </div>
+      </section>
+      <aside
+        aria-label="Task Cockpit"
+        className="h-fit space-y-3 rounded-[24px] border border-border/70 bg-card/60 p-4 xl:sticky xl:top-0"
+      >
+        <h3 className="text-sm font-semibold text-foreground">
+          {title === DEFAULT_COPY.title ? copy.title : title}
+        </h3>
+        <div className="grid gap-2">
+          <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">{copy.latestActivity}</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{formatDate(latestTimestamp)}</p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">{copy.keyMilestones}</p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {sortedEvents.filter((event) => isKeyMilestone(event)).length}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-background/70 px-3 py-3">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">{copy.attentionNeeded}</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{attentionCount}</p>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }

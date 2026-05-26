@@ -13,6 +13,50 @@ afterEach(() => {
 });
 
 describe("ExecutionTimeline", () => {
+  it("keeps the task cockpit separate from the run-grouped execution stream", () => {
+    render(
+      <ExecutionTimeline
+        currentRunId="run_current"
+        events={[
+          {
+            id: "current_run_input",
+            runId: "run_current",
+            eventType: "run.input_requested",
+            title: "等待补充约束",
+            summary: "需要你确认不可变范围。",
+            kind: "input",
+            badge: "待补充",
+            whyItMatters: "不补充无法继续。",
+            linkedEvidenceLabel: null,
+            payload: {},
+            runtimeTs: "2026-04-20T09:21:00.000Z",
+          },
+          {
+            id: "previous_output",
+            runId: "run_previous",
+            eventType: "run.output_generated",
+            title: "上一轮首稿",
+            summary: "生成了首轮草稿。",
+            kind: "output",
+            badge: "新产出",
+            whyItMatters: "可作为后续参考。",
+            linkedEvidenceLabel: null,
+            payload: {},
+            runtimeTs: "2026-04-20T09:15:00.000Z",
+          },
+        ]}
+      />,
+    );
+
+    const cockpit = screen.getByRole("complementary", { name: "Task Cockpit" });
+    expect(within(cockpit).getByText("Latest Activity")).toBeInTheDocument();
+    expect(within(cockpit).getByText("Needs Attention")).toBeInTheDocument();
+
+    const stream = screen.getByRole("region", { name: "Execution Stream" });
+    expect(within(stream).getByRole("region", { name: "Current Run" })).toBeInTheDocument();
+    expect(within(stream).getByRole("region", { name: "Previous Run 1" })).toBeInTheDocument();
+  });
+
   it("prioritizes key milestones and collapses background progress records by default", () => {
     render(
       <ExecutionTimeline
