@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { executionActionBodySchema } from "./execution.schema";
 import { workspaceId } from "./common";
 
 // ── GET /schedule ──
@@ -25,7 +26,7 @@ const workspaceCommandBaseSchema = z.object({
   idempotencyKey: z.string().min(1).optional(),
 });
 
-export const workCommandBodySchema = z.discriminatedUnion("type", [
+export const workCommandBodySchema = z.union([
   workspaceCommandBaseSchema.extend({
     type: z.literal("plan.generate"),
     forceRefresh: z.boolean().optional(),
@@ -35,11 +36,9 @@ export const workCommandBodySchema = z.discriminatedUnion("type", [
     type: z.literal("plan.accept"),
     planId: z.string().min(1),
   }),
-  workspaceCommandBaseSchema.extend({
+  executionActionBodySchema.and(workspaceCommandBaseSchema.extend({
     type: z.literal("execution.action"),
-    action: z.string().min(1),
-    reason: z.string().optional(),
-  }),
+  })),
   workspaceCommandBaseSchema.extend({
     type: z.literal("checkpoint.action"),
     checkpointId: z.string().min(1),

@@ -180,6 +180,34 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Input sent");
   });
 
+  it("dispatches node recovery execution actions from the action tab", async () => {
+    const dispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Retry queued" });
+    const node = createTaskWorkspaceFixtureNode({
+      id: "failed-node",
+      title: "Retry failed run",
+      status: "pending",
+      nextAction: "Retry Run",
+      availableActions: [{
+        id: "task-primary:retry_sync:failed-node",
+        label: "Retry Run",
+        kind: "retry",
+        emphasis: "danger",
+        executionAction: { action: "retry_node", nodeId: "failed-node" },
+      }],
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "blocked" })} activity={[]} selectedNodes={[node]} onDispatchExecutionAction={dispatchExecutionAction} onSubmitCheckpointAction={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send Retry Run" }));
+
+    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
+      action: "retry_node",
+      nodeId: "failed-node",
+    }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Retry queued");
+  });
+
   it("shows submitted input in a read-only form for completed input nodes", () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "input-node",
@@ -275,6 +303,44 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
 
     await screen.findByText("Copied result.");
     expect(writeText).toHaveBeenCalledWith("Finished research\n\nPatch summary");
+  });
+
+  it("does not duplicate the completion summary when JSON output already contains it", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "done-json",
+      title: "Completed JSON step",
+      objective: "Finish structured work",
+      phase: "Done",
+      status: "done",
+      completionSummary: "Structured result is ready",
+      resultOutputs: [{
+        kind: "json",
+        value: {
+          summary: "Structured result is ready",
+          count: 2,
+        },
+      }],
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
+
+    expect(screen.getAllByText(/Structured result is ready/)).toHaveLength(1);
+  });
+
+  it("renders expanded drawer content as a selectable fixed panel", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "drawer-node",
+      title: "Drawer node",
+      status: "done",
+      completionSummary: "Selectable result text",
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} variant="drawer" drawerSize="expanded" onSubmitCheckpointAction={vi.fn()} />);
+
+    const drawer = screen.getByLabelText("Current node details");
+    expect(drawer).toHaveAttribute("data-node-detail-drawer", "true");
+    expect(drawer).not.toHaveAttribute("data-vaul-drawer");
+    expect(drawer).toHaveClass("select-text");
   });
 
   it("renders no-result and no-action states when selected node has no outputs or actions", () => {

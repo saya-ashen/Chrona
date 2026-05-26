@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspector } from "@/components/tasks/plan/task-plan-graph/inspector";
@@ -295,6 +295,44 @@ describe("TaskPlanGraph", () => {
 
     expect(screen.getByText("No node selected")).toBeInTheDocument();
     expect(screen.getByText(/Select a plan node to inspect its goal/)).toBeInTheDocument();
+  });
+
+  it("dispatches execution actions from the node inspector", async () => {
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Retry queued" });
+
+    render(
+      <TaskPlanGraphInspector
+        graphCopy={DEFAULT_GRAPH_COPY}
+        node={{
+          id: "node-failed",
+          title: "Recover failed node",
+          objective: "Retry the stale failed run.",
+          phase: "execution",
+          status: "pending",
+          type: "task",
+          interactionType: "retry",
+          availableActions: [
+            {
+              id: "task-primary:retry_sync:node-failed",
+              label: "Retry Run",
+              kind: "retry",
+              emphasis: "danger",
+              executionAction: { action: "retry_node", nodeId: "node-failed" },
+            },
+          ],
+        }}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Retry Run" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({
+      action: "retry_node",
+      nodeId: "node-failed",
+    }));
+    expect(await screen.findByText("Retry queued")).toBeInTheDocument();
   });
 
   it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", async () => {

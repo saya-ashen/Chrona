@@ -34,26 +34,34 @@ export function readBlockReason(
           blockType: string | null;
           blockScope: string | null;
           blockSince: Date | null;
+          currentNodeId?: string | null;
         }
       | null;
   },
 ) {
-  return (
-    (task.blockReason as {
-      actionRequired?: string;
-      blockType?: string;
-      scope?: string;
-      since?: string;
-    } | null) ??
-    (task.projection
-      ? {
-          actionRequired: task.projection.actionRequired ?? undefined,
-          blockType: task.projection.blockType ?? undefined,
-          scope: task.projection.blockScope ?? undefined,
-          since: task.projection.blockSince?.toISOString(),
-        }
-      : null)
-  );
+  const storedBlockReason = task.blockReason as {
+    actionRequired?: string;
+    blockType?: string;
+    scope?: string;
+    since?: string;
+    nodeId?: string | null;
+  } | null;
+  const projectedBlockReason = task.projection
+    ? {
+        actionRequired: task.projection.actionRequired ?? undefined,
+        blockType: task.projection.blockType ?? undefined,
+        scope: task.projection.blockScope ?? undefined,
+        since: task.projection.blockSince?.toISOString(),
+        nodeId: task.projection.currentNodeId ?? undefined,
+      }
+    : null;
+
+  if (!storedBlockReason) return projectedBlockReason;
+  return {
+    ...storedBlockReason,
+    nodeId: storedBlockReason.nodeId ?? projectedBlockReason?.nodeId,
+    since: storedBlockReason.since ?? projectedBlockReason?.since,
+  };
 }
 
 function _deriveTaskPlanStepStatus(

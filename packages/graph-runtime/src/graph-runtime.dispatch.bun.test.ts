@@ -157,6 +157,50 @@ describe("graph-runtime dispatch", () => {
     ]);
   });
 
+  it("retries a failed node by obsoleting rejected results before re-execution", async () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeBranchingPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    let calls = 0;
+    const runtime = createGraphRuntime({
+      taskId: "task_1",
+      runtimeName: "test",
+      now: () => 300 + calls,
+      callbacks: {
+        executeNode: async ({ node, plan, userInput }) => {
+          calls += 1;
+          if (calls === 1) {
+            return { status: "failed", error: "Provider unavailable" };
+          }
+          return executeBuiltinGraphNode({ node, plan, userInput });
+        },
+      },
+    });
+
+    const first = await runtime.dispatch({
+      type: "start",
+      state: { graph, attempts: [], results: [], executionContextSnapshots: [] },
+      trigger: "manual",
+      context: null,
+    });
+    const second = await runtime.dispatch({
+      type: "retry_node",
+      state: first.state,
+      context: null,
+      nodeId: "choose",
+    });
+
+    expect(first.status).toBe("failed");
+    expect(second.status).toBe("waiting_for_user");
+    expect(second.currentNodeId).toBe("choose");
+    expect(second.state.results.map((result) => [result.nodeId, result.status])).toEqual([
+      ["choose", "obsolete"],
+      ["choose", "current"],
+    ]);
+  });
+
   it("blocks retry when maxAttempts policy is reached", async () => {
     const graph = createPlanGraphFromCompiledPlan({
       taskId: "task_1",

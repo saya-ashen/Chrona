@@ -327,6 +327,100 @@ describe("runTaskNodeFeature", () => {
     expect(result.status === "done" ? result.selectedBranch : undefined).toBeUndefined();
   });
 
+  it("uses chrona_condition_select terminal tool evidence as condition routing authority", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Node AI condition terminal tool workspace",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-condition-terminal-tool",
+        workspaceId: workspace.id,
+        title: "Node AI condition terminal tool task",
+        status: TaskStatus.Running,
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "local-run-condition-terminal-tool",
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date(),
+        syncStatus: "healthy",
+      },
+    });
+
+    const condition = makeConditionNode();
+    const passed = makeDownstreamNode({ id: "passed_node", localId: "passed_node", title: "Passed" });
+    const fixes = makeDownstreamNode({ id: "fix_node", localId: "fix_node", title: "Needs fixes" });
+    const plan = makeConditionPlan({ condition, passed, fixes });
+    const branchRef = "B20260522-01-B";
+    const aiRuntimeInvoker = {
+      invoke: async () => ({
+        runId: "local-run-condition-terminal-tool",
+        runtimeRunRef: "runtime-condition-terminal-tool",
+        runtimeSessionKey: "main-session",
+        conversationEntryIds: ["conversation-entry-condition-terminal-tool"],
+        response: {
+          provider: "hermes",
+          runId: "runtime-condition-terminal-tool",
+          nativeRunId: "runtime-condition-terminal-tool",
+          sessionId: "main-session",
+          status: "completed" as const,
+          outputText: "Needs fixes selected",
+          structuredPayload: {
+            branchRef,
+            summary: "Needs fixes selected",
+            outputs: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+          },
+          raw: { terminalToolName: "chrona_condition_select" },
+          error: null,
+        },
+      }),
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+
+    const result = await runTaskNodeFeature({
+      taskId: task.id,
+      mainSession: {
+        id: "main-session",
+        taskId: task.id,
+        sessionKey: "chrona:task:task-condition-terminal-tool:plan-1",
+      },
+      node: condition,
+      plan,
+      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+      featureSpec: {
+        feature: "evaluate_condition_node",
+        instructions: "Evaluate the current condition node.",
+        inputText: "{}",
+        terminalToolName: "chrona_condition_select",
+        structuredOutputSchema: undefined,
+      },
+      providerInput: {},
+    });
+
+    expect(result).toMatchObject({
+      status: "done",
+      summary: "Needs fixes selected",
+      output: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+      selectedBranch: {
+        label: "Needs fixes",
+        nextNodeId: "fix_node",
+        source: "ai",
+      },
+    });
+  });
+
   it("keeps a completed provider run with chrona_node_block as blocked", async () => {
     const workspace = await db.workspace.create({
       data: {

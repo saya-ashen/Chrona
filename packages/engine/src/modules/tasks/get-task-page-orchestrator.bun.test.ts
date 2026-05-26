@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getTaskActivityPage, getTaskPage } from "@/modules/tasks/get-task-page";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/plan-run-store";
+import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 
 async function resetDb() {
@@ -159,6 +160,73 @@ describe("getTaskPage orchestrator read model", () => {
       currentNodeId: "answer",
       issues: [],
     });
+  });
+
+  it("returns a target node action from paused task state when graph node state is stale", async () => {
+    const { workspace, task } = await seedTask("Paused action task");
+    const compiledPlan = makeCompiledPlan();
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      compiledPlan,
+      status: "accepted",
+      prompt: compiledPlan.title,
+      summary: compiledPlan.goal,
+      generatedBy: "orchestrator-test",
+    });
+    const graph = createPlanGraphFromCompiledPlan({ taskId: task.id, compiledPlan });
+    await savePlanRun({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: compiledPlan.editablePlanId,
+      compiledPlan,
+      graph,
+      results: [],
+    });
+    await db.executionSession.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: compiledPlan.editablePlanId,
+        status: "Paused",
+        currentNodeId: "answer",
+        pauseReason: "external_dependency",
+        completedNodeIds: JSON.stringify(["prepare"]),
+        pausedAt: new Date("2026-05-21T00:00:00.000Z"),
+      },
+    });
+    await rebuildTaskProjection(task.id);
+
+    const page = await getTaskPage(task.id);
+
+    expect(page.task.blockReason).toMatchObject({
+      blockType: "external_dependency",
+      scope: "plan_node",
+      actionRequired: "Resume after external dependency is resolved",
+      nodeId: "answer",
+    });
+    expect(page.task.executionSummary).toMatchObject({
+      taskId: task.id,
+      executionState: "blocked",
+      currentNodeId: "answer",
+      primaryAction: {
+        type: "resume",
+        enabled: true,
+        label: "Resume after external dependency is resolved",
+        targetNodeId: "answer",
+      },
+    });
+    expect(page.reconciliation).toMatchObject({
+      taskId: task.id,
+      executionState: "blocked",
+      currentNodeId: "answer",
+      primaryAction: { type: "resume", targetNodeId: "answer" },
+    });
+    expect(page.task.graphNodeStates).toContainEqual(expect.objectContaining({
+      id: "answer",
+      status: "pending",
+      current: true,
+    }));
   });
 
   it("maps persisted provider events into structured activity items", async () => {

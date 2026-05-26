@@ -325,6 +325,76 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a retry action when the task is blocked by a failed run even if graph nodes are stale", () => {
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Retry queued" });
+    const acceptedPlan = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 1,
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const staleCurrentNode = createTaskWorkspaceFixtureNode({
+      id: "node-failed",
+      title: "Inspect UX readiness",
+      status: "pending",
+    });
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([staleCurrentNode], "node-failed")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({
+          task: {
+            savedPlan: acceptedPlan,
+            status: "Blocked",
+            runnabilitySummary: "Runtime provider failed while executing the current node.",
+            blockReason: { blockType: "run_failed", scope: "run", actionRequired: "Retry Run" },
+            executionSummary: {
+              taskId: "task-1",
+              executionState: "failed",
+              stateLabel: "Failed",
+              stateReason: "Runtime provider failed while executing the current node.",
+              graphVersion: 1,
+              currentNodeId: "node-failed",
+              primaryAction: { type: "retry_sync", enabled: true, label: "Retry Run" },
+              progress: { completed: 3, total: 4, percent: 75 },
+              readiness: { runnable: true, reason: null },
+              degraded: null,
+              blocking: { reason: "Runtime provider failed while executing the current node.", nodeId: "node-failed" },
+              waiting: null,
+              recoveryActions: [],
+            },
+          },
+        })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        planningTaskDraft={{
+          title: "Review task output",
+          description: "",
+          priority: "Medium",
+          dueAt: null,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Retry Run" }));
+
+    expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "retry_node", nodeId: "node-failed" });
+  });
+
   it("wires selected-node activity into the node drawer", async () => {
     const graphPlan = createTaskWorkspaceFixtureGraph([
       createTaskWorkspaceFixtureNode({ id: "node-a", title: "Node A", status: "active" }),

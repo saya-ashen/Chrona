@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { CheckpointActionKind, ExecutionCheckpoint, NodeResult, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
+import type { CheckpointActionKind, ExecutionActionInput, ExecutionCheckpoint, NodeResult, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
@@ -67,6 +67,7 @@ export type PlanNodeAction = {
   emphasis?: "default" | "primary" | "warning" | "danger";
   checkpointId?: string;
   checkpointAction?: CheckpointActionKind;
+  executionAction?: ExecutionActionInput;
   requiresPayload?: boolean;
 };
 
@@ -165,6 +166,7 @@ export type TaskPlanGraphProps = {
   plan: TaskPlanGraphPlan;
   inspectorPlacement?: "overlay" | "none";
   onSelectedNodeChange?: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
+  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<{ message: string }>;
   dismissSelectionOnOutsideClick?: boolean;
   showOverview?: boolean;
 };

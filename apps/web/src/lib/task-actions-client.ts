@@ -1,4 +1,5 @@
 import { api } from "./rpc-client";
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 
 async function parseActionResponse(response: {
   ok: boolean;
@@ -139,6 +140,18 @@ export function retryExecution(input: {
     .$post({
       param: { taskId: input.taskId },
       json: { action: "start_manual", prompt: input.prompt ?? undefined },
+    })
+    .then(parseActionResponse);
+}
+
+export function dispatchExecutionAction(input: {
+  taskId: string;
+  action: ExecutionActionInput;
+}) {
+  return api.tasks[":taskId"].execution.actions
+    .$post({
+      param: { taskId: input.taskId },
+      json: input.action,
     })
     .then(parseActionResponse);
 }

@@ -77,7 +77,14 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
     data.planExecution,
   );
   const currentPlanAction = getCurrentPlanAction(currentRun, data.taskPlan, copy);
-  const currentPlanStep = data.taskPlan.nodes.find((step) => step.id === data.taskPlan.analytics.activeNodeIds[0]) ?? null;
+  const primaryActionNodeId = data.taskShell.executionSummary?.primaryAction?.targetNodeId
+    ?? data.taskShell.executionSummary?.currentNodeId
+    ?? data.planExecution?.currentNodeId
+    ?? data.taskPlan.analytics.activeNodeIds[0]
+    ?? null;
+  const currentPlanStep = data.taskPlan.nodes.find((step) => step.id === primaryActionNodeId)
+    ?? data.taskPlan.nodes.find((step) => step.id === data.taskPlan.analytics.activeNodeIds[0])
+    ?? null;
   const quickPrompts = workComposer
     ? getQuickPrompts(workComposer, currentRun, data.currentIntervention, copy)
     : [];
@@ -144,6 +151,7 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
           currentRunId={currentRun?.id ?? null}
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          onDispatchExecutionAction={actions.dispatchExecutionAction}
           completedCount={completedCount}
           nodeCount={nodeCount}
           waitingCount={waitingCount}

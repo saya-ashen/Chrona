@@ -92,9 +92,8 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
 
     if (command.type === "execution.action") {
       const action = {
+        ...command,
         action: command.action,
-        reason: command.reason,
-        idempotencyKey: command.idempotencyKey,
       } as ExecutionActionInput;
       const result = await engine.tasks.execution.dispatch({
         taskId,

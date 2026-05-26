@@ -6,6 +6,7 @@ import { ExecutionTimeline } from "@/components/work/execution-timeline";
 import { formatDateTime } from "./work-page-formatters";
 import { WorkPageSectionFrame } from "./work-page-section-frame";
 import type { WorkCopy, WorkPageData } from "./work-page-types";
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 
 type NodeViewStatus = "completed" | "running" | "waiting" | "blocked" | "pending";
 
@@ -63,6 +64,7 @@ type WorkPageMainTabsProps = {
   currentRunId: string | null;
   activeTab: (typeof bottomTabs)[number]["id"];
   onTabChange: (tab: (typeof bottomTabs)[number]["id"]) => void;
+  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<{ message: string }>;
   completedCount: number;
   nodeCount: number;
   waitingCount: number;
@@ -74,6 +76,7 @@ export function WorkPageMainTabs({
   currentRunId,
   activeTab,
   onTabChange,
+  onDispatchExecutionAction,
   completedCount,
   nodeCount,
   waitingCount,
@@ -153,7 +156,12 @@ export function WorkPageMainTabs({
 
             <div className="relative grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="h-[500px] min-h-0 overflow-hidden rounded-[28px] xl:h-[620px]">
-                <TaskPlanGraph mode="full" fillHeight plan={data.taskPlan} />
+                <TaskPlanGraph
+                  mode="full"
+                  fillHeight
+                  plan={data.taskPlan}
+                  onDispatchExecutionAction={onDispatchExecutionAction}
+                />
               </div>
               <aside className="min-h-0 overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.045] shadow-[0_18px_58px_rgba(2,6,23,0.22)]">
                 <div className="border-b border-white/10 px-4 py-3">

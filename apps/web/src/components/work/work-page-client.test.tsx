@@ -220,6 +220,7 @@ describe("WorkPageClient", () => {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
+        dispatchExecutionAction: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
       },
@@ -251,6 +252,7 @@ describe("WorkPageClient", () => {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
+        dispatchExecutionAction: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
       },
@@ -263,6 +265,104 @@ describe("WorkPageClient", () => {
     expect(screen.getByText("Current Plan - 1/3 completed")).toBeInTheDocument();
     expect(screen.getAllByText("整理页面骨架").length).toBeGreaterThan(0);
     expect(screen.getAllByText("确认下一步").length).toBeGreaterThan(0);
+  });
+
+  it("uses the backend primary action target as the current work page plan node", async () => {
+    const dispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Retry queued" });
+    const blockedData: WorkPageData = {
+      ...baseData,
+      taskShell: {
+        ...baseData.taskShell,
+        status: "Attention Needed",
+        blockReason: {
+          blockType: "run_failed",
+          scope: "run",
+          actionRequired: "Retry Run",
+          nodeId: "step_2",
+        },
+        executionSummary: {
+          executionState: "failed",
+          currentNodeId: "step_2",
+          primaryAction: {
+            type: "retry_sync",
+            enabled: true,
+            label: "Retry Run",
+            targetNodeId: "step_2",
+          },
+          taskId: "task_1",
+          stateLabel: "Failed",
+          stateReason: "Retry Run",
+          graphVersion: 0,
+          progress: { total: 3, completed: 1, percent: 33 },
+          recoveryActions: [],
+          blocking: { reason: "Retry Run", nodeId: "step_2" },
+          waiting: null,
+          degraded: null,
+          readiness: { runnable: true, reason: null },
+        },
+      },
+      planExecution: {
+        status: "blocked",
+        currentNodeId: "step_2",
+        executedNodeIds: ["step_1"],
+        waitingNodeIds: [],
+        blockedNodeIds: ["step_2"],
+        message: "Retry Run",
+      },
+      taskPlan: testPlan({
+        ...baseData.taskPlan,
+        currentStepId: "step_2",
+        steps: baseData.taskPlan.steps.map((step) =>
+          step.id === "step_2"
+            ? {
+                ...step,
+                status: "pending",
+                interactionType: "retry",
+                availableActions: [
+                  {
+                    id: "task-primary:retry_sync:step_2",
+                    label: "Retry Run",
+                    kind: "retry",
+                    emphasis: "danger",
+                    executionAction: { action: "retry_node", nodeId: "step_2" },
+                  },
+                ],
+              }
+            : step,
+        ),
+      }),
+    };
+
+    vi.mocked(useWorkPageController).mockReturnValue({
+      data: blockedData,
+      isPending: false,
+      heroErrorMessage: null,
+      resultErrorMessage: null,
+      composerResetKey: 0,
+      setData: vi.fn(),
+      setHeroErrorMessage: vi.fn(),
+      setResultErrorMessage: vi.fn(),
+      refresh: vi.fn(),
+      resetComposer: vi.fn(),
+      submitWorkInput: vi.fn(),
+      actions: {
+        startExecution: vi.fn(),
+        acceptResult: vi.fn(),
+        retryResult: vi.fn(),
+        dispatchExecutionAction,
+        markTaskDone: vi.fn(),
+        reopenTask: vi.fn(),
+      },
+    });
+
+    render(<WorkPageClient initialData={blockedData} />);
+
+    expect(screen.getAllByText("整理页面骨架").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("tab", { name: "Task Plan" })[0]!);
+    expect(screen.getByText("Current Plan - 1/3 completed")).toBeInTheDocument();
+    expect(screen.getAllByText("整理页面骨架").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Blocked").length).toBeGreaterThan(0);
+    expect(dispatchExecutionAction).not.toHaveBeenCalled();
   });
 
   it("keeps the collaboration tab focused on conversation messages while the composer stays docked at the bottom", async () => {
@@ -328,6 +428,7 @@ describe("WorkPageClient", () => {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
+        dispatchExecutionAction: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
       },
@@ -495,6 +596,7 @@ describe("WorkPageClient", () => {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
+        dispatchExecutionAction: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
       },
@@ -570,6 +672,7 @@ describe("WorkPageClient", () => {
         startExecution: vi.fn(),
         acceptResult: vi.fn(),
         retryResult: vi.fn(),
+        dispatchExecutionAction: vi.fn(),
         markTaskDone: vi.fn(),
         reopenTask: vi.fn(),
       },

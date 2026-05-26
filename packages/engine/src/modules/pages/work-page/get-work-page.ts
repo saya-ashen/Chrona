@@ -3,6 +3,7 @@ import { getAcceptedCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-e
 import { resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
 import { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";
 import type { WorkPageCopy } from "./types";
+import { reconcileTaskState } from "@/modules/orchestration/reconcile-task-state";
 import { toIsoString, classifyWorkstreamItem, formatEventTitle, summarizePayload } from "./helpers";
 import {
   buildScheduleImpact,
@@ -182,6 +183,15 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       }
     : null;
 
+  const orchestratorState = effectivePlanGraph
+    ? reconcileTaskState({
+        taskId: task.id,
+        graph: effectivePlanGraph,
+        runnable: true,
+        taskStatus: task.status,
+        blockReason,
+      })
+    : null;
   const planExecution = (() => {
     if (!effectivePlanGraph) {
       return {
@@ -200,7 +210,12 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     const waiting = effective.nodes
       .filter((n) => n.status === "waiting_for_user")
       .map((n) => n.id);
-    const blocked = effective.blockedNodeIds;
+    const blocked = Array.from(new Set([
+      ...effective.blockedNodeIds,
+      ...(orchestratorState?.summary.executionState === "blocked" || orchestratorState?.summary.executionState === "failed"
+        ? [orchestratorState.summary.currentNodeId]
+        : []),
+    ].filter((value): value is string => Boolean(value))));
     const inProgress = effective.nodes.find((n) => n.status === "running");
 
     const allDone = effective.pendingNodeIds.length === 0 && effective.runningNodeIds.length === 0 && effective.blockedNodeIds.length === 0 && effective.failedNodeIds.length === 0;
@@ -244,10 +259,10 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       };
     }
 
-    if (task.status === "Blocked" && blocked.length > 0) {
+    if (task.status === "Blocked" && (blocked.length > 0 || orchestratorState?.summary.currentNodeId)) {
       return {
         status: "blocked" as const,
-        currentNodeId: blocked[0],
+        currentNodeId: orchestratorState?.summary.currentNodeId ?? blocked[0] ?? null,
         executedNodeIds: executed,
         waitingNodeIds: waiting,
         blockedNodeIds: blocked,
@@ -343,6 +358,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       scheduledEndAt: toIsoString(task.projection?.scheduledEndAt ?? null),
       scheduleStatus: task.projection?.scheduleStatus ?? "Unscheduled",
       blockReason,
+      executionSummary: orchestratorState?.summary ?? null,
     },
     currentRun: serializedRun,
     currentIntervention: buildCurrentIntervention({

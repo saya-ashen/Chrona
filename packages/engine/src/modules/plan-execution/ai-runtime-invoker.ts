@@ -467,7 +467,7 @@ async function collectProviderRunSnapshot(
       };
     }
     if (event.type === "tool_completed") {
-      terminalToolName = event.toolName;
+      terminalToolName = event.toolName ?? terminalToolName;
     }
     if (event.type === "run_failed") {
       const run = event.run ?? fallbackRun;

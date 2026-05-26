@@ -344,6 +344,54 @@ describe("task workspace execution console view model", () => {
     });
   });
 
+  it("attaches the orchestrator recovery action to the target node", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Blocked",
+          blockReason: {
+            blockType: "run_failed",
+            actionRequired: "Retry Run",
+            scope: "run",
+            nodeId: "failed-node",
+          },
+          executionSummary: {
+            taskId: "task-1",
+            executionState: "failed",
+            stateLabel: "Failed",
+            stateReason: "Run failed",
+            graphVersion: 2,
+            currentNodeId: "failed-node",
+            primaryAction: { type: "retry_sync", label: "Retry Run", enabled: true, targetNodeId: "failed-node" },
+            progress: { completed: 1, total: 2, percent: 50 },
+            readiness: { runnable: true, reason: "Run can be retried" },
+            degraded: null,
+            blocking: { nodeId: "failed-node", reason: "Run failed" },
+            waiting: null,
+            recoveryActions: [],
+          },
+        },
+      }),
+      graphPlan: graph([
+        node({ id: "prepare", status: "done" }),
+        node({ id: "failed-node", status: "pending" }),
+      ], "failed-node"),
+    });
+
+    const targetNode = view.graphPlan?.nodes.find((item) => item.id === "failed-node");
+    expect(targetNode?.availableActions?.[0]).toMatchObject({
+      id: "task-primary:retry_sync:failed-node",
+      label: "Retry Run",
+      kind: "retry",
+      emphasis: "danger",
+      executionAction: { action: "retry_node", nodeId: "failed-node" },
+    });
+    expect(view.nodeDetail.currentNode?.availableActions?.[0]).toMatchObject({ label: "Retry Run" });
+    expect(view.nodeDetail.disabledActionReason).toBeUndefined();
+    expect(view.attention).toMatchObject({ actionLabel: "Open action controls", actionNodeId: "failed-node" });
+  });
+
   it("uses the current checkpoint as the primary status and disables Start", () => {
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData({

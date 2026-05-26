@@ -1,4 +1,4 @@
-import { appendCurrentResult, markNodeResults, updateAttemptStatus } from "../execution-state";
+import { appendCurrentResult, updateAttemptStatus } from "../execution-state";
 import { normalizeResultEvidence } from "../evidence";
 import { resolveEffectivePlanGraph } from "../resolve";
 import type { GraphExecutionState, GraphSubmittedNodeResult } from "../execution/types";
@@ -77,7 +77,11 @@ export function retryNodeState(input: {
           }
         : attempt,
     ),
-    results: markNodeResults(input.state.results, input.nodeId, "obsolete"),
+    results: input.state.results.map((result) =>
+      result.nodeId === input.nodeId && (result.status === "current" || result.status === "rejected")
+        ? { ...result, status: "obsolete" }
+        : result,
+    ),
   };
 }
 

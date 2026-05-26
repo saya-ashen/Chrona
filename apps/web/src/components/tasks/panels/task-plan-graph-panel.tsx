@@ -14,6 +14,7 @@ type TaskPlanGraphPanelProps = {
   fillHeight?: boolean;
   inspectorPlacement?: Parameters<typeof TaskPlanGraph>[0]["inspectorPlacement"];
   onSelectedNodeChange?: Parameters<typeof TaskPlanGraph>[0]["onSelectedNodeChange"];
+  onDispatchExecutionAction?: Parameters<typeof TaskPlanGraph>[0]["onDispatchExecutionAction"];
   dismissSelectionOnOutsideClick?: Parameters<typeof TaskPlanGraph>[0]["dismissSelectionOnOutsideClick"];
   showOverview?: Parameters<typeof TaskPlanGraph>[0]["showOverview"];
 };
@@ -28,6 +29,7 @@ export function TaskPlanGraphPanel({
   fillHeight = false,
   inspectorPlacement,
   onSelectedNodeChange,
+  onDispatchExecutionAction,
   dismissSelectionOnOutsideClick,
   showOverview,
 }: TaskPlanGraphPanelProps) {
@@ -56,6 +58,7 @@ export function TaskPlanGraphPanel({
         className={fillHeight ? "relative z-[1] min-h-0 flex-1" : "relative z-[1]"}
         inspectorPlacement={inspectorPlacement}
         onSelectedNodeChange={onSelectedNodeChange}
+        onDispatchExecutionAction={onDispatchExecutionAction}
         dismissSelectionOnOutsideClick={dismissSelectionOnOutsideClick}
         showOverview={showOverview}
       />

@@ -111,4 +111,66 @@ describe("reconcileTaskState", () => {
       stateReason: "Runtime sync timed out",
     });
   });
+
+  it("uses task block reason when persisted node state has not caught up", () => {
+    const graph = makeGraph([
+      makeNode({ id: "setup", status: "completed" }),
+      makeNode({ id: "failed", status: "pending", dependencies: ["setup"] }),
+    ]);
+
+    const result = reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "Blocked",
+      blockReason: {
+        blockType: "run_failed",
+        scope: "run",
+        actionRequired: "Retry Run",
+        nodeId: "failed",
+      },
+    });
+
+    expect(result.summary).toMatchObject({
+      executionState: "failed",
+      currentNodeId: "failed",
+      primaryAction: { type: "retry_sync", enabled: true, label: "Retry Run", targetNodeId: "failed" },
+    });
+    expect(result.reconciliation).toMatchObject({
+      executionState: "failed",
+      currentNodeId: "failed",
+      primaryAction: { type: "retry_sync", targetNodeId: "failed" },
+    });
+  });
+
+  it("maps blocked pause reasons to distinct frontend primary actions", () => {
+    const graph = makeGraph([makeNode({ id: "blocked", status: "pending" })]);
+
+    expect(reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "WaitingForInput",
+      blockReason: { blockType: "human_input_required", actionRequired: "Provide Input", nodeId: "blocked" },
+    }).summary.primaryAction).toMatchObject({ type: "provide_input", label: "Provide Input", targetNodeId: "blocked" });
+
+    expect(reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "WaitingForApproval",
+      blockReason: { blockType: "approval_required", actionRequired: "Review Step Output", nodeId: "blocked" },
+    }).summary.primaryAction).toMatchObject({ type: "approve", label: "Review Step Output", targetNodeId: "blocked" });
+
+    expect(reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "Blocked",
+      blockReason: { blockType: "external_dependency", actionRequired: "Resume after external dependency is resolved", nodeId: "blocked" },
+    }).summary.primaryAction).toMatchObject({ type: "resume", label: "Resume after external dependency is resolved", targetNodeId: "blocked" });
+
+    expect(reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "Blocked",
+      blockReason: { blockType: "replan_required", actionRequired: "Replan", nodeId: "blocked" },
+    }).summary.primaryAction).toMatchObject({ type: "replan", label: "Replan", targetNodeId: "blocked" });
+  });
 });

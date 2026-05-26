@@ -1,6 +1,7 @@
 import { DEFAULT_WORK_PAGE_COPY } from "./work-page-copy";
 
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
+import type { TaskExecutionSummary } from "@chrona/contracts";
 
 export type WorkPageClientProps = {
   initialData: {
@@ -21,7 +22,9 @@ export type WorkPageClientProps = {
         blockType?: string;
         scope?: string;
         since?: string;
+        nodeId?: string | null;
       } | null;
+      executionSummary?: TaskExecutionSummary | null;
     };
     currentRun: {
       id: string;
