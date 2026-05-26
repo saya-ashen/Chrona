@@ -38,8 +38,15 @@ function isCompletedGraphNode(status: string) {
   return status === "done" || status === "completed" || status === "skipped";
 }
 
+function isSyntheticStartingNodeWithoutExecutionEvidence(node: TaskPlanGraphPlan["nodes"][number]) {
+  return node.metadata?.launchState === "starting";
+}
+
 function hasStartedGraphExecution(graphPlan: TaskPlanGraphPlan | null) {
-  return (graphPlan?.nodes ?? []).some((node) => node.status !== "idle" && node.status !== "pending" && node.status !== "ready");
+  return (graphPlan?.nodes ?? []).some((node) => {
+    if (isSyntheticStartingNodeWithoutExecutionEvidence(node)) return false;
+    return node.status !== "idle" && node.status !== "pending" && node.status !== "ready";
+  });
 }
 
 function hasNodeActionPayload(node: PlanNodeDataModel | null) {

@@ -266,6 +266,8 @@ export type PlanExecutionResult = {
   taskId: string;
   planId: string | null;
   mainSessionId: string | null;
+  executionSessionId?: string | null;
+  planRunId?: string | null;
   status: PlanExecutionStatus;
   currentNodeId: string | null;
   executedNodeIds: string[];

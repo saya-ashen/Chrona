@@ -42,6 +42,8 @@ export function buildExecutionResponse(input: {
     planId: input.planId,
     mainSessionId: input.mainSessionId,
     status: input.status,
+    executionSessionId: input.executionSessionId ?? null,
+    planRunId: input.planRunId ?? null,
     currentNodeId: input.currentNodeId,
     executedNodeIds: input.executedNodeIds,
     waitingNodeIds: input.effective.waitingNodeIds,

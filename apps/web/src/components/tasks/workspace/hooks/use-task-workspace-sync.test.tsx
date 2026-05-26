@@ -441,6 +441,7 @@ describe("task workspace page synchronization", () => {
     mocks.currentExecutionResponse = executionResult({
       status: "running",
       currentNodeId: "node-1",
+      executionSessionId: "execution-session-1",
       message: "Current execution state.",
     });
 
@@ -459,6 +460,33 @@ describe("task workspace page synchronization", () => {
     expect(node?.actionable).toBe(false);
     expect(node?.availableActions).toEqual([]);
     expect(node?.metadata?.launchState).toBe("starting");
+  });
+
+  it("does not show a ready node as starting when current execution has no session evidence", async () => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });
+    const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan });
+    mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: initialPlan }];
+    mocks.currentExecutionResponse = executionResult({
+      status: "running",
+      currentNodeId: "node-1",
+      executionSessionId: null,
+      planRunId: undefined,
+      message: "No active execution session.",
+    });
+
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    await waitFor(() => expect(result.current.plan.currentExecution?.status).toBe("running"));
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.status).toBe("ready"));
+
+    const node = result.current.plan.graphPlan?.nodes[0];
+    expect(node?.statusLabel).not.toBe("Starting");
+    expect(node?.active).not.toBe(true);
+    expect(node?.metadata?.launchState).toBeUndefined();
   });
 
   it("does not refresh the workspace page for plan-only progress events", async () => {
