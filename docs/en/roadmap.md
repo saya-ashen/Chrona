@@ -35,7 +35,7 @@ These capabilities exist in the current codebase and should be treated as produc
 
 ## Near-term priorities
 
-Near-term work should make the existing product dependable and understandable rather than adding unrelated surfaces.
+Near-term work should make the existing schedule-to-execution product dependable and understandable before broadening the surface area too far.
 
 ### 1. Make the Work page execution record practical
 
@@ -69,7 +69,28 @@ Near-term work should make the existing product dependable and understandable ra
 - Keep orchestration, plan execution, scheduling, and task lifecycle policy in `packages/engine`.
 - Keep shared schemas and API contracts in `packages/contracts`.
 
-### 5. Bring docs in line with the product
+### 5. Add more provider integrations
+
+- Add more execution/provider integrations beyond the current provider set.
+- Keep each provider behind explicit capability contracts instead of leaking provider-specific protocol details into product code.
+- Make provider capability discovery, error handling, and runtime diagnostics visible enough for schedule-driven execution.
+- Preserve the core task/plan/schedule workflow when adding provider-specific behavior.
+
+### 6. Support multi-session task execution
+
+- Let a single task execution use multiple sessions when a provider, task scope, or recovery path requires it.
+- Make session reuse, isolation, refresh-after-error, and recovery behavior explicit.
+- Keep per-session events inspectable from the Work page and execution timeline.
+- Prevent multi-session execution from duplicating node completion or corrupting graph state.
+
+### 7. Integrate external calendar software
+
+- Connect external calendar systems so Chrona can coordinate scheduled work with existing calendars.
+- Keep calendar import/sync behavior explicit, reversible where possible, and safe around conflicts.
+- Map external events to Chrona work blocks without losing Chrona task, plan, and execution context.
+- Surface calendar conflicts and schedule proposals in the same review loop as native Chrona scheduling.
+
+### 8. Bring docs in line with the product
 
 - Keep README and quick-start pages focused on the current Vite + Hono + Bun app.
 - Remove or archive stale refactor/audit plans after their content is merged into current docs.
@@ -83,7 +104,9 @@ Mid-term work should extend the current loops once Work, execution, and schedule
 | --- | --- |
 | Dynamic replanning | Let running tasks request plan changes, route them through review/acceptance, and resume safely after approval. |
 | Execution recovery | Improve retry, resume, cancellation, blocked-state recovery, and run/session diagnostics. |
-| Runtime abstraction | Support additional execution backends without changing the core task/plan/schedule workflow. |
+| Runtime abstraction | Support additional execution backends and providers without changing the core task/plan/schedule workflow. |
+| Multi-session execution | Coordinate multiple provider/runtime sessions for one task while preserving graph correctness and auditability. |
+| Calendar ecosystem | Sync with external calendar software while keeping Chrona's task, plan, and execution state authoritative. |
 | Richer memory | Use task and workspace memory more deliberately in planning, node execution, and summaries. |
 | Better projections | Make page projections fast, task-scoped where possible, and consistent across Work, Schedule, Inbox, and Task Workspace. |
 | Test coverage | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP tools, Work projections, and schedule proposal decisions. |

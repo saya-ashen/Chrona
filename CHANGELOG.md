@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.4-rc.1 — First MVP release candidate
+
+Date: 2026-05-26
+
+### Status
+- First reviewable MVP release candidate for local development, internal dogfood, and friendly-user review.
+- Not a stable public release; APIs, runtime contracts, packaging, and recovery flows may still change.
+- Full RC notes, verification summary, and known limitations: [docs/internal/release-candidate-0.1.4.md](./docs/internal/release-candidate-0.1.4.md).
+
+### Highlights
+- Repositioned top-level English and Chinese README copy around Chrona's schedule-first loop: task, plan, schedule, and auto execution.
+- Added an explicit project-status warning and roadmap summary to the README.
+- Improved Work execution record usability with a run-grouped execution stream and separate sticky task cockpit.
+- Hardened Inbox action copy handling so proposal and task actions use the required copy contract.
+- Added focused ExecutionTimeline coverage for cockpit/stream separation and run-grouped execution behavior.
+
+### Known limitations
+- The focused React UI gate is green under Vitest/jsdom; raw `bun test` remains the wrong runner for those React Testing Library files.
+- Schedule-to-auto-execution reliability, task-scoped recovery, wait/condition paths, and projection refresh behavior still need more verification before wider release.
+- Packaged CLI quick-start docs still need reconciliation with the current Bun-only top-level README/runtime position.
+
 ## 0.1.4
 
 ### Breaking changes

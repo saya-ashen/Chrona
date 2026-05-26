@@ -7,7 +7,7 @@ English | [中文](./README.zh.md)
 <h1 align="center">Chrona</h1>
 
 <p align="center">
-  <strong>Turn AI conversations into durable tasks, editable plans, scheduled work, and observable execution.</strong>
+  <strong>A local-first schedule app for planning work and automatically completing scheduled tasks with AI.</strong>
 </p>
 
 <p align="center">
@@ -18,11 +18,15 @@ English | [中文](./README.zh.md)
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
+  <a href="#project-status">Status</a> ·
+  <a href="#roadmap">Roadmap</a> ·
   <a href="./docs/en/quick-start.md">Full Guide</a> ·
   <a href="./docs/architecture.md">Architecture</a> ·
-  <a href="./docs/en/roadmap.md">Roadmap</a> ·
   <a href="./CONTRIBUTING.md">Contributing</a>
 </p>
+
+> [!WARNING]
+> Chrona is in fast active development. It is Bun-only, APIs and runtime contracts may change, and the main product direction is a schedule-first app that can automatically execute due work.
 
 <p align="center">
   <img src="docs/assets/CreateTask.png" width="45%" alt="Create a structured Chrona task" />
@@ -31,24 +35,30 @@ English | [中文](./README.zh.md)
 
 ---
 
-Chrona is a local-first workbench for AI-native work. It keeps work out of disposable chat threads by connecting four layers that usually live in separate tools:
+Chrona is a local-first schedule app for AI-assisted work. Its main goal is to help you put work on a schedule, let AI execute scheduled tasks when appropriate, and keep the result inspectable instead of buried in chat history.
+
+Chrona connects four layers that usually live in separate tools:
 
 ```text
-Task -> Plan -> Schedule -> Execution
+Task -> Plan -> Schedule -> Auto Execution
 ```
 
-Use Chrona to capture a rough intent, turn it into an editable plan graph, place it on a schedule, execute it with AI or human checkpoints, and inspect what happened later.
+Use Chrona to capture work, generate an editable plan, place it on the calendar, execute it manually or automatically, and review what happened later.
+
+## Project Status
+
+Chrona is usable for local development and product exploration, but it is not stable software yet. The current codebase already includes task, plan, schedule, execution, inbox, and AI-client flows; the next major focus is making the schedule-to-auto-execution loop reliable enough for daily use.
 
 ## Why Chrona
 
-AI chat is fast, but work state disappears into transcripts. Chrona makes the state explicit:
+Calendars tell you what should happen. Task apps tell you what is pending. AI chat can do work, but it usually loses schedule, state, and accountability. Chrona combines those loops:
 
 | If you need to... | Chrona gives you... |
 | --- | --- |
-| Save real work instead of prompts | durable tasks with priority, status, tags, dependencies, schedule metadata, and accepted results |
-| Turn vague intent into steps | AI-generated plan graphs that can be reviewed, patched, accepted, and rerun |
-| Keep time and execution connected | schedule blocks, conflicts, suggestions, waiting states, and inbox review queues |
-| Let AI act without losing control | scoped runtime refs, checkpoints, approvals, tool traces, failures, and persisted outputs |
+| Plan the day around real work | tasks with priority, status, due dates, estimates, dependencies, and schedule metadata |
+| Turn a scheduled task into executable steps | AI-generated plan graphs that can be reviewed, patched, accepted, and rerun |
+| Let due work move forward automatically | schedule blocks, proposals, waiting states, inbox approvals, and execution actions |
+| Keep AI execution accountable | scoped runtime refs, checkpoints, approvals, tool traces, failures, and persisted outputs |
 
 ## Quick Start
 
@@ -84,15 +94,15 @@ The container stores SQLite data in `/data/chrona.db`. Set `API_KEY` explicitly 
 2. Go to `Settings -> AI Clients`.
 3. Add an `llm`, `hermes`, or `debug` client.
 4. Bind the client to features such as `generate_plan`, `suggest`, `chat`, or `dispatch_task`.
-5. Create a task, generate a plan, review it, accept it, then start execution from the task workspace or Work page.
+5. Create a task, place it on the schedule, generate a plan, review it, accept it, then start execution from the task workspace or Work page.
 
 See the [full quick start](./docs/en/quick-start.md) for data directories, AI client details, and troubleshooting.
 
 ## What You Can Do
 
-### Capture durable tasks
+### Build a real schedule
 
-Create, update, complete, reopen, delete, tag, prioritize, estimate, relate, schedule, and accept results for real units of work.
+Create tasks with priority, estimates, due dates, dependencies, and schedule metadata so the calendar becomes the source of what should happen next.
 
 ### Generate editable plans
 
@@ -102,6 +112,10 @@ Turn a rough task into a structured plan blueprint. Accepted plans become persis
 
 Run plans as typed graphs with `task`, `checkpoint`, `condition`, and `wait` nodes. Nodes can be manual, assisted, or automatic, and can be assigned to user, AI, or system executors.
 
+### Move scheduled work forward
+
+Use schedule views, AI insights, conflict suggestions, schedule proposals, waiting runs, failed runs, cancelled runs, and inbox approvals to move due work toward execution.
+
 ### Keep AI execution observable
 
 AI workers receive safe runtime refs instead of internal database IDs. They report progress through Chrona commands such as `chrona.task.complete`, `chrona.condition.select`, `chrona.node.block`, `chrona.node.fail`, and `chrona.wait.complete`.
@@ -110,13 +124,27 @@ AI workers receive safe runtime refs instead of internal database IDs. They repo
   <img src="docs/assets/NodeDetail.png" width="80%" alt="Inspect a Chrona execution node with state, details, and activity" />
 </p>
 
-### Manage time and review queues
-
-Use schedule views, AI insights, conflict suggestions, schedule proposals, waiting runs, failed runs, cancelled runs, and inbox approvals to keep work moving.
-
 ### Resume with context
 
 Use the Work page, task workspace, memory console, assistant surfaces, conversation history, tool traces, and persisted outputs to understand and continue long-running work.
+
+## Roadmap
+
+This is a short summary of the project roadmap. See the full [roadmap](./docs/en/roadmap.md) for the source of truth.
+
+| Status | Area | Scope |
+| --- | --- | --- |
+| Done | Task foundation | Task create/update/delete, completion/reopen, status, priority, labels, dependencies, parent/child relationships, and task projections. |
+| Done | Schedule surfaces | Timeline/task views, AI insights, conflicts, schedule proposals, task creation, and configuration surfaces. |
+| Done | Plan generation | Streaming AI plan generation, plan persistence, review/edit/accept flows, and materialization into graph nodes. |
+| Done | Execution runtime | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with AI-visible refs and persisted execution state. |
+| Done | Review loops | Inbox surfaces for pending approvals, schedule proposals, waiting inputs, and failed/cancelled runs. |
+| Next | Polish existing flows | Make Work, Schedule, Inbox, Task Workspace, and execution records more reliable and easier to understand. |
+| Next | Reliable auto execution | Start due scheduled work only when configured and safe, with clear recovery when execution blocks or fails. |
+| Next | More providers | Add more execution/provider integrations beyond the current provider set while keeping provider boundaries explicit. |
+| Next | Multi-session execution | Let task execution use multiple sessions where needed, with clear isolation, reuse, recovery, and diagnostics. |
+| Next | External calendars | Connect external calendar software so Chrona can coordinate scheduled work with existing calendar systems. |
+| Later | Production readiness | Improve authentication, backup/restore, deployment docs, migration safety, observability, and operational runbooks. |
 
 ## Architecture
 
@@ -151,7 +179,7 @@ Copy `.env.example` if you want local overrides.
 
 | Variable | Purpose | Default / note |
 | --- | --- | --- |
-| `DATABASE_URL` | SQLite database URL | source default: `file:./prisma/dev.db`; Docker: `file:/data/chrona.db`; CLI: platform data directory |
+| `DATABASE_URL` | SQLite database URL | source default: `file:./prisma/dev.db`; Docker: `file:/data/chrona.db` |
 | `HOST` | API server bind host | defaults to local-only `127.0.0.1` |
 | `PORT` | API server port | `3101` |
 | `API_KEY` | Optional bearer token for `/api/*` routes | Docker generates one when omitted |
@@ -199,10 +227,6 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, code style, boundary rules, 
 | Provider boundary | [docs/provider-boundary.md](./docs/provider-boundary.md) |
 | Package boundaries | [docs/package-boundaries.md](./docs/package-boundaries.md) |
 | Roadmap | [English](./docs/en/roadmap.md) / [中文](./docs/zh/roadmap.md) |
-
-## Project Status
-
-Chrona is under fast active development. The core task, plan, schedule, execution, and AI-client flows are present, but APIs, runtime contracts, packaging, and deployment paths may still change before a stable release. Bun is the only supported runtime for now.
 
 ## Contributing
 

@@ -35,7 +35,7 @@ Chrona 正在演进为面向 AI 辅助工作的任务控制面。产品要把四
 
 ## 近期计划
 
-近期工作应优先让现有产品可靠、清晰，而不是增加无关的新表面。
+近期工作应优先让现有“日程到执行”产品可靠、清晰，再谨慎扩展新的产品表面。
 
 ### 1. 让 Work 页面执行记录真正可用
 
@@ -69,7 +69,28 @@ Chrona 正在演进为面向 AI 辅助工作的任务控制面。产品要把四
 - 编排、计划执行、排期和任务生命周期策略保留在 `packages/engine`。
 - 共享 schema 与 API contracts 保留在 `packages/contracts`。
 
-### 5. 让文档与产品状态一致
+### 5. 接入更多 provider
+
+- 在当前 provider 集合之外，接入更多 execution/provider 集成。
+- 每个 provider 都应位于显式 capability contracts 之后，不把 provider-specific 协议细节泄漏到产品代码。
+- 让 provider capability discovery、错误处理和 runtime diagnostics 足够可见，以支持日程驱动执行。
+- 增加 provider-specific 行为时，保持核心 task/plan/schedule 工作流不变。
+
+### 6. 支持任务执行多 session
+
+- 当 provider、任务范围或恢复路径需要时，允许单个任务执行使用多个 session。
+- 明确 session 复用、隔离、错误后刷新和恢复行为。
+- 在 Work 页面和执行时间线中，让每个 session 的事件可检查。
+- 避免多 session 执行导致节点重复完成或破坏图状态。
+
+### 7. 接入外部日历软件
+
+- 连接外部日历系统，让 Chrona 与用户已有日历协调日程任务。
+- Calendar import/sync 行为应显式、尽可能可回滚，并安全处理冲突。
+- 将外部事件映射到 Chrona work blocks，同时不丢失 Chrona task、plan 和 execution context。
+- 在与原生 Chrona scheduling 相同的 review loop 中暴露日历冲突和日程提案。
+
+### 8. 让文档与产品状态一致
 
 - README 和 quick-start 聚焦当前 Vite + Hono + Bun 应用。
 - 过时的重构计划、审计记录和阶段性债务文档，在内容合并进当前文档后删除或归档。
@@ -83,7 +104,9 @@ Chrona 正在演进为面向 AI 辅助工作的任务控制面。产品要把四
 | --- | --- |
 | 动态重规划 | 运行中的任务可以请求计划变更，经审查/接受后安全恢复执行。 |
 | 执行恢复 | 改进 retry、resume、cancel、blocked-state recovery，以及 run/session diagnostics。 |
-| 运行时抽象 | 在不改变核心 task/plan/schedule 工作流的前提下，支持更多 execution backends。 |
+| 运行时抽象 | 在不改变核心 task/plan/schedule 工作流的前提下，支持更多 execution backends 和 providers。 |
+| 多 session 执行 | 为单个任务协调多个 provider/runtime sessions，同时保持图状态正确和可审计。 |
+| 日历生态 | 与外部日历软件同步，同时让 Chrona 的 task、plan 和 execution state 保持权威。 |
 | 更强记忆 | 在规划、节点执行和总结中更有意识地使用 task/workspace memory。 |
 | 更好的投影 | 让 Work、Schedule、Inbox、Task Workspace 的页面投影更快、更一致，并在可能时保持 task-scoped。 |
 | 测试覆盖 | 为 plan generation、graph execution、task-scoped execution actions、MCP tools、Work projections、schedule proposal decisions 增加聚焦测试。 |
