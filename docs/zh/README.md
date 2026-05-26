@@ -1,6 +1,6 @@
 # Chrona 文档 — 中文
 
-Chrona 是一个本地优先的 AI 任务控制台。它把“想法”推进为任务、可编辑图计划、排期、AI/运行时执行节点，以及可观察的任务结果。
+Chrona 是一个本地优先的 AI 任务控制面。它把意图推进为任务、可编辑图计划、排期、AI/运行时执行节点，以及可观察的任务结果。
 
 ## 当前能做什么
 
@@ -8,7 +8,7 @@ Chrona 是一个本地优先的 AI 任务控制台。它把“想法”推进为
 - AI 计划生成：从任务生成 PlanBlueprint，流式查看进度，审查、编辑并接受计划。
 - 图计划执行：执行 task / checkpoint / condition / wait 节点，支持输入、审批、重试、阻塞、失败和完成。
 - Work 页面：在一个任务工作台中查看最新结果、计划图、执行记录、任务信息、对话上下文和命令输入区。
-- Schedule 页面：查看时间块、冲突、排期建议，接受建议，并在到期时自动启动工作。
+- Schedule 页面：查看时间块、检查冲突、创建排期建议、接受建议，并在到期时自动启动工作。
 - Inbox：聚合审批、排期建议、等待输入、失败运行和取消运行。
 - AI 配置：Settings / AI Clients 使用数据库保存 AI client 与 feature binding。
 - 智能体集成：Hermes 插件通过 MCP 暴露 Chrona 工具，使用 AI-visible refs，而不是后端真实 ID。
@@ -25,7 +25,6 @@ Chrona 是一个本地优先的 AI 任务控制台。它把“想法”推进为
 | 理解持久化模型 | [数据模型](../data-model.md) |
 | 判断代码应该放在哪里 | [包边界说明](../package-boundaries.md) |
 | 扩展 AI/运行时 provider | [Provider 边界](../provider-boundary.md) |
-| 运行测试 | [测试指南](./testing.md) |
 
 ## 主要用户流程
 

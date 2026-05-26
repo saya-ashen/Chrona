@@ -168,7 +168,7 @@ export function useWorkPageProjectionState(initialData: WorkPageData, copy: Work
         Accept: "text/event-stream",
       },
       onEvent({ event }) {
-        if (event === "task_projection_updated") {
+        if (event === "task_projection_updated" || event === "task_workspace_updated") {
           void refresh({ silent: true });
         }
       },

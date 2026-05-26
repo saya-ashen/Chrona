@@ -45,8 +45,14 @@ export async function getCurrentExecution(input: { taskId: string }): Promise<Pl
     attempts: runtime.persisted.attempts,
     results: runtime.persisted.results,
   }) as unknown as EffectivePlanGraph;
-  const status = executionStatusFromEffectiveGraph(effective);
-  const currentNodeId = currentNodeFromEffective(effective)?.id ?? executionSession?.currentNodeId ?? null;
+  const hasActiveExecutionSession = Boolean(executionSession);
+  const status = hasActiveExecutionSession || effective.completedNodeIds.length > 0
+    ? executionStatusFromEffectiveGraph(effective)
+    : "started";
+  const currentNodeId = currentNodeFromEffective(effective)?.id
+    ?? (!hasActiveExecutionSession && status === "started" ? effective.readyNodeIds[0] : null)
+    ?? executionSession?.currentNodeId
+    ?? null;
 
   return buildExecutionResponse({
     taskId: input.taskId,

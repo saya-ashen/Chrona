@@ -67,7 +67,7 @@ bun run test:api
 
 ## AI clients
 
-Chrona 将 AI clients 与 feature bindings 存在数据库中。常见 client 类型包括：
+Chrona 将 AI clients 与 feature bindings 存在数据库中。支持的 client 类型包括：
 
 - `llm`：OpenAI/OpenRouter 兼容模型调用，用于轻量 AI 功能。
 - `hermes`：配置 Hermes bridge/provider 后，用于 Hermes-backed agent execution。

@@ -228,9 +228,14 @@ function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, chec
   } satisfies TaskPlanGraphPlan;
 }
 
+function hasExecutionStartEvidence(currentExecution: PlanExecutionResult) {
+  return Boolean(currentExecution.executionSessionId || currentExecution.planRunId);
+}
+
 function withStartingReadyNode(graphPlan: TaskPlanGraphPlan | null, currentExecution: PlanExecutionResult | null) {
   if (!graphPlan || !currentExecution) return graphPlan;
   if (currentExecution.status !== "running" && currentExecution.status !== "started") return graphPlan;
+  if (!hasExecutionStartEvidence(currentExecution)) return graphPlan;
   if (graphPlan.nodes.some((node) => node.status === "active" || node.status === "in_progress")) return graphPlan;
 
   const startingNodeId = currentExecution.currentNodeId

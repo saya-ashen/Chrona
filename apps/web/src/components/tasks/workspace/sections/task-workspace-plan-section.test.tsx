@@ -395,6 +395,57 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "retry_node", nodeId: "node-failed" });
   });
 
+  it("shows Start plan when an accepted graph only has a synthetic starting decoration without execution evidence", () => {
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Started" });
+    const acceptedPlan = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 1,
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const syntheticStartingNode = createTaskWorkspaceFixtureNode({
+      id: "node-ready",
+      title: "Ready node",
+      status: "active",
+      statusLabel: "Starting",
+      active: true,
+      metadata: { launchState: "starting" },
+    });
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([syntheticStartingNode], "node-ready")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, status: "Ready" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        planningTaskDraft={{
+          title: "Review task output",
+          description: "",
+          priority: "Medium",
+          dueAt: null,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Start plan" }));
+
+    expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
+  });
+
   it("wires selected-node activity into the node drawer", async () => {
     const graphPlan = createTaskWorkspaceFixtureGraph([
       createTaskWorkspaceFixtureNode({ id: "node-a", title: "Node A", status: "active" }),

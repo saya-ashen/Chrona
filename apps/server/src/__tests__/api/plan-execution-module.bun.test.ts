@@ -577,7 +577,7 @@ async function expectConversationHistory(taskId: string, expectedAssistantTexts:
 async function getCurrentExecution(server: Hono, taskId: string) {
   const response = await server.request(`http://local/api/tasks/${taskId}/execution/current`);
   expect(response.status).toBe(200);
-  return json<{ status: string; currentNodeId: string | null; checkpoint: unknown | null }>(response);
+  return json<{ status: string; currentNodeId: string | null; checkpoint: unknown | null; executionSessionId?: string | null; message?: string }>(response);
 }
 
 async function setupModuleExecutionTest(compiledPlan: CompiledPlan, title: string) {
@@ -596,6 +596,24 @@ describe("task execution module API integration", () => {
 
   afterEach(() => {
     aiClientRegistry.get = realGetAiClient;
+  });
+
+  it("reports accepted plans as ready to start before any execution session exists", async () => {
+    const { server, taskId, provider } = await setupModuleExecutionTest(
+      makeSingleTaskPlan("module_ready_to_start"),
+      "Module ready-to-start task",
+    );
+
+    const current = await getCurrentExecution(server, taskId);
+
+    expect(current).toMatchObject({
+      status: "started",
+      currentNodeId: "task_node",
+      checkpoint: null,
+      message: "No active execution session.",
+    });
+    expect(current.executionSessionId ?? null).toBeNull();
+    expect(provider.calls.startRun).toHaveLength(0);
   });
 
   it("executes a single task through API and records provider events, SSE, history, and current state", async () => {

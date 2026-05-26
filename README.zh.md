@@ -6,7 +6,7 @@
 
 <p align="center">
   <h1 align="center">Chrona</h1>
-  <p align="center"><strong>面向 AI 原生工作的任务控制层：规划、日程与执行。</strong></p>
+  <p align="center"><strong>面向 AI 原生工作的任务控制面：规划、排期与执行。</strong></p>
   <p align="center">
     Chrona 把粗略意图变成结构化任务、计划图、日程块和可观测的 AI 执行过程。
   </p>
@@ -36,7 +36,7 @@ Chrona 是一个 local-first 的 AI 原生工作台。它把通常分散在不�
 Task → Plan → Schedule → Execution
 ```
 
-Chrona 不只是 todo list、calendar 或 chat UI。它是一个让工作状态保持显式的控制层：
+Chrona 不只是 todo list、calendar 或 chat UI。它是一个让工作状态保持显式的控制面：
 
 - task 保存面向用户的工作单元、优先级、状态、标签、依赖、父子任务、日程信息和结果
 - plan 把任务变成可编辑、可接受、可执行的类型化图节点
