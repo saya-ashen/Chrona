@@ -20,7 +20,7 @@ jobs:
 
       - run: bunx prisma generate
 
-      - run: bunx prisma db push --skip-generate
+      - run: bunx prisma db push
 
       - run: bun run typecheck
 
