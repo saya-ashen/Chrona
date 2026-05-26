@@ -133,5 +133,6 @@ export async function createTask(input: CreateTaskInput) {
   return {
     taskId: task.id,
     workspaceId: task.workspaceId,
+    autoExecute: task.autoExecute,
   };
 }

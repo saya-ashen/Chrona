@@ -367,6 +367,27 @@ Pause execution for a time duration or external event.
 - timeout: optional {minutes, onTimeout} - what to do if wait exceeds limit
 - onTimeout: "continue" (proceed anyway), "pause" (halt indefinitely), "fail" (mark failed), "notify_user" (alert user)
 
+## Graph simplicity and user friction
+
+Prefer the simplest executable graph that can complete the task safely.
+Do not create structure just to look comprehensive.
+Minimize user interruption and avoid unnecessary blocking dependencies.
+
+- For simple tasks, use 2-4 nodes: one or two execution tasks plus one final result delivery node.
+- For medium tasks, use 4-7 nodes.
+- Use more than 8 nodes only when the task clearly has independent phases, required approvals, external waits, or real branching decisions.
+- Do not split one coherent action into multiple micro-nodes. Keep tightly coupled work in the same task node.
+- Do not create checkpoint nodes for low-risk internal progress reviews, status updates, summaries, or "verify before continuing" steps.
+- Do not ask the user for input unless the task cannot safely or correctly proceed without that input.
+- If user input is needed, prefer the least-effort checkpoint type that works: use "confirm" for yes/no, use "choose" when the user can pick from known options, use "input" only when free-form text or specific fields are truly required, and use "edit" only when the user must modify generated content.
+- Do not use free-text input when a bounded choice is enough.
+- Do not create condition nodes unless execution must choose between materially different downstream paths.
+- Do not create wait nodes unless execution must pause for time or an external event.
+- Do not add dependency edges just to make the graph look ordered. If a node can run without another node's output, leave it independent.
+- Do not block independent work behind approval, input, wait, or unrelated execution nodes.
+- Use parallelism only for clearly independent work. Prefer a mostly linear graph when parallelism would make execution harder to understand.
+- If several adjacent nodes would need the same working context, keep them in one node or one short linear segment.
+
 ## CRITICAL RULES
 
 1. Plan describes WHAT to do and the flow. Do NOT generate AI actions, tool_action, or integration nodes.
@@ -378,7 +399,7 @@ Pause execution for a time duration or external event.
 7. High-risk actions (send message, modify calendar, delete data) MUST have a preceding checkpoint with checkpointType "approve" or "confirm".
 8. If you need user input, choice, or confirmation: use checkpoint. Do NOT create separate user_input/decision nodes.
 9. If you are at a phase boundary, use a task node with a summary-like title. Do NOT create milestone nodes.
-10. Maximize parallelism: independent tasks should not be chained sequentially.
+10. Use dependency edges only for real execution dependencies. If a node does not need another node's output, user decision, approval, or external event, do not make it wait behind that node.
 11. The graph MUST be a DAG: never create cycles, back edges, self-loops, or edges from a later step back to an earlier step.
 12. Condition branches count as graph edges. A branch from condition_check to task_a plus an edge from task_a back to condition_check is a cycle and is invalid.
 13. Do NOT model retries, revisions, missing-info loops, or "loop until done" by pointing edges back to previous nodes.
@@ -389,6 +410,9 @@ Pause execution for a time duration or external event.
 18. All successful execution paths must converge into this single final result delivery node. Do not add another node after it for confirmation or status bookkeeping.
 19. The final node title should make it clear that this node delivers or presents the task result to the user.
 20. This phase is planning only. Do NOT execute or implement the task.
+21. The plan should be minimal but sufficient. If a node does not change execution state, request necessary user input, wait for an external event, branch the flow, gate risk, or deliver a final result, remove or merge it.
+22. Minimize user operations. Do not add input, confirmation, approval, or review checkpoints unless they are required for correctness, safety, or user preference.
+23. Prefer bounded user choices over free-form input whenever the valid options are known.
 
 Respond in the same language as the input.`.trim();
 

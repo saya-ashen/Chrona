@@ -36,6 +36,8 @@ const DEFAULT_DIALOG_COPY = {
   endTime: "End time",
   autoExecute: "Auto-execute at scheduled time",
   autoExecuteDescription: "Start execution automatically when the scheduled start time arrives.",
+  autoPlanGeneration: "Generate plan after saving",
+  autoPlanGenerationDescription: "Create a draft execution plan for this task immediately after it is saved.",
   description: "Description (optional)",
   descriptionPlaceholder: "Add description",
   priority: "Priority",
@@ -62,6 +64,7 @@ type TaskCreateDialogProps = {
     description: string;
     priority: "Low" | "Medium" | "High" | "Urgent";
     autoExecute: boolean;
+    autoPlanGenerationEnabled: boolean;
     dueAt: Date | null;
     scheduledStartAt: Date;
     scheduledEndAt: Date;
@@ -82,6 +85,7 @@ export function TaskCreateDialog({
   const aiPreferences = useScheduleAiPreferences();
   const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
   const defaultAutoExecuteEnabled = aiPreferences.defaultAutoExecuteEnabled;
+  const defaultAutoPlanGenerationEnabled = aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
   const { messages } = useI18n();
   const localizedDialogCopy = (messages.components as { taskCreateDialog?: Partial<typeof DEFAULT_DIALOG_COPY> } | undefined)?.taskCreateDialog;
@@ -96,6 +100,7 @@ export function TaskCreateDialog({
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [autoExecute, setAutoExecute] = useState(defaultAutoExecuteEnabled);
+  const [autoPlanGenerationEnabled, setAutoPlanGenerationEnabled] = useState(defaultAutoPlanGenerationEnabled);
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -154,10 +159,11 @@ export function TaskCreateDialog({
       setDescription("");
       setPriority("Medium");
       setAutoExecute(defaultAutoExecuteEnabled);
+      setAutoPlanGenerationEnabled(defaultAutoPlanGenerationEnabled);
       setShowAutoComplete(false);
       suppressRef.current = false;
     }
-  }, [isOpen, initialStartAt, initialEndAt, initialTitle, defaultAutoExecuteEnabled]);
+  }, [isOpen, initialStartAt, initialEndAt, initialTitle, defaultAutoExecuteEnabled, defaultAutoPlanGenerationEnabled]);
 
   async function handleSubmit() {
     if (!title.trim()) return;
@@ -176,6 +182,7 @@ export function TaskCreateDialog({
       description: description.trim(),
       priority,
       autoExecute,
+      autoPlanGenerationEnabled,
       dueAt: null,
       scheduledStartAt,
       scheduledEndAt,
@@ -399,6 +406,22 @@ export function TaskCreateDialog({
               <span className="block font-medium">{dialogCopy.autoExecute}</span>
               <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
                 {dialogCopy.autoExecuteDescription}
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={autoPlanGenerationEnabled}
+              onChange={(e) => setAutoPlanGenerationEnabled(e.target.checked)}
+              disabled={isPending}
+              className="mt-1 shrink-0"
+            />
+            <span className="min-w-0">
+              <span className="block font-medium">{dialogCopy.autoPlanGeneration}</span>
+              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                {dialogCopy.autoPlanGenerationDescription}
               </span>
             </span>
           </label>

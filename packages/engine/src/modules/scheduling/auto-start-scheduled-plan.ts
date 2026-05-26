@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { taskPlanExecution } from "@/modules/plan-execution";
+import { TaskPlanStatus } from "@/generated/prisma/client";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
@@ -30,6 +31,11 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           status: true,
           autoExecute: true,
           executionRuntime: true,
+          taskPlans: {
+            where: { status: TaskPlanStatus.Accepted },
+            select: { id: true },
+            take: 1,
+          },
         },
       },
     },
@@ -58,6 +64,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           task: {
             status: task.status,
             executionRuntime: task.executionRuntime,
+            hasAcceptedPlan: task.taskPlans.length > 0,
           },
           workBlock: { scheduledStartAt: block.scheduledStartAt },
           now,

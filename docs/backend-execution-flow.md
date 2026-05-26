@@ -116,6 +116,17 @@ Source anchors:
 | `failed` | Mark task/session failed unless retry action is later submitted |
 | `replan_required` | Pause for plan review or approval |
 
+## Context segments
+
+Provider sessions are not the same as Chrona execution sessions. Chrona should use context segments as the default long-task provider-session boundary: related plan nodes share one provider task session, then Chrona writes a structured segment summary and switches to the next segment session.
+
+This avoids two failure modes:
+
+- One provider session for the whole task makes Chrona depend on opaque provider-side context compression and risks context pollution across unrelated nodes.
+- One provider session per node loses useful short-term working context between tightly related nodes.
+
+`WorkBlock` should remain the scheduling/time container. A `WorkBlock` can contain one or more context segments. Segment policy belongs in `packages/engine`, while providers only create, resume, or virtualize native sessions. See `docs/internal/execution-context-segments.md`.
+
 ## Checkpoint actions
 
 `POST /api/tasks/:taskId/execution/checkpoint/:checkpointId/actions` maps checkpoint-level actions onto execution continuation actions. It supports input submission, result approval/rejection, replan decisions, retry, unblock, manual completion/skip, fail, and cancel.

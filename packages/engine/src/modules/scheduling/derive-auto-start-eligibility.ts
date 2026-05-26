@@ -20,6 +20,7 @@ type AutoStartEligibility =
 export type TaskLike = {
   status: string;
   executionRuntime?: string | null;
+  hasAcceptedPlan?: boolean;
 };
 
 export type WorkBlockLike = {
@@ -65,6 +66,10 @@ export function deriveAutoStartEligibility(input: {
 
   if (!input.task.executionRuntime) {
     return { ok: false, reason: "no_runtime_config" };
+  }
+
+  if (!input.task.hasAcceptedPlan) {
+    return { ok: false, reason: "no_accepted_plan" };
   }
 
   return { ok: true, mode: "start_task" };

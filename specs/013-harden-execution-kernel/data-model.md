@@ -114,6 +114,41 @@ Represents one external AI/provider execution.
 - `idempotencyKey` is unique per node attempt.
 - A second provider start for the same node attempt must return or observe the existing provider run rather than creating a duplicate.
 
+## Execution Context Segment
+
+Represents the provider-session and context-compaction boundary for a group of related plan nodes.
+
+**Fields**:
+
+- `id`: stable segment identifier.
+- `taskPlanRunId`: owning task plan run.
+- `executionSessionId`: owning Chrona execution session, if active.
+- `workBlockId`: optional scheduling block that contains the segment.
+- `taskSessionId`: provider-facing task session used by nodes in the segment.
+- `segmentKey`: deterministic key such as `plan-{planId}:segment-{segmentId}`.
+- `title`: human-readable segment name.
+- `objective`: segment-level goal.
+- `nodeIds`: ordered or grouped plan node IDs assigned to the segment.
+- `status`: `pending`, `running`, `summarizing`, `completed`, `invalidated`.
+- `summary`: structured compact handoff state for downstream segments.
+- `startedAt`: start time.
+- `completedAt`: completion time.
+
+**Relationships**:
+
+- Belongs to one task plan run.
+- May belong to one WorkBlock.
+- Uses one TaskSession as its provider-session continuity record.
+- Contains many node attempts through assigned node IDs.
+
+**Validation rules**:
+
+- Nodes in one running segment may share a provider task session.
+- Segment transition must not depend on provider-native compression; Chrona must persist a structured segment summary.
+- Replanning or graph mutation can invalidate pending segment assignments.
+- Parallel branches should use separate segments unless explicitly configured otherwise.
+- Branch joins should start a new segment that consumes upstream segment summaries.
+
 ## Node Result
 
 Represents the durable checkpoint produced by a node attempt.
@@ -208,3 +243,4 @@ stale callbacks -> stale/rejected result record, never effective
 - Task graph UI status is derived from task plan run status, node attempts, and effective node results.
 - Provider run history is diagnostic and must not by itself make a node completed.
 - Legacy unpublished state paths that disagree with this model must be removed or rewritten to derive from this model.
+- Current provider context should be projected through execution context segments, not inferred from provider-native session history alone.

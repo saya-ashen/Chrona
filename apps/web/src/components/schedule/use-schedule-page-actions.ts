@@ -146,6 +146,7 @@ export function useSchedulePageActions({
       refreshProjection,
       resetViewData: () => setViewData(hydratedData),
       actionFailedMessage,
+      autoPlanGenerationEnabled: input.autoPlanGenerationEnabled,
     });
   }
 

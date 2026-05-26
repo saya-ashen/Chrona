@@ -153,6 +153,7 @@ function createTaskRouter() {
         title: title.trim(),
         description: parsed.data.description,
         priority: parsed.data.priority,
+        autoExecute: parsed.data.autoExecute,
         executionRuntime: parsed.data.executionRuntime,
         executionConfig: parsed.data.executionConfig,
       });
@@ -261,6 +262,43 @@ describe("Task CRUD workflow", () => {
     expect(body.taskId).toBeDefined();
     expect(typeof body.taskId).toBe("string");
     expect(body.workspaceId).toBe(workspaceId);
+  });
+
+  it("returns and persists explicit auto-execute values from task creation", async () => {
+    const enabledResponse = await app().request("http://local/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceId,
+        title: "Auto execute enabled",
+        autoExecute: true,
+      }),
+    });
+    const disabledResponse = await app().request("http://local/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceId,
+        title: "Auto execute disabled",
+        autoExecute: false,
+      }),
+    });
+
+    expect(enabledResponse.status).toBe(201);
+    expect(disabledResponse.status).toBe(201);
+    const enabled = await enabledResponse.json() as any;
+    const disabled = await disabledResponse.json() as any;
+
+    expect(enabled.autoExecute).toBe(true);
+    expect(disabled.autoExecute).toBe(false);
+
+    const persisted = await db.task.findMany({
+      where: { id: { in: [enabled.taskId, disabled.taskId] } },
+      select: { id: true, autoExecute: true },
+    });
+    const persistedById = new Map(persisted.map((task) => [task.id, task.autoExecute]));
+    expect(persistedById.get(enabled.taskId)).toBe(true);
+    expect(persistedById.get(disabled.taskId)).toBe(false);
   });
 
   it("lists tasks for a workspace", async () => {
