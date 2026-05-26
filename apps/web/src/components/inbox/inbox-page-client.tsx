@@ -45,7 +45,7 @@ export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
           action: {
             action: "resume_with_approval",
             decision: action === "reject" ? "reject" : action === "edit" ? "request_changes" : "approve",
-            feedback: action === "edit" ? copy?.editPlaceholder : undefined,
+            feedback: action === "edit" ? copy.editPlaceholder : undefined,
           },
         });
       } else {
@@ -74,18 +74,18 @@ export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
             item.kind === "schedule_proposal" ? (
               <>
                 <Button type="button" disabled={pendingItemId === item.id} onClick={() => void runItemAction(item, "approve")}>
-                  {copy?.acceptProposal ?? "Accept Proposal"}
+                  {copy.acceptProposal ?? "Accept Proposal"}
                 </Button>
                 <Button type="button" variant="outline" disabled={pendingItemId === item.id} onClick={() => void runItemAction(item, "reject")}>
-                  {copy?.rejectProposal ?? "Reject Proposal"}
+                  {copy.rejectProposal ?? "Reject Proposal"}
                 </Button>
                 <LocalizedLink href="/schedule" className="rounded-md border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted">
-                  {copy?.openSchedule ?? "Open Schedule"}
+                  {copy.openSchedule ?? "Open Schedule"}
                 </LocalizedLink>
               </>
             ) : item.kind === "approval" ? null : (
               <LocalizedLink href={`/tasks/${item.sourceTaskId}`} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
-                {copy?.openTask ?? "Open Task"}
+                {copy.openTask ?? "Open Task"}
               </LocalizedLink>
             ),
         }))}
