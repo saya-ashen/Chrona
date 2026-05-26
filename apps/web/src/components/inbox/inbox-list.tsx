@@ -20,6 +20,9 @@ type InboxListProps = {
     actions?: ReactNode;
   }>;
   copy?: Partial<typeof DEFAULT_COPY>;
+  onApprove?: (itemId: string) => void;
+  onReject?: (itemId: string) => void;
+  onEditAndApprove?: (itemId: string) => void;
 };
 
 const DEFAULT_COPY = {
@@ -32,7 +35,13 @@ const DEFAULT_COPY = {
   editAndApprove: "Edit and Approve",
 };
 
-export function InboxList({ items, copy: copyProp }: InboxListProps) {
+export function InboxList({
+  items,
+  copy: copyProp,
+  onApprove,
+  onReject,
+  onEditAndApprove,
+}: InboxListProps) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
 
   return (
@@ -66,18 +75,21 @@ export function InboxList({ items, copy: copyProp }: InboxListProps) {
                 <Button
                   type="button"
                   variant="default"
+                  onClick={() => onApprove?.(item.id)}
                 >
                   {copy.approve}
                 </Button>
                 <Button
                   type="button"
                   variant="destructive"
+                  onClick={() => onReject?.(item.id)}
                 >
                   {copy.reject}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
+                  onClick={() => onEditAndApprove?.(item.id)}
                 >
                   {copy.editAndApprove}
                 </Button>
