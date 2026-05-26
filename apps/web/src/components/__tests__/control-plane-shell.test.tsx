@@ -1,6 +1,9 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+let mockTaskDialogAutoExecute = true;
+let mockTaskDialogAutoPlanGenerationEnabled = true;
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
@@ -25,11 +28,34 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/components/schedule/dialogs/task-create-dialog", () => ({
-  TaskCreateDialog: ({ isOpen }: { isOpen: boolean }) => isOpen ? <div role="dialog">Create task dialog</div> : null,
+  TaskCreateDialog: ({ isOpen, onSubmit }: { isOpen: boolean; onSubmit: (input: any) => Promise<void> }) => isOpen ? (
+    <div role="dialog">
+      <span>Create task dialog</span>
+      <button
+        type="button"
+        onClick={() => onSubmit({
+          title: "Created from shell",
+          description: "Shell description",
+          priority: "High",
+          autoExecute: mockTaskDialogAutoExecute,
+          autoPlanGenerationEnabled: mockTaskDialogAutoPlanGenerationEnabled,
+          dueAt: null,
+          scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
+          scheduledEndAt: new Date(2026, 3, 15, 10, 0, 0, 0),
+        })}
+      >
+        Submit task
+      </button>
+    </div>
+  ) : null,
 }));
 
 vi.mock("@/lib/task-actions-client", () => ({
   createTaskFromSchedule: vi.fn(),
+}));
+
+vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
+  startTaskPlanGenerationSession: vi.fn(),
 }));
 
 vi.mock("@/lib/utils", () => ({
@@ -60,12 +86,31 @@ vi.mock("@chrona/i18n/react", () => ({
   }),
 }));
 
+import {
+  SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
+  type ScheduleAiPreferences,
+} from "@/lib/schedule-ai-preferences";
+import { createTaskFromSchedule } from "@/lib/task-actions-client";
+import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 
 const defaultWorkspace = { id: "ws-1", name: "Default" };
+const mockCreateTaskFromSchedule = vi.mocked(createTaskFromSchedule);
+const mockStartTaskPlanGenerationSession = vi.mocked(startTaskPlanGenerationSession);
+
+function writePreferences(preferences: ScheduleAiPreferences) {
+  window.localStorage.setItem(
+    SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
+    JSON.stringify(preferences),
+  );
+}
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
+  vi.clearAllMocks();
+  mockTaskDialogAutoExecute = true;
+  mockTaskDialogAutoPlanGenerationEnabled = true;
 });
 
 describe("ControlPlaneShell", () => {
@@ -105,5 +150,94 @@ describe("ControlPlaneShell", () => {
     await user.click(newTaskButton);
 
     expect(screen.getByRole("dialog")).toHaveTextContent("Create task dialog");
+  });
+
+  it("passes dialog auto-execute choice into task creation and auto-generates a draft plan when the task-level plan switch is enabled", async () => {
+    const user = userEvent.setup();
+    writePreferences({
+      autoSuggestionsEnabled: false,
+      autoPlanGenerationEnabled: false,
+      defaultAutoExecuteEnabled: false,
+    });
+    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+
+    render(
+      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
+        <div>Workspace body</div>
+      </ControlPlaneShell>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "New Task" }));
+    await user.click(screen.getByRole("button", { name: "Submit task" }));
+
+    await waitFor(() => {
+      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspaceId: "ws-1",
+          title: "Created from shell",
+          description: "Shell description",
+          priority: "High",
+          autoExecute: true,
+        }),
+      );
+    });
+    expect(mockStartTaskPlanGenerationSession).toHaveBeenCalledWith({
+      taskId: "created-task",
+      forceRefresh: true,
+    });
+  });
+
+  it("does not use auto-execute as an implicit plan-generation trigger", async () => {
+    const user = userEvent.setup();
+    mockTaskDialogAutoExecute = true;
+    mockTaskDialogAutoPlanGenerationEnabled = false;
+    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+
+    render(
+      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
+        <div>Workspace body</div>
+      </ControlPlaneShell>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "New Task" }));
+    await user.click(screen.getByRole("button", { name: "Submit task" }));
+
+    await waitFor(() => {
+      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoExecute: true,
+        }),
+      );
+    });
+    expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-generate a draft plan when the task-level switch is disabled", async () => {
+    const user = userEvent.setup();
+    mockTaskDialogAutoPlanGenerationEnabled = false;
+    writePreferences({
+      autoSuggestionsEnabled: false,
+      autoPlanGenerationEnabled: true,
+      defaultAutoExecuteEnabled: false,
+    });
+    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+
+    render(
+      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
+        <div>Workspace body</div>
+      </ControlPlaneShell>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "New Task" }));
+    await user.click(screen.getByRole("button", { name: "Submit task" }));
+
+    await waitFor(() => {
+      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Created from shell",
+        }),
+      );
+    });
+    expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 });

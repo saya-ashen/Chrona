@@ -8,6 +8,9 @@ const fetchScheduleProjection = vi.fn();
 const createTaskFromSchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const applySchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const updateTaskConfigFromSchedule = vi.fn();
+const startTaskPlanGenerationSession = vi.fn();
+let mockTaskDialogAutoExecute = true;
+let mockTaskDialogAutoPlanGenerationEnabled = true;
 
 vi.mock("@/lib/router", () => ({
   AppLink: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -32,6 +35,10 @@ vi.mock("@/lib/task-actions-client", () => ({
   createTaskFromSchedule: (...args: unknown[]) => createTaskFromSchedule(...args),
   applySchedule: (...args: unknown[]) => applySchedule(...args),
   updateTaskConfigFromSchedule: (...args: unknown[]) => updateTaskConfigFromSchedule(...args),
+}));
+
+vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
+  startTaskPlanGenerationSession: (...args: unknown[]) => startTaskPlanGenerationSession(...args),
 }));
 
 vi.mock("@/components/schedule/panels/planning-header", () => ({
@@ -152,6 +159,8 @@ vi.mock("@/components/schedule/dialogs/task-create-dialog", () => ({
       scheduledEndAt: Date;
       priority: string;
       dueAt: Date | null;
+      autoExecute?: boolean;
+      autoPlanGenerationEnabled?: boolean;
     }) => void;
   }) =>
     isOpen ? (
@@ -164,6 +173,8 @@ vi.mock("@/components/schedule/dialogs/task-create-dialog", () => ({
               scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
               scheduledEndAt: new Date(2026, 3, 15, 10, 30, 0, 0),
               priority: "High",
+              autoExecute: mockTaskDialogAutoExecute,
+              autoPlanGenerationEnabled: mockTaskDialogAutoPlanGenerationEnabled,
               dueAt: null,
             })
           }
@@ -204,6 +215,8 @@ fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mockTaskDialogAutoExecute = true;
+  mockTaskDialogAutoPlanGenerationEnabled = true;
   fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
     if (typeof input === "string" && input.endsWith("/execution/actions")) {
       return Promise.resolve({
@@ -373,6 +386,38 @@ describe("SchedulePage quick create", () => {
     });
 
     expect(applySchedule).toHaveBeenCalled();
+    expect(startTaskPlanGenerationSession).toHaveBeenCalledWith({
+      taskId: "created-task",
+      forceRefresh: true,
+    });
+  });
+
+  it("does not auto-generate a draft plan after quick-create when the task-level plan switch is disabled", async () => {
+    const user = userEvent.setup();
+    mockTaskDialogAutoPlanGenerationEnabled = false;
+
+    render(
+      <SchedulePage
+        workspaceId="workspace-1"
+        data={createData()}
+        selectedDay="2026-04-15"
+        selectedView="timeline"
+        showNewTask
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /add to queue/i }));
+
+    await waitFor(() => {
+      expect(createTaskFromSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Inbox triage",
+        }),
+      );
+    });
+
+    expect(applySchedule).toHaveBeenCalled();
+    expect(startTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 });
 

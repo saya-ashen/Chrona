@@ -51,11 +51,13 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
     scheduledStartAt,
     scheduledEndAt,
     workBlockStatus,
+    acceptedPlan = true,
     ...taskOverrides
   } = overrides as {
     scheduledStartAt?: Date;
     scheduledEndAt?: Date;
     workBlockStatus?: "Scheduled" | "Active" | "Completed" | "Cancelled";
+    acceptedPlan?: boolean;
   } & Record<string, unknown>;
 
   const task = await db.task.create({
@@ -83,6 +85,31 @@ async function createDueTask(workspaceId: string, overrides: Record<string, unkn
     },
   });
 
+  if (acceptedPlan) {
+    await saveCompiledPlan({
+      workspaceId,
+      taskId: task.id,
+      status: "accepted",
+      summary: "accepted graph",
+      generatedBy: "auto-start-test",
+      compiledPlan: {
+        id: `graph-${task.id}`,
+        editablePlanId: `ep-${task.id}`,
+        sourceVersion: 1,
+        title: task.title,
+        goal: task.title,
+        assumptions: [],
+        nodes: [],
+        edges: [],
+        entryNodeIds: [],
+        terminalNodeIds: [],
+        topologicalOrder: [],
+        completionPolicy: { type: "all_tasks_completed" },
+        validationWarnings: [],
+      },
+    });
+  }
+
   return { task, workBlock };
 }
 
@@ -95,6 +122,21 @@ describe("auto-start-scheduled-plan", () => {
   afterAll(async () => {
     await resetDb();
     mock.restore();
+  });
+
+  it("skips due auto-execute tasks without an accepted plan", async () => {
+    const workspace = await createWorkspace();
+    const { task } = await createDueTask(workspace.id, { acceptedPlan: false });
+
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
+
+    expect(result.started).toEqual([]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      taskId: task.id,
+      reason: "no_accepted_plan",
+    });
+    expect(startMock).not.toHaveBeenCalled();
   });
 
   it("starts due scheduled parent task and materializes automatic child-task nodes into separate sessions", async () => {
@@ -417,6 +459,29 @@ describe("auto-start-scheduled-plan", () => {
       scheduledStartAt: new Date(now.getTime() - 60_000),
       scheduledEndAt: new Date(now.getTime() + 30 * 60_000),
       scheduleSource: "human",
+    });
+    const createdTask = await db.task.findUniqueOrThrow({ where: { id: created.taskId } });
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: created.taskId,
+      status: "accepted",
+      summary: "accepted graph",
+      generatedBy: "auto-start-test",
+      compiledPlan: {
+        id: `graph-${created.taskId}`,
+        editablePlanId: `ep-${created.taskId}`,
+        sourceVersion: 1,
+        title: createdTask.title,
+        goal: createdTask.title,
+        assumptions: [],
+        nodes: [],
+        edges: [],
+        entryNodeIds: [],
+        terminalNodeIds: [],
+        topologicalOrder: [],
+        completionPolicy: { type: "all_tasks_completed" },
+        validationWarnings: [],
+      },
     });
     await db.task.update({
       where: { id: created.taskId },

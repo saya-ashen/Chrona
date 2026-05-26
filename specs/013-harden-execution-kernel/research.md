@@ -69,3 +69,14 @@
 - Migrate old local data: rejected because the user explicitly removed compatibility requirements.
 - Support both old and new state readers: rejected because dual readers caused hidden divergence and unstable UI state.
 - Keep legacy aliases temporarily: rejected because the feature's goal is to remove conflicting state authority.
+
+## Decision: Add context segments as the provider-session boundary
+
+**Rationale**: Running an entire task plan through one provider session makes Chrona depend on provider-specific context retention and compression. Switching to one provider session per node overcorrects and loses useful short-term working context between related nodes. A context segment provides the middle boundary: related nodes share one provider task session, then Chrona writes a structured summary and switches to a new session for the next segment.
+
+**Alternatives considered**:
+
+- Whole-task shared provider session: rejected because provider-side compression is opaque, inconsistent across providers, hard to test, and can pollute unrelated downstream nodes.
+- Per-node provider session by default: rejected because it loses local findings, design decisions, and short-term tool context needed by adjacent implementation, verification, and repair nodes.
+- Use `WorkBlock` as the session boundary: rejected because `WorkBlock` is a scheduling/time container, while provider context grouping is an execution-context concern. One WorkBlock may contain multiple context segments.
+- Use raw graph subgraphs as the session boundary: rejected as the only abstraction because graph mutation and replanning can change subgraph shape. Segment assignment may be derived from the graph, but the runtime needs a durable context-segment entity or equivalent persisted assignment.

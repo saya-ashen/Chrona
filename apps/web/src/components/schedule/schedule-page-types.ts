@@ -299,6 +299,7 @@ export type TimelineCreateInput = {
   executionRuntime: string;
   executionConfig: RuntimeInput;
   autoExecute: boolean;
+  autoPlanGenerationEnabled: boolean;
   dueAt: Date | null;
   scheduledStartAt: Date;
   scheduledEndAt: Date;

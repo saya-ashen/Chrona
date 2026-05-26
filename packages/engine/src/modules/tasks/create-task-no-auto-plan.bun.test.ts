@@ -59,4 +59,37 @@ describe("createTask (no auto plan generation)", () => {
     // Plan generation is now manual-only — no automatic enqueue.
     expect(materializationMock).not.toHaveBeenCalled();
   });
+
+  it("persists and returns the explicit task auto-execute choice", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Auto Execute Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+
+    const enabled = await createTask({
+      workspaceId: workspace.id,
+      title: "Explicit auto execute enabled",
+      autoExecute: true,
+      executionRuntime: "hermes",
+      executionConfig: { prompt: "Do it" },
+    });
+    const disabled = await createTask({
+      workspaceId: workspace.id,
+      title: "Explicit auto execute disabled",
+      autoExecute: false,
+      executionRuntime: "hermes",
+      executionConfig: { prompt: "Do it" },
+    });
+
+    const persisted = await db.task.findMany({
+      where: { id: { in: [enabled.taskId, disabled.taskId] } },
+      select: { id: true, autoExecute: true },
+    });
+    const persistedById = new Map(persisted.map((task) => [task.id, task.autoExecute]));
+
+    expect(enabled.autoExecute).toBe(true);
+    expect(disabled.autoExecute).toBe(false);
+    expect(persistedById.get(enabled.taskId)).toBe(true);
+    expect(persistedById.get(disabled.taskId)).toBe(false);
+    expect(materializationMock).not.toHaveBeenCalled();
+  });
 });

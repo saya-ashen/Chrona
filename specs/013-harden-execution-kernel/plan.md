@@ -109,6 +109,7 @@ Key decisions:
 - Use execution epoch/fencing to reject stale writes and late callbacks.
 - Use node attempt identity as the idempotency boundary for provider-side runs.
 - Treat completed node results as durable checkpoints and remove conflicting unpublished legacy result-state paths.
+- Use context segments as the provider-session boundary for long task execution: related nodes may share short-term provider context, while segment transitions summarize and switch sessions under Chrona control.
 
 ## Phase 1: Design & Contracts
 

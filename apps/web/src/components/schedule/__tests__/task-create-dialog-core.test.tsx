@@ -19,6 +19,10 @@ vi.mock("@/components/schedule/panels/automation-suggestion-panel", () => ({
   AutomationSuggestionPanel: () => null,
 }));
 
+import {
+  SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
+  type ScheduleAiPreferences,
+} from "@/lib/schedule-ai-preferences";
 import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
 
 const defaultProps = {
@@ -31,8 +35,16 @@ const defaultProps = {
   onSubmit: vi.fn().mockResolvedValue(undefined),
 };
 
+function writePreferences(preferences: ScheduleAiPreferences) {
+  window.localStorage.setItem(
+    SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
+    JSON.stringify(preferences),
+  );
+}
+
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.clearAllMocks();
   mockUseAutoComplete.mockImplementation(() => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
   mockUseSmartAutomation.mockImplementation(() => ({ suggestion: null, isLoading: false }));
@@ -58,6 +70,67 @@ describe("TaskCreateDialog – Core functionality", () => {
     expect(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i })).not.toBeChecked();
     expect(screen.getByText("Save")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
+  });
+
+  it("uses the stored default auto-execute preference when opening the dialog", async () => {
+    writePreferences({
+      autoSuggestionsEnabled: false,
+      autoPlanGenerationEnabled: false,
+      defaultAutoExecuteEnabled: true,
+    });
+
+    render(<TaskCreateDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i })).toBeChecked();
+    });
+  });
+
+  it("uses the stored auto plan generation preference as the task-level plan switch default", async () => {
+    writePreferences({
+      autoSuggestionsEnabled: false,
+      autoPlanGenerationEnabled: false,
+      defaultAutoExecuteEnabled: false,
+    });
+
+    render(<TaskCreateDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: /generate plan after saving/i })).not.toBeChecked();
+    });
+  });
+
+  it("uses stored defaults for auto-execute and plan generation, then preserves explicit task-level overrides on submit", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    writePreferences({
+      autoSuggestionsEnabled: false,
+      autoPlanGenerationEnabled: true,
+      defaultAutoExecuteEnabled: true,
+    });
+
+    render(<TaskCreateDialog {...defaultProps} onSubmit={onSubmit} />);
+
+    const autoExecuteCheckbox = await screen.findByRole("checkbox", { name: /auto-execute at scheduled time/i });
+    const planGenerationCheckbox = await screen.findByRole("checkbox", { name: /generate plan after saving/i });
+    expect(autoExecuteCheckbox).toBeChecked();
+    expect(planGenerationCheckbox).toBeChecked();
+
+    await user.click(autoExecuteCheckbox);
+    await user.click(planGenerationCheckbox);
+    await user.type(screen.getByPlaceholderText("Add title"), "Override defaults");
+    await user.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+    expect(onSubmit.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        title: "Override defaults",
+        autoExecute: false,
+        autoPlanGenerationEnabled: false,
+      }),
+    );
   });
 
   it("calls onClose when backdrop clicked", async () => {
@@ -137,6 +210,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     expect(call.description).toBe("Some description");
     expect(call.priority).toBe("High");
     expect(call.autoExecute).toBe(true);
+    expect(call.autoPlanGenerationEnabled).toBe(true);
     expect(call.dueAt).toBeNull();
     expect(call.scheduledStartAt).toBeInstanceOf(Date);
     expect(call.scheduledEndAt).toBeInstanceOf(Date);

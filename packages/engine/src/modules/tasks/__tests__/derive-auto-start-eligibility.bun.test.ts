@@ -10,6 +10,7 @@ function makeTask(overrides: Partial<TaskLike> = {}): TaskLike {
   return {
     status: "Ready",
     executionRuntime: "hermes",
+    hasAcceptedPlan: true,
     ...overrides,
   };
 }
@@ -210,6 +211,18 @@ describe("deriveAutoStartEligibility", () => {
         activeRun: null,
       });
       expect(result).toEqual({ ok: false, reason: "no_runtime_config" });
+    });
+  });
+
+  describe("not eligible — no_accepted_plan", () => {
+    it("rejects tasks without an accepted plan", () => {
+      const result = deriveAutoStartEligibility({
+        task: makeTask({ hasAcceptedPlan: false }),
+        workBlock: makeWorkBlock(),
+        now,
+        activeRun: null,
+      });
+      expect(result).toEqual({ ok: false, reason: "no_accepted_plan" });
     });
   });
 });
