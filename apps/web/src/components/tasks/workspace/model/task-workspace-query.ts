@@ -1,4 +1,5 @@
 import { api } from "@/lib/rpc-client";
+import { appendTaskPrimaryNodeAction, graphNodeIdForTaskAction } from "@/components/tasks/plan/task-action-node-action";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { ExecutionActionInput, NodeResultOutput, PlanExecutionResult, SubmitCheckpointActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type {
@@ -242,12 +243,19 @@ function buildAttentionCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
   }
 
   if (pageData.task.blockReason) {
+    const actionNodeId = graphNodeIdForTaskAction(
+      pageData.task.executionSummary?.primaryAction,
+      pageData,
+      null,
+    ) ?? currentNode?.id;
     return {
       id: "task-block-reason",
       title: "Blocked",
       description: pageData.task.blockReason.actionRequired ?? pageData.task.runnabilitySummary,
       statusLabel: pageData.task.blockReason.blockType,
       tone: "critical",
+      actionLabel: actionNodeId ? "Open action controls" : undefined,
+      actionNodeId: actionNodeId ?? undefined,
     };
   }
 
@@ -520,33 +528,37 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   graphPlan: TaskPlanGraphPlan | null;
   selectedNode?: PlanNodeDataModel | null;
 }): TaskWorkspaceExecutionConsoleView {
+  const graphPlan = appendTaskPrimaryNodeAction(input.pageData, input.graphPlan);
   const task = {
     ...input.pageData.task,
-    status: deriveTaskStatusFromGraph(input.pageData.task.status, input.graphPlan),
+    status: deriveTaskStatusFromGraph(input.pageData.task.status, graphPlan),
   } satisfies TaskData;
   const pageData = { ...input.pageData, task } satisfies TaskPageData;
-  const currentNode = pickWorkspaceCurrentNode(input.graphPlan, input.selectedNode ?? null);
-  const progress = buildProgressSummary(input.graphPlan);
+  const selectedNode = input.selectedNode
+    ? graphPlan?.nodes.find((node) => node.id === input.selectedNode?.id) ?? input.selectedNode
+    : null;
+  const currentNode = pickWorkspaceCurrentNode(graphPlan, selectedNode);
+  const progress = buildProgressSummary(graphPlan);
   const attention = buildAttentionCard(pageData, currentNode);
   const isPermissionLimited = !pageData.task.isRunnable && !pageData.task.blockReason;
   const isStale = pageData.latestRunSummary?.syncStatus === "stale";
-  const errorMessage = input.graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null;
-  const activity = buildActivity(pageData, input.graphPlan);
+  const errorMessage = graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null;
+  const activity = buildActivity(pageData, graphPlan);
 
   return {
     task,
     header: buildTaskHeaderView(pageData, progress, Boolean(attention), currentNode),
     navigation: buildWorkspaceNavigationView(pageData, Boolean(attention)),
-    executionFlow: buildExecutionFlowView(input.graphPlan, input.selectedNode ?? currentNode),
-    graphPlan: input.graphPlan,
+    executionFlow: buildExecutionFlowView(graphPlan, selectedNode ?? currentNode),
+    graphPlan,
     progress,
     nodeDetail: {
-      selectedNode: input.selectedNode ?? null,
+      selectedNode,
       currentNode,
       title: currentNode?.title ?? "No plan node selected",
       description: currentNode?.summary ?? currentNode?.objective ?? "Generate or select a plan node to inspect execution details.",
       status: currentNode ? mapTaskWorkspaceStatus(currentNode.status) : null,
-      stepPosition: currentNode ? `${(input.graphPlan?.nodes ?? []).findIndex((node) => node.id === currentNode.id) + 1}/${input.graphPlan?.nodes.length ?? 0}` : "0/0",
+      stepPosition: currentNode ? `${(graphPlan?.nodes ?? []).findIndex((node) => node.id === currentNode.id) + 1}/${graphPlan?.nodes.length ?? 0}` : "0/0",
       autoRefreshEnabled: currentNode ? ["running", "approval-needed"].includes(mapTaskWorkspaceStatus(currentNode.status)) : false,
       tabs: ["result", "activity", "action", "configuration"],
       disabledActionReason:
@@ -558,19 +570,19 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
       isEmpty: !currentNode,
     },
     readiness: buildReadinessCard(pageData, currentNode),
-    latestResult: buildLatestResultCard(pageData, input.graphPlan),
+    latestResult: buildLatestResultCard(pageData, graphPlan),
     attention,
-    artifacts: buildArtifactItems(pageData, input.graphPlan),
+    artifacts: buildArtifactItems(pageData, graphPlan),
     activity,
     states: {
-      isEmpty: (input.graphPlan?.nodes.length ?? 0) === 0,
+      isEmpty: (graphPlan?.nodes.length ?? 0) === 0,
       isStale,
       isPermissionLimited,
       errorMessage,
       treatment: buildWorkspaceStateTreatment({
         currentNode,
-        hasPlan: (input.graphPlan?.nodes.length ?? 0) > 0,
-        allNodesDone: Boolean(input.graphPlan?.nodes.length) && Boolean(input.graphPlan?.nodes.every((node) => isDoneStatus(node.status))),
+        hasPlan: (graphPlan?.nodes.length ?? 0) > 0,
+        allNodesDone: Boolean(graphPlan?.nodes.length) && Boolean(graphPlan?.nodes.every((node) => isDoneStatus(node.status))),
         isBlocked: Boolean(pageData.task.blockReason),
         isStale,
         isPermissionLimited,

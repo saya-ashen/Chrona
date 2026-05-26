@@ -28,6 +28,8 @@ describe("generate_plan feature spec", () => {
     expect(spec.structuredOutputSchema).toBeUndefined();
     expect(GENERATE_PLAN_BLUEPRINT_TOOL_NAME).toBe("chrona_plan_generate");
     expect(spec.instructions).toContain("You MUST call the chrona_plan_generate tool.");
+    expect(spec.instructions).toContain("Every executable plan must end with exactly one user-facing result delivery node.");
+    expect(spec.instructions).toContain("not a checkpoint, approval, confirmation, review, waiting, routing, or bookkeeping node");
     expect(spec.inputText).toContain("Title: 制作一个汉堡");
     expect(spec.inputText).toContain("Estimated duration: 60 minutes");
   });

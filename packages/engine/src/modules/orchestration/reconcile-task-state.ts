@@ -14,7 +14,16 @@ type ReconcileTaskStateInput = {
   graph: EffectivePlanGraph;
   runnable?: boolean;
   readinessReason?: string | null;
+  taskStatus?: string | null;
+  blockReason?: TaskBlockReason | null;
   now?: Date;
+};
+
+type TaskBlockReason = {
+  blockType?: string | null;
+  actionRequired?: string | null;
+  scope?: string | null;
+  nodeId?: string | null;
 };
 
 export type ReconciledTaskState = {
@@ -26,10 +35,15 @@ export type ReconciledTaskState = {
 const noAction: TaskAction = { type: "none", enabled: false, label: "No action available" };
 
 export function reconcileTaskState(input: ReconcileTaskStateInput): ReconciledTaskState {
-  const currentNode = pickCurrentNode(input.graph);
-  const executionState = deriveExecutionState(input.graph);
+  const currentNode = pickCurrentNode(input.graph, input.blockReason);
+  const executionState = deriveExecutionState(input.graph, input.blockReason, input.taskStatus);
   const progress = deriveProgress(input.graph);
-  const primaryAction = derivePrimaryAction(executionState, input.runnable ?? true);
+  const primaryAction = derivePrimaryAction({
+    state: executionState,
+    runnable: input.runnable ?? true,
+    blockReason: input.blockReason,
+    targetNodeId: currentNode?.id ?? input.blockReason?.nodeId ?? null,
+  });
   const issues = detectReconciliationIssues(input.graph);
   const repairActions = deriveRepairActions(issues);
 
@@ -69,12 +83,18 @@ export function reconcileTaskState(input: ReconcileTaskStateInput): ReconciledTa
   };
 }
 
-function deriveExecutionState(graph: EffectivePlanGraph): TaskExecutionState {
+function deriveExecutionState(
+  graph: EffectivePlanGraph,
+  blockReason?: TaskBlockReason | null,
+  taskStatus?: string | null,
+): TaskExecutionState {
   if (graph.failedNodeIds.length > 0) return "failed";
   if (graph.degradedNodeIds.length > 0) return "degraded";
   if (graph.blockedNodeIds.length > 0) return "blocked";
   if (graph.waitingForApprovalNodeIds.length > 0) return "waiting_for_approval";
   if (graph.waitingForUserNodeIds.length > 0 || graph.waitingNodeIds.length > 0) return "waiting_for_user";
+  const blockState = executionStateFromTaskBlock(blockReason, taskStatus);
+  if (blockState) return blockState;
   if (graph.runningNodeIds.length > 0) return "running";
   if (graph.cancelledNodeIds.length > 0 && graph.readyNodeIds.length === 0) return "cancelled";
   if (graph.readyNodeIds.length > 0) return "queued";
@@ -82,8 +102,9 @@ function deriveExecutionState(graph: EffectivePlanGraph): TaskExecutionState {
   return "not_started";
 }
 
-function pickCurrentNode(graph: EffectivePlanGraph) {
+function pickCurrentNode(graph: EffectivePlanGraph, blockReason?: TaskBlockReason | null) {
   const currentId = [
+    blockReason?.nodeId,
     ...graph.runningNodeIds,
     ...graph.waitingForApprovalNodeIds,
     ...graph.waitingForUserNodeIds,
@@ -92,11 +113,19 @@ function pickCurrentNode(graph: EffectivePlanGraph) {
     ...graph.degradedNodeIds,
     ...graph.failedNodeIds,
     ...graph.readyNodeIds,
-  ][0];
+  ].find((nodeId): nodeId is string => Boolean(nodeId));
   return currentId ? graph.nodes.find((node) => node.id === currentId) ?? null : null;
 }
 
-function derivePrimaryAction(state: TaskExecutionState, runnable: boolean): TaskAction {
+function derivePrimaryAction(input: {
+  state: TaskExecutionState;
+  runnable: boolean;
+  blockReason?: TaskBlockReason | null;
+  targetNodeId?: string | null;
+}): TaskAction {
+  const blockAction = derivePrimaryActionFromTaskBlock(input.blockReason, input.targetNodeId);
+  if (blockAction) return input.runnable ? blockAction : { ...blockAction, enabled: false, label: "Not runnable" };
+  const { state, runnable } = input;
   if (!runnable) return { type: "none", enabled: false, label: "Not runnable" };
   switch (state) {
     case "not_started":
@@ -115,6 +144,66 @@ function derivePrimaryAction(state: TaskExecutionState, runnable: boolean): Task
     default:
       return noAction;
   }
+}
+
+function executionStateFromTaskBlock(
+  blockReason?: TaskBlockReason | null,
+  taskStatus?: string | null,
+): TaskExecutionState | null {
+  const blockType = normalizeBlockType(blockReason);
+  if (blockType === "human_input_required" || blockType === "waiting_for_input") return "waiting_for_user";
+  if (blockType === "approval_required" || blockType === "approval_pending") return "waiting_for_approval";
+  if (blockType === "replan_required") return "waiting_for_approval";
+  if (blockType === "run_failed" || blockType === "node_failed") return "failed";
+  if (blockType) return "blocked";
+
+  switch (taskStatus?.toLowerCase()) {
+    case "waitingforinput":
+    case "waiting_for_input":
+      return "waiting_for_user";
+    case "waitingforapproval":
+    case "waiting_for_approval":
+      return "waiting_for_approval";
+    case "blocked":
+      return "blocked";
+    case "failed":
+      return "failed";
+    default:
+      return null;
+  }
+}
+
+function derivePrimaryActionFromTaskBlock(
+  blockReason?: TaskBlockReason | null,
+  targetNodeId?: string | null,
+): TaskAction | null {
+  const blockType = normalizeBlockType(blockReason);
+  const actionRequired = blockReason?.actionRequired?.trim();
+  switch (blockType) {
+    case "human_input_required":
+    case "waiting_for_input":
+      return { type: "provide_input", enabled: true, label: actionRequired || "Provide input", targetNodeId };
+    case "approval_required":
+    case "approval_pending":
+      return { type: "approve", enabled: true, label: actionRequired || "Review approval", targetNodeId };
+    case "replan_required":
+      return { type: "replan", enabled: true, label: actionRequired || "Replan", targetNodeId };
+    case "run_failed":
+    case "node_failed":
+      return { type: "retry_sync", enabled: true, label: actionRequired || "Retry run", targetNodeId };
+    case "external_dependency":
+      return { type: "resume", enabled: true, label: actionRequired || "Resume after unblock", targetNodeId };
+    case "capability_unavailable":
+      return { type: "retry_sync", enabled: true, label: actionRequired || "Retry after provider is available", targetNodeId };
+    case "node_blocked":
+      return { type: "replan", enabled: true, label: actionRequired || "Resolve blocked node", targetNodeId };
+    default:
+      return null;
+  }
+}
+
+function normalizeBlockType(blockReason?: TaskBlockReason | null) {
+  return blockReason?.blockType?.trim().toLowerCase() ?? "";
 }
 
 function deriveProgress(graph: EffectivePlanGraph) {

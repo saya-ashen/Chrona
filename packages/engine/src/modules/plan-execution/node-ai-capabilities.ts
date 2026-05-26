@@ -10,6 +10,7 @@ import type { AiRuntimeInvocation, AiRuntimeInvoker } from "./ai-runtime-invoker
 import type { NodeExecutionResult } from "./node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
+import { branchBindingForRef } from "./node-runtime-refs";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
@@ -94,12 +95,16 @@ function failedErrorFromSnapshot(input: {
 
 function terminalNodeResultFromSnapshot(input: {
   invocation: AiRuntimeInvocation;
+  node: EffectivePlanNode;
+  plan: EffectivePlanGraph;
   evidence: NodeExecutionEvidence;
   structured: Record<string, unknown> | undefined;
   summary?: string;
 }): NodeExecutionResult | undefined {
   const terminalToolName = terminalToolNameFromSnapshot(input.invocation.response);
   switch (terminalToolName) {
+    case "chrona_condition_select":
+      return conditionSelectionResultFromSnapshot(input);
     case "chrona_node_block":
       return {
         status: "blocked",
@@ -122,6 +127,47 @@ function terminalNodeResultFromSnapshot(input: {
       };
     default:
       return undefined;
+  }
+}
+
+function conditionSelectionResultFromSnapshot(input: {
+  node: EffectivePlanNode;
+  plan: EffectivePlanGraph;
+  evidence: NodeExecutionEvidence;
+  structured: Record<string, unknown> | undefined;
+  summary?: string;
+}): NodeExecutionResult {
+  const branchRef = recordValue(input.structured, "branchRef");
+  if (input.node.type !== "condition" || typeof branchRef !== "string" || !branchRef.trim()) {
+    return {
+      status: "blocked",
+      reason: "Condition selection terminal tool completed without a valid branchRef",
+      evidence: input.evidence,
+    };
+  }
+  try {
+    const branch = branchBindingForRef({
+      plan: input.plan,
+      node: input.node,
+      branchRef: branchRef.trim(),
+    });
+    return {
+      status: "done",
+      summary: input.summary || `Condition resolved to branch: ${branch.label}`,
+      evidence: input.evidence,
+      output: outputFromStructuredPayload({ structured: input.structured, fallback: undefined }),
+      selectedBranch: {
+        label: branch.label,
+        nextNodeId: branch.nextNodeId!,
+        source: "ai",
+      },
+    };
+  } catch (error) {
+    return {
+      status: "blocked",
+      reason: error instanceof Error ? error.message : "Condition branchRef could not be resolved",
+      evidence: input.evidence,
+    };
   }
 }
 
@@ -210,7 +256,14 @@ export async function runTaskNodeFeature(
     const summary = invocation.response.outputText?.trim() ||
       (typeof structuredSummary === "string" ? structuredSummary.trim() : undefined);
     const terminalNodeResult = invocation.response.status === "completed"
-      ? terminalNodeResultFromSnapshot({ invocation, evidence, structured, summary })
+      ? terminalNodeResultFromSnapshot({
+          invocation,
+          node: input.node,
+          plan: input.plan,
+          evidence,
+          structured,
+          summary,
+        })
       : undefined;
     const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed"
       ? {

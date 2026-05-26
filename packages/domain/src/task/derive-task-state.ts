@@ -14,6 +14,7 @@ type BlockReason = {
   blockType: string;
   scope: string;
   actionRequired: string;
+  nodeId?: string;
 };
 
 type DeriveTaskStateResult = {
@@ -145,6 +146,7 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
           blockType: "human_input_required",
           scope: "plan_node",
           actionRequired: "Provide Input",
+          nodeId: input.executionSession.currentNodeId ?? undefined,
         },
         blockSince: activeRun?.updatedAt ?? null,
       };
@@ -157,6 +159,7 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
           blockType: pauseReason === "replan_required" ? "replan_required" : "approval_required",
           scope: "plan_node",
           actionRequired: "Review Step Output",
+          nodeId: input.executionSession.currentNodeId ?? undefined,
         },
         blockSince: activeRun?.updatedAt ?? null,
       };
@@ -173,14 +176,28 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
         blockSince: activeRun?.updatedAt ?? null,
       };
     }
+    if (pauseReason === "external_dependency") {
+      return {
+        persistedStatus: "Blocked",
+        displayState: "Attention Needed",
+        blockReason: {
+          blockType: "external_dependency",
+          scope: "plan_node",
+          actionRequired: "Resume after external dependency is resolved",
+          nodeId: input.executionSession.currentNodeId ?? undefined,
+        },
+        blockSince: activeRun?.updatedAt ?? null,
+      };
+    }
     return {
       persistedStatus: "Blocked",
       displayState: "Attention Needed",
-      blockReason: {
-        blockType: "node_blocked",
-        scope: "plan_node",
-        actionRequired: "Check execution status",
-      },
+        blockReason: {
+          blockType: "node_blocked",
+          scope: "plan_node",
+          actionRequired: "Check execution status",
+          nodeId: input.executionSession.currentNodeId ?? undefined,
+        },
       blockSince: activeRun?.updatedAt ?? null,
     };
   }

@@ -51,6 +51,7 @@ export const taskActionSchema = z.object({
   type: z.union([taskPrimaryActionTypeSchema, taskRecoveryActionTypeSchema]),
   enabled: z.boolean(),
   label: z.string().min(1),
+  targetNodeId: z.string().min(1).nullable().optional(),
 });
 
 export const taskProgressSchema = z.object({

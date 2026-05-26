@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import type { TaskAction } from "@chrona/contracts";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
@@ -57,6 +58,61 @@ function isCompletedTaskStatus(status: string | null | undefined) {
 function hasCompletedGraphExecution(graphPlan: TaskPlanGraphPlan | null) {
   const nodes = graphPlan?.nodes ?? [];
   return nodes.length > 0 && nodes.every((node) => isCompletedGraphNode(node.status));
+}
+
+function graphNodeIdForAction(action: TaskAction | null | undefined, pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null) {
+  return action?.targetNodeId
+    ?? pageData.task.executionSummary?.currentNodeId
+    ?? graphPlan?.currentStepId
+    ?? graphPlan?.nodes.find((node) => node.status === "failed" || node.status === "blocked")?.id
+    ?? null;
+}
+
+function dispatchInputForPrimaryAction(
+  action: TaskAction,
+  nodeId: string | null,
+): ExecutionActionInput | null {
+  switch (action.type) {
+    case "start":
+      return { action: "start_manual" };
+    case "retry_sync":
+      return nodeId ? { action: "retry_node", nodeId } : null;
+    case "resume":
+      return { action: "resume_after_unblock", ...(nodeId ? { nodeId } : {}) };
+    case "cancel":
+      return { action: "cancel_session" };
+    case "pause":
+      return { action: "pause_session" };
+    case "provide_input":
+    case "approve":
+    case "replan":
+    case "none":
+    case "cancel_execution":
+    case "replan_from_node":
+    case "repair_inconsistency":
+      return null;
+  }
+}
+
+function primaryActionTone(action: TaskAction): CommandCenterPrimaryAction["tone"] {
+  switch (action.type) {
+    case "retry_sync":
+    case "cancel":
+    case "cancel_execution":
+      return "critical";
+    case "provide_input":
+    case "approve":
+    case "resume":
+    case "replan":
+    case "replan_from_node":
+      return "warning";
+    case "start":
+      return "success";
+    case "pause":
+    case "none":
+    case "repair_inconsistency":
+      return "neutral";
+  }
 }
 
 function isNodeDetailDrawerTarget(target: EventTarget | null) {
@@ -170,6 +226,18 @@ export function TaskWorkspacePlanSection({
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
   const currentOperationNode = operationConsoleView.nodeDetail.currentNode;
   const selectedDetailNode = consoleView.nodeDetail.currentNode;
+  const taskPrimaryAction = pageData.task.executionSummary?.primaryAction ?? null;
+  const primaryActionNodeId = graphNodeIdForAction(taskPrimaryAction, pageData, graphPlan);
+  const primaryActionDispatch = taskPrimaryAction
+    ? dispatchInputForPrimaryAction(taskPrimaryAction, primaryActionNodeId)
+    : null;
+  const shouldUseTaskPrimaryAction = Boolean(
+    isPlanAccepted &&
+    !hasTaskCompleted &&
+    taskPrimaryAction?.enabled &&
+    taskPrimaryAction.type !== "none" &&
+    taskPrimaryAction.type !== "start",
+  );
   const nodeActivityQuery = useQuery({
     queryKey: ["task-workspace-node-activity", pageData.task.id, selectedDetailNode?.id],
     queryFn: () => loadNodeWorkspaceActivityPage({
@@ -251,14 +319,24 @@ export function TaskWorkspacePlanSection({
           tone: "success",
           suppressAttentionCard: true,
         }
-    : !hasGraphExecutionStarted
+    : shouldUseTaskPrimaryAction && taskPrimaryAction
            ? {
-              label: "Start plan",
-              description: "Run the accepted plan and move into the first executable step.",
-              statusLabel: plan.status,
-              tone: "success",
-              onClick: () => void onDispatchExecutionAction({ action: "start_manual" }),
-            }
+               label: taskPrimaryAction.label,
+               description: pageData.task.runnabilitySummary || pageData.task.blockReason?.actionRequired || "Complete the required execution action to continue the accepted plan.",
+               statusLabel: pageData.task.blockReason?.blockType ?? consoleView.header.primaryStateLabel ?? pageData.task.status,
+               tone: primaryActionTone(taskPrimaryAction),
+               onClick: primaryActionDispatch
+                 ? () => void onDispatchExecutionAction(primaryActionDispatch)
+                 : undefined,
+             }
+        : !hasGraphExecutionStarted
+            ? {
+               label: "Start plan",
+               description: "Run the accepted plan and move into the first executable step.",
+               statusLabel: plan.status,
+               tone: "success",
+               onClick: () => void onDispatchExecutionAction({ action: "start_manual" }),
+             }
         : shouldShowCurrentOperation && currentOperationNode
           ? {
               label: "Current node action",
@@ -266,12 +344,13 @@ export function TaskWorkspacePlanSection({
               statusLabel: currentOperationNode.statusLabel ?? currentOperationNode.status,
               tone: operationConsoleView.attention?.tone ?? operationConsoleView.readiness.tone,
               actionControls: (
-                <WorkspaceNodeActionControls
-                  node={currentOperationNode}
-                  disabledActionReason={operationConsoleView.nodeDetail.disabledActionReason}
-                  onSubmitCheckpointAction={onSubmitCheckpointAction}
-                  className="border-0 bg-transparent p-0 shadow-none"
-                />
+                  <WorkspaceNodeActionControls
+                    node={currentOperationNode}
+                    disabledActionReason={operationConsoleView.nodeDetail.disabledActionReason}
+                    onDispatchExecutionAction={onDispatchExecutionAction}
+                    onSubmitCheckpointAction={onSubmitCheckpointAction}
+                    className="border-0 bg-transparent p-0 shadow-none"
+                  />
               ),
             }
         : {
@@ -461,6 +540,7 @@ export function TaskWorkspacePlanSection({
                 onDrawerSizeChange={setNodeDrawerSize}
                 preferredTab={preferredNodeDetailTab}
                 onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
+                onDispatchExecutionAction={onDispatchExecutionAction}
                 onSubmitCheckpointAction={onSubmitCheckpointAction}
               />
             </div>

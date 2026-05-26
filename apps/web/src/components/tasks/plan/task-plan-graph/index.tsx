@@ -82,6 +82,7 @@ function GraphShell({
   onFitGraph,
   onZoomIn,
   onZoomOut,
+  onDispatchExecutionAction,
   inspectorPlacement,
   showOverview,
   fillHeight = false,
@@ -106,6 +107,7 @@ function GraphShell({
   onFitGraph: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  onDispatchExecutionAction?: TaskPlanGraphProps["onDispatchExecutionAction"];
   inspectorPlacement: "overlay" | "none";
   showOverview: boolean;
   fillHeight?: boolean;
@@ -176,6 +178,7 @@ function GraphShell({
                 node={selectedNode}
                 graphCopy={graphCopy}
                 nodes={planNodes}
+                onDispatchExecutionAction={onDispatchExecutionAction}
               />
             </div>
           </div>
@@ -247,6 +250,7 @@ export function TaskPlanGraph({
   className,
   inspectorPlacement = "overlay",
   onSelectedNodeChange,
+  onDispatchExecutionAction,
   dismissSelectionOnOutsideClick = true,
   showOverview = true,
 }: TaskPlanGraphProps) {
@@ -299,6 +303,14 @@ export function TaskPlanGraph({
   const compact = useMemo(() => buildCompactViewModel(plan), [plan]);
   const selectedNode =
     plan.nodes.find((node) => node.id === selectedNodeId) ?? null;
+
+  useEffect(() => {
+    if (selectedNodeId || plan.state !== "ready") return;
+    const actionableNode = plan.nodes.find((node) => node.availableActions?.some((action) => action.executionAction));
+    if (actionableNode) {
+      setSelectedNodeId(actionableNode.id);
+    }
+  }, [plan.nodes, plan.state, selectedNodeId]);
 
   useEffect(() => {
     onSelectedNodeChange?.(selectedNode, plan.nodes);
@@ -521,10 +533,11 @@ export function TaskPlanGraph({
               onDismissOverlay={handleDismissOverlay}
               onCenterCurrentNode={handleCenterCurrentNode}
               onExpandGraph={() => setIsFullDialogOpen(true)}
-              onFitGraph={handleFitGraph}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              inspectorPlacement={inspectorPlacement}
+            onFitGraph={handleFitGraph}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onDispatchExecutionAction={onDispatchExecutionAction}
+            inspectorPlacement={inspectorPlacement}
               showOverview={showOverview}
               testId="task-plan-graph-full-dialog"
             />
@@ -641,6 +654,7 @@ export function TaskPlanGraph({
           onFitGraph={handleFitGraph}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
+          onDispatchExecutionAction={onDispatchExecutionAction}
           inspectorPlacement={inspectorPlacement}
           showOverview={showOverview}
         />

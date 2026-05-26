@@ -30,6 +30,7 @@ export type TaskData = {
     blockType?: string;
     actionRequired?: string;
     scope?: string;
+    nodeId?: string;
     since?: string;
   } | null;
   dependencies: Array<{

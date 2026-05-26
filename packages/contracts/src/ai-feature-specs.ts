@@ -384,7 +384,11 @@ Pause execution for a time duration or external event.
 13. Do NOT model retries, revisions, missing-info loops, or "loop until done" by pointing edges back to previous nodes.
 14. If more information is needed, add a checkpoint for that input and then continue to a NEW downstream task such as task_finalize_requirements. Do not route the checkpoint back to an earlier task.
 15. Before calling chrona_plan_generate, mentally topologically sort the graph: every edge and branch must point only to a downstream node.
-16. This phase is planning only. Do NOT execute or implement the task.
+16. Every executable plan must end with exactly one user-facing result delivery node.
+17. The final node must present the completed task result to the user in the form that best fits the task. It must be a real result-delivery node, not a checkpoint, approval, confirmation, review, waiting, routing, or bookkeeping node.
+18. All successful execution paths must converge into this single final result delivery node. Do not add another node after it for confirmation or status bookkeeping.
+19. The final node title should make it clear that this node delivers or presents the task result to the user.
+20. This phase is planning only. Do NOT execute or implement the task.
 
 Respond in the same language as the input.`.trim();
 

@@ -3,6 +3,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import {
   acceptTaskResult,
+  dispatchExecutionAction as dispatchTaskExecutionAction,
   markTaskDone,
   reopenTask,
   retryExecution,
@@ -10,6 +11,7 @@ import {
   startExecution,
   submitExecutionInput,
 } from "@/lib/task-actions-client";
+import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import type { WorkCopy, WorkPageData } from "./work-page-types";
 
 type ActionScope = "hero" | "result";
@@ -47,7 +49,7 @@ export function useWorkPageActions({
   setResultErrorMessage,
 }: UseWorkPageActionsArgs) {
   const runScopedAction = useCallback(
-    async (action: () => Promise<void>, scope: ActionScope) => {
+    async <T>(action: () => Promise<T>, scope: ActionScope): Promise<T> => {
       const setScopedErrorMessage =
         scope === "hero" ? setHeroErrorMessage : setResultErrorMessage;
 
@@ -56,15 +58,14 @@ export function useWorkPageActions({
         setScopedErrorMessage(null);
 
         const actionEpoch = beginRefreshEpoch();
-        await action();
+        const result = await action();
         await refresh({ epoch: actionEpoch });
 
-        return true;
+        return result;
       } catch (error) {
-        setScopedErrorMessage(
-          error instanceof Error ? error.message : copy.actionFailed,
-        );
-        return false;
+        const message = error instanceof Error ? error.message : copy.actionFailed;
+        setScopedErrorMessage(message);
+        throw new Error(message);
       } finally {
         setIsPending(false);
       }
@@ -81,7 +82,8 @@ export function useWorkPageActions({
         return false;
       }
 
-      const didSucceed = await runScopedAction(async () => {
+      try {
+        await runScopedAction(async () => {
         const planExecution = data.planExecution;
 
         if (!planExecution) {
@@ -131,13 +133,12 @@ export function useWorkPageActions({
         }
 
         throw new Error(copy.currentRunCannotAcceptMessages);
-      }, "hero");
-
-      if (didSucceed) {
+        }, "hero");
         resetComposer();
+        return true;
+      } catch {
+        return false;
       }
-
-      return didSucceed;
     },
     [
       copy.composerRequired,
@@ -155,12 +156,14 @@ export function useWorkPageActions({
         await startExecution({
           taskId: data.taskShell.id,
         });
+        return true;
       }, "hero");
     },
 
     async acceptResult() {
       return runScopedAction(async () => {
         await acceptTaskResult({ taskId: data.taskShell.id });
+        return true;
       }, "result");
     },
 
@@ -172,18 +175,35 @@ export function useWorkPageActions({
             prompt?.trim() ||
             `${copy.continueProcessingPrefix}${data.taskShell.title}`,
         });
+        return true;
       }, "result");
+    },
+
+    async dispatchExecutionAction(action: ExecutionActionInput) {
+      return runScopedAction(async () => {
+        const result = await dispatchTaskExecutionAction({
+          taskId: data.taskShell.id,
+          action,
+        });
+        return {
+          message: result && typeof result === "object" && "message" in result
+            ? String((result as { message?: unknown }).message ?? "Action queued")
+            : "Action queued",
+        };
+      }, "hero");
     },
 
     async markTaskDone() {
       return runScopedAction(async () => {
         await markTaskDone({ taskId: data.taskShell.id });
+        return true;
       }, "result");
     },
 
     async reopenTask() {
       return runScopedAction(async () => {
         await reopenTask({ taskId: data.taskShell.id });
+        return true;
       }, "result");
     },
   };

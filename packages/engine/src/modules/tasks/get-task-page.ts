@@ -82,28 +82,39 @@ type TaskActivityPageInput = {
 function readBlockReason(task: {
   blockReason: unknown;
   projection: {
-    blockType: string | null;
-    actionRequired: string | null;
-    blockScope: string | null;
-    blockSince: Date | null;
+      blockType: string | null;
+      actionRequired: string | null;
+      blockScope: string | null;
+      blockSince: Date | null;
+      currentNodeId: string | null;
+    } | null;
+  }) {
+  const storedBlockReason = task.blockReason as {
+    blockType?: string;
+    actionRequired?: string;
+    scope?: string;
+    nodeId?: string;
+    since?: string;
   } | null;
-}) {
-  return (
-    (task.blockReason as {
-      blockType?: string;
-      actionRequired?: string;
-      scope?: string;
-      since?: string;
-    } | null) ??
-    (task.projection
-      ? {
-          blockType: task.projection.blockType ?? undefined,
-          actionRequired: task.projection.actionRequired ?? undefined,
-          scope: task.projection.blockScope ?? undefined,
-          since: task.projection.blockSince?.toISOString(),
-        }
-      : null)
-  );
+  const projectedBlockReason = task.projection
+    ? {
+        blockType: task.projection.blockType ?? undefined,
+        actionRequired: task.projection.actionRequired ?? undefined,
+        scope: task.projection.blockScope ?? undefined,
+        nodeId: task.projection.currentNodeId ?? undefined,
+        since: task.projection.blockSince?.toISOString(),
+      }
+    : null;
+
+  if (storedBlockReason) {
+    return {
+      ...storedBlockReason,
+      nodeId: storedBlockReason.nodeId ?? projectedBlockReason?.nodeId,
+      since: storedBlockReason.since ?? projectedBlockReason?.since,
+    };
+  }
+
+  return projectedBlockReason;
 }
 
 function stringPayloadValue(payload: unknown, key: string) {
@@ -545,6 +556,8 @@ export async function getTaskPage(taskId: string) {
         graph: savedPlan.effectivePlan,
         runnable: runnability.isRunnable,
         readinessReason: runnability.summary,
+        taskStatus: task.status,
+        blockReason: readBlockReason(task),
       })
     : null;
 

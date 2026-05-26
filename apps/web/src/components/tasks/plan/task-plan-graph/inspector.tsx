@@ -1,6 +1,6 @@
 "use client";
 
-import type { SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { interactionLabel, nodeKindLabel } from "./logic";
 import { TaskPlanGraphInspectorDetails } from "./inspector-details";
 import { TaskPlanGraphInspectorRunPanel } from "./inspector-run-panel";
@@ -12,11 +12,13 @@ export function TaskPlanGraphInspector({
   graphCopy,
   nodes = [],
   onSubmitCheckpointAction,
+  onDispatchExecutionAction,
 }: {
   node: PlanNodeDataModel | null;
   graphCopy: GraphCopy;
   nodes?: PlanNodeDataModel[];
   onSubmitCheckpointAction?: (action: SubmitCheckpointActionInput) => Promise<TaskExecutionDispatchResult>;
+  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<{ message: string }>;
 }) {
   if (!node) {
     return (
@@ -50,7 +52,11 @@ export function TaskPlanGraphInspector({
 
       <div className="relative mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         <TaskPlanGraphInspectorDetails node={node} graphCopy={graphCopy} nodes={nodes} />
-        <TaskPlanGraphInspectorRunPanel node={node} onSubmitCheckpointAction={onSubmitCheckpointAction} />
+        <TaskPlanGraphInspectorRunPanel
+          node={node}
+          onSubmitCheckpointAction={onSubmitCheckpointAction}
+          onDispatchExecutionAction={onDispatchExecutionAction}
+        />
       </div>
     </aside>
   );

@@ -5,7 +5,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles, Terminal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { NodeResultEvidence, NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -381,9 +381,11 @@ function summarizeFieldValues(fields: PlanNodeField[], values: Record<string, st
 export function TaskPlanGraphInspectorRunPanel({
   node,
   onSubmitCheckpointAction,
+  onDispatchExecutionAction,
 }: {
   node: PlanNodeDataModel;
   onSubmitCheckpointAction?: (action: SubmitCheckpointActionInput) => Promise<TaskExecutionDispatchResult>;
+  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<{ message: string }>;
 }) {
   const [selectedActionId, setSelectedActionId] = useState<string | null>(() => defaultActionForNode(node));
   const form = useForm<Record<string, string>>({
@@ -410,11 +412,12 @@ export function TaskPlanGraphInspectorRunPanel({
   const runPanelCopy = useMemo(() => getRunPanelCopy(resolvedRunPanelMode), [resolvedRunPanelMode]);
   const runPanelTheme = useMemo(() => getRunPanelTheme(resolvedRunPanelMode), [resolvedRunPanelMode]);
   const runPanelHints = useMemo(() => getRunPanelHints(resolvedRunPanelMode), [resolvedRunPanelMode]);
-  const showRunControls = node.status === "ready" || node.status === "active" || node.status === "waiting" || node.status === "blocked";
+  const availableActions = node.availableActions ?? [];
+  const hasExecutionAction = availableActions.some((action) => action.executionAction);
+  const showRunControls = hasExecutionAction || node.status === "ready" || node.status === "active" || node.status === "waiting" || node.status === "blocked";
   const SubmitIcon = runPanelCopy.submitIcon;
   const primarySubmitLabel = resolvePrimarySubmitLabel(node, resolvedRunPanelMode, runPanelCopy.submitLabel);
   const interactiveFields = node.interactiveFields ?? [];
-  const availableActions = node.availableActions ?? [];
   const canSubmitRunAction = interactiveFields.every((field) => !field.required || Boolean(fieldValues[field.key]?.trim()));
 
   async function handleRunAction(values: Record<string, string>) {
@@ -422,6 +425,25 @@ export function TaskPlanGraphInspectorRunPanel({
     const label = selectedAction?.kind === "trigger"
       ? primarySubmitLabel
       : selectedAction?.label ?? node.nextAction ?? "Run action";
+
+    if (selectedAction?.executionAction) {
+      if (!onDispatchExecutionAction) {
+        setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: "No backend handler is connected for this surface." }, ...current].slice(0, 4));
+        return;
+      }
+
+      setIsDispatching(true);
+      try {
+        const result = await onDispatchExecutionAction(selectedAction.executionAction);
+        setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Failed to dispatch execution action";
+        setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} still running` : `${label} failed`, detail: message }, ...current].slice(0, 4));
+      } finally {
+        setIsDispatching(false);
+      }
+      return;
+    }
 
     if (!onSubmitCheckpointAction) {
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || "No backend handler is connected for this surface." }, ...current].slice(0, 4));

@@ -251,5 +251,17 @@ function approvalBlockType(pauseReason: ExecutionPauseReason | null) {
 }
 
 function blockedBlockType(pauseReason: ExecutionPauseReason | null) {
-  return pauseReason === "capability_unavailable" ? "capability_unavailable" : "node_blocked";
+  switch (pauseReason) {
+    case "capability_unavailable":
+      return "capability_unavailable";
+    case "external_dependency":
+      return "external_dependency";
+    case "manual_action":
+    case null:
+    case "user_input":
+    case "approval":
+    case "review":
+    case "replan_required":
+      return "node_blocked";
+  }
 }

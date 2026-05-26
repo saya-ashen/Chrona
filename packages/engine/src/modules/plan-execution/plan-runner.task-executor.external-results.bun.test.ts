@@ -313,6 +313,12 @@ describe("plan-runner task executor external results", () => {
         evidence: { sessionId: input.mainSession.id, runId: "provider-without-branch" },
       } satisfies NodeExecutionResult;
     });
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "started",
+      summary: "Auto task runtime run started",
+      evidence: { runId: "auto-run" },
+      output: { runtimeRunRef: "auto-run" },
+    });
 
     const { workspace, task } = await seedWorkspaceAndTask("Runner AI condition command result");
     const compiledPlan = makeAiConditionThenTaskPlan("graph_ai_condition_command_result");
@@ -324,7 +330,7 @@ describe("plan-runner task executor external results", () => {
     });
 
     expect(result.status).toBe("running");
-    expect(result.message).toContain("result was submitted through graph command");
+    expect(result.message).toBe("Auto task runtime run started");
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     const conditionResult = [...(persisted?.results ?? [])].reverse().find(
@@ -345,8 +351,8 @@ describe("plan-runner task executor external results", () => {
       results: persisted!.results,
     });
     expect(effectiveAfterSelection.nodes.find((node) => node.id === "auto_task")).toMatchObject({
-      ready: true,
-      status: "ready",
+      ready: false,
+      status: "running",
     });
     const blockedEvent = await db.event.findFirst({
       where: { taskId: task.id, eventType: "plan_execution.node_blocked" },

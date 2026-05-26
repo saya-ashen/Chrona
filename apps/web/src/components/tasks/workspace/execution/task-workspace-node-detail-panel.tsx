@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { ChevronUp, Copy, X } from "lucide-react";
-import type { NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
 import {
@@ -32,14 +32,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
@@ -104,10 +96,18 @@ function stringifyOutput(output: NodeResultOutput) {
   return "";
 }
 
+function outputsContainText(outputs: NodeResultOutput[], text: string | null) {
+  const normalizedText = text?.trim();
+  if (!normalizedText) return false;
+
+  return outputs.some((output) => stringifyOutput(output).includes(normalizedText));
+}
+
 function ResultTab({ node }: { node: PlanNodeDataModel }) {
-  const runResult = useMemo(() => extractRunResult(node), [node]);
+  const rawRunResult = useMemo(() => extractRunResult(node), [node]);
   const runError = useMemo(() => extractRunError(node), [node]);
   const outputs = node.resultOutputs ?? [];
+  const runResult = outputsContainText(outputs, rawRunResult) ? null : rawRunResult;
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const copyText = [runResult, ...outputs.map(stringifyOutput)]
     .filter((value): value is string => Boolean(value?.trim()))
@@ -295,11 +295,15 @@ function hasSubmittedInputFields(inputFields: Record<string, string> | undefined
 export function WorkspaceNodeActionControls({
   node,
   disabledActionReason,
+  onDispatchExecutionAction,
   onSubmitCheckpointAction,
   className,
 }: {
   node: PlanNodeDataModel;
   disabledActionReason?: string;
+  onDispatchExecutionAction?: (
+    action: ExecutionActionInput,
+  ) => Promise<TaskExecutionDispatchResult>;
   onSubmitCheckpointAction?: (
     action: SubmitCheckpointActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
@@ -357,6 +361,15 @@ export function WorkspaceNodeActionControls({
     setIsDispatching(true);
     setActionStatus(null);
     try {
+      if (selectedAction?.executionAction) {
+        if (!onDispatchExecutionAction) {
+          throw new Error("Execution actions are not available for this view.");
+        }
+        const result = await onDispatchExecutionAction(selectedAction.executionAction);
+        setActionStatus(result.message);
+        return;
+      }
+
       if (!onSubmitCheckpointAction) {
         throw new Error("Checkpoint actions are not available for this view.");
       }
@@ -519,6 +532,7 @@ export function TaskWorkspaceNodeDetailPanel({
   onDrawerSizeChange,
   preferredTab,
   onPreferredTabApplied,
+  onDispatchExecutionAction,
   onSubmitCheckpointAction,
 }: {
   detail: NodeDetailPanelState;
@@ -531,6 +545,9 @@ export function TaskWorkspaceNodeDetailPanel({
   onDrawerSizeChange?: (size: NodeDrawerSize) => void;
   preferredTab?: NodeDetailPanelState["tabs"][number] | null;
   onPreferredTabApplied?: () => void;
+  onDispatchExecutionAction?: (
+    action: ExecutionActionInput,
+  ) => Promise<TaskExecutionDispatchResult>;
   onSubmitCheckpointAction?: (
     action: SubmitCheckpointActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
@@ -588,6 +605,7 @@ export function TaskWorkspaceNodeDetailPanel({
         <WorkspaceNodeActionControls
           node={node}
           disabledActionReason={detail.disabledActionReason}
+          onDispatchExecutionAction={onDispatchExecutionAction}
           onSubmitCheckpointAction={onSubmitCheckpointAction}
         />
       </TabsContent>
@@ -646,67 +664,55 @@ export function TaskWorkspaceNodeDetailPanel({
     }
 
     return (
-      <Drawer
-        open
-        handleOnly
-        onOpenChange={(open) => onDrawerSizeChange?.(open ? "expanded" : "collapsed")}
-        direction="bottom"
-        modal={false}
+      <section
+        id="task-workspace-node-actions"
+        aria-label="Current node details"
+        data-node-detail-drawer="true"
+        className="pointer-events-auto fixed inset-x-2 bottom-2 z-50 mx-auto flex h-[min(72vh,680px)] max-w-[calc(100vw-1rem)] select-text flex-col overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-white/95 text-sm text-popover-foreground shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur"
+        style={drawerFrame ? { left: drawerFrame.left, right: "auto", width: drawerFrame.width } : undefined}
       >
-        <DrawerContent
-          id="task-workspace-node-actions"
-          aria-modal={false}
-          aria-label="Current node details"
-          data-node-detail-drawer="true"
-          className="pointer-events-auto inset-x-2 bottom-2 mx-auto h-[min(72vh,680px)] max-w-[calc(100vw-1rem)] select-text overflow-hidden rounded-[1.35rem] border border-slate-200/80 bg-white/95 shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur"
-          style={drawerFrame ? { left: drawerFrame.left, right: "auto", width: drawerFrame.width } : undefined}
-          overlayClassName="pointer-events-none bg-transparent backdrop-blur-0"
-        >
-          <DrawerHeader className="border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(236,254,255,0.72))] px-2.5 py-1.5 text-left">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
-                  Node
-                </span>
-                <DrawerTitle className="min-w-0 truncate text-sm font-semibold text-slate-950">
-                  Current node: {drawerNodeTitle}
-                </DrawerTitle>
-                <Badge variant={statusTone(detail.status)}>
-                  {detail.status ?? "waiting"}
-                </Badge>
-                <span className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                  Step {detail.stepPosition}
-                </span>
-                <DrawerDescription className="sr-only">
-                  Inspect result, activity, actions, and details for the selected plan node.
-                </DrawerDescription>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
-                <span className="hidden sm:inline">Auto-refresh</span>
+        <div className="border-b border-slate-200/80 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(236,254,255,0.72))] px-2.5 py-1.5 text-left">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
+                Node
+              </span>
+              <h2 className="min-w-0 truncate font-heading text-sm font-semibold text-slate-950">
+                Current node: {drawerNodeTitle}
+              </h2>
+              <Badge variant={statusTone(detail.status)}>
+                {detail.status ?? "waiting"}
+              </Badge>
+              <span className="shrink-0 rounded-full border border-slate-200 bg-white/80 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                Step {detail.stepPosition}
+              </span>
+              <p className="sr-only">
+                Inspect result, activity, actions, and details for the selected plan node.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-500">
+              <span className="hidden sm:inline">Auto-refresh</span>
+              <span
+                className={cn(
+                  "h-5 w-9 rounded-full p-0.5",
+                  detail.autoRefreshEnabled ? "bg-slate-950" : "bg-slate-200",
+                )}
+              >
                 <span
                   className={cn(
-                    "h-5 w-9 rounded-full p-0.5",
-                    detail.autoRefreshEnabled ? "bg-slate-950" : "bg-slate-200",
+                    "block size-4 rounded-full bg-white transition-transform",
+                    detail.autoRefreshEnabled && "translate-x-4",
                   )}
-                >
-                  <span
-                    className={cn(
-                      "block size-4 rounded-full bg-white transition-transform",
-                      detail.autoRefreshEnabled && "translate-x-4",
-                    )}
-                  />
-                </span>
-              </div>
-              <DrawerClose asChild>
-                <Button type="button" variant="ghost" size="icon-xs" aria-label="Close selected node drawer" className="rounded-full">
-                  <X />
-                </Button>
-              </DrawerClose>
+                />
+              </span>
             </div>
-          </DrawerHeader>
-          {tabs}
-        </DrawerContent>
-      </Drawer>
+            <Button type="button" variant="ghost" size="icon-xs" aria-label="Close selected node drawer" className="rounded-full" onClick={() => onDrawerSizeChange?.("collapsed")}>
+              <X />
+            </Button>
+          </div>
+        </div>
+        {tabs}
+      </section>
     );
   }
 

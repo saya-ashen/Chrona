@@ -357,6 +357,136 @@ describe("getWorkPage", () => {
     ]);
   });
 
+  it("returns a targeted execution action for a blocked work page node when graph state is stale", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Work Blocked Plan",
+        defaultRuntime: "hermes",
+        status: WorkspaceStatus.Active,
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Recover blocked node",
+        status: TaskStatus.Blocked,
+        priority: TaskPriority.High,
+        executionRuntime: "hermes",
+        executionConfig: {},
+        blockReason: {
+          blockType: "run_failed",
+          scope: "run",
+          actionRequired: "Retry Run",
+        },
+      },
+    });
+
+    await db.taskProjection.create({
+      data: {
+        taskId: task.id,
+        workspaceId: workspace.id,
+        persistedStatus: TaskStatus.Blocked,
+        displayState: "Attention Needed",
+        blockType: "run_failed",
+        blockScope: "run",
+        actionRequired: "Retry Run",
+        currentNodeId: "answer",
+        scheduleStatus: "Unscheduled",
+      },
+    });
+
+    const compiledPlan: CompiledPlan = {
+      id: "compiled_blocked_work_page_plan",
+      editablePlanId: "graph_blocked_work_page_plan",
+      sourceVersion: 1,
+      title: "Blocked work page plan",
+      goal: "Recover a stale failed node.",
+      assumptions: [],
+      nodes: [
+        {
+          id: "prepare",
+          localId: "prepare",
+          type: "task",
+          title: "Prepare context",
+          config: { expectedOutput: "Context ready." },
+          dependencies: [],
+          dependents: ["answer"],
+          priority: "High",
+          estimatedMinutes: 10,
+        },
+        {
+          id: "answer",
+          localId: "answer",
+          type: "task",
+          title: "Draft answer",
+          config: { expectedOutput: "First answer." },
+          dependencies: ["prepare"],
+          dependents: [],
+          priority: "High",
+          estimatedMinutes: 30,
+        },
+      ],
+      edges: [{ id: "edge-prepare-answer", from: "prepare", to: "answer" }],
+      entryNodeIds: ["prepare"],
+      terminalNodeIds: ["answer"],
+      topologicalOrder: ["prepare", "answer"],
+      completionPolicy: { type: "all_tasks_completed" },
+      validationWarnings: [],
+    };
+
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      compiledPlan,
+      status: "accepted",
+      prompt: "recover stale node",
+      summary: "Recover stale node.",
+      generatedBy: "graph-planner",
+    });
+
+    const graph = createPlanGraphFromCompiledPlan({ taskId: task.id, compiledPlan });
+    await savePlanRun({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: compiledPlan.editablePlanId,
+      run: createPlanRunFromCompiledPlan(compiledPlan),
+      compiledPlan,
+      graph,
+      attempts: [],
+      results: [],
+      executionContextSnapshots: [],
+    });
+
+    const page = await getWorkPage(task.id);
+
+    expect(page.taskShell.blockReason).toMatchObject({
+      blockType: "run_failed",
+      actionRequired: "Retry Run",
+      nodeId: "answer",
+    });
+    expect(page.taskShell.executionSummary).toMatchObject({
+      executionState: "failed",
+      currentNodeId: "answer",
+      primaryAction: {
+        type: "retry_sync",
+        enabled: true,
+        label: "Retry Run",
+        targetNodeId: "answer",
+      },
+    });
+    expect(page.planExecution).toMatchObject({
+      status: "blocked",
+      currentNodeId: "answer",
+      blockedNodeIds: ["answer"],
+      message: "Retry Run",
+    });
+    expect(page.taskPlan.steps).toContainEqual(expect.objectContaining({
+      id: "answer",
+      status: "pending",
+    }));
+  });
+
   it("includes conversation history from earlier runs in the collaboration feed", async () => {
     const workspace = await db.workspace.create({
       data: {

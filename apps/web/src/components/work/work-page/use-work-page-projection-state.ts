@@ -2,6 +2,7 @@
 
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
+import { appendTaskPrimaryNodeAction } from "@/components/tasks/plan/task-action-node-action";
 import { api } from "@/lib/rpc-client";
 import { useAppRouter } from "@/lib/router";
 import type { WorkCopy, WorkPageData } from "./work-page-types";
@@ -49,29 +50,31 @@ function normalizeWorkPageData(data: WorkPageData): WorkPageData {
   const edges = Array.isArray(data.taskPlan?.edges) ? data.taskPlan.edges : [];
   const analytics = data.taskPlan?.analytics ?? buildTaskPlanAnalytics(nodes, edges);
 
+  const taskPlan = appendTaskPrimaryNodeAction(data, {
+    ...data.taskPlan,
+    state: data.taskPlan?.state ?? (nodes.length > 0 ? "ready" : "empty"),
+    nodes,
+    edges,
+    steps: steps.length > 0 ? steps : nodes,
+    analytics: {
+      entryNodeIds: analytics.entryNodeIds ?? [],
+      terminalNodeIds: analytics.terminalNodeIds ?? [],
+      activeNodeIds: analytics.activeNodeIds ?? [],
+      reachableFromActiveIds: analytics.reachableFromActiveIds ?? [],
+      criticalPathNodeIds: analytics.criticalPathNodeIds ?? [],
+      attentionNodeIds: analytics.attentionNodeIds ?? [],
+      blockedNodeIds: analytics.blockedNodeIds ?? [],
+      rankByNodeId: analytics.rankByNodeId ?? {},
+      laneByNodeId: analytics.laneByNodeId ?? {},
+      upstreamByNodeId: analytics.upstreamByNodeId ?? {},
+      downstreamByNodeId: analytics.downstreamByNodeId ?? {},
+    },
+  });
+
   return {
     ...data,
     composerValue: data.composerValue ?? "",
-    taskPlan: {
-      ...data.taskPlan,
-      state: data.taskPlan?.state ?? (nodes.length > 0 ? "ready" : "empty"),
-      nodes,
-      edges,
-      steps: steps.length > 0 ? steps : nodes,
-      analytics: {
-        entryNodeIds: analytics.entryNodeIds ?? [],
-        terminalNodeIds: analytics.terminalNodeIds ?? [],
-        activeNodeIds: analytics.activeNodeIds ?? [],
-        reachableFromActiveIds: analytics.reachableFromActiveIds ?? [],
-        criticalPathNodeIds: analytics.criticalPathNodeIds ?? [],
-        attentionNodeIds: analytics.attentionNodeIds ?? [],
-        blockedNodeIds: analytics.blockedNodeIds ?? [],
-        rankByNodeId: analytics.rankByNodeId ?? {},
-        laneByNodeId: analytics.laneByNodeId ?? {},
-        upstreamByNodeId: analytics.upstreamByNodeId ?? {},
-        downstreamByNodeId: analytics.downstreamByNodeId ?? {},
-      },
-    },
+    taskPlan: taskPlan ?? data.taskPlan,
   };
 }
 

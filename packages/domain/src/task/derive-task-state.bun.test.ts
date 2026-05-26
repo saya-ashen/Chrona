@@ -44,6 +44,30 @@ describe("deriveTaskState", () => {
     });
   });
 
+  it("preserves external dependency pause reason in the task block reason", () => {
+    const result = deriveTaskState({
+      task: { status: "Running", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Completed", updatedAt }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: {
+        status: "Paused",
+        currentNodeId: "cn_external_1",
+        pauseReason: "external_dependency",
+      },
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Blocked",
+      displayState: "Attention Needed",
+      blockReason: {
+        blockType: "external_dependency",
+        scope: "plan_node",
+        actionRequired: "Resume after external dependency is resolved",
+      },
+    });
+  });
+
   it("does not let stale running runs reopen a completed task", () => {
     expect(
       deriveTaskState({
