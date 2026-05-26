@@ -164,7 +164,7 @@ describe("useWorkPageProjectionState", () => {
     const generatingData = workPageData({
       taskPlan: {
         ...emptyPlan,
-        state: "generating",
+        state: "empty",
         summary: "AI is generating a plan…",
       },
     });
@@ -184,14 +184,14 @@ describe("useWorkPageProjectionState", () => {
     });
 
     await waitFor(() => expect(mocks.workFetchCount).toBe(1));
-    expect(result.current.data.taskPlan.state).toBe("generating");
+    expect(result.current.data.taskPlan.state).toBe("empty");
   });
 
   it("refreshes the workspace when automatic plan generation saves the generated plan", async () => {
     const initialData = workPageData({
       taskPlan: {
         ...emptyPlan,
-        state: "generating",
+        state: "empty",
         summary: "AI is generating a plan…",
       },
     });
