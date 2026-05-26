@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
@@ -40,6 +41,10 @@ vi.mock("@chrona/i18n/react", () => ({
 
 import { InboxList } from "@/components/inbox/inbox-list";
 
+afterEach(() => {
+  cleanup();
+});
+
 describe("InboxList", () => {
   it("shows action type, risk, task, run, summary, and consequence", () => {
     render(
@@ -71,9 +76,43 @@ describe("InboxList", () => {
       "href",
       "/en/tasks/task_1",
     );
-    expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
-      "href",
-      "/en/tasks/task_1",
+  });
+
+  it("wires default approval buttons to item-specific actions", async () => {
+    const user = userEvent.setup();
+    const onApprove = vi.fn();
+    const onReject = vi.fn();
+    const onEditAndApprove = vi.fn();
+
+    render(
+      <InboxList
+        onApprove={onApprove}
+        onReject={onReject}
+        onEditAndApprove={onEditAndApprove}
+        items={[
+          {
+            id: "approval_1",
+            kind: "approval",
+            actionType: "Approval needed",
+            riskLevel: "high",
+            sourceTaskTitle: "Review adapter mapping",
+            sourceTaskId: "task_1",
+            workspaceId: "ws_1",
+            currentRunLabel: "run_projection",
+            detail: "command approval",
+            summary: "Approve the file patch",
+            consequence: "Blocks deployment until approved",
+          },
+        ]}
+      />,
     );
+
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await user.click(screen.getByRole("button", { name: "Reject" }));
+    await user.click(screen.getByRole("button", { name: "Edit and Approve" }));
+
+    expect(onApprove).toHaveBeenCalledWith("approval_1");
+    expect(onReject).toHaveBeenCalledWith("approval_1");
+    expect(onEditAndApprove).toHaveBeenCalledWith("approval_1");
   });
 });

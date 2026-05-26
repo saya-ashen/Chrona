@@ -116,6 +116,22 @@ export function clearSchedule(input: { taskId: string }) {
     .then(parseActionResponse);
 }
 
+export function decideScheduleProposal(input: {
+  proposalId: string;
+  decision: "Accepted" | "Rejected";
+  resolutionNote?: string | null;
+}) {
+  return api.tasks["schedule-proposals"].decision
+    .$post({
+      json: {
+        proposalId: input.proposalId,
+        decision: input.decision,
+        resolutionNote: input.resolutionNote ?? undefined,
+      },
+    })
+    .then(parseActionResponse);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Execution
 // ═══════════════════════════════════════════════════════════════
