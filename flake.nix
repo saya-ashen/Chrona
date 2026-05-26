@@ -2,7 +2,8 @@
   description = "Chrona development shell";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -54,7 +55,7 @@
       chronaNodeModules = pkgs.stdenv.mkDerivation {
         name = "chrona-node-modules";
         src = self;
-        nativeBuildInputs = [ pkgs.bun ];
+        nativeBuildInputs = [pkgs.bun];
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
         outputHash = "sha256-SYKc1Hu5MHi2QUC/ZTtfSmudZI3ja5M9MXseFzFk2Ek=";

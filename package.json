@@ -75,6 +75,7 @@
     "build:binary:windows-x64": "bun run scripts/build-binaries.ts --target windows-x64"
   },
   "dependencies": {
+    "@base-ui/react": "1.4.1",
     "@fullcalendar/interaction": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
     "@fullcalendar/timegrid": "^6.1.20",
