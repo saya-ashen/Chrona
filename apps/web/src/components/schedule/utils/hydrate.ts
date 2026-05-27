@@ -26,6 +26,7 @@ export function hydrateSchedulePageData(
     scheduled: data.scheduled.map((item) => hydrateRecord(item)),
     unscheduled: data.unscheduled.map((item) => hydrateRecord(item)),
     risks: data.risks.map((item) => hydrateRecord(item)),
+    listItems: data.listItems.map((item) => hydrateRecord(item)),
     proposals: data.proposals.map((proposal) => ({
       ...proposal,
       dueAt: toDate(proposal.dueAt),

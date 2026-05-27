@@ -126,6 +126,26 @@ function getRunnabilityTone(isRunnable: boolean) {
   return isRunnable ? ("secondary" as const) : ("destructive" as const);
 }
 
+function getTaskDisplayState(item: ScheduleTaskListItem) {
+  if (item.displayState) {
+    return item.displayState;
+  }
+
+  if (item.latestRunStatus) {
+    return item.latestRunStatus;
+  }
+
+  if (item.scheduleStatus && item.scheduleStatus !== "Unscheduled") {
+    return item.scheduleStatus;
+  }
+
+  if (item.isRunnable) {
+    return item.runnabilitySummary;
+  }
+
+  return item.persistedStatus;
+}
+
 function matchesFilter(item: ScheduleTaskListItem, filter: ListFilterKey) {
   switch (filter) {
     case "all":
@@ -159,6 +179,8 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
     executionRuntime: item.executionRuntime,
     executionConfig: item.executionConfig,
     dueAt: item.dueAt,
+    scheduledStartAt: item.scheduledStartAt,
+    scheduledEndAt: item.scheduledEndAt,
   };
 }
 
@@ -274,7 +296,7 @@ export function ScheduleTaskList({
             const isExpanded = expandedTaskId === item.taskId;
 
             return (
-              <Card key={item.taskId} className="rounded-2xl border border-border/70">
+              <Card key={item.taskId} className="overflow-visible rounded-2xl border border-border/70">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="space-y-1">
@@ -304,7 +326,7 @@ export function ScheduleTaskList({
                     <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
                         <dt className="text-xs uppercase tracking-[0.16em]">{copy.state}</dt>
-                        <dd className="mt-1 text-foreground">{item.displayState ?? item.persistedStatus}</dd>
+                        <dd className="mt-1 text-foreground">{getTaskDisplayState(item)}</dd>
                       </div>
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
                         <dt className="text-xs uppercase tracking-[0.16em]">{copy.due}</dt>

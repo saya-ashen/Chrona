@@ -31,7 +31,7 @@ export type RunLike = {
   status: string;
 };
 
-const ALLOWABLE_START_STATUSES = ["Ready", "Scheduled", "Queued"] as const;
+const ALLOWABLE_START_STATUSES = ["Draft", "Ready", "Scheduled", "Queued"] as const;
 
 const ACTIVE_RUN_STATUSES = ["Pending", "Running", "WaitingForInput", "WaitingForApproval"] as const;
 

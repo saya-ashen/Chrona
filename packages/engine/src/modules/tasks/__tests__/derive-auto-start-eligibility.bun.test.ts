@@ -82,6 +82,16 @@ describe("deriveAutoStartEligibility", () => {
       });
       expect(result.ok).toBe(true);
     });
+
+    it("returns ok when task status is Draft but runtime and accepted plan are ready", () => {
+      const result = deriveAutoStartEligibility({
+        task: makeTask({ status: "Draft" }),
+        workBlock: makeWorkBlock(),
+        now,
+        activeRun: null,
+      });
+      expect(result.ok).toBe(true);
+    });
   });
 
   describe("not eligible — not_scheduled", () => {
@@ -171,16 +181,6 @@ describe("deriveAutoStartEligibility", () => {
   });
 
   describe("not eligible — invalid_task_status", () => {
-    it("rejects tasks with Draft status", () => {
-      const result = deriveAutoStartEligibility({
-        task: makeTask({ status: "Draft" }),
-        workBlock: makeWorkBlock(),
-        now,
-        activeRun: null,
-      });
-      expect(result).toEqual({ ok: false, reason: "invalid_task_status" });
-    });
-
     it("rejects tasks with Done status", () => {
       const result = deriveAutoStartEligibility({
         task: makeTask({ status: "Done" }),

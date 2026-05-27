@@ -259,6 +259,30 @@ describe("auto-start-scheduled-plan", () => {
     expect(callArgs?.trigger).toBe("scheduler");
   });
 
+  it("starts due Draft tasks when runtime config and accepted plan make them runnable", async () => {
+    const workspace = await createWorkspace();
+    const { task } = await createDueTask(workspace.id, { status: "Draft" });
+
+    startMock.mockResolvedValue({
+      taskId: task.id,
+      planId: "plan-draft-ready",
+      mainSessionId: "session-draft-ready",
+      status: "running" as const,
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Started from draft",
+    });
+
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
+
+    expect(result.started).toHaveLength(1);
+    expect(result.started[0]?.taskId).toBe(task.id);
+    expect(result.skipped).toEqual([]);
+    expect(startMock).toHaveBeenCalledTimes(1);
+  });
+
   it("skips tasks that are not yet due", async () => {
     const workspace = await createWorkspace();
     await createDueTask(workspace.id, {
@@ -482,10 +506,6 @@ describe("auto-start-scheduled-plan", () => {
         completionPolicy: { type: "all_tasks_completed" },
         validationWarnings: [],
       },
-    });
-    await db.task.update({
-      where: { id: created.taskId },
-      data: { status: "Ready" },
     });
 
     startMock.mockResolvedValue({

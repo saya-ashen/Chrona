@@ -43,6 +43,14 @@ function userStatusLabel(status: TaskHeaderView["status"]) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function shouldShowPersistedTaskStatus(taskStatus: string, primaryStatusLabel: string) {
+  if (taskStatus === primaryStatusLabel) {
+    return false;
+  }
+
+  return !["Draft", "Ready"].includes(taskStatus);
+}
+
 function actionIcon(actionId: TaskHeaderAction["id"]) {
   if (actionId === "start") return Play;
   if (actionId === "pause") return Pause;
@@ -97,7 +105,7 @@ export function TaskWorkspaceHeaderCard({
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const visibleActions = header.actions.filter((action) => action.id !== "more");
   const primaryStatusLabel = header.primaryStateLabel ?? userStatusLabel(header.status);
-  const showTaskStatus = task.status !== primaryStatusLabel;
+  const showTaskStatus = shouldShowPersistedTaskStatus(task.status, primaryStatusLabel);
   const menuItems: TaskActionsMenuItem[] = [
     ...(header.canEditTitle
       ? [{
