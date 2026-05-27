@@ -43,6 +43,8 @@ const task = {
   description: null,
   executionRuntime: "hermes",
   executionConfig: {},
+  autoPlanGeneration: false,
+  autoExecute: false,
   status: "Draft",
   priority: "Medium",
   dueAt: null,

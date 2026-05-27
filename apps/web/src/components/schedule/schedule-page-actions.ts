@@ -3,7 +3,6 @@ import {
   createTaskFromSchedule,
   updateTaskConfigFromSchedule,
 } from "@/lib/task-actions-client";
-import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
   type SchedulePageCopy,
@@ -351,6 +350,7 @@ export async function handleCreateTaskBlockAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
+      autoPlanGeneration: autoPlanGenerationEnabled || input.autoExecute,
       autoExecute: input.autoExecute,
       executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
@@ -369,13 +369,6 @@ export async function handleCreateTaskBlockAction({
       scheduledEndAt: input.scheduledEndAt,
       scheduleSource: "human",
     });
-
-    if (autoPlanGenerationEnabled) {
-      void startTaskPlanGenerationSession({
-        taskId: created.taskId,
-        forceRefresh: true,
-      });
-    }
 
     applyOptimisticViewData((current) => ({
       ...current,
@@ -455,6 +448,8 @@ export async function handleTaskConfigSaveAction({
       priority: input.priority,
       executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
+      autoPlanGeneration: input.autoPlanGeneration,
+      autoExecute: input.autoExecute,
     });
 
     if (input.scheduledStartAt && input.scheduledEndAt) {

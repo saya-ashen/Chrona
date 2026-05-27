@@ -38,6 +38,8 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     lastActivityAt: overrides.lastActivityAt ?? null,
     executionRuntime: overrides.executionRuntime ?? "hermes",
     executionConfig: overrides.executionConfig ?? {},
+    autoPlanGeneration: overrides.autoPlanGeneration ?? false,
+    autoExecute: overrides.autoExecute ?? false,
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",

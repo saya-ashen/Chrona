@@ -65,6 +65,7 @@ export type CreateTaskInput = {
   title: string;
   description?: string | null;
   priority?: TaskPriority;
+  autoPlanGeneration?: boolean;
   autoExecute?: boolean;
   parentTaskId?: string | null;
 } & Partial<TaskRuntimeFields>;
@@ -74,5 +75,7 @@ export type UpdateTaskInput = {
   title?: string;
   description?: string | null;
   priority?: TaskPriority;
+  autoPlanGeneration?: boolean;
+  autoExecute?: boolean;
   status?: TaskStatus;
 } & Partial<TaskRuntimeFields>;

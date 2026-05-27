@@ -35,9 +35,9 @@ const DEFAULT_DIALOG_COPY = {
   startTime: "Start time",
   endTime: "End time",
   autoExecute: "Auto-execute at scheduled time",
-  autoExecuteDescription: "Start execution automatically when the scheduled start time arrives.",
+  autoExecuteDescription: "Force plan generation on, accept the generated plan, then start execution at the scheduled time.",
   autoPlanGeneration: "Generate plan after saving",
-  autoPlanGenerationDescription: "Create a draft execution plan for this task immediately after it is saved.",
+  autoPlanGenerationDescription: "Create a draft execution plan after saving. Required when auto-execute is enabled.",
   description: "Description (optional)",
   descriptionPlaceholder: "Add description",
   priority: "Priority",
@@ -182,7 +182,7 @@ export function TaskCreateDialog({
       description: description.trim(),
       priority,
       autoExecute,
-      autoPlanGenerationEnabled,
+      autoPlanGenerationEnabled: autoExecute || autoPlanGenerationEnabled,
       dueAt: null,
       scheduledStartAt,
       scheduledEndAt,
@@ -398,7 +398,13 @@ export function TaskCreateDialog({
             <input
               type="checkbox"
               checked={autoExecute}
-              onChange={(e) => setAutoExecute(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setAutoExecute(checked);
+                if (checked) {
+                  setAutoPlanGenerationEnabled(true);
+                }
+              }}
               disabled={isPending}
               className="mt-1 shrink-0"
             />
@@ -413,9 +419,9 @@ export function TaskCreateDialog({
           <label className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 text-sm text-foreground">
             <input
               type="checkbox"
-              checked={autoPlanGenerationEnabled}
+              checked={autoExecute || autoPlanGenerationEnabled}
               onChange={(e) => setAutoPlanGenerationEnabled(e.target.checked)}
-              disabled={isPending}
+              disabled={isPending || autoExecute}
               className="mt-1 shrink-0"
             />
             <span className="min-w-0">

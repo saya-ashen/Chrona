@@ -22,6 +22,7 @@ export function createTaskFromSchedule(input: {
   title: string;
   description?: string | null;
   priority?: string;
+  autoPlanGeneration?: boolean;
   autoExecute?: boolean;
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
@@ -39,6 +40,7 @@ export function createTaskFromSchedule(input: {
           | "High"
           | "Urgent"
           | undefined,
+        autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
@@ -55,6 +57,8 @@ export function updateTaskConfigFromSchedule(input: {
   priority?: string;
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
+  autoPlanGeneration?: boolean;
+  autoExecute?: boolean;
 }) {
   return api.tasks[":taskId"]
     .$patch({
@@ -70,6 +74,8 @@ export function updateTaskConfigFromSchedule(input: {
           | undefined,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
+        autoPlanGeneration: input.autoPlanGeneration,
+        autoExecute: input.autoExecute,
       },
     })
     .then(parseActionResponse);

@@ -84,6 +84,8 @@ export type ScheduleRecord = {
   latestRunStatus: string | null;
   scheduleProposalCount: number;
   lastActivityAt: Date | null;
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
   savedPlan?: ScheduleTaskPlanSnapshot | null;
   aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
 } & ScheduleRuntimeFields;
@@ -155,6 +157,8 @@ export type ScheduleCardItem = {
   isRunnable?: boolean;
   runnabilityState?: string;
   runnabilitySummary?: string;
+  autoPlanGeneration?: boolean;
+  autoExecute?: boolean;
   savedPlan?: ScheduleTaskPlanSnapshot | null;
   aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
 };

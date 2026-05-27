@@ -1,6 +1,7 @@
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
@@ -59,6 +60,8 @@ export async function createTask(input: CreateTaskInput) {
     workspaceDefaultRuntime: workspace.defaultRuntime,
     executionConfig,
   });
+  const autoExecute = input.autoExecute ?? false;
+  const autoPlanGeneration = autoExecute || (input.autoPlanGeneration ?? false);
 
   const staticState = deriveTaskStaticState({
     runtimeSpec: getRuntimeTaskConfigSpec(validatedRuntimeConfig.executionRuntime),
@@ -78,7 +81,8 @@ export async function createTask(input: CreateTaskInput) {
       priority: input.priority
         ? TaskPriority[input.priority]
         : TaskPriority.Medium,
-      autoExecute: input.autoExecute ?? false,
+      autoPlanGeneration,
+      autoExecute,
       status,
       parentTaskId: input.parentTaskId ?? null,
     },
@@ -121,6 +125,7 @@ export async function createTask(input: CreateTaskInput) {
     payload: {
       title: task.title,
       priority: task.priority,
+      autoPlanGeneration: task.autoPlanGeneration,
       autoExecute: task.autoExecute,
       status: task.status,
       parentTaskId: task.parentTaskId,
@@ -130,9 +135,14 @@ export async function createTask(input: CreateTaskInput) {
 
   await rebuildTaskProjection(task.id);
 
+  if (task.autoPlanGeneration) {
+    startAutoPlanGenerationForTask({ taskId: task.id, accept: task.autoExecute });
+  }
+
   return {
     taskId: task.id,
     workspaceId: task.workspaceId,
+    autoPlanGeneration: task.autoPlanGeneration,
     autoExecute: task.autoExecute,
   };
 }

@@ -201,6 +201,8 @@ function pageData(input: {
       description: null,
       executionRuntime: "local",
       executionConfig: null,
+      autoPlanGeneration: false,
+      autoExecute: false,
       status: input.taskStatus,
       priority: "High",
       dueAt: null,

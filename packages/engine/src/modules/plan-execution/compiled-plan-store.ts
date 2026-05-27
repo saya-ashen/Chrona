@@ -2,7 +2,7 @@ import { Prisma, TaskPlanStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { CompiledPlan, EditablePlan } from "@chrona/contracts/ai";
 
-type PlanStatus = "draft" | "accepted" | "superseded" | "archived";
+export type PlanStatus = "draft" | "accepted" | "superseded" | "archived";
 
 const TASK_PLAN_STATUS_TO_DB: Record<PlanStatus, TaskPlanStatus> = {
   draft: TaskPlanStatus.Draft,

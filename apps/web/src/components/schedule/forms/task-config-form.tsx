@@ -39,6 +39,8 @@ export type TaskConfigFormDraft = {
 export type TaskConfigFormInput = TaskConfigFormDraft & {
   executionRuntime: string;
   executionConfig: RuntimeInput;
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
 };
 
 export type TaskConfigExecutionRuntime = {
@@ -65,6 +67,8 @@ type TaskConfigFormState = {
   executionRuntime: string;
   fieldExecutionConfig: RuntimeInput;
   extraExecutionConfig: string;
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
 };
 
 export type TaskConfigDraftState = {
@@ -85,6 +89,8 @@ type TaskConfigFormProps = {
     scheduledEndAt?: Date | null;
     executionRuntime?: string | null;
     executionConfig?: unknown;
+    autoPlanGeneration?: boolean;
+    autoExecute?: boolean;
   };
   submitLabel: string;
   pendingLabel: string;
@@ -215,6 +221,88 @@ function TaskConfigDatePicker({
   );
 }
 
+function TaskAutomationOption({
+  label,
+  description,
+  checked,
+  disabled,
+  name,
+  onCheckedChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  name: string;
+  onCheckedChange?: (checked: boolean) => void;
+}) {
+  return (
+    <label className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-xl border border-border/70 bg-background/90 px-3 py-2.5 text-sm text-foreground shadow-sm transition-colors has-[[data-state=checked]]:border-primary/35 has-[[data-state=checked]]:bg-primary/5">
+      <Checkbox
+        name={name}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange ? (nextChecked) => onCheckedChange(nextChecked === true) : undefined}
+        className="mt-0.5"
+      />
+      <span className="min-w-0">
+        <span className="block font-medium leading-5">{label}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{description}</span>
+      </span>
+    </label>
+  );
+}
+
+function TaskAutomationSection({
+  copy,
+  autoPlanGeneration,
+  autoExecute,
+  onAutoPlanGenerationChange,
+  onAutoExecuteChange,
+  compact = false,
+}: {
+  copy: {
+    automation: string;
+    autoExecute: string;
+    autoExecuteDescription: string;
+    autoPlanGeneration: string;
+    autoPlanGenerationDescription: string;
+  };
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
+  onAutoPlanGenerationChange: (checked: boolean) => void;
+  onAutoExecuteChange: (checked: boolean) => void;
+  compact?: boolean;
+}) {
+  const effectiveAutoPlanGeneration = autoExecute || autoPlanGeneration;
+
+  return (
+    <section className={compact ? "rounded-2xl border border-border/60 bg-muted/20 p-3" : "rounded-[1.2rem] border border-border/60 bg-muted/20 p-3 shadow-sm"}>
+      <div className="flex items-center justify-between gap-3">
+        <p className={compact ? "text-sm font-medium text-foreground" : "text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"}>{copy.automation}</p>
+        {effectiveAutoPlanGeneration || autoExecute ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span> : null}
+      </div>
+      <div className="mt-3 grid gap-2">
+        <TaskAutomationOption
+          name="autoPlanGeneration"
+          checked={effectiveAutoPlanGeneration}
+          disabled={autoExecute}
+          label={copy.autoPlanGeneration}
+          description={copy.autoPlanGenerationDescription}
+          onCheckedChange={onAutoPlanGenerationChange}
+        />
+        <TaskAutomationOption
+          name="autoExecute"
+          checked={autoExecute}
+          label={copy.autoExecute}
+          description={copy.autoExecuteDescription}
+          onCheckedChange={onAutoExecuteChange}
+        />
+      </div>
+    </section>
+  );
+}
+
 const DEFAULT_COPY = {
   moreOptions: "More options",
   starterPresets: "Starter presets",
@@ -239,6 +327,11 @@ const DEFAULT_COPY = {
   descriptionPlaceholder: "Optional execution context or desired outcome",
   runtimeParams: "Additional runtime params (JSON)",
   runtimeParamsPlaceholder: '{"customFlag": true}',
+  automation: "Automation",
+  autoPlanGeneration: "Auto-generate plan",
+  autoPlanGenerationDescription: "Create a draft execution plan automatically. You can turn this off unless auto-execute is enabled.",
+  autoExecute: "Auto-execute at scheduled time",
+  autoExecuteDescription: "Force plan generation on, accept the generated plan, then start execution at the scheduled time.",
   errorInvalidJson: "Runtime params must be valid JSON",
   errorJsonObject: "Runtime params must be a JSON object",
   errorIncompleteSchedule: "Set date, start, and end time together",
@@ -459,6 +552,8 @@ function toFormState(
     scheduledDate: formatLocalDateInput(initialValues?.scheduledStartAt),
     scheduledStartTime: formatLocalTimeInput(initialValues?.scheduledStartAt),
     scheduledEndTime: formatLocalTimeInput(initialValues?.scheduledEndAt),
+    autoPlanGeneration: initialValues?.autoExecute || (initialValues?.autoPlanGeneration ?? false),
+    autoExecute: initialValues?.autoExecute ?? false,
     ...runtimeState,
   };
 }
@@ -513,6 +608,8 @@ function buildTaskConfigFormInput(
     scheduledEndAt,
     executionRuntime: executionRuntime.key,
     executionConfig,
+    autoPlanGeneration: formState.autoExecute || formState.autoPlanGeneration,
+    autoExecute: formState.autoExecute,
   };
 }
 
@@ -556,6 +653,17 @@ function applyPresetValues(
 
   if ("description" in values) {
     next.description = values.description ?? "";
+  }
+
+  if ("autoExecute" in values) {
+    next.autoExecute = values.autoExecute ?? false;
+    if (next.autoExecute) {
+      next.autoPlanGeneration = true;
+    }
+  }
+
+  if ("autoPlanGeneration" in values) {
+    next.autoPlanGeneration = next.autoExecute || (values.autoPlanGeneration ?? false);
   }
 
   if ("priority" in values && values.priority) {
@@ -669,6 +777,8 @@ export function TaskConfigForm({
   const initialScheduledEndAt = initialValues?.scheduledEndAt;
   const initialExecutionRuntime = initialValues?.executionRuntime;
   const initialExecutionConfig = initialValues?.executionConfig;
+  const initialAutoPlanGeneration = initialValues?.autoPlanGeneration;
+  const initialAutoExecute = initialValues?.autoExecute;
   const initialState = useMemo(
     () =>
       toFormState(
@@ -681,6 +791,8 @@ export function TaskConfigForm({
           scheduledEndAt: initialScheduledEndAt,
           executionRuntime: initialExecutionRuntime,
           executionConfig: initialExecutionConfig,
+          autoPlanGeneration: initialAutoPlanGeneration,
+          autoExecute: initialAutoExecute,
         },
         executionRuntimes,
         defaultExecutionRuntime,
@@ -696,6 +808,8 @@ export function TaskConfigForm({
       initialScheduledEndAt,
       initialExecutionRuntime,
       initialExecutionConfig,
+      initialAutoPlanGeneration,
+      initialAutoExecute,
     ],
   );
   const {
@@ -838,7 +952,7 @@ export function TaskConfigForm({
         />
 
         {!compact ? (
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] xl:items-start">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
             <div className="flex flex-col gap-3">
               <Controller
                 name="description"
@@ -853,25 +967,10 @@ export function TaskConfigForm({
                       placeholder={copy.descriptionPlaceholder}
                     />
                   </TaskConfigField>
-                )}
-              />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <TaskConfigField label={copy.priority} htmlFor="task-config-priority" className="text-xs text-muted-foreground">
-                <TaskConfigSelect
-                  name="priority"
-                  id="task-config-priority"
-                  value={formState.priority}
-                  options={(["Low", "Medium", "High", "Urgent"] as const).map((priority) => ({
-                    value: priority,
-                    label: copy.priorities[priority],
-                  }))}
-                  onValueChange={(value) => setValue("priority", value as TaskConfigFormInput["priority"], { shouldDirty: true })}
+                  )}
                 />
-              </TaskConfigField>
 
-              <div className="rounded-[1.2rem] border border-border/60 bg-muted/25 p-3 shadow-sm">
+                <div className="rounded-[1.2rem] border border-border/60 bg-muted/20 p-3 shadow-sm">
                 <div className="mb-2 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{copy.schedule}</p>
@@ -915,6 +1014,34 @@ export function TaskConfigForm({
                   </TaskConfigField>
                 </FieldGroup>
               </div>
+            </div>
+
+              <div className="flex flex-col gap-3">
+                <TaskConfigField label={copy.priority} htmlFor="task-config-priority" className="text-xs text-muted-foreground">
+                <TaskConfigSelect
+                  name="priority"
+                  id="task-config-priority"
+                  value={formState.priority}
+                  options={(["Low", "Medium", "High", "Urgent"] as const).map((priority) => ({
+                    value: priority,
+                    label: copy.priorities[priority],
+                  }))}
+                  onValueChange={(value) => setValue("priority", value as TaskConfigFormInput["priority"], { shouldDirty: true })}
+                />
+                </TaskConfigField>
+
+                <TaskAutomationSection
+                  copy={copy}
+                  autoPlanGeneration={formState.autoPlanGeneration}
+                  autoExecute={formState.autoExecute}
+                  onAutoPlanGenerationChange={(checked) => setValue("autoPlanGeneration", checked, { shouldDirty: true })}
+                  onAutoExecuteChange={(checked) => {
+                    setValue("autoExecute", checked, { shouldDirty: true });
+                    if (checked) {
+                      setValue("autoPlanGeneration", true, { shouldDirty: true });
+                    }
+                  }}
+                />
             </div>
           </div>
         ) : null}
@@ -1059,6 +1186,20 @@ export function TaskConfigForm({
                     )}
                   />
                 </TaskConfigField>
+
+                <TaskAutomationSection
+                  compact
+                  copy={copy}
+                  autoPlanGeneration={formState.autoPlanGeneration}
+                  autoExecute={formState.autoExecute}
+                  onAutoPlanGenerationChange={(checked) => setValue("autoPlanGeneration", checked, { shouldDirty: true })}
+                  onAutoExecuteChange={(checked) => {
+                    setValue("autoExecute", checked, { shouldDirty: true });
+                    if (checked) {
+                      setValue("autoPlanGeneration", true, { shouldDirty: true });
+                    }
+                  }}
+                />
               </>
 
               {optionalRuntimeFields.map((field) => {

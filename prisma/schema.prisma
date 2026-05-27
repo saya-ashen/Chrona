@@ -161,6 +161,7 @@ model Task {
   executionConfig      Json
   status               TaskStatus
   priority             TaskPriority
+  autoPlanGeneration   Boolean                @default(false)
   autoExecute          Boolean                @default(false)
   parentTaskId         String?
   dueAt                DateTime?

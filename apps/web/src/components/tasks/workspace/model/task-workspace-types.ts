@@ -12,6 +12,8 @@ export type TaskData = {
   description: string | null;
   executionRuntime: string;
   executionConfig: unknown;
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
   status: string;
   priority: string;
   dueAt: string | null;
@@ -91,6 +93,8 @@ export type EditableTask = {
   scheduleStatus: string;
   executionRuntime: string;
   executionConfig: unknown;
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
 };
 
 export type CurrentProposalState = {

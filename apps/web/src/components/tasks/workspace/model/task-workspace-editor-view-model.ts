@@ -12,6 +12,8 @@ export function taskToEditableTask(task: TaskData): EditableTask {
     scheduleStatus: task.scheduleStatus,
     executionRuntime: task.executionRuntime,
     executionConfig: task.executionConfig,
+    autoPlanGeneration: task.autoPlanGeneration,
+    autoExecute: task.autoExecute,
   };
 }
 
@@ -29,6 +31,8 @@ export function taskToTaskConfigInitialValues(task: TaskData) {
     scheduledEndAt: task.scheduledEndAt ? new Date(task.scheduledEndAt) : null,
     executionRuntime: task.executionRuntime,
     executionConfig: task.executionConfig,
+    autoPlanGeneration: task.autoPlanGeneration,
+    autoExecute: task.autoExecute,
   };
 }
 
@@ -43,6 +47,8 @@ export function taskConfigInputToEditableTask(input: TaskConfigFormInput, schedu
     scheduleStatus,
     executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
+    autoPlanGeneration: input.autoPlanGeneration,
+    autoExecute: input.autoExecute,
   };
 }
 

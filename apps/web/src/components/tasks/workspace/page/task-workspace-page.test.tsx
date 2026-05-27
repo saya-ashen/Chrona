@@ -194,6 +194,8 @@ function taskData(): TaskPageData {
       description: null,
       executionRuntime: "local",
       executionConfig: null,
+      autoPlanGeneration: false,
+      autoExecute: false,
       status: "Ready",
       priority: "High",
       dueAt: null,

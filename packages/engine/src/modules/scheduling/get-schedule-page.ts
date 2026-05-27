@@ -29,6 +29,8 @@ function mapProjectionItem(
       priority: string;
       executionRuntime: string;
       executionConfig: unknown;
+      autoPlanGeneration: boolean;
+      autoExecute: boolean;
     };
   },
 ) {
@@ -51,6 +53,8 @@ function mapProjectionItem(
     latestRunStatus: item.latestRunStatus,
     scheduleProposalCount: item.scheduleProposalCount ?? 0,
     lastActivityAt: item.lastActivityAt,
+    autoPlanGeneration: item.task.autoPlanGeneration,
+    autoExecute: item.task.autoExecute,
     ...mapTaskRunnability(item.task),
   };
 }

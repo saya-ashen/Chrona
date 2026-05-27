@@ -24,6 +24,11 @@ async function generateTaskPlanForTask(input: {
   return result;
 }
 
+async function generateAndAcceptTaskPlanForTask(input: { taskId: string; accept?: boolean }) {
+  const { generateAndAcceptTaskPlan } = await import("@/modules/plans/auto-generate-task-plan");
+  await generateAndAcceptTaskPlan(input);
+}
+
 const aiGeneratePlanMock = mock(async (request: { title: string; description?: string }): Promise<PlanBlueprint> => ({
   title: `Plan for ${request.title}`,
   goal: request.description ?? request.title,
@@ -184,6 +189,59 @@ describe("generateTaskPlanForTask", () => {
     expect(savedPlan?.prompt).toBe("Add an explicit verification step before final output.");
     expect(aiGeneratePlanMock).toHaveBeenCalledWith(expect.objectContaining({
       userInstruction: "Add an explicit verification step before final output.",
+    }));
+  });
+
+  it("generates and accepts plans for auto-execute tasks", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Auto Accept Plan", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Auto execute plan",
+        status: "Draft",
+        priority: "High",
+        autoExecute: true,
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
+    await generateAndAcceptTaskPlanForTask({ taskId: task.id });
+
+    const savedPlan = await getLatestTaskPlanReadModel(task.id);
+    expect(savedPlan?.status).toBe("accepted");
+    expect(aiGeneratePlanMock).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: task.id,
+      title: "Auto execute plan",
+    }));
+  });
+
+  it("generates draft plans without accepting when auto-plan only is enabled", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Auto Draft Plan", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Auto plan only",
+        status: "Draft",
+        priority: "High",
+        autoPlanGeneration: true,
+        autoExecute: false,
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
+    await generateAndAcceptTaskPlanForTask({ taskId: task.id, accept: false });
+
+    const savedPlan = await getLatestTaskPlanReadModel(task.id);
+    expect(savedPlan?.status).toBe("draft");
+    expect(aiGeneratePlanMock).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: task.id,
+      title: "Auto plan only",
     }));
   });
 

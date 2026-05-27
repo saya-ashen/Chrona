@@ -281,6 +281,67 @@ describe("updateTask", () => {
     const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(storedTask.status).toBe("Ready");
   });
+
+  it("persists auto-execute updates", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Auto Execute Update",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Enable auto execute",
+        executionRuntime: "hermes",
+        executionConfig: {},
+        status: "Draft",
+        priority: "Medium",
+        autoExecute: false,
+      },
+    });
+
+    await updateTask({
+      taskId: task.id,
+      autoExecute: true,
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(storedTask.autoPlanGeneration).toBe(true);
+    expect(storedTask.autoExecute).toBe(true);
+  });
+
+  it("persists independent auto-plan generation updates", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Auto Plan Update",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Enable auto plan",
+        executionRuntime: "hermes",
+        executionConfig: {},
+        status: "Draft",
+        priority: "Medium",
+        autoPlanGeneration: false,
+        autoExecute: false,
+      },
+    });
+
+    await updateTask({
+      taskId: task.id,
+      autoPlanGeneration: true,
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(storedTask.autoPlanGeneration).toBe(true);
+    expect(storedTask.autoExecute).toBe(false);
+  });
 });
 
 describe("reopenTask", () => {
