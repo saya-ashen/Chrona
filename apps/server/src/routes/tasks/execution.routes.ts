@@ -9,14 +9,14 @@ import {
   executionActionParamSchema,
 } from "@chrona/contracts/api";
 import type { PlanExecutionSSEEvent } from "@chrona/contracts";
-import type { EffectivePlanGraph, ExecutionActionType } from "@chrona/contracts/ai";
-import type { CheckpointActionKind } from "@chrona/contracts/ai";
+import type { EffectivePlanGraph } from "@chrona/contracts/ai";
 import type {
   GraphExecutionEvent,
   PlanExecutionRuntimeEvent,
 } from "@chrona/engine/modules/plan-execution";
 
 import { error, toHttpError } from "../../lib/http";
+import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "./runtime-event-summary";
 
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
 
@@ -50,134 +50,8 @@ function summarizeGraphEvent(event: GraphExecutionEvent): Extract<PlanExecutionS
   return { type: "graph_event", event: event.type };
 }
 
-function toolLabel(toolName?: string): string {
-  switch (toolName) {
-    case "chrona_execution_dispatch":
-      return "Updating execution state";
-    case "chrona_plan_read":
-      return "Reading plan";
-    case "chrona_plan_mutate":
-      return "Updating plan";
-    case "chrona_task_read":
-      return "Reading task";
-    default:
-      return toolName ?? "Running tool";
-  }
-}
-
-function summarizeRuntimeEvent(
-  action: ExecutionActionType,
-  event: PlanExecutionRuntimeEvent,
-): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }> {
-  const providerEvent = event.event;
-  const provider = providerEvent.provider ?? "provider";
-  const base = {
-    type: "runtime_event" as const,
-    action,
-    nodeId: event.nodeId,
-    nodeTitle: event.nodeTitle,
-    runtimeName: event.runtimeName,
-    provider,
-    runId: providerEvent.runId,
-    nativeRunId: providerEvent.nativeRunId,
-    sequence: providerEvent.sequence,
-    timestamp: providerEvent.timestamp,
-    rawEventType: providerEvent.rawEventType,
-  };
-
-  switch (providerEvent.type) {
-    case "text_delta":
-      return { ...base, event: { type: "assistant_text_delta", text: providerEvent.text } };
-    case "reasoning_delta":
-      return { ...base, event: { type: "reasoning_delta", text: providerEvent.text } };
-    case "tool_call":
-      return {
-        ...base,
-        event: {
-          type: "tool_started",
-          toolName: providerEvent.tool,
-          label: toolLabel(providerEvent.tool),
-          input: providerEvent.input,
-        },
-      };
-    case "tool_started":
-      return {
-        ...base,
-        event: {
-          type: "tool_started",
-          toolName: providerEvent.toolName,
-          label: toolLabel(providerEvent.toolName),
-          preview: providerEvent.preview,
-          input: providerEvent.input,
-        },
-      };
-    case "tool_result":
-      return {
-        ...base,
-        event: {
-          type: "tool_completed",
-          toolName: providerEvent.tool,
-          label: toolLabel(providerEvent.tool),
-        },
-      };
-    case "tool_completed":
-      return {
-        ...base,
-        event: {
-          type: "tool_completed",
-          toolName: providerEvent.toolName,
-          label: toolLabel(providerEvent.toolName),
-          durationMs: providerEvent.durationMs,
-          error: providerEvent.error
-            ? {
-                message: providerEvent.error.message,
-                code: providerEvent.error.code,
-              }
-            : undefined,
-        },
-      };
-    case "approval_required":
-      return { ...base, event: { type: "approval_required", approval: providerEvent.approval } };
-    case "run_started":
-      return { ...base, event: { type: "run_status", status: "started", message: "Provider run started." } };
-    case "run_completed":
-      return { ...base, event: { type: "run_status", status: "completed", message: "Provider run finished. Chrona state sync is authoritative." } };
-    case "run_failed":
-      return { ...base, event: { type: "run_status", status: "failed", message: providerEvent.error } };
-    case "run_cancelled":
-      return { ...base, event: { type: "run_status", status: "cancelled", message: "Provider run cancelled." } };
-    case "raw_event":
-      return { ...base, event: { type: "raw_event", rawEventType: providerEvent.rawEventType } };
-  }
-}
-
 function writeExecutionEvent(stream: SseStream, event: PlanExecutionSSEEvent) {
   return stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
-}
-
-function checkpointActionToExecutionAction(action: CheckpointActionKind): ExecutionActionType {
-  switch (action) {
-    case "submit_input":
-      return "resume_with_input";
-    case "approve_result":
-    case "reject_result":
-    case "request_changes":
-    case "accept_replan":
-    case "reject_replan":
-    case "request_replan":
-      return "resume_with_approval";
-    case "retry_node":
-      return "retry_node";
-    case "resume_after_unblock":
-      return "resume_after_unblock";
-    case "mark_node_completed":
-    case "mark_node_skipped":
-      return "complete_manual_node";
-    case "fail_task":
-      return "fail_current_node";
-    case "cancel_session":
-      return "cancel_session";
-  }
 }
 
 export function createExecutionRoutes(engine: ChronaEngine) {

@@ -3,6 +3,8 @@ import {
   getPlanRun,
   savePlanRun,
 } from "../plan-run-store";
+import { Prisma } from "@/generated/prisma/client";
+import { db } from "@/lib/db";
 import { getAcceptedCompiledPlan } from "../compiled-plan-store";
 import { graphStatusForExecutionStatus, planRunStatusForExecutionStatus } from "../execution-state-machine";
 import type {
@@ -171,6 +173,13 @@ export async function persistRuntimeState(input: {
     results: input.results,
     executionContextSnapshots: input.executionContextSnapshots,
   });
+  await syncNormalizedRuntimeState({
+    workspaceId: input.workspaceId,
+    taskId: input.taskId,
+    planId: input.planId,
+    attempts: input.attempts,
+    results: input.results,
+  });
 }
 
 export async function persistTerminalRuntimeState(input: {
@@ -209,4 +218,108 @@ export async function persistTerminalRuntimeState(input: {
     results: input.persisted.results,
     executionContextSnapshots: input.persisted.executionContextSnapshots,
   });
+  await syncNormalizedRuntimeState({
+    workspaceId: input.workspaceId,
+    taskId: input.taskId,
+    planId: input.planId,
+    attempts: input.persisted.attempts,
+    results: input.persisted.results,
+  });
+}
+
+async function syncNormalizedRuntimeState(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  attempts: NodeAttempt[];
+  results: NodeResult[];
+}) {
+  if (input.attempts.length === 0) return;
+  const planRun = await db.taskPlanRun.findUnique({
+    where: { taskId_planId: { taskId: input.taskId, planId: input.planId } },
+    select: { id: true, executionEpoch: true },
+  });
+  if (!planRun) return;
+
+  const currentResultsByNodeId = new Map(
+    input.results
+      .filter((result) => result.status === "current")
+      .map((result) => [result.nodeId, result]),
+  );
+
+  for (const attempt of input.attempts) {
+    await syncNormalizedAttempt({
+      ...input,
+      planRunId: planRun.id,
+      executionEpoch: planRun.executionEpoch,
+      attempt,
+      result: currentResultsByNodeId.get(attempt.nodeId),
+    });
+    await syncProviderRunsForAttempt(attempt);
+  }
+}
+
+async function syncNormalizedAttempt(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  planRunId: string;
+  executionEpoch: number;
+  attempt: NodeAttempt;
+  result?: NodeResult;
+}) {
+  const mutableFields = {
+    status: input.attempt.status,
+    finishedAt: dateOrNull(input.attempt.finishedAt),
+    error: toJsonInput(input.attempt.error),
+    runtimeSnapshot: toJsonInput(input.attempt.runtimeSnapshot),
+    selectedBranchRef: input.result?.selectedBranch?.ref ?? null,
+    selectedNextNodeId: input.result?.selectedBranch?.nextNodeId ?? null,
+  };
+  await db.taskPlanNodeAttempt.upsert({
+    where: { idempotencyKey: input.attempt.idempotencyKey },
+    update: mutableFields,
+    create: {
+      id: input.attempt.id,
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      planId: input.planId,
+      planRunId: input.planRunId,
+      nodeId: input.attempt.nodeId,
+      nodeLayerId: input.attempt.nodeLayerId,
+      executionContextSnapshotId: input.attempt.executionContextSnapshotId,
+      idempotencyKey: input.attempt.idempotencyKey,
+      attemptNumber: input.attempt.attemptNumber,
+      executionEpoch: input.executionEpoch,
+      startedAt: new Date(input.attempt.startedAt),
+      ...mutableFields,
+    },
+    select: { id: true },
+  });
+}
+
+async function syncProviderRunsForAttempt(attempt: NodeAttempt) {
+  if (attempt.status === "running") return;
+  await db.taskPlanProviderRun.updateMany({
+    where: { nodeAttemptId: attempt.id, status: "running" },
+    data: {
+      status: providerRunStatusForAttempt(attempt.status),
+      finishedAt: dateOrNull(attempt.finishedAt) ?? new Date(),
+    },
+  });
+}
+
+function providerRunStatusForAttempt(status: NodeAttempt["status"]) {
+  if (status === "succeeded") return "completed";
+  return status;
+}
+
+function toJsonInput(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return Prisma.JsonNull;
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function dateOrNull(value?: string) {
+  return value ? new Date(value) : null;
 }

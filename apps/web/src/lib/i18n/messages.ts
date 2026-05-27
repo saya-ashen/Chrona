@@ -6,6 +6,8 @@ export const taskWorkspaceActivityMessages = {
   reasoningDetails: "Reasoning details",
   showToolDetails: "Show tool details",
   hideToolDetails: "Hide tool details",
+  showFullContent: "Show full content",
+  hideFullContent: "Hide full content",
   loadOlder: "Load older activity",
   loadingOlder: "Loading older activity...",
   toolLabels: {

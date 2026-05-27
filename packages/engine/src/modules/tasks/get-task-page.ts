@@ -71,6 +71,11 @@ type TaskTimelineActivityItem = {
   metadata: unknown;
 };
 
+type ActivityCursor = {
+  source: "timeline" | "event";
+  timestamp: Date;
+};
+
 type TaskActivityPageInput = {
   taskId: string;
   scope?: "task" | "node";
@@ -448,50 +453,102 @@ function mapTimelineItemToActivity(item: TaskTimelineActivityItem): WorkspaceAct
   });
 }
 
+async function resolveActivityCursor(cursor: string | undefined): Promise<ActivityCursor | null> {
+  if (!cursor) return null;
+
+  const timelineItem = await db.taskTimelineItem.findUnique({
+    where: { id: cursor },
+    select: { sortTime: true },
+  });
+  if (timelineItem) return { source: "timeline", timestamp: timelineItem.sortTime };
+
+  const event = await db.event.findUnique({
+    where: { id: cursor },
+    select: { occurredAt: true, createdAt: true },
+  });
+  if (event) return { source: "event", timestamp: event.occurredAt ?? event.createdAt };
+
+  return null;
+}
+
+function timelineCursorWhere<T extends Record<string, unknown>>(
+  where: T,
+  cursor: ActivityCursor | null,
+) {
+  if (!cursor) return where;
+
+  return {
+    ...where,
+    sortTime: { lt: cursor.timestamp },
+  };
+}
+
+function eventCursorWhere<T extends Record<string, unknown>>(
+  where: T,
+  cursor: ActivityCursor | null,
+) {
+  if (!cursor) return where;
+
+  return {
+    ...where,
+    OR: [
+      { occurredAt: { lt: cursor.timestamp } },
+      { occurredAt: null, createdAt: { lt: cursor.timestamp } },
+    ],
+  };
+}
+
+async function getMergedActivity(input: {
+  taskId: string;
+  nodeId?: string;
+  cursor?: string;
+  limit: number;
+}) {
+  const cursor = await resolveActivityCursor(input.cursor);
+  const take = Math.min(input.limit * 3, 3000) + 1;
+  const baseWhere = input.nodeId
+    ? { taskId: input.taskId, nodeId: input.nodeId }
+    : { taskId: input.taskId };
+  const [timelineItems, events] = await Promise.all([
+    db.taskTimelineItem.findMany({
+      where: timelineCursorWhere(baseWhere, cursor),
+      orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
+      take,
+    }),
+    db.event.findMany({
+      where: eventCursorWhere(baseWhere, cursor),
+      orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }, { ingestSequence: "desc" }],
+      take,
+    }),
+  ]);
+  const activity = orderActivityNewestFirst([
+    ...timelineItems.map(mapTimelineItemToActivity),
+    ...buildActivityTimeline([...events].reverse()),
+  ]);
+  const items = activity.slice(0, input.limit);
+
+  return {
+    items,
+    nextCursor: activity.length > input.limit ? items.at(-1)?.id : undefined,
+  };
+}
+
 export async function getTaskActivityPage(input: TaskActivityPageInput) {
   const limit = Math.min(Math.max(input.limit ?? 100, 1), 3000);
   const scope = input.scope ?? "task";
   if (scope === "node" && !input.nodeId) {
     throw new Error("nodeId is required for node activity");
   }
-  const timelineItems = await db.taskTimelineItem.findMany({
-    where: scope === "node"
-      ? { taskId: input.taskId, nodeId: input.nodeId }
-      : { taskId: input.taskId },
-    orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
-    take: limit + 1,
-    ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+  const activity = await getMergedActivity({
+    taskId: input.taskId,
+    ...(scope === "node" && input.nodeId ? { nodeId: input.nodeId } : {}),
+    cursor: input.cursor,
+    limit,
   });
-  const pageTimelineItems = timelineItems.slice(0, limit);
-  if (pageTimelineItems.length > 0) {
-    return {
-      items: orderActivityNewestFirst(pageTimelineItems.map(mapTimelineItemToActivity)),
-      nextCursor: timelineItems.length > limit ? pageTimelineItems.at(-1)?.id : undefined,
-      scope: {
-        type: scope,
-        taskId: input.taskId,
-        ...(scope === "node" && input.nodeId ? { nodeId: input.nodeId } : {}),
-        limit,
-      },
-    };
-  }
-
-  const events = await db.event.findMany({
-    where: scope === "node"
-      ? { taskId: input.taskId, nodeId: input.nodeId }
-      : { taskId: input.taskId },
-    orderBy: { ingestSequence: "desc" },
-    take: limit + 1,
-    ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
-  });
-  const pageEvents = events.slice(0, limit);
-  const activity = orderActivityNewestFirst(
-    buildActivityTimeline([...pageEvents].reverse()),
-  );
 
   return {
-    items: activity,
-    nextCursor: events.length > limit ? pageEvents.at(-1)?.id : undefined,
+    items: activity.items,
+    nextCursor: activity.nextCursor,
     scope: {
       type: scope,
       taskId: input.taskId,
@@ -525,7 +582,7 @@ export async function getTaskPage(taskId: string) {
       },
       events: {
         orderBy: { ingestSequence: "desc" },
-        take: 100,
+        take: 300,
       },
       scheduleProposals: {
         where: { status: "Pending" },
@@ -632,7 +689,10 @@ export async function getTaskPage(taskId: string) {
       uri: artifact.uri,
     })),
     activityTimeline: task.timelineItems.length > 0
-      ? orderActivityNewestFirst(task.timelineItems.map(mapTimelineItemToActivity))
+      ? orderActivityNewestFirst([
+          ...task.timelineItems.map(mapTimelineItemToActivity),
+          ...buildActivityTimeline([...task.events].reverse()),
+        ]).slice(0, 100)
       : buildActivityTimeline([...task.events].reverse()),
   };
 }

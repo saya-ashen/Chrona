@@ -21,6 +21,7 @@ type MainSessionEventType =
   | "node_blocked"
   | "graph_mutation_applied"
   | "node_result_submitted"
+  | "continuation_skipped"
   | "replan_proposed"
   | "execution_completed"
   | "user_input_received"
@@ -125,7 +126,7 @@ export async function appendMainSessionEvent(input: {
       origin: input.envelope?.origin,
       correlation: input.envelope?.correlation,
     },
-    externalRef: `graph_runtime:${input.taskId}:${input.sessionId}:${input.eventType}:${Object.values(input.payload).join(",").slice(0, 64)}`,
+    externalRef: planExecutionEventKey(input),
     correlationId: input.sessionId,
     occurredAt,
   });
@@ -153,7 +154,7 @@ export async function appendMainSessionEvent(input: {
       correlation: input.envelope?.correlation,
       ...input.payload,
     },
-    dedupeKey: `plan_execution.${input.eventType}:${input.taskId}:${input.sessionId}:${Object.values(input.payload).join(",").slice(0, 64)}`,
+    dedupeKey: planExecutionEventKey(input),
     summary: timelineTitle(input.eventType, input.nodeTitle),
     severity: input.eventType === "node_blocked" ? "warning" : "info",
     occurredAt,
@@ -199,6 +200,30 @@ export async function appendMainSessionEvent(input: {
     workspaceId: task.workspaceId,
     reason: `plan_execution.${input.eventType}`,
   });
+}
+
+function planExecutionEventKey(input: {
+  taskId: string;
+  sessionId: string;
+  eventType: MainSessionEventType;
+  nodeId?: string | null;
+  payload: MainSessionEventPayload;
+  envelope?: PlanGraphCommandEnvelope;
+}) {
+  const origin = input.envelope?.origin;
+  const uniqueRef =
+    origin?.requestId ??
+    input.envelope?.correlation.toolInvocationId ??
+    input.envelope?.correlation.providerRunId ??
+    input.envelope?.correlation.nodeAttemptId;
+  return [
+    "plan_execution",
+    input.eventType,
+    input.taskId,
+    input.sessionId,
+    input.nodeId ?? "none",
+    uniqueRef ?? Object.values(input.payload).join(",").slice(0, 64),
+  ].join(":");
 }
 
 function timelineTitle(eventType: MainSessionEventType, nodeTitle?: string | null) {

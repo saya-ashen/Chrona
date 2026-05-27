@@ -19,8 +19,11 @@ export async function rebuildTaskProjection(taskId: string) {
       },
       events: { orderBy: { ingestSequence: "desc" }, take: 1 },
       workBlocks: {
-        where: { status: { in: ["Scheduled", "Active"] } },
-        orderBy: { scheduledStartAt: "asc" },
+        where: { status: { in: ["Scheduled", "Active", "Completed"] } },
+        orderBy: [
+          { scheduledStartAt: "asc" },
+          { updatedAt: "desc" },
+        ],
         take: 1,
       },
     },

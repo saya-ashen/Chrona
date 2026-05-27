@@ -7,6 +7,7 @@ import { workCommandBodySchema, workProjectionParamSchema } from "@chrona/contra
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
+import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "../tasks/runtime-event-summary";
 
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
 const WORKSPACE_SSE_HEARTBEAT_INTERVAL_MS = 5000;
@@ -44,6 +45,7 @@ function publishWorkspaceTrigger(input: {
   commandId: string;
   type: "plan.generation.event" | "execution.runtime_event" | "execution.state.updated" | "execution.result" | "checkpoint.result";
   eventKind?: string;
+  [key: string]: unknown;
 }) {
   appendTaskWorkspaceEvent(input);
 }
@@ -108,12 +110,14 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
           });
         },
         onRuntimeEvent(event) {
+          const { type: _runtimeType, ...runtimePayload } = summarizeRuntimeEvent(action.action, event);
           publishWorkspaceTrigger({
             taskId,
             workspaceId,
             commandId,
             type: "execution.runtime_event",
             eventKind: event.event.type,
+            ...runtimePayload,
           });
         },
         onStateChange() {
@@ -148,12 +152,14 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         });
       },
       onRuntimeEvent(event) {
+        const { type: _runtimeType, ...runtimePayload } = summarizeRuntimeEvent(checkpointActionToExecutionAction(command.action), event);
         publishWorkspaceTrigger({
           taskId,
           workspaceId,
           commandId,
           type: "execution.runtime_event",
           eventKind: event.event.type,
+          ...runtimePayload,
         });
       },
       onStateChange() {

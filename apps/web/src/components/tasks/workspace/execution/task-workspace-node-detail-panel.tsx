@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
+import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import {
   buildDefaultWorkspaceActionFields,
   buildWorkspaceCheckpointActionInput,
@@ -524,6 +525,7 @@ function ConfigurationTab({
 export function TaskWorkspaceNodeDetailPanel({
   detail,
   activity,
+  runtimeEvents = [],
   isActivityLoading,
   selectedNodes,
   variant = "panel",
@@ -537,6 +539,7 @@ export function TaskWorkspaceNodeDetailPanel({
 }: {
   detail: NodeDetailPanelState;
   activity: WorkspaceActivityItem[];
+  runtimeEvents?: WorkspaceRuntimeEvent[];
   isActivityLoading?: boolean;
   selectedNodes: PlanNodeDataModel[];
   variant?: NodeDetailVariant;
@@ -597,6 +600,7 @@ export function TaskWorkspaceNodeDetailPanel({
       <TabsContent value="activity" aria-label={`${TAB_LABELS.activity} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-slate-50/75 p-2", variant === "rail" && "max-h-none")}>
         <WorkspaceActivityFeed
           activity={activity}
+          runtimeEvents={runtimeEvents}
           title={taskWorkspaceActivityMessages.nodeTitle}
           emptyMessage={isActivityLoading ? "Loading node activity..." : taskWorkspaceActivityMessages.nodeEmpty}
         />

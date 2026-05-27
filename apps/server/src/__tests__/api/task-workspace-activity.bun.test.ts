@@ -45,6 +45,63 @@ describe("task workspace activity endpoint", () => {
     expect(body.scope).toMatchObject({ type: "task", limit: 2 });
   });
 
+  it("merges coarse timeline items with provider tool events", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Mixed Activity");
+    const { taskId } = await seedTask(workspaceId, { title: "Mixed activity" });
+
+    await db.taskTimelineItem.create({
+      data: {
+        workspaceId,
+        taskId,
+        kind: "plan_execution.node_started",
+        title: "Node started",
+        body: "Run implementation",
+        severity: "info",
+        status: "running",
+        nodeId: "node-a",
+        sortTime: new Date("2026-05-22T00:00:02.000Z"),
+        metadata: { nodeId: "node-a" },
+      },
+    });
+    await db.event.createMany({
+      data: [{
+        eventType: "provider.tool_started",
+        workspaceId,
+        taskId,
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        nodeId: "node-a",
+        nodeTitle: "Node A",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_started", toolName: "chrona_task_read", preview: "Read task" } },
+        dedupeKey: "activity-tool-started",
+        occurredAt: new Date("2026-05-22T00:00:03.000Z"),
+        ingestSequence: 1,
+      }, {
+        eventType: "provider.tool_completed",
+        workspaceId,
+        taskId,
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        nodeId: "node-a",
+        nodeTitle: "Node A",
+        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_completed", toolName: "chrona_task_read", durationMs: 42 } },
+        dedupeKey: "activity-tool-completed",
+        occurredAt: new Date("2026-05-22T00:00:04.000Z"),
+        ingestSequence: 2,
+      }],
+    });
+
+    const res = await app().request(`/api/tasks/${taskId}/activity?limit=10`);
+    const body = await json<{ items: Array<{ kind: string; title: string; sourceNodeId?: string }> }>(res);
+
+    expect(res.status).toBe(200);
+    expect(body.items.map((item) => item.kind)).toEqual(["tool_completed", "tool_started", "node"]);
+    expect(body.items.map((item) => item.title)).toEqual(["Tool completed", "Tool started", "Node started"]);
+    expect(body.items.every((item) => item.sourceNodeId === "node-a")).toBe(true);
+  });
+
   it("returns node-scoped activity without inferring nearby provider events", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Node Activity History");
     const { taskId } = await seedTask(workspaceId, { title: "Node activity history" });
