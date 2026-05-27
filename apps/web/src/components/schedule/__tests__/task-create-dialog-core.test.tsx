@@ -83,6 +83,8 @@ describe("TaskCreateDialog – Core functionality", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: /generate plan after saving/i })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: /generate plan after saving/i })).toBeDisabled();
     });
   });
 
@@ -115,8 +117,10 @@ describe("TaskCreateDialog – Core functionality", () => {
     const planGenerationCheckbox = await screen.findByRole("checkbox", { name: /generate plan after saving/i });
     expect(autoExecuteCheckbox).toBeChecked();
     expect(planGenerationCheckbox).toBeChecked();
+    expect(planGenerationCheckbox).toBeDisabled();
 
     await user.click(autoExecuteCheckbox);
+    expect(planGenerationCheckbox).not.toBeDisabled();
     await user.click(planGenerationCheckbox);
     await user.type(screen.getByPlaceholderText("Add title"), "Override defaults");
     await user.click(screen.getByText("Save"));

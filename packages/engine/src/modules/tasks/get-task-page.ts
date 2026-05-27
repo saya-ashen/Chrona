@@ -575,6 +575,8 @@ export async function getTaskPage(taskId: string) {
       description: task.description,
       executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig,
+      autoPlanGeneration: task.autoPlanGeneration,
+      autoExecute: task.autoExecute,
       status: task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,

@@ -212,9 +212,7 @@ export function SchedulePage({
         />
       </div>
 
-      {activeView === "timeline" &&
-      viewModel.selectedItem &&
-      viewModel.activeDay ? (
+      {viewModel.selectedItem && viewModel.activeDay ? (
         <SelectedBlockSheet
           item={viewModel.selectedItem}
           selectedDay={viewModel.activeDay}

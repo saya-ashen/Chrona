@@ -5,11 +5,11 @@ import { useI18n, useLocale } from "@chrona/i18n/react";
 import { SelectedBlockMainColumn } from "@/components/schedule/panels/selected-block-sheet/selected-block-main-column";
 import { SelectedBlockSheetHeader } from "@/components/schedule/panels/selected-block-sheet/selected-block-sheet-header";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { SelectedBlockSheetProps } from "@/components/schedule/panels/selected-block-sheet/types";
 import { useSelectedBlockConfigState } from "@/components/schedule/panels/selected-block-sheet/use-selected-block-config-state";
 import { useSelectedBlockPlanState } from "@/components/schedule/panels/selected-block-sheet/use-selected-block-plan-state";
@@ -45,24 +45,19 @@ export function SelectedBlockSheet({
   } = useSelectedBlockConfigState({ item, onSaveTaskConfigAction });
 
   return (
-    <Drawer
+    <Dialog
       open
-      defaultOpen
-      direction="bottom"
-      noBodyStyles
-      shouldScaleBackground={false}
-      setBackgroundColorOnScale={false}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
     >
-      <DrawerContent
-        overlayClassName="data-open:!animate-none data-closed:!animate-none"
-        className="z-[130] max-h-[92vh] rounded-t-[2rem] border border-border/70 bg-background shadow-[0_-24px_80px_-32px_rgba(15,23,42,0.55)] data-open:!animate-none data-closed:!animate-none md:!bottom-auto md:!left-1/2 md:!right-auto md:!top-1/2 md:!mt-0 md:!h-auto md:!max-h-[calc(100vh-2rem)] md:!overflow-hidden md:w-[min(1180px,calc(100vw-2rem))] md:!-translate-x-1/2 md:!-translate-y-1/2 md:rounded-[2rem] md:shadow-[0_24px_90px_-32px_rgba(15,23,42,0.55)]"
+      <DialogContent
+        showCloseButton={false}
+        className="z-[130] max-h-[calc(100vh-1rem)] overflow-hidden rounded-[1.5rem] border border-border/70 bg-background p-0 text-foreground shadow-[0_24px_90px_-32px_rgba(15,23,42,0.55)] sm:max-w-none md:max-h-[calc(100vh-2rem)] md:w-[min(1180px,calc(100vw-2rem))] md:rounded-[2rem]"
       >
-        <DrawerTitle className="sr-only">{copy.taskDetails}</DrawerTitle>
-        <DrawerDescription className="sr-only">{copy.closeTaskDetails}</DrawerDescription>
-        <div className="flex max-h-[92vh] min-h-0 flex-col overflow-hidden md:h-auto md:max-h-[calc(100vh-2rem)]">
+        <DialogTitle className="sr-only">{copy.taskDetails}</DialogTitle>
+        <DialogDescription className="sr-only">{copy.closeTaskDetails}</DialogDescription>
+        <div className="flex max-h-[calc(100vh-1rem)] min-h-0 flex-col overflow-hidden md:max-h-[calc(100vh-2rem)]">
           <SelectedBlockSheetHeader
             item={item}
             locale={locale}
@@ -70,7 +65,7 @@ export function SelectedBlockSheet({
             onClose={onClose}
           />
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 select-text overflow-y-auto">
             <div>
               <SelectedBlockMainColumn
                 item={item}
@@ -94,7 +89,7 @@ export function SelectedBlockSheet({
             </div>
           </div>
         </div>
-      </DrawerContent>
-    </Drawer>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -32,6 +32,8 @@ export type ScheduleTaskListItem = {
   scheduleSource: string | null;
   scheduleProposalCount: number;
   lastActivityAt: Date | null;
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
   executionRuntime: string;
   executionConfig: unknown;
   isRunnable: boolean;
@@ -181,6 +183,8 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
     dueAt: item.dueAt,
     scheduledStartAt: item.scheduledStartAt,
     scheduledEndAt: item.scheduledEndAt,
+    autoPlanGeneration: item.autoPlanGeneration,
+    autoExecute: item.autoExecute,
   };
 }
 

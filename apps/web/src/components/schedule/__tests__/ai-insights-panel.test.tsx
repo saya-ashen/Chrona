@@ -38,6 +38,8 @@ const mockItem: ScheduledItem = {
   lastActivityAt: null,
   executionRuntime: "hermes",
   executionConfig: {},
+  autoPlanGeneration: false,
+  autoExecute: false,
   isRunnable: true,
   runnabilityState: "ready",
   runnabilitySummary: "Ready",

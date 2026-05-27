@@ -152,7 +152,7 @@ describe("ControlPlaneShell", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("Create task dialog");
   });
 
-  it("passes dialog auto-execute choice into task creation and auto-generates a draft plan when the task-level plan switch is enabled", async () => {
+  it("passes dialog automation choices into task creation", async () => {
     const user = userEvent.setup();
     writePreferences({
       autoSuggestionsEnabled: false,
@@ -177,17 +177,15 @@ describe("ControlPlaneShell", () => {
           title: "Created from shell",
           description: "Shell description",
           priority: "High",
+          autoPlanGeneration: true,
           autoExecute: true,
         }),
       );
     });
-    expect(mockStartTaskPlanGenerationSession).toHaveBeenCalledWith({
-      taskId: "created-task",
-      forceRefresh: true,
-    });
+    expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 
-  it("does not use auto-execute as an implicit plan-generation trigger", async () => {
+  it("forces plan generation when auto-execute is enabled", async () => {
     const user = userEvent.setup();
     mockTaskDialogAutoExecute = true;
     mockTaskDialogAutoPlanGenerationEnabled = false;
@@ -205,6 +203,7 @@ describe("ControlPlaneShell", () => {
     await waitFor(() => {
       expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
         expect.objectContaining({
+          autoPlanGeneration: true,
           autoExecute: true,
         }),
       );
@@ -212,8 +211,9 @@ describe("ControlPlaneShell", () => {
     expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 
-  it("does not auto-generate a draft plan when the task-level switch is disabled", async () => {
+  it("does not request auto plan generation when both task automation switches are disabled", async () => {
     const user = userEvent.setup();
+    mockTaskDialogAutoExecute = false;
     mockTaskDialogAutoPlanGenerationEnabled = false;
     writePreferences({
       autoSuggestionsEnabled: false,
@@ -235,6 +235,8 @@ describe("ControlPlaneShell", () => {
       expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Created from shell",
+          autoPlanGeneration: false,
+          autoExecute: false,
         }),
       );
     });

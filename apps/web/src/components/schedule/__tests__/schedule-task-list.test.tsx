@@ -56,6 +56,8 @@ function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; t
     lastActivityAt: null,
     executionRuntime: "hermes",
     executionConfig: {},
+    autoPlanGeneration: false,
+    autoExecute: false,
     isRunnable: true,
     runnabilityState: "Ready",
     runnabilitySummary: "Ready",

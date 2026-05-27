@@ -6,7 +6,6 @@ import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assista
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dialog";
-import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { createTaskFromSchedule } from "@/lib/task-actions-client";
 import { useAppPathname, useAppRouter } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
@@ -212,19 +211,14 @@ export function ControlPlaneShell({
         onSubmit={async (input) => {
           try {
             setIsCreatingTask(true);
-            const created = (await createTaskFromSchedule({
+            await createTaskFromSchedule({
               workspaceId: _defaultWorkspace.id,
               title: input.title,
               description: input.description || null,
               priority: input.priority,
+              autoPlanGeneration: input.autoPlanGenerationEnabled || input.autoExecute,
               autoExecute: input.autoExecute,
-            })) as { taskId?: string };
-            if (input.autoPlanGenerationEnabled && created.taskId) {
-              void startTaskPlanGenerationSession({
-                taskId: created.taskId,
-                forceRefresh: true,
-              });
-            }
+            });
             router.refresh();
           } finally {
             setIsCreatingTask(false);

@@ -27,6 +27,8 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
     task.scheduledEndAt,
     task.executionRuntime,
     task.executionConfig,
+    task.autoPlanGeneration,
+    task.autoExecute,
   ]);
   const originalEditableTask = useMemo(() => taskToEditableTask(task), [task]);
   const draftEditableTask = useMemo(
@@ -76,6 +78,8 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
         priority: input.priority,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
+        autoPlanGeneration: input.autoPlanGeneration,
+        autoExecute: input.autoExecute,
       };
 
       const response = await api.tasks[":taskId"].$patch({
@@ -130,6 +134,8 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
         scheduleStatus: prev.scheduleStatus,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
+        autoPlanGeneration: input.autoPlanGeneration,
+        autoExecute: input.autoExecute,
       }));
       setTaskConfigDraft(input);
       setHasUnsavedConfigChanges(false);

@@ -88,6 +88,8 @@ export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixtu
       description: null,
       executionRuntime: "local",
       executionConfig: null,
+      autoPlanGeneration: false,
+      autoExecute: false,
       status: "Ready",
       priority: "High",
       dueAt: null,

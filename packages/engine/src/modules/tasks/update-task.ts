@@ -2,6 +2,7 @@ import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
@@ -120,11 +121,17 @@ export async function updateTask(
     input.executionRuntime !== undefined ||
     input.executionConfig !== undefined ||
     input.sessionStrategy !== undefined;
+  const nextAutoExecute = input.autoExecute ?? currentTask.autoExecute;
+  const nextAutoPlanGeneration = nextAutoExecute
+    ? true
+    : input.autoPlanGeneration ?? currentTask.autoPlanGeneration;
 
   const changedFields = [
     input.title !== undefined ? "title" : null,
     input.description !== undefined ? "description" : null,
     input.priority !== undefined ? "priority" : null,
+    input.autoPlanGeneration !== undefined || input.autoExecute === true ? "autoPlanGeneration" : null,
+    input.autoExecute !== undefined ? "autoExecute" : null,
     input.status !== undefined ? "status" : null,
     input.executionRuntime !== undefined ? "executionRuntime" : null,
     input.executionConfig !== undefined ? "executionConfig" : null,
@@ -137,6 +144,11 @@ export async function updateTask(
       title,
       description,
       priority: input.priority ? TaskPriority[input.priority] : undefined,
+      autoPlanGeneration:
+        input.autoPlanGeneration !== undefined || input.autoExecute === true
+          ? nextAutoPlanGeneration
+          : undefined,
+      autoExecute: input.autoExecute,
       executionRuntime: shouldPersistResolvedRuntimeConfig
         ? validatedRuntimeConfig.executionRuntime
         : undefined,
@@ -161,6 +173,16 @@ export async function updateTask(
   });
 
   await rebuildTaskProjection(task.id);
+
+  if (
+    nextAutoPlanGeneration &&
+    (
+      (input.autoPlanGeneration === true && currentTask.autoPlanGeneration !== true) ||
+      (input.autoExecute === true && currentTask.autoExecute !== true)
+    )
+  ) {
+    startAutoPlanGenerationForTask({ taskId: task.id, accept: nextAutoExecute });
+  }
 
   return {
     taskId: task.id,

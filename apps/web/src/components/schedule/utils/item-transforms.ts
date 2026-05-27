@@ -98,6 +98,8 @@ export function createScheduledItemFromQueueItem(
     description: item.description,
     executionRuntime: item.executionRuntime,
     executionConfig: item.executionConfig,
+    autoPlanGeneration: item.autoPlanGeneration,
+    autoExecute: item.autoExecute,
     isRunnable: item.isRunnable,
     runnabilityState: item.runnabilityState,
     runnabilitySummary: item.runnabilitySummary,
@@ -130,6 +132,8 @@ export function createScheduledItemFromCreateInput(
     lastActivityAt: new Date(),
     executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
+    autoPlanGeneration: input.autoExecute || input.autoPlanGenerationEnabled,
+    autoExecute: input.autoExecute,
     isRunnable: false,
     runnabilityState: "missing_accepted_plan",
     runnabilitySummary: "Generate and accept a plan",
@@ -182,6 +186,8 @@ export function applyTaskConfigToItem<
     scheduledEndAt: input.scheduledEndAt,
     executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
+    autoPlanGeneration: input.autoPlanGeneration,
+    autoExecute: input.autoExecute,
     isRunnable: runnability.isRunnable,
     runnabilityState: runnability.state,
     runnabilitySummary: runnability.summary,
@@ -204,6 +210,8 @@ export function toTaskConfigInitialValues(item: {
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
+  autoExecute?: boolean;
+  autoPlanGeneration?: boolean;
 }) {
   return {
     title: item.title,
@@ -214,6 +222,8 @@ export function toTaskConfigInitialValues(item: {
     executionRuntime: item.executionRuntime ?? null,
     executionConfig: item.executionConfig,
     dueAt: item.dueAt ?? null,
+    autoPlanGeneration: item.autoPlanGeneration ?? false,
+    autoExecute: item.autoExecute ?? false,
   };
 }
 

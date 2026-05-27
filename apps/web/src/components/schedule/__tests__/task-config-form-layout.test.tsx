@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /* ------------------------------------------------------------------ */
@@ -104,6 +105,51 @@ describe("TaskConfigForm – field layout", () => {
     render(<TaskConfigForm {...defaultProps} />);
 
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("lets auto-plan toggle independently until auto-execute forces it on", async () => {
+    const user = userEvent.setup();
+    render(<TaskConfigForm {...defaultProps} />);
+
+    const autoExecute = screen.getByRole("checkbox", { name: /^Auto-execute at scheduled time/i });
+    const autoPlanGeneration = screen.getByRole("checkbox", { name: /^Auto-generate plan/i });
+
+    expect(autoExecute).not.toBeChecked();
+    expect(autoPlanGeneration).not.toBeChecked();
+    expect(autoPlanGeneration).not.toBeDisabled();
+
+    await user.click(autoPlanGeneration);
+    expect(autoPlanGeneration).toBeChecked();
+    expect(autoExecute).not.toBeChecked();
+
+    await user.click(autoPlanGeneration);
+    expect(autoPlanGeneration).not.toBeChecked();
+
+    await user.click(autoExecute);
+
+    expect(autoExecute).toBeChecked();
+    expect(autoPlanGeneration).toBeChecked();
+    expect(autoPlanGeneration).toBeDisabled();
+  });
+
+  it("submits auto execute from the edit form", async () => {
+    const user = userEvent.setup();
+    const onSubmitAction = vi.fn();
+    render(
+      <TaskConfigForm
+        {...defaultProps}
+        initialValues={{ title: "Scheduled task" }}
+        onSubmitAction={onSubmitAction}
+      />,
+    );
+
+    await user.click(screen.getByRole("checkbox", { name: /^Auto-execute at scheduled time/i }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSubmitAction).toHaveBeenCalledWith(expect.objectContaining({
+      autoPlanGeneration: true,
+      autoExecute: true,
+    }));
   });
 
   it("shows pending label when isPending is true", () => {

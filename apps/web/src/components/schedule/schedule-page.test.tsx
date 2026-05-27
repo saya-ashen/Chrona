@@ -314,6 +314,8 @@ function createData(): SchedulePageData {
           temperature: 0.2,
           prompt: "Implement the automation flow",
         },
+        autoPlanGeneration: false,
+        autoExecute: false,
         isRunnable: true,
         runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready to run",
@@ -402,11 +404,14 @@ describe("SchedulePage quick create", () => {
       );
     });
 
+    expect(createTaskFromSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        autoPlanGeneration: true,
+        autoExecute: true,
+      }),
+    );
     expect(applySchedule).toHaveBeenCalled();
-    expect(startTaskPlanGenerationSession).toHaveBeenCalledWith({
-      taskId: "created-task",
-      forceRefresh: true,
-    });
+    expect(startTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 
   it("does not auto-generate a draft plan after quick-create when the task-level plan switch is disabled", async () => {
@@ -433,6 +438,12 @@ describe("SchedulePage quick create", () => {
       );
     });
 
+    expect(createTaskFromSchedule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        autoPlanGeneration: true,
+        autoExecute: true,
+      }),
+    );
     expect(applySchedule).toHaveBeenCalled();
     expect(startTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
@@ -550,6 +561,8 @@ describe("SchedulePage data display", () => {
         lastActivityAt: null,
         executionRuntime: "hermes",
         executionConfig: {},
+        autoPlanGeneration: false,
+        autoExecute: false,
         isRunnable: true,
         runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready",
@@ -595,6 +608,8 @@ describe("SchedulePage data display", () => {
         lastActivityAt: null,
         executionRuntime: "hermes",
         executionConfig: {},
+        autoPlanGeneration: false,
+        autoExecute: false,
         isRunnable: true,
         runnabilityState: "ready_to_run",
         runnabilitySummary: "Ready",
