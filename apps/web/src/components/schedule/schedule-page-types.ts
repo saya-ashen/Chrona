@@ -58,7 +58,10 @@ type ScheduleRuntimeFields = {
 /** Frontend-friendly alias for the canonical TaskPlanReadModel from @chrona/contracts */
 export type ScheduledAiTaskPlan = TaskPlanReadModel;
 
-type ScheduleTaskPlanSnapshot = TaskPlanReadModel | null;
+export type ScheduleTaskPlanSnapshot = Pick<
+  TaskPlanReadModel,
+  "id" | "status" | "revision" | "summary" | "updatedAt" | "generatedBy"
+>;
 
 export type ScheduleAiPlanGenerationStatus =
   | "idle"

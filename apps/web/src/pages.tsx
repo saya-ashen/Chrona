@@ -23,8 +23,17 @@ export type AppBootData = {
   locale: Locale;
   dictionary: Dictionary;
   defaultWorkspace: Awaited<ReturnType<typeof import("@chrona/engine/modules/workspaces/get-default-workspace").getDefaultWorkspace>>;
+};
+
+export type ScheduleRouteData = {
   schedule: Awaited<ReturnType<typeof import("@chrona/engine/modules/scheduling/get-schedule-page").getSchedulePage>>;
+};
+
+export type InboxRouteData = {
   inbox: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-inbox").getInbox>>;
+};
+
+export type MemoryRouteData = {
   memory: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-memory-console").getMemoryConsole>>;
 };
 
@@ -70,7 +79,8 @@ function useAppBootOutletData() {
 }
 
 export function ScheduleRoutePage() {
-  const { defaultWorkspace, schedule } = useAppBootOutletData();
+  const { defaultWorkspace } = useAppBootOutletData();
+  const { schedule } = useLoaderData() as ScheduleRouteData;
   const [searchParams] = useSearchParams();
 
   return (
@@ -86,7 +96,8 @@ export function ScheduleRoutePage() {
 }
 
 export function InboxRoutePage() {
-  const { defaultWorkspace, inbox, dictionary } = useAppBootOutletData();
+  const { defaultWorkspace, dictionary } = useAppBootOutletData();
+  const { inbox } = useLoaderData() as InboxRouteData;
   const t = dictionary.pages.inbox;
 
   return (
@@ -105,7 +116,8 @@ export function InboxRoutePage() {
 }
 
 export function MemoryRoutePage() {
-  const { defaultWorkspace, memory, dictionary } = useAppBootOutletData();
+  const { defaultWorkspace, dictionary } = useAppBootOutletData();
+  const { memory } = useLoaderData() as MemoryRouteData;
   const t = dictionary.pages.memory;
 
   return (

@@ -6,7 +6,7 @@ import { render, waitFor } from "@testing-library/react";
 import { hydrateSchedulePageData } from "@/components/schedule/schedule-page-utils";
 import { AppShell } from "../app-shell";
 import { LocaleLandingPage, ScheduleRoutePage } from "../pages";
-import type { AppBootData } from "../pages";
+import type { AppBootData, ScheduleRouteData } from "../pages";
 
 const bootData: AppBootData = {
   locale: "en",
@@ -35,6 +35,9 @@ const bootData: AppBootData = {
     },
   } as unknown) as AppBootData["dictionary"],
   defaultWorkspace: { id: "ws-1" } as AppBootData["defaultWorkspace"],
+};
+
+const scheduleRouteData: ScheduleRouteData = {
   schedule: hydrateSchedulePageData(({
     defaultExecutionRuntime: "hermes",
     executionRuntimes: [],
@@ -69,9 +72,7 @@ const bootData: AppBootData = {
     risks: [],
     listItems: [],
     workBlocks: [],
-  } as unknown as AppBootData["schedule"])) as unknown as AppBootData["schedule"],
-  inbox: {} as AppBootData["inbox"],
-  memory: {} as AppBootData["memory"],
+  } as unknown as ScheduleRouteData["schedule"])) as unknown as ScheduleRouteData["schedule"],
 };
 
 describe("localized child pages under /:lang", () => {
@@ -84,7 +85,7 @@ describe("localized child pages under /:lang", () => {
           element: <AppShell />,
           children: [
             { index: true, element: <LocaleLandingPage /> },
-            { path: "schedule", element: <ScheduleRoutePage /> },
+            { path: "schedule", loader: async () => scheduleRouteData, element: <ScheduleRoutePage /> },
           ],
         },
       ],

@@ -5,6 +5,9 @@ import { getDictionary, resolveLocale, type Locale } from "@chrona/i18n";
 import { apiJson } from "./api";
 import type {
   AppBootData,
+  InboxRouteData,
+  MemoryRouteData,
+  ScheduleRouteData,
   TaskListRouteData,
   TaskPageRouteData,
   WorkPageRouteData,
@@ -25,19 +28,43 @@ export async function loadAppBootData({ params, request }: LoaderFunctionArgs): 
 
   const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
 
-  const [schedule, inbox, memory] = await Promise.all([
-    apiJson<AppBootData["schedule"]>(`${origin}/api/schedule?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
-    apiJson<AppBootData["inbox"]>(`${origin}/api/inbox?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
-    apiJson<AppBootData["memory"]>(`${origin}/api/memory?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`),
-  ]);
-
   return {
     locale,
     dictionary,
     defaultWorkspace,
-    schedule,
-    inbox,
-    memory,
+  };
+}
+
+export async function loadScheduleRouteData({ request }: LoaderFunctionArgs): Promise<ScheduleRouteData> {
+  const origin = getOrigin(request);
+  const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
+
+  return {
+    schedule: await apiJson<ScheduleRouteData["schedule"]>(
+      `${origin}/api/schedule?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`,
+    ),
+  };
+}
+
+export async function loadInboxRouteData({ request }: LoaderFunctionArgs): Promise<InboxRouteData> {
+  const origin = getOrigin(request);
+  const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
+
+  return {
+    inbox: await apiJson<InboxRouteData["inbox"]>(
+      `${origin}/api/inbox?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`,
+    ),
+  };
+}
+
+export async function loadMemoryRouteData({ request }: LoaderFunctionArgs): Promise<MemoryRouteData> {
+  const origin = getOrigin(request);
+  const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
+
+  return {
+    memory: await apiJson<MemoryRouteData["memory"]>(
+      `${origin}/api/memory?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`,
+    ),
   };
 }
 
