@@ -17,6 +17,9 @@ import {
 import { NotFoundPage } from "@/components/not-found-page";
 import {
   loadAppBootData,
+  loadInboxRouteData,
+  loadMemoryRouteData,
+  loadScheduleRouteData,
   loadTaskListData,
   loadTaskPageData,
   loadWorkPageData,
@@ -50,14 +53,17 @@ export function createAppRouter() {
         },
         {
           path: "schedule",
+          loader: loadScheduleRouteData,
           element: <ScheduleRoutePage />,
         },
         {
           path: "inbox",
+          loader: loadInboxRouteData,
           element: <InboxRoutePage />,
         },
         {
           path: "memory",
+          loader: loadMemoryRouteData,
           element: <MemoryRoutePage />,
         },
         {

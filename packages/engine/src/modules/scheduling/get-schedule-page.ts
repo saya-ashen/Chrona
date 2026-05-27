@@ -79,6 +79,21 @@ function mapTaskRunnability(task: {
   };
 }
 
+function mapScheduleTaskPlanSnapshot(savedPlan: TaskPlanReadModel | null) {
+  if (!savedPlan) {
+    return null;
+  }
+
+  return {
+    id: savedPlan.id,
+    status: savedPlan.status,
+    revision: savedPlan.revision,
+    summary: savedPlan.summary,
+    updatedAt: savedPlan.updatedAt,
+    generatedBy: savedPlan.generatedBy,
+  };
+}
+
 function hasTask<T extends { task: unknown }>(
   item: T,
 ): item is T & { task: NonNullable<T["task"]> } {
@@ -314,7 +329,10 @@ export async function getSchedulePage(workspaceId: string) {
   }));
 
   const listItems = projections.filter(hasTask).map((item) => mapProjectionItem(item));
-  const planSnapshots = new Map<string, TaskPlanReadModel>();
+  const planSnapshots = new Map<
+    string,
+    NonNullable<ReturnType<typeof mapScheduleTaskPlanSnapshot>>
+  >();
   const planStatuses = new Map<
     string,
     "idle" | "generating" | "waiting_acceptance" | "accepted"
@@ -323,7 +341,10 @@ export async function getSchedulePage(workspaceId: string) {
     listItems.map(async (item) => {
       const savedPlan = await getLatestTaskPlanReadModel(item.taskId);
       if (savedPlan) {
-        planSnapshots.set(item.taskId, savedPlan);
+        const snapshot = mapScheduleTaskPlanSnapshot(savedPlan);
+        if (snapshot) {
+          planSnapshots.set(item.taskId, snapshot);
+        }
       }
       planStatuses.set(
         item.taskId,

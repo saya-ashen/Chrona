@@ -202,7 +202,7 @@ function createJsonResponse(body: unknown, status = 200) {
 }
 
 import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-panels";
-import type { ScheduledItem, ScheduledAiTaskPlan } from "@/components/schedule/schedule-page-types";
+import type { ScheduledItem, ScheduledAiTaskPlan, ScheduleTaskPlanSnapshot } from "@/components/schedule/schedule-page-types";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -290,6 +290,17 @@ function makeStubTaskPlanReadModel(overrides: Partial<ScheduledAiTaskPlan> = {})
       failedNodeIds: [],
       pendingNodeIds: [],
     },
+  };
+}
+
+function makeSchedulePlanSnapshot(overrides: Partial<ScheduleTaskPlanSnapshot> = {}): ScheduleTaskPlanSnapshot {
+  return {
+    id: overrides.id ?? "plan-snapshot",
+    status: overrides.status ?? "draft",
+    revision: overrides.revision ?? 2,
+    summary: overrides.summary ?? "snapshot summary",
+    updatedAt: overrides.updatedAt ?? "2026-04-25T10:00:00.000Z",
+    generatedBy: overrides.generatedBy ?? "generate-task-plan",
   };
 }
 
@@ -542,6 +553,56 @@ describe("SelectedBlockSheet – layout order", () => {
 
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-from-parent");
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
+  });
+
+  it("loads the full saved plan when schedule data only includes a lightweight snapshot", async () => {
+    const fullPlan = makeStubTaskPlanReadModel({
+      id: "plan-full",
+      status: "draft",
+      revision: 2,
+      summary: "loaded full plan",
+      updatedAt: "2026-04-25T10:00:00.000Z",
+    });
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes("/api/tasks/") && url.endsWith("/plan")) {
+        return Promise.resolve(createJsonResponse({
+          taskId: "task-1",
+          aiPlanGenerationStatus: "waiting_acceptance",
+          savedPlan: fullPlan,
+        }));
+      }
+
+      return Promise.resolve(createJsonResponse([]));
+    });
+
+    render(<SelectedBlockSheet {...defaultSheetProps} item={{
+      ...mockItem,
+      aiPlanGenerationStatus: "waiting_acceptance",
+      savedPlan: makeSchedulePlanSnapshot({ id: "plan-full" }),
+    }} />);
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "");
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-full");
+    expect(mockFetch.mock.calls.some(([input]) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+      return url.includes("/api/tasks/task-1/plan");
+    })).toBe(true);
   });
 
   it("does not poll the task plan endpoint while the edit sheet is open", async () => {

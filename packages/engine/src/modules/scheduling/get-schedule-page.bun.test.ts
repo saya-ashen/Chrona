@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
+import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { getSchedulePage } from "@/modules/scheduling/get-schedule-page";
 
@@ -365,6 +366,77 @@ describe("getSchedulePage", () => {
 
     expect(page.scheduled.some((item) => item.taskId === hiddenTask.id)).toBe(false);
     expect(page.listItems.some((item) => item.taskId === hiddenTask.id)).toBe(false);
+  });
+
+  it("returns lightweight saved plan snapshots without first-paint graph payload", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Schedule Plan Snapshot",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Planned task",
+        status: "Ready",
+        priority: "High",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
+    await db.taskProjection.create({
+      data: {
+        taskId: task.id,
+        workspaceId: workspace.id,
+        persistedStatus: "Ready",
+        displayState: "Ready",
+        scheduleStatus: "Scheduled",
+        scheduleSource: "human",
+        scheduledStartAt: new Date("2026-04-15T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-04-15T10:00:00.000Z"),
+      },
+    });
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      status: "draft",
+      prompt: "plan this task",
+      summary: "Plan summary",
+      generatedBy: "generate-task-plan",
+      compiledPlan: {
+        id: "compiled-plan-1",
+        editablePlanId: "plan-1",
+        sourceVersion: 1,
+        title: "Plan title",
+        goal: "Plan goal",
+        assumptions: [],
+        nodes: [],
+        edges: [],
+        entryNodeIds: [],
+        terminalNodeIds: [],
+        topologicalOrder: [],
+        completionPolicy: { type: "all_tasks_completed" },
+        validationWarnings: [],
+      },
+    });
+
+    const page = await getSchedulePage(workspace.id);
+    const item = page.listItems.find((entry) => entry.taskId === task.id);
+
+    expect(item?.savedPlan).toEqual({
+      id: "plan-1",
+      status: "draft",
+      revision: 1,
+      summary: "Plan summary",
+      updatedAt: expect.any(String),
+      generatedBy: "generate-task-plan",
+    });
+    expect(JSON.stringify(item?.savedPlan)).not.toContain("blueprint");
+    expect(JSON.stringify(item?.savedPlan)).not.toContain("compiledPlan");
+    expect(JSON.stringify(item?.savedPlan)).not.toContain("effectivePlan");
   });
 
   it("keeps a completed scheduled task in the timeline after projection rebuild", async () => {
