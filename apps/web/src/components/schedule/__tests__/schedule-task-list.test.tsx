@@ -172,6 +172,27 @@ describe("ScheduleTaskList", () => {
     expect(screen.getByText("Missing config")).toBeInTheDocument();
   });
 
+  it("shows scheduled display state instead of stale Draft persistence state", () => {
+    render(
+      <ScheduleTaskList
+        {...defaultProps}
+        items={[
+          makeItem({
+            taskId: "t-draft-scheduled",
+            title: "Scheduled task",
+            persistedStatus: "Draft",
+            scheduleStatus: "Scheduled",
+            isRunnable: true,
+            runnabilitySummary: "Ready to run",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByText("Scheduled").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("Draft")).not.toBeInTheDocument();
+  });
+
   it("clicking quick edit button expands task config form", async () => {
     const user = userEvent.setup();
     render(<ScheduleTaskList {...defaultProps} />);

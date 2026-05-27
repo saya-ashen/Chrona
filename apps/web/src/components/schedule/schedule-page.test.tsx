@@ -343,6 +343,23 @@ describe("SchedulePage projection hydration", () => {
     expect(hydrated.scheduled[0]?.scheduledStartAt).toBeInstanceOf(Date);
     expect(hydrated.scheduled[0]?.scheduledEndAt).toBeInstanceOf(Date);
   });
+
+  it("hydrates list item date strings for list view formatting", () => {
+    const data = createData();
+    const hydrated = hydrateSchedulePageData({
+      ...data,
+      listItems: [
+        {
+          ...data.scheduled[0],
+          scheduledStartAt: "2026-04-15T09:00:00.000Z" as unknown as Date,
+          scheduledEndAt: "2026-04-15T10:00:00.000Z" as unknown as Date,
+        },
+      ],
+    } as unknown as SchedulePageData);
+
+    expect(hydrated.listItems[0]?.scheduledStartAt).toBeInstanceOf(Date);
+    expect(hydrated.listItems[0]?.scheduledEndAt).toBeInstanceOf(Date);
+  });
 });
 
 describe("SchedulePage quick create", () => {

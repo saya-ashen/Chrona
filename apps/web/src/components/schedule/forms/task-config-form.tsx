@@ -161,7 +161,7 @@ function TaskConfigSelect({
           </span>
         </SelectTrigger>
         {isOpen ? (
-          <SelectContent className="z-[160]">
+          <SelectContent position="popper" className="z-[160] max-h-72">
             <SelectGroup>
               {options.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
