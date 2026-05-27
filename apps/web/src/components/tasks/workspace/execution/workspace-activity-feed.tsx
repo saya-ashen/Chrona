@@ -8,6 +8,9 @@ import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../mod
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type { WorkspaceActivityItem } from "../model/task-workspace-types";
 
+const ACTIVITY_TEXT_COLLAPSE_THRESHOLD = 360;
+const ACTIVITY_TEXT_PREVIEW_LENGTH = 280;
+
 function dotClassName(tone: WorkspaceActivityItem["tone"]) {
   if (tone === "success") return "bg-emerald-500";
   if (tone === "warning") return "bg-orange-500";
@@ -24,6 +27,30 @@ function toneBadgeVariant(tone: WorkspaceActivityItem["tone"]) {
 
 function timeLabel(timestamp: string | null | undefined) {
   return timestamp ? timestamp.slice(11, 16) : null;
+}
+
+function CollapsibleActivityText({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shouldCollapse = text.length > ACTIVITY_TEXT_COLLAPSE_THRESHOLD;
+  const visibleText = shouldCollapse && !expanded ? `${text.slice(0, ACTIVITY_TEXT_PREVIEW_LENGTH).trimEnd()}...` : text;
+
+  return (
+    <div className={className}>
+      <p className="whitespace-pre-wrap break-words">{visibleText}</p>
+      {shouldCollapse ? (
+        <Button type="button" variant="ghost" size="sm" className="mt-1 h-6 rounded-full px-2 text-[11px]" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+          {expanded ? taskWorkspaceActivityMessages.hideFullContent : taskWorkspaceActivityMessages.showFullContent}
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 function ToolDetails({ item }: { item: WorkspaceActivityItem }) {
@@ -52,7 +79,9 @@ function ToolDetails({ item }: { item: WorkspaceActivityItem }) {
           {detailRows.map(([label, value]) => (
             <div key={label} className="grid gap-1 sm:grid-cols-[72px_minmax(0,1fr)]">
               <dt className="font-semibold text-slate-500">{label}</dt>
-              <dd className="whitespace-pre-wrap break-words text-slate-700">{value}</dd>
+              <dd className="min-w-0 text-slate-700">
+                <CollapsibleActivityText text={value} />
+              </dd>
             </div>
           ))}
         </dl>
@@ -79,10 +108,10 @@ function ActivityRow({ item }: { item: WorkspaceActivityItem }) {
         {isReasoning ? (
           <details className="mt-1 rounded-lg border border-slate-200/70 bg-white/70 px-2 py-1.5 text-xs text-slate-500">
             <summary className="cursor-pointer font-medium text-slate-800">{taskWorkspaceActivityMessages.reasoningDetails}</summary>
-            <p className="mt-1 whitespace-pre-wrap break-words leading-5">{text}</p>
+            <CollapsibleActivityText text={text} className="mt-1 leading-5" />
           </details>
         ) : (
-          <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-[1.35] text-slate-500">{text}</p>
+          <CollapsibleActivityText text={text} className="mt-0.5 text-xs leading-[1.35] text-slate-500" />
         )}
         <ToolDetails item={item} />
       </div>

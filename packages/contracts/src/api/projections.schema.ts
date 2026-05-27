@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { executionActionBodySchema } from "./execution.schema";
+import { checkpointActionKindSchema, executionActionBodySchema } from "./execution.schema";
 import { workspaceId } from "./common";
 
 // ── GET /schedule ──
@@ -42,7 +42,7 @@ export const workCommandBodySchema = z.union([
   workspaceCommandBaseSchema.extend({
     type: z.literal("checkpoint.action"),
     checkpointId: z.string().min(1),
-    action: z.string().min(1),
+    action: checkpointActionKindSchema,
     payload: z.record(z.string(), z.unknown()).optional(),
   }),
 ]);

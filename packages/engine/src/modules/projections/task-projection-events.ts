@@ -32,6 +32,7 @@ type TaskWorkspaceRuntimeEvent = WorkspaceEventBase & {
     | "execution.result"
     | "checkpoint.result";
   eventKind?: string;
+  [key: string]: unknown;
 };
 
 type TaskProjectionEvent =

@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
+import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { getSchedulePage } from "@/modules/scheduling/get-schedule-page";
 
 async function resetDb() {
@@ -364,5 +365,70 @@ describe("getSchedulePage", () => {
 
     expect(page.scheduled.some((item) => item.taskId === hiddenTask.id)).toBe(false);
     expect(page.listItems.some((item) => item.taskId === hiddenTask.id)).toBe(false);
+  });
+
+  it("keeps a completed scheduled task in the timeline after projection rebuild", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Completed Schedule Visibility",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+
+    const scheduledStartAt = new Date("2026-05-27T09:00:00.000Z");
+    const scheduledEndAt = new Date("2026-05-27T10:00:00.000Z");
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Completed task should remain visible",
+        status: "Completed",
+        priority: "High",
+        completedAt: new Date("2026-05-27T10:05:00.000Z"),
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
+    await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Completed",
+        scheduledStartAt,
+        scheduledEndAt,
+        completedAt: new Date("2026-05-27T10:05:00.000Z"),
+        trigger: "manual",
+      },
+    });
+
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Completed",
+        triggeredBy: "schedule",
+        startedAt: scheduledStartAt,
+        endedAt: new Date("2026-05-27T10:05:00.000Z"),
+      },
+    });
+
+    await rebuildTaskProjection(task.id);
+
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(projection.scheduledStartAt).toEqual(scheduledStartAt);
+    expect(projection.scheduledEndAt).toEqual(scheduledEndAt);
+    expect(projection.scheduleStatus).toBe("Completed");
+
+    const page = await getSchedulePage(workspace.id);
+    expect(page.scheduled.find((item) => item.taskId === task.id)).toMatchObject({
+      taskId: task.id,
+      title: "Completed task should remain visible",
+      persistedStatus: "Completed",
+      scheduleStatus: "Completed",
+      scheduledStartAt,
+      scheduledEndAt,
+    });
   });
 });

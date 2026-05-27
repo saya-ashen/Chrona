@@ -145,6 +145,13 @@ describe("plan-runner task executor external results", () => {
         });
         expect(submittedResult.status).toBe("running");
 
+        const activeSession = await db.executionSession.findFirstOrThrow({
+          where: { taskId: input.taskId, status: "Active" },
+          orderBy: { updatedAt: "desc" },
+        });
+        expect(activeSession.id).not.toBe("provider-runtime-session");
+        expect(activeSession.currentNodeId).toBeNull();
+
         return {
           status: "started",
           summary: "Provider stream observed external task completion",
@@ -191,6 +198,17 @@ describe("plan-runner task executor external results", () => {
       status: "current",
       outputSummary: "Runtime tool completed first task",
     });
+
+    const normalizedFirstAttempt = await db.taskPlanNodeAttempt.findFirstOrThrow({
+      where: { taskId: task.id, nodeId: "first_task" },
+    });
+    expect(normalizedFirstAttempt.status).toBe("succeeded");
+    expect(normalizedFirstAttempt.finishedAt).toBeInstanceOf(Date);
+
+    const runningProviderRows = await db.taskPlanProviderRun.count({
+      where: { taskId: task.id, nodeAttemptId: normalizedFirstAttempt.id, status: "running" },
+    });
+    expect(runningProviderRows).toBe(0);
   });
 
   it("submits condition branch selections through the unified graph command", async () => {
@@ -265,7 +283,7 @@ describe("plan-runner task executor external results", () => {
     const events = await db.event.findMany({
       where: { taskId: task.id },
       orderBy: { ingestSequence: "asc" },
-      select: { actorType: true, eventType: true, nodeId: true, payload: true },
+      select: { actorType: true, eventType: true, nodeId: true, payload: true, rawEventId: true },
     });
     expect(events).toEqual(
       expect.arrayContaining([
@@ -282,6 +300,10 @@ describe("plan-runner task executor external results", () => {
         }),
       ]),
     );
+    const resultEvents = events.filter(
+      (event) => event.eventType === "plan_execution.node_result_submitted",
+    );
+    expect(new Set(resultEvents.map((event) => event.rawEventId)).size).toBe(resultEvents.length);
   });
 
   it("converges when an AI condition submits a branch through the graph command", async () => {

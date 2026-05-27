@@ -254,6 +254,9 @@ export function TaskWorkspacePlanSection({
     }),
     enabled: Boolean(selectedDetailNode?.id) && nodeDrawerSize !== "collapsed",
   });
+  const selectedNodeRuntimeEvents = selectedDetailNode?.id
+    ? runtimeEvents.filter((event) => event.nodeId === selectedDetailNode.id)
+    : [];
   const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
   const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
@@ -539,6 +542,7 @@ export function TaskWorkspacePlanSection({
               <TaskWorkspaceNodeDetailPanel
                 detail={consoleView.nodeDetail}
                 activity={nodeActivityQuery.data?.items ?? []}
+                runtimeEvents={selectedNodeRuntimeEvents}
                 isActivityLoading={nodeActivityQuery.isLoading || nodeActivityQuery.isFetching}
                 selectedNodes={selectedPlanNodes}
                 variant="drawer"
