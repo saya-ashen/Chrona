@@ -151,8 +151,8 @@ test.describe("AI Client Settings", () => {
     await patchResp;
 
     // Verify both cards exist (both survived)
-    await expect(page.getByText("Default Client A")).toBeVisible();
-    await expect(page.getByText("Default Client B")).toBeVisible();
+    await expect(page.getByText("Default Client A").first()).toBeVisible();
+    await expect(page.getByText("Default Client B").first()).toBeVisible();
   });
 
   test("rejects client creation with empty name", async ({ page }) => {

@@ -1,13 +1,18 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
-export type TaskWorkspaceViewport = "desktop" | "mobile";
+export type TaskWorkspaceViewport = "desktop" | "tablet" | "mobile";
 
 export function taskWorkspaceScreenshotName(testInfo: TestInfo, label: string) {
   return `${testInfo.project.name}-${label.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
 }
 
 export async function setTaskWorkspaceViewport(page: Page, viewport: TaskWorkspaceViewport) {
-  await page.setViewportSize(viewport === "desktop" ? { width: 1440, height: 900 } : { width: 390, height: 844 });
+  const size = viewport === "desktop"
+    ? { width: 1440, height: 900 }
+    : viewport === "tablet"
+      ? { width: 1024, height: 768 }
+      : { width: 390, height: 844 };
+  await page.setViewportSize(size);
 }
 
 export async function gotoSeededTaskWorkspace(page: Page, workspaceId: string, taskId: string) {

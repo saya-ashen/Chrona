@@ -1,5 +1,134 @@
 # Chrona 测试指南
 
+## 当前测试基建
+
+Chrona 测试基建由五层组成：
+
+| 层级 | 命令 | 适用范围 |
+|------|------|----------|
+| 类型/静态检查 | `bun run typecheck`, `bun run lint` | TypeScript、ESLint、基础质量门禁 |
+| Vitest | `bun run test` | 前端组件、hooks、纯 TypeScript 单元测试 |
+| Bun Test | `bun run test:bun` | Bun-only runtime、SQLite/Prisma、engine、contracts、providers |
+| API Test | `bun run test:api` | Hono route/API 工作流 |
+| Playwright | `bun run test:e2e` | 浏览器端关键用户旅程 |
+
+默认测试不得访问真实 LLM、真实外网或开发者本机数据。真实 provider 数据只能通过显式 fixture record 命令生成。
+
+## 新增工具
+
+| 工具 | 用途 | 位置 |
+|------|------|------|
+| MSW | 前端组件/API mock | `apps/web/src/test/msw/` |
+| `@axe-core/playwright` | E2E 可访问性扫描 | `e2e/specs/accessibility-test-helpers.ts` |
+| `fast-check` | 状态矩阵/属性测试 | domain、graph-runtime、schedule 纯逻辑测试 |
+| LLM fixture recorder | 录制/回放 provider 返回快照 | `packages/engine/src/test/llm-fixture-recorder.ts` |
+
+## 推荐命令
+
+```bash
+bun run typecheck
+bun run lint
+bun run test
+bun run test:bun
+bun run test:api
+bun run test:e2e:desktop
+bun run test:e2e:tablet
+bun run test:e2e:mobile
+CHRONA_LLM_FIXTURE_MODE=replay bun run test:llm:replay
+CHRONA_LLM_FIXTURE_MODE=record bun run test:llm:record
+```
+
+完整覆盖率交付前必须记录以下命令结果：
+
+| 命令 | 目的 | 结果记录 |
+|------|------|----------|
+| `bun run typecheck` | TypeScript 严格类型检查 | `specs/014-test-coverage/verification/typecheck.md` |
+| `bun run lint` | ESLint 与 UI foundation 相关静态检查 | `specs/014-test-coverage/verification/lint.md` |
+| `bun run test` | Vitest 前端/共享单元测试 | `specs/014-test-coverage/verification/test.md` |
+| `bun run test:bun` | Bun runtime、engine、domain、contracts、provider 测试 | `specs/014-test-coverage/verification/test-bun.md` |
+| `bun run test:api` | Hono/API 工作流测试 | `specs/014-test-coverage/verification/test-api.md` |
+| `CHRONA_LLM_FIXTURE_MODE=replay bun run test:llm:replay` | Provider fixture replay，不访问真实 LLM | `specs/014-test-coverage/verification/test-llm-replay.md` |
+| `bun run test:e2e:desktop` | Desktop 端到端工作流 | `specs/014-test-coverage/verification/test-e2e-desktop.md` |
+| `bun run test:e2e:tablet` | Tablet 端到端工作流和响应式回归 | `specs/014-test-coverage/verification/test-e2e-tablet.md` |
+| `bun run test:e2e:mobile` | Mobile 端到端工作流和无横向滚动回归 | `specs/014-test-coverage/verification/test-e2e-mobile.md` |
+
+如果运行单个数据库相关 Bun 测试文件，先创建隔离 SQLite：
+
+```bash
+bun run scripts/init-sqlite-db.ts --reset .tmp/<suite-name>.db
+DATABASE_URL=file:/absolute/path/to/.tmp/<suite-name>.db NODE_ENV=test bun test <files>
+```
+
+## 测试数据原则
+
+- 优先使用 builders 和 fixtures，不在测试体内复制大段对象。
+- 数据必须 deterministic，可读、可复现。
+- bug 回归测试先抽取最小数据，再写红测。
+- 不使用真实用户 prompt、真实日程、API key、本地路径。
+- seed 只提供基础世界；测试自己创建最小差异数据。
+
+## LLM Fixture 规范
+
+真实 LLM/provider 数据采用 record/replay/off 三模式。录制边界必须是 provider 返回值，即 `ProviderRunSnapshot`，不能录制上层 feature normalizer、业务 service 或任意包装函数的返回值。
+
+| 模式 | 环境变量 | 行为 |
+|------|----------|------|
+| off | unset | 不读写 cassette，直接执行 provider 请求 |
+| record | `CHRONA_LLM_FIXTURE_MODE=record` | 执行真实 provider 请求或受控 debug provider 请求，脱敏后写入 fixture |
+| replay | `CHRONA_LLM_FIXTURE_MODE=replay` | 从 fixture 读取 `ProviderRunSnapshot`，不访问网络 |
+
+cassette 路径：
+
+```text
+packages/engine/src/test/llm-fixtures/<provider>/<feature>/<name>.json
+```
+
+cassette 必须包含：
+
+- `schemaVersion`
+- `provider`
+- `feature`
+- `recordedAt`
+- `request.inputHash`
+- `request.redactedInput`
+- `response`，类型为 `ProviderRunSnapshot`
+
+`response` 至少应覆盖 provider 合约字段：
+
+- `provider`
+- `runId`
+- `status`
+- `outputText` 或 `structuredPayload`
+- `error`
+
+上层解析结果不写入 cassette。需要验证 feature 解析时，应先 replay provider snapshot，再让生产解析逻辑处理 `structuredPayload` / `outputText`。
+
+禁止写入：
+
+- API key / Authorization header
+- 用户真实任务内容
+- 真实 calendar/memory/inbox 数据
+- 本地绝对路径
+- chain-of-thought / reasoning trace
+- provider 原始 debug metadata 中的敏感字段
+
+## 前端测试规范
+
+- 默认使用 Testing Library 行为断言，不写 snapshot。
+- API mock 优先使用 MSW：从 `apps/web/src/test/msw/server.ts` 导入 `server`，在测试文件内显式 `listen/resetHandlers/close` 后使用 `server.use(http.get(...))`。
+- MSW 不在全局 setup 自动启动。每个需要网络 mock 的测试文件必须显式声明生命周期，避免无关测试被隐藏的 handler 污染：`beforeAll(() => server.listen({ onUnhandledRequest: "error" }))`、`afterEach(() => server.resetHandlers())`、`afterAll(() => server.close())`。
+- 需要 React Query 时使用 `renderWithQueryClient()`。
+- UI 文案从 i18n message 走，不在测试中固化无关文案。
+- SSE 相关逻辑测试 `apps/web/src/lib/fetch-json-event-source.ts`，组件只测用户可见状态。
+
+## E2E 规范
+
+- 默认 desktop：`bun run test:e2e:desktop`。
+- viewport 回归：`bun run test:e2e:tablet`、`bun run test:e2e:mobile`。
+- 移动端必须无横向滚动。
+- 可访问性扫描用 `scanPageAccessibility(page)`，再断言 violations。
+- E2E 只覆盖关键旅程，不替代 API/engine 测试。
+
 ## 测试运行器
 
 Chrona 使用三套运行器处理不同层级的测试：
