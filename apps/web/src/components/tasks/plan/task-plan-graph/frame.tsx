@@ -70,6 +70,7 @@ export function TaskPlanGraphFrame({
   const flowRef = useRef<ReactFlowInstance<FlowGraphNode, FlowGraphEdge> | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const lastInitialFitKey = useRef<string | null>(null);
+  const initFrameRef = useRef<number | null>(null);
   const wheelHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wheelHintShown = useRef(false);
   const [showWheelZoomHint, setShowWheelZoomHint] = useState(false);
@@ -131,7 +132,13 @@ export function TaskPlanGraphFrame({
 
   const handleInit = useCallback((flow: ReactFlowInstance<FlowGraphNode, FlowGraphEdge>) => {
     flowRef.current = flow;
-    requestAnimationFrame(() => focusInitialView(0));
+    if (initFrameRef.current !== null) {
+      cancelAnimationFrame(initFrameRef.current);
+    }
+    initFrameRef.current = requestAnimationFrame(() => {
+      initFrameRef.current = null;
+      focusInitialView(0);
+    });
   }, [focusInitialView]);
 
   useEffect(() => {
@@ -145,6 +152,9 @@ export function TaskPlanGraphFrame({
 
   useEffect(() => {
     return () => {
+      if (initFrameRef.current !== null) {
+        cancelAnimationFrame(initFrameRef.current);
+      }
       if (wheelHintTimer.current) {
         clearTimeout(wheelHintTimer.current);
       }

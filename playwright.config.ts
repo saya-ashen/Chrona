@@ -5,7 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 const E2E_DB_PATH = process.env.CHRONA_E2E_DB_PATH ?? join(tmpdir(), "chrona-e2e.db");
 const E2E_DATABASE_URL = `file:${E2E_DB_PATH}`;
-const E2E_TEMPLATE_DB_PATH = process.env.CHRONA_E2E_TEMPLATE_DB_PATH ?? "prisma/dev.db";
+const E2E_TEMPLATE_DB_PATH = process.env.CHRONA_E2E_TEMPLATE_DB_PATH;
+const E2E_TEMPLATE_ARG = E2E_TEMPLATE_DB_PATH ? ` --template "${E2E_TEMPLATE_DB_PATH}"` : "";
 const E2E_WEB_PORT = process.env.CHRONA_E2E_WEB_PORT ?? "43100";
 const E2E_API_PORT = process.env.CHRONA_E2E_API_PORT ?? "43101";
 const E2E_BASE_URL = `http://127.0.0.1:${E2E_WEB_PORT}`;
@@ -21,7 +22,8 @@ const E2E_API_BASE_URL = `http://127.0.0.1:${E2E_API_PORT}`;
  */
 export default defineConfig({
   testDir: "./e2e/specs",
-  fullyParallel: true,
+  fullyParallel: false,
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
@@ -29,7 +31,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `bun run scripts/init-sqlite-db.ts --reset --template "${E2E_TEMPLATE_DB_PATH}" "${E2E_DB_PATH}" && DATABASE_URL="${E2E_DATABASE_URL}" bun run db:seed && HOST=127.0.0.1 PORT="${E2E_API_PORT}" DATABASE_URL="${E2E_DATABASE_URL}" VITE_API_BASE_URL="${E2E_API_BASE_URL}" CHRONA_WEB_PORT="${E2E_WEB_PORT}" bun run dev`,
+    command: `bun run scripts/init-sqlite-db.ts --reset${E2E_TEMPLATE_ARG} "${E2E_DB_PATH}" && DATABASE_URL="${E2E_DATABASE_URL}" bun run db:seed && HOST=127.0.0.1 PORT="${E2E_API_PORT}" DATABASE_URL="${E2E_DATABASE_URL}" VITE_API_BASE_URL="${E2E_API_BASE_URL}" CHRONA_WEB_PORT="${E2E_WEB_PORT}" bun run dev`,
     url: E2E_BASE_URL,
     reuseExistingServer: false,
   },

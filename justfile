@@ -1,103 +1,108 @@
-# ── Development ──────────────────────────────────────────────
+# Short command layer for day-to-day Chrona work.
+# Use `just --list` for the catalog and `bun run chrona help` for full groups.
 
-# Start web + server in dev mode (concurrent)
-dev:
-    bun run dev
+default: help
 
-# Start only the Vite web dev server
-dev:web:
-    bun run dev:web
+# Show available just recipes
+help:
+    @just --list
 
-# Start only the Hono API server (tsx watch)
-dev:server:
-    bun run server:dev
+# ── Grouped Commands ──────────────────────────────────────────
 
-# Start only the Hono API server (Bun runtime)
-dev:server:bun:
-    bun run server:dev:bun
+# Show or run dev commands: just dev [all|web|server]
+dev target="":
+    @if [ -z "{{target}}" ]; then bun run chrona dev; else bun run chrona dev {{target}}; fi
 
-# ── Build ────────────────────────────────────────────────────
+# Show or run server commands: just server [start|dev|bundle-check]
+server target="":
+    @if [ -z "{{target}}" ]; then bun run chrona server; else bun run chrona server {{target}}; fi
 
-# Build the Vite SPA
-build:
-    bun run build
+# Show or run build commands: just build [web|full|npm|cli]
+build target="":
+    @if [ -z "{{target}}" ]; then bun run chrona build; else bun run chrona build {{target}}; fi
 
-# Full build (SPA + bundle-check)
-build:full:
-    bun run build:full
+# Show or run check commands: just check [all|type|lint|deadcode|exports|deps|pages|ui|boundaries]
+check target="" *args:
+    @if [ -z "{{target}}" ]; then bun run chrona check; else bun run chrona check {{target}} -- {{args}}; fi
 
-# Build the npm distribution package
-build:npm:
-    bun run build:npm
+# Show or run test commands: just test [all|unit|web|watch|api|bun|e2e|desktop|tablet|mobile|llm:record|llm:replay]
+test target="" *args:
+    @if [ -z "{{target}}" ]; then bun run chrona test; else bun run chrona test {{target}} -- {{args}}; fi
 
-# ── Check & Lint ─────────────────────────────────────────────
+# Show or run database commands: just db [generate|push|migrate|seed|fixtures]
+db target="" *args:
+    @if [ -z "{{target}}" ]; then bun run chrona db; else bun run chrona db {{target}} -- {{args}}; fi
 
-# Run all checks (typecheck + lint) — AGENTS.md required flow
-check: typecheck lint
+# Show or run binary build commands: just binary [current|linux-x64|linux-arm64|darwin-x64|darwin-arm64|windows-x64]
+binary target="":
+    @if [ -z "{{target}}" ]; then bun run chrona binary; else bun run chrona binary {{target}}; fi
+
+# Show or run LLM fixture commands: just llm [record|replay]
+llm target="":
+    @if [ -z "{{target}}" ]; then bun run chrona llm; else bun run chrona llm {{target}}; fi
+
+# Show or run demo commands: just demo [readme-gif]
+demo target="":
+    @if [ -z "{{target}}" ]; then bun run chrona demo; else bun run chrona demo {{target}}; fi
+
+# Show or run plugin commands: just plugin [hermes]
+plugin target="":
+    @if [ -z "{{target}}" ]; then bun run chrona plugin; else bun run chrona plugin {{target}}; fi
+
+# ── Common Aliases ────────────────────────────────────────────
 
 # TypeScript type checking
 typecheck:
-    bun run typecheck
+    bun run chrona check type
+
+# Vitest unit tests
+unit *args:
+    bun run chrona test unit -- {{args}}
 
 # ESLint across the monorepo
 lint:
-    bun run lint
+    bun run chrona check lint
+
+# UI foundation rules
+ui:
+    bun run chrona check ui
 
 # Dependency-cruiser boundary check
-check:boundaries:
-    bun run check:boundaries
+boundaries:
+    bun run chrona check boundaries
 
-# ── Test ─────────────────────────────────────────────────────
+# Run API tests
+api:
+    bun run chrona test api
 
-# Run vitest with coverage
-test:
-    bun run test
-
-# Run vitest in watch mode
-test:watch:
-    bun run test:watch
+# Run Bun-only tests
+bun-test:
+    bun run chrona test bun
 
 # Run Playwright E2E tests
-test:e2e:
-    bun run test:e2e
-
-# ── Database ─────────────────────────────────────────────────
-
-# Generate Prisma client
-db:generate:
-    bun run db:generate
-
-# Push schema to SQLite database
-db:push:
-    bun run db:push
-
-# Run Prisma migrations
-db:migrate:
-    bun run db:migrate
-
-# Seed the database
-db:seed:
-    bun run db:seed
+e2e *args:
+    bun run chrona test e2e -- {{args}}
 
 # Full DB setup: generate client + seed
-db:setup:
+db-setup:
     bun run setup
 
-# ── CLI ──────────────────────────────────────────────────────
+# Build the npm distribution package
+npm-build:
+    bun run chrona build npm
 
-# Build the Chrona CLI binary
-cli:build:
-    bun run cli:build
+# Build the Chrona CLI package
+cli-build:
+    bun run chrona build cli
 
-# ── Demo (Playwright recordings) ─────────────────────────────
+# ── Demo Artifacts ────────────────────────────────────────────
 
-
-# Remove old artifacts and GIFs
+# Remove old demo artifacts and GIFs
 clean-videos:
     rm -rf artifacts/demo/playwright/
     rm -f docs/assets/demo-plan.gif docs/assets/demo-assistant.gif
 
-# Run the Playwright recordings
+# Run Playwright recordings
 _playwright:
     bunx playwright test --config=playwright.record.config.ts
 
@@ -105,13 +110,13 @@ _playwright:
 _convert-gifs:
     @sh scripts/demo/convert-record-gifs.sh
 
-# Run both demos in debug mode
+# Run demos in debug mode
 demo-debug: clean-videos
     bunx playwright test --config=playwright.record.config.ts --debug
 
-# ── Misc ─────────────────────────────────────────────────────
+# ── Cleanup ──────────────────────────────────────────────────
 
-# Clean all generated artifacts
+# Clean generated artifacts
 clean:
     rm -rf artifacts/demo/playwright/
     rm -rf dist/
