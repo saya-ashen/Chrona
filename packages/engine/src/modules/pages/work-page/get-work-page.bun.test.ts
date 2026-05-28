@@ -357,6 +357,58 @@ describe("getWorkPage", () => {
     ]);
   });
 
+  it("ignores stale stored block reasons for completed tasks", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Completed Work Page",
+        defaultRuntime: "hermes",
+        status: WorkspaceStatus.Active,
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Completed stale blocker",
+        status: TaskStatus.Completed,
+        priority: TaskPriority.High,
+        executionRuntime: "hermes",
+        executionConfig: {},
+        blockReason: {
+          blockType: "sync_stale",
+          scope: "run",
+          actionRequired: "Re-sync",
+        },
+      },
+    });
+
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: RunStatus.Completed,
+        triggeredBy: "user",
+        endedAt: new Date("2026-04-08T10:00:00.000Z"),
+      },
+    });
+
+    const page = await getWorkPage(task.id);
+
+    expect(page.currentIntervention).toMatchObject({
+      kind: "review",
+      title: "Review result",
+    });
+    expect(page.closure).toMatchObject({
+      canAcceptResult: true,
+      canMarkDone: false,
+      isDone: true,
+    });
+    expect(page.reliability).toMatchObject({
+      isStale: false,
+      stopReason: null,
+    });
+  });
+
   it("returns a targeted execution action for a blocked work page node when graph state is stale", async () => {
     const workspace = await db.workspace.create({
       data: {

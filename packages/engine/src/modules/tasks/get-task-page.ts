@@ -85,6 +85,7 @@ type TaskActivityPageInput = {
 };
 
 function readBlockReason(task: {
+  status: string;
   blockReason: unknown;
   projection: {
       blockType: string | null;
@@ -94,6 +95,8 @@ function readBlockReason(task: {
       currentNodeId: string | null;
     } | null;
   }) {
+  if (task.status === "Completed" || task.status === "Done") return null;
+
   const storedBlockReason = task.blockReason as {
     blockType?: string;
     actionRequired?: string;

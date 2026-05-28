@@ -173,4 +173,32 @@ describe("reconcileTaskState", () => {
       blockReason: { blockType: "replan_required", actionRequired: "Replan", nodeId: "blocked" },
     }).summary.primaryAction).toMatchObject({ type: "replan", label: "Replan", targetNodeId: "blocked" });
   });
+
+  it("ignores stale task block reasons for completed tasks", () => {
+    const graph = makeGraph([
+      makeNode({ id: "setup", status: "completed" }),
+      makeNode({ id: "finish", status: "completed" }),
+    ]);
+
+    const result = reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "Completed",
+      blockReason: {
+        blockType: "sync_stale",
+        scope: "run",
+        actionRequired: "Re-sync",
+      },
+    });
+
+    expect(result.summary).toMatchObject({
+      executionState: "completed",
+      currentNodeId: null,
+      primaryAction: { type: "none", enabled: false },
+    });
+    expect(result.reconciliation).toMatchObject({
+      executionState: "completed",
+      currentNodeId: null,
+    });
+  });
 });

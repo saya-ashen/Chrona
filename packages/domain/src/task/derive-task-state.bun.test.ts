@@ -86,4 +86,21 @@ describe("deriveTaskState", () => {
       blockReason: null,
     });
   });
+
+  it("does not report sync-stale blockers for completed tasks", () => {
+    expect(
+      deriveTaskState({
+        task: { status: "Completed", latestRunId: "run_1" },
+        runs: [{ id: "run_1", status: "Completed", updatedAt }],
+        approvals: [],
+        sync: { stale: true },
+        executionSession: null,
+      }),
+    ).toMatchObject({
+      persistedStatus: "Completed",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    });
+  });
 });

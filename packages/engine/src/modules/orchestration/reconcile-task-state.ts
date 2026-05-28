@@ -150,6 +150,8 @@ function executionStateFromTaskBlock(
   blockReason?: TaskBlockReason | null,
   taskStatus?: string | null,
 ): TaskExecutionState | null {
+  if (taskStatus === "Completed" || taskStatus === "Done") return null;
+
   const blockType = normalizeBlockType(blockReason);
   if (blockType === "human_input_required" || blockType === "waiting_for_input") return "waiting_for_user";
   if (blockType === "approval_required" || blockType === "approval_pending") return "waiting_for_approval";

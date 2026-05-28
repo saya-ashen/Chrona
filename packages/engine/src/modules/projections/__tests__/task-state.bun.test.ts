@@ -34,7 +34,7 @@ describe("deriveTaskState", () => {
     expect(result.blockReason?.actionRequired).toBe("Provide Input");
   });
 
-  it("keeps sync-stale as a display state instead of overwriting the stored task status", () => {
+  it("ignores sync-stale blockers for completed tasks", () => {
     const result = deriveTaskState({
       task: { status: "Completed", latestRunId: "run_3" },
       runs: [{ id: "run_3", status: "Completed", updatedAt: new Date("2026-04-08T10:00:00Z") }],
@@ -43,7 +43,8 @@ describe("deriveTaskState", () => {
     });
 
     expect(result.persistedStatus).toBe("Completed");
-    expect(result.displayState).toBe("Sync Stale");
+    expect(result.displayState).toBeNull();
+    expect(result.blockReason).toBeNull();
   });
 
   it("preserves done tasks instead of projecting them back to completed", () => {

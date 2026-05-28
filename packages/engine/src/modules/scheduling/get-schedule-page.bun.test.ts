@@ -86,6 +86,18 @@ describe("getSchedulePage", () => {
       },
     });
 
+    const completedUnscheduledTask = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Completed task should leave queue",
+        status: "Completed",
+        priority: "Medium",
+        completedAt: new Date("2026-04-15T12:30:00.000Z"),
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
     const subtask = await db.task.create({
       data: {
         workspaceId: workspace.id,
@@ -155,6 +167,16 @@ describe("getSchedulePage", () => {
           scheduleProposalCount: 1,
           actionRequired: "Schedule task",
           lastActivityAt: new Date("2026-04-15T12:05:00.000Z"),
+        },
+        {
+          taskId: completedUnscheduledTask.id,
+          workspaceId: workspace.id,
+          persistedStatus: "Completed",
+          displayState: "Completed",
+          dueAt: todayTwenty,
+          scheduleStatus: "Unscheduled",
+          scheduleProposalCount: 0,
+          lastActivityAt: new Date("2026-04-15T12:30:00.000Z"),
         },
         {
           taskId: subtask.id,
@@ -253,7 +275,8 @@ describe("getSchedulePage", () => {
       scheduleStatus: "Scheduled",
     });
 
-    expect(page.unscheduled).toHaveLength(1);
+    expect(page.unscheduled.map((item) => item.taskId)).toEqual([unscheduledTask.id]);
+    expect(page.unscheduled.some((item) => item.taskId === completedUnscheduledTask.id)).toBe(false);
     expect(page.unscheduled[0]).toMatchObject({
       taskId: unscheduledTask.id,
       title: "Queue follow-up docs",
@@ -353,9 +376,16 @@ describe("getSchedulePage", () => {
       },
     ]);
 
-    expect(page.listItems).toHaveLength(5);
+    expect(page.listItems).toHaveLength(6);
     expect(page.listItems.map((item) => item.taskId).sort()).toEqual(
-      [reviewTask.id, riskTask.id, scheduledTask.id, subtask.id, unscheduledTask.id].sort(),
+      [
+        completedUnscheduledTask.id,
+        reviewTask.id,
+        riskTask.id,
+        scheduledTask.id,
+        subtask.id,
+        unscheduledTask.id,
+      ].sort(),
     );
     expect(page.listItems.some((item) => item.taskId === subtask.id)).toBe(true);
     expect(page.listItems.find((item) => item.taskId === unscheduledTask.id)).toMatchObject({

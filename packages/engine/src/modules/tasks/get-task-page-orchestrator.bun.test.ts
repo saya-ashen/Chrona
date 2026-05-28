@@ -229,6 +229,59 @@ describe("getTaskPage orchestrator read model", () => {
     }));
   });
 
+  it("ignores stale stored block reasons for completed tasks", async () => {
+    const { workspace, task } = await seedTask("Completed stale blocker task");
+    const compiledPlan = makeCompiledPlan();
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      compiledPlan,
+      status: "accepted",
+      prompt: compiledPlan.title,
+      summary: compiledPlan.goal,
+      generatedBy: "orchestrator-test",
+    });
+    const graph = createPlanGraphFromCompiledPlan({ taskId: task.id, compiledPlan });
+    const results: NodeResult[] = graph.nodes.map((node) => ({
+      nodeId: node.id,
+      nodeLayerId: definitionLayerId(graph, node.id),
+      status: "current",
+      outputSummary: `${node.id} done`,
+    }));
+    await savePlanRun({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: compiledPlan.editablePlanId,
+      compiledPlan,
+      graph,
+      results,
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: {
+        status: "Completed",
+        blockReason: {
+          blockType: "sync_stale",
+          scope: "run",
+          actionRequired: "Re-sync",
+        },
+      },
+    });
+    await rebuildTaskProjection(task.id);
+
+    const page = await getTaskPage(task.id);
+
+    expect(page.task.status).toBe("Completed");
+    expect(page.task.blockReason).toBeNull();
+    expect(page.task.executionSummary).toMatchObject({
+      executionState: "completed",
+      primaryAction: { type: "none", enabled: false },
+    });
+    expect(page.reconciliation).toMatchObject({
+      executionState: "completed",
+    });
+  });
+
   it("maps persisted provider events into structured activity items", async () => {
     const { workspace, task } = await seedTask("Activity task");
     const run = await db.run.create({

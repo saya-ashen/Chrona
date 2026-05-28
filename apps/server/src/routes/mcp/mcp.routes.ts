@@ -194,7 +194,28 @@ function aiVisibleToolResult(toolName: ChronaToolName, result: ChronaToolResult)
     message: result.message,
     reasonCode: result.reasonCode,
     recovery: result.recovery,
+    ...(result.evidence ? { evidence: result.evidence } : {}),
   };
+}
+
+function aiVisibleToolText(result: ChronaToolResult): string {
+  const issues = Array.isArray(result.recovery?.details?.issues)
+    ? result.recovery.details.issues
+    : [];
+  if (issues.length === 0) return result.message;
+
+  const issueText = issues
+    .map((issue) => {
+      if (!issue || typeof issue !== "object") return null;
+      const path = "path" in issue && typeof issue.path === "string" ? issue.path : null;
+      const message = "message" in issue && typeof issue.message === "string" ? issue.message : null;
+      if (!path && !message) return null;
+      return path && message ? `${path}: ${message}` : path ?? message;
+    })
+    .filter((issue): issue is string => Boolean(issue));
+  if (issueText.length === 0) return result.message;
+
+  return `${result.message}\nValidation issues:\n${issueText.map((issue) => `- ${issue}`).join("\n")}`;
 }
 
 function toChronaInput(
@@ -264,7 +285,7 @@ async function callChronaTool(
     message: result.message,
   });
   return {
-    content: [{ type: "text", text: result.message }],
+    content: [{ type: "text", text: aiVisibleToolText(result) }],
     structuredContent: aiVisibleToolResult(toolName, result),
     isError: result.status === "rejected",
   };

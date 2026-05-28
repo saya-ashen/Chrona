@@ -79,6 +79,7 @@ import { dispatchRuntimeCommandAction } from "./use-cases/dispatch-runtime-comma
 import { getCurrentExecution } from "./use-cases/get-current-execution";
 import { resolveCheckpointTransition } from "./use-cases/checkpoint-transition/resolve-checkpoint-transition";
 export { syncPlanRunRuntimeResult } from "./use-cases/sync-runtime-result/sync-plan-run-runtime-result";
+export { reconcileStaleRuntimeRuns } from "./use-cases/sync-runtime-result/reconcile-stale-runtime-runs";
 export { getCurrentExecution } from "./use-cases/get-current-execution";
 export { submitTerminalNodeResult } from "./use-cases/submit-terminal-node-result";
 
