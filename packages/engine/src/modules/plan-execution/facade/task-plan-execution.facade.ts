@@ -4,6 +4,7 @@ import type { submitCheckpointAction } from "../task-plan-execution";
 import type { getCurrentExecution } from "../task-plan-execution";
 import type { submitTerminalNodeResult } from "../task-plan-execution";
 import type { syncPlanRunRuntimeResult } from "../task-plan-execution";
+import type { reconcileStaleRuntimeRuns } from "../task-plan-execution";
 import {
   startPlanExecution as startExecution,
   dispatchExecutionAction as dispatchExecution,
@@ -11,6 +12,7 @@ import {
   getCurrentExecution as currentExecution,
   submitTerminalNodeResult as submitNodeResult,
   syncPlanRunRuntimeResult as syncRuntimeResult,
+  reconcileStaleRuntimeRuns as reconcileRuntimeRuns,
 } from "../task-plan-execution";
 
 export class TaskPlanExecution {
@@ -36,6 +38,10 @@ export class TaskPlanExecution {
 
   async syncRuntimeResult(input: Parameters<typeof syncPlanRunRuntimeResult>[0]) {
     return syncRuntimeResult(input);
+  }
+
+  async reconcileStaleRuntimeRuns(input?: Parameters<typeof reconcileStaleRuntimeRuns>[0]) {
+    return reconcileRuntimeRuns(input);
   }
 }
 

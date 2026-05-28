@@ -40,7 +40,11 @@ const blockPayload = {
   },
 };
 
-function app(rejected = false, operations: CapturedToolOperation[] = []) {
+function app(
+  rejected = false,
+  operations: CapturedToolOperation[] = [],
+  resultOverride?: Record<string, unknown>,
+) {
   const engine = {
     agentTools: {
       registry: () => ({
@@ -74,6 +78,7 @@ function app(rejected = false, operations: CapturedToolOperation[] = []) {
           auditRef: rejected ? "op-rejected" : null,
           recovery: rejected ? { nextTool: "chrona.execution.read" } : null,
           completedAt: new Date().toISOString(),
+          ...resultOverride,
         };
       },
     },
@@ -114,6 +119,17 @@ async function postRpcWithOperations(body: unknown) {
     body: JSON.stringify(body),
   });
   return { response, operations };
+}
+
+async function postRpcWithResult(body: unknown, resultOverride: Record<string, unknown>) {
+  return app(false, [], resultOverride).request("/api/mcp", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify(body),
+  });
 }
 
 describe("MCP routes", () => {
@@ -463,6 +479,44 @@ describe("MCP routes", () => {
           recovery: { nextTool: "chrona.execution.read" },
         },
       },
+    });
+  });
+
+  it("exposes plan generation validation issues to the model", async () => {
+    const issue = {
+      path: "nodes.task_inspect_unscheduled_cards",
+      message: "High-risk task must be directly preceded by approve/confirm checkpoint",
+    };
+    const response = await postRpcWithResult(
+      rpc("tools/call", {
+        name: "chrona_plan_generate",
+        arguments: {
+          title: "Invalid plan",
+          goal: "Expose validation issues",
+          nodes: [{ id: "task_inspect_unscheduled_cards", type: "task", title: "Inspect unscheduled cards" }],
+          edges: [],
+        },
+        _meta: { sessionId: "chrona:task:task-1:plan-graph" },
+      }),
+      {
+        status: "rejected",
+        reasonCode: "VALIDATION_ERROR",
+        message: "Plan blueprint compilation failed",
+        recovery: { nextTool: "chrona.plan.read", details: { issues: [issue] } },
+        evidence: { validationIssues: [issue] },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.result.isError).toBe(true);
+    expect(body.result.content[0].text).toContain("Validation issues:");
+    expect(body.result.content[0].text).toContain(issue.path);
+    expect(body.result.structuredContent).toMatchObject({
+      status: "rejected",
+      reasonCode: "VALIDATION_ERROR",
+      recovery: { details: { issues: [issue] } },
+      evidence: { validationIssues: [issue] },
     });
   });
 

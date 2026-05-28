@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
+import { aiClientRegistry } from "@/modules/ai/runtime/client-registry";
 import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
 import { savePlanRun } from "@/modules/plan-execution/plan-run-store";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
+import { reconcileStaleRuntimeRuns } from "./reconcile-stale-runtime-runs";
 import { syncPlanRunRuntimeResult } from "./sync-plan-run-runtime-result";
 import {
   executeTaskNodeCapabilityMock,
@@ -305,5 +307,109 @@ describe("syncPlanRunRuntimeResult", () => {
       orderBy: { updatedAt: "desc" },
     });
     expect(session.currentNodeId).toBe("second_task");
+  });
+
+  it("marks a running node failed when provider lookup returns a non-retryable 404", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "started",
+      summary: "First runtime run started",
+      evidence: { sessionId: "main-session", runId: "run_first_task" },
+      output: { runtimeRunRef: "runtime-first-task" },
+    });
+    const { workspace, task } = await seedWorkspaceAndTask("Runtime reconcile missing provider run");
+    const compiledPlan = makeTwoTaskPlan("graph_runtime_reconcile_missing_provider_run");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+    await db.aiClient.create({
+      data: {
+        name: "Debug provider",
+        type: "debug",
+        config: { profile: "normal" },
+        isDefault: true,
+        enabled: true,
+      },
+    });
+    await aiClientRegistry.refresh();
+    await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "start_manual" } });
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    const attempt = persisted?.attempts[0];
+    expect(attempt).toBeTruthy();
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        taskSessionId: task.defaultSessionId,
+        runtimeName: "debug",
+        runtimeRunRef: "runtime-first-task",
+        runtimeSessionRef: "main-session",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date("2026-05-25T09:09:29.533Z"),
+        syncStatus: "healthy",
+      },
+    });
+    await db.rawEventLog.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        taskSessionId: task.defaultSessionId,
+        planId: compiledPlan.editablePlanId,
+        nodeAttemptId: attempt!.id,
+        nodeId: attempt!.nodeId,
+        nodeTitle: "Collect script requirements",
+        source: "provider",
+        direction: "inbound",
+        rawType: "tool.started",
+        rawPayload: { type: "tool.started" },
+        payloadHash: "runtime-first-task-tool-started",
+        provider: "debug",
+        runtimeName: "debug",
+        nativeRunId: "runtime-first-task",
+        externalRef: "provider.runtime:runtime-first-task:1:tool_started",
+        sequence: 1,
+        correlationId: "provider-run-first-task",
+        occurredAt: new Date("2026-05-25T09:09:40.000Z"),
+      },
+    });
+    const lastRawEvent = await db.rawEventLog.findFirstOrThrow({
+      where: { taskId: task.id, rawType: "tool.started" },
+    });
+    await db.taskPlanProviderRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: compiledPlan.editablePlanId,
+        planRunId: persisted!.id,
+        nodeAttemptId: attempt!.id,
+        idempotencyKey: "provider-run-first-task",
+        providerRunRef: "runtime-first-task",
+        runtimeName: "debug",
+        nativeRunId: "runtime-first-task",
+        lastRawEventId: lastRawEvent.id,
+        status: "running",
+      },
+    });
+    const client = await aiClientRegistry.get();
+    client!.providerClient!.getRun = async () => {
+      throw Object.assign(new Error("missing run"), { status: 404, retryable: false });
+    };
+
+    const result = await reconcileStaleRuntimeRuns({ taskId: task.id });
+
+    expect(result).toEqual({ checked: 1, synced: 1, leftRunning: 0, skipped: 0 });
+    const reconciledRun = await db.run.findUniqueOrThrow({ where: { id: run.id } });
+    expect(reconciledRun.status).toBe("Failed");
+    expect(reconciledRun.syncStatus).toBe("degraded");
+    expect(reconciledRun.errorSummary).toContain("HTTP 404");
+    expect(reconciledRun.errorSummary).toContain("tool.started");
+    const reconciledPlan = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(reconciledPlan?.attempts.map((candidate) => [candidate.nodeId, candidate.status])).toEqual([
+      ["first_task", "failed"],
+    ]);
+    expect(reconciledPlan?.attempts[0]?.error).toMatchObject({
+      message: expect.stringContaining("no longer available"),
+    });
+    const providerRun = await db.taskPlanProviderRun.findFirstOrThrow({ where: { taskId: task.id } });
+    expect(providerRun.status).toBe("failed");
+    expect(providerRun.finishedAt).toBeTruthy();
   });
 });

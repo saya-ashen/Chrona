@@ -13,8 +13,11 @@ import {
 import { compileEditablePlan } from "@chrona/domain";
 
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
-const HIGH_RISK_PATTERN =
-  /\b(send|email|message|calendar|schedule|book|pay|purchase|delete|remove|cancel|modify|update)\b/i;
+const HIGH_RISK_PATTERNS = [
+  /\b(send|email|message|book|pay|purchase|delete|remove|cancel)\b/i,
+  /\b(modify|update|schedule|reschedule)\b.*\b(calendar|event|meeting|appointment|reservation|booking)\b/i,
+  /\b(calendar|event|meeting|appointment|reservation|booking)\b.*\b(modify|update|schedule|reschedule)\b/i,
+];
 
 function compileIssue(path: string, message: string) {
   return { path, message };
@@ -87,7 +90,7 @@ function checkHighRiskTasks(
     const haystack = [node.title, node.expectedOutput, node.completionCriteria]
       .filter(Boolean)
       .join(" ");
-    if (!HIGH_RISK_PATTERN.test(haystack)) continue;
+    if (!HIGH_RISK_PATTERNS.some((pattern) => pattern.test(haystack))) continue;
     const predecessors = incoming.get(node.id) ?? [];
     const hasGate = predecessors.some((candidateId) => {
       const candidate = nodeMap.get(candidateId);

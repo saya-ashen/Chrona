@@ -134,4 +134,56 @@ describe("compilePlanBlueprint", () => {
       },
     })).toThrow(PlanCompileError);
   });
+
+  it("does not require a checkpoint for schedule analysis or result delivery", () => {
+    const result = compilePlanBlueprint({
+      taskId: "task-1",
+      blueprint: {
+        title: "Schedule fix plan",
+        goal: "Review unscheduled cards and present a fix",
+        nodes: [
+          {
+            id: "task_inspect_unscheduled_cards",
+            type: "task",
+            title: "Inspect unscheduled cards",
+            expectedOutput: "List cards that need schedule fixes",
+          },
+          {
+            id: "task_present_schedule_fix_result",
+            type: "task",
+            title: "Present schedule fix result",
+            expectedOutput: "User-facing summary of proposed schedule fixes",
+          },
+        ],
+        edges: [
+          {
+            from: "task_inspect_unscheduled_cards",
+            to: "task_present_schedule_fix_result",
+          },
+        ],
+      },
+    });
+
+    expect(result.compiledPlan.nodes).toHaveLength(2);
+  });
+
+  it("still requires a checkpoint before modifying calendar events", () => {
+    expect(() => compilePlanBlueprint({
+      taskId: "task-1",
+      blueprint: {
+        title: "Calendar update",
+        goal: "Move the meeting",
+        nodes: [
+          {
+            id: "reschedule_meeting",
+            type: "task",
+            title: "Reschedule calendar meeting",
+            executor: "system",
+            mode: "auto",
+          },
+        ],
+        edges: [],
+      },
+    })).toThrow(PlanCompileError);
+  });
 });

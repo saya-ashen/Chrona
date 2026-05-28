@@ -62,7 +62,7 @@ export function QueueCard({
     <Card
       size="sm"
       className={cn(
-        "gap-0 rounded-xl bg-card/95 py-0 shadow-[0_3px_12px_rgba(15,23,42,0.06)] ring-border/80 transition-[background,border-color,box-shadow,opacity,transform]",
+        "gap-0 rounded-xl bg-card/95 py-0 data-[size=sm]:py-0 shadow-[0_3px_12px_rgba(15,23,42,0.06)] ring-border/70 transition-[background,border-color,box-shadow,opacity,transform] hover:bg-card hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)]",
         isDragging && "scale-[0.99] border-primary/70 bg-primary/10 opacity-80 shadow-[0_0_0_2px_rgba(37,99,235,0.16),0_12px_28px_rgba(15,23,42,0.16)]",
       )}
     >
@@ -72,24 +72,24 @@ export function QueueCard({
         onDragStart={(event) => onDragStart(item, event)}
         onDragEnd={onDragEnd}
         className={cn(
-          "grid min-h-[4.25rem] cursor-grab select-none grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-2.5 active:cursor-grabbing",
+          "grid min-h-14 cursor-grab select-none grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-1.5 px-2.5 py-1.5 active:cursor-grabbing",
           isPending && "cursor-not-allowed opacity-60",
         )}
       >
         <div className={`w-1 shrink-0 self-stretch rounded-full ${accent}`} />
 
         <GripVertical
-          className="shrink-0 text-muted-foreground/40"
+          className="size-4 shrink-0 text-muted-foreground/35"
           aria-hidden="true"
         />
 
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-sm font-medium leading-5 text-foreground">
               {item.title}
             </span>
           </div>
-          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-1 text-xs leading-4 text-muted-foreground">
             <Badge variant={getPriorityTone(item.priority)}>
               {item.priority}
             </Badge>

@@ -27,6 +27,7 @@ export function buildScheduleImpact(task: {
 
 export function readBlockReason(
   task: {
+    status: string;
     blockReason: unknown;
     projection:
       | {
@@ -39,6 +40,8 @@ export function readBlockReason(
       | null;
   },
 ) {
+  if (task.status === "Completed" || task.status === "Done") return null;
+
   const storedBlockReason = task.blockReason as {
     actionRequired?: string;
     blockType?: string;

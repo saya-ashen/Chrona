@@ -372,7 +372,10 @@ export async function getSchedulePage(workspaceId: string) {
     .map((item) => item);
 
   const unscheduled = topLevelItems
-    .filter((item) => item.scheduleStatus === "Unscheduled")
+    .filter(
+      (item) =>
+        item.scheduleStatus === "Unscheduled" && item.persistedStatus !== "Completed",
+    )
     .map((item) => item);
 
   const risks = topLevelItems
