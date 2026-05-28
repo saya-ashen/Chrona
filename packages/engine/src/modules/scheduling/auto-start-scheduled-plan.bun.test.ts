@@ -295,6 +295,65 @@ describe("auto-start-scheduled-plan", () => {
     expect(startMock).not.toHaveBeenCalled();
   });
 
+  it("starts tasks whose scheduled start exactly matches now", async () => {
+    const now = new Date("2026-05-28T10:00:00.000Z");
+    const workspace = await createWorkspace();
+    const { task } = await createDueTask(workspace.id, {
+      scheduledStartAt: now,
+      scheduledEndAt: new Date(now.getTime() + 60 * 60_000),
+    });
+
+    startMock.mockResolvedValue({
+      taskId: task.id,
+      planId: "plan-boundary",
+      mainSessionId: "session-boundary",
+      status: "running" as const,
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Started at boundary",
+    });
+
+    const result = await autoStartScheduledPlanTasks({ now });
+
+    expect(result.started).toHaveLength(1);
+    expect(result.started[0]?.taskId).toBe(task.id);
+    expect(result.skipped).toEqual([]);
+    expect(result.failed).toEqual([]);
+    expect(startMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("processes overdue backlog from oldest scheduled start first", async () => {
+    const now = new Date("2026-05-28T10:00:00.000Z");
+    const workspace = await createWorkspace();
+    const { task: newerTask } = await createDueTask(workspace.id, {
+      title: "Newer backlog task",
+      scheduledStartAt: new Date(now.getTime() - 5 * 60_000),
+    });
+    const { task: olderTask } = await createDueTask(workspace.id, {
+      title: "Older backlog task",
+      scheduledStartAt: new Date(now.getTime() - 60 * 60_000),
+    });
+
+    startMock.mockImplementation(async (input: { taskId: string }) => ({
+      taskId: input.taskId,
+      planId: `plan-${input.taskId}`,
+      mainSessionId: `session-${input.taskId}`,
+      status: "running" as const,
+      currentNodeId: null,
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      message: "Started backlog task",
+    }));
+
+    const result = await autoStartScheduledPlanTasks({ now });
+
+    expect(result.started.map((started) => started.taskId)).toEqual([olderTask.id, newerTask.id]);
+    expect(startMock.mock.calls.map((call) => call[0]?.taskId)).toEqual([olderTask.id, newerTask.id]);
+  });
+
   it("ignores due scheduled tasks that did not opt in to auto execution", async () => {
     const workspace = await createWorkspace();
     await createDueTask(workspace.id, { autoExecute: false });

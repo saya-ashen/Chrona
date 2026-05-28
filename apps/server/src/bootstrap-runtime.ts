@@ -1,13 +1,6 @@
 import { createChronaEngine } from "@chrona/engine";
+import { createServerRuntimeBootstrap } from "./runtime-bootstrap";
 
-let orchestratorStarted = false;
 const engine = createChronaEngine();
 
-export function bootstrapServerRuntime() {
-  if (orchestratorStarted) {
-    return;
-  }
-
-  engine.runtime.startTaskOrchestrator();
-  orchestratorStarted = true;
-}
+export const bootstrapServerRuntime = createServerRuntimeBootstrap(engine.runtime);

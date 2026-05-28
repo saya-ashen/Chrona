@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { render, waitFor } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 
 import { hydrateSchedulePageData } from "@/components/schedule/schedule-page-utils";
 import { AppShell } from "../app-shell";
@@ -92,10 +92,14 @@ describe("localized child pages under /:lang", () => {
       { initialEntries: ["/en"] },
     );
 
-    render(<RouterProvider router={router} />);
+    const view = render(<RouterProvider router={router} />);
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/en/schedule");
+    });
+
+    await act(async () => {
+      view.unmount();
     });
   });
 });
