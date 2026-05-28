@@ -129,9 +129,13 @@ function normalizeArgs(args: string[]) {
   return { commandArgs: args.slice(0, separator), passthrough: args.slice(separator + 1) };
 }
 
+function isHelpArg(arg: string | undefined) {
+  return !arg || arg === "help" || arg === "--help" || arg === "-h";
+}
+
 function resolveCommand(commandArgs: string[]) {
   const [group, maybeName] = commandArgs;
-  if (!group || group === "help" || group === "--help" || group === "-h") {
+  if (isHelpArg(group)) {
     return null;
   }
 
@@ -140,8 +144,13 @@ function resolveCommand(commandArgs: string[]) {
     throw new Error(`Unknown group '${group}'. Run 'bun run chrona help'.`);
   }
 
+  const defaultCommand = commands.all;
+  if (!maybeName && defaultCommand) {
+    return defaultCommand;
+  }
+
   const names = Object.keys(commands);
-  if (!maybeName || maybeName === "help" || maybeName === "--help" || maybeName === "-h") {
+  if (isHelpArg(maybeName)) {
     printGroupHelp(group, commands);
     return undefined;
   }

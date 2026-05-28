@@ -2,6 +2,7 @@ import { HermesProviderClient } from "@chrona/hermes";
 import { CHRONA_DEBUG_PROVIDER_TYPE, normalizeDebugProviderProfile } from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
+  ProviderRunEvent,
   ProviderRunSnapshot,
   StartRunInput,
 } from "@chrona/providers-foundation";
@@ -221,35 +222,21 @@ async function runProviderRequest(
   request: ProviderFeatureRequest,
 ): Promise<ProviderRunSnapshot> {
   let finalSnapshot: ProviderRunSnapshot | null = null;
-  for await (const event of providerClient.streamRun({
-    ...toStartRunInput(request),
-    stream: true,
-  })) {
-    if (event.type === "run_completed") {
-      finalSnapshot = {
-        provider: providerClient.provider,
-        runId: event.run.runId,
-        nativeRunId: event.run.nativeRunId,
-        sessionId: event.run.sessionId,
-        status: event.run.status ?? "completed",
-        outputText: event.outputText,
-        structuredPayload: event.structuredPayload,
-        usage: event.usage,
-        error: null,
-        raw: event.raw,
-      };
+  try {
+    for await (const event of providerClient.streamRun({
+      ...toStartRunInput(request),
+      stream: true,
+    })) {
+      if (event.type === "run_completed") {
+        finalSnapshot = providerRunCompletedSnapshot(providerClient.provider, event);
+      }
+      if (event.type === "run_failed") {
+        finalSnapshot = providerRunFailedSnapshot(providerClient.provider, request, event);
+      }
     }
-    if (event.type === "run_failed") {
-      finalSnapshot = {
-        provider: providerClient.provider,
-        runId: event.run?.runId ?? crypto.randomUUID(),
-        nativeRunId: event.run?.nativeRunId,
-        sessionId: event.run?.sessionId ?? request.sessionId,
-        status: "failed",
-        error: event.error,
-        raw: event.raw,
-      };
-    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new AiClientError(message, providerClient.provider, "internal");
   }
   if (!finalSnapshot) {
     throw new AiClientError(
@@ -259,6 +246,40 @@ async function runProviderRequest(
     );
   }
   return finalSnapshot;
+}
+
+function providerRunCompletedSnapshot(
+  provider: AiClientRecord["type"],
+  event: Extract<ProviderRunEvent, { type: "run_completed" }>,
+): ProviderRunSnapshot {
+  return {
+    provider,
+    runId: event.run.runId,
+    nativeRunId: event.run.nativeRunId,
+    sessionId: event.run.sessionId,
+    status: event.run.status ?? "completed",
+    outputText: event.outputText,
+    structuredPayload: event.structuredPayload,
+    usage: event.usage,
+    error: null,
+    raw: event.raw,
+  };
+}
+
+function providerRunFailedSnapshot(
+  provider: AiClientRecord["type"],
+  request: ProviderFeatureRequest,
+  event: Extract<ProviderRunEvent, { type: "run_failed" }>,
+): ProviderRunSnapshot {
+  return {
+    provider,
+    runId: event.run?.runId ?? crypto.randomUUID(),
+    nativeRunId: event.run?.nativeRunId,
+    sessionId: event.run?.sessionId ?? request.sessionId,
+    status: "failed",
+    error: event.error,
+    raw: event.raw,
+  };
 }
 
 async function llmFeaturePayload(

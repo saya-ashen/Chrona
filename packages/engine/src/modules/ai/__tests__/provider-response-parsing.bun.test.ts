@@ -66,6 +66,46 @@ function client(snapshot: ProviderRunSnapshot): EngineAiClient {
   };
 }
 
+function clientWithStreamFailure(error: Error): EngineAiClient {
+  const providerClient: AgentProviderClient = {
+    provider: "debug",
+    getCapabilities: async () => ({
+      supportsSessions: true,
+      supportsStreaming: true,
+      supportsRunLookup: true,
+      supportsCancellation: true,
+      supportsToolCalls: true,
+      supportsPreviousResponse: false,
+    }),
+    checkHealth: async () => ({ ok: true, provider: "debug", checkedAt: new Date(0).toISOString() }),
+    createSession: async () => ({ provider: "debug", sessionId: "session-1" }),
+    startRun: async () => ({ provider: "debug", runId: "run-1", sessionId: "session-1" }),
+    streamRun: () => ({
+      [Symbol.asyncIterator]() {
+        return {
+          next: async () => {
+            throw error;
+          },
+        };
+      },
+    }),
+    getRun: async () => providerSnapshot(),
+    cancelRun: async () => ({ provider: "debug", runId: "run-1", sessionId: "session-1", status: "cancelled" }),
+  };
+
+  return {
+    record: {
+      id: "debug",
+      name: "Debug",
+      type: "debug",
+      config: {},
+      enabled: true,
+      isDefault: true,
+    } satisfies AiClientRecord,
+    providerClient,
+  };
+}
+
 describe("provider response parsing", () => {
   test("returns parsed structured payload and debug metadata", async () => {
     const { dispatchFeaturePayload } = await import("../providers");
@@ -86,5 +126,11 @@ describe("provider response parsing", () => {
     const { dispatchFeaturePayload } = await import("../providers");
     await expect(dispatchFeaturePayload(client(providerSnapshot({ error: "provider failed", structuredPayload: null })), "chat", {}, "scope-1"))
       .rejects.toMatchObject({ code: "internal", message: "[debug] provider failed" } satisfies Partial<AiClientError>);
+  });
+
+  test("wraps provider stream failures as AiClientError", async () => {
+    const { dispatchFeaturePayload } = await import("../providers");
+    await expect(dispatchFeaturePayload(clientWithStreamFailure(new Error("provider stream timeout")), "chat", {}, "scope-1"))
+      .rejects.toMatchObject({ code: "internal", message: "[debug] provider stream timeout" } satisfies Partial<AiClientError>);
   });
 });
