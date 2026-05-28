@@ -27,7 +27,7 @@ async function createTask(request: APIRequestContext, title: string) {
 }
 
 test.describe("Task workspace layout", () => {
-  for (const viewport of ["desktop", "mobile"] as const) {
+  for (const viewport of ["desktop", "tablet", "mobile"] as const) {
     test(`keeps workspace execution regions reachable on ${viewport}`, async ({ page, request }) => {
       const taskId = await createTask(request, `E2E Layout ${viewport}`);
       await setTaskWorkspaceViewport(page, viewport);
@@ -36,10 +36,11 @@ test.describe("Task workspace layout", () => {
       await expect(page.getByText(`E2E Layout ${viewport}`).first()).toBeVisible();
       await expect(page.getByText("Plan").first()).toBeVisible();
 
-      if (viewport === "mobile") {
-        const hasHorizontalScroll = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-        expect(hasHorizontalScroll).toBe(false);
-      }
+      const overflow = await page.evaluate(() => ({
+        bodyOverflow: document.body.scrollWidth > window.innerWidth,
+        documentOverflow: document.documentElement.scrollWidth > window.innerWidth,
+      }));
+      expect(overflow).toEqual({ bodyOverflow: false, documentOverflow: false });
     });
   }
 });
