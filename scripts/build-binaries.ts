@@ -43,9 +43,10 @@ function log(step: string, ...args: string[]) {
   console.log(`  [${step}]`, ...args);
 }
 
-function bunRun(script: string) {
-  log("bun", `run ${script}`);
-  Bun.spawnSync(["bun", "run", script], { cwd: ROOT, stdio: ["inherit", "inherit", "inherit"] });
+function bunRun(args: string[], label: string) {
+  log("bun", label);
+  const result = Bun.spawnSync(["bun", ...args], { cwd: ROOT, stdio: ["inherit", "inherit", "inherit"] });
+  if (result.exitCode !== 0) throw new Error(`${label} failed with exit code ${result.exitCode}`);
 }
 
 // ────── Archive helpers ─────────────────────────────────────────
@@ -85,11 +86,11 @@ async function buildBinary(target: string) {
 
   // Step 1: Ensure Web UI is built
   log("build", "Building Web UI...");
-  bunRun("build");
+  bunRun(["run", "--cwd", "apps/web", "build"], "run --cwd apps/web build");
 
   // Step 2: Ensure Prisma client is generated
   log("build", "Generating Prisma client...");
-  bunRun("db:generate");
+  bunRun(["run", "db:generate"], "run db:generate");
 
   // Step 3: Clean and create release directory
   if (existsSync(releaseDir)) {

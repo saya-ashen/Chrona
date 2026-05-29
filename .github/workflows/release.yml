@@ -34,12 +34,10 @@ jobs:
 
       - run: bunx prisma generate
 
-      - run: bun run build
+      - name: Build binary
+        run: bun run chrona build ${{ matrix.target }}
         env:
           VITE_API_BASE_URL: ""
-
-      - name: Build binary
-        run: bun run build:binary:${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

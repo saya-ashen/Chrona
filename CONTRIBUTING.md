@@ -31,17 +31,17 @@ Development ports:
 
 ## Build & Package
 
-The npm package is built with esbuild (not tsup/bun build) to handle monorepo workspace paths:
+Chrona is distributed as portable binaries:
 
 ```bash
-bun run build         # Build the SPA (Vite)
-bun run build:npm     # Build the npm launcher bundle
+bun run build         # Build the portable binary for the current platform
+bun run chrona build web  # Build only the SPA (Vite)
 ```
 
 Test locally:
 
 ```bash
-bun dist/cli.js start
+./dist/releases/chrona-linux-x64/chrona start
 ```
 
 ## Project Architecture
