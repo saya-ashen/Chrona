@@ -37,10 +37,13 @@ const COMMANDS: Partial<Record<string, CommandGroup>> = {
     "bundle-check": { description: "Verify web bundle exists", run: ["test", "-f", "apps/web/dist/index.html"] },
   },
   build: {
+    all: { description: "Build portable binary for current platform", run: ["bun", "run", "scripts/build-binaries.ts"] },
     web: { description: "Build web app", run: ["bun", "run", "--cwd", "apps/web", "build"] },
-    full: { description: "Build web app and verify server bundle", run: ["bun", "run", "--cwd", "apps/web", "build", "&&", "test", "-f", "apps/web/dist/index.html"] },
-    npm: { description: "Build npm package", run: ["bun", "run", "scripts/build-npm.ts"] },
-    cli: { description: "Build CLI package", run: ["bun", "build", "packages/cli/src/index.ts", "packages/cli/src/bun-entry.ts", "packages/cli/src/npm-launcher.ts", "--outdir=packages/cli/dist", "--target=bun", "--tsconfig-override=tsconfig.json"] },
+    "linux-x64": { description: "Build linux x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "linux-x64"] },
+    "linux-arm64": { description: "Build linux arm64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "linux-arm64"] },
+    "darwin-x64": { description: "Build macOS x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "darwin-x64"] },
+    "darwin-arm64": { description: "Build macOS arm64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "darwin-arm64"] },
+    "windows-x64": { description: "Build Windows x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "windows-x64"] },
   },
   binary: {
     current: { description: "Build binary for current platform", run: ["bun", "run", "scripts/build-binaries.ts"] },

@@ -67,8 +67,8 @@ Date: 2026-05-26
 ## 0.1.2
 
 ### Features
-- npm package `@chrona-org/cli` — install via `npm install -g` and run `chrona start`
-- Bun runtime embedded via npm binary — no separate Bun install required for users
+- Portable binary release — download the platform archive and run `chrona start`
+- Bun runtime embedded in the binary — no separate Bun install required for users
 - Auto-setup on first launch: creates data/config directories, SQLite database, runs migrations
 - Single binary entry point: `chrona start` launches the packaged server
 - OS-standard data directories (XDG on Linux, App Support on macOS, %APPDATA% on Windows)

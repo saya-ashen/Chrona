@@ -2,7 +2,6 @@ import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 
 import { createProgram } from "./program.js";
-import { runStartupIntegrationChecks } from "./startup-integrations.js";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 
 // ──────────────────────────────────────────────────────────────
@@ -185,8 +184,6 @@ async function startServerMode(args: string[] = []) {
   console.log(`🚀 Starting Chrona on ${appUrl}`);
   console.log(`🔌 Chrona MCP: ${mcpUrl}`);
   console.log("");
-
-  await runStartupIntegrationChecks({ mcpUrl });
 
   setTimeout(() => {
     openBrowser(host, port);

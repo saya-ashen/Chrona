@@ -220,7 +220,7 @@ export async function detectHermesEnvironment(input: HermesIntegrationInput = {}
   const mcpUrl = input.mcpUrl || process.env.CHRONA_MCP_URL || DEFAULT_CHRONA_MCP_URL;
   const timeoutMs = input.timeoutMs ?? 5_000;
   const mode = localModeFromBaseUrl(baseUrl);
-  const envApiKey = mode === "local" ? readHermesEnv(input.hermesHome).API_SERVER_KEY.trim() || undefined : undefined;
+  const envApiKey = mode === "local" ? readHermesEnv(input.hermesHome).API_SERVER_KEY?.trim() || undefined : undefined;
   const effectiveInput = { ...input, apiKey: input.apiKey ?? envApiKey };
   const checks: HermesCheck[] = [];
 

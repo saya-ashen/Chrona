@@ -7,7 +7,7 @@ const DATABASE_URL = resolveRuntimeDatabaseUrl(process.env);
 if (typeof globalThis.Bun === "undefined") {
   throw new Error(
     "Chrona database runtime requires Bun. " +
-    "Please run Chrona through the npm launcher or set CHRONA_BUN_PATH.",
+    "Please run Chrona through the portable binary or with Bun.",
   );
 }
 
