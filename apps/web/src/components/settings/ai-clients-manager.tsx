@@ -45,8 +45,11 @@ type ClientFormValues = {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
 };
+
+type HermesClientScope = "local" | "remote";
 
 type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
 
@@ -74,6 +77,38 @@ type RuntimeProviderOption = {
   label: string;
 };
 
+const LOCAL_HERMES_BASE_URL = "http://127.0.0.1:8642";
+
+type HermesCheck = {
+  key: string;
+  status: "ok" | "warning" | "error" | "unknown" | "skipped";
+  message: string;
+};
+
+type HermesSetupAction = {
+  key: string;
+  kind: "automatic" | "manual";
+  reason: string;
+  blocked?: boolean;
+};
+
+type HermesIntegrationResult = {
+  diagnostics: {
+    mode: "local" | "remote" | "unknown";
+    restartRequired: boolean;
+    checks: HermesCheck[];
+  };
+  plan: {
+    summary: string;
+    canRunAutomatically: boolean;
+    actions: HermesSetupAction[];
+  };
+  apiKey?: string;
+  maskedApiKey?: string;
+  changed?: string[];
+  restart?: { ok: boolean; message: string; exitCode: number | null };
+};
+
 function buildClientPayload(input: {
   name: string;
   type: AiClientType;
@@ -81,6 +116,7 @@ function buildClientPayload(input: {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
 }): ClientFormPayload {
   if (input.type === "debug") {
@@ -93,12 +129,13 @@ function buildClientPayload(input: {
   }
 
   return {
-    name: input.name,
-    type: input.type,
-    config: {
-      baseUrl: input.baseUrl || "http://127.0.0.1:8642",
+      name: input.name,
+      type: input.type,
+      config: {
+      baseUrl: input.baseUrl || (input.hermesScope === "local" ? LOCAL_HERMES_BASE_URL : ""),
       apiKey: input.apiKey,
       timeoutMs: Number(input.timeoutSeconds) * 1000,
+      scope: input.type === "hermes" ? input.hermesScope : undefined,
     },
     isDefault: input.isDefault,
   };
@@ -137,6 +174,39 @@ async function testClientAvailability(payload: ClientFormPayload): Promise<TestR
     status: data.available ? "available" : "unavailable",
     reason: data.reason ?? null,
   };
+}
+
+async function diagnoseHermes(values: ClientFormValues): Promise<HermesIntegrationResult> {
+  const res = await api.integrations.hermes.diagnose.$post({
+    json: {
+      baseUrl: values.baseUrl,
+      apiKey: values.apiKey || undefined,
+      timeoutMs: Number(values.timeoutSeconds) * 1000,
+    },
+  });
+  const data = (await res.json()) as HermesIntegrationResult & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? "Failed to diagnose Hermes integration");
+  return data;
+}
+
+async function setupLocalHermes(values: ClientFormValues): Promise<HermesIntegrationResult> {
+  const res = await api.integrations.hermes["setup-local"].$post({
+    json: {
+      baseUrl: values.baseUrl,
+      apiKey: values.apiKey || undefined,
+      timeoutMs: Number(values.timeoutSeconds) * 1000,
+    },
+  });
+  const data = (await res.json()) as HermesIntegrationResult & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? "Failed to configure local Hermes");
+  return data;
+}
+
+async function restartLocalHermes(): Promise<{ ok: boolean; message: string; exitCode: number | null }> {
+  const res = await api.integrations.hermes["restart-local"].$post();
+  const data = (await res.json()) as { ok: boolean; message: string; exitCode: number | null; error?: string };
+  if (!res.ok) throw new Error(data.error ?? "Failed to restart Hermes gateway");
+  return data;
 }
 
 function getStatusLabel(copy: Record<string, string>, status: TestStatus) {
@@ -186,6 +256,21 @@ const DEFAULTS: Record<string, string> = {
   debugProfileDeterministic: "Deterministic",
   debugProfileToolSubmit: "Tool submit",
   debugProfileHermesLike: "Hermes-like",
+  hermesScopeLabel: "Hermes location",
+  hermesScopeLocal: "Local Hermes",
+  hermesScopeRemote: "Remote Hermes",
+  hermesLocalDescription: "Local mode can install the Chrona Hermes plugin and enable the Hermes API server on this machine.",
+  hermesRemoteDescription: "Remote mode will not touch local files. Configure the remote Hermes machine manually, then test availability here.",
+  hermesRestartDescription: "Restart Hermes if you changed the plugin, enabled the API server, or updated the API key. Chrona can run hermes gateway restart, but it may not know your original gateway startup options; restart it yourself if that is clearer. Running tasks may pause briefly during restart.",
+  remoteBaseUrlRequired: "Remote Hermes base URL is required",
+  diagnoseHermes: "Diagnose Hermes",
+  autoConfigureHermes: "Auto-configure local Hermes",
+  restartHermes: "Restart Hermes gateway",
+  restartHermesRequested: "Hermes restart requested.",
+  hermesDiagnosticsTitle: "Hermes diagnostics",
+  hermesPlanTitle: "Setup plan",
+  hermesChangedTitle: "Changed",
+  hermesRestartRequired: "Restart Hermes, then run diagnosis again.",
   setAsDefault: "Set as default Client",
   save: "Save",
   cancel: "Cancel",
@@ -224,8 +309,9 @@ function ClientForm({
       (initial?.config as { timeoutSeconds?: number; timeoutMs?: number })?.timeoutSeconds
         ?? (((initial?.config as { timeoutMs?: number })?.timeoutMs ?? 120000) / 1000),
     ),
-    baseUrl: (initial?.config as { baseUrl?: string })?.baseUrl ?? "http://127.0.0.1:8642",
+    baseUrl: (initial?.config as { baseUrl?: string })?.baseUrl ?? LOCAL_HERMES_BASE_URL,
     apiKey: (initial?.config as { apiKey?: string })?.apiKey ?? "",
+    hermesScope: (initial?.config as { scope?: HermesClientScope })?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initial?.config as { profile?: unknown })?.profile),
   }), [fallbackType, initial, providers]);
   const form = useForm<ClientFormValues>({
@@ -234,14 +320,24 @@ function ClientForm({
   });
   const values = form.watch();
   const isDebugClient = values.type === "debug";
+  const isHermesClient = values.type === "hermes";
+  const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
+  const [hermesResult, setHermesResult] = useState<HermesIntegrationResult | null>(null);
+  const [hermesBusy, setHermesBusy] = useState<"diagnose" | "setup" | "restart" | null>(null);
 
   useEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form]);
 
   const payload = buildClientPayload(values);
+
+  useEffect(() => {
+    if (values.type === "hermes" && values.hermesScope === "local" && !values.baseUrl) {
+      form.setValue("baseUrl", LOCAL_HERMES_BASE_URL, { shouldDirty: true });
+    }
+  }, [form, values.baseUrl, values.hermesScope, values.type]);
 
   function handleSave(nextValues: ClientFormValues) {
     onSave(buildClientPayload(nextValues));
@@ -288,15 +384,176 @@ function ClientForm({
               </Field>
             </div>
 
+            {isHermesClient && (
+              <Card className="border-dashed bg-muted/25" size="sm">
+                <CardContent className="flex flex-col gap-4">
+                  <Field>
+                    <FieldLabel>{copy.hermesScopeLabel}</FieldLabel>
+                    <Controller
+                      name="hermesScope"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(scope: HermesClientScope) => {
+                            field.onChange(scope);
+                            const currentBaseUrl = form.getValues("baseUrl");
+                            if (scope === "remote" && currentBaseUrl === LOCAL_HERMES_BASE_URL) {
+                              form.setValue("baseUrl", "", { shouldDirty: true, shouldValidate: true });
+                            }
+                            if (scope === "local" && !currentBaseUrl) {
+                              form.setValue("baseUrl", LOCAL_HERMES_BASE_URL, { shouldDirty: true, shouldValidate: true });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label={copy.hermesScopeLabel}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="local">{copy.hermesScopeLocal}</SelectItem>
+                              <SelectItem value="remote">{copy.hermesScopeRemote}</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </Field>
+                  <p className="text-sm text-muted-foreground">
+                    {isLocalHermes ? copy.hermesLocalDescription : copy.hermesRemoteDescription}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={hermesBusy !== null}
+                      onClick={async () => {
+                        setHermesBusy("diagnose");
+                        try {
+                          setHermesResult(await diagnoseHermes(form.getValues()));
+                        } catch (error) {
+                          setHermesResult({
+                            diagnostics: { mode: "unknown", restartRequired: false, checks: [] },
+                            plan: {
+                              summary: error instanceof Error ? error.message : copy.reasonUnknown,
+                              canRunAutomatically: false,
+                              actions: [],
+                            },
+                          });
+                        } finally {
+                          setHermesBusy(null);
+                        }
+                      }}
+                    >
+                      {hermesBusy === "diagnose" ? copy.testing : copy.diagnoseHermes}
+                    </Button>
+                    {isLocalHermes && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={hermesBusy !== null}
+                        onClick={async () => {
+                          setHermesBusy("setup");
+                          try {
+                            const result = await setupLocalHermes(form.getValues());
+                            setHermesResult(result);
+                            if (result.apiKey) form.setValue("apiKey", result.apiKey, { shouldDirty: true });
+                          } catch (error) {
+                            setHermesResult({
+                              diagnostics: { mode: "unknown", restartRequired: false, checks: [] },
+                              plan: {
+                                summary: error instanceof Error ? error.message : copy.reasonUnknown,
+                                canRunAutomatically: false,
+                                actions: [],
+                              },
+                            });
+                          } finally {
+                            setHermesBusy(null);
+                          }
+                        }}
+                      >
+                        {hermesBusy === "setup" ? copy.testing : copy.autoConfigureHermes}
+                      </Button>
+                    )}
+                    {isLocalHermes && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={hermesBusy !== null}
+                        onClick={async () => {
+                          setHermesBusy("restart");
+                          try {
+                            const restart = await restartLocalHermes();
+                            setHermesResult((current) => ({
+                              diagnostics: current?.diagnostics ?? { mode: "local", restartRequired: false, checks: [] },
+                              plan: current?.plan ?? { summary: copy.restartHermesRequested, canRunAutomatically: false, actions: [] },
+                              changed: current?.changed,
+                              maskedApiKey: current?.maskedApiKey,
+                              restart,
+                            }));
+                          } catch (error) {
+                            setHermesResult((current) => ({
+                              diagnostics: current?.diagnostics ?? { mode: "local", restartRequired: false, checks: [] },
+                              plan: current?.plan ?? { summary: copy.reasonUnknown, canRunAutomatically: false, actions: [] },
+                              changed: current?.changed,
+                              maskedApiKey: current?.maskedApiKey,
+                              restart: {
+                                ok: false,
+                                exitCode: null,
+                                message: error instanceof Error ? error.message : copy.reasonUnknown,
+                              },
+                            }));
+                          } finally {
+                            setHermesBusy(null);
+                          }
+                        }}
+                      >
+                        {hermesBusy === "restart" ? copy.testing : copy.restartHermes}
+                      </Button>
+                    )}
+                  </div>
+                  {isLocalHermes ? <p className="text-xs text-muted-foreground">{copy.hermesRestartDescription}</p> : null}
+                  {hermesResult && (
+                    <div className="grid gap-3 text-sm md:grid-cols-2">
+                      <div className="rounded-md border bg-background p-3">
+                        <div className="mb-2 font-medium">{copy.hermesDiagnosticsTitle}</div>
+                        <div className="flex flex-col gap-1">
+                          {hermesResult.diagnostics.checks.slice(0, 6).map((check) => (
+                            <div key={check.key} className="flex gap-2">
+                              <Badge variant={check.status === "error" ? "destructive" : check.status === "ok" ? "default" : "secondary"}>{check.status}</Badge>
+                              <span className="text-muted-foreground">{check.message}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-md border bg-background p-3">
+                        <div className="mb-2 font-medium">{copy.hermesPlanTitle}</div>
+                        <p className="text-muted-foreground">{hermesResult.plan.summary}</p>
+                        {hermesResult.maskedApiKey ? <p className="mt-2 text-muted-foreground">API key: {hermesResult.maskedApiKey}</p> : null}
+                        {hermesResult.changed && hermesResult.changed.length > 0 ? (
+                          <p className="mt-2 text-muted-foreground">{copy.hermesChangedTitle}: {hermesResult.changed.join(", ")}</p>
+                        ) : null}
+                        {hermesResult.diagnostics.restartRequired ? <p className="mt-2 text-muted-foreground">{copy.hermesRestartRequired}</p> : null}
+                        {hermesResult.restart ? <p className="mt-2 text-muted-foreground">{hermesResult.restart.message}</p> : null}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {!isDebugClient && (
               <>
                 <Field>
                   <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
                   <Input
-                    {...form.register("baseUrl")}
+                    {...form.register("baseUrl", {
+                      validate: (value) => values.type !== "hermes" || values.hermesScope !== "remote" || Boolean(value.trim()) || copy.remoteBaseUrlRequired,
+                    })}
                     id="ai-client-base-url"
-                    placeholder="http://127.0.0.1:8642"
+                    placeholder={isLocalHermes ? LOCAL_HERMES_BASE_URL : "http://hermes-host:8642"}
                   />
+                  {form.formState.errors.baseUrl ? <FieldError errors={[form.formState.errors.baseUrl]} /> : null}
                 </Field>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field>

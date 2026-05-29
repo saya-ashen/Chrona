@@ -1,0 +1,13 @@
+{
+  "name": "@chrona/integrations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/hermes": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./hermes": "./src/hermes/index.ts"
+  }
+}
