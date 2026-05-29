@@ -2,6 +2,8 @@
 
 Providers are protocol adapters. They connect Chrona to external AI/runtime systems, but they do not own Chrona workflow semantics.
 
+Provider runtime code is intentionally separate from local integration management. Runtime providers send requests, stream events, parse external protocol data, and expose health/capabilities. Integration code may inspect or modify local machine state only when the user explicitly asks for setup or diagnosis.
+
 ## Core rule
 
 Provider code may know how to:
@@ -30,6 +32,22 @@ Those decisions belong in `packages/engine`.
 | `packages/providers/foundation` | Provider-neutral contracts and shared adapter shapes |
 | `packages/providers/hermes` | Hermes-specific transport, session, event, and tool-call adaptation |
 | `packages/providers/debug` | Development/debug execution runtime, hidden unless explicitly enabled |
+
+## Integration packages
+
+| Package | Role |
+| --- | --- |
+| `packages/integrations/hermes` | Hermes environment diagnosis, local plugin install/update, Hermes `.env` management, setup planning, and explicit gateway restart helper |
+
+Integration packages are allowed to do side-effectful local setup work that provider packages must not do:
+
+- inspect local CLI availability
+- read or write local integration config files
+- install or update an external runtime plugin
+- produce manual setup guidance for remote machines
+- run explicit user-requested local commands such as `hermes gateway restart`
+
+Integration packages must keep these side effects behind explicit setup/diagnosis APIs. They should not run automatically during normal provider execution.
 
 ## Session ownership
 
@@ -73,6 +91,8 @@ Hermes may expose native concepts such as session keys, run refs, native run IDs
 
 Hermes code should not expose a high-level `executeTask()` abstraction that embeds Chrona task lifecycle decisions. The engine starts/continues execution and decides what to do with provider events.
 
+Hermes local setup belongs in `packages/integrations/hermes`, not `packages/providers/hermes`. Examples include checking `~/.hermes/.env`, installing the Chrona Hermes plugin, writing the plugin MCP URL, planning restart requirements, and starting `hermes gateway restart` after an explicit user action.
+
 ## Boundary with AI clients
 
 Settings / AI Clients stores configured clients and feature bindings in the database. The engine loads the selected client for a feature such as `generate_plan`, `suggest`, `chat`, or `dispatch_task`, then calls provider/foundation-facing abstractions. There is no generic bridge chat endpoint standing in for every product capability; feature-specific flows should have explicit contracts.
@@ -88,7 +108,8 @@ Before adding provider code, decide:
 1. Is this a canonical Chrona schema? Put it in `packages/contracts`.
 2. Is this a provider-neutral adapter shape? Put it in `packages/providers/foundation`.
 3. Is this external protocol behavior? Put it in a concrete package under `packages/providers/`.
-4. Is this task/plan/schedule/execution policy? Put it in `packages/engine`.
-5. Is this only HTTP route wiring? Put it in `apps/server`.
+4. Is this local install/config/diagnosis behavior for an external runtime? Put it in `packages/integrations/`.
+5. Is this task/plan/schedule/execution policy? Put it in `packages/engine`.
+6. Is this only HTTP route wiring? Put it in `apps/server`.
 
 If upper layers need to parse raw provider wire format, the boundary is wrong.
