@@ -17,7 +17,6 @@ export function WorkPageHeaderCard({
   executionStatus,
   executionTone,
   syncLabel,
-  isStale,
   description,
   taskId,
 }: WorkPageHeaderCardProps) {
@@ -30,7 +29,7 @@ export function WorkPageHeaderCard({
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-[1.35rem]">{title}</h1>
               <Badge variant={executionTone}>{executionStatus}</Badge>
-              <Badge variant={isStale ? "secondary" : "secondary"}>{syncLabel}</Badge>
+              <Badge variant="secondary">{syncLabel}</Badge>
             </div>
             <p className="mt-1 max-w-3xl text-xs text-muted-foreground sm:text-sm">{description}</p>
           </div>

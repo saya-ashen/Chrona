@@ -4,11 +4,11 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
-
 jobs:
   build-binary:
+    permissions:
+      contents: read
+
     strategy:
       fail-fast: false
       matrix:

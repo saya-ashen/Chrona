@@ -218,7 +218,7 @@ function downloadAndCacheBun(): string {
         throw new Error("Bun binary not found after extraction");
       }
 
-      import.meta.require?.("node:fs").chmodSync(extractedBun, 0o755);
+      import.meta.require?.("node:fs").chmodSync(extractedBun, 0o700);
 
       const cachedPath = getCachedBunPath();
       import.meta.require?.("node:fs").renameSync(extractedBun, cachedPath);

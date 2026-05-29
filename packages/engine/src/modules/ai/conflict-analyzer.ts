@@ -85,7 +85,7 @@ export function analyzeConflicts(tasks: ScheduledTaskInfo[]): ConflictAnalysisRe
 
   return {
     conflicts,
-    suggestions: conflicts.map(buildRuleSuggestion),
+    suggestions: conflicts.map((conflict, index) => buildRuleSuggestion(conflict, index)),
     summary: summarize(conflicts),
   };
 }

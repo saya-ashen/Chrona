@@ -377,7 +377,7 @@ describe("getSchedulePage", () => {
     ]);
 
     expect(page.listItems).toHaveLength(6);
-    expect(page.listItems.map((item) => item.taskId).sort()).toEqual(
+    expect(page.listItems.map((item) => item.taskId).sort((left, right) => left.localeCompare(right))).toEqual(
       [
         completedUnscheduledTask.id,
         reviewTask.id,
@@ -385,7 +385,7 @@ describe("getSchedulePage", () => {
         scheduledTask.id,
         subtask.id,
         unscheduledTask.id,
-      ].sort(),
+      ].sort((left, right) => left.localeCompare(right)),
     );
     expect(page.listItems.some((item) => item.taskId === subtask.id)).toBe(true);
     expect(page.listItems.find((item) => item.taskId === unscheduledTask.id)).toMatchObject({
