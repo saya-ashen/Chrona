@@ -7,7 +7,7 @@ type Command = {
 
 type CommandGroup = Partial<Record<string, Command>>;
 
-const TEST_COMMANDS: CommandGroup = {
+export const TEST_COMMANDS: CommandGroup = {
   all: { description: "Unit, Bun, API, and Playwright e2e tests", run: ["bun", "x", "vitest", "run", "&&", "bun", "run", "scripts/run-bun-tests.ts", "&&", "bun", "run", "scripts/run-api-tests.ts", "&&", "bun", "x", "playwright", "test"] },
   ci: { description: "CI unit, Bun, API, and LLM replay tests", run: ["bun", "x", "vitest", "run", "--reporter=verbose", "&&", "bun", "run", "scripts/run-bun-tests.ts", "&&", "bun", "run", "scripts/run-api-tests.ts", "&&", "bun", "test", "packages/engine/src/test/llm-fixtures.bun.test.ts"] },
   unit: { description: "Vitest unit tests", run: ["bun", "x", "vitest", "run"] },
@@ -122,7 +122,7 @@ Commands:`);
   }
 }
 
-function normalizeArgs(args: string[]) {
+export function normalizeArgs(args: string[]) {
   const separator = args.indexOf("--");
   if (separator === -1) {
     return { commandArgs: args, passthrough: [] };
@@ -134,7 +134,7 @@ function isHelpArg(arg: string | undefined) {
   return !arg || arg === "help" || arg === "--help" || arg === "-h";
 }
 
-function resolveCommand(commandArgs: string[]) {
+export function resolveCommand(commandArgs: string[]) {
   const [group, maybeName] = commandArgs;
   if (isHelpArg(group)) {
     return null;
@@ -164,7 +164,7 @@ function resolveCommand(commandArgs: string[]) {
   return command;
 }
 
-async function runSequence(tokens: string[], passthrough: string[]) {
+export async function runSequence(tokens: string[], passthrough: string[]) {
   const chunks: string[][] = [[]];
   for (const token of tokens) {
     if (token === "&&") {
@@ -192,7 +192,7 @@ async function runSequence(tokens: string[], passthrough: string[]) {
   }
 }
 
-async function main() {
+export async function main() {
   const { commandArgs, passthrough } = normalizeArgs(process.argv.slice(2));
   const command = resolveCommand(commandArgs);
   if (!command) {
@@ -205,7 +205,9 @@ async function main() {
   await runSequence(command.run, passthrough);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}
