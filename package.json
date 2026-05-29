@@ -45,6 +45,7 @@
     "check:ui-foundation": "bun run scripts/check-ui-foundation.mjs",
     "analyze": "bun run chrona check all",
     "test": "bun run chrona test all",
+    "test:ci": "bun run chrona test ci",
     "test:unit": "bun run chrona test unit",
     "test:api": "bun run scripts/run-api-tests.ts",
     "test:bun": "bun run scripts/run-bun-tests.ts",

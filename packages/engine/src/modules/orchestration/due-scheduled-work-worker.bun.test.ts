@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
+import { recordOrchestratorEvent } from "./scheduler-events";
 import { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 
 async function resetDb() {
@@ -74,5 +75,39 @@ describe("runDueScheduledWorkWorker", () => {
       "scheduler.fail",
     ]);
     expect(events.map((event) => event.reason)).toEqual([null, "already_running", "boom"]);
+  });
+
+  it("does not record events when no scheduled work is due", async () => {
+    const startDueWork = mock(async () => ({
+      started: [],
+      skipped: [],
+      failed: [],
+      now: "2026-05-17T00:00:00.000Z",
+    }));
+    const recordEvent = mock(recordOrchestratorEvent);
+
+    const result = await runDueScheduledWorkWorker({ deps: { recordEvent, startDueWork } });
+
+    expect(result.started).toEqual([]);
+    expect(result.skipped).toEqual([]);
+    expect(result.failed).toEqual([]);
+    expect(recordEvent).not.toHaveBeenCalled();
+    expect(await db.schedulerEvent.count()).toBe(0);
+  });
+
+  it("ignores due work results for tasks that no longer exist", async () => {
+    const startDueWork = mock(async () => ({
+      started: [{ taskId: "missing-task", workBlockId: "block_started", runId: "plan_1" }],
+      skipped: [{ taskId: "missing-task", workBlockId: "block_skipped", reason: "already_running" }],
+      failed: [{ taskId: "missing-task", workBlockId: "block_failed", error: "boom" }],
+      now: "2026-05-17T00:00:00.000Z",
+    }));
+    const recordEvent = mock(recordOrchestratorEvent);
+
+    const result = await runDueScheduledWorkWorker({ deps: { recordEvent, startDueWork } });
+
+    expect(result.started).toHaveLength(1);
+    expect(recordEvent).not.toHaveBeenCalled();
+    expect(await db.schedulerEvent.count()).toBe(0);
   });
 });

@@ -126,28 +126,32 @@ export function createTaskOrchestrator(options: TaskOrchestratorOptions = {}): T
   };
 }
 
+export function createDefaultTaskOrchestratorWorkers(): TaskOrchestratorWorker[] {
+  return [
+    {
+      name: "restart-recovery",
+      async run() {
+        await runRestartRecoveryWorker();
+      },
+    },
+    {
+      name: "due-scheduled-work",
+      async run() {
+        await runDueScheduledWorkWorker();
+      },
+    },
+    {
+      name: "graph-advancement",
+      async run() {
+        await runGraphAdvancementWorker();
+      },
+    },
+  ];
+}
+
 export function createDefaultTaskOrchestrator() {
   return createTaskOrchestrator({
-    workers: [
-      {
-        name: "restart-recovery",
-        async run() {
-          await runRestartRecoveryWorker();
-        },
-      },
-      {
-        name: "due-scheduled-work",
-        async run() {
-          await runDueScheduledWorkWorker();
-        },
-      },
-      {
-        name: "graph-advancement",
-        async run() {
-          await runGraphAdvancementWorker();
-        },
-      },
-    ],
+    workers: createDefaultTaskOrchestratorWorkers(),
   });
 }
 

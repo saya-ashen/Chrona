@@ -31,6 +31,7 @@ export {
 export type { TaskOrchestratorConfig } from "./orchestrator-config";
 export {
   createDefaultTaskOrchestrator,
+  createDefaultTaskOrchestratorWorkers,
   createTaskOrchestrator,
   getTaskOrchestrator,
   startTaskOrchestrator,

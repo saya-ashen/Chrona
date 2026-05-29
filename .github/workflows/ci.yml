@@ -24,26 +24,8 @@ jobs:
 
       - run: bun run lint
 
-      - name: Run tests (Vitest)
-        run: bun run test:unit -- --reporter=verbose
-        env:
-          DATABASE_URL: "file:./prisma/dev.db"
-          OPENCLAW_MODE: "mock"
-
-      - name: Run tests (Bun)
-        run: bun run test:bun
-        env:
-          DATABASE_URL: "file:./prisma/dev.db"
-          OPENCLAW_MODE: "mock"
-
-      - name: Run tests (API)
-        run: bun run test:api
-        env:
-          DATABASE_URL: "file:./prisma/dev.db"
-          OPENCLAW_MODE: "mock"
-
-      - name: Replay LLM fixtures
-        run: bun run test:llm:replay
+      - name: Run CI tests
+        run: bun run test:ci
         env:
           DATABASE_URL: "file:./prisma/dev.db"
           CHRONA_LLM_FIXTURE_MODE: "replay"

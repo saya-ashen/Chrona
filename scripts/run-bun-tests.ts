@@ -8,14 +8,26 @@ const ignoredSegments = new Set(["node_modules", ".direnv", ".git", ".worktrees"
 const rootDir = process.cwd();
 const tempDbPath = resolve(rootDir, ".tmp", "bun-test.db");
 const tempDatabaseUrl = `file:${tempDbPath}`;
+const requestedFiles = process.argv.slice(2);
 
 function shouldInclude(path: string) {
   return !path.split("/").some((segment) => ignoredSegments.has(segment));
 }
 
-const files = (await Array.fromAsync(include.scan(".")))
-  .filter(shouldInclude)
-  .sort((a, b) => a.localeCompare(b));
+function resolveRequestedFiles(paths: string[]) {
+  const invalid = paths.filter((path) => !path.endsWith(".bun.test.ts") || !shouldInclude(path) || !existsSync(path));
+  if (invalid.length > 0) {
+    console.error(`Invalid Bun test file(s): ${invalid.join(", ")}`);
+    process.exit(1);
+  }
+  return paths;
+}
+
+const files = requestedFiles.length > 0
+  ? resolveRequestedFiles(requestedFiles)
+  : (await Array.fromAsync(include.scan(".")))
+    .filter(shouldInclude)
+    .sort((a, b) => a.localeCompare(b));
 
 if (files.length === 0) {
   process.exit(0);
