@@ -43,9 +43,9 @@ function log(step: string, ...args: string[]) {
   console.log(`  [${step}]`, ...args);
 }
 
-function bunRun(script: string) {
-  log("bun", `run ${script}`);
-  Bun.spawnSync(["bun", "run", script], { cwd: ROOT, stdio: ["inherit", "inherit", "inherit"] });
+function bunRun(...args: string[]) {
+  log("bun", `run ${args.join(" ")}`);
+  Bun.spawnSync(["bun", "run", ...args], { cwd: ROOT, stdio: ["inherit", "inherit", "inherit"] });
 }
 
 // ────── Archive helpers ─────────────────────────────────────────
@@ -85,7 +85,7 @@ async function buildBinary(target: string) {
 
   // Step 1: Ensure Web UI is built
   log("build", "Building Web UI...");
-  bunRun("build");
+  bunRun("chrona", "build", "web");
 
   // Step 2: Ensure Prisma client is generated
   log("build", "Generating Prisma client...");
