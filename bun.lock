@@ -62,6 +62,7 @@
         "@chrona/db": "workspace:*",
         "@chrona/engine": "workspace:*",
         "@chrona/i18n": "workspace:*",
+        "@chrona/integrations": "workspace:*",
         "@chrona/shared": "workspace:*",
       },
     },
@@ -104,6 +105,7 @@
         "agentdash": "./src/index.ts",
       },
       "dependencies": {
+        "@chrona/integrations": "workspace:*",
         "chalk": "^5.6.2",
         "cli-table3": "^0.6.5",
         "commander": "^14.0.3",
@@ -150,6 +152,13 @@
     "packages/i18n": {
       "name": "@chrona/i18n",
       "version": "0.1.0",
+    },
+    "packages/integrations": {
+      "name": "@chrona/integrations",
+      "version": "0.1.0",
+      "dependencies": {
+        "@chrona/hermes": "workspace:*",
+      },
     },
     "packages/providers/debug": {
       "name": "@chrona/providers-debug",
@@ -287,6 +296,8 @@
     "@chrona/hermes": ["@chrona/hermes@workspace:packages/providers/hermes"],
 
     "@chrona/i18n": ["@chrona/i18n@workspace:packages/i18n"],
+
+    "@chrona/integrations": ["@chrona/integrations@workspace:packages/integrations"],
 
     "@chrona/providers-debug": ["@chrona/providers-debug@workspace:packages/providers/debug"],
 

@@ -62,7 +62,39 @@ Calendars tell you what should happen. Task apps tell you what is pending. AI ch
 
 ## Quick Start
 
-Chrona is Bun-only today. The repository and production server both use Bun as the runtime; npm package installation is not currently supported.
+Chrona is Bun-only today. The source repository uses Bun as the runtime; npm package installation is not currently supported for repository development.
+
+### Download a release
+
+Use this path if you want to run Chrona without cloning the repository.
+
+1. Open the [latest GitHub release](https://github.com/saya-ashen/Chrona/releases/latest).
+2. Download the archive for your platform:
+
+| Platform | Asset |
+| --- | --- |
+| Linux x64 | `chrona-linux-x64.tar.gz` |
+| Linux ARM64 | `chrona-linux-arm64.tar.gz` |
+| macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
+| Windows x64 | `chrona-windows-x64.tar.gz` |
+
+3. Extract the archive and start Chrona:
+
+```bash
+tar -xzf chrona-linux-x64.tar.gz
+cd chrona-linux-x64
+./chrona start
+```
+
+On Windows, run the packaged executable instead:
+
+```powershell
+tar -xzf chrona-windows-x64.tar.gz
+cd chrona-windows-x64
+.\Chrona.exe start
+```
+
+Open `http://localhost:3101` after the server starts.
 
 ### Run from source
 
@@ -76,17 +108,6 @@ bun run dev
 ```
 
 Open `http://localhost:3101`. `bun run dev` starts the Bun/Hono API server and the Vite web app.
-
-### Run with Docker
-
-Use this path if you want a containerized local server.
-
-```bash
-docker build -t chrona .
-docker run --rm -p 3101:3101 -v chrona-data:/data chrona
-```
-
-The container stores SQLite data in `/data/chrona.db`. Set `API_KEY` explicitly for stable authenticated access across restarts.
 
 ## First Run
 
@@ -179,10 +200,10 @@ Copy `.env.example` if you want local overrides.
 
 | Variable | Purpose | Default / note |
 | --- | --- | --- |
-| `DATABASE_URL` | SQLite database URL | source default: `file:./prisma/dev.db`; Docker: `file:/data/chrona.db` |
+| `DATABASE_URL` | SQLite database URL | source default: `file:./prisma/dev.db`; packaged releases use the platform data directory unless overridden |
 | `HOST` | API server bind host | defaults to local-only `127.0.0.1` |
 | `PORT` | API server port | `3101` |
-| `API_KEY` | Optional bearer token for `/api/*` routes | Docker generates one when omitted |
+| `API_KEY` | Optional bearer token for `/api/*` routes | omit for local-only development |
 | `CHRONA_WEB_DIST` | Built web app directory for static serving | `apps/web/dist` |
 | `ALLOWED_ORIGINS` | Comma-separated CORS allowlist | omit for local development |
 | `VITE_API_BASE_URL` | Frontend API base URL override | useful when web and API are split |

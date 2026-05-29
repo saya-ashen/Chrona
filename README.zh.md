@@ -62,7 +62,39 @@ Chrona 当前可用于本地开发和产品探索，但还不是稳定软件。�
 
 ## 快速开始
 
-Chrona 目前是 Bun-only 项目。仓库开发和生产 server 都使用 Bun 作为运行时；当前不支持 npm package 安装。
+Chrona 目前是 Bun-only 项目。源码仓库使用 Bun 作为运行时；仓库开发当前不支持 npm package 安装。
+
+### 下载发行版
+
+如果你只想运行 Chrona，不需要克隆仓库，选择这条路径。
+
+1. 打开 [最新 GitHub Release](https://github.com/saya-ashen/Chrona/releases/latest)。
+2. 下载对应平台的压缩包：
+
+| 平台 | 文件 |
+| --- | --- |
+| Linux x64 | `chrona-linux-x64.tar.gz` |
+| Linux ARM64 | `chrona-linux-arm64.tar.gz` |
+| macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
+| Windows x64 | `chrona-windows-x64.tar.gz` |
+
+3. 解压并启动 Chrona：
+
+```bash
+tar -xzf chrona-linux-x64.tar.gz
+cd chrona-linux-x64
+./chrona start
+```
+
+Windows 使用打包的可执行文件：
+
+```powershell
+tar -xzf chrona-windows-x64.tar.gz
+cd chrona-windows-x64
+.\Chrona.exe start
+```
+
+server 启动后打开 `http://localhost:3101`。
 
 ### 从源码运行
 
@@ -76,17 +108,6 @@ bun run dev
 ```
 
 打开 `http://localhost:3101`。`bun run dev` 会启动 Bun/Hono API server 和 Vite Web 应用。
-
-### 使用 Docker 运行
-
-如果你想启动容器化的本地 server，选择这条路径。
-
-```bash
-docker build -t chrona .
-docker run --rm -p 3101:3101 -v chrona-data:/data chrona
-```
-
-容器会把 SQLite 数据保存到 `/data/chrona.db`。如果需要跨重启保持稳定认证，请显式设置 `API_KEY`。
 
 ## 首次运行
 
@@ -179,10 +200,10 @@ React SPA
 
 | 变量 | 用途 | 默认值 / 说明 |
 | --- | --- | --- |
-| `DATABASE_URL` | SQLite database URL | 源码默认：`file:./prisma/dev.db`；Docker：`file:/data/chrona.db` |
+| `DATABASE_URL` | SQLite database URL | 源码默认：`file:./prisma/dev.db`；发行版默认使用平台数据目录，除非显式覆盖 |
 | `HOST` | API server bind host | 默认只绑定本机 `127.0.0.1` |
 | `PORT` | API server port | `3101` |
-| `API_KEY` | `/api/*` routes 的可选 bearer token | Docker 未设置时会自动生成 |
+| `API_KEY` | `/api/*` routes 的可选 bearer token | 本机开发可省略 |
 | `CHRONA_WEB_DIST` | 静态服务使用的 Web build 目录 | `apps/web/dist` |
 | `ALLOWED_ORIGINS` | 逗号分隔的 CORS allowlist | 本地开发可省略 |
 | `VITE_API_BASE_URL` | 前端 API base URL override | Web 和 API 分离部署时使用 |

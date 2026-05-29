@@ -48,6 +48,8 @@
       "@chrona/shared/*": ["./packages/shared/src/*"],
       "@chrona/engine": ["./packages/engine/src/index.ts"],
       "@chrona/engine/*": ["./packages/engine/src/*"],
+      "@chrona/integrations": ["./packages/integrations/src/index.ts"],
+      "@chrona/integrations/*": ["./packages/integrations/src/*"],
       "@chrona/providers-foundation": ["./packages/providers/foundation/src/index.ts"],
       "@chrona/providers-foundation/*": ["./packages/providers/foundation/src/*"],
       "@chrona/web/*": ["./apps/web/src/*"]
