@@ -17,7 +17,13 @@ function isMissingValue(value: unknown) {
 }
 
 function getSegments(path: string) {
-  return path.split(".").filter(Boolean);
+  return path.split(".").filter(Boolean).map((segment) => {
+    if (segment === "__proto__" || segment === "prototype" || segment === "constructor") {
+      throw new Error("path contains an unsafe segment");
+    }
+
+    return segment;
+  });
 }
 
 export function getValueAtPath(input: unknown, path: string): unknown {
