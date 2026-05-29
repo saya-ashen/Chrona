@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import {
+  createDefaultTaskOrchestratorWorkers,
   createTaskOrchestrator,
   type TaskOrchestratorConfig,
   type TaskOrchestratorOptions,
@@ -64,6 +65,16 @@ function createHarness(overrides: Partial<TaskOrchestratorOptions> = {}) {
 
   return { clearedHandles, handles, intervalCalls, leaseRepository, orchestrator, worker };
 }
+
+describe("default task orchestrator workers", () => {
+  it("includes due scheduled work in the production worker set", () => {
+    expect(createDefaultTaskOrchestratorWorkers().map((worker) => worker.name)).toEqual([
+      "restart-recovery",
+      "due-scheduled-work",
+      "graph-advancement",
+    ]);
+  });
+});
 
 describe("task orchestrator lifecycle", () => {
   it("starts one polling loop and keeps startup idempotent", () => {

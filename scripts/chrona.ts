@@ -9,6 +9,7 @@ type CommandGroup = Partial<Record<string, Command>>;
 
 const TEST_COMMANDS: CommandGroup = {
   all: { description: "Unit, Bun, API, and Playwright e2e tests", run: ["bun", "x", "vitest", "run", "&&", "bun", "run", "scripts/run-bun-tests.ts", "&&", "bun", "run", "scripts/run-api-tests.ts", "&&", "bun", "x", "playwright", "test"] },
+  ci: { description: "CI unit, Bun, API, and LLM replay tests", run: ["bun", "x", "vitest", "run", "--reporter=verbose", "&&", "bun", "run", "scripts/run-bun-tests.ts", "&&", "bun", "run", "scripts/run-api-tests.ts", "&&", "bun", "test", "packages/engine/src/test/llm-fixtures.bun.test.ts"] },
   unit: { description: "Vitest unit tests", run: ["bun", "x", "vitest", "run"] },
   web: { description: "Vitest with coverage", run: ["bun", "x", "vitest", "run", "--coverage"] },
   watch: { description: "Vitest watch mode", run: ["bun", "x", "vitest"] },
