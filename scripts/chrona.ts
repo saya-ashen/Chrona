@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { resolve } from "node:path";
+
 type Command = {
   description: string;
   run: string[];
@@ -165,6 +167,7 @@ export function resolveCommand(commandArgs: string[]) {
 }
 
 export async function runSequence(tokens: string[], passthrough: string[]) {
+  const root = resolve(import.meta.dirname, "..");
   const chunks: string[][] = [[]];
   for (const token of tokens) {
     if (token === "&&") {
@@ -182,7 +185,7 @@ export async function runSequence(tokens: string[], passthrough: string[]) {
     const args = index === chunks.length - 1 ? [...chunk, ...passthrough] : chunk;
     const [cmd, ...rest] = args;
     const proc = Bun.spawn([cmd, ...rest], {
-      cwd: import.meta.dirname.replace(/\/scripts$/, ""),
+      cwd: root,
       stdio: ["inherit", "inherit", "inherit"],
     });
     const code = await proc.exited;
