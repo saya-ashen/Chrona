@@ -24,6 +24,20 @@ const messages = {
       debugProfileDeterministic: "Deterministic",
       debugProfileToolSubmit: "Tool submit",
       debugProfileHermesLike: "Hermes-like",
+      hermesScopeLabel: "Hermes location",
+      hermesScopeLocal: "Local Hermes",
+      hermesScopeRemote: "Remote Hermes",
+      hermesLocalDescription: "Local mode can install the Chrona Hermes plugin and enable the Hermes API server on this machine.",
+      hermesRemoteDescription: "Remote mode will not touch local files. Configure the remote Hermes machine manually, then test availability here.",
+      hermesRestartDescription: "Restart Hermes if you changed the plugin, enabled the API server, or updated the API key. Chrona can run hermes gateway restart, but it may not know your original gateway startup options; restart it yourself if that is clearer. Running tasks may pause briefly during restart.",
+      diagnoseHermes: "Diagnose Hermes",
+      autoConfigureHermes: "Auto-configure local Hermes",
+      restartHermes: "Restart Hermes gateway",
+      restartHermesRequested: "Hermes restart requested.",
+      hermesDiagnosticsTitle: "Hermes diagnostics",
+      hermesPlanTitle: "Setup plan",
+      hermesChangedTitle: "Changed",
+      hermesRestartRequired: "Restart Hermes, then run diagnosis again.",
       timeoutSeconds: "Timeout (seconds)",
       modelLabel: "Model",
       setAsDefault: "Set as default Client",
@@ -168,6 +182,7 @@ describe("AiClientsManager", () => {
       config: {
         baseUrl: "http://localhost:8642",
         apiKey: "hermes-token",
+        scope: "local",
         timeoutMs: 45000,
       },
     });
@@ -327,9 +342,106 @@ describe("AiClientsManager", () => {
       type: "hermes",
       config: {
         baseUrl: "http://localhost:8642",
+        scope: "local",
         timeoutMs: 120000,
       },
     });
+  });
+
+  it("shows remote Hermes guidance without local auto-configuration", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    await user.click(screen.getByRole("combobox", { name: "Hermes location" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Remote Hermes"));
+
+    expect(screen.getByText("Remote mode will not touch local files. Configure the remote Hermes machine manually, then test availability here.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Auto-configure local Hermes" })).not.toBeInTheDocument();
+  });
+
+  it("auto-configures local Hermes and writes the returned API key into the client payload", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+      target: { value: "Auto Hermes" },
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        apiKey: "chrona-generated-token",
+        maskedApiKey: "chrona-...oken",
+        changed: ["env:/home/user/.hermes/.env"],
+        diagnostics: {
+          mode: "local",
+          restartRequired: true,
+          checks: [{ key: "hermesEnvFile", status: "warning", message: "Hermes .env updated" }],
+        },
+        plan: { summary: "Restart Hermes.", canRunAutomatically: false, actions: [] },
+      }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Auto-configure local Hermes" }));
+
+    await screen.findByText("Restart Hermes.");
+
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ client: { id: "client_hermes" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const createCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients" && call[1]?.method === "POST");
+    expect(JSON.parse(createCall?.[1]?.body as string)).toMatchObject({
+      name: "Auto Hermes",
+      type: "hermes",
+      config: {
+        apiKey: "chrona-generated-token",
+        scope: "local",
+      },
+    });
+  });
+
+  it("lets local Hermes clients request a gateway restart", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+
+    expect(screen.getByText(/Chrona can run hermes gateway restart/)).toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, exitCode: null, message: "Hermes gateway restart command started in the background." }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Restart Hermes gateway" }));
+
+    await screen.findByText("Hermes gateway restart command started in the background.");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/integrations/hermes/restart-local",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("allows testing an existing client card and shows the returned failure reason", async () => {

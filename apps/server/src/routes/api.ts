@@ -10,6 +10,7 @@ import { createClientsRoutes } from "./ai/clients.routes";
 import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
 import { createMcpRoutes } from "./mcp/mcp.routes";
 import { createRuntimeRoutes } from "./runtime.routes";
+import { createHermesIntegrationRoutes } from "./integrations/hermes.routes";
 
 export function createApiRouter(engine: ChronaEngine) {
   return new Hono()
@@ -18,6 +19,7 @@ export function createApiRouter(engine: ChronaEngine) {
     .route("/", createPageRoutes(engine))
     .route("/", createWorkspacesRoutes(engine))
     .route("/", createClientsRoutes(engine))
+    .route("/", createHermesIntegrationRoutes())
     .route("/", createRuntimeRoutes(engine))
     .route("/", createAssistantSurfaceRoutes(engine))
     .route("/", createMcpRoutes(engine));
