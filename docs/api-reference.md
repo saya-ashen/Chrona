@@ -230,6 +230,76 @@ Tests connectivity for a client config.
 
 Replaces feature bindings for a client. Features include `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task`.
 
+## Hermes integration
+
+These endpoints support the Settings / AI Clients Hermes setup flow. They diagnose local or remote Hermes configuration and run explicit user-approved local setup actions. They do not replace the AI client CRUD endpoints; the client still stores the selected base URL, API key, scope, and feature bindings.
+
+### POST /api/integrations/hermes/diagnose
+
+Runs Hermes environment checks and returns diagnostics plus a setup plan.
+
+Request fields:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `baseUrl` | no | Hermes API base URL. Local URLs such as `localhost` and `127.0.0.1` enable local checks. Remote URLs skip local filesystem/CLI checks and return manual guidance. |
+| `apiKey` | no | Hermes API key to test. Local diagnostics can also reuse `API_SERVER_KEY` from `~/.hermes/.env` when omitted. |
+| `mcpUrl` | no | Chrona MCP URL expected by the Hermes plugin. |
+| `hermesHome` | no | Override Hermes home directory for local checks. |
+| `pluginDir` | no | Override Chrona Hermes plugin directory for local checks. |
+| `timeoutMs` | no | API health request timeout. |
+
+Response shape:
+
+```json
+{
+  "diagnostics": {
+    "mode": "local",
+    "canAutoConfigure": true,
+    "restartRequired": false,
+    "checks": []
+  },
+  "plan": {
+    "summary": "Hermes integration looks ready.",
+    "canRunAutomatically": false,
+    "actions": []
+  }
+}
+```
+
+Common check keys include `baseUrlScope`, `hermesCli`, `chronaPluginInstalled`, `chronaPluginVersion`, `chronaPluginMcpUrl`, `hermesEnvFile`, `apiServerReachable`, `apiKey`, and `apiCapabilities`.
+
+### POST /api/integrations/hermes/setup-local
+
+Runs approved local setup actions for a local Hermes gateway. This endpoint is intended for explicit user clicks such as `Auto-configure local Hermes`.
+
+It may install or update the Chrona Hermes plugin, write plugin MCP config, and write `API_SERVER_ENABLED=true` plus `API_SERVER_KEY` to the Hermes `.env`. Plugin install/update and `.env` changes require a manual Hermes restart because Chrona cannot infer how the gateway was originally started.
+
+Request fields are the same as `diagnose`, with additional optional fields:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `apiKey` | no | Key to write. If omitted, Chrona reuses an existing local `API_SERVER_KEY` or generates one. |
+| `skipEnable` | no | Skip `hermes plugins enable chrona` during plugin install/update. |
+
+Response includes updated diagnostics, plan, changed local artifacts, masked API key, optional generated API key, and restart requirement.
+
+### POST /api/integrations/hermes/restart-local
+
+Starts `hermes gateway restart` in the background and returns immediately. Chrona ignores command stdio and does not wait for the gateway process to exit because some Hermes restart modes continue running in the foreground.
+
+Response shape:
+
+```json
+{
+  "ok": true,
+  "exitCode": null,
+  "message": "Hermes gateway restart command started in the background."
+}
+```
+
+Users should restart Hermes manually instead when it runs under a service manager or a custom command that needs specific flags.
+
 ## Assistant Surface
 
 ### GET /api/assistant-surface?pageType=...

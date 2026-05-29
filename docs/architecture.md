@@ -12,14 +12,16 @@ flowchart TB
 
   Web --> API[apps/server Hono API]
   MCP --> API
+  CLI --> Integrations[packages/integrations/*]
+  API --> Integrations
 
   API --> Engine[packages/engine]
   Engine --> Contracts[packages/contracts]
   Engine --> Graph[packages/graph-runtime]
   Engine --> DB[(SQLite via Prisma)]
   Engine --> Providers[packages/providers/*]
+  Integrations --> HermesLocal[Local Hermes CLI/config/plugin]
   Providers --> Hermes[Hermes / runtime gateway]
-  Providers --> LLM[OpenAI/OpenRouter-compatible APIs]
 
   Engine --> Projections[Task/Schedule/Work/Inbox projections]
   Projections --> DB
@@ -34,7 +36,8 @@ flowchart TB
 | Engine | `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
 | Contracts | `packages/contracts` | Shared schemas and DTOs for API, AI features, plan runtime, SSE, and MCP tools |
 | Graph runtime | `packages/graph-runtime` | Plan graph build, resolve, transition, and command primitives |
-| Providers | `packages/providers/*` | Protocol adapters for LLM/Hermes/runtime backends |
+| Providers | `packages/providers/*` | Protocol adapters for configured external runtime backends |
+| Integrations | `packages/integrations/*` | User-approved local/remote setup, diagnosis, external plugin install, and restart helpers |
 | Database | `packages/db` + `prisma` | Prisma 7 + SQLite bootstrap, repositories, schema, migrations, seed |
 | CLI | `packages/cli` | Packaged entry point for starting Chrona |
 | External plugins | `external-plugins/hermes` | Hermes Agent integration and Chrona MCP tool exposure |
@@ -60,6 +63,8 @@ Inbox aggregates attention items: approvals, schedule proposals, waiting inputs,
 ### Settings / AI Clients
 
 AI clients and feature bindings are database-backed. The old fallback-chain style is replaced by explicit configured clients and feature bindings.
+
+Hermes setup uses the integrations layer. Settings can diagnose local or remote Hermes clients, auto-configure a local Hermes gateway after explicit user action, and show manual instructions for remote gateways. Provider runtime code stays responsible for Hermes protocol calls; integration code owns local plugin/config/env/restart side effects.
 
 ## Core workflows
 
