@@ -4,17 +4,6 @@
   "description": "Chrona — AI-native task control plane for planning, scheduling, and observing runtime-powered work",
   "license": "MIT",
   "type": "module",
-  "bin": {
-    "chrona": "./dist/cli.js"
-  },
-  "files": [
-    "dist",
-    "apps/web/dist",
-    "external-plugins/hermes",
-    "prisma/schema.prisma",
-    "prisma/migrations",
-    ".env.example"
-  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/saya-ashen/Chrona.git"
@@ -57,9 +46,7 @@
     "db:generate": "prisma generate",
     "setup": "bun run db:generate && bun run db:seed",
     "db:seed": "bun prisma/seed.ts",
-    "prepublishOnly": "bun run typecheck && bun run lint && bun run test:unit && bun run test:bun && bun run test:api && bun run deadcode && bun run check:ui-foundation && bun run check:boundaries && bun run chrona build web && bun run build:npm",
-    "check:boundaries": "bun run chrona check boundaries",
-    "build:npm": "bun run chrona build npm"
+    "check:boundaries": "bun run chrona check boundaries"
   },
   "dependencies": {
     "@base-ui/react": "1.4.1",

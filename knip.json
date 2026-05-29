@@ -16,7 +16,6 @@
   "ignore": [
     "postcss.config.mjs",
     "packages/cli/src/bun-entry.ts",
-    "packages/cli/src/npm-launcher.ts",
     "packages/db/src/generated/**"
   ],
   "ignoreBinaries": [

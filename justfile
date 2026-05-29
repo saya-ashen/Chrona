@@ -17,7 +17,7 @@ dev target="":
 server target="":
     @if [ -z "{{target}}" ]; then bun run chrona server; else bun run chrona server {{target}}; fi
 
-# Show or run build commands: just build [web|full|npm|cli]
+# Show or run build commands: just build [web|linux-x64|linux-arm64|darwin-x64|darwin-arm64|windows-x64]
 build target="":
     @if [ -z "{{target}}" ]; then bun run chrona build; else bun run chrona build {{target}}; fi
 
@@ -87,13 +87,9 @@ e2e *args:
 db-setup:
     bun run setup
 
-# Build the npm distribution package
-npm-build:
-    bun run chrona build npm
-
-# Build the Chrona CLI package
-cli-build:
-    bun run chrona build cli
+# Build the portable binary for the current platform
+binary-build:
+    bun run chrona build
 
 # ── Demo Artifacts ────────────────────────────────────────────
 

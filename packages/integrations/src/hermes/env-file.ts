@@ -38,7 +38,7 @@ export function readHermesEnv(hermesHome?: string): Record<string, string> {
 }
 
 export function getHermesEnvApiKey(hermesHome?: string): string | undefined {
-  const apiKey = readHermesEnv(hermesHome).API_SERVER_KEY.trim();
+  const apiKey = readHermesEnv(hermesHome).API_SERVER_KEY?.trim();
   return apiKey || undefined;
 }
 

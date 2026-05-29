@@ -92,30 +92,21 @@
           ln -sf ${pkgs.nodejs_22}/bin/node .local/bin/node
           export PATH="$PWD/.local/bin:$PATH"
 
-          ROOT="$PWD"
-          (cd apps/web && node "$ROOT/node_modules/vite/bin/vite.js" build)
-          bun run build:npm
+          bun run build
         '';
 
         installPhase = ''
-          mkdir -p $out/lib/chrona/apps/web $out/lib/chrona/prisma $out/bin
-
-          cp -r dist $out/lib/chrona/
-          cp -r apps/web/dist $out/lib/chrona/apps/web/
-          cp -r prisma $out/lib/chrona/
-          cp .env.example $out/lib/chrona/
-          rm -rf node_modules/@chrona node_modules/.bin/chrona node_modules/.bin/agentdash
-          cp -r node_modules $out/lib/chrona/
-
-          makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/chrona \
-            --add-flags "$out/lib/chrona/dist/cli.js" \
-            --set PRISMA_SCHEMA_ENGINE_BINARY ${pkgs.prisma-engines}/bin/schema-engine
+          release_dir="$(find dist/releases -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          mkdir -p $out/bin
+          cp -r "$release_dir/resources" $out/bin/resources
+          cp "$release_dir/chrona" $out/bin/chrona
+          chmod +x $out/bin/chrona
         '';
       };
 
-      apps.npm-smoke = {
+      apps.binary-smoke = {
         type = "app";
-        program = toString (pkgs.writeShellScript "chrona-npm-smoke" ''
+        program = toString (pkgs.writeShellScript "chrona-binary-smoke" ''
           set -euo pipefail
 
           export PATH="${pkgs.lib.makeBinPath smokeTools}:$PATH"
@@ -132,28 +123,19 @@
           bun run typecheck
           bunx vitest run  # no --coverage to avoid jsdom teardown flakiness
 
-          echo "==> Building npm package"
+          echo "==> Building binary"
           bun run build
-          bun run build:npm
 
-          echo "==> Packing"
-          PKG="$(npm pack --silent)"
+          CHRONA_BIN="$(find "$ROOT/dist/releases" -path "*/chrona" -type f | head -n 1)"
+          test -n "$CHRONA_BIN"
 
-          mkdir -p "$TMP/home" "$TMP/app" "$TMP/cache" "$TMP/data" "$TMP/config"
-
-          echo "==> Installing tarball in clean app"
-          cd "$TMP/app"
-          npm init -y >/dev/null
-
-          HOME="$TMP/home" \
-          npm_config_cache="$TMP/cache" \
-          npm install "$ROOT/$PKG"
+          mkdir -p "$TMP/home" "$TMP/data" "$TMP/config"
 
           echo "==> Checking CLI"
           HOME="$TMP/home" \
           CHRONA_DATA_DIR="$TMP/data" \
           CHRONA_CONFIG_DIR="$TMP/config" \
-          ./node_modules/.bin/chrona --help
+          "$CHRONA_BIN" --help
 
           echo "==> Starting Chrona briefly"
           set +e
@@ -161,7 +143,7 @@
           CHRONA_DATA_DIR="$TMP/data" \
           CHRONA_CONFIG_DIR="$TMP/config" \
           PORT=3101 \
-          timeout 20s ./node_modules/.bin/chrona start
+          timeout 20s "$CHRONA_BIN" start
           code="$?"
           set -e
 
@@ -173,7 +155,7 @@
           test -f "$TMP/config/.env"
           test -f "$TMP/data/dev.db"
 
-          echo "npm smoke test passed"
+          echo "binary smoke test passed"
         '');
       };
 

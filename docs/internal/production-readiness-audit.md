@@ -8,7 +8,7 @@ Scope: current repository state for a formal Chrona release. This audit covers b
 
 Current state is not ready for a formal release.
 
-The web build, npm bundle build, and Linux x64 binary build pass. A local Linux x64 binary smoke test also starts successfully, initializes SQLite migrations, listens on `127.0.0.1`, and shuts down cleanly.
+The web build and Linux x64 binary build pass. A local Linux x64 binary smoke test also starts successfully, initializes SQLite migrations, listens on `127.0.0.1`, and shuts down cleanly.
 
 Release is blocked by failing test gates, a Docker default startup conflict, and production security risks around AI client secrets and internal error exposure.
 
@@ -17,9 +17,8 @@ Release is blocked by failing test gates, a Docker default startup conflict, and
 | Check | Result | Notes |
 | --- | --- | --- |
 | `bun run typecheck` | Pass | TypeScript check passed. |
-| `bun run build` | Pass | Vite production build passed with warnings. |
-| `bun run build:npm` | Pass | Built `dist/cli.js` and `dist/bun-entry.js`. |
-| `bun run build:binary:linux-x64` | Pass | Built `dist/releases/chrona-linux-x64/chrona` and archive. |
+| `bun run chrona build web` | Pass | Vite production build passed with warnings. |
+| `bun run chrona build linux-x64` | Pass | Built `dist/releases/chrona-linux-x64/chrona` and archive. |
 | Linux x64 binary first-start smoke | Pass | Created database, ran migrations, started on `127.0.0.1`, shut down cleanly. |
 | `bun run test:api` | Pass | API Bun test runner passed. |
 | `bun run check:ui-foundation` | Pass | No duplicate primitive consumers found. |
@@ -149,17 +148,13 @@ Impact: release verification cannot reliably prove browser flows. Port conflicts
 
 Recommended fix: make E2E use an isolated configurable port or a dedicated CI database/server lifecycle. If local reuse is desired, make it explicit and safe.
 
-### 4. Publish Gate Is Too Weak
+### 4. Release Gate Is Too Weak
 
-Evidence: `package.json` has:
+Evidence: release validation is split across ad hoc commands and does not enforce one complete binary smoke gate.
 
-```text
-"prepublishOnly": "bun run build && bun run build:npm"
-```
+Impact: binary publication can proceed even while tests, Bun tests, deadcode, E2E, or release smoke checks are failing.
 
-Impact: npm publication can proceed even while tests, Bun tests, deadcode, E2E, or release smoke checks are failing.
-
-Recommended fix: add a release gate script that includes at minimum `typecheck`, `lint`, `test`, `test:bun`, `build`, `build:npm`, and one binary smoke check. Use `prepublishOnly` to call that gate.
+Recommended fix: add a release gate script that includes at minimum `typecheck`, `lint`, `test`, `test:bun`, `build`, and one binary smoke check.
 
 ### 5. Docker Healthcheck Depends On `curl`
 
@@ -221,15 +216,7 @@ Recommended fix: review i18n import strategy and chunking after blockers are fix
 
 ## P3 Release Experience And Operations
 
-### 1. npm Launcher Depends On External Tools For Bun Download
-
-Evidence: `packages/cli/src/npm-launcher.ts` downloads Bun through `curl` or `wget`, then extracts with `unzip`. Windows automatic Bun download is not supported.
-
-Impact: npm install/run path can fail on machines without these tools. README currently emphasizes binary downloads, so this is a secondary release risk.
-
-Recommended fix: document prerequisites or replace download/extract implementation with a more self-contained path.
-
-### 2. GitNexus Index Is Stale
+### 1. GitNexus Index Is Stale
 
 Evidence: GitNexus reported the Chrona index is 24 commits behind HEAD.
 
@@ -237,7 +224,7 @@ Impact: does not affect product runtime, but reduces confidence in future graph-
 
 Recommended fix: run `npx gitnexus analyze` before using GitNexus for release-critical change impact analysis.
 
-### 3. Local `.env` Exists In Workspace
+### 2. Local `.env` Exists In Workspace
 
 Evidence: `.env` exists in the repository working directory. `.dockerignore` excludes `.env*` and `git status --short` was clean.
 
@@ -259,8 +246,7 @@ bun run check:ui-foundation
 bun run check:boundaries
 bun run deadcode
 bun run build
-bun run build:npm
-bun run build:binary:linux-x64
+bun run chrona build linux-x64
 bun run test:e2e
 ```
 
@@ -273,5 +259,5 @@ Also require a binary smoke test that starts Chrona with a fresh data directory,
 3. Stop returning raw AI client secrets from `/api/ai/clients`.
 4. Stop returning internal error messages in production 500 responses.
 5. Remove or strictly gate raw Hermes request/event logs.
-6. Strengthen `prepublishOnly` or add a dedicated `release:check` script.
+6. Add a dedicated `release:check` script.
 7. Make E2E validation stable in CI and local clean environments.
