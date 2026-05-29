@@ -1,5 +1,11 @@
 import { HermesProviderError, type HermesProviderConfig } from "./types";
 
+function trimTrailingSlashes(value: string) {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
 export type HermesHttpClient = {
   request(
     path: string,
@@ -104,7 +110,7 @@ export async function ensureHermesOk(response: Response, operation: string): Pro
 }
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
-  const normalized = baseUrl?.trim().replace(/\/+$/, "") ?? "";
+  const normalized = trimTrailingSlashes(baseUrl?.trim() ?? "");
   if (!normalized) return "http://127.0.0.1:8642";
   if (/^https?:\/\//i.test(normalized)) return normalized;
   return `http://${normalized}`;

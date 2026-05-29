@@ -16,6 +16,12 @@ import { dispatch, extractJSON } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
 
+function trimTrailingSlashes(value: string) {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
 function ensureObject(
   value: unknown,
   context: string,
@@ -76,7 +82,7 @@ export async function chat(
   const llmClient = aiClientRegistry.requireLlmClient(client);
   const config = llmClient.record.config;
   const model = config.model ?? "gpt-4o-mini";
-  const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const url = `${trimTrailingSlashes(config.baseUrl)}/chat/completions`;
 
   const body: Record<string, unknown> = {
     model,

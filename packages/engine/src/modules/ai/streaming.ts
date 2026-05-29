@@ -2,7 +2,7 @@
  * AI Features — Streaming support (provider SSE + LLM SSE).
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type {
   AiFeature,
@@ -31,6 +31,12 @@ import {
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
 import { buildSessionIdentity } from "./session";
+
+function trimTrailingSlashes(value: string) {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
 
 function summarizeText(value: string, maxLength: number) {
   if (value.length <= maxLength) return value;
@@ -349,7 +355,7 @@ async function* llmStream(
   options?: { jsonMode?: boolean; temperature?: number; maxTokens?: number },
 ): AsyncGenerator<StreamEvent> {
   const model = config.model ?? "gpt-4o-mini";
-  const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const url = `${trimTrailingSlashes(config.baseUrl)}/chat/completions`;
 
   yield { type: "status", message: "Connecting to LLM..." };
 
@@ -474,11 +480,11 @@ function buildSuggestScope(request: SmartSuggestRequest): string {
   const workspace = asciiSlug(request.workspaceId ?? "default", 24);
   const normalizedInput = request.input.trim();
   const inputSlug = asciiSlug(normalizedInput, 24);
-  const inputHash = createHash("sha1")
+  const inputHash = createHash("sha256")
     .update(normalizedInput)
     .digest("hex")
     .slice(0, 8);
-  const nonce = Math.random().toString(36).slice(2, 10);
+  const nonce = randomUUID().slice(0, 8);
   return `${workspace}-${request.kind}-${inputSlug}-${inputHash}-${nonce}`;
 }
 

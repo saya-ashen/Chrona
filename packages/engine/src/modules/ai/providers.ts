@@ -19,6 +19,12 @@ import { AiClientError, validatePreparedFeaturePayload } from "@chrona/contracts
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
 
+function trimTrailingSlashes(value: string) {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
 const HERMES_API_SERVER_DOCS_URL =
   "https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server";
 
@@ -164,12 +170,14 @@ export function extractJSON(text: string): Record<string, unknown> | null {
     /* fall through to regex extraction */
   }
 
-  const jsonMatch =
-    trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)```/) ??
-    trimmed.match(/(\{[\s\S]*\})/);
-  if (!jsonMatch?.[1]) return null;
+  const fencedStart = trimmed.indexOf("```");
+  const fencedEnd = fencedStart >= 0 ? trimmed.indexOf("```", fencedStart + 3) : -1;
+  const candidate = fencedStart >= 0 && fencedEnd > fencedStart
+    ? trimmed.slice(fencedStart + 3, fencedEnd).replace(/^json\s*/i, "").trim()
+    : trimmed.slice(trimmed.indexOf("{"), trimmed.lastIndexOf("}") + 1).trim();
+  if (!candidate) return null;
   try {
-    const parsed = JSON.parse(jsonMatch[1].trim());
+    const parsed = JSON.parse(candidate);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       return parsed as Record<string, unknown>;
     }
@@ -290,7 +298,7 @@ async function llmFeaturePayload(
 ): Promise<string> {
   const config = client.config as LLMClientConfig;
   const model = config.model ?? "gpt-4o-mini";
-  const url = `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const url = `${trimTrailingSlashes(config.baseUrl)}/chat/completions`;
 
   const body: Record<string, unknown> = {
     model,

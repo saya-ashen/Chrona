@@ -48,8 +48,11 @@ function readPluginYamlVersion(pluginDir: string): string | undefined {
   const pluginYamlPath = join(pluginDir, "plugin.yaml");
   if (!existsSync(pluginYamlPath)) return undefined;
 
-  const match = readFileSync(pluginYamlPath, "utf8").match(/^version:\s*(.+)$/m);
-  return match?.[1]?.trim();
+  for (const line of readFileSync(pluginYamlPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("version:")) return trimmed.slice("version:".length).trim();
+  }
+  return undefined;
 }
 
 export function findHermesPluginSourceDir(): string {
