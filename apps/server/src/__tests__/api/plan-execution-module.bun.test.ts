@@ -667,7 +667,7 @@ describe("task execution module API integration", () => {
     const events = await postExecutionAction(server, taskId, { action: "start_manual" });
 
     expectExecutionSse(events, "completed");
-    expect(provider.calls.nodeTitles.sort()).toEqual([
+    expect(provider.calls.nodeTitles.toSorted((left, right) => left.localeCompare(right))).toEqual([
       "Collect architecture facts",
       "Collect documentation facts",
     ]);

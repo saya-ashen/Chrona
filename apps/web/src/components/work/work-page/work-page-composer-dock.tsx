@@ -94,7 +94,7 @@ export function WorkPageComposerDock({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-foreground">Add Input</p>
-                  <Badge variant={workComposer ? "secondary" : "secondary"}>{workComposer ? "Needed" : "Standby"}</Badge>
+                  <Badge variant="secondary">{workComposer ? "Needed" : "Standby"}</Badge>
                 </div>
                 <p className="mt-1 truncate text-sm text-muted-foreground">{dockSummary}</p>
               </div>

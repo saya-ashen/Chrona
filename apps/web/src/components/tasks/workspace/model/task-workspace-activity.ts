@@ -208,5 +208,5 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
 }
 
 export function runtimeEventsToWorkspaceActivity(events: WorkspaceRuntimeEvent[], limit = DEFAULT_LIMIT) {
-  return mergeWorkspaceActivity(events.map(runtimeEventToWorkspaceActivity), limit);
+  return mergeWorkspaceActivity(events.map((event, index) => runtimeEventToWorkspaceActivity(event, index)), limit);
 }
