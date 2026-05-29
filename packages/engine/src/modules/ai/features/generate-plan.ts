@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   buildGeneratePlanFeatureSpec,
@@ -37,11 +37,11 @@ export function buildGeneratePlanScope(
     return `chrona:task:${taskPart}:default`;
   }
   const titlePart = asciiSlug(request.title, 120) || "untitled";
-  const titleHash = createHash("sha1")
+  const titleHash = createHash("sha256")
     .update(request.title)
     .digest("hex")
     .slice(0, 8);
-  const nonce = Math.random().toString(36).slice(2, 10);
+  const nonce = randomUUID().slice(0, 8);
   return `adhoc-${titlePart}-${titleHash}-${nonce}`;
 }
 

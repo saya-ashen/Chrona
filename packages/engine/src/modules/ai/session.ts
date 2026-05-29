@@ -35,7 +35,7 @@ export function buildSessionIdentity(
   const sessionKey = scope.trim() || "default";
   const featurePart = sanitizeSessionPart(feature, 18);
   const scopePart = sanitizeSessionPart(sessionKey, 28);
-  const scopeHash = createHash("sha1")
+  const scopeHash = createHash("sha256")
     .update(sessionKey)
     .digest("hex")
     .slice(0, 10);

@@ -37,6 +37,8 @@ COPY scripts/init-sqlite-db.ts scripts/init-sqlite-db.ts
 COPY tsconfig.json .
 
 RUN bunx prisma generate
+RUN addgroup --system chrona && adduser --system --ingroup chrona chrona && mkdir -p /data && chown -R chrona:chrona /app /data
+USER chrona
 
 EXPOSE 3101
 VOLUME ["/data"]

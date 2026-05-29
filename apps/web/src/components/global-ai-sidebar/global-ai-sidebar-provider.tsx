@@ -106,7 +106,7 @@ const fallbackContextValue: AiSidebarContextValue = {
 
 function createMessage(content: string, responseKind: AiSidebarMessage["responseKind"]): AiSidebarMessage {
   return {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: `msg-${crypto.randomUUID()}`,
     role: "assistant",
     createdAt: new Date().toISOString(),
     content,
