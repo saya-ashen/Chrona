@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
@@ -15,11 +16,13 @@ vi.mock("@/components/ui/card", () => ({
 
 import { ScheduleMiniCalendar } from "@/components/schedule/schedule-mini-calendar";
 
+afterEach(() => cleanup());
+
 describe("ScheduleMiniCalendar", () => {
-  it("renders a month-style calendar grid with selectable days", () => {
+  it("renders a shadcn calendar grid with selectable days", () => {
     render(
       <ScheduleMiniCalendar
-        monthLabel="April 2026"
+        selectedDate={new Date(2026, 3, 1)}
         days={[
           {
             key: "2026-03-30",
@@ -54,8 +57,23 @@ describe("ScheduleMiniCalendar", () => {
       "href",
       "/en/schedule?day=2026-04-01",
     );
-    expect(screen.getAllByText("Mon").length).toBeGreaterThan(0);
-    expect(screen.getByText("30")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getAllByText("Mo").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("30").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
+  });
+
+  it("can navigate to another month", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ScheduleMiniCalendar
+        selectedDate={new Date(2026, 3, 1)}
+        days={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(screen.getByText("May 2026")).toBeInTheDocument();
   });
 });

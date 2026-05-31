@@ -128,6 +128,7 @@ export const CalendarSourceScalarFieldEnum = {
   nextExpectedRefreshAt: 'nextExpectedRefreshAt',
   lastErrorCode: 'lastErrorCode',
   lastErrorMessage: 'lastErrorMessage',
+  blockedNetworkConfirmedAt: 'blockedNetworkConfirmedAt',
   importedCount: 'importedCount',
   skippedCount: 'skippedCount',
   createdAt: 'createdAt',

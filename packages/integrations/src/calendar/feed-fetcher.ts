@@ -5,6 +5,10 @@ import type { CalendarValidationErrorCode } from "@chrona/contracts";
 
 export type CalendarFeedTransport = (url: string) => Promise<{ status: number; text: string }>;
 
+export type CalendarFeedOptions = {
+  allowBlockedNetwork?: boolean;
+};
+
 export class CalendarFeedError extends Error {
   constructor(public readonly code: CalendarValidationErrorCode, message: string) {
     super(message);
@@ -52,22 +56,22 @@ function isBlockedIpv6(address: string) {
   );
 }
 
-function assertAllowedAddress(address: string) {
+function assertAllowedAddress(address: string, options: CalendarFeedOptions = {}) {
   const version = isIP(address);
-  if (version === 4 && isBlockedIpv4(address)) {
-    throw new CalendarFeedError("unsupported_scheme", "Calendar host resolves to a blocked network.");
+  if (version === 4 && isBlockedIpv4(address) && !options.allowBlockedNetwork) {
+    throw new CalendarFeedError("blocked_network", "Calendar host resolves to a blocked network.");
   }
-  if (version === 6 && isBlockedIpv6(address)) {
-    throw new CalendarFeedError("unsupported_scheme", "Calendar host resolves to a blocked network.");
+  if (version === 6 && isBlockedIpv6(address) && !options.allowBlockedNetwork) {
+    throw new CalendarFeedError("blocked_network", "Calendar host resolves to a blocked network.");
   }
   if (version === 0) {
     throw new CalendarFeedError("invalid_url", "Calendar host is invalid.");
   }
 }
 
-async function resolveAllowedAddress(hostname: string) {
+async function resolveAllowedAddress(hostname: string, options: CalendarFeedOptions = {}) {
   if (isIP(hostname)) {
-    assertAllowedAddress(hostname);
+    assertAllowedAddress(hostname, options);
     return hostname;
   }
 
@@ -76,7 +80,7 @@ async function resolveAllowedAddress(hostname: string) {
     throw new CalendarFeedError("unreachable", "Calendar could not be reached.");
   }
 
-  for (const { address } of addresses) assertAllowedAddress(address);
+  for (const { address } of addresses) assertAllowedAddress(address, options);
   return addresses[0]?.address ?? hostname;
 }
 
@@ -119,7 +123,7 @@ function requestCalendarFeed(url: URL, address: string): Promise<{ status: numbe
   });
 }
 
-export async function defaultCalendarFeedTransport(url: string) {
+export async function defaultCalendarFeedTransport(url: string, options: CalendarFeedOptions = {}) {
   let current = new URL(url);
 
   for (let redirectCount = 0; redirectCount <= MAX_CALENDAR_REDIRECTS; redirectCount += 1) {
@@ -127,7 +131,7 @@ export async function defaultCalendarFeedTransport(url: string) {
       throw new CalendarFeedError("unsupported_scheme", "Calendar links must use https.");
     }
 
-    const address = await resolveAllowedAddress(current.hostname);
+    const address = await resolveAllowedAddress(current.hostname, options);
     const response = await requestCalendarFeed(current, address);
     if (response.status < 300 || response.status >= 400) return { status: response.status, text: response.text };
 
@@ -144,10 +148,13 @@ export async function defaultCalendarFeedTransport(url: string) {
 export async function fetchCalendarFeed(
   url: string,
   transport: CalendarFeedTransport = defaultCalendarFeedTransport,
+  options: CalendarFeedOptions = {},
 ) {
   let response: { status: number; text: string };
   try {
-    response = await transport(url);
+    response = transport === defaultCalendarFeedTransport
+      ? await defaultCalendarFeedTransport(url, options)
+      : await transport(url);
   } catch (cause) {
     if (cause instanceof CalendarFeedError) throw cause;
     throw new CalendarFeedError("unreachable", "Calendar could not be reached.");

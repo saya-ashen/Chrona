@@ -31,6 +31,13 @@ describe("calendar import helpers", () => {
     await expect(fetchCalendarFeed("https://[::1]/team.ics")).rejects.toThrow(CalendarFeedError);
   });
 
+  it("allows explicitly confirmed blocked-network calendar targets", async () => {
+    await expect(fetchCalendarFeed("https://127.0.0.1/team.ics", async () => ({
+      status: 200,
+      text: await fixture("valid.ics"),
+    }), { allowBlockedNetwork: true })).resolves.toContain("BEGIN:VCALENDAR");
+  });
+
   it("parses valid, all-day, cancelled, timezone, and duplicate fixtures", async () => {
     const validEvents = parseICalendarFeed(await fixture("valid.ics")).events;
     expect(validEvents).toHaveLength(1);

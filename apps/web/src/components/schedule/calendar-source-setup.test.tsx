@@ -13,6 +13,9 @@ import {
 vi.mock("@/lib/external-calendar-client", () => ({
   createExternalCalendarSource: vi.fn(),
   getExternalCalendarErrorMessage: vi.fn((error: unknown) => error instanceof Error ? error.message : "Calendar source failed"),
+  isBlockedNetworkCalendarError: vi.fn((error: unknown) => Boolean(
+    error && typeof error === "object" && "data" in error && (error as { data?: { errorCode?: string } }).data?.errorCode === "blocked_network",
+  )),
   listExternalCalendarSources: vi.fn(),
   validateCalendarSource: vi.fn(),
 }));
@@ -59,7 +62,7 @@ describe("CalendarSourceSetup", () => {
     await user.click(within(dialog).getByRole("button", { name: /^validate$/i }));
 
     await waitFor(() => {
-      expect(validateMock).toHaveBeenCalledWith("workspace-1", "https://calendar.example.test/team.ics?token=secret");
+      expect(validateMock).toHaveBeenCalledWith("workspace-1", "https://calendar.example.test/team.ics?token=secret", undefined);
     });
     expect(screen.getByText(/calendar link validated/i)).toBeInTheDocument();
     expect(screen.getByText(/3 events/i)).toBeInTheDocument();
@@ -102,10 +105,46 @@ describe("CalendarSourceSetup", () => {
         color: "#2563eb",
         syncPolicy: "auto_complete_past_events",
         automationPolicy: "auto_plan",
+        allowBlockedNetwork: undefined,
       });
     });
     expect(await screen.findByText(/Team calendar/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /manage/i })).toBeInTheDocument();
+  });
+
+  it("asks for confirmation before connecting a blocked-network calendar", async () => {
+    const user = userEvent.setup();
+    const error = { data: { errorCode: "blocked_network" } };
+    createMock.mockRejectedValueOnce(error);
+    createMock.mockResolvedValueOnce({
+      source: {
+        id: "source-1",
+        name: "Proxy calendar",
+        sourceType: "subscription",
+        redactedUrlLabel: "calendar.google.com/basic.ics",
+        color: "#2563eb",
+        syncPolicy: "auto_complete_past_events",
+        automationPolicy: "auto_plan",
+        lifecycleState: "active",
+      },
+      syncStatus: { sourceId: "source-1", state: "success", importedCount: 1, skippedCount: 0 },
+    });
+    errorMessageMock.mockReturnValueOnce("This calendar resolves through a private or proxy network.");
+
+    render(<CalendarSourceSetup workspaceId="workspace-1" />);
+
+    await user.click(screen.getByRole("button", { name: /connect calendar/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/display name/i), "Proxy calendar");
+    await user.type(within(dialog).getByLabelText(/calendar url/i), "https://calendar.google.com/basic.ics");
+    await user.click(within(dialog).getByRole("button", { name: /connect calendar/i }));
+
+    const confirmDialog = await screen.findByRole("dialog", { name: /confirm proxy calendar access/i });
+    await user.click(within(confirmDialog).getByRole("button", { name: /trust and continue/i }));
+
+    await waitFor(() => expect(createMock).toHaveBeenLastCalledWith("workspace-1", expect.objectContaining({
+      allowBlockedNetwork: true,
+    })));
   });
 
   it("maps invalid-link errors into actionable feedback", async () => {

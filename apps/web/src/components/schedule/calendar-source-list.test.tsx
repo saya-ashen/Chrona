@@ -14,6 +14,9 @@ import {
 vi.mock("@/lib/external-calendar-client", () => ({
   deleteExternalCalendarSource: vi.fn(),
   getExternalCalendarErrorMessage: vi.fn((error: unknown) => error instanceof Error ? error.message : "Calendar source failed"),
+  isBlockedNetworkCalendarError: vi.fn((error: unknown) => Boolean(
+    error && typeof error === "object" && "data" in error && (error as { data?: { errorCode?: string } }).data?.errorCode === "blocked_network",
+  )),
   listExternalCalendarSources: vi.fn(),
   refreshExternalCalendarSource: vi.fn(),
   updateExternalCalendarSource: vi.fn(),
@@ -99,6 +102,28 @@ describe("CalendarSourceList", () => {
     await waitFor(() => expect(refreshMock).toHaveBeenCalledWith("workspace-1", "source-1"));
     expect(await within(dialog).findByText(/partial/i)).toBeInTheDocument();
     expect(within(dialog).getByText("2")).toBeInTheDocument();
+  });
+
+  it("asks for confirmation before refreshing a blocked-network calendar", async () => {
+    const user = userEvent.setup();
+    const error = { data: { errorCode: "blocked_network" } };
+    refreshMock.mockRejectedValueOnce(error);
+    refreshMock.mockResolvedValueOnce({
+      source: activeSource,
+      syncStatus: { sourceId: "source-1", state: "success", importedCount: 2, skippedCount: 0 },
+    });
+    errorMessageMock.mockReturnValueOnce("This calendar resolves through a private or proxy network.");
+
+    render(<CalendarSourceList workspaceId="workspace-1" />);
+
+    await user.click(await screen.findByRole("button", { name: /manage/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /refresh/i }));
+
+    const confirmDialog = await screen.findByRole("dialog", { name: /confirm proxy calendar access/i });
+    await user.click(within(confirmDialog).getByRole("button", { name: /trust and continue/i }));
+
+    await waitFor(() => expect(refreshMock).toHaveBeenLastCalledWith("workspace-1", "source-1", { allowBlockedNetwork: true }));
   });
 
   it("confirms removal before deleting a source", async () => {

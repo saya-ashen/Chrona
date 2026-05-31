@@ -50,6 +50,8 @@ export function safeCalendarErrorMessage(
       return "Enter a valid calendar subscription URL.";
     case "unsupported_scheme":
       return "Use a supported read-only calendar subscription link.";
+    case "blocked_network":
+      return "Calendar host resolves to a private or proxy network. Confirm this source if you trust the calendar link.";
     case "unauthorized":
       return "Calendar requires authorization or a different sharing link.";
     case "unreachable":

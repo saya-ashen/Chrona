@@ -42,7 +42,7 @@ export function ScheduleLeftSidebar({
   return (
     <aside className="flex min-h-0 flex-col gap-3 overflow-visible xl:overflow-y-auto xl:pr-1">
       <ScheduleMiniCalendar
-        monthLabel={viewModel.calendarMonthLabel}
+        selectedDate={viewModel.activeDayDate}
         days={viewModel.calendarDays.map((day) => ({
           ...day,
           href: localizeHref(

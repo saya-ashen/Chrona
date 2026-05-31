@@ -7,6 +7,7 @@ import type { CalendarFeedTransport } from "@chrona/integrations";
 import { startAutoPlanGenerationForTask } from "@chrona/engine";
 import {
   createCalendarSourceRequestSchema,
+  refreshCalendarSourceRequestSchema,
   updateCalendarSourceRequestSchema,
   validateCalendarSourceRequestSchema,
 } from "@chrona/contracts";
@@ -66,7 +67,7 @@ export function createCalendarSourceRoutes(options: CalendarSourceRouteOptions =
       async (c) => {
         try {
           const body = c.req.valid("json");
-          return json(c, await service.validateSourceUrl(body.url));
+          return json(c, await service.validateSourceUrl(body.url, { allowBlockedNetwork: body.allowBlockedNetwork }));
         } catch (cause) {
           return internalServerError(c, "POST /api/workspaces/:workspaceId/calendar-sources/validate", cause, "Failed to validate calendar source");
         }
@@ -109,10 +110,15 @@ export function createCalendarSourceRoutes(options: CalendarSourceRouteOptions =
         }
       },
     )
-    .post("/workspaces/:workspaceId/calendar-sources/:sourceId/refresh", zValidator("param", sourceParamSchema), async (c) => {
+    .post(
+      "/workspaces/:workspaceId/calendar-sources/:sourceId/refresh",
+      zValidator("param", sourceParamSchema),
+      async (c) => {
       try {
         const { workspaceId, sourceId } = c.req.valid("param");
-        return json(c, await service.refreshSource(workspaceId, sourceId));
+        const rawBody = await c.req.json().catch(() => undefined);
+        const body = refreshCalendarSourceRequestSchema.parse(rawBody) ?? {};
+        return json(c, await service.refreshSource(workspaceId, sourceId, { allowBlockedNetwork: body.allowBlockedNetwork }));
       } catch (cause) {
         if (cause instanceof Error && cause.message === "calendar_source_not_found") return error(c, "Calendar source not found", 404);
         return internalServerError(c, "POST /api/workspaces/:workspaceId/calendar-sources/:sourceId/refresh", cause, "Failed to refresh calendar source");

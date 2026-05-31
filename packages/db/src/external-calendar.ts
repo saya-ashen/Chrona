@@ -19,6 +19,7 @@ export type CalendarSourceCreateData = {
   color: string;
   syncPolicy?: CalendarSyncPolicy;
   automationPolicy?: CalendarAutomationPolicy;
+  blockedNetworkConfirmedAt?: Date | null;
 };
 
 export type ImportedCalendarEventWrite = {

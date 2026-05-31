@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   createExternalCalendarSource,
   getExternalCalendarErrorMessage,
+  isBlockedNetworkCalendarError,
   validateCalendarSource,
 } from "@/lib/external-calendar-client";
 import { externalCalendarMessages } from "@/lib/i18n/messages";
@@ -91,6 +92,7 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [blockedNetworkAction, setBlockedNetworkAction] = useState<"validate" | "connect" | null>(null);
 
   function reset() {
     setName("");
@@ -100,14 +102,17 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
     setAutomationPolicy("auto_plan");
     setValidation(null);
     setErrorMessage(null);
+    setBlockedNetworkAction(null);
   }
 
-  async function handleValidate() {
+  async function validateSource(allowBlockedNetwork = false) {
     setErrorMessage(null);
     setValidation(null);
     setIsValidating(true);
     try {
-      setValidation(await validateCalendarSource(workspaceId, url.trim()));
+      const result = await validateCalendarSource(workspaceId, url.trim(), allowBlockedNetwork || undefined);
+      setValidation(result);
+      if (!result.valid && result.errorCode === "blocked_network") setBlockedNetworkAction("validate");
     } catch (error) {
       setErrorMessage(getExternalCalendarErrorMessage(error));
     } finally {
@@ -115,8 +120,11 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
     }
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function handleValidate() {
+    void validateSource();
+  }
+
+  async function submitSource(allowBlockedNetwork = false) {
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
@@ -126,6 +134,7 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
         color,
         syncPolicy,
         automationPolicy,
+        allowBlockedNetwork: allowBlockedNetwork || undefined,
       });
       if (created.syncStatus) {
         onConnected(created as ConnectedSource);
@@ -133,10 +142,23 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
         onOpenChange(false);
       }
     } catch (error) {
+      if (isBlockedNetworkCalendarError(error)) setBlockedNetworkAction("connect");
       setErrorMessage(getExternalCalendarErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await submitSource();
+  }
+
+  function handleBlockedNetworkConfirm() {
+    const action = blockedNetworkAction;
+    setBlockedNetworkAction(null);
+    if (action === "validate") void validateSource(true);
+    if (action === "connect") void submitSource(true);
   }
 
   const trimmedUrl = url.trim();
@@ -237,6 +259,40 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+      <BlockedNetworkConfirmationDialog
+        open={blockedNetworkAction !== null}
+        onOpenChange={(next) => setBlockedNetworkAction(next ? blockedNetworkAction : null)}
+        onConfirm={handleBlockedNetworkConfirm}
+      />
+    </Dialog>
+  );
+}
+
+function BlockedNetworkConfirmationDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{externalCalendarMessages.blockedNetworkTitle}</DialogTitle>
+          <DialogDescription>{externalCalendarMessages.blockedNetworkDescription}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {externalCalendarMessages.blockedNetworkCancel}
+          </Button>
+          <Button type="button" onClick={onConfirm}>
+            {externalCalendarMessages.blockedNetworkConfirm}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

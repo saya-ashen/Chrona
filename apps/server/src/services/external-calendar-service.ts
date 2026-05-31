@@ -41,6 +41,10 @@ export type ExternalCalendarServiceOptions = {
   autoPlanTask?: (input: { taskId: string; accept?: boolean }) => void | Promise<void>;
 };
 
+type CalendarFetchOptions = {
+  allowBlockedNetwork?: boolean;
+};
+
 function iso(date?: Date | null) {
   return date ? date.toISOString() : undefined;
 }
@@ -93,10 +97,10 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
   const now = options.now ?? (() => new Date());
   const autoPlanTask = options.autoPlanTask ?? (() => undefined);
 
-  async function validateSourceUrl(url: string): Promise<ValidateCalendarSourceResponse> {
+  async function validateSourceUrl(url: string, fetchOptions: CalendarFetchOptions = {}): Promise<ValidateCalendarSourceResponse> {
     try {
       const normalized = normalizeCalendarSourceUrl(url);
-      const feed = await fetchCalendarFeed(normalized.url, options.transport);
+      const feed = await fetchCalendarFeed(normalized.url, options.transport, fetchOptions);
       const parsed = parseICalendarFeed(feed);
       return {
         valid: true,
@@ -111,13 +115,17 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
     }
   }
 
-  async function refreshSource(workspaceId: string, sourceId: string) {
+  async function refreshSource(workspaceId: string, sourceId: string, fetchOptions: CalendarFetchOptions = {}) {
     const source = await getCalendarSource(workspaceId, sourceId);
     if (!source) throw new Error("calendar_source_not_found");
+    const allowBlockedNetwork = Boolean(fetchOptions.allowBlockedNetwork || source.blockedNetworkConfirmedAt);
+    if (fetchOptions.allowBlockedNetwork && !source.blockedNetworkConfirmedAt) {
+      await updateCalendarSource(workspaceId, sourceId, { blockedNetworkConfirmedAt: now() });
+    }
 
     try {
       await updateCalendarSourceSyncStatus(workspaceId, sourceId, { syncState: "syncing" });
-      const feed = await fetchCalendarFeed(source.sourceUrl, options.transport);
+      const feed = await fetchCalendarFeed(source.sourceUrl, options.transport, { allowBlockedNetwork });
       const parsed = parseICalendarFeed(feed);
       const normalizedEvents = normalizeImportedEvents(parsed.events);
       const writes: ImportedCalendarEventWrite[] = normalizedEvents.map((event) => ({
@@ -163,7 +171,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         const code = errorCode(cause);
         return { validation: { valid: false as const, errorCode: code, message: safeCalendarErrorMessage(code) } };
       }
-      const validation = await validateSourceUrl(normalized.url);
+      const validation = await validateSourceUrl(normalized.url, { allowBlockedNetwork: input.allowBlockedNetwork });
       if (!validation.valid) return { validation };
 
       const source = await createCalendarSource({
@@ -174,6 +182,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         color: input.color ?? DEFAULT_SOURCE_COLOR,
         syncPolicy: input.syncPolicy ?? defaultSyncPolicyForUrl(normalized.url),
         automationPolicy: input.automationPolicy ?? "auto_plan",
+        blockedNetworkConfirmedAt: input.allowBlockedNetwork ? now() : null,
       });
       return await refreshSource(workspaceId, source.id);
     },

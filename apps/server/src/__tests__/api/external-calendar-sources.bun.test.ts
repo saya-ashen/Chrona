@@ -101,6 +101,34 @@ describe("External calendar source API", () => {
     expect(listed.sources).toEqual([]);
   });
 
+  it("requires confirmation before saving blocked-network calendar sources", async () => {
+    const { workspaceId } = await seedWorkspace("Calendar blocked network");
+    const url = fixtureUrl("valid.ics");
+    const blockedTransport: CalendarFeedTransport = async () => {
+      const { CalendarFeedError } = await import("@chrona/integrations");
+      throw new CalendarFeedError("blocked_network", "Calendar host resolves to a blocked network.");
+    };
+
+    const rejectedRes = await app(blockedTransport).request(`http://local/api/workspaces/${workspaceId}/calendar-sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Proxy calendar", url }),
+    });
+    expect(rejectedRes.status).toBe(400);
+    const rejected = await json<{ valid: boolean; errorCode: string }>(rejectedRes);
+    expect(rejected.valid).toBe(false);
+    expect(rejected.errorCode).toBe("blocked_network");
+
+    const acceptedRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Proxy calendar", url, allowBlockedNetwork: true }),
+    });
+    expect(acceptedRes.status).toBe(201);
+    const source = await db.calendarSource.findFirstOrThrow({ where: { workspaceId } });
+    expect(source.blockedNetworkConfirmedAt).toBeInstanceOf(Date);
+  });
+
   it("rejects malformed feeds without saving", async () => {
     const { workspaceId } = await seedWorkspace("Calendar malformed");
 

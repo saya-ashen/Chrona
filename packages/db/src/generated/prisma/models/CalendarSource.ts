@@ -52,6 +52,7 @@ export type CalendarSourceMinAggregateOutputType = {
   nextExpectedRefreshAt: Date | null
   lastErrorCode: string | null
   lastErrorMessage: string | null
+  blockedNetworkConfirmedAt: Date | null
   importedCount: number | null
   skippedCount: number | null
   createdAt: Date | null
@@ -74,6 +75,7 @@ export type CalendarSourceMaxAggregateOutputType = {
   nextExpectedRefreshAt: Date | null
   lastErrorCode: string | null
   lastErrorMessage: string | null
+  blockedNetworkConfirmedAt: Date | null
   importedCount: number | null
   skippedCount: number | null
   createdAt: Date | null
@@ -96,6 +98,7 @@ export type CalendarSourceCountAggregateOutputType = {
   nextExpectedRefreshAt: number
   lastErrorCode: number
   lastErrorMessage: number
+  blockedNetworkConfirmedAt: number
   importedCount: number
   skippedCount: number
   createdAt: number
@@ -130,6 +133,7 @@ export type CalendarSourceMinAggregateInputType = {
   nextExpectedRefreshAt?: true
   lastErrorCode?: true
   lastErrorMessage?: true
+  blockedNetworkConfirmedAt?: true
   importedCount?: true
   skippedCount?: true
   createdAt?: true
@@ -152,6 +156,7 @@ export type CalendarSourceMaxAggregateInputType = {
   nextExpectedRefreshAt?: true
   lastErrorCode?: true
   lastErrorMessage?: true
+  blockedNetworkConfirmedAt?: true
   importedCount?: true
   skippedCount?: true
   createdAt?: true
@@ -174,6 +179,7 @@ export type CalendarSourceCountAggregateInputType = {
   nextExpectedRefreshAt?: true
   lastErrorCode?: true
   lastErrorMessage?: true
+  blockedNetworkConfirmedAt?: true
   importedCount?: true
   skippedCount?: true
   createdAt?: true
@@ -283,6 +289,7 @@ export type CalendarSourceGroupByOutputType = {
   nextExpectedRefreshAt: Date | null
   lastErrorCode: string | null
   lastErrorMessage: string | null
+  blockedNetworkConfirmedAt: Date | null
   importedCount: number
   skippedCount: number
   createdAt: Date
@@ -328,6 +335,7 @@ export type CalendarSourceWhereInput = {
   nextExpectedRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   lastErrorCode?: Prisma.StringNullableFilter<"CalendarSource"> | string | null
   lastErrorMessage?: Prisma.StringNullableFilter<"CalendarSource"> | string | null
+  blockedNetworkConfirmedAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   importedCount?: Prisma.IntFilter<"CalendarSource"> | number
   skippedCount?: Prisma.IntFilter<"CalendarSource"> | number
   createdAt?: Prisma.DateTimeFilter<"CalendarSource"> | Date | string
@@ -352,6 +360,7 @@ export type CalendarSourceOrderByWithRelationInput = {
   nextExpectedRefreshAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedNetworkConfirmedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   importedCount?: Prisma.SortOrder
   skippedCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -380,6 +389,7 @@ export type CalendarSourceWhereUniqueInput = Prisma.AtLeast<{
   nextExpectedRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   lastErrorCode?: Prisma.StringNullableFilter<"CalendarSource"> | string | null
   lastErrorMessage?: Prisma.StringNullableFilter<"CalendarSource"> | string | null
+  blockedNetworkConfirmedAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   importedCount?: Prisma.IntFilter<"CalendarSource"> | number
   skippedCount?: Prisma.IntFilter<"CalendarSource"> | number
   createdAt?: Prisma.DateTimeFilter<"CalendarSource"> | Date | string
@@ -404,6 +414,7 @@ export type CalendarSourceOrderByWithAggregationInput = {
   nextExpectedRefreshAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockedNetworkConfirmedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   importedCount?: Prisma.SortOrder
   skippedCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -434,6 +445,7 @@ export type CalendarSourceScalarWhereWithAggregatesInput = {
   nextExpectedRefreshAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CalendarSource"> | Date | string | null
   lastErrorCode?: Prisma.StringNullableWithAggregatesFilter<"CalendarSource"> | string | null
   lastErrorMessage?: Prisma.StringNullableWithAggregatesFilter<"CalendarSource"> | string | null
+  blockedNetworkConfirmedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CalendarSource"> | Date | string | null
   importedCount?: Prisma.IntWithAggregatesFilter<"CalendarSource"> | number
   skippedCount?: Prisma.IntWithAggregatesFilter<"CalendarSource"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"CalendarSource"> | Date | string
@@ -455,6 +467,7 @@ export type CalendarSourceCreateInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -479,6 +492,7 @@ export type CalendarSourceUncheckedCreateInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -501,6 +515,7 @@ export type CalendarSourceUpdateInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -525,6 +540,7 @@ export type CalendarSourceUncheckedUpdateInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -548,6 +564,7 @@ export type CalendarSourceCreateManyInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -569,6 +586,7 @@ export type CalendarSourceUpdateManyMutationInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -591,6 +609,7 @@ export type CalendarSourceUncheckedUpdateManyInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -628,6 +647,7 @@ export type CalendarSourceCountOrderByAggregateInput = {
   nextExpectedRefreshAt?: Prisma.SortOrder
   lastErrorCode?: Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrder
+  blockedNetworkConfirmedAt?: Prisma.SortOrder
   importedCount?: Prisma.SortOrder
   skippedCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -655,6 +675,7 @@ export type CalendarSourceMaxOrderByAggregateInput = {
   nextExpectedRefreshAt?: Prisma.SortOrder
   lastErrorCode?: Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrder
+  blockedNetworkConfirmedAt?: Prisma.SortOrder
   importedCount?: Prisma.SortOrder
   skippedCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -677,6 +698,7 @@ export type CalendarSourceMinOrderByAggregateInput = {
   nextExpectedRefreshAt?: Prisma.SortOrder
   lastErrorCode?: Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrder
+  blockedNetworkConfirmedAt?: Prisma.SortOrder
   importedCount?: Prisma.SortOrder
   skippedCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -792,6 +814,7 @@ export type CalendarSourceCreateWithoutWorkspaceInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -814,6 +837,7 @@ export type CalendarSourceUncheckedCreateWithoutWorkspaceInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -865,6 +889,7 @@ export type CalendarSourceScalarWhereInput = {
   nextExpectedRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   lastErrorCode?: Prisma.StringNullableFilter<"CalendarSource"> | string | null
   lastErrorMessage?: Prisma.StringNullableFilter<"CalendarSource"> | string | null
+  blockedNetworkConfirmedAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   importedCount?: Prisma.IntFilter<"CalendarSource"> | number
   skippedCount?: Prisma.IntFilter<"CalendarSource"> | number
   createdAt?: Prisma.DateTimeFilter<"CalendarSource"> | Date | string
@@ -886,6 +911,7 @@ export type CalendarSourceCreateWithoutEventsInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -909,6 +935,7 @@ export type CalendarSourceUncheckedCreateWithoutEventsInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -946,6 +973,7 @@ export type CalendarSourceUpdateWithoutEventsInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -969,6 +997,7 @@ export type CalendarSourceUncheckedUpdateWithoutEventsInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -990,6 +1019,7 @@ export type CalendarSourceCreateManyWorkspaceInput = {
   nextExpectedRefreshAt?: Date | string | null
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
+  blockedNetworkConfirmedAt?: Date | string | null
   importedCount?: number
   skippedCount?: number
   createdAt?: Date | string
@@ -1011,6 +1041,7 @@ export type CalendarSourceUpdateWithoutWorkspaceInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1033,6 +1064,7 @@ export type CalendarSourceUncheckedUpdateWithoutWorkspaceInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1055,6 +1087,7 @@ export type CalendarSourceUncheckedUpdateManyWithoutWorkspaceInput = {
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedNetworkConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   importedCount?: Prisma.IntFieldUpdateOperationsInput | number
   skippedCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1108,6 +1141,7 @@ export type CalendarSourceSelect<ExtArgs extends runtime.Types.Extensions.Intern
   nextExpectedRefreshAt?: boolean
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
+  blockedNetworkConfirmedAt?: boolean
   importedCount?: boolean
   skippedCount?: boolean
   createdAt?: boolean
@@ -1133,6 +1167,7 @@ export type CalendarSourceSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   nextExpectedRefreshAt?: boolean
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
+  blockedNetworkConfirmedAt?: boolean
   importedCount?: boolean
   skippedCount?: boolean
   createdAt?: boolean
@@ -1156,6 +1191,7 @@ export type CalendarSourceSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   nextExpectedRefreshAt?: boolean
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
+  blockedNetworkConfirmedAt?: boolean
   importedCount?: boolean
   skippedCount?: boolean
   createdAt?: boolean
@@ -1179,13 +1215,14 @@ export type CalendarSourceSelectScalar = {
   nextExpectedRefreshAt?: boolean
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
+  blockedNetworkConfirmedAt?: boolean
   importedCount?: boolean
   skippedCount?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type CalendarSourceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "sourceType" | "sourceUrl" | "redactedUrlLabel" | "color" | "lifecycleState" | "syncPolicy" | "automationPolicy" | "syncState" | "lastSuccessfulRefreshAt" | "nextExpectedRefreshAt" | "lastErrorCode" | "lastErrorMessage" | "importedCount" | "skippedCount" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarSource"]>
+export type CalendarSourceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "sourceType" | "sourceUrl" | "redactedUrlLabel" | "color" | "lifecycleState" | "syncPolicy" | "automationPolicy" | "syncState" | "lastSuccessfulRefreshAt" | "nextExpectedRefreshAt" | "lastErrorCode" | "lastErrorMessage" | "blockedNetworkConfirmedAt" | "importedCount" | "skippedCount" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarSource"]>
 export type CalendarSourceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   events?: boolean | Prisma.CalendarSource$eventsArgs<ExtArgs>
@@ -1220,6 +1257,7 @@ export type $CalendarSourcePayload<ExtArgs extends runtime.Types.Extensions.Inte
     nextExpectedRefreshAt: Date | null
     lastErrorCode: string | null
     lastErrorMessage: string | null
+    blockedNetworkConfirmedAt: Date | null
     importedCount: number
     skippedCount: number
     createdAt: Date
@@ -1664,6 +1702,7 @@ export interface CalendarSourceFieldRefs {
   readonly nextExpectedRefreshAt: Prisma.FieldRef<"CalendarSource", 'DateTime'>
   readonly lastErrorCode: Prisma.FieldRef<"CalendarSource", 'String'>
   readonly lastErrorMessage: Prisma.FieldRef<"CalendarSource", 'String'>
+  readonly blockedNetworkConfirmedAt: Prisma.FieldRef<"CalendarSource", 'DateTime'>
   readonly importedCount: Prisma.FieldRef<"CalendarSource", 'Int'>
   readonly skippedCount: Prisma.FieldRef<"CalendarSource", 'Int'>
   readonly createdAt: Prisma.FieldRef<"CalendarSource", 'DateTime'>
