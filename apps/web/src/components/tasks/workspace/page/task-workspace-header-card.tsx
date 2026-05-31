@@ -155,7 +155,7 @@ export function TaskWorkspaceHeaderCard({
 
   return (
     <Card
-      className="relative z-30 min-w-0 overflow-visible rounded-[0.9rem] border-slate-200/80 bg-white/88 p-1 shadow-sm backdrop-blur"
+      className="relative z-30 min-w-0 overflow-visible rounded-[0.9rem] border-border/70 bg-card/90 p-1 shadow-sm backdrop-blur"
      
      
     >
@@ -163,11 +163,11 @@ export function TaskWorkspaceHeaderCard({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {workspaceStateLabel ? (
-              <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary-foreground">
                 {workspaceStateLabel}
               </span>
             ) : null}
-            <h1 className="min-w-0 break-words text-base font-semibold leading-tight tracking-tight text-slate-950 lg:max-w-[42vw]">
+            <h1 className="min-w-0 break-words text-base font-semibold leading-tight tracking-tight text-foreground lg:max-w-[42vw]">
               {header.title}
             </h1>
             <Badge variant={userStatusTone(header.status)}>
@@ -178,7 +178,7 @@ export function TaskWorkspaceHeaderCard({
               {task.priority}
             </Badge>
           </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span>
               {header.totalSteps} steps · {header.completedSteps} accepted · {header.progressPercent}%
               {header.primaryActionLabel ? ` · ${header.primaryActionLabel}` : ""}

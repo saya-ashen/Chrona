@@ -44,13 +44,13 @@ export function TaskAiPlanPanel({
       ? {
           icon: <Clock3 className="size-4" />,
           label: "Draft ready",
-          className: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
+          className: "border-warning/30 bg-warning/15 text-warning-foreground",
         }
       : generationStatus === "accepted"
         ? {
             icon: <CheckCircle2 className="size-4" />,
             label: "Applied",
-            className: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+            className: "border-success/30 bg-success/12 text-success",
           }
         : {
             icon: <Sparkles className="size-4" />,

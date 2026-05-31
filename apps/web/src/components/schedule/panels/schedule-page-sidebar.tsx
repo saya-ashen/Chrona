@@ -72,7 +72,7 @@ export function ScheduleLeftSidebar({
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
             <p className="text-xs text-muted-foreground">Risk items</p>
-            <p className="mt-1 text-lg font-semibold text-rose-600">{selectedDay?.riskCount ?? 0}</p>
+            <p className="mt-1 text-lg font-semibold text-destructive">{selectedDay?.riskCount ?? 0}</p>
           </div>
         </div>
       </Card>

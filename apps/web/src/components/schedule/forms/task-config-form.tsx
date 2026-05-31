@@ -997,7 +997,7 @@ export function TaskConfigForm({
   return (
     <div className="space-y-3">
       {localErrorMessage ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{localErrorMessage}</p>
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{localErrorMessage}</p>
       ) : null}
 
       {presets && presets.length > 0 ? (

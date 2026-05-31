@@ -15,10 +15,10 @@ import { createLogger, summarizeText } from "@/lib/logger";
 const logger = createLogger("schedule.command-bar");
 
 const priorityBadgeColors: Record<string, string> = {
-  Low: "bg-green-100 text-green-700",
-  Medium: "bg-amber-100 text-amber-700",
-  High: "bg-orange-100 text-orange-700",
-  Urgent: "bg-red-100 text-red-700",
+  Low: "bg-success/12 text-success",
+  Medium: "bg-warning/15 text-warning-foreground",
+  High: "bg-warning/20 text-warning-foreground",
+  Urgent: "bg-destructive/12 text-destructive",
 };
 
 type ProcessTrace = {
@@ -81,7 +81,7 @@ function AiProcessPanel({ trace }: { trace: ProcessTrace | null }) {
           <div className="font-medium text-foreground">toolCalls</div>
           {trace.toolCalls.map((toolCall, index) => (
             <div key={`${toolCall.tool}-${index}`} className="flex items-center gap-1.5 text-muted-foreground">
-              <Wrench className="size-3 text-amber-500" />
+              <Wrench className="size-3 text-warning-foreground" />
               <span className="font-mono">{toolCall.tool}</span>
             </div>
           ))}
@@ -104,9 +104,9 @@ function AiProcessPanel({ trace }: { trace: ProcessTrace | null }) {
       ) : null}
       {trace.finalSummary ? <div className="mt-2 text-muted-foreground">finalSummary: {trace.finalSummary}</div> : null}
       {trace.error ? (
-        <div className="mt-2 flex items-center gap-1.5 text-red-600"><AlertCircle className="size-3.5" />{trace.error}</div>
+        <div className="mt-2 flex items-center gap-1.5 text-destructive"><AlertCircle className="size-3.5" />{trace.error}</div>
       ) : trace.phase === "done" ? (
-        <div className="mt-2 flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="size-3.5" />done</div>
+        <div className="mt-2 flex items-center gap-1.5 text-success"><CheckCircle2 className="size-3.5" />done</div>
       ) : (
         <div className="mt-2 flex items-center gap-1.5 text-primary"><Loader2 className="size-3.5 animate-spin" />running</div>
       )}
@@ -352,7 +352,7 @@ export function ScheduleCommandBar({
                 <div className="border-b border-border/20 px-3 py-1.5">
                   {toolCalls.map((tc, i) => (
                     <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <Wrench className="size-2.5 text-amber-500" />
+                      <Wrench className="size-2.5 text-warning-foreground" />
                       <span className="font-mono">{tc.tool}</span>
                     </div>
                   ))}
@@ -399,7 +399,7 @@ export function ScheduleCommandBar({
         </Button>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">{copy.quickCreateHint || DEFAULT_SCHEDULE_PAGE_COPY.quickCreateHint}</p>
-      {submitError ? <div className="mt-2 text-xs text-red-600">{submitError}</div> : null}
+      {submitError ? <div className="mt-2 text-xs text-destructive">{submitError}</div> : null}
       <AiProcessPanel trace={processTrace} />
     </div>
   );

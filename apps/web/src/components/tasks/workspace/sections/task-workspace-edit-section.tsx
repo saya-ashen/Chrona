@@ -107,12 +107,12 @@ export function TaskWorkspaceEditSection({
               onSubmitAction={onSubmitAction}
             />
             {saveSuccess ? (
-              <p className="mt-2 px-1 text-xs text-emerald-600">
+              <p className="mt-2 px-1 text-xs text-success">
                 Saved successfully
               </p>
             ) : null}
             {saveError ? (
-              <p className="mt-2 px-1 text-xs text-red-600">{saveError}</p>
+              <p className="mt-2 px-1 text-xs text-destructive">{saveError}</p>
             ) : null}
           </div>
         </DialogContent>

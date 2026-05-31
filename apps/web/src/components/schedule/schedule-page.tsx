@@ -202,7 +202,7 @@ export function SchedulePage({
   }, []);
 
   return (
-    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
+    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-sm sm:p-3">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -256,12 +256,12 @@ export function SchedulePage({
       ) : null}
 
       {errorMessage ? (
-        <div className="mx-2 mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm">
+        <div className="mx-2 mt-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-sm">
           Error: {errorMessage}
         </div>
       ) : null}
 
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-visible rounded-[24px] bg-slate-50/70 p-2 lg:gap-4 lg:p-3 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
+      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-3xl bg-muted/40 p-2 lg:gap-4 lg:p-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
         <ScheduleLeftSidebar
           locale={locale}
           activeView={activeView}

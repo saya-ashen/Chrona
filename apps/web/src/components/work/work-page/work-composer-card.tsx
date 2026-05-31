@@ -239,7 +239,7 @@ export function WorkComposerCard({
       {errorMessage ? (
         <p
           role="alert"
-          className="mt-4 rounded-2xl border border-red-300/70 bg-red-500/10 px-3 py-2 text-sm text-red-700"
+          className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
           {errorMessage}
         </p>

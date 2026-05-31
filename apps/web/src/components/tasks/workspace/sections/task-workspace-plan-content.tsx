@@ -60,19 +60,19 @@ export function TaskWorkspacePlanContent({
             showOverview={false}
             onSelectedNodeChange={onSelectedNodeChange}
           />
-          {acceptPlanError ? <p className="text-xs text-red-600">{acceptPlanError}</p> : null}
+          {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
         </>
       ) : (
         <Card
          
          
-          className="flex h-[520px] min-w-0 max-w-full flex-col rounded-[1.35rem] border-slate-200/80 bg-white/75 shadow-sm ring-0 md:h-[640px] xl:h-full"
+          className="flex h-[520px] min-w-0 max-w-full flex-col rounded-[1.35rem] border-border/70 bg-card/75 shadow-sm ring-0 md:h-[640px] xl:h-full"
         >
           <div className="mb-1 flex min-w-0 items-center justify-between gap-2 px-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700">{label}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
             {isGraphPlanPending ? null : generatePlanButton}
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-300 bg-slate-50/70 px-5 text-center text-sm text-slate-500">
+          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-muted/40 px-5 text-center text-sm text-muted-foreground">
             {isGraphPlanPending ? "Preparing plan graph..." : "The plan graph will appear here once AI generates a plan."}
           </div>
         </Card>

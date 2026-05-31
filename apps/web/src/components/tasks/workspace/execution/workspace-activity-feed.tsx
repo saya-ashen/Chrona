@@ -12,11 +12,11 @@ const ACTIVITY_TEXT_COLLAPSE_THRESHOLD = 360;
 const ACTIVITY_TEXT_PREVIEW_LENGTH = 280;
 
 function dotClassName(tone: WorkspaceActivityItem["tone"]) {
-  if (tone === "success") return "bg-emerald-500";
-  if (tone === "warning") return "bg-orange-500";
-  if (tone === "danger") return "bg-red-500";
-  if (tone === "info") return "bg-blue-500";
-  return "bg-slate-300";
+  if (tone === "success") return "bg-success";
+  if (tone === "warning") return "bg-warning";
+  if (tone === "danger") return "bg-destructive";
+  if (tone === "info") return "bg-info";
+  return "bg-muted-foreground/40";
 }
 
 function toneBadgeVariant(tone: WorkspaceActivityItem["tone"]) {
@@ -69,7 +69,7 @@ function ToolDetails({ item }: { item: WorkspaceActivityItem }) {
   if (detailRows.length === 0) return null;
 
   return (
-    <div className="mt-1.5 rounded-xl border border-slate-200/80 bg-white/75 p-2">
+    <div className="mt-1.5 rounded-xl border border-border/70 bg-card/75 p-2">
       <Button type="button" variant="ghost" size="sm" className="h-7 rounded-full px-2 text-xs" onClick={() => setExpanded((value) => !value)}>
         {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
         {expanded ? taskWorkspaceActivityMessages.hideToolDetails : taskWorkspaceActivityMessages.showToolDetails}
@@ -78,8 +78,8 @@ function ToolDetails({ item }: { item: WorkspaceActivityItem }) {
         <dl className="mt-2 space-y-1.5 text-xs">
           {detailRows.map(([label, value]) => (
             <div key={label} className="grid gap-1 sm:grid-cols-[72px_minmax(0,1fr)]">
-              <dt className="font-semibold text-slate-500">{label}</dt>
-              <dd className="min-w-0 text-slate-700">
+              <dt className="font-semibold text-muted-foreground">{label}</dt>
+              <dd className="min-w-0 text-foreground/80">
                 <CollapsibleActivityText text={value} />
               </dd>
             </div>
@@ -96,22 +96,22 @@ function ActivityRow({ item }: { item: WorkspaceActivityItem }) {
   const text = item.assistant?.text ?? item.summary;
 
   return (
-    <div className="flex gap-2 rounded-xl border border-transparent px-1.5 py-1.5 hover:border-slate-200/70 hover:bg-slate-50/80">
+    <div className="flex gap-2 rounded-xl border border-transparent px-1.5 py-1.5 hover:border-border/70 hover:bg-muted/50">
       <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", dotClassName(item.tone))} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          {label ? <span className="text-xs text-slate-500">{label}</span> : null}
-          <p className="break-words text-sm font-medium text-slate-900">{item.title}</p>
+          {label ? <span className="text-xs text-muted-foreground">{label}</span> : null}
+          <p className="break-words text-sm font-medium text-foreground">{item.title}</p>
           {item.sourceNodeTitle ? <Badge variant="outline" className="max-w-full truncate text-[10px]">{item.sourceNodeTitle}</Badge> : null}
           {item.tool ? <Badge variant={toneBadgeVariant(item.tone)} className="gap-1 text-[10px]"><Wrench className="size-3" />{item.tool.state}</Badge> : null}
         </div>
         {isReasoning ? (
-          <details className="mt-1 rounded-lg border border-slate-200/70 bg-white/70 px-2 py-1.5 text-xs text-slate-500">
-            <summary className="cursor-pointer font-medium text-slate-800">{taskWorkspaceActivityMessages.reasoningDetails}</summary>
+          <details className="mt-1 rounded-lg border border-border/70 bg-card/70 px-2 py-1.5 text-xs text-muted-foreground">
+            <summary className="cursor-pointer font-medium text-foreground/80">{taskWorkspaceActivityMessages.reasoningDetails}</summary>
             <CollapsibleActivityText text={text} className="mt-1 leading-5" />
           </details>
         ) : (
-          <CollapsibleActivityText text={text} className="mt-0.5 text-xs leading-[1.35] text-slate-500" />
+          <CollapsibleActivityText text={text} className="mt-0.5 text-xs leading-[1.35] text-muted-foreground" />
         )}
         <ToolDetails item={item} />
       </div>
@@ -141,20 +141,20 @@ export function WorkspaceActivityFeed({
   const items = mergeWorkspaceActivity([...runtimeEventsToWorkspaceActivity(runtimeEvents, limit), ...activity], limit);
 
   return (
-    <section className="rounded-[1rem] border border-slate-200/80 bg-white/90 p-3 shadow-sm">
+    <section className="rounded-[1rem] border border-border/70 bg-card/90 p-3 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <CalendarClock className="size-4 text-cyan-700" />
-          <p className="text-sm font-semibold text-slate-950">{title}</p>
+          <CalendarClock className="size-4 text-primary" />
+          <p className="text-sm font-semibold text-foreground">{title}</p>
         </div>
         {runtimeEvents.length > 0 ? (
-          <span className="rounded-full border border-cyan-200/70 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800">
+          <span className="rounded-full border border-primary/30 bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">
             {runtimeEvents.at(-1)?.provider ?? "runtime"}
           </span>
         ) : null}
       </div>
       {items.length === 0 ? (
-        <p className="mt-1.5 text-[13px] text-slate-500">{emptyMessage}</p>
+        <p className="mt-1.5 text-[13px] text-muted-foreground">{emptyMessage}</p>
       ) : (
         <div className="mt-2 space-y-1">
           {items.map((item) => <ActivityRow key={item.id} item={item} />)}

@@ -171,7 +171,7 @@ export function CalendarSourceActions({
       </div>
 
       {confirmingRemove ? (
-        <p className="text-sm text-red-700">{externalCalendarMessages.removeConfirmation}</p>
+        <p className="text-sm text-destructive">{externalCalendarMessages.removeConfirmation}</p>
       ) : null}
       {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
     </div>

@@ -248,7 +248,7 @@ function ValidationResult({ validation }: { validation: ValidateCalendarSourceRe
   }
 
   return (
-    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+    <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success">
       <p className="font-medium">{externalCalendarMessages.validatedTitle}</p>
       <p className="mt-1">
         {validation.detectedName ?? "Calendar feed"} has {validation.eventPreviewCount} events from {validation.redactedUrlLabel}.

@@ -293,7 +293,7 @@ export function TaskWorkspacePlanSection({
                 value={regenerationInstruction}
                 onChange={(event) => setRegenerationInstruction(event.target.value)}
                 placeholder="Tell Chrona what to change in the regenerated plan..."
-                className="min-h-24 resize-y rounded-xl bg-white/90 text-sm"
+                className="min-h-24 resize-y rounded-xl bg-background text-sm"
                 aria-label="Plan regeneration instruction"
               />
               <div className="flex flex-wrap gap-2">
@@ -317,7 +317,7 @@ export function TaskWorkspacePlanSection({
                   {isGeneratingPlan ? "Generating..." : "Regenerate with instruction"}
                 </Button>
               </div>
-              {acceptPlanError ? <p className="text-xs text-red-700">{acceptPlanError}</p> : null}
+              {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
             </div>
           ),
         }
@@ -440,12 +440,12 @@ export function TaskWorkspacePlanSection({
   return (
     <section
       aria-label="Task execution workspace"
-      className="relative flex flex-col overflow-visible rounded-[1.5rem] border border-slate-200/80 bg-[radial-gradient(circle_at_18%_0%,rgba(14,165,233,0.14),transparent_34%),radial-gradient(circle_at_82%_6%,rgba(99,102,241,0.10),transparent_30%),linear-gradient(135deg,rgba(248,250,252,0.98),rgba(241,245,249,0.9)_46%,rgba(255,255,255,0.98))] p-2 pb-0 shadow-[0_22px_70px_rgba(15,23,42,0.10)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+      className="relative flex flex-col overflow-visible rounded-[1.5rem] border border-border/70 bg-[radial-gradient(circle_at_18%_0%,color-mix(in_oklab,var(--primary)_14%,transparent),transparent_34%),radial-gradient(circle_at_82%_6%,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_30%),linear-gradient(135deg,color-mix(in_oklab,var(--card)_98%,transparent),color-mix(in_oklab,var(--muted)_60%,var(--card))_46%,var(--card))] p-2 pb-0 shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-32 rounded-full bg-cyan-300/18 blur-3xl" />
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-32 rounded-full bg-primary/15 blur-3xl" />
       {stateMessage ? (
         <div
-          className="relative mb-2 rounded-xl border border-amber-300/45 bg-amber-50/80 px-3 py-2 text-sm text-amber-950 shadow-sm"
+          className="relative mb-2 rounded-xl border border-warning/40 bg-warning/15 px-3 py-2 text-sm text-warning-foreground shadow-sm"
           role="status"
         >
           {stateMessage}
@@ -454,7 +454,7 @@ export function TaskWorkspacePlanSection({
 
       {recoveryIssue ? (
         <div
-          className="relative mb-2 rounded-xl border border-red-300/50 bg-red-50/85 px-3 py-2 text-sm text-red-950 shadow-sm"
+          className="relative mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-sm"
           role="alert"
         >
           <div className="font-semibold">Recovery needed</div>
@@ -465,7 +465,7 @@ export function TaskWorkspacePlanSection({
                 <button
                   key={action.type}
                   type="button"
-                  className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+                  className="rounded-lg bg-destructive px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
                   disabled={!action.enabled}
                   onClick={() => focusNodeActions(recoveryCurrentNodeId)}
                 >
@@ -493,7 +493,7 @@ export function TaskWorkspacePlanSection({
           </section>
 
           <aside
-            className="min-h-0 space-y-2 overflow-y-auto rounded-[1.2rem] border border-slate-200/80 bg-white/82 p-2 shadow-[0_14px_45px_rgba(15,23,42,0.07)] backdrop-blur"
+            className="min-h-0 space-y-2 overflow-y-auto rounded-[1.2rem] border border-border/70 bg-card/82 p-2 shadow-sm backdrop-blur"
             aria-label="Task command center"
           >
             <TaskWorkspaceExecutionOverview

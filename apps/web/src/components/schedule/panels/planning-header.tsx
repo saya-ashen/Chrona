@@ -52,7 +52,7 @@ export function PlanningHeader({
   return (
     <header
       aria-label={ariaLabel}
-      className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-white/92 px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.08)] lg:flex-row lg:items-center lg:px-5"
+      className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/92 px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:px-5"
     >
       {/* Title + Date */}
       <div className="flex min-w-0 flex-wrap items-center gap-3 lg:min-w-[15rem]">
@@ -135,7 +135,7 @@ export function PlanningHeader({
             <span
               className={cn(
                 "text-xs font-semibold",
-                m.tone === "critical" ? "text-rose-600" : m.tone === "info" ? "text-primary" : "text-foreground",
+                m.tone === "critical" ? "text-destructive" : m.tone === "info" ? "text-primary" : "text-foreground",
               )}
             >
               {m.value}

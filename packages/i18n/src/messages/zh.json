@@ -200,7 +200,9 @@
       "openWork": "打开执行页",
       "approve": "批准",
       "reject": "拒绝",
-      "editAndApprove": "编辑并批准"
+      "editAndApprove": "编辑并批准",
+      "emptyTitle": "全部处理完毕",
+      "emptyDescription": "暂时没有需要你处理的审批、输入请求或日程提案。"
     },
     "memoryConsole": {
       "source": "来源",

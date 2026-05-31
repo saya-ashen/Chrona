@@ -31,7 +31,7 @@ export function WorkPageRightRail({
         <div className="space-y-3 text-sm">
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <CheckCircle2 className="size-4 text-emerald-600" />
+              <CheckCircle2 className="size-4 text-success" />
               <span>{copy.syncStatusLabel}</span>
             </div>
             <span className="font-medium text-foreground">{syncLabel}</span>
@@ -46,14 +46,14 @@ export function WorkPageRightRail({
       </WorkPageSectionFrame>
 
       {rightRailSummary && rightRailSummary !== copy.noBlockingAction ? (
-        <section className="shrink-0 rounded-[22px] border border-amber-200/70 bg-amber-50/80 p-4 shadow-[0_14px_32px_rgba(245,158,11,0.08)]">
+        <section className="shrink-0 rounded-[22px] border border-warning/30 bg-warning/10 p-4 shadow-sm">
           <div className="flex items-start gap-3">
-            <div className="rounded-full bg-white p-2 text-amber-600 shadow-sm">
+            <div className="rounded-full bg-background p-2 text-warning-foreground shadow-sm">
               <Clock3 className="size-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-amber-950">Heads Up</h3>
-              <p className="mt-2 text-sm leading-6 text-amber-900/80">{rightRailSummary}</p>
+              <h3 className="text-base font-semibold text-foreground">Heads Up</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{rightRailSummary}</p>
             </div>
           </div>
         </section>

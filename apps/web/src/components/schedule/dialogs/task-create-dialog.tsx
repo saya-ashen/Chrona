@@ -19,10 +19,10 @@ import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 /*  Priority badge color map                                          */
 /* ------------------------------------------------------------------ */
 const priorityBadgeColors: Record<string, string> = {
-  Low: "bg-green-100 text-green-700",
-  Medium: "bg-amber-100 text-amber-700",
-  High: "bg-orange-100 text-orange-700",
-  Urgent: "bg-red-100 text-red-700",
+  Low: "bg-success/12 text-success",
+  Medium: "bg-warning/15 text-warning-foreground",
+  High: "bg-warning/20 text-warning-foreground",
+  Urgent: "bg-destructive/12 text-destructive",
 };
 
 const DEFAULT_DIALOG_COPY = {
@@ -283,7 +283,7 @@ export function TaskCreateDialog({
                   <div className="border-b border-border/20 px-3 py-1.5">
                     {toolCalls.map((tc, i) => (
                       <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <Wrench className="size-2.5 text-amber-500" />
+                        <Wrench className="size-2.5 text-warning-foreground" />
                         <span className="font-mono">{tc.tool}</span>
                       </div>
                     ))}

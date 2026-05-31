@@ -540,9 +540,9 @@ export function DayTimeline({
     return (
       <div
         className={cn(
-          "flex h-full min-h-0 gap-2 overflow-hidden rounded-[0.85rem] border-2 p-2 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]",
+          "flex h-full min-h-0 gap-2 overflow-hidden rounded-[0.85rem] border-2 p-2 text-left shadow-xs",
           hasConflict
-            ? "border-red-400 bg-red-50/95"
+            ? "border-destructive/50 bg-destructive/10"
             : isCurrent
               ? "border-primary/70 bg-primary/18"
               : "border-primary/45 bg-primary/12",
@@ -592,7 +592,7 @@ export function DayTimeline({
             {items.length} {items.length === 1 ? copy.blockSingular : copy.blockPlural}
           </p>
         </div>
-        <div className="rounded-full border border-border/45 bg-white/75 px-2.5 py-1 text-right text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        <div className="rounded-full border border-border/45 bg-card/75 px-2.5 py-1 text-right text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           <p className="font-semibold uppercase">
             {draggedItem ? copy.dropOntoLane : copy.clickOrDrag}
           </p>
@@ -604,7 +604,7 @@ export function DayTimeline({
         role="region"
         aria-label={`Schedule drop zone for ${formatDayHeading(dayDate, locale, copy)}`}
         className={cn(
-          "chrona-fullcalendar relative min-h-0 flex-1 overflow-hidden bg-slate-50/85 p-1.5 sm:p-2",
+          "chrona-fullcalendar relative min-h-0 flex-1 overflow-hidden bg-muted/40 p-1.5 sm:p-2",
           draggedItem && "chrona-fullcalendar-drop-mode",
         )}
         onDragOver={handleDragOver}
@@ -720,7 +720,7 @@ export function DayTimeline({
           </div>
 
           {items.length === 0 ? (
-            <div className="pointer-events-none absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-3xl border border-dashed border-primary/30 bg-white/95 p-5 text-sm text-muted-foreground shadow-[0_12px_32px_rgba(15,23,42,0.09)] sm:left-24 sm:right-6">
+            <div className="pointer-events-none absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-3xl border border-dashed border-primary/30 bg-card/95 p-5 text-sm text-muted-foreground shadow-sm sm:left-24 sm:right-6">
               <p className="font-medium text-foreground">{copy.emptyDayLane}</p>
               <p className="mt-1">{copy.emptyDayLaneDescription}</p>
             </div>

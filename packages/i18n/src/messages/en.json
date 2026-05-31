@@ -200,7 +200,9 @@
       "openWork": "Open Work",
       "approve": "Approve",
       "reject": "Reject",
-      "editAndApprove": "Edit and Approve"
+      "editAndApprove": "Edit and Approve",
+      "emptyTitle": "You're all caught up",
+      "emptyDescription": "No approvals, input requests, or schedule proposals need your attention right now."
     },
     "memoryConsole": {
       "source": "Source",

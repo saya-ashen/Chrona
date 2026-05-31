@@ -105,12 +105,12 @@ function getBadgeClass(kind: string | undefined) {
   switch (kind) {
     case "approval":
     case "input":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-warning/30 bg-warning/15 text-warning-foreground";
     case "failure":
-      return "border-red-200 bg-red-50 text-red-700";
+      return "border-destructive/30 bg-destructive/10 text-destructive";
     case "result":
     case "output":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      return "border-success/30 bg-success/10 text-success";
     default:
       return "border-border bg-card text-muted-foreground";
   }
@@ -120,12 +120,12 @@ function getCardClass(kind: string | undefined) {
   switch (kind) {
     case "approval":
     case "input":
-      return "border-amber-200/70 bg-amber-50/60";
+      return "border-warning/25 bg-warning/10";
     case "failure":
-      return "border-red-200/70 bg-red-50/60";
+      return "border-destructive/25 bg-destructive/8";
     case "result":
     case "output":
-      return "border-emerald-200/70 bg-emerald-50/60";
+      return "border-success/25 bg-success/8";
     default:
       return "border-border/70 bg-background/90";
   }

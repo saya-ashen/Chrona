@@ -60,7 +60,7 @@ export function ScheduleMiniCalendar({
           >
             <span className="text-sm font-medium">{day.dateNumber}</span>
             {day.riskCount > 0 ? (
-              <span className="mt-1 size-1.5 rounded-full bg-red-500" />
+              <span className="mt-1 size-1.5 rounded-full bg-destructive" />
             ) : day.scheduledCount > 0 ? (
               <span className="mt-1 size-1.5 rounded-full bg-primary/70" />
             ) : null}
