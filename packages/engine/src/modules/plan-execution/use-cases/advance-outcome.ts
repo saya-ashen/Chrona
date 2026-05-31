@@ -14,7 +14,7 @@ import { getPlanRun } from "../plan-run-store";
 import type { ExecutionSessionRow } from "../persistence/execution-session-store";
 import { setExecutionSessionState } from "../persistence/execution-session-store";
 import { appendGraphRuntimeEvents } from "../persistence/runtime-event-store";
-import { cancelWorkBlock } from "../persistence/work-block-store";
+import { releaseWorkBlock } from "../persistence/work-block-store";
 import { persistRuntimeState } from "../persistence/plan-runtime-store";
 import type { ensureNativePlanRun } from "../persistence/plan-runtime-store";
 import { markExecutionNodeActive } from "../persistence/task-execution-store";
@@ -84,7 +84,7 @@ async function cancelledAdvanceResponse(input: {
     latestEventId: latestEvidence?.id ?? null,
     latestRawEventId: latestEvidence?.rawEventId ?? null,
   });
-  await cancelWorkBlock(input.taskId, input.executionSession.workBlockId);
+  await releaseWorkBlock(input.taskId, input.executionSession.workBlockId);
   await db.task.update({
     where: { id: input.taskId },
     data: { status: transition.taskStatus, blockReason: transition.blockReason },

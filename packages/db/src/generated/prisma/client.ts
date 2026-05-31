@@ -47,6 +47,16 @@ export { Prisma }
  */
 export type Workspace = Prisma.WorkspaceModel
 /**
+ * Model CalendarSource
+ * 
+ */
+export type CalendarSource = Prisma.CalendarSourceModel
+/**
+ * Model ImportedCalendarEvent
+ * 
+ */
+export type ImportedCalendarEvent = Prisma.ImportedCalendarEventModel
+/**
  * Model Task
  * 
  */

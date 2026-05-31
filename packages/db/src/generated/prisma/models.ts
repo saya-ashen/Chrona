@@ -9,6 +9,8 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/Workspace'
+export type * from './models/CalendarSource'
+export type * from './models/ImportedCalendarEvent'
 export type * from './models/Task'
 export type * from './models/SchedulerLease'
 export type * from './models/GraphVersion'

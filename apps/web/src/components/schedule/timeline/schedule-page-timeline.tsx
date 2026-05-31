@@ -14,7 +14,7 @@ import type {
   EventInput,
   AllowFunc,
 } from "@fullcalendar/core";
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
   getSchedulePageCopy,
@@ -24,7 +24,9 @@ import { TaskCreateDialog } from "@/components/schedule/dialogs/task-create-dial
 import { DayTimelineSummary } from "@/components/schedule/panels/schedule-page-panels";
 import { TimelinePlacementCard } from "@/components/schedule/timeline/schedule-timeline-primitives";
 import { ScheduleGhostBlockLayer } from "@/components/global-ai-sidebar/schedule-ghost-block-layer";
+import { ExternalCalendarEventBlock } from "@/components/schedule/external-calendar-event-block";
 import type { ScheduleGhostBlockPreview } from "@chrona/contracts";
+import type { PlanningBusyBlock } from "@chrona/domain";
 import type {
   ScheduledItem,
   TimelineCreateInput,
@@ -46,6 +48,7 @@ import {
 import { type TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
 import { Badge } from "@/components/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
+import { externalCalendarMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
 const TIMELINE_HOUR_HEIGHT = 56;
@@ -125,6 +128,7 @@ export function DayTimeline({
   conflictTaskIds,
   ghostPreview = null,
   draggedItem,
+  externalEvents = [],
   executionRuntimes: _executionRuntimes,
   defaultExecutionRuntime,
   isPending,
@@ -141,6 +145,7 @@ export function DayTimeline({
   conflictTaskIds?: Set<string>;
   ghostPreview?: ScheduleGhostBlockPreview | null;
   draggedItem: TimelineDragItem | null;
+  externalEvents?: PlanningBusyBlock[];
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
   isPending: boolean;
@@ -171,6 +176,13 @@ export function DayTimeline({
     DEFAULT_TIMELINE_PIXELS_PER_MINUTE,
   );
 
+  useEffect(() => {
+    const api = calendarRef.current?.getApi();
+    if (!api) return;
+
+    api.gotoDate(dayDate);
+  }, [dayDate]);
+
   const mapMinuteToY = (minute: number) => {
     const clamped = Math.min(Math.max(minute, 0), 24 * 60);
     return clamped * timelinePixelsPerMinute;
@@ -191,7 +203,8 @@ export function DayTimeline({
     source,
   });
 
-  const calendarEvents = useMemo<EventInput[]>(() => items.map((item) => {
+  const calendarEvents = useMemo<EventInput[]>(() => [
+    ...items.map((item) => {
     const start = item.scheduledStartAt ?? dateForMinute(dayDate, 9 * 60);
     const end = item.scheduledEndAt ?? dateForMinute(
       dayDate,
@@ -219,7 +232,23 @@ export function DayTimeline({
       ].filter(Boolean),
       extendedProps: { item, hasConflict, isCurrent },
     };
-  }), [conflictTaskIds, dayDate, hiddenTaskId, isPending, items, selectedDay, selectedTaskId]);
+    }),
+    ...externalEvents.map((event) => ({
+      id: `external-${event.id}`,
+      title: event.title,
+      start: event.startsAt,
+      end: event.endsAt,
+      allDay: false,
+      editable: false,
+      durationEditable: false,
+      startEditable: false,
+      classNames: [
+        "chrona-calendar-external-event",
+        event.overlapsScheduledTask ? "chrona-calendar-external-event-overlap" : "",
+      ].filter(Boolean),
+      extendedProps: { externalEvent: event },
+    })),
+  ], [conflictTaskIds, externalEvents, dayDate, hiddenTaskId, isPending, items, selectedDay, selectedTaskId]);
 
   function closeComposer() {
     setComposerDraft(null);
@@ -490,6 +519,16 @@ export function DayTimeline({
   }
 
   function renderEventContent(info: EventContentArg) {
+    const externalEvent = info.event.extendedProps.externalEvent as PlanningBusyBlock | undefined;
+    if (externalEvent) {
+      return (
+        <ExternalCalendarEventBlock
+          event={externalEvent}
+          timeRange={formatTimeRange(info.event.start, info.event.end, locale, copy)}
+        />
+      );
+    }
+
     const item = info.event.extendedProps.item as ScheduledItem | undefined;
     if (!item) {
       return <span>{info.event.title}</span>;
@@ -609,6 +648,14 @@ export function DayTimeline({
                 >
                   {copy.resizeHandleLabel} {item.title}
                 </button>
+              </div>
+            ))}
+            {externalEvents.map((event) => (
+              <div key={event.id}>
+                <span>
+                  {event.title} · {event.sourceName} · {externalCalendarMessages.readOnlyLabel}
+                </span>
+                {event.overlapsScheduledTask ? <span> · {externalCalendarMessages.overlapsTaskLabel}</span> : null}
               </div>
             ))}
           </div>

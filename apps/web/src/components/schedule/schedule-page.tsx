@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { projectPlanningBusyBlocks, type PlanningBusyBlock } from "@chrona/domain";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import type {
   SchedulePageProps,
@@ -14,13 +15,16 @@ import { buildSchedulePageViewModel } from "@/components/schedule/schedule-page-
 import { SchedulePageHeader } from "@/components/schedule/schedule-page-main-panel";
 import { SchedulePageMainPanel } from "@/components/schedule/schedule-page-main-panel";
 import { SchedulePageDialogs } from "@/components/schedule/dialogs/schedule-page-dialogs";
+import { CalendarSourceSetup } from "@/components/schedule/calendar-source-setup";
 import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-panels";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { localizeHref } from "@chrona/i18n";
 import { useAppRouter } from "@/lib/router";
+import { listExternalCalendarEvents } from "@/lib/external-calendar-client";
 import { useSchedulePageActions } from "./use-schedule-page-actions";
 import { useSchedulePageState } from "./use-schedule-page-state";
 import { createScheduleAiSidebarContext } from "./adapters/schedule-ai-sidebar-adapter";
@@ -47,6 +51,8 @@ export function SchedulePage({
     () => getSchedulePageCopy(messages.components?.schedulePage),
     [messages.components?.schedulePage],
   );
+  const [externalEvents, setExternalEvents] = useState<PlanningBusyBlock[]>([]);
+  const [externalEventsRefreshKey, setExternalEventsRefreshKey] = useState(0);
 
   const actionFailedMessage =
     messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed";
@@ -149,6 +155,46 @@ export function SchedulePage({
     });
   }, [activeView, refreshProjection, registerHandlers, setPageContext, viewData, viewModel.activeDay, workspaceId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const start = new Date(`${viewModel.activeDay}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    listExternalCalendarEvents(workspaceId, start.toISOString(), end.toISOString())
+      .then(({ events }) => {
+        if (cancelled) return;
+        setExternalEvents(projectPlanningBusyBlocks({
+          events,
+          scheduledBlocks: (viewModel.activeGroup?.items ?? [])
+            .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
+            .map((item) => ({
+              id: item.taskId,
+              startsAt: item.scheduledStartAt as Date,
+              endsAt: item.scheduledEndAt as Date,
+            })),
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) setExternalEvents([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [externalEventsRefreshKey, viewModel.activeDay, viewModel.activeGroup?.items, workspaceId]);
+
+  useEffect(() => {
+    function refreshExternalEvents() {
+      setExternalEventsRefreshKey((key) => key + 1);
+    }
+
+    window.addEventListener("chrona:external-calendar-source-created", refreshExternalEvents);
+    return () => {
+      window.removeEventListener("chrona:external-calendar-source-created", refreshExternalEvents);
+    };
+  }, []);
+
   return (
     <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
       <p className="sr-only" aria-live="polite">
@@ -190,6 +236,7 @@ export function SchedulePage({
           conflictTaskIds={viewModel.conflictTaskIds}
           listItems={viewData.listItems}
           ghostPreview={pendingProposal?.kind === "schedule" ? pendingProposal.schedulePreview ?? null : null}
+          externalEvents={externalEvents}
           executionRuntimes={data.executionRuntimes}
           defaultExecutionRuntime={data.defaultExecutionRuntime}
           isPending={isPending}
@@ -201,15 +248,28 @@ export function SchedulePage({
           onSaveTaskConfigAction={handleTaskConfigSave}
         />
 
-        <ScheduleRightSidebar
-          copy={copy}
-          viewData={viewData}
-          draggedTask={draggedTask}
-          isPending={isPending}
-          handleQueueDragStart={handleQueueDragStart}
-          handleQueueDragEnd={handleQueueDragEnd}
-          onOpenTaskDetails={setLocalSelectedTaskId}
-        />
+        <div className="min-h-0 overflow-visible xl:overflow-hidden xl:pl-1">
+          <Tabs defaultValue="queue" className="h-full min-h-0">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="queue">Queue</TabsTrigger>
+              <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            </TabsList>
+            <TabsContent value="queue" className="min-h-0 overflow-visible xl:overflow-y-auto">
+              <ScheduleRightSidebar
+                copy={copy}
+                viewData={viewData}
+                draggedTask={draggedTask}
+                isPending={isPending}
+                handleQueueDragStart={handleQueueDragStart}
+                handleQueueDragEnd={handleQueueDragEnd}
+                onOpenTaskDetails={setLocalSelectedTaskId}
+              />
+            </TabsContent>
+            <TabsContent value="calendar" className="min-h-0 overflow-visible xl:overflow-y-auto">
+              <CalendarSourceSetup workspaceId={workspaceId} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
       {viewModel.selectedItem && viewModel.activeDay ? (

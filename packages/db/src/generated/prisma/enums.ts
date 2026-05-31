@@ -76,6 +76,44 @@ export const ScheduleProposalStatus = {
 export type ScheduleProposalStatus = (typeof ScheduleProposalStatus)[keyof typeof ScheduleProposalStatus]
 
 
+export const CalendarSourceLifecycleState = {
+  active: 'active',
+  disabled: 'disabled',
+  removing: 'removing',
+  removed: 'removed'
+} as const
+
+export type CalendarSourceLifecycleState = (typeof CalendarSourceLifecycleState)[keyof typeof CalendarSourceLifecycleState]
+
+
+export const CalendarEventStatus = {
+  confirmed: 'confirmed',
+  tentative: 'tentative',
+  cancelled: 'cancelled'
+} as const
+
+export type CalendarEventStatus = (typeof CalendarEventStatus)[keyof typeof CalendarEventStatus]
+
+
+export const CalendarSyncState = {
+  idle: 'idle',
+  syncing: 'syncing',
+  success: 'success',
+  partial: 'partial',
+  failed: 'failed'
+} as const
+
+export type CalendarSyncState = (typeof CalendarSyncState)[keyof typeof CalendarSyncState]
+
+
+export const CalendarSyncPolicy = {
+  keep_active: 'keep_active',
+  auto_complete_past_events: 'auto_complete_past_events'
+} as const
+
+export type CalendarSyncPolicy = (typeof CalendarSyncPolicy)[keyof typeof CalendarSyncPolicy]
+
+
 export const RunStatus = {
   Pending: 'Pending',
   Running: 'Running',

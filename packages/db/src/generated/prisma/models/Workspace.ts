@@ -220,6 +220,8 @@ export type WorkspaceWhereInput = {
   graphMutations?: Prisma.GraphMutationRecordListRelationFilter
   reconciliationEvents?: Prisma.ReconciliationEventListRelationFilter
   schedulerEvents?: Prisma.SchedulerEventListRelationFilter
+  calendarSources?: Prisma.CalendarSourceListRelationFilter
+  importedCalendarEvents?: Prisma.ImportedCalendarEventListRelationFilter
 }
 
 export type WorkspaceOrderByWithRelationInput = {
@@ -252,6 +254,8 @@ export type WorkspaceOrderByWithRelationInput = {
   graphMutations?: Prisma.GraphMutationRecordOrderByRelationAggregateInput
   reconciliationEvents?: Prisma.ReconciliationEventOrderByRelationAggregateInput
   schedulerEvents?: Prisma.SchedulerEventOrderByRelationAggregateInput
+  calendarSources?: Prisma.CalendarSourceOrderByRelationAggregateInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventOrderByRelationAggregateInput
 }
 
 export type WorkspaceWhereUniqueInput = Prisma.AtLeast<{
@@ -287,6 +291,8 @@ export type WorkspaceWhereUniqueInput = Prisma.AtLeast<{
   graphMutations?: Prisma.GraphMutationRecordListRelationFilter
   reconciliationEvents?: Prisma.ReconciliationEventListRelationFilter
   schedulerEvents?: Prisma.SchedulerEventListRelationFilter
+  calendarSources?: Prisma.CalendarSourceListRelationFilter
+  importedCalendarEvents?: Prisma.ImportedCalendarEventListRelationFilter
 }, "id">
 
 export type WorkspaceOrderByWithAggregationInput = {
@@ -345,6 +351,8 @@ export type WorkspaceCreateInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateInput = {
@@ -377,6 +385,8 @@ export type WorkspaceUncheckedCreateInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUpdateInput = {
@@ -409,6 +419,8 @@ export type WorkspaceUpdateInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateInput = {
@@ -441,6 +453,8 @@ export type WorkspaceUncheckedUpdateInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateManyInput = {
@@ -522,6 +536,34 @@ export type EnumWorkspaceStatusFieldUpdateOperationsInput = {
 
 export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
+}
+
+export type WorkspaceCreateNestedOneWithoutCalendarSourcesInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutCalendarSourcesInput, Prisma.WorkspaceUncheckedCreateWithoutCalendarSourcesInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutCalendarSourcesInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+}
+
+export type WorkspaceUpdateOneRequiredWithoutCalendarSourcesNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutCalendarSourcesInput, Prisma.WorkspaceUncheckedCreateWithoutCalendarSourcesInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutCalendarSourcesInput
+  upsert?: Prisma.WorkspaceUpsertWithoutCalendarSourcesInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutCalendarSourcesInput, Prisma.WorkspaceUpdateWithoutCalendarSourcesInput>, Prisma.WorkspaceUncheckedUpdateWithoutCalendarSourcesInput>
+}
+
+export type WorkspaceCreateNestedOneWithoutImportedCalendarEventsInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutImportedCalendarEventsInput, Prisma.WorkspaceUncheckedCreateWithoutImportedCalendarEventsInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutImportedCalendarEventsInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+}
+
+export type WorkspaceUpdateOneRequiredWithoutImportedCalendarEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkspaceCreateWithoutImportedCalendarEventsInput, Prisma.WorkspaceUncheckedCreateWithoutImportedCalendarEventsInput>
+  connectOrCreate?: Prisma.WorkspaceCreateOrConnectWithoutImportedCalendarEventsInput
+  upsert?: Prisma.WorkspaceUpsertWithoutImportedCalendarEventsInput
+  connect?: Prisma.WorkspaceWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutImportedCalendarEventsInput, Prisma.WorkspaceUpdateWithoutImportedCalendarEventsInput>, Prisma.WorkspaceUncheckedUpdateWithoutImportedCalendarEventsInput>
 }
 
 export type WorkspaceCreateNestedOneWithoutTasksInput = {
@@ -832,6 +874,302 @@ export type WorkspaceUpdateOneRequiredWithoutExecutionSessionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WorkspaceUpdateToOneWithWhereWithoutExecutionSessionsInput, Prisma.WorkspaceUpdateWithoutExecutionSessionsInput>, Prisma.WorkspaceUncheckedUpdateWithoutExecutionSessionsInput>
 }
 
+export type WorkspaceCreateWithoutCalendarSourcesInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkspaceInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutWorkspaceInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutWorkspaceInput
+  taskTimelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutWorkspaceInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkspaceInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutWorkspaceInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutWorkspaceInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutWorkspaceInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutWorkspaceInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceUncheckedCreateWithoutCalendarSourcesInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkspaceInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskTimelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutWorkspaceInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutWorkspaceInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceCreateOrConnectWithoutCalendarSourcesInput = {
+  where: Prisma.WorkspaceWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutCalendarSourcesInput, Prisma.WorkspaceUncheckedCreateWithoutCalendarSourcesInput>
+}
+
+export type WorkspaceUpsertWithoutCalendarSourcesInput = {
+  update: Prisma.XOR<Prisma.WorkspaceUpdateWithoutCalendarSourcesInput, Prisma.WorkspaceUncheckedUpdateWithoutCalendarSourcesInput>
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutCalendarSourcesInput, Prisma.WorkspaceUncheckedCreateWithoutCalendarSourcesInput>
+  where?: Prisma.WorkspaceWhereInput
+}
+
+export type WorkspaceUpdateToOneWithWhereWithoutCalendarSourcesInput = {
+  where?: Prisma.WorkspaceWhereInput
+  data: Prisma.XOR<Prisma.WorkspaceUpdateWithoutCalendarSourcesInput, Prisma.WorkspaceUncheckedUpdateWithoutCalendarSourcesInput>
+}
+
+export type WorkspaceUpdateWithoutCalendarSourcesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkspaceNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutWorkspaceNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutWorkspaceNestedInput
+  taskTimelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutWorkspaceNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkspaceNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutWorkspaceNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutWorkspaceNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutWorkspaceNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutWorkspaceNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceUncheckedUpdateWithoutCalendarSourcesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskTimelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutWorkspaceNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceCreateWithoutImportedCalendarEventsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkspaceInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutWorkspaceInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutWorkspaceInput
+  taskTimelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkspaceInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutWorkspaceInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkspaceInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutWorkspaceInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutWorkspaceInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutWorkspaceInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutWorkspaceInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceUncheckedCreateWithoutImportedCalendarEventsInput = {
+  id?: string
+  name: string
+  description?: string | null
+  defaultRuntime: string
+  status: $Enums.WorkspaceStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutWorkspaceInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutWorkspaceInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutWorkspaceInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutWorkspaceInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkspaceInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutWorkspaceInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskTimelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskProjections?: Prisma.TaskProjectionUncheckedCreateNestedManyWithoutWorkspaceInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutWorkspaceInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutWorkspaceInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutWorkspaceInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutWorkspaceInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutWorkspaceInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+}
+
+export type WorkspaceCreateOrConnectWithoutImportedCalendarEventsInput = {
+  where: Prisma.WorkspaceWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutImportedCalendarEventsInput, Prisma.WorkspaceUncheckedCreateWithoutImportedCalendarEventsInput>
+}
+
+export type WorkspaceUpsertWithoutImportedCalendarEventsInput = {
+  update: Prisma.XOR<Prisma.WorkspaceUpdateWithoutImportedCalendarEventsInput, Prisma.WorkspaceUncheckedUpdateWithoutImportedCalendarEventsInput>
+  create: Prisma.XOR<Prisma.WorkspaceCreateWithoutImportedCalendarEventsInput, Prisma.WorkspaceUncheckedCreateWithoutImportedCalendarEventsInput>
+  where?: Prisma.WorkspaceWhereInput
+}
+
+export type WorkspaceUpdateToOneWithWhereWithoutImportedCalendarEventsInput = {
+  where?: Prisma.WorkspaceWhereInput
+  data: Prisma.XOR<Prisma.WorkspaceUpdateWithoutImportedCalendarEventsInput, Prisma.WorkspaceUncheckedUpdateWithoutImportedCalendarEventsInput>
+}
+
+export type WorkspaceUpdateWithoutImportedCalendarEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkspaceNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutWorkspaceNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutWorkspaceNestedInput
+  taskTimelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkspaceNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutWorkspaceNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkspaceNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutWorkspaceNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutWorkspaceNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutWorkspaceNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutWorkspaceNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+}
+
+export type WorkspaceUncheckedUpdateWithoutImportedCalendarEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  defaultRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkspaceStatusFieldUpdateOperationsInput | $Enums.WorkspaceStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutWorkspaceNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutWorkspaceNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutWorkspaceNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutWorkspaceNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskTimelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskDependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskProjections?: Prisma.TaskProjectionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutWorkspaceNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutWorkspaceNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutWorkspaceNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutWorkspaceNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutWorkspaceNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+}
+
 export type WorkspaceCreateWithoutTasksInput = {
   id?: string
   name: string
@@ -861,6 +1199,8 @@ export type WorkspaceCreateWithoutTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTasksInput = {
@@ -892,6 +1232,8 @@ export type WorkspaceUncheckedCreateWithoutTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTasksInput = {
@@ -939,6 +1281,8 @@ export type WorkspaceUpdateWithoutTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTasksInput = {
@@ -970,6 +1314,8 @@ export type WorkspaceUncheckedUpdateWithoutTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutGraphVersionsInput = {
@@ -1001,6 +1347,8 @@ export type WorkspaceCreateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutGraphVersionsInput = {
@@ -1032,6 +1380,8 @@ export type WorkspaceUncheckedCreateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutGraphVersionsInput = {
@@ -1079,6 +1429,8 @@ export type WorkspaceUpdateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutGraphVersionsInput = {
@@ -1110,6 +1462,8 @@ export type WorkspaceUncheckedUpdateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutGraphMutationsInput = {
@@ -1141,6 +1495,8 @@ export type WorkspaceCreateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutGraphMutationsInput = {
@@ -1172,6 +1528,8 @@ export type WorkspaceUncheckedCreateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutGraphMutationsInput = {
@@ -1219,6 +1577,8 @@ export type WorkspaceUpdateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutGraphMutationsInput = {
@@ -1250,6 +1610,8 @@ export type WorkspaceUncheckedUpdateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutReconciliationEventsInput = {
@@ -1281,6 +1643,8 @@ export type WorkspaceCreateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutWorkspaceInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutReconciliationEventsInput = {
@@ -1312,6 +1676,8 @@ export type WorkspaceUncheckedCreateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutWorkspaceInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutReconciliationEventsInput = {
@@ -1359,6 +1725,8 @@ export type WorkspaceUpdateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutWorkspaceNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutReconciliationEventsInput = {
@@ -1390,6 +1758,8 @@ export type WorkspaceUncheckedUpdateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutWorkspaceNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutSchedulerEventsInput = {
@@ -1421,6 +1791,8 @@ export type WorkspaceCreateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutWorkspaceInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutSchedulerEventsInput = {
@@ -1452,6 +1824,8 @@ export type WorkspaceUncheckedCreateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutWorkspaceInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutSchedulerEventsInput = {
@@ -1499,6 +1873,8 @@ export type WorkspaceUpdateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutWorkspaceNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutSchedulerEventsInput = {
@@ -1530,6 +1906,8 @@ export type WorkspaceUncheckedUpdateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutWorkspaceNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskDependenciesInput = {
@@ -1561,6 +1939,8 @@ export type WorkspaceCreateWithoutTaskDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskDependenciesInput = {
@@ -1592,6 +1972,8 @@ export type WorkspaceUncheckedCreateWithoutTaskDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskDependenciesInput = {
@@ -1639,6 +2021,8 @@ export type WorkspaceUpdateWithoutTaskDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskDependenciesInput = {
@@ -1670,6 +2054,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskPlansInput = {
@@ -1701,6 +2087,8 @@ export type WorkspaceCreateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskPlansInput = {
@@ -1732,6 +2120,8 @@ export type WorkspaceUncheckedCreateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskPlansInput = {
@@ -1779,6 +2169,8 @@ export type WorkspaceUpdateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskPlansInput = {
@@ -1810,6 +2202,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskPlanRunsInput = {
@@ -1841,6 +2235,8 @@ export type WorkspaceCreateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskPlanRunsInput = {
@@ -1872,6 +2268,8 @@ export type WorkspaceUncheckedCreateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskPlanRunsInput = {
@@ -1919,6 +2317,8 @@ export type WorkspaceUpdateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskPlanRunsInput = {
@@ -1950,6 +2350,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskPlanNodeAttemptsInput = {
@@ -1981,6 +2383,8 @@ export type WorkspaceCreateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
@@ -2012,6 +2416,8 @@ export type WorkspaceUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskPlanNodeAttemptsInput = {
@@ -2059,6 +2465,8 @@ export type WorkspaceUpdateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
@@ -2090,6 +2498,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskPlanProviderRunsInput = {
@@ -2121,6 +2531,8 @@ export type WorkspaceCreateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskPlanProviderRunsInput = {
@@ -2152,6 +2564,8 @@ export type WorkspaceUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskPlanProviderRunsInput = {
@@ -2199,6 +2613,8 @@ export type WorkspaceUpdateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
@@ -2230,6 +2646,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskPlanLayersInput = {
@@ -2261,6 +2679,8 @@ export type WorkspaceCreateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskPlanLayersInput = {
@@ -2292,6 +2712,8 @@ export type WorkspaceUncheckedCreateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskPlanLayersInput = {
@@ -2339,6 +2761,8 @@ export type WorkspaceUpdateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskPlanLayersInput = {
@@ -2370,6 +2794,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutApprovalsInput = {
@@ -2401,6 +2827,8 @@ export type WorkspaceCreateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutApprovalsInput = {
@@ -2432,6 +2860,8 @@ export type WorkspaceUncheckedCreateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutApprovalsInput = {
@@ -2479,6 +2909,8 @@ export type WorkspaceUpdateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutApprovalsInput = {
@@ -2510,6 +2942,8 @@ export type WorkspaceUncheckedUpdateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutArtifactsInput = {
@@ -2541,6 +2975,8 @@ export type WorkspaceCreateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutArtifactsInput = {
@@ -2572,6 +3008,8 @@ export type WorkspaceUncheckedCreateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutArtifactsInput = {
@@ -2619,6 +3057,8 @@ export type WorkspaceUpdateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutArtifactsInput = {
@@ -2650,6 +3090,8 @@ export type WorkspaceUncheckedUpdateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutMemoriesInput = {
@@ -2681,6 +3123,8 @@ export type WorkspaceCreateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutMemoriesInput = {
@@ -2712,6 +3156,8 @@ export type WorkspaceUncheckedCreateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutMemoriesInput = {
@@ -2759,6 +3205,8 @@ export type WorkspaceUpdateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutMemoriesInput = {
@@ -2790,6 +3238,8 @@ export type WorkspaceUncheckedUpdateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutEventsInput = {
@@ -2821,6 +3271,8 @@ export type WorkspaceCreateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutEventsInput = {
@@ -2852,6 +3304,8 @@ export type WorkspaceUncheckedCreateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutEventsInput = {
@@ -2899,6 +3353,8 @@ export type WorkspaceUpdateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutEventsInput = {
@@ -2930,6 +3386,8 @@ export type WorkspaceUncheckedUpdateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutRawEventLogsInput = {
@@ -2961,6 +3419,8 @@ export type WorkspaceCreateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutRawEventLogsInput = {
@@ -2992,6 +3452,8 @@ export type WorkspaceUncheckedCreateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutRawEventLogsInput = {
@@ -3039,6 +3501,8 @@ export type WorkspaceUpdateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutRawEventLogsInput = {
@@ -3070,6 +3534,8 @@ export type WorkspaceUncheckedUpdateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutToolInvocationsInput = {
@@ -3101,6 +3567,8 @@ export type WorkspaceCreateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutToolInvocationsInput = {
@@ -3132,6 +3600,8 @@ export type WorkspaceUncheckedCreateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutToolInvocationsInput = {
@@ -3179,6 +3649,8 @@ export type WorkspaceUpdateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutToolInvocationsInput = {
@@ -3210,6 +3682,8 @@ export type WorkspaceUncheckedUpdateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskTimelineItemsInput = {
@@ -3241,6 +3715,8 @@ export type WorkspaceCreateWithoutTaskTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskTimelineItemsInput = {
@@ -3272,6 +3748,8 @@ export type WorkspaceUncheckedCreateWithoutTaskTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskTimelineItemsInput = {
@@ -3319,6 +3797,8 @@ export type WorkspaceUpdateWithoutTaskTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskTimelineItemsInput = {
@@ -3350,6 +3830,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutTaskProjectionsInput = {
@@ -3381,6 +3863,8 @@ export type WorkspaceCreateWithoutTaskProjectionsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutTaskProjectionsInput = {
@@ -3412,6 +3896,8 @@ export type WorkspaceUncheckedCreateWithoutTaskProjectionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutTaskProjectionsInput = {
@@ -3459,6 +3945,8 @@ export type WorkspaceUpdateWithoutTaskProjectionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutTaskProjectionsInput = {
@@ -3490,6 +3978,8 @@ export type WorkspaceUncheckedUpdateWithoutTaskProjectionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutScheduleProposalsInput = {
@@ -3521,6 +4011,8 @@ export type WorkspaceCreateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutScheduleProposalsInput = {
@@ -3552,6 +4044,8 @@ export type WorkspaceUncheckedCreateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutScheduleProposalsInput = {
@@ -3599,6 +4093,8 @@ export type WorkspaceUpdateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutScheduleProposalsInput = {
@@ -3630,6 +4126,8 @@ export type WorkspaceUncheckedUpdateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutWorkBlocksInput = {
@@ -3661,6 +4159,8 @@ export type WorkspaceCreateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutWorkBlocksInput = {
@@ -3692,6 +4192,8 @@ export type WorkspaceUncheckedCreateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutWorkBlocksInput = {
@@ -3739,6 +4241,8 @@ export type WorkspaceUpdateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutWorkBlocksInput = {
@@ -3770,6 +4274,8 @@ export type WorkspaceUncheckedUpdateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceCreateWithoutExecutionSessionsInput = {
@@ -3801,6 +4307,8 @@ export type WorkspaceCreateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceUncheckedCreateWithoutExecutionSessionsInput = {
@@ -3832,6 +4340,8 @@ export type WorkspaceUncheckedCreateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutWorkspaceInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutWorkspaceInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutWorkspaceInput
+  calendarSources?: Prisma.CalendarSourceUncheckedCreateNestedManyWithoutWorkspaceInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutWorkspaceInput
 }
 
 export type WorkspaceCreateOrConnectWithoutExecutionSessionsInput = {
@@ -3879,6 +4389,8 @@ export type WorkspaceUpdateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutWorkspaceNestedInput
 }
 
 export type WorkspaceUncheckedUpdateWithoutExecutionSessionsInput = {
@@ -3910,6 +4422,8 @@ export type WorkspaceUncheckedUpdateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutWorkspaceNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutWorkspaceNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutWorkspaceNestedInput
+  calendarSources?: Prisma.CalendarSourceUncheckedUpdateManyWithoutWorkspaceNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceNestedInput
 }
 
 
@@ -3940,6 +4454,8 @@ export type WorkspaceCountOutputType = {
   graphMutations: number
   reconciliationEvents: number
   schedulerEvents: number
+  calendarSources: number
+  importedCalendarEvents: number
 }
 
 export type WorkspaceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3965,6 +4481,8 @@ export type WorkspaceCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensi
   graphMutations?: boolean | WorkspaceCountOutputTypeCountGraphMutationsArgs
   reconciliationEvents?: boolean | WorkspaceCountOutputTypeCountReconciliationEventsArgs
   schedulerEvents?: boolean | WorkspaceCountOutputTypeCountSchedulerEventsArgs
+  calendarSources?: boolean | WorkspaceCountOutputTypeCountCalendarSourcesArgs
+  importedCalendarEvents?: boolean | WorkspaceCountOutputTypeCountImportedCalendarEventsArgs
 }
 
 /**
@@ -4131,6 +4649,20 @@ export type WorkspaceCountOutputTypeCountSchedulerEventsArgs<ExtArgs extends run
   where?: Prisma.SchedulerEventWhereInput
 }
 
+/**
+ * WorkspaceCountOutputType without action
+ */
+export type WorkspaceCountOutputTypeCountCalendarSourcesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CalendarSourceWhereInput
+}
+
+/**
+ * WorkspaceCountOutputType without action
+ */
+export type WorkspaceCountOutputTypeCountImportedCalendarEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ImportedCalendarEventWhereInput
+}
+
 
 export type WorkspaceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -4162,6 +4694,8 @@ export type WorkspaceSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   graphMutations?: boolean | Prisma.Workspace$graphMutationsArgs<ExtArgs>
   reconciliationEvents?: boolean | Prisma.Workspace$reconciliationEventsArgs<ExtArgs>
   schedulerEvents?: boolean | Prisma.Workspace$schedulerEventsArgs<ExtArgs>
+  calendarSources?: boolean | Prisma.Workspace$calendarSourcesArgs<ExtArgs>
+  importedCalendarEvents?: boolean | Prisma.Workspace$importedCalendarEventsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workspace"]>
 
@@ -4219,6 +4753,8 @@ export type WorkspaceInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   graphMutations?: boolean | Prisma.Workspace$graphMutationsArgs<ExtArgs>
   reconciliationEvents?: boolean | Prisma.Workspace$reconciliationEventsArgs<ExtArgs>
   schedulerEvents?: boolean | Prisma.Workspace$schedulerEventsArgs<ExtArgs>
+  calendarSources?: boolean | Prisma.Workspace$calendarSourcesArgs<ExtArgs>
+  importedCalendarEvents?: boolean | Prisma.Workspace$importedCalendarEventsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkspaceCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WorkspaceIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -4249,6 +4785,8 @@ export type $WorkspacePayload<ExtArgs extends runtime.Types.Extensions.InternalA
     graphMutations: Prisma.$GraphMutationRecordPayload<ExtArgs>[]
     reconciliationEvents: Prisma.$ReconciliationEventPayload<ExtArgs>[]
     schedulerEvents: Prisma.$SchedulerEventPayload<ExtArgs>[]
+    calendarSources: Prisma.$CalendarSourcePayload<ExtArgs>[]
+    importedCalendarEvents: Prisma.$ImportedCalendarEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -4674,6 +5212,8 @@ export interface Prisma__WorkspaceClient<T, Null = never, ExtArgs extends runtim
   graphMutations<T extends Prisma.Workspace$graphMutationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$graphMutationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GraphMutationRecordPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   reconciliationEvents<T extends Prisma.Workspace$reconciliationEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$reconciliationEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReconciliationEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   schedulerEvents<T extends Prisma.Workspace$schedulerEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$schedulerEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SchedulerEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  calendarSources<T extends Prisma.Workspace$calendarSourcesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$calendarSourcesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  importedCalendarEvents<T extends Prisma.Workspace$importedCalendarEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Workspace$importedCalendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ImportedCalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -5626,6 +6166,54 @@ export type Workspace$schedulerEventsArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.SchedulerEventScalarFieldEnum | Prisma.SchedulerEventScalarFieldEnum[]
+}
+
+/**
+ * Workspace.calendarSources
+ */
+export type Workspace$calendarSourcesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CalendarSource
+   */
+  select?: Prisma.CalendarSourceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CalendarSource
+   */
+  omit?: Prisma.CalendarSourceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CalendarSourceInclude<ExtArgs> | null
+  where?: Prisma.CalendarSourceWhereInput
+  orderBy?: Prisma.CalendarSourceOrderByWithRelationInput | Prisma.CalendarSourceOrderByWithRelationInput[]
+  cursor?: Prisma.CalendarSourceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CalendarSourceScalarFieldEnum | Prisma.CalendarSourceScalarFieldEnum[]
+}
+
+/**
+ * Workspace.importedCalendarEvents
+ */
+export type Workspace$importedCalendarEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ImportedCalendarEvent
+   */
+  select?: Prisma.ImportedCalendarEventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ImportedCalendarEvent
+   */
+  omit?: Prisma.ImportedCalendarEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ImportedCalendarEventInclude<ExtArgs> | null
+  where?: Prisma.ImportedCalendarEventWhereInput
+  orderBy?: Prisma.ImportedCalendarEventOrderByWithRelationInput | Prisma.ImportedCalendarEventOrderByWithRelationInput[]
+  cursor?: Prisma.ImportedCalendarEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ImportedCalendarEventScalarFieldEnum | Prisma.ImportedCalendarEventScalarFieldEnum[]
 }
 
 /**

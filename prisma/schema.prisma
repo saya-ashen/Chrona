@@ -58,6 +58,32 @@ enum ScheduleProposalStatus {
   Rejected
 }
 
+enum CalendarSourceLifecycleState {
+  active
+  disabled
+  removing
+  removed
+}
+
+enum CalendarEventStatus {
+  confirmed
+  tentative
+  cancelled
+}
+
+enum CalendarSyncState {
+  idle
+  syncing
+  success
+  partial
+  failed
+}
+
+enum CalendarSyncPolicy {
+  keep_active
+  auto_complete_past_events
+}
+
 enum RunStatus {
   Pending
   Running
@@ -150,6 +176,60 @@ model Workspace {
   graphMutations       GraphMutationRecord[]
   reconciliationEvents ReconciliationEvent[]
   schedulerEvents      SchedulerEvent[]
+  calendarSources      CalendarSource[]
+  importedCalendarEvents ImportedCalendarEvent[]
+}
+
+model CalendarSource {
+  id                      String                       @id @default(cuid())
+  workspaceId             String
+  name                    String
+  sourceType              String                       @default("subscription")
+  sourceUrl               String
+  redactedUrlLabel        String
+  color                   String
+  lifecycleState          CalendarSourceLifecycleState @default(active)
+  syncPolicy              CalendarSyncPolicy           @default(keep_active)
+  syncState               CalendarSyncState            @default(idle)
+  lastSuccessfulRefreshAt DateTime?
+  nextExpectedRefreshAt   DateTime?
+  lastErrorCode           String?
+  lastErrorMessage        String?
+  importedCount           Int                          @default(0)
+  skippedCount            Int                          @default(0)
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  workspace               Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  events                  ImportedCalendarEvent[]
+
+  @@index([workspaceId, lifecycleState])
+  @@unique([workspaceId, sourceUrl])
+}
+
+model ImportedCalendarEvent {
+  id               String              @id @default(cuid())
+  workspaceId      String
+  calendarSourceId String
+  taskId           String?             @unique
+  externalUid      String
+  recurrenceId     String?
+  dedupeKey        String
+  title            String
+  description      String?
+  startsAt         DateTime
+  endsAt           DateTime
+  isAllDay         Boolean             @default(false)
+  status           CalendarEventStatus @default(confirmed)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  calendarSource   CalendarSource      @relation(fields: [calendarSourceId], references: [id], onDelete: Cascade)
+  task             Task?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@unique([calendarSourceId, dedupeKey])
+  @@index([taskId])
+  @@index([workspaceId, startsAt, endsAt])
+  @@index([calendarSourceId, startsAt])
 }
 
 model Task {
@@ -201,6 +281,7 @@ model Task {
   graphMutations       GraphMutationRecord[]
   reconciliationEvents ReconciliationEvent[]
   schedulerEvents      SchedulerEvent[]
+  importedCalendarEvent ImportedCalendarEvent?
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])

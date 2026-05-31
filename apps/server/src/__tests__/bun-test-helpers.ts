@@ -16,6 +16,8 @@ export const runLiveHermes = process.env.CHRONA_LIVE_HERMES_TESTS === "1";
 export async function resetTestDb() {
   assertSafeTestDatabaseUrl(process.env.DATABASE_URL);
 
+  await db.importedCalendarEvent.deleteMany();
+  await db.calendarSource.deleteMany();
   await db.taskAssistantMessage.deleteMany();
   await db.scheduleProposal.deleteMany();
   await db.toolInvocation.deleteMany();

@@ -1,5 +1,43 @@
 // AI plan contracts — new architecture
 export type {
+  CalendarEventStatus,
+  CalendarSourceLifecycleState,
+  CalendarSourceSummary,
+  CalendarSourceSyncPolicy,
+  CalendarSourceType,
+  CalendarSourceListResponse,
+  CalendarSourceResponse,
+  CalendarSyncStatus,
+  CalendarValidationErrorCode,
+  CreateCalendarSourceRequest,
+  ImportedCalendarEventSummary,
+  ImportedCalendarEventListResponse,
+  UpdateCalendarSourceRequest,
+  ValidateCalendarSourceResponse,
+} from "./external-calendar";
+
+export {
+  calendarEventStatusSchema,
+  calendarSourceDeleteResponseSchema,
+  calendarSourceLifecycleStateSchema,
+  calendarSourceListResponseSchema,
+  calendarSourceResponseSchema,
+  calendarSourceSummarySchema,
+  calendarSourceSyncPolicySchema,
+  calendarSourceTypeSchema,
+  calendarSyncStatusSchema,
+  calendarValidationErrorCodeSchema,
+  createCalendarSourceRequestSchema,
+  importedCalendarEventListResponseSchema,
+  importedCalendarEventSummarySchema,
+  updateCalendarSourceRequestSchema,
+  validateCalendarSourceFailureSchema,
+  validateCalendarSourceRequestSchema,
+  validateCalendarSourceResponseSchema,
+  validateCalendarSourceSuccessSchema,
+} from "./external-calendar";
+
+export type {
   AssistantActionRequest,
   AssistantActionResult,
   AssistantPreviewSurface,

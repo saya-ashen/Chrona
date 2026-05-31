@@ -123,6 +123,7 @@ function derivePrimaryAction(input: {
   blockReason?: TaskBlockReason | null;
   targetNodeId?: string | null;
 }): TaskAction {
+  if (input.state === "completed" || input.state === "cancelled") return noAction;
   const blockAction = derivePrimaryActionFromTaskBlock(input.blockReason, input.targetNodeId);
   if (blockAction) return input.runnable ? blockAction : { ...blockAction, enabled: false, label: "Not runnable" };
   const { state, runnable } = input;
@@ -192,6 +193,7 @@ function derivePrimaryActionFromTaskBlock(
       return { type: "replan", enabled: true, label: actionRequired || "Replan", targetNodeId };
     case "run_failed":
     case "node_failed":
+    case "sync_stale":
       return { type: "retry_sync", enabled: true, label: actionRequired || "Retry run", targetNodeId };
     case "external_dependency":
       return { type: "resume", enabled: true, label: actionRequired || "Resume after unblock", targetNodeId };

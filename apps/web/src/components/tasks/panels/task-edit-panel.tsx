@@ -14,7 +14,6 @@ type TaskEditPanelProps = {
 
 export function TaskEditPanel({
   title = "Edit task",
-  description = "Keep edits here. Use the AI panel only for planning.",
   actions,
   children,
   className,
@@ -31,9 +30,8 @@ export function TaskEditPanel({
       <div className="space-y-2.5">
         <div className="px-1">
           <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
               <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-              <div className="text-xs text-muted-foreground">{description}</div>
             </div>
             {actions ? <div className="shrink-0">{actions}</div> : null}
           </div>

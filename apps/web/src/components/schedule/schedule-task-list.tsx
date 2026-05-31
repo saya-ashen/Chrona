@@ -34,6 +34,14 @@ export type ScheduleTaskListItem = {
   lastActivityAt: Date | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  sourceManaged?: {
+    source: "external_calendar";
+    eventId: string;
+    sourceName: string;
+    sourceColor: string;
+    description: string | null;
+    immutableFields: readonly ["title", "scheduledStartAt", "scheduledEndAt"];
+  } | null;
   executionRuntime: string;
   executionConfig: unknown;
   isRunnable: boolean;
@@ -220,6 +228,8 @@ export function ScheduleTaskList({
     quickEdit: t("components.scheduleTaskList.quickEdit"),
     saveTaskConfig: t("components.scheduleTaskList.saveTaskConfig"),
     saving: t("components.scheduleTaskList.saving"),
+    calendarDescription: t("components.taskConfigForm.calendarDescription"),
+    chronaNotesEmpty: t("components.taskConfigForm.chronaNotesEmpty"),
   };
 
   const listFilters: Array<{ key: ListFilterKey; label: string; emptyMessage: string }> = [
@@ -323,7 +333,9 @@ export function ScheduleTaskList({
                         ) : null}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {item.description ?? copy.noDescription}
+                        {item.sourceManaged
+                          ? item.description || item.sourceManaged.description || copy.chronaNotesEmpty
+                          : item.description ?? copy.noDescription}
                       </p>
                     </div>
 
@@ -379,6 +391,10 @@ export function ScheduleTaskList({
                       defaultExecutionRuntime={defaultExecutionRuntime}
                       initialValues={toTaskConfigInitialValues(item)}
                       isPending={isPending}
+                      lockedFields={item.sourceManaged?.immutableFields}
+                      lockedFieldsHint={item.sourceManaged ? `Synced from ${item.sourceManaged.sourceName}. Title and time are managed by the calendar source.` : undefined}
+                      sourceDescription={item.sourceManaged?.description ?? null}
+                      sourceDescriptionLabel={item.sourceManaged ? `${copy.calendarDescription} · ${item.sourceManaged.sourceName}` : undefined}
                       submitLabel={copy.saveTaskConfig}
                       pendingLabel={copy.saving}
                       onSubmitAction={async (input) => {

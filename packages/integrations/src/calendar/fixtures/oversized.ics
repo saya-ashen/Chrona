@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Chrona//External Calendar Fixtures//EN
+CALSCALE:GREGORIAN
+X-CHRONA-FIXTURE:OVERSIZED
+BEGIN:VEVENT
+UID:oversized-feed@example.test
+DTSTAMP:20260501T080000Z
+DTSTART:20260510T120000Z
+DTEND:20260510T130000Z
+SUMMARY:External oversized feed marker
+DESCRIPTION:Tests feed-size rejection paths without storing a huge file in git.
+END:VEVENT
+END:VCALENDAR

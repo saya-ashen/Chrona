@@ -385,6 +385,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   Workspace: 'Workspace',
+  CalendarSource: 'CalendarSource',
+  ImportedCalendarEvent: 'ImportedCalendarEvent',
   Task: 'Task',
   SchedulerLease: 'SchedulerLease',
   GraphVersion: 'GraphVersion',
@@ -430,7 +432,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanNodeAttempt" | "taskPlanProviderRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "rawEventLog" | "conversationEntry" | "toolInvocation" | "taskTimelineItem" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
+    modelProps: "workspace" | "calendarSource" | "importedCalendarEvent" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanNodeAttempt" | "taskPlanProviderRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "rawEventLog" | "conversationEntry" | "toolInvocation" | "taskTimelineItem" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -505,6 +507,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.WorkspaceCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.WorkspaceCountAggregateOutputType> | number
+        }
+      }
+    }
+    CalendarSource: {
+      payload: Prisma.$CalendarSourcePayload<ExtArgs>
+      fields: Prisma.CalendarSourceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CalendarSourceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CalendarSourceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+        }
+        findFirst: {
+          args: Prisma.CalendarSourceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CalendarSourceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+        }
+        findMany: {
+          args: Prisma.CalendarSourceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>[]
+        }
+        create: {
+          args: Prisma.CalendarSourceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+        }
+        createMany: {
+          args: Prisma.CalendarSourceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CalendarSourceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>[]
+        }
+        delete: {
+          args: Prisma.CalendarSourceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+        }
+        update: {
+          args: Prisma.CalendarSourceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+        }
+        deleteMany: {
+          args: Prisma.CalendarSourceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CalendarSourceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CalendarSourceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>[]
+        }
+        upsert: {
+          args: Prisma.CalendarSourceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+        }
+        aggregate: {
+          args: Prisma.CalendarSourceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCalendarSource>
+        }
+        groupBy: {
+          args: Prisma.CalendarSourceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CalendarSourceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CalendarSourceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CalendarSourceCountAggregateOutputType> | number
+        }
+      }
+    }
+    ImportedCalendarEvent: {
+      payload: Prisma.$ImportedCalendarEventPayload<ExtArgs>
+      fields: Prisma.ImportedCalendarEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ImportedCalendarEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ImportedCalendarEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>
+        }
+        findFirst: {
+          args: Prisma.ImportedCalendarEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ImportedCalendarEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>
+        }
+        findMany: {
+          args: Prisma.ImportedCalendarEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>[]
+        }
+        create: {
+          args: Prisma.ImportedCalendarEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>
+        }
+        createMany: {
+          args: Prisma.ImportedCalendarEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ImportedCalendarEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>[]
+        }
+        delete: {
+          args: Prisma.ImportedCalendarEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>
+        }
+        update: {
+          args: Prisma.ImportedCalendarEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.ImportedCalendarEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ImportedCalendarEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ImportedCalendarEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.ImportedCalendarEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportedCalendarEventPayload>
+        }
+        aggregate: {
+          args: Prisma.ImportedCalendarEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateImportedCalendarEvent>
+        }
+        groupBy: {
+          args: Prisma.ImportedCalendarEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ImportedCalendarEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ImportedCalendarEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ImportedCalendarEventCountAggregateOutputType> | number
         }
       }
     }
@@ -2777,6 +2927,51 @@ export const WorkspaceScalarFieldEnum = {
 export type WorkspaceScalarFieldEnum = (typeof WorkspaceScalarFieldEnum)[keyof typeof WorkspaceScalarFieldEnum]
 
 
+export const CalendarSourceScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  name: 'name',
+  sourceType: 'sourceType',
+  sourceUrl: 'sourceUrl',
+  redactedUrlLabel: 'redactedUrlLabel',
+  color: 'color',
+  lifecycleState: 'lifecycleState',
+  syncPolicy: 'syncPolicy',
+  syncState: 'syncState',
+  lastSuccessfulRefreshAt: 'lastSuccessfulRefreshAt',
+  nextExpectedRefreshAt: 'nextExpectedRefreshAt',
+  lastErrorCode: 'lastErrorCode',
+  lastErrorMessage: 'lastErrorMessage',
+  importedCount: 'importedCount',
+  skippedCount: 'skippedCount',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CalendarSourceScalarFieldEnum = (typeof CalendarSourceScalarFieldEnum)[keyof typeof CalendarSourceScalarFieldEnum]
+
+
+export const ImportedCalendarEventScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  calendarSourceId: 'calendarSourceId',
+  taskId: 'taskId',
+  externalUid: 'externalUid',
+  recurrenceId: 'recurrenceId',
+  dedupeKey: 'dedupeKey',
+  title: 'title',
+  description: 'description',
+  startsAt: 'startsAt',
+  endsAt: 'endsAt',
+  isAllDay: 'isAllDay',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ImportedCalendarEventScalarFieldEnum = (typeof ImportedCalendarEventScalarFieldEnum)[keyof typeof ImportedCalendarEventScalarFieldEnum]
+
+
 export const TaskScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
@@ -3474,6 +3669,48 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
 
 
 /**
+ * Reference to a field of type 'CalendarSourceLifecycleState'
+ */
+export type EnumCalendarSourceLifecycleStateFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSourceLifecycleState'>
+    
+
+
+/**
+ * Reference to a field of type 'CalendarSyncPolicy'
+ */
+export type EnumCalendarSyncPolicyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSyncPolicy'>
+    
+
+
+/**
+ * Reference to a field of type 'CalendarSyncState'
+ */
+export type EnumCalendarSyncStateFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSyncState'>
+    
+
+
+/**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
+ * Reference to a field of type 'CalendarEventStatus'
+ */
+export type EnumCalendarEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarEventStatus'>
+    
+
+
+/**
  * Reference to a field of type 'Json'
  */
 export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
@@ -3498,20 +3735,6 @@ export type EnumTaskStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Prism
  * Reference to a field of type 'TaskPriority'
  */
 export type EnumTaskPriorityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TaskPriority'>
-    
-
-
-/**
- * Reference to a field of type 'Boolean'
- */
-export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
-    
-
-
-/**
- * Reference to a field of type 'Int'
- */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
     
 
 
@@ -3730,6 +3953,8 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   workspace?: Prisma.WorkspaceOmit
+  calendarSource?: Prisma.CalendarSourceOmit
+  importedCalendarEvent?: Prisma.ImportedCalendarEventOmit
   task?: Prisma.TaskOmit
   schedulerLease?: Prisma.SchedulerLeaseOmit
   graphVersion?: Prisma.GraphVersionOmit

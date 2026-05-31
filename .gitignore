@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -21,6 +22,7 @@
 
 # production
 /build
+build/
 
 # misc
 .DS_Store
@@ -55,11 +57,15 @@ agent-dashboard-app/
 prisma/dev.db
 prisma/dev.db-shm
 prisma/dev.db-wal
+prisma/dev.db.*
+prisma/dev.db-shm.*
+prisma/dev.db-wal.*
 .env
 .env.local
 
 # build output
 /dist/
+dist/
 /packages/cli/dist/
 apps/web/dist/
 apps/web/node_modules/.vite/

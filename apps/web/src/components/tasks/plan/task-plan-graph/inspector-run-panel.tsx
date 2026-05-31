@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "@/components/tasks/task-workspace-query";
 import { buildWorkspaceCheckpointActionInput } from "@/components/tasks/workspace/model/task-workspace-actions";
 import { interactionLabel } from "./logic";
+import { jsonOutputText } from "./result-output-format";
 import type { PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./types";
 
 type RunPanelMode = PlanNodeDataModel["interactionType"];
@@ -270,6 +271,19 @@ export function ResultOutputCard({ output, disableInternalScroll = false }: { ou
         </div>
       );
     case "json":
+      {
+        const text = jsonOutputText(output.value);
+        if (text) {
+          return (
+            <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{output.title ?? "Result"}</p>
+              <div className="mt-2">
+                <MarkdownContent content={text} disableInternalScroll={disableInternalScroll} />
+              </div>
+            </div>
+          );
+        }
+      }
       return (
         <div className="rounded-xl border border-border/60 bg-slate-950 px-3 py-2 text-slate-50">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">{output.title ?? "JSON"}</p>

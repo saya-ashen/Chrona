@@ -180,7 +180,7 @@ After /clear or /compact: knowledge base and session stats preserved. Use
 
 For additional context about technologies to be used, project structure, shell
 commands, and other important information, read
-`specs/014-test-coverage/plan.md`
+`specs/015-external-calendar/plan.md`
 
 <!-- SPECKIT END -->
 

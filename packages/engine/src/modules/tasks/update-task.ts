@@ -79,6 +79,17 @@ export async function updateTask(
       },
     },
   });
+  const importedCalendarEvent = await db.importedCalendarEvent.findUnique({
+    where: { taskId: input.taskId },
+    select: { title: true },
+  });
+  if (
+    importedCalendarEvent &&
+    title !== undefined &&
+    title !== importedCalendarEvent.title
+  ) {
+    throw new Error("External calendar task title is managed by the calendar source");
+  }
   const baseExecutionConfig =
     input.executionConfig === undefined
       ? currentTask.executionConfig

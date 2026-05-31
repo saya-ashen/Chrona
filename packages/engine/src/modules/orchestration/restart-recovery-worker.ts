@@ -1,8 +1,12 @@
 import { db } from "@/lib/db";
+import { taskPlanExecution } from "@/modules/plan-execution";
 import { recordOrchestratorEvent } from "./scheduler-events";
+
+type RecoveryTaskRef = { workspaceId: string } | null;
 
 type RestartRecoveryWorkerDeps = {
   recordEvent?: typeof recordOrchestratorEvent;
+  reconcileStaleRuntimeRuns?: typeof taskPlanExecution.reconcileStaleRuntimeRuns;
 };
 
 export async function runRestartRecoveryWorker(input: {
@@ -11,6 +15,8 @@ export async function runRestartRecoveryWorker(input: {
 } = {}) {
   const now = input.now ?? new Date();
   const recordEvent = input.deps?.recordEvent ?? recordOrchestratorEvent;
+  const reconcileStaleRuntimeRuns = input.deps?.reconcileStaleRuntimeRuns ??
+    taskPlanExecution.reconcileStaleRuntimeRuns.bind(taskPlanExecution);
   const expiredLeases = await db.schedulerLease.findMany({ where: { expiresAt: { lte: now } } });
   await db.schedulerLease.deleteMany({ where: { expiresAt: { lte: now } } });
 
@@ -26,7 +32,8 @@ export async function runRestartRecoveryWorker(input: {
     include: { task: { select: { workspaceId: true } } },
   });
   for (const session of activeSessions) {
-    if (!session.task) {
+    const task = session.task as RecoveryTaskRef;
+    if (task === null) {
       console.warn("[restart-recovery-worker] active session missing task", {
         sessionId: session.id,
         taskId: session.taskId,
@@ -34,11 +41,11 @@ export async function runRestartRecoveryWorker(input: {
       continue;
     }
     await recordEvent({
-      workspaceId: session.task.workspaceId,
+      workspaceId: task.workspaceId,
       taskId: session.taskId,
       eventType: "scheduler.repair",
       reason: "restart_active_session_scan",
-      payload: { sessionId: session.id},
+      payload: { sessionId: session.id },
     });
   }
 
@@ -47,7 +54,8 @@ export async function runRestartRecoveryWorker(input: {
     include: { task: { select: { workspaceId: true } } },
   });
   for (const run of degradedRuns) {
-    if (!run.task) {
+    const task = run.task as RecoveryTaskRef;
+    if (task === null) {
       console.warn("[restart-recovery-worker] degraded run missing task", {
         runId: run.id,
         taskId: run.taskId,
@@ -55,7 +63,7 @@ export async function runRestartRecoveryWorker(input: {
       continue;
     }
     await recordEvent({
-      workspaceId: run.task.workspaceId,
+      workspaceId: task.workspaceId,
       taskId: run.taskId,
       eventType: "scheduler.repair",
       reason: "restart_degraded_run_scan",
@@ -63,9 +71,12 @@ export async function runRestartRecoveryWorker(input: {
     });
   }
 
+  const runtimeReconciliation = await reconcileStaleRuntimeRuns({ limit: 25 });
+
   return {
     expiredLeaseCount: expiredLeases.length,
     activeSessionCount: activeSessions.length,
     degradedRunCount: degradedRuns.length,
+    runtimeReconciliation,
   };
 }

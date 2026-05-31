@@ -1,0 +1,123 @@
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { CalendarSourceSetup } from "@/components/schedule/calendar-source-setup";
+import {
+  createExternalCalendarSource,
+  getExternalCalendarErrorMessage,
+  listExternalCalendarSources,
+  validateCalendarSource,
+} from "@/lib/external-calendar-client";
+
+vi.mock("@/lib/external-calendar-client", () => ({
+  createExternalCalendarSource: vi.fn(),
+  getExternalCalendarErrorMessage: vi.fn((error: unknown) => error instanceof Error ? error.message : "Calendar source failed"),
+  listExternalCalendarSources: vi.fn(),
+  validateCalendarSource: vi.fn(),
+}));
+
+const validateMock = vi.mocked(validateCalendarSource);
+const createMock = vi.mocked(createExternalCalendarSource);
+const errorMessageMock = vi.mocked(getExternalCalendarErrorMessage);
+const listMock = vi.mocked(listExternalCalendarSources);
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("CalendarSourceSetup", () => {
+  beforeEach(() => {
+    listMock.mockResolvedValue({ sources: [] });
+  });
+
+  it("renders read-only guidance and empty connected-source state", () => {
+    render(<CalendarSourceSetup workspaceId="workspace-1" />);
+
+    expect(screen.getByRole("heading", { name: /connect external calendar/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/read-only/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/no external calendars connected/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/display name/i)).toHaveValue("");
+    expect(screen.getByLabelText(/calendar url/i)).toHaveValue("");
+  });
+
+  it("validates a source link and shows preview feedback", async () => {
+    const user = userEvent.setup();
+    validateMock.mockResolvedValueOnce({
+      valid: true,
+      detectedName: "Engineering Calendar",
+      eventPreviewCount: 3,
+      redactedUrlLabel: "calendar.example.test",
+      warnings: [],
+    });
+
+    render(<CalendarSourceSetup workspaceId="workspace-1" />);
+
+    await user.type(screen.getByLabelText(/calendar url/i), "https://calendar.example.test/team.ics?token=secret");
+    await user.click(screen.getByRole("button", { name: /validate/i }));
+
+    await waitFor(() => {
+      expect(validateMock).toHaveBeenCalledWith("workspace-1", "https://calendar.example.test/team.ics?token=secret");
+    });
+    expect(screen.getByText(/calendar link validated/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 events/i)).toBeInTheDocument();
+    expect(screen.getByText(/calendar.example.test/i)).toBeInTheDocument();
+  });
+
+  it("creates a source and shows imported event count", async () => {
+    const user = userEvent.setup();
+    createMock.mockResolvedValueOnce({
+      source: {
+        id: "source-1",
+        name: "Team calendar",
+        sourceType: "subscription",
+        redactedUrlLabel: "team.ics",
+        color: "#2563eb",
+        syncPolicy: "auto_complete_past_events",
+        lifecycleState: "active",
+      },
+      syncStatus: {
+        sourceId: "source-1",
+        state: "success",
+        importedCount: 4,
+        skippedCount: 0,
+      },
+    });
+
+    render(<CalendarSourceSetup workspaceId="workspace-1" />);
+
+    await user.type(screen.getByLabelText(/display name/i), "Team calendar");
+    await user.type(screen.getByLabelText(/calendar url/i), "https://calendar.example.test/team.ics");
+    await user.click(screen.getByRole("button", { name: /connect calendar/i }));
+
+    await waitFor(() => {
+      expect(createMock).toHaveBeenCalledWith("workspace-1", {
+        name: "Team calendar",
+        url: "https://calendar.example.test/team.ics",
+        color: "#2563eb",
+        syncPolicy: "auto_complete_past_events",
+      });
+    });
+    expect(screen.getByText(/Team calendar/i)).toBeInTheDocument();
+    expect(screen.getByText(/Imported events/i)).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText(/team.ics/i)).toBeInTheDocument();
+  });
+
+  it("maps invalid-link errors into actionable feedback", async () => {
+    const user = userEvent.setup();
+    const error = new Error("Unsupported calendar link");
+    createMock.mockRejectedValueOnce(error);
+    errorMessageMock.mockReturnValueOnce("Use an http, https, or file calendar link.");
+
+    render(<CalendarSourceSetup workspaceId="workspace-1" />);
+
+    await user.type(screen.getByLabelText(/display name/i), "Bad calendar");
+    await user.type(screen.getByLabelText(/calendar url/i), "ftp://calendar.example.test/team.ics");
+    await user.click(screen.getByRole("button", { name: /connect calendar/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Use an http, https, or file calendar link.");
+    expect(screen.getByText(/no external calendars connected/i)).toBeInTheDocument();
+  });
+});

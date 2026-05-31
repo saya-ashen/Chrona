@@ -18,11 +18,11 @@ export async function completeWorkBlock(taskId: string, workBlockId?: string | n
   });
 }
 
-export async function cancelWorkBlock(taskId: string, workBlockId?: string | null) {
+export async function releaseWorkBlock(taskId: string, workBlockId?: string | null) {
   await db.workBlock.updateMany({
     where: workBlockId
       ? { id: workBlockId, taskId }
       : { taskId, status: "Active" },
-    data: { status: "Cancelled" },
+    data: { status: "Scheduled", startedAt: null },
   });
 }

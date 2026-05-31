@@ -890,6 +890,38 @@ describe("buildPlanningSummary", () => {
     expect(summary.proposalCount).toBe(1);
     expect(summary.riskCount).toBe(1);
   });
+
+  it("excludes running unscheduled tasks from ready queue count", () => {
+    const summary = buildPlanningSummary({
+      scheduled: [],
+      unscheduled: [
+        createScheduledItem({
+          taskId: "queued",
+          scheduleStatus: "Unscheduled",
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }),
+        createScheduledItem({
+          taskId: "running",
+          persistedStatus: "Running",
+          scheduleStatus: "Unscheduled",
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }),
+        createScheduledItem({
+          taskId: "pending-run",
+          latestRunStatus: "Pending",
+          scheduleStatus: "Unscheduled",
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }),
+      ],
+      proposals: [],
+      risks: [],
+    });
+
+    expect(summary.readyToScheduleCount).toBe(1);
+  });
 });
 
 describe("buildTodayFocusItems", () => {

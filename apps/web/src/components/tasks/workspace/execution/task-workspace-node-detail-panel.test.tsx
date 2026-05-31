@@ -143,6 +143,29 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("Review")).toBeInTheDocument();
   });
 
+  it("renders provider JSON outputText as the result body", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "final",
+      title: "Format final answer",
+      status: "done",
+      completionSummary: "Readable final answer",
+      resultOutputs: [{
+        kind: "json",
+        value: {
+          runtimeRunRef: "run-1",
+          runtimeName: "hermes",
+          provider: "hermes",
+          outputText: "Readable final answer",
+        },
+      }],
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);
+
+    expect(screen.getByText("Readable final answer")).toBeInTheDocument();
+    expect(screen.queryByText(/runtimeRunRef/)).not.toBeInTheDocument();
+  });
+
   it("submits free-form input nodes without requiring a predefined action", async () => {
     const dispatchAction = vi.fn().mockResolvedValue({ message: "Input sent" });
     const node = createTaskWorkspaceFixtureNode({

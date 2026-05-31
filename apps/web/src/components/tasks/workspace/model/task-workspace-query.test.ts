@@ -222,6 +222,28 @@ describe("task workspace execution console view model", () => {
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "done-output-0", sourceNodeId: "done" }));
   });
 
+  it("uses provider output text from JSON result wrappers", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([node({
+        id: "done",
+        status: "done",
+        resultOutputs: [{
+          kind: "json",
+          value: {
+            runtimeRunRef: "run-1",
+            runtimeName: "hermes",
+            outputText: "Readable final answer",
+          },
+        }],
+      })]),
+    });
+
+    expect(view.latestResult).toMatchObject({ description: "Readable final answer" });
+    expect(view.latestResult.content).toBe("Readable final answer");
+    expect(view.artifacts).toContainEqual(expect.objectContaining({ content: "Readable final answer" }));
+  });
+
   it("keeps latest result tied to the newest completed result when selection changes", () => {
     const first = node({
       id: "first-result",

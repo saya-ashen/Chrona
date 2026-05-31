@@ -1,0 +1,115 @@
+import { Hono } from "hono";
+import { z } from "zod";
+import { zValidator } from "@hono/zod-validator";
+import {
+  createCalendarSourceRequestSchema,
+  updateCalendarSourceRequestSchema,
+  validateCalendarSourceRequestSchema,
+} from "@chrona/contracts";
+
+import { error, internalServerError, json } from "../lib/http";
+import { createExternalCalendarService } from "../services/external-calendar-service";
+
+const workspaceParamSchema = z.object({ workspaceId: z.string().min(1) });
+const sourceParamSchema = workspaceParamSchema.extend({ sourceId: z.string().min(1) });
+const eventQuerySchema = z.object({
+  from: z.string().datetime().or(z.string().date()),
+  to: z.string().datetime().or(z.string().date()),
+  sourceId: z.string().optional(),
+});
+
+function parseDate(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+export function createCalendarSourceRoutes() {
+  const service = createExternalCalendarService();
+
+  return new Hono()
+    .post(
+      "/workspaces/:workspaceId/calendar-sources/validate",
+      zValidator("param", workspaceParamSchema),
+      zValidator("json", validateCalendarSourceRequestSchema),
+      async (c) => {
+        try {
+          const body = c.req.valid("json");
+          return json(c, await service.validateSourceUrl(body.url));
+        } catch (cause) {
+          return internalServerError(c, "POST /api/workspaces/:workspaceId/calendar-sources/validate", cause, "Failed to validate calendar source");
+        }
+      },
+    )
+    .post(
+      "/workspaces/:workspaceId/calendar-sources",
+      zValidator("param", workspaceParamSchema),
+      zValidator("json", createCalendarSourceRequestSchema),
+      async (c) => {
+        try {
+          const { workspaceId } = c.req.valid("param");
+          const result = await service.createSource(workspaceId, c.req.valid("json"));
+          if ("validation" in result) return json(c, result.validation, 400);
+          return json(c, result, 201);
+        } catch (cause) {
+          return internalServerError(c, "POST /api/workspaces/:workspaceId/calendar-sources", cause, "Failed to create calendar source");
+        }
+      },
+    )
+    .get("/workspaces/:workspaceId/calendar-sources", zValidator("param", workspaceParamSchema), async (c) => {
+      try {
+        const { workspaceId } = c.req.valid("param");
+        return json(c, await service.listSources(workspaceId));
+      } catch (cause) {
+        return internalServerError(c, "GET /api/workspaces/:workspaceId/calendar-sources", cause, "Failed to list calendar sources");
+      }
+    })
+    .patch(
+      "/workspaces/:workspaceId/calendar-sources/:sourceId",
+      zValidator("param", sourceParamSchema),
+      zValidator("json", updateCalendarSourceRequestSchema),
+      async (c) => {
+        try {
+          const { workspaceId, sourceId } = c.req.valid("param");
+          return json(c, await service.updateSource(workspaceId, sourceId, c.req.valid("json")));
+        } catch (cause) {
+          if (cause instanceof Error && cause.message.includes("Record to update not found")) return error(c, "Calendar source not found", 404);
+          return internalServerError(c, "PATCH /api/workspaces/:workspaceId/calendar-sources/:sourceId", cause, "Failed to update calendar source");
+        }
+      },
+    )
+    .post("/workspaces/:workspaceId/calendar-sources/:sourceId/refresh", zValidator("param", sourceParamSchema), async (c) => {
+      try {
+        const { workspaceId, sourceId } = c.req.valid("param");
+        return json(c, await service.refreshSource(workspaceId, sourceId));
+      } catch (cause) {
+        if (cause instanceof Error && cause.message === "calendar_source_not_found") return error(c, "Calendar source not found", 404);
+        return internalServerError(c, "POST /api/workspaces/:workspaceId/calendar-sources/:sourceId/refresh", cause, "Failed to refresh calendar source");
+      }
+    })
+    .delete("/workspaces/:workspaceId/calendar-sources/:sourceId", zValidator("param", sourceParamSchema), async (c) => {
+      try {
+        const { workspaceId, sourceId } = c.req.valid("param");
+        return json(c, await service.removeSource(workspaceId, sourceId));
+      } catch (cause) {
+        return internalServerError(c, "DELETE /api/workspaces/:workspaceId/calendar-sources/:sourceId", cause, "Failed to remove calendar source");
+      }
+    })
+    .get(
+      "/workspaces/:workspaceId/calendar-events",
+      zValidator("param", workspaceParamSchema),
+      zValidator("query", eventQuerySchema),
+      async (c) => {
+        try {
+          const { workspaceId } = c.req.valid("param");
+          const query = c.req.valid("query");
+          const from = parseDate(query.from);
+          const to = parseDate(query.to);
+          if (!from || !to || from >= to) return error(c, "Provide a valid from/to date range", 400);
+          return json(c, await service.listEvents(workspaceId, from, to, query.sourceId));
+        } catch (cause) {
+          return internalServerError(c, "GET /api/workspaces/:workspaceId/calendar-events", cause, "Failed to list calendar events");
+        }
+      },
+    );
+}

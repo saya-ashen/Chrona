@@ -11,6 +11,7 @@ import type {
   TimelineCreateInput,
   TimelineDragItem,
 } from "@/components/schedule/schedule-page-types";
+import type { PlanningBusyBlock } from "@chrona/domain";
 import type { SchedulePageCopy } from "@/components/schedule/schedule-page-copy";
 import type { SchedulePageViewModel } from "@/components/schedule/schedule-page-view-model";
 import type { TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
@@ -91,7 +92,7 @@ export function SchedulePageHeader({
           label: copy.queueMetric,
           value: String(viewData.planningSummary.readyToScheduleCount),
           hint: copy.cockpitQueueHint,
-          tone: viewData.summary.unscheduledCount > 0 ? "info" : undefined,
+          tone: viewData.planningSummary.readyToScheduleCount > 0 ? "info" : undefined,
         },
         {
           label: copy.risksMetric,
@@ -144,6 +145,7 @@ export function SchedulePageMainPanel({
   conflictTaskIds,
   listItems,
   ghostPreview,
+  externalEvents,
   executionRuntimes,
   defaultExecutionRuntime,
   isPending,
@@ -162,6 +164,7 @@ export function SchedulePageMainPanel({
   conflictTaskIds: Set<string>;
   listItems: SchedulePageData["listItems"];
   ghostPreview: ScheduleGhostBlockPreview | null;
+  externalEvents: PlanningBusyBlock[];
   executionRuntimes: SchedulePageData["executionRuntimes"];
   defaultExecutionRuntime: string;
   isPending: boolean;
@@ -207,6 +210,7 @@ export function SchedulePageMainPanel({
                 selectedTaskId={activeSelectedTaskId}
                 conflictTaskIds={conflictTaskIds}
                 ghostPreview={ghostPreview}
+                externalEvents={externalEvents}
                 draggedItem={draggedItem}
                 executionRuntimes={executionRuntimes}
                 defaultExecutionRuntime={defaultExecutionRuntime}

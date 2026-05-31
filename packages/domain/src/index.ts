@@ -8,3 +8,5 @@ export * from "./ai-sidebar/summarize-context";
 export * from "./assistant-surface/action-mapping";
 export * from "./assistant-surface/proposal-routing";
 export * from "./assistant-surface/summary-priority";
+export * from "./calendar/normalize-imported-events";
+export * from "./calendar/planning-busy-blocks";

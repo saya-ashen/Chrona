@@ -17,8 +17,9 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@chrona/i18n/react";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Info } from "lucide-react";
 import {
   deleteValueAtPath,
   getValueAtPath,
@@ -92,6 +93,10 @@ type TaskConfigFormProps = {
     autoPlanGeneration?: boolean;
     autoExecute?: boolean;
   };
+  lockedFields?: readonly ("title" | "scheduledStartAt" | "scheduledEndAt")[];
+  lockedFieldsHint?: string;
+  sourceDescription?: string | null;
+  sourceDescriptionLabel?: string;
   submitLabel: string;
   pendingLabel: string;
   isPending?: boolean;
@@ -109,6 +114,9 @@ type TaskConfigSelectOption = {
 function TaskConfigField({
   label,
   hint,
+  tooltip,
+  titleClassName,
+  hideTitle,
   htmlFor,
   invalid,
   error,
@@ -117,6 +125,9 @@ function TaskConfigField({
 }: {
   label: string;
   hint?: string;
+  tooltip?: string;
+  titleClassName?: string;
+  hideTitle?: boolean;
   htmlFor?: string;
   invalid?: boolean;
   error?: { message?: string };
@@ -125,11 +136,67 @@ function TaskConfigField({
 }) {
   return (
     <Field data-invalid={invalid} className={className}>
-      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
+      <div className={cn("flex items-center gap-1.5", titleClassName, hideTitle && "sr-only")}>
+        <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
+        {tooltip ? <InfoPopover label={label} content={tooltip} /> : null}
+      </div>
       {children}
       {invalid ? <FieldError errors={[error]} /> : null}
       {hint ? <FieldDescription>{hint}</FieldDescription> : null}
     </Field>
+  );
+}
+
+function InfoPopover({ label, content }: { label: string; content: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${label} info`}
+          onClick={() => setOpen((current) => !current)}
+          className="inline-flex rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <Info className="size-3.5" aria-hidden="true" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="start"
+        className="!z-[1000] w-64 border-border/70 bg-popover text-left text-xs leading-5 shadow-xl"
+      >
+        {content}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function TaskConfigSection({
+  title,
+  info,
+  actions,
+  compact = false,
+  children,
+}: {
+  title: string;
+  info?: string;
+  actions?: ReactNode;
+  compact?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className={cn("rounded-[1.2rem] border border-border/60 bg-background/80 p-3 text-sm text-foreground shadow-sm", compact && "rounded-xl")}>
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="truncate">{title}</span>
+          {info ? <InfoPopover label={title} content={info} /> : null}
+        </div>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
+      </div>
+      <div className="flex flex-col gap-2">{children}</div>
+    </section>
   );
 }
 
@@ -139,6 +206,7 @@ function TaskConfigSelect({
   value,
   placeholder = "-",
   options,
+  disabled,
   onValueChange,
 }: {
   name: string;
@@ -146,6 +214,7 @@ function TaskConfigSelect({
   value: string;
   placeholder?: string;
   options: TaskConfigSelectOption[];
+  disabled?: boolean;
   onValueChange: (value: string) => void;
 }) {
   const triggerId = id ?? `task-config-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -158,10 +227,11 @@ function TaskConfigSelect({
       <Select
         open={isOpen}
         value={value || undefined}
-        onOpenChange={setIsOpen}
+        onOpenChange={(nextOpen) => setIsOpen(disabled ? false : nextOpen)}
         onValueChange={onValueChange}
+        disabled={disabled}
       >
-        <SelectTrigger id={triggerId} className="w-full">
+        <SelectTrigger id={triggerId} className="w-full" disabled={disabled}>
           <span data-slot="select-value" className={selectedOption ? undefined : "text-muted-foreground"}>
             {selectedOption?.label ?? placeholder}
           </span>
@@ -186,11 +256,13 @@ function TaskConfigDatePicker({
   name,
   value,
   placeholder,
+  disabled,
   onValueChange,
 }: {
   name: string;
   value: string;
   placeholder: string;
+  disabled?: boolean;
   onValueChange: (value: string) => void;
 }) {
   const selectedDate = parseLocalDateInput(value);
@@ -203,6 +275,7 @@ function TaskConfigDatePicker({
           <Button
             type="button"
             variant="outline"
+            disabled={disabled}
             className="w-full justify-start px-3 text-left font-normal"
           >
             <CalendarIcon data-icon="inline-start" />
@@ -277,12 +350,12 @@ function TaskAutomationSection({
   const effectiveAutoPlanGeneration = autoExecute || autoPlanGeneration;
 
   return (
-    <section className={compact ? "rounded-2xl border border-border/60 bg-muted/20 p-3" : "rounded-[1.2rem] border border-border/60 bg-muted/20 p-3 shadow-sm"}>
-      <div className="flex items-center justify-between gap-3">
-        <p className={compact ? "text-sm font-medium text-foreground" : "text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"}>{copy.automation}</p>
-        {effectiveAutoPlanGeneration || autoExecute ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span> : null}
-      </div>
-      <div className="mt-3 grid gap-2">
+    <TaskConfigSection
+      title={copy.automation}
+      compact={compact}
+      actions={effectiveAutoPlanGeneration || autoExecute ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span> : null}
+    >
+      <div className="grid gap-2">
         <TaskAutomationOption
           name="autoPlanGeneration"
           checked={effectiveAutoPlanGeneration}
@@ -299,7 +372,7 @@ function TaskAutomationSection({
           onCheckedChange={onAutoExecuteChange}
         />
       </div>
-    </section>
+    </TaskConfigSection>
   );
 }
 
@@ -307,6 +380,7 @@ const DEFAULT_COPY = {
   moreOptions: "More options",
   starterPresets: "Starter presets",
   title: "Title",
+  basics: "Basics",
   titlePlaceholder: "Add the next task to execute",
   priority: "Priority",
   schedule: "Schedule",
@@ -324,6 +398,13 @@ const DEFAULT_COPY = {
   adapter: "Adapter",
   advancedFields: "Advanced fields",
   description: "Description",
+  chronaNotes: "Chrona notes",
+  chronaNotesPlaceholder: "Add local context, instructions, or desired outcome",
+  chronaNotesHelp: "Stored only in Chrona. It does not update the calendar source.",
+  chronaNotesEmpty: "No Chrona notes yet.",
+  calendarDescription: "Calendar description",
+  calendarDescriptionEmpty: "No calendar description provided.",
+  calendarDescriptionHelp: "Read-only calendar text. Edit it in the source calendar.",
   descriptionPlaceholder: "Optional execution context or desired outcome",
   runtimeParams: "Additional runtime params (JSON)",
   runtimeParamsPlaceholder: '{"customFlag": true}',
@@ -750,6 +831,10 @@ export function TaskConfigForm({
   defaultExecutionRuntime,
   compact = false,
   initialValues,
+  lockedFields = [],
+  lockedFieldsHint,
+  sourceDescription,
+  sourceDescriptionLabel,
   submitLabel,
   pendingLabel,
   isPending = false,
@@ -769,6 +854,12 @@ export function TaskConfigForm({
     },
   }), [taskConfigFormMessages]);
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
+  const lockedFieldSet = useMemo(() => new Set(lockedFields), [lockedFields]);
+  const isTitleLocked = lockedFieldSet.has("title");
+  const isScheduleLocked = lockedFieldSet.has("scheduledStartAt") || lockedFieldSet.has("scheduledEndAt");
+  const hasSourceDescription = sourceDescription !== undefined;
+  const descriptionLabel = hasSourceDescription ? copy.chronaNotes : copy.description;
+  const descriptionPlaceholder = hasSourceDescription ? copy.chronaNotesPlaceholder : copy.descriptionPlaceholder;
   const initialTitle = initialValues?.title;
   const initialDescription = initialValues?.description;
   const initialPriority = initialValues?.priority;
@@ -935,89 +1026,32 @@ export function TaskConfigForm({
 
       <form onSubmit={(event) => void handleSubmit(submitForm)(event)}>
         <FieldGroup className="gap-3">
-        <Controller
-          name="title"
-          control={control}
-          rules={{ required: copy.title }}
-          render={({ field, fieldState }) => (
-            <TaskConfigField label={copy.title} htmlFor={field.name} invalid={fieldState.invalid} error={fieldState.error} className="text-xs text-muted-foreground">
-              <Input
-                {...field}
-                aria-invalid={fieldState.invalid}
-                id={field.name}
-                placeholder={copy.titlePlaceholder}
-              />
-            </TaskConfigField>
-          )}
-        />
-
-        {!compact ? (
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
-            <div className="flex flex-col gap-3">
+          <TaskConfigSection title={copy.basics} info={isTitleLocked ? lockedFieldsHint : undefined}>
+            <div className={compact ? "grid gap-3" : "grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]"}>
               <Controller
-                name="description"
+                name="title"
                 control={control}
+                rules={{ required: copy.title }}
                 render={({ field, fieldState }) => (
-                  <TaskConfigField label={copy.description} htmlFor={field.name} invalid={fieldState.invalid} error={fieldState.error} className="text-xs text-muted-foreground">
-                    <Textarea
+                  <TaskConfigField
+                    label={copy.title}
+                    htmlFor={field.name}
+                    invalid={fieldState.invalid}
+                    error={fieldState.error}
+                  className="text-xs text-foreground"
+                  >
+                    <Input
                       {...field}
                       aria-invalid={fieldState.invalid}
                       id={field.name}
-                      rows={5}
-                      placeholder={copy.descriptionPlaceholder}
+                      disabled={isPending || isTitleLocked}
+                      placeholder={copy.titlePlaceholder}
                     />
                   </TaskConfigField>
-                  )}
-                />
+                )}
+              />
 
-                <div className="rounded-[1.2rem] border border-border/60 bg-muted/20 p-3 shadow-sm">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{copy.schedule}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{copy.scheduleHint}</p>
-                  </div>
-                  {scheduleDurationLabel ? (
-                    <span className="rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">
-                      {scheduleDurationLabel}
-                    </span>
-                  ) : null}
-                </div>
-
-                <FieldGroup className="grid gap-2 sm:grid-cols-3">
-                  <TaskConfigField label={copy.scheduleDate} className="text-xs text-muted-foreground">
-                    <TaskConfigDatePicker
-                      name="scheduledDate"
-                      value={formState.scheduledDate}
-                      placeholder={copy.scheduleDate}
-                      onValueChange={(value) => setValue("scheduledDate", value, { shouldDirty: true })}
-                    />
-                  </TaskConfigField>
-
-                  <TaskConfigField label={copy.scheduleStart} className="text-xs text-muted-foreground">
-                    <TaskConfigSelect
-                      name="scheduledStartTime"
-                      value={formState.scheduledStartTime}
-                      placeholder="--"
-                      options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
-                      onValueChange={(value) => setValue("scheduledStartTime", value, { shouldDirty: true })}
-                    />
-                  </TaskConfigField>
-
-                  <TaskConfigField label={copy.scheduleEnd} className="text-xs text-muted-foreground">
-                    <TaskConfigSelect
-                      name="scheduledEndTime"
-                      value={formState.scheduledEndTime}
-                      placeholder="--"
-                      options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
-                      onValueChange={(value) => setValue("scheduledEndTime", value, { shouldDirty: true })}
-                    />
-                  </TaskConfigField>
-                </FieldGroup>
-              </div>
-            </div>
-
-              <div className="flex flex-col gap-3">
-                <TaskConfigField label={copy.priority} htmlFor="task-config-priority" className="text-xs text-muted-foreground">
+              <TaskConfigField label={copy.priority} htmlFor="task-config-priority" className="text-xs text-foreground">
                 <TaskConfigSelect
                   name="priority"
                   id="task-config-priority"
@@ -1028,8 +1062,101 @@ export function TaskConfigForm({
                   }))}
                   onValueChange={(value) => setValue("priority", value as TaskConfigFormInput["priority"], { shouldDirty: true })}
                 />
-                </TaskConfigField>
+              </TaskConfigField>
+            </div>
+          </TaskConfigSection>
 
+        {!compact ? (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+            <div className="flex flex-col gap-3">
+              <Controller
+                name="description"
+                control={control}
+                render={({ field, fieldState }) => (
+                  <TaskConfigSection title={descriptionLabel} info={hasSourceDescription ? copy.chronaNotesHelp : undefined}>
+                    <TaskConfigField
+                      label={descriptionLabel}
+                      htmlFor={field.name}
+                      invalid={fieldState.invalid}
+                      error={fieldState.error}
+                      hideTitle
+                      className="gap-2 text-xs text-foreground"
+                    >
+                      <Textarea
+                        {...field}
+                        aria-invalid={fieldState.invalid}
+                        id={field.name}
+                        rows={5}
+                        placeholder={descriptionPlaceholder}
+                        className="bg-background"
+                      />
+                    </TaskConfigField>
+                  </TaskConfigSection>
+                  )}
+                />
+
+                {hasSourceDescription ? (
+                  <TaskConfigSection title={sourceDescriptionLabel ?? copy.calendarDescription} info={copy.calendarDescriptionHelp}>
+                    <p className="mt-2 min-h-20 whitespace-pre-wrap rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-sm text-foreground">
+                      {sourceDescription || copy.calendarDescriptionEmpty}
+                    </p>
+                  </TaskConfigSection>
+                ) : null}
+
+                <TaskConfigSection
+                  title={copy.schedule}
+                  info={isScheduleLocked ? lockedFieldsHint : undefined}
+                  actions={scheduleDurationLabel ? (
+                    <span className="rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">
+                      {scheduleDurationLabel}
+                    </span>
+                  ) : null}
+                >
+                  <p className="text-xs text-muted-foreground">{copy.scheduleHint}</p>
+
+                  <FieldGroup className="grid gap-2 sm:grid-cols-3">
+                    <TaskConfigField label={copy.scheduleDate} className="text-xs text-foreground">
+                      <TaskConfigDatePicker
+                        name="scheduledDate"
+                        value={formState.scheduledDate}
+                        placeholder={copy.scheduleDate}
+                        disabled={isScheduleLocked}
+                        onValueChange={(value) => {
+                          if (!isScheduleLocked) setValue("scheduledDate", value, { shouldDirty: true });
+                        }}
+                      />
+                    </TaskConfigField>
+
+                    <TaskConfigField label={copy.scheduleStart} className="text-xs text-foreground">
+                      <TaskConfigSelect
+                        name="scheduledStartTime"
+                        value={formState.scheduledStartTime}
+                        placeholder="--"
+                        options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                        disabled={isScheduleLocked}
+                        onValueChange={(value) => {
+                          if (!isScheduleLocked) setValue("scheduledStartTime", value, { shouldDirty: true });
+                        }}
+                      />
+                    </TaskConfigField>
+
+                    <TaskConfigField label={copy.scheduleEnd} className="text-xs text-foreground">
+                      <TaskConfigSelect
+                        name="scheduledEndTime"
+                        value={formState.scheduledEndTime}
+                        placeholder="--"
+                        options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))}
+                        disabled={isScheduleLocked}
+                        onValueChange={(value) => {
+                          if (!isScheduleLocked) setValue("scheduledEndTime", value, { shouldDirty: true });
+                        }}
+                      />
+                    </TaskConfigField>
+                  </FieldGroup>
+                </TaskConfigSection>
+            </div>
+
+              <div className="flex flex-col gap-3">
                 <TaskAutomationSection
                   copy={copy}
                   autoPlanGeneration={formState.autoPlanGeneration}
@@ -1052,7 +1179,7 @@ export function TaskConfigForm({
 
           if (field.kind === "textarea") {
             return (
-              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                 <Textarea
                   name={field.path}
                   rows={compact ? 3 : 4}
@@ -1066,7 +1193,7 @@ export function TaskConfigForm({
 
           if (field.kind === "select") {
             return (
-              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                 <TaskConfigSelect
                   name={field.path}
                   value={renderFieldValue(value)}
@@ -1079,7 +1206,7 @@ export function TaskConfigForm({
 
           if (field.kind === "number") {
             return (
-              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                 <Input
                   name={field.path}
                   type="number"
@@ -1095,7 +1222,7 @@ export function TaskConfigForm({
 
           if (field.kind === "boolean") {
             return (
-              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                 <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 py-2 text-sm text-foreground">
                   <Checkbox
                     name={field.path}
@@ -1110,7 +1237,7 @@ export function TaskConfigForm({
 
           if (field.kind === "json") {
             return (
-              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+              <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                 <Textarea
                   name={field.path}
                   rows={compact ? 4 : 5}
@@ -1122,7 +1249,7 @@ export function TaskConfigForm({
           }
 
           return (
-            <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+            <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
               <Input
                 name={field.path}
                 value={renderFieldValue(value)}
@@ -1141,21 +1268,8 @@ export function TaskConfigForm({
 
             <FieldGroup className="mt-3 gap-3">
               <>
-                <TaskConfigField label={copy.priority} htmlFor="task-config-compact-priority" className="text-xs text-muted-foreground">
-                  <TaskConfigSelect
-                    name="priority"
-                    id="task-config-compact-priority"
-                    value={formState.priority}
-                    options={(["Low", "Medium", "High", "Urgent"] as const).map((priority) => ({
-                      value: priority,
-                      label: copy.priorities[priority],
-                    }))}
-                    onValueChange={(value) => setValue("priority", value as TaskConfigFormInput["priority"], { shouldDirty: true })}
-                  />
-                </TaskConfigField>
-
                 {executionRuntimes.length > 1 ? (
-                  <TaskConfigField label={copy.adapter} className="text-xs text-muted-foreground">
+                  <TaskConfigField label={copy.adapter} className="text-xs text-foreground">
                     <TaskConfigSelect
                       name="executionRuntime"
                       value={formState.executionRuntime}
@@ -1172,20 +1286,35 @@ export function TaskConfigForm({
                   </TaskConfigField>
                 ) : null}
 
-                <TaskConfigField label={copy.description} className="text-xs text-muted-foreground">
-                  <Controller
-                    name="description"
-                    control={control}
-                    render={({ field, fieldState }) => (
-                      <Textarea
-                        {...field}
-                        aria-invalid={fieldState.invalid}
-                        rows={3}
-                        placeholder={copy.descriptionPlaceholder}
-                      />
-                    )}
-                  />
-                </TaskConfigField>
+                <TaskConfigSection title={descriptionLabel} info={hasSourceDescription ? copy.chronaNotesHelp : undefined} compact>
+                  <TaskConfigField
+                    label={descriptionLabel}
+                    hideTitle
+                    className="gap-2 text-xs text-foreground"
+                  >
+                    <Controller
+                      name="description"
+                      control={control}
+                      render={({ field, fieldState }) => (
+                        <Textarea
+                          {...field}
+                          aria-invalid={fieldState.invalid}
+                          rows={3}
+                          placeholder={descriptionPlaceholder}
+                          className="bg-background"
+                        />
+                      )}
+                    />
+                  </TaskConfigField>
+                </TaskConfigSection>
+
+                {hasSourceDescription ? (
+                  <TaskConfigSection title={sourceDescriptionLabel ?? copy.calendarDescription} info={copy.calendarDescriptionHelp} compact>
+                    <p className="mt-2 min-h-16 whitespace-pre-wrap rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-sm text-foreground">
+                      {sourceDescription || copy.calendarDescriptionEmpty}
+                    </p>
+                  </TaskConfigSection>
+                ) : null}
 
                 <TaskAutomationSection
                   compact
@@ -1207,7 +1336,7 @@ export function TaskConfigForm({
 
               if (field.kind === "textarea") {
                 return (
-                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                     <Textarea
                       name={field.path}
                       rows={3}
@@ -1221,7 +1350,7 @@ export function TaskConfigForm({
 
               if (field.kind === "select") {
                 return (
-                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                     <TaskConfigSelect
                       name={field.path}
                       value={renderFieldValue(value)}
@@ -1234,7 +1363,7 @@ export function TaskConfigForm({
 
               if (field.kind === "number") {
                 return (
-                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                     <Input
                       name={field.path}
                       type="number"
@@ -1250,7 +1379,7 @@ export function TaskConfigForm({
 
               if (field.kind === "boolean") {
                 return (
-                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                     <label className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-3 py-2 text-sm text-foreground">
                       <Checkbox
                         name={field.path}
@@ -1265,7 +1394,7 @@ export function TaskConfigForm({
 
               if (field.kind === "json") {
                 return (
-                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                  <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                     <Textarea
                       name={field.path}
                       rows={4}
@@ -1277,7 +1406,7 @@ export function TaskConfigForm({
               }
 
               return (
-                <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-muted-foreground">
+                <TaskConfigField key={field.path} label={field.label} hint={field.description} className="text-xs text-foreground">
                   <Input
                     name={field.path}
                     value={renderFieldValue(value)}

@@ -86,26 +86,10 @@ export function buildSchedulePageViewModel({
   const todayGroupKey = scheduledGroups.find(
     (group) => group.key === todayKey,
   )?.key;
-  const todayGroup =
-    scheduledGroups.find((group) => group.key === todayGroupKey) ?? null;
-  const firstPopulatedGroup =
-    scheduledGroups.find(
-      (group) =>
-        group.items.length > 0 ||
-        group.proposalCount > 0 ||
-        group.riskCount > 0,
-    )?.key ?? null;
   const activeDay =
     selectedGroupKey ??
-    (todayGroup &&
-    (todayGroup.items.length > 0 ||
-      todayGroup.proposalCount > 0 ||
-      todayGroup.riskCount > 0)
-      ? todayGroup.key
-      : null) ??
-    firstPopulatedGroup ??
-    todayKey ??
-    scheduledGroups[0]?.key;
+    todayGroupKey ??
+    todayKey;
   const activeGroup =
     scheduledGroups.find((group) => group.key === activeDay) ?? null;
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;

@@ -52,6 +52,8 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   Workspace: 'Workspace',
+  CalendarSource: 'CalendarSource',
+  ImportedCalendarEvent: 'ImportedCalendarEvent',
   Task: 'Task',
   SchedulerLease: 'SchedulerLease',
   GraphVersion: 'GraphVersion',
@@ -108,6 +110,51 @@ export const WorkspaceScalarFieldEnum = {
 } as const
 
 export type WorkspaceScalarFieldEnum = (typeof WorkspaceScalarFieldEnum)[keyof typeof WorkspaceScalarFieldEnum]
+
+
+export const CalendarSourceScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  name: 'name',
+  sourceType: 'sourceType',
+  sourceUrl: 'sourceUrl',
+  redactedUrlLabel: 'redactedUrlLabel',
+  color: 'color',
+  lifecycleState: 'lifecycleState',
+  syncPolicy: 'syncPolicy',
+  syncState: 'syncState',
+  lastSuccessfulRefreshAt: 'lastSuccessfulRefreshAt',
+  nextExpectedRefreshAt: 'nextExpectedRefreshAt',
+  lastErrorCode: 'lastErrorCode',
+  lastErrorMessage: 'lastErrorMessage',
+  importedCount: 'importedCount',
+  skippedCount: 'skippedCount',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CalendarSourceScalarFieldEnum = (typeof CalendarSourceScalarFieldEnum)[keyof typeof CalendarSourceScalarFieldEnum]
+
+
+export const ImportedCalendarEventScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  calendarSourceId: 'calendarSourceId',
+  taskId: 'taskId',
+  externalUid: 'externalUid',
+  recurrenceId: 'recurrenceId',
+  dedupeKey: 'dedupeKey',
+  title: 'title',
+  description: 'description',
+  startsAt: 'startsAt',
+  endsAt: 'endsAt',
+  isAllDay: 'isAllDay',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ImportedCalendarEventScalarFieldEnum = (typeof ImportedCalendarEventScalarFieldEnum)[keyof typeof ImportedCalendarEventScalarFieldEnum]
 
 
 export const TaskScalarFieldEnum = {

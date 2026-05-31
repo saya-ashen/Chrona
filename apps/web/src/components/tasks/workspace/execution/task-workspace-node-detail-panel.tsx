@@ -9,6 +9,7 @@ import {
   extractRunResult,
   ResultOutputCard,
 } from "@/components/tasks/plan/task-plan-graph/inspector-run-panel";
+import { stringifyResultOutput } from "@/components/tasks/plan/task-plan-graph/result-output-format";
 import type {
   PlanNodeDataModel,
   PlanNodeField,
@@ -90,18 +91,11 @@ function EmptyDetailState() {
   );
 }
 
-function stringifyOutput(output: NodeResultOutput) {
-  if (output.kind === "text" || output.kind === "markdown") return output.content;
-  if (output.kind === "json") return JSON.stringify(output.value, null, 2);
-  if (output.kind === "file") return [output.title, output.path, output.description].filter(Boolean).join("\n");
-  return "";
-}
-
 function outputsContainText(outputs: NodeResultOutput[], text: string | null) {
   const normalizedText = text?.trim();
   if (!normalizedText) return false;
 
-  return outputs.some((output) => stringifyOutput(output).includes(normalizedText));
+  return outputs.some((output) => stringifyResultOutput(output).includes(normalizedText));
 }
 
 function ResultTab({ node }: { node: PlanNodeDataModel }) {
@@ -110,7 +104,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
   const outputs = node.resultOutputs ?? [];
   const runResult = outputsContainText(outputs, rawRunResult) ? null : rawRunResult;
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
-  const copyText = [runResult, ...outputs.map(stringifyOutput)]
+  const copyText = [runResult, ...outputs.map(stringifyResultOutput)]
     .filter((value): value is string => Boolean(value?.trim()))
     .join("\n\n");
 

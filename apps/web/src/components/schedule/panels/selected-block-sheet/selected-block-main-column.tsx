@@ -69,6 +69,9 @@ export function SelectedBlockMainColumn({
             defaultExecutionRuntime={defaultExecutionRuntime}
             isPending={isPending}
             initialValues={toTaskConfigInitialValues(item)}
+            lockedFields={item.sourceManaged?.immutableFields}
+            lockedFieldsHint={item.sourceManaged ? `Synced from ${item.sourceManaged.sourceName}. Title and time are managed by the calendar source.` : undefined}
+            sourceDescription={item.sourceManaged?.description ?? null}
             submitLabel={copy.saveTaskConfig}
             pendingLabel={copy.saving}
             footerActions={onDeleteTask ? (

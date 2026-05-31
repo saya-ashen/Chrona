@@ -66,4 +66,42 @@ describe("stop and pause regressions", () => {
     ]);
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
   });
+
+  it("preserves scheduled work block when execution is stopped", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "started",
+      summary: "Runtime run started",
+      evidence: { sessionId: "main-session", runId: "run-scheduled-task" },
+      output: { runtimeRunRef: "runtime-scheduled-task" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Stop keeps schedule");
+    const compiledPlan = makeTwoTaskPlan("graph_stop_keeps_schedule");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+    const scheduledStartAt = new Date("2026-05-30T11:00:00.000Z");
+    const scheduledEndAt = new Date("2026-05-30T12:00:00.000Z");
+    const workBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        scheduledStartAt,
+        scheduledEndAt,
+        trigger: "manual",
+      },
+    });
+
+    await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "start_manual" } });
+    await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "cancel_session", reason: "User stop" } });
+
+    const preservedBlock = await db.workBlock.findUniqueOrThrow({ where: { id: workBlock.id } });
+    expect(preservedBlock.status).toBe("Scheduled");
+    expect(preservedBlock.startedAt).toBeNull();
+    expect(preservedBlock.scheduledStartAt).toEqual(scheduledStartAt);
+    expect(preservedBlock.scheduledEndAt).toEqual(scheduledEndAt);
+
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(projection.scheduledStartAt).toEqual(scheduledStartAt);
+    expect(projection.scheduledEndAt).toEqual(scheduledEndAt);
+  });
 });

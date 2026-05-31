@@ -201,4 +201,29 @@ describe("reconcileTaskState", () => {
       currentNodeId: null,
     });
   });
+
+  it("shows retry sync action for stale sync blocks on resumable graph state", () => {
+    const graph = makeGraph([
+      makeNode({ id: "setup", status: "completed" }),
+      makeNode({ id: "sync", status: "ready", dependencies: ["setup"] }),
+      makeNode({ id: "finish", status: "pending", dependencies: ["sync"] }),
+    ]);
+
+    const result = reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "Cancelled",
+      blockReason: {
+        blockType: "sync_stale",
+        scope: "run",
+        actionRequired: "Re-sync",
+      },
+    });
+
+    expect(result.summary).toMatchObject({
+      executionState: "blocked",
+      currentNodeId: "sync",
+      primaryAction: { type: "retry_sync", enabled: true, label: "Re-sync", targetNodeId: "sync" },
+    });
+  });
 });

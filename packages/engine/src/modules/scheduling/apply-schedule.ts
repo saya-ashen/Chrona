@@ -19,6 +19,20 @@ export async function applySchedule(input: {
     where: { id: input.taskId },
     select: { id: true, workspaceId: true, title: true, updatedAt: true },
   });
+  const importedCalendarEvent = await db.importedCalendarEvent.findUnique({
+    where: { taskId: input.taskId },
+    select: { startsAt: true, endsAt: true },
+  });
+  if (importedCalendarEvent) {
+    const nextStart = input.scheduledStartAt?.getTime() ?? null;
+    const nextEnd = input.scheduledEndAt?.getTime() ?? null;
+    if (
+      nextStart !== importedCalendarEvent.startsAt.getTime() ||
+      nextEnd !== importedCalendarEvent.endsAt.getTime()
+    ) {
+      throw new Error("External calendar task schedule is managed by the calendar source");
+    }
+  }
 
   await db.task.update({
     where: { id: input.taskId },

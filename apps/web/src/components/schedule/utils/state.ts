@@ -317,6 +317,15 @@ function countDueSoonUnscheduledItems(items: UnscheduledItem[]) {
   }).length;
 }
 
+function isReadyToScheduleQueueItem(item: UnscheduledItem) {
+  return (
+    item.scheduleStatus === "Unscheduled" &&
+    item.persistedStatus !== "Running" &&
+    item.latestRunStatus !== "Running" &&
+    item.latestRunStatus !== "Pending"
+  );
+}
+
 export function buildPlanningSummary(input: {
   scheduled: ScheduledItem[];
   unscheduled: UnscheduledItem[];
@@ -341,9 +350,7 @@ export function buildPlanningSummary(input: {
     }, 0),
     overdueCount: input.scheduled.filter((item) => item.scheduleStatus === "Overdue").length,
     atRiskCount: input.scheduled.filter((item) => item.scheduleStatus === "AtRisk").length,
-    readyToScheduleCount: input.unscheduled.filter(
-      (item) => item.scheduleStatus === "Unscheduled",
-    ).length,
+    readyToScheduleCount: input.unscheduled.filter(isReadyToScheduleQueueItem).length,
     autoRunnableCount: input.unscheduled.filter((item) => item.isRunnable).length,
     waitingOnUserCount: input.risks.filter(
       (item) =>

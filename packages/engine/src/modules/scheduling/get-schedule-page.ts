@@ -31,6 +31,11 @@ function mapProjectionItem(
       executionConfig: unknown;
       autoPlanGeneration: boolean;
       autoExecute: boolean;
+      importedCalendarEvent: {
+        id: string;
+        description: string | null;
+        calendarSource: { name: string; color: string };
+      } | null;
     };
   },
 ) {
@@ -39,7 +44,10 @@ function mapProjectionItem(
     workspaceId: item.workspaceId,
     parentTaskId: item.task.parentTaskId,
     title: item.task.title,
-    description: item.task.description,
+    description:
+      item.task.importedCalendarEvent && item.task.description === item.task.importedCalendarEvent.description
+        ? null
+        : item.task.description,
     priority: item.task.priority,
     persistedStatus: item.persistedStatus,
     displayState: item.displayState,
@@ -55,6 +63,16 @@ function mapProjectionItem(
     lastActivityAt: item.lastActivityAt,
     autoPlanGeneration: item.task.autoPlanGeneration,
     autoExecute: item.task.autoExecute,
+    sourceManaged: item.task.importedCalendarEvent
+      ? {
+          source: "external_calendar" as const,
+          eventId: item.task.importedCalendarEvent.id,
+          sourceName: item.task.importedCalendarEvent.calendarSource.name,
+          sourceColor: item.task.importedCalendarEvent.calendarSource.color,
+          description: item.task.importedCalendarEvent.description,
+          immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+        }
+      : null,
     ...mapTaskRunnability(item.task),
   };
 }
@@ -299,7 +317,14 @@ export async function getSchedulePage(workspaceId: string) {
     db.taskProjection.findMany({
       where: { workspaceId },
       include: {
-        task: { include: { workspace: { select: { defaultRuntime: true } } } },
+        task: {
+          include: {
+            workspace: { select: { defaultRuntime: true } },
+            importedCalendarEvent: {
+              include: { calendarSource: { select: { name: true, color: true } } },
+            },
+          },
+        },
       },
       orderBy: [
         { scheduledStartAt: "asc" },

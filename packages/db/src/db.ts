@@ -1,8 +1,11 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
-import { resolveRuntimeDatabaseUrl, resolveSqliteAdapterUrl } from "./sqlite-url";
+import { ensureSqliteDatabase } from "./sqlite-migrations";
+import { AUTO_TEST_DATABASE_ENV, resolveRuntimeDatabaseUrl, resolveSqliteAdapterUrl } from "./sqlite-url";
 
 const DATABASE_URL = resolveRuntimeDatabaseUrl(process.env);
+const MIGRATIONS_DIR = process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations");
 
 if (typeof globalThis.Bun === "undefined") {
   throw new Error(
@@ -18,6 +21,14 @@ function createAdapter() {
 }
 
 function createDbClient() {
+  if (process.env.NODE_ENV === "test") {
+    ensureSqliteDatabase({
+      databaseUrl: DATABASE_URL,
+      migrationsDir: MIGRATIONS_DIR,
+      reset: process.env[AUTO_TEST_DATABASE_ENV] === "1",
+    });
+  }
+
   const adapter = createAdapter();
 
   const client = new PrismaClient({

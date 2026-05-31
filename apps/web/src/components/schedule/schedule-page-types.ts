@@ -89,6 +89,14 @@ export type ScheduleRecord = {
   lastActivityAt: Date | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  sourceManaged?: {
+    source: "external_calendar";
+    eventId: string;
+    sourceName: string;
+    sourceColor: string;
+    description: string | null;
+    immutableFields: readonly ["title", "scheduledStartAt", "scheduledEndAt"];
+  } | null;
   savedPlan?: ScheduleTaskPlanSnapshot | null;
   aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
 } & ScheduleRuntimeFields;

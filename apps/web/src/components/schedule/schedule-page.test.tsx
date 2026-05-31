@@ -199,6 +199,14 @@ Object.defineProperty(globalThis, "fetch", {
 });
 
 fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
+  if (typeof input === "string" && input.includes("/calendar-events")) {
+    return Promise.resolve({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ events: [] }),
+    });
+  }
+
   if (typeof input === "string" && input.endsWith("/execution/actions")) {
     return Promise.resolve({
       ok: true,
@@ -218,6 +226,14 @@ afterEach(() => {
   mockTaskDialogAutoExecute = true;
   mockTaskDialogAutoPlanGenerationEnabled = true;
   fetchScheduleProjection.mockImplementation((input: RequestInfo | URL) => {
+    if (typeof input === "string" && input.includes("/calendar-events")) {
+      return Promise.resolve({
+        ok: true,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => ({ events: [] }),
+      });
+    }
+
     if (typeof input === "string" && input.endsWith("/execution/actions")) {
       return Promise.resolve({
         ok: true,

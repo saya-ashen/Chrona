@@ -1,7 +1,8 @@
 import { api } from "@/lib/rpc-client";
 import { appendTaskPrimaryNodeAction, graphNodeIdForTaskAction } from "@/components/tasks/plan/task-action-node-action";
+import { stringifyResultOutput } from "@/components/tasks/plan/task-plan-graph/result-output-format";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import type { ExecutionActionInput, NodeResultOutput, PlanExecutionResult, SubmitCheckpointActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type {
   ExecutionOverviewCard,
   ExecutionFlowView,
@@ -152,22 +153,15 @@ export function pickWorkspaceCurrentNode(
 function nodeResultSummary(node: PlanNodeDataModel) {
   return node.completionSummary
     ?? node.result?.outputSummary
-    ?? (node.resultOutputs ?? []).map(stringifyNodeResultOutput).find((value) => value.trim())
+    ?? (node.resultOutputs ?? []).map(stringifyResultOutput).find((value) => value.trim())
     ?? null;
-}
-
-function stringifyNodeResultOutput(output: NodeResultOutput) {
-  if (output.kind === "text" || output.kind === "markdown") return output.content;
-  if (output.kind === "json") return JSON.stringify(output.value, null, 2);
-  if (output.kind === "file") return [output.title, output.path, output.description].filter(Boolean).join("\n");
-  return "";
 }
 
 function nodeResultContent(node: PlanNodeDataModel) {
   const parts = [
     node.result?.outputSummary,
     node.completionSummary,
-    ...(node.resultOutputs ?? []).map(stringifyNodeResultOutput),
+    ...(node.resultOutputs ?? []).map(stringifyResultOutput),
   ].filter((value): value is string => Boolean(value?.trim()));
 
   return Array.from(new Set(parts)).join("\n\n");
@@ -325,7 +319,7 @@ function buildArtifactItems(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan
     title: `${node.title} output ${index + 1}`,
     type: output.kind,
     sourceNodeId: node.id,
-    content: stringifyNodeResultOutput(output),
+    content: stringifyResultOutput(output),
   })));
 
   return [

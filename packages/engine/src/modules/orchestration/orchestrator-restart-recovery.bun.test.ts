@@ -97,9 +97,29 @@ describe("runRestartRecoveryWorker", () => {
       },
     });
 
-    const result = await runRestartRecoveryWorker({ now: new Date("2026-05-17T00:01:00.000Z") });
+    const result = await runRestartRecoveryWorker({
+      now: new Date("2026-05-17T00:01:00.000Z"),
+      deps: {
+        reconcileStaleRuntimeRuns: async () => ({
+          checked: 0,
+          synced: 0,
+          leftRunning: 0,
+          skipped: 0,
+        }),
+      },
+    });
 
-    expect(result).toEqual({ expiredLeaseCount: 1, activeSessionCount: 1, degradedRunCount: 1 });
+    expect(result).toEqual({
+      expiredLeaseCount: 1,
+      activeSessionCount: 1,
+      degradedRunCount: 1,
+      runtimeReconciliation: {
+        checked: 0,
+        synced: 0,
+        leftRunning: 0,
+        skipped: 0,
+      },
+    });
     expect(await db.schedulerLease.count()).toBe(0);
     const events = await db.schedulerEvent.findMany({ where: { taskId: task.id } });
     expect(events.map((event) => event.reason)).toEqual([
@@ -164,9 +184,57 @@ describe("runRestartRecoveryWorker", () => {
       await db.$executeRaw`PRAGMA foreign_keys = ON`;
     }
 
-    const result = await runRestartRecoveryWorker({ now: new Date("2026-05-17T00:01:00.000Z") });
+    const result = await runRestartRecoveryWorker({
+      now: new Date("2026-05-17T00:01:00.000Z"),
+      deps: {
+        reconcileStaleRuntimeRuns: async () => ({
+          checked: 0,
+          synced: 0,
+          leftRunning: 0,
+          skipped: 0,
+        }),
+      },
+    });
 
-    expect(result).toEqual({ expiredLeaseCount: 0, activeSessionCount: 0, degradedRunCount: 1 });
+    expect(result).toEqual({
+      expiredLeaseCount: 0,
+      activeSessionCount: 0,
+      degradedRunCount: 1,
+      runtimeReconciliation: {
+        checked: 0,
+        synced: 0,
+        leftRunning: 0,
+        skipped: 0,
+      },
+    });
     expect(await db.schedulerEvent.count()).toBe(0);
+  });
+
+  it("reconciles stale runtime runs during restart recovery", async () => {
+    let callCount = 0;
+
+    const result = await runRestartRecoveryWorker({
+      now: new Date("2026-05-17T00:01:00.000Z"),
+      deps: {
+        reconcileStaleRuntimeRuns: async (input) => {
+          callCount += 1;
+          expect(input).toEqual({ limit: 25 });
+          return {
+            checked: 2,
+            synced: 1,
+            leftRunning: 1,
+            skipped: 0,
+          };
+        },
+      },
+    });
+
+    expect(callCount).toBe(1);
+    expect(result.runtimeReconciliation).toEqual({
+      checked: 2,
+      synced: 1,
+      leftRunning: 1,
+      skipped: 0,
+    });
   });
 });
