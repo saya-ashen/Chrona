@@ -1,30 +1,31 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
 import { createChronaEngine } from "@chrona/engine";
 import { db } from "@chrona/db";
+import type { CalendarFeedTransport } from "@chrona/integrations";
 
 import { createApiRouter } from "../../routes/api";
 import { json, resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
-function app() {
+function app(transport = fixtureTransport) {
   const server = new Hono();
-  server.route("/api", createApiRouter(createChronaEngine()));
+  server.route("/api", createApiRouter(createChronaEngine(), { calendarSources: { transport } }));
   return server;
 }
 
 function fixtureUrl(name: string) {
-  return new URL(`../../../../../packages/integrations/src/calendar/fixtures/${name}`, import.meta.url).href;
+  return `https://calendar-fixtures.test/${name}`;
 }
 
-function tempCalendarUrl(content: string) {
-  const dir = mkdtempSync(join(tmpdir(), "chrona-calendar-management-"));
-  const file = join(dir, "source.ics");
-  writeFileSync(file, content, "utf8");
-  return new URL(`file://${file}`).href;
+async function fixture(name: string) {
+  return await readFile(new URL(`../../../../../packages/integrations/src/calendar/fixtures/${name}`, import.meta.url), "utf8");
 }
+
+const fixtureTransport: CalendarFeedTransport = async (url) => {
+  const name = new URL(url).pathname.slice(1);
+  return { status: 200, text: name === "partial.ics" ? partialFeed : await fixture(name) };
+};
 
 const partialFeed = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -111,7 +112,7 @@ describe("External calendar source management API", () => {
     });
     const created = await json<{ source: { id: string } }>(createRes);
 
-    await db.calendarSource.update({ where: { id: created.source.id, workspaceId }, data: { sourceUrl: tempCalendarUrl(partialFeed) } });
+    await db.calendarSource.update({ where: { id: created.source.id, workspaceId }, data: { sourceUrl: fixtureUrl("partial.ics") } });
     const partialRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-sources/${created.source.id}/refresh`, { method: "POST" });
     expect(partialRes.status).toBe(200);
     const partial = await json<{ syncStatus: { state: string; importedCount: number; skippedCount: number } }>(partialRes);

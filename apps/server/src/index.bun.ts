@@ -3,7 +3,7 @@ import { createServerApp } from "./app";
 import { resolve } from "node:path";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { createLogger } from "@chrona/shared/logger";
-import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolvePort } from "./config/env";
+import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
 
 const log = createLogger("apps.server");
 const SSE_REQUEST_TIMEOUT_SECONDS = 120;
@@ -28,6 +28,18 @@ export async function startBunServer() {
       host,
       port,
       warning: "HOST=0.0.0.0 without API_KEY exposes Chrona to your network.",
+    });
+  }
+  if (!env.API_KEY) {
+    log.warn("api authentication disabled", {
+      host,
+      port,
+      warning: "Set API_KEY before exposing Chrona beyond localhost.",
+    });
+  }
+  if (resolveAllowedOrigins(env).includes("*")) {
+    log.warn("cors wildcard enabled", {
+      warning: "ALLOWED_ORIGINS=* allows browser requests from any origin.",
     });
   }
   const server = Bun.serve({

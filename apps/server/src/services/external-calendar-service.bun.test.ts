@@ -40,6 +40,6 @@ describe("External calendar service sync policies", () => {
       include: { task: { include: { projection: true } } },
     });
     expect(importedEvent.task?.status).toBe("Completed");
-    expect(importedEvent.task?.projection?.scheduledStartAt).toBeNull();
+    expect(importedEvent.task?.projection?.scheduledStartAt?.toISOString()).toBe("2026-05-01T09:00:00.000Z");
   });
 });

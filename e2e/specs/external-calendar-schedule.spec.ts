@@ -1,13 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
 
-function fixtureUrl(eventTitle: string) {
-  const source = resolve(process.cwd(), "packages/integrations/src/calendar/fixtures/valid.ics");
-  const target = join(tmpdir(), `chrona-e2e-schedule-${Date.now()}.ics`);
-  writeFileSync(target, readFileSync(source, "utf8").replace("SUMMARY:External standup", `SUMMARY:${eventTitle}`));
-  return new URL(`file://${target}`).href;
+function fixtureUrl(eventTitle: string, key: string) {
+  return `https://calendar-fixtures.test/valid.ics?title=${encodeURIComponent(eventTitle)}&key=${encodeURIComponent(key)}`;
 }
 
 test.describe("external calendar events on schedule", () => {
@@ -18,7 +12,7 @@ test.describe("external calendar events on schedule", () => {
     await page.getByRole("tab", { name: /calendar/i }).click();
 
     await page.getByLabel(/display name/i).first().fill(sourceName);
-    await page.getByLabel(/calendar url/i).fill(fixtureUrl(eventTitle));
+    await page.getByLabel(/calendar url/i).fill(fixtureUrl(eventTitle, sourceName));
     await page.getByRole("button", { name: /connect calendar/i }).click();
     const sourceRow = page.locator("article").filter({ hasText: sourceName });
     await expect(sourceRow).toContainText(/imported events/i);

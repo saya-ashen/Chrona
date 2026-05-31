@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import type { CalendarFeedTransport } from "@chrona/integrations";
 import {
   createCalendarSourceRequestSchema,
   updateCalendarSourceRequestSchema,
@@ -9,6 +12,10 @@ import {
 
 import { error, internalServerError, json } from "../lib/http";
 import { createExternalCalendarService } from "../services/external-calendar-service";
+
+export type CalendarSourceRouteOptions = {
+  transport?: CalendarFeedTransport;
+};
 
 const workspaceParamSchema = z.object({ workspaceId: z.string().min(1) });
 const sourceParamSchema = workspaceParamSchema.extend({ sourceId: z.string().min(1) });
@@ -24,8 +31,28 @@ function parseDate(value: string) {
   return parsed;
 }
 
-export function createCalendarSourceRoutes() {
-  const service = createExternalCalendarService();
+function createE2eCalendarFixtureTransport(): CalendarFeedTransport {
+  const fixture = readFileSync(resolve("packages/integrations/src/calendar/fixtures/valid.ics"), "utf8");
+  return async (url) => {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "calendar-fixtures.test") return { status: 404, text: "" };
+
+    const title = parsed.searchParams.get("title");
+    return {
+      status: 200,
+      text: title ? fixture.replace("SUMMARY:External standup", `SUMMARY:${title}`) : fixture,
+    };
+  };
+}
+
+function defaultRouteTransport() {
+  return process.env.CHRONA_E2E_CALENDAR_FIXTURES === "1"
+    ? createE2eCalendarFixtureTransport()
+    : undefined;
+}
+
+export function createCalendarSourceRoutes(options: CalendarSourceRouteOptions = {}) {
+  const service = createExternalCalendarService({ transport: options.transport ?? defaultRouteTransport() });
 
   return new Hono()
     .post(

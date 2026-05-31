@@ -1,19 +1,45 @@
 import { beforeEach, describe, expect, it } from "bun:test";
+import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
 import { createChronaEngine } from "@chrona/engine";
 import { db } from "@chrona/db";
+import type { CalendarFeedTransport } from "@chrona/integrations";
 
 import { createApiRouter } from "../../routes/api";
 import { json, resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
-function app() {
+function app(transport = fixtureTransport) {
   const server = new Hono();
-  server.route("/api", createApiRouter(createChronaEngine()));
+  server.route("/api", createApiRouter(createChronaEngine(), { calendarSources: { transport } }));
   return server;
 }
 
 function fixtureUrl(name: string) {
-  return new URL(`../../../../../packages/integrations/src/calendar/fixtures/${name}`, import.meta.url).href;
+  return `https://calendar-fixtures.test/${name}`;
+}
+
+async function fixture(name: string) {
+  return await readFile(new URL(`../../../../../packages/integrations/src/calendar/fixtures/${name}`, import.meta.url), "utf8");
+}
+
+const fixtureTransport: CalendarFeedTransport = async (url) => ({
+  status: 200,
+  text: await fixture(new URL(url).pathname.slice(1)),
+});
+
+async function expectImportedFixtureEvent(workspaceId: string) {
+  const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
+    where: { workspaceId },
+    include: { task: { include: { projection: true, workBlocks: true } } },
+    orderBy: { startsAt: "asc" },
+  });
+  const task = importedEvent.task;
+  expect(task).toBeTruthy();
+  expect(importedEvent.description).toBe("Discuss sync blockers and handoff notes.");
+  expect(task?.title).toBe(importedEvent.title);
+  expect(task?.description).toBeNull();
+  expect(task?.projection?.scheduledStartAt?.toISOString()).toBe(importedEvent.startsAt.toISOString());
+  expect(task?.workBlocks[0]?.scheduledEndAt.toISOString()).toBe(importedEvent.endsAt.toISOString());
 }
 
 describe("External calendar source API", () => {
@@ -34,7 +60,7 @@ describe("External calendar source API", () => {
     const validation = await json<{ valid: boolean; redactedUrlLabel?: string; eventPreviewCount?: number }>(validateRes);
     expect(validation.valid).toBe(true);
     expect(validation.eventPreviewCount).toBeGreaterThan(0);
-    expect(validation.redactedUrlLabel).toBe("local fixture");
+    expect(validation.redactedUrlLabel).toBe("calendar-fixtures.test/valid.ics");
     expect(JSON.stringify(validation)).not.toContain(url);
 
     const createRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-sources`, {
@@ -48,24 +74,13 @@ describe("External calendar source API", () => {
       syncStatus: { importedCount: number; state: string };
     }>(createRes);
     expect(created.source.name).toBe("Team calendar");
-    expect(created.source.redactedUrlLabel).toBe("local fixture");
+    expect(created.source.redactedUrlLabel).toBe("calendar-fixtures.test/valid.ics");
     expect(created.source.color).toBe("#0f766e");
     expect(created.syncStatus.importedCount).toBeGreaterThan(0);
     expect(created.syncStatus.state).toBe("success");
     expect(JSON.stringify(created)).not.toContain(url);
 
-    const importedEvents = await db.importedCalendarEvent.findMany({
-      where: { workspaceId },
-      include: { task: { include: { projection: true, workBlocks: true } } },
-      orderBy: { startsAt: "asc" },
-    });
-    expect(importedEvents.length).toBeGreaterThan(0);
-    expect(importedEvents[0]?.task).toBeTruthy();
-    expect(importedEvents[0]?.description).toBe("Discuss sync blockers and handoff notes.");
-    expect(importedEvents[0]?.task?.title).toBe(importedEvents[0]?.title);
-    expect(importedEvents[0]?.task?.description).toBeNull();
-    expect(importedEvents[0]?.task?.projection?.scheduledStartAt?.toISOString()).toBe(importedEvents[0]?.startsAt.toISOString());
-    expect(importedEvents[0]?.task?.workBlocks[0]?.scheduledEndAt.toISOString()).toBe(importedEvents[0]?.endsAt.toISOString());
+    await expectImportedFixtureEvent(workspaceId);
   });
 
   it("rejects unsupported URLs without saving", async () => {
