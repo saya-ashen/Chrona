@@ -7,9 +7,11 @@ const messages = {
   pages: {
     aiClientsPage: {
       title: "AI Clients",
-      subtitle: "Manage AI clients and configure which client each feature uses",
+      subtitle: "Connect Hermes so Chrona can plan tasks and safely execute approved work.",
       addClient: "+ Add Client",
-      emptyState: "No AI Clients configured yet. Click the button above to add one.",
+      emptyState: "No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.",
+      emptyStateCta: "Connect Hermes",
+      hermesIntro: "Hermes is Chrona's local AI bridge. Start with Local Hermes if you run it on this machine, or Remote Hermes if another machine hosts it.",
       loading: "Loading...",
       defaultBadge: "Default",
       enabled: "Enabled",
@@ -102,7 +104,7 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
     fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
@@ -138,7 +140,7 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
     fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
@@ -198,7 +200,7 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
     fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
@@ -248,7 +250,7 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
     fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
@@ -355,7 +357,7 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
     await user.click(screen.getByRole("combobox", { name: "Hermes location" }));
     await user.click(within(screen.getByRole("listbox")).getByText("Remote Hermes"));
@@ -370,7 +372,7 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
     fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
       target: { value: "Auto Hermes" },
@@ -425,7 +427,7 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI Clients configured yet. Click the button above to add one.");
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
     expect(screen.getByText(/Chrona can run hermes gateway restart/)).toBeInTheDocument();

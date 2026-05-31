@@ -115,7 +115,7 @@ export function renderWorkInspectorSectionPanel(
           </p>
         </div>
 
-        {currentException ? <p className="text-xs text-amber-700">{labels.currentBlocker}：{currentException}</p> : null}
+        {currentException ? <p className="text-xs text-warning-foreground">{labels.currentBlocker}：{currentException}</p> : null}
         {currentAction ? (
           isInternalAppHref(currentAction.href) ? (
             <Button asChild>
@@ -196,7 +196,7 @@ export function renderWorkInspectorSectionPanel(
             </div>
             {tool.argumentsSummary ? <p className="mt-2 text-muted-foreground">{labels.toolArguments}：{tool.argumentsSummary}</p> : null}
             {tool.resultSummary ? <p className="mt-1 text-muted-foreground">{labels.toolResult}：{tool.resultSummary}</p> : null}
-            {tool.errorSummary ? <p className="mt-1 text-red-700">{labels.toolError}：{tool.errorSummary}</p> : null}
+            {tool.errorSummary ? <p className="mt-1 text-destructive">{labels.toolError}：{tool.errorSummary}</p> : null}
           </div>
         ))}
       </div>

@@ -119,7 +119,7 @@ export function ScheduleEditorForm({
 
   return (
     <div className="space-y-2">
-      {errorMessage ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p> : null}
+      {errorMessage ? <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{errorMessage}</p> : null}
 
       <form onSubmit={(event) => void form.handleSubmit(handleScheduleSubmit)(event)}>
         <FieldGroup className="grid gap-2 md:grid-cols-3">

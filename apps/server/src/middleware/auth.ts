@@ -1,8 +1,16 @@
+import { timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
 import { readEnv } from "../config/env";
 
 const SKIP_PATHS = ["/api/health", "/health"];
+
+function matchesApiKey(providedKey: string | null, expectedKey: string) {
+  if (!providedKey) return false;
+  const provided = Buffer.from(providedKey);
+  const expected = Buffer.from(expectedKey);
+  return provided.byteLength === expected.byteLength && timingSafeEqual(provided, expected);
+}
 
 export function apiKeyAuth(): MiddlewareHandler {
   const expectedKey = readEnv().API_KEY;
@@ -25,7 +33,7 @@ export function apiKeyAuth(): MiddlewareHandler {
       ? authHeader.slice(7)
       : null;
 
-    if (providedKey !== expectedKey) {
+    if (!matchesApiKey(providedKey, expectedKey)) {
       const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
       return c.json({ error: messages.unauthorized }, 401);
     }

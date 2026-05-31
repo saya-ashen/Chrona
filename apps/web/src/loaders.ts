@@ -115,16 +115,9 @@ export async function loadWorkPageData({ params, request }: LoaderFunctionArgs):
     throw new Response("Task id is required", { status: 400 });
   }
 
-  try {
-    return {
-      locale,
-      dictionary,
-      work: await apiJson<WorkPageRouteData["work"]>(`${origin}/api/work/${params.taskId}`),
-    };
-  } catch (error) {
-    if (error instanceof Response && error.status === 404) {
-      throw error;
-    }
-    throw error;
-  }
+  return {
+    locale,
+    dictionary,
+    work: await apiJson<WorkPageRouteData["work"]>(`${origin}/api/work/${params.taskId}`),
+  };
 }

@@ -95,6 +95,25 @@ describe("task workspace actions", () => {
     expect(getWorkspaceActionDisabledReason({ fields, values: { decision: "Approve" }, isDispatching: true })).toBe("Action is already being sent.");
   });
 
+  it("uses injected copy for presentation and disabled reasons", () => {
+    expect(buildWorkspaceStateTreatment({
+      currentNode: null,
+      hasPlan: false,
+      allNodesDone: false,
+      copy: {
+        noPlanYetLabel: "Localized empty",
+        noPlanYetGuidance: "Localized guidance",
+      },
+    })).toMatchObject({ label: "Localized empty", guidance: "Localized guidance" });
+
+    expect(getWorkspaceActionDisabledReason({
+      fields: [{ key: "decision", label: "Decision", value: "", required: true }],
+      values: { decision: "" },
+      isDispatching: false,
+      copy: { completeRequiredField: "Localized required: {fields}." },
+    })).toBe("Localized required: Decision.");
+  });
+
   it("maps approval and manual execution nodes to checkpoint actions", () => {
     expect(buildWorkspaceCheckpointActionInput({
       node: node({ interactionType: "approve", checkpoint }),
@@ -195,10 +214,11 @@ describe("task workspace actions", () => {
       limit: 50,
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/tasks/task-1/nodes/node-1/activity?cursor=event-0&limit=50",
-      { method: "GET", headers: { Accept: "application/json" } },
-    );
+    const requestUrl = fetchMock.mock.calls[0]?.[0];
+    const calledUrl = requestUrl instanceof Request ? requestUrl.url : String(requestUrl);
+    expect(calledUrl).toContain("/api/tasks/task-1/nodes/node-1/activity");
+    expect(calledUrl).toContain("cursor=event-0");
+    expect(calledUrl).toContain("limit=50");
     expect(page).toMatchObject({ nextCursor: "event-1", scope: { type: "node", nodeId: "node-1" } });
   });
 

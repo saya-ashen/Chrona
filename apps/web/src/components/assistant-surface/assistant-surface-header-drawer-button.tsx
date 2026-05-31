@@ -32,15 +32,15 @@ export function AssistantSurfaceHeaderDrawerButton() {
       aria-haspopup="menu"
       aria-label={t("components.assistantSurface.entryLabel")}
       className={cn(
-        "group inline-flex h-9 max-w-[72vw] items-center gap-2 border-b-2 px-1.5 text-sm transition-colors sm:max-w-[520px] sm:px-2",
+        "group inline-flex h-9 max-w-[72vw] items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary-soft/60 sm:max-w-[520px] sm:px-2.5",
         assistant.isOpen
-          ? "border-primary text-primary"
-          : "border-transparent text-slate-700 hover:border-primary/30 hover:text-primary",
+          ? "border-primary/50 bg-primary-soft text-primary"
+          : "text-muted-foreground hover:text-primary",
       )}
     >
       <span className={cn(
         "flex size-5 shrink-0 items-center justify-center rounded-full transition-colors",
-        assistant.isOpen ? "bg-primary text-white" : "bg-primary-soft text-primary group-hover:bg-primary group-hover:text-white",
+        assistant.isOpen ? "bg-primary text-primary-foreground" : "bg-primary-soft text-primary group-hover:bg-primary group-hover:text-primary-foreground",
       )}>
         <PanelTopOpen className="size-3.5" />
       </span>

@@ -92,7 +92,7 @@ export function TaskPlanSidePanel({
             </div>
 
             {currentException ? (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{panelCopy.currentBlocker}{currentException}</p>
+              <p className="rounded-xl border border-warning/30 bg-warning/15 px-3 py-2 text-xs text-warning-foreground">{panelCopy.currentBlocker}{currentException}</p>
             ) : null}
             {currentAction ? (
               <div className="flex flex-wrap gap-2">

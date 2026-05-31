@@ -9,6 +9,7 @@ export const calendarSourceLifecycleStateSchema = z.enum([
 ]);
 export const calendarEventStatusSchema = z.enum(["confirmed", "tentative", "cancelled"]);
 export const calendarSourceSyncPolicySchema = z.enum(["keep_active", "auto_complete_past_events"]);
+export const calendarAutomationPolicySchema = z.enum(["manual", "auto_plan", "auto_execute"]);
 export const calendarValidationErrorCodeSchema = z.enum([
   "invalid_url",
   "unsupported_scheme",
@@ -26,6 +27,7 @@ export const calendarSourceSummarySchema = z.object({
   redactedUrlLabel: z.string().min(1),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   syncPolicy: calendarSourceSyncPolicySchema,
+  automationPolicy: calendarAutomationPolicySchema,
   lifecycleState: calendarSourceLifecycleStateSchema,
   lastSuccessfulRefreshAt: z.string().datetime().optional(),
   nextExpectedRefreshAt: z.string().datetime().optional(),
@@ -85,12 +87,14 @@ export const createCalendarSourceRequestSchema = z.object({
   url: z.string().min(1),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   syncPolicy: calendarSourceSyncPolicySchema.optional(),
+  automationPolicy: calendarAutomationPolicySchema.optional(),
 });
 
 export const updateCalendarSourceRequestSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   syncPolicy: calendarSourceSyncPolicySchema.optional(),
+  automationPolicy: calendarAutomationPolicySchema.optional(),
   enabled: z.boolean().optional(),
 }).refine((value) => Object.keys(value).length > 0, "At least one update field is required");
 
@@ -116,6 +120,7 @@ export type CalendarSourceType = z.infer<typeof calendarSourceTypeSchema>;
 export type CalendarSourceLifecycleState = z.infer<typeof calendarSourceLifecycleStateSchema>;
 export type CalendarEventStatus = z.infer<typeof calendarEventStatusSchema>;
 export type CalendarSourceSyncPolicy = z.infer<typeof calendarSourceSyncPolicySchema>;
+export type CalendarAutomationPolicy = z.infer<typeof calendarAutomationPolicySchema>;
 export type CalendarValidationErrorCode = z.infer<typeof calendarValidationErrorCodeSchema>;
 export type CalendarSourceSummary = z.infer<typeof calendarSourceSummarySchema>;
 export type CalendarSyncStatus = z.infer<typeof calendarSyncStatusSchema>;

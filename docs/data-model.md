@@ -64,6 +64,13 @@ Important enums:
 
 Tasks are the canonical work records. `TaskProjection` stores read-optimized task state used by app surfaces after create/update/lifecycle/result changes.
 
+`TaskStatus.Completed` and `TaskStatus.Done` are both terminal, but they are not interchangeable today:
+
+- `Completed` means Chrona/runtime execution reached a completed state, including imported calendar tasks auto-completed by sync policy.
+- `Done` means the user explicitly accepted or closed the task outcome after completion; derivation keeps `Done` stable and does not downgrade it to runtime-derived `Completed`.
+
+New code should use `Completed` for runtime/import completion and reserve `Done` for explicit user closure until the enum is consolidated.
+
 Typical lifecycle actions:
 
 - create

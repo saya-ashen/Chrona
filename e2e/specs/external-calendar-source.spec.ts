@@ -1,13 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { copyFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
 
-function fixtureUrl() {
-  const source = resolve(process.cwd(), "packages/integrations/src/calendar/fixtures/valid.ics");
-  const target = join(tmpdir(), `chrona-e2e-${Date.now()}.ics`);
-  copyFileSync(source, target);
-  return new URL(`file://${target}`).href;
+function fixtureUrl(eventTitle: string, key: string) {
+  return `https://calendar-fixtures.test/valid.ics?title=${encodeURIComponent(eventTitle)}&key=${encodeURIComponent(key)}`;
 }
 
 test.describe("external calendar source setup", () => {
@@ -20,13 +14,13 @@ test.describe("external calendar source setup", () => {
     await expect(page.getByText(/read-only/i).first()).toBeVisible();
 
     await page.getByLabel(/display name/i).first().fill(sourceName);
-    await page.getByLabel(/calendar url/i).fill(fixtureUrl());
+    await page.getByLabel(/calendar url/i).fill(fixtureUrl(`External standup ${testInfo.project.name}`, sourceName));
     await page.getByRole("button", { name: /connect calendar/i }).click();
     await expect(page.locator("article").filter({ hasText: sourceName })).toContainText(/imported events/i);
 
     await page.getByLabel(/display name/i).first().fill(`Bad calendar ${testInfo.project.name}`);
     await page.getByLabel(/calendar url/i).fill("ftp://example.test/private.ics");
     await page.getByRole("button", { name: /connect calendar/i }).click();
-    await expect(page.getByRole("alert")).toContainText(/http|https|file|calendar/i);
+    await expect(page.getByRole("alert")).toContainText(/https|calendar/i);
   });
 });

@@ -1,5 +1,6 @@
 import { type ComponentProps } from "react";
 import { X } from "lucide-react";
+import { useI18n } from "@chrona/i18n/react";
 import {
   TaskConfigForm,
   type TaskConfigExecutionRuntime,
@@ -57,6 +58,8 @@ export function TaskWorkspaceEditSection({
   onApplyProposal,
   onCancelProposal,
 }: TaskWorkspaceEditSectionProps) {
+  const { messages } = useI18n();
+  const copy = messages.components?.taskWorkspace ?? {};
   const handleOpenChange = (open: boolean) => {
     if (open !== isEditExpanded) {
       onToggleExpanded();
@@ -74,14 +77,14 @@ export function TaskWorkspaceEditSection({
           <DialogHeader className="flex-row items-start justify-between gap-3 border-b border-border/60 px-4 py-4 text-left sm:px-5">
             <div className="flex flex-col gap-1">
               <DialogTitle className="text-sm font-semibold text-foreground">
-                Edit task
+                {copy.editTaskTitle ?? "Edit task"}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Full-screen editor. Keep changes here until you save them.
+                {copy.editTaskDescription ?? "Full-screen editor. Keep changes here until you save them."}
               </DialogDescription>
             </div>
             <DialogClose
-              aria-label="Close task editor"
+              aria-label={copy.closeTaskEditor ?? "Close task editor"}
               render={
                 <Button
                   type="button"
@@ -101,25 +104,25 @@ export function TaskWorkspaceEditSection({
               defaultExecutionRuntime={defaultExecutionRuntime}
               isPending={isSaving}
               initialValues={taskConfigInitialValues}
-              submitLabel="Save changes"
-              pendingLabel="Saving..."
+              submitLabel={copy.saveChanges ?? "Save changes"}
+              pendingLabel={copy.saving ?? "Saving..."}
               onDraftStateChange={onDraftStateChange}
               onSubmitAction={onSubmitAction}
             />
             {saveSuccess ? (
-              <p className="mt-2 px-1 text-xs text-emerald-600">
-                Saved successfully
+              <p className="mt-2 px-1 text-xs text-success">
+                {copy.savedSuccessfully ?? "Saved successfully"}
               </p>
             ) : null}
             {saveError ? (
-              <p className="mt-2 px-1 text-xs text-red-600">{saveError}</p>
+              <p className="mt-2 px-1 text-xs text-destructive">{saveError}</p>
             ) : null}
           </div>
         </DialogContent>
       </Dialog>
 
       {hasUnsavedConfigChanges ? (
-        <span className="sr-only">Task has unsaved edits</span>
+        <span className="sr-only">{copy.unsavedEdits ?? "Task has unsaved edits"}</span>
       ) : null}
 
       {currentProposal ? (

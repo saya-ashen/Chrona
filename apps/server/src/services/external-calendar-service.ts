@@ -11,6 +11,7 @@ import {
   type ImportedCalendarEventWrite,
 } from "@chrona/db";
 import type {
+  CalendarAutomationPolicy,
   CalendarSourceSummary,
   CalendarSourceSyncPolicy,
   CalendarSyncStatus,
@@ -37,6 +38,7 @@ const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 export type ExternalCalendarServiceOptions = {
   transport?: CalendarFeedTransport;
   now?: () => Date;
+  autoPlanTask?: (input: { taskId: string; accept?: boolean }) => void | Promise<void>;
 };
 
 function iso(date?: Date | null) {
@@ -51,6 +53,7 @@ function toSourceSummary(source: CalendarSource): CalendarSourceSummary {
     redactedUrlLabel: source.redactedUrlLabel,
     color: source.color,
     syncPolicy: source.syncPolicy,
+    automationPolicy: source.automationPolicy as CalendarAutomationPolicy,
     lifecycleState: source.lifecycleState,
     lastSuccessfulRefreshAt: iso(source.lastSuccessfulRefreshAt),
     nextExpectedRefreshAt: iso(source.nextExpectedRefreshAt),
@@ -88,6 +91,7 @@ function errorCode(cause: unknown): CalendarValidationErrorCode {
 
 export function createExternalCalendarService(options: ExternalCalendarServiceOptions = {}) {
   const now = options.now ?? (() => new Date());
+  const autoPlanTask = options.autoPlanTask ?? (() => undefined);
 
   async function validateSourceUrl(url: string): Promise<ValidateCalendarSourceResponse> {
     try {
@@ -122,13 +126,15 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         calendarSourceId: sourceId,
       }));
       const refreshedAt = now();
-      const importedCount = await replaceImportedCalendarEvents(sourceId, writes, {
+      const replacement = await replaceImportedCalendarEvents(sourceId, writes, {
         policy: source.syncPolicy,
+        automationPolicy: source.automationPolicy,
         now: refreshedAt,
       });
+      await Promise.all(replacement.automationRequests.map((request) => autoPlanTask(request)));
       const updated = await updateCalendarSourceSyncStatus(workspaceId, sourceId, {
         syncState: parsed.skippedCount > 0 ? "partial" : "success",
-        importedCount,
+        importedCount: replacement.importedCount,
         skippedCount: parsed.skippedCount,
         lastSuccessfulRefreshAt: refreshedAt,
         nextExpectedRefreshAt: new Date(refreshedAt.getTime() + REFRESH_INTERVAL_MS),
@@ -167,6 +173,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         redactedUrlLabel: normalized.redactedUrlLabel,
         color: input.color ?? DEFAULT_SOURCE_COLOR,
         syncPolicy: input.syncPolicy ?? defaultSyncPolicyForUrl(normalized.url),
+        automationPolicy: input.automationPolicy ?? "auto_plan",
       });
       return await refreshSource(workspaceId, source.id);
     },
@@ -178,6 +185,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         ...(input.name ? { name: input.name } : {}),
         ...(input.color ? { color: input.color } : {}),
         ...(input.syncPolicy ? { syncPolicy: input.syncPolicy } : {}),
+        ...(input.automationPolicy ? { automationPolicy: input.automationPolicy } : {}),
         ...(typeof input.enabled === "boolean" ? { lifecycleState: input.enabled ? "active" : "disabled" } : {}),
       });
       return { source: toSourceSummary(source) };

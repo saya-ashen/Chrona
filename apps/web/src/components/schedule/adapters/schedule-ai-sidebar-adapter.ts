@@ -13,14 +13,12 @@ export function createScheduleAiSidebarContext({
   activeView: ScheduleViewMode;
 }): { context: AiSidebarPageContextSummary; actions: AiSidebarQuickAction[] } {
   const freeMinutes = Math.max(0, (12 * 60) - data.planningSummary.todayLoadMinutes);
-  const conflictCount = data.planningSummary.conflictCount + data.summary.riskCount;
   const fingerprint = [
     workspaceId,
     selectedDate,
     activeView,
     data.summary.unscheduledCount,
     data.planningSummary.largestIdleWindowMinutes,
-    conflictCount,
   ].join(":");
 
   const context: AiSidebarPageContextSummary = {
@@ -33,16 +31,15 @@ export function createScheduleAiSidebarContext({
     unscheduledCount: data.summary.unscheduledCount,
     freeMinutes,
     largestIdleWindowMinutes: data.planningSummary.largestIdleWindowMinutes,
-    conflictCount,
+    conflictCount: 0,
     activeView,
     primaryAction: data.summary.unscheduledCount > 0 ? "Smart schedule queue" : "Review timeline",
-    capabilities: ["smart-schedule", "find-opening", "explain-unplaced", "handle-conflict"],
+    capabilities: ["smart-schedule", "find-opening", "explain-unplaced"],
     highlights: [
       { label: "Selected date", value: selectedDate },
       { label: "Queue", value: String(data.summary.unscheduledCount), tone: data.summary.unscheduledCount > 0 ? "info" : "success" },
       { label: "Free time", value: `${freeMinutes}m` },
       { label: "Largest opening", value: `${data.planningSummary.largestIdleWindowMinutes}m` },
-      { label: "Conflicts", value: String(conflictCount), tone: conflictCount > 0 ? "critical" : "success" },
     ],
   };
 
@@ -70,14 +67,6 @@ export function createScheduleAiSidebarContext({
         description: "Explain why queued work is not placed yet.",
         kind: "informational",
         enabled: true,
-      },
-      {
-        id: "handle-conflict",
-        label: "Handle conflict",
-        description: "Preview conflict resolution before schedule changes persist.",
-        kind: "mutating-preview",
-        enabled: conflictCount > 0,
-        disabledReason: "No conflicts detected for the current context.",
       },
     ],
   };

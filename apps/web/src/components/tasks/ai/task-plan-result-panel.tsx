@@ -53,7 +53,7 @@ export function TaskPlanResultPanel({
           {graphSummary.warnings.map((warning, index) => (
             <div
               key={index}
-              className="flex items-start gap-2 text-xs text-amber-700"
+              className="flex items-start gap-2 text-xs text-warning-foreground"
             >
               <AlertTriangle className="mt-0.5 size-3 shrink-0" />
               <span>{warning}</span>

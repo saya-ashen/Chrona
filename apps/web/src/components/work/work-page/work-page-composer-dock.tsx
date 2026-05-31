@@ -52,7 +52,7 @@ export function WorkPageComposerDock({
       <div className="pointer-events-none fixed bottom-3 left-4 right-4 z-40 xl:left-[268px] xl:right-7">
         <div className="mx-auto w-full max-w-[1180px]">
           {isComposerExpanded ? (
-            <div className="pointer-events-auto rounded-[26px] border border-border/80 bg-white/96 p-3 shadow-[0_24px_70px_rgba(15,23,42,0.16)] supports-[backdrop-filter]:backdrop-blur">
+            <div className="pointer-events-auto rounded-[26px] border border-border/80 bg-card/96 p-3 shadow-lg supports-[backdrop-filter]:backdrop-blur">
               <div className="mb-3 flex items-center justify-between gap-3 px-1">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">Add Input</p>
@@ -68,7 +68,7 @@ export function WorkPageComposerDock({
                 </Button>
               </div>
               <WorkComposerCard
-                className="border-border/80 bg-white shadow-none"
+                className="border-border/80 bg-background shadow-none"
                 composer={workComposer}
                 currentIntervention={data.currentIntervention}
                 currentStepTitle={currentStepTitle}
@@ -89,7 +89,7 @@ export function WorkPageComposerDock({
             <button
               type="button"
               onClick={() => onExpandChange(true)}
-              className="pointer-events-auto flex w-full items-center justify-between gap-3 rounded-[22px] border border-border/80 bg-white/96 px-4 py-3 text-left shadow-[0_18px_40px_rgba(15,23,42,0.14)] supports-[backdrop-filter]:backdrop-blur"
+              className="pointer-events-auto flex w-full items-center justify-between gap-3 rounded-[22px] border border-border/80 bg-card/96 px-4 py-3 text-left shadow-lg supports-[backdrop-filter]:backdrop-blur"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">

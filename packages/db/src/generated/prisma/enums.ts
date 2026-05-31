@@ -114,6 +114,15 @@ export const CalendarSyncPolicy = {
 export type CalendarSyncPolicy = (typeof CalendarSyncPolicy)[keyof typeof CalendarSyncPolicy]
 
 
+export const CalendarAutomationPolicy = {
+  manual: 'manual',
+  auto_plan: 'auto_plan',
+  auto_execute: 'auto_execute'
+} as const
+
+export type CalendarAutomationPolicy = (typeof CalendarAutomationPolicy)[keyof typeof CalendarAutomationPolicy]
+
+
 export const RunStatus = {
   Pending: 'Pending',
   Running: 'Running',

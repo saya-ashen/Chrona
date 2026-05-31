@@ -35,11 +35,53 @@ describe("External calendar service sync policies", () => {
     });
 
     expect("source" in result ? result.source.syncPolicy : null).toBe("auto_complete_past_events");
+    expect("source" in result ? result.source.automationPolicy : null).toBe("auto_plan");
     const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
       where: { workspaceId },
       include: { task: { include: { projection: true } } },
     });
     expect(importedEvent.task?.status).toBe("Completed");
-    expect(importedEvent.task?.projection?.scheduledStartAt).toBeNull();
+    expect(importedEvent.task?.projection?.scheduledStartAt?.toISOString()).toBe("2026-05-01T09:00:00.000Z");
+  });
+
+  it("starts plan generation for new future confirmed imports", async () => {
+    const { workspaceId } = await seedWorkspace("Google automation");
+    const startedPlans: Array<{ taskId: string; accept?: boolean }> = [];
+    const futureFeed = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Chrona//Future Policy Fixture//EN
+BEGIN:VEVENT
+UID:google-future-event@example.test
+DTSTAMP:20260501T080000Z
+DTSTART:20260601T090000Z
+DTEND:20260601T100000Z
+SUMMARY:Future Google sync
+END:VEVENT
+END:VCALENDAR`;
+    const service = createExternalCalendarService({
+      now: () => new Date("2026-05-30T10:00:00.000Z"),
+      transport: async () => ({ status: 200, text: futureFeed }),
+      autoPlanTask: (input) => {
+        startedPlans.push(input);
+      },
+    });
+
+    const result = await service.createSource(workspaceId, {
+      name: "Google calendar",
+      url: "https://calendar.google.com/calendar/ical/user/basic.ics",
+      color: "#2563eb",
+      automationPolicy: "auto_execute",
+    });
+
+    expect("source" in result ? result.source.automationPolicy : null).toBe("auto_execute");
+    const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
+      where: { workspaceId },
+      include: { task: true },
+    });
+    expect(importedEvent.task?.autoPlanGeneration).toBe(true);
+    expect(importedEvent.task?.autoExecute).toBe(true);
+    const taskId = importedEvent.task?.id;
+    if (!taskId) throw new Error("Expected imported task");
+    expect(startedPlans).toEqual([{ taskId, accept: true }]);
   });
 });

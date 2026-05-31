@@ -18,6 +18,7 @@ import { SchedulePageDialogs } from "@/components/schedule/dialogs/schedule-page
 import { CalendarSourceSetup } from "@/components/schedule/calendar-source-setup";
 import { SelectedBlockSheet } from "@/components/schedule/panels/schedule-page-panels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 import { ScheduleLeftSidebar, ScheduleRightSidebar } from "@/components/schedule/panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "@/components/schedule/schedule-page-copy";
@@ -141,6 +142,11 @@ export function SchedulePage({
   });
 
   const dialogDefaults = getQuickCreateDefaults(data);
+  const isEmptyWorkspace =
+    viewData.scheduled.length === 0 &&
+    viewData.unscheduled.length === 0 &&
+    viewData.listItems.length === 0 &&
+    viewData.proposals.length === 0;
 
   useEffect(() => {
     const { context, actions } = createScheduleAiSidebarContext({
@@ -196,7 +202,7 @@ export function SchedulePage({
   }, []);
 
   return (
-    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
+    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-sm sm:p-3">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -212,13 +218,50 @@ export function SchedulePage({
         buildScheduleViewHref={buildScheduleViewHref}
       />
 
+      {isEmptyWorkspace ? (
+        <section className="mx-1 mt-3 rounded-3xl border border-primary/20 bg-primary-soft/70 p-4 text-sm shadow-sm sm:mx-2">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 space-y-2">
+              <h2 className="text-base font-semibold text-foreground">
+                {copy.firstRunTitle}
+              </h2>
+              <p className="max-w-3xl text-muted-foreground">
+                {copy.firstRunDescription}
+              </p>
+              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                <span>{copy.firstRunStepConnectAi}</span>
+                <span>{copy.firstRunStepCreateTask}</span>
+                <span>{copy.firstRunStepReviewPlan}</span>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => router.push(localizeHref(locale, "/settings?panel=ai-clients"))}
+              >
+                {copy.firstRunConnectAi}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(localizeHref(locale, `/schedule?day=${encodeURIComponent(viewModel.activeDay)}&new=1`))}
+              >
+                {copy.firstRunCreateTask}
+              </Button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {errorMessage ? (
-        <div className="mx-2 mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm">
+        <div className="mx-2 mt-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-sm">
           Error: {errorMessage}
         </div>
       ) : null}
 
-      <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-visible rounded-[24px] bg-slate-50/70 p-2 lg:gap-4 lg:p-3 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
+      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-3xl bg-muted/40 p-2 lg:gap-4 lg:p-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
         <ScheduleLeftSidebar
           locale={locale}
           activeView={activeView}

@@ -107,7 +107,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
 
     expect(screen.getByRole("heading", { name: "Current node: Approve generated patch" })).toBeInTheDocument();
     expect(screen.getByText("Step 1/1")).toBeInTheDocument();
-    expect(screen.getByText("Auto-refresh")).toBeInTheDocument();
+    expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.getByText("Result summary")).toBeInTheDocument();
     expect(screen.getAllByText("Generated patch touches task workspace only.").length).toBeGreaterThan(0);
     expect(screen.getByText("Patch summary")).toBeInTheDocument();

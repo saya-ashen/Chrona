@@ -31,13 +31,13 @@ export function ConversationThread({ messages, onSubmit }: { messages: AiSidebar
   }
 
   return (
-    <section className="rounded-3xl border border-border/60 bg-white p-4 shadow-sm" aria-labelledby="ai-conversation-title">
+    <section className="rounded-3xl border border-border/60 bg-card p-4 shadow-sm" aria-labelledby="ai-conversation-title">
       <h2 id="ai-conversation-title" className="text-sm font-semibold text-foreground">{t("components.globalAiSidebar.conversation")}</h2>
       <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
         {messages.length === 0 ? (
-          <p className="rounded-2xl bg-slate-50 px-3 py-3 text-sm text-muted-foreground">{t("components.globalAiSidebar.emptyConversation")}</p>
+          <p className="rounded-2xl bg-muted/50 px-3 py-3 text-sm text-muted-foreground">{t("components.globalAiSidebar.emptyConversation")}</p>
         ) : messages.map((message) => (
-          <article key={message.id} className={cn("rounded-2xl px-3 py-2 text-sm", message.role === "user" ? "bg-primary-soft text-primary" : "bg-slate-50 text-foreground", message.responseKind === "error" && "bg-red-50 text-red-700")}>
+          <article key={message.id} className={cn("rounded-2xl px-3 py-2 text-sm", message.role === "user" ? "bg-primary-soft text-primary" : "bg-muted/50 text-foreground", message.responseKind === "error" && "bg-destructive/10 text-destructive")}>
             {message.content}
           </article>
         ))}
@@ -54,7 +54,7 @@ export function ConversationThread({ messages, onSubmit }: { messages: AiSidebar
               aria-invalid={Boolean(form.formState.errors.message)}
               id="global-ai-follow-up"
               placeholder={t("components.globalAiSidebar.followUpPlaceholder")}
-              className="rounded-2xl bg-white"
+              className="rounded-2xl bg-background"
             />
             {form.formState.errors.message ? <FieldError errors={[form.formState.errors.message]} /> : null}
           </Field>

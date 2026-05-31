@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   planResponses: [] as Array<{ taskId: string; aiPlanGenerationStatus?: string; savedPlan?: TaskPlanReadModel | null; generationSession?: unknown }>,
   acceptResponse: null as { savedPlan?: TaskPlanReadModel | null } | null,
   commandResponses: [] as Array<{ commandId: string; taskId: string; acceptedAt: string }>,
+  commandCalls: [] as Array<{ taskId: string; json: Record<string, unknown> }>,
   fetchCalls: [] as Array<{ input: string; init?: RequestInit }>,
   currentExecutionResponse: null as PlanExecutionResult | null,
   eventHandlers: new Map<string, JsonEventHandler>(),
@@ -96,6 +97,31 @@ vi.mock("@/lib/rpc-client", () => ({
               json: async () => mocks.acceptResponse,
             })),
           },
+        },
+        execution: {
+          current: {
+            $get: vi.fn(async () => ({
+              ok: true,
+              json: async () => mocks.currentExecutionResponse,
+            })),
+          },
+        },
+      },
+    },
+    work: {
+      ":taskId": {
+        commands: {
+          $post: vi.fn(async (args: { param: { taskId: string }; json: Record<string, unknown> }) => {
+            mocks.commandCalls.push({ taskId: args.param.taskId, json: args.json });
+            return {
+              ok: true,
+              json: async () => mocks.commandResponses.shift() ?? {
+                commandId: "command-1",
+                taskId: "task-1",
+                acceptedAt: "2026-05-17T00:00:00.000Z",
+              },
+            };
+          }),
         },
       },
     },
@@ -264,7 +290,7 @@ function nextWorkspaceEvent(input: TaskWorkspaceSseEvent) {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
+    const url = input instanceof Request ? input.url : String(input);
     mocks.fetchCalls.push({ input: url, init });
 
     if (url.endsWith("/execution/current")) {
@@ -300,6 +326,7 @@ afterEach(() => {
   mocks.planResponses = [];
   mocks.acceptResponse = null;
   mocks.commandResponses = [];
+  mocks.commandCalls = [];
   mocks.fetchCalls = [];
   mocks.currentExecutionResponse = null;
   mocks.eventHandlers.clear();
@@ -666,7 +693,7 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(result.current.plan?.status).toBe("accepted"));
     expect(result.current.plan?.summary).toBe("Accepted plan");
     expect(result.current.planGenerationStatus).toBe("accepted");
-    expect(mocks.fetchCalls.some((call) => call.input === "/api/work/task-1/commands")).toBe(true);
+    expect(mocks.commandCalls.some((call) => call.taskId === "task-1" && call.json.type === "plan.accept")).toBe(true);
     expect(refreshWorkspace).toHaveBeenCalledTimes(1);
   });
 

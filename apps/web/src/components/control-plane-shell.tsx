@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ClipboardList, Plus, Settings } from "lucide-react";
+import { Brain, CalendarDays, ClipboardList, Inbox, Plus, Settings } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assistant-surface-dropdown";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
@@ -62,6 +62,7 @@ export function ControlPlaneShell({
     .map((segment) => {
       if (segment === "schedule") return t("nav.schedule");
       if (segment === "tasks") return t("nav.tasks");
+      if (segment === "inbox") return t("nav.inbox");
       if (segment === "settings") return t("nav.settings");
       if (segment === "work") return t("common.work");
       return segment;
@@ -80,6 +81,18 @@ export function ControlPlaneShell({
       active: pathname.startsWith("/tasks"),
     },
     {
+      href: "/inbox",
+      label: t("nav.inbox"),
+      icon: Inbox,
+      active: pathname.startsWith("/inbox"),
+    },
+    {
+      href: "/memory",
+      label: t("nav.memory"),
+      icon: Brain,
+      active: pathname.startsWith("/memory"),
+    },
+    {
       href: "/settings",
       label: t("nav.settings"),
       icon: Settings,
@@ -90,27 +103,27 @@ export function ControlPlaneShell({
   return (
     <SidebarProvider
       defaultOpen
-      className="h-screen min-h-0 bg-[#f6f8fc] text-foreground"
-      style={{ "--sidebar-width": "208px" } as CSSProperties}
+      className="h-screen min-h-0 bg-canvas text-foreground"
+      style={{ "--sidebar-width": "224px" } as CSSProperties}
     >
-      <Sidebar collapsible="none" className="hidden border-r border-border/60 bg-white xl:flex">
-        <SidebarHeader className="border-b border-border/60 px-3.5 py-3">
+      <Sidebar collapsible="none" className="hidden border-r border-border/60 bg-sidebar xl:flex">
+        <SidebarHeader className="border-b border-border/60 px-3.5 py-3.5">
           <LocalizedLink
             href="/schedule"
             aria-label={t("nav.brandTitle")}
-            className="group flex min-w-0 items-center gap-3"
+            className="group flex min-w-0 items-center gap-2.5"
           >
             <img
               src="/favicon.png"
               alt=""
               aria-hidden="true"
-              className="h-9 w-9 shrink-0 rounded-xl object-cover mix-blend-multiply dark:mix-blend-screen"
+              className="h-9 w-9 shrink-0 rounded-xl object-cover ring-1 ring-border/60 mix-blend-multiply dark:mix-blend-screen"
             />
             <span className="min-w-0">
-              <span className="block truncate text-[1.35rem] font-semibold tracking-tight leading-none text-foreground">
+              <span className="block truncate text-[1.3rem] font-semibold tracking-tight leading-none text-foreground">
                 {t("nav.brandTitle")}
               </span>
-              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+              <span className="mt-0.5 block truncate text-[11px] leading-tight text-muted-foreground">
                 {t("nav.brandTagline")}
               </span>
             </span>
@@ -135,10 +148,10 @@ export function ControlPlaneShell({
                     }
                     isActive={item.active}
                     className={cn(
-                      "h-auto rounded-xl px-3.5 py-2 text-sm font-medium transition-colors",
+                      "h-auto rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                       item.active
-                        ? "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary"
-                        : "text-slate-700 hover:bg-slate-100 hover:text-foreground",
+                        ? "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary [&_svg]:text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
                     <Icon className="size-4" />
@@ -154,53 +167,81 @@ export function ControlPlaneShell({
       </Sidebar>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="relative z-50 border-b border-border/60 bg-white/92 supports-[backdrop-filter]:backdrop-blur">
-          <div className="relative flex w-full items-center justify-between gap-3 px-4 py-1.5 sm:px-6 xl:px-7">
-            <LocalizedLink
-              href="/schedule"
-              aria-label={t("nav.brandTitle")}
-              className="flex min-w-0 items-center gap-3 xl:hidden"
-            >
-              <img
-                src="/favicon.png"
-                alt=""
-                aria-hidden="true"
-                className="h-8 w-8 shrink-0 rounded-xl object-cover mix-blend-multiply dark:mix-blend-screen"
-              />
-              <span className="block truncate text-sm font-semibold tracking-tight text-foreground">
-                {t("nav.brandTitle")}
-              </span>
-            </LocalizedLink>
+        <header className="relative z-50 border-b border-border/60 bg-background/85 supports-[backdrop-filter]:backdrop-blur-md">
+          <div className="relative flex w-full items-center gap-2 px-4 py-2 sm:gap-3 sm:px-6 xl:px-7">
+            <div className="flex min-w-0 shrink items-center gap-3">
+              <LocalizedLink
+                href="/schedule"
+                aria-label={t("nav.brandTitle")}
+                className="flex shrink-0 items-center gap-2 xl:hidden"
+              >
+                <img
+                  src="/favicon.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-8 w-8 shrink-0 rounded-xl object-cover ring-1 ring-border/60 mix-blend-multiply dark:mix-blend-screen"
+                />
+                <span className="hidden truncate text-sm font-semibold tracking-tight text-foreground sm:block">
+                  {t("nav.brandTitle")}
+                </span>
+              </LocalizedLink>
 
-            <div className="min-w-0 flex-1 pr-2">
-              <p className="truncate text-xs text-muted-foreground">
+              <p className="hidden min-w-0 truncate text-xs font-medium text-muted-foreground xl:block">
                 {breadcrumb.join(" / ") || t("nav.schedule")}
               </p>
             </div>
 
-            <div className="absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+            <div className="flex min-w-0 flex-1 items-center justify-center">
               <AssistantSurfaceHeaderDrawerButton />
             </div>
 
-            <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Button
                 type="button"
                 onClick={() => setShowCreateTaskDialog(true)}
-                variant="outline"
+                variant="default"
                 size="sm"
-                className="h-8 rounded-xl border-border/70 bg-white px-3 text-sm"
+                className="h-8 gap-1.5 px-2.5 sm:px-3"
               >
-                <Plus className="mr-1 size-3.5" />
-                {t("nav.newTask")}
+                <Plus className="size-4" />
+                <span className="hidden sm:inline">{t("nav.newTask")}</span>
               </Button>
               <LocaleSwitcher />
             </div>
             <AssistantSurfaceDropdown />
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3 sm:px-6 xl:px-7">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:px-6 xl:px-7 xl:pb-3">
           {children}
         </main>
+
+        <nav
+          aria-label="Primary"
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-border/60 bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md xl:hidden"
+        >
+          <ul className="mx-auto flex max-w-lg items-stretch justify-around">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={`mobile-${item.href}`} className="flex-1">
+                  <LocalizedLink
+                    href={item.href}
+                    aria-current={item.active ? "page" : undefined}
+                    className={cn(
+                      "flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-medium transition-colors",
+                      item.active
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="size-5" />
+                    <span className="truncate">{item.label}</span>
+                  </LocalizedLink>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </div>
       <TaskCreateDialog
         isOpen={showCreateTaskDialog}

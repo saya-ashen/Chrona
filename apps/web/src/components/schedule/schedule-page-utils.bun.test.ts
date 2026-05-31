@@ -75,7 +75,7 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
 }
 
 describe("schedule-page-utils scheduling helpers", () => {
-  it("detects overlapping scheduled windows while ignoring the current task", () => {
+  it("does not flag overlapping scheduled windows as conflicts", () => {
     const items = [
       createScheduledItem({
         taskId: "task-a",
@@ -94,7 +94,7 @@ describe("schedule-page-utils scheduling helpers", () => {
         startAt: new Date(2026, 3, 15, 9, 30, 0, 0),
         endAt: new Date(2026, 3, 15, 10, 15, 0, 0),
       }),
-    ).toEqual({ hasConflict: true, conflictingTaskIds: ["task-a"] });
+    ).toEqual({ hasConflict: false, conflictingTaskIds: [] });
 
     expect(
       detectScheduleConflicts(items, {
@@ -127,7 +127,7 @@ describe("schedule-page-utils scheduling helpers", () => {
     });
   });
 
-  it("builds a placement preview with conflict metadata", () => {
+  it("builds a placement preview without overlap conflict metadata", () => {
     const items = [
       createScheduledItem({
         taskId: "task-a",
@@ -149,8 +149,8 @@ describe("schedule-page-utils scheduling helpers", () => {
     expect(preview).toMatchObject({
       startMinute: 9 * 60 + 30,
       endMinute: 10 * 60 + 30,
-      hasConflict: true,
-      conflictingTaskIds: ["task-a"],
+      hasConflict: false,
+      conflictingTaskIds: [],
       source: "drag",
     });
     expect(preview.height).toBeGreaterThan(0);
@@ -430,11 +430,11 @@ describe("formatting functions", () => {
 describe("tone and accent helpers", () => {
   describe("getPriorityAccent", () => {
     it("returns correct classes", () => {
-      expect(getPriorityAccent("Urgent")).toBe("bg-red-500");
-      expect(getPriorityAccent("High")).toBe("bg-amber-500");
-      expect(getPriorityAccent("Medium")).toBe("bg-amber-400");
-      expect(getPriorityAccent("Low")).toBe("bg-emerald-500");
-      expect(getPriorityAccent("unknown")).toBe("bg-emerald-500");
+      expect(getPriorityAccent("Urgent")).toBe("bg-destructive");
+      expect(getPriorityAccent("High")).toBe("bg-warning");
+      expect(getPriorityAccent("Medium")).toBe("bg-warning/70");
+      expect(getPriorityAccent("Low")).toBe("bg-success");
+      expect(getPriorityAccent("unknown")).toBe("bg-success");
     });
   });
 

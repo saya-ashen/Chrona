@@ -75,25 +75,39 @@ function matchesFilter(task: TaskItem, filter: FilterKey): boolean {
 }
 
 function statusTone(status: string) {
-  if (["Completed", "Done"].includes(status)) return "secondary" as const;
-  if (["Running", "Ready", "Queued"].includes(status)) return "secondary" as const;
-  if (["WaitingForInput", "WaitingForApproval"].includes(status)) return "secondary" as const;
+  if (["Completed", "Done"].includes(status)) return "success" as const;
+  if (["Running"].includes(status)) return "info" as const;
+  if (["Ready", "Queued"].includes(status)) return "secondary" as const;
+  if (["WaitingForInput", "WaitingForApproval"].includes(status)) return "warning" as const;
   if (["Failed", "Blocked"].includes(status)) return "destructive" as const;
   return "outline" as const;
 }
 
 function priorityTone(priority: string) {
   if (priority === "Urgent") return "destructive" as const;
-  if (priority === "High") return "secondary" as const;
+  if (priority === "High") return "warning" as const;
   return "outline" as const;
 }
 
+function toPreviewText(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function taskAccentClass(task: TaskItem): string {
-  if (["Failed", "Blocked"].includes(task.status)) return "from-red-500 to-orange-400";
-  if (["WaitingForInput", "WaitingForApproval"].includes(task.status)) return "from-amber-400 to-yellow-300";
-  if (task.status === "Running") return "from-blue-500 to-cyan-400";
-  if (["Completed", "Done"].includes(task.status)) return "from-emerald-500 to-teal-400";
-  return "from-primary to-violet-400";
+  if (["Failed", "Blocked"].includes(task.status)) return "from-destructive to-destructive/60";
+  if (["WaitingForInput", "WaitingForApproval"].includes(task.status)) return "from-warning to-warning/60";
+  if (task.status === "Running") return "from-info to-info/60";
+  if (["Completed", "Done"].includes(task.status)) return "from-success to-success/60";
+  return "from-primary to-primary/60";
 }
 
 function formatRelativeTime(dateStr: string, copy: TaskListCopy): string {
@@ -150,8 +164,8 @@ function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: strin
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         <TaskStat label={copy.statTotal} value={counts.all} />
-        <TaskStat label={copy.statNeeds} value={counts.needsMe} className="text-amber-600" />
-        <TaskStat label={copy.statReady} value={counts.ready} className="text-cyan-600" />
+        <TaskStat label={copy.statNeeds} value={counts.needsMe} className="text-warning-foreground" />
+        <TaskStat label={copy.statReady} value={counts.ready} className="text-info" />
       </div>
     </div>
   );
@@ -159,7 +173,7 @@ function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: strin
 
 function TaskStat({ label, value, className = "" }: { label: string; value: number; className?: string }) {
   return (
-    <span className="rounded-full border border-white/70 bg-white/75 px-2 py-1 shadow-sm">
+    <span className="rounded-full border border-border/70 bg-card px-2 py-1 shadow-xs">
       {label} <strong className={`font-semibold text-foreground ${className}`}>{value}</strong>
     </span>
   );
@@ -167,7 +181,7 @@ function TaskStat({ label, value, className = "" }: { label: string; value: numb
 
 function TaskFilterBar({ filter, counts, copy, onFilterChange }: { filter: FilterKey; counts: TaskCounts; copy: TaskListCopy; onFilterChange: (filter: FilterKey) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-[20px] border border-white/70 bg-white/80 p-1.5 shadow-sm backdrop-blur">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/70 bg-card p-1.5 shadow-xs">
       {FILTERS.map((f) => (
         <Button
           key={f.key}
@@ -175,7 +189,7 @@ function TaskFilterBar({ filter, counts, copy, onFilterChange }: { filter: Filte
           onClick={() => onFilterChange(f.key)}
           variant={filter === f.key ? "default" : "ghost"}
           size="sm"
-          className={filter === f.key ? "rounded-2xl shadow-sm" : "rounded-2xl text-slate-600 hover:bg-slate-100"}
+          className={filter === f.key ? "rounded-xl" : "rounded-xl text-muted-foreground hover:bg-muted"}
         >
           {filterLabel(f.key, copy)}
           <span className="ml-1.5 text-[11px] opacity-60">{counts[filterKeyToCountKey(f.key)]}</span>
@@ -247,7 +261,7 @@ function TaskRow({
   ];
 
   return (
-    <div className="group relative overflow-hidden rounded-[24px] border border-white/70 bg-white/92 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
+    <div className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
       <div className={`absolute inset-y-3 left-3 w-1 rounded-full bg-gradient-to-b ${taskAccentClass(task)}`} aria-hidden="true" />
       <div className="flex flex-wrap items-center justify-between gap-3 pl-4">
         <Checkbox
@@ -266,7 +280,7 @@ function TaskRow({
               <Badge variant="secondary">{task.projection.runStatus}</Badge>
             )}
           </div>
-          {task.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{task.description}</p>}
+          {task.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{toPreviewText(task.description)}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
             {task.dueAt && <span>{copy.duePrefix}: {new Date(task.dueAt).toLocaleDateString()}</span>}
             <span>{copy.updatedPrefix}: {formatRelativeTime(task.updatedAt, copy)}</span>
@@ -381,13 +395,13 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
   }
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[30px] border border-border/55 bg-white/70 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:p-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-[24px] bg-[linear-gradient(135deg,rgba(248,250,252,0.94),rgba(238,242,255,0.78))] p-3 sm:p-4">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/60 p-2 shadow-sm sm:p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl bg-gradient-to-br from-muted/40 to-primary-soft/30 p-3 sm:p-4">
         <TaskListHero title={copy.nav.tasks} copy={taskCopy} activeFilterLabel={activeFilterLabel} counts={counts} />
         <TaskFilterBar filter={filter} counts={counts} copy={taskCopy} onFilterChange={setFilter} />
 
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[20px] border border-white/70 bg-white/80 px-3 py-2 text-xs shadow-sm backdrop-blur">
-          <label className="flex items-center gap-2 font-medium text-slate-700">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+          <label className="flex items-center gap-2 font-medium text-foreground">
             <Checkbox
               aria-label={taskCopy.selectVisible}
               checked={allVisibleSelected}
@@ -397,7 +411,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
             {taskCopy.selectedCount.replace("{count}", String(selectedIds.size))}
           </label>
           <div className="flex flex-wrap items-center gap-2">
-            {actionMessage ? <span className="text-red-600" role="status">{actionMessage}</span> : null}
+            {actionMessage ? <span className="text-destructive" role="status">{actionMessage}</span> : null}
             <Button
               type="button"
               variant="outline"
@@ -423,7 +437,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-[26px] border border-dashed border-border/70 bg-white/80 p-10 text-center text-sm text-muted-foreground shadow-sm">
+          <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center text-sm text-muted-foreground shadow-xs">
             {taskCopy.emptyFiltered}
           </div>
         ) : (

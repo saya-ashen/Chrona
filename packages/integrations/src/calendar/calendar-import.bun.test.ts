@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { normalizeImportedEvents } from "@chrona/domain";
-import { fetchCalendarFeed } from "./feed-fetcher";
+import { CalendarFeedError, fetchCalendarFeed } from "./feed-fetcher";
 import { parseICalendarFeed } from "./normalizer";
 import { CalendarSourceUrlError, normalizeCalendarSourceUrl } from "./source-url";
 
@@ -19,6 +19,16 @@ describe("calendar import helpers", () => {
 
   it("rejects unsupported URL schemes", () => {
     expect(() => normalizeCalendarSourceUrl("webcal://calendar.example/team.ics")).toThrow(CalendarSourceUrlError);
+    expect(() => normalizeCalendarSourceUrl("http://calendar.example/team.ics")).toThrow(CalendarSourceUrlError);
+    expect(() => normalizeCalendarSourceUrl("file:///etc/passwd")).toThrow(CalendarSourceUrlError);
+  });
+
+  it("blocks unsafe default feed targets before network access", async () => {
+    await expect(fetchCalendarFeed("file:///etc/passwd")).rejects.toThrow(CalendarFeedError);
+    await expect(fetchCalendarFeed("http://calendar.example/team.ics")).rejects.toThrow(CalendarFeedError);
+    await expect(fetchCalendarFeed("https://127.0.0.1/team.ics")).rejects.toThrow(CalendarFeedError);
+    await expect(fetchCalendarFeed("https://169.254.169.254/latest/meta-data")).rejects.toThrow(CalendarFeedError);
+    await expect(fetchCalendarFeed("https://[::1]/team.ics")).rejects.toThrow(CalendarFeedError);
   });
 
   it("parses valid, all-day, cancelled, timezone, and duplicate fixtures", async () => {

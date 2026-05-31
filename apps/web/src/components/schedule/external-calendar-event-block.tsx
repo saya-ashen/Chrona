@@ -14,8 +14,8 @@ export function ExternalCalendarEventBlock({
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 gap-2 overflow-hidden rounded-[0.85rem] border border-dashed bg-white/92 p-2 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]",
-        event.overlapsScheduledTask ? "border-amber-400 bg-amber-50/95" : "border-slate-300",
+        "flex h-full min-h-0 gap-2 overflow-hidden rounded-[0.85rem] border border-dashed bg-card/92 p-2 text-left shadow-xs",
+        event.overlapsScheduledTask ? "border-warning/60 bg-warning/10" : "border-border",
       )}
       data-read-only="true"
     >

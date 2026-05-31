@@ -266,7 +266,7 @@ export function TaskPlanGenerationPanel({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         <p>Failed to plan task: {error}</p>
       </div>
     );

@@ -84,6 +84,12 @@ enum CalendarSyncPolicy {
   auto_complete_past_events
 }
 
+enum CalendarAutomationPolicy {
+  manual
+  auto_plan
+  auto_execute
+}
+
 enum RunStatus {
   Pending
   Running
@@ -190,6 +196,7 @@ model CalendarSource {
   color                   String
   lifecycleState          CalendarSourceLifecycleState @default(active)
   syncPolicy              CalendarSyncPolicy           @default(keep_active)
+  automationPolicy        CalendarAutomationPolicy     @default(auto_plan)
   syncState               CalendarSyncState            @default(idle)
   lastSuccessfulRefreshAt DateTime?
   nextExpectedRefreshAt   DateTime?

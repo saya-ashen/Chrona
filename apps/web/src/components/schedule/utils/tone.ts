@@ -1,13 +1,13 @@
 export function getPriorityAccent(priority: string) {
   switch (priority.toLowerCase()) {
     case "urgent":
-      return "bg-red-500";
+      return "bg-destructive";
     case "high":
-      return "bg-amber-500";
+      return "bg-warning";
     case "medium":
-      return "bg-amber-400";
+      return "bg-warning/70";
     default:
-      return "bg-emerald-500";
+      return "bg-success";
   }
 }
 

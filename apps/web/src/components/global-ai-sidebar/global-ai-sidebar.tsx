@@ -28,9 +28,9 @@ export function GlobalAiSidebar() {
         side="right"
         showCloseButton={false}
         aria-label={t("components.globalAiSidebar.panelLabel")}
-        className="w-full max-w-[440px] gap-0 overflow-hidden border-l border-border/70 bg-slate-50/96 p-0 shadow-[-24px_0_70px_rgba(15,23,42,0.18)] sm:w-[420px] sm:max-w-[420px]"
+        className="w-full max-w-[440px] gap-0 overflow-hidden border-l border-border/70 bg-muted/40 p-0 shadow-2xl sm:w-[420px] sm:max-w-[420px]"
       >
-        <SheetHeader className="flex-row items-center justify-between gap-3 border-b border-border/70 bg-white px-4 py-3">
+        <SheetHeader className="flex-row items-center justify-between gap-3 border-b border-border/70 bg-card px-4 py-3">
           <div className="flex flex-col gap-0.5">
             <SheetDescription className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               {t("components.globalAiSidebar.eyebrow")}
@@ -60,7 +60,7 @@ export function GlobalAiSidebar() {
           <ProposalPreviewCard proposal={sidebar.pendingProposal} />
         </div>
         {sidebar.pendingProposal ? (
-          <footer className="border-t border-border/70 bg-white px-4 py-3" aria-live="polite">
+          <footer className="border-t border-border/70 bg-card px-4 py-3" aria-live="polite">
             <div className="flex gap-2">
               <Button type="button" onClick={() => void sidebar.confirmProposal()} disabled={confirmDisabled} className="flex-1 rounded-2xl">
                 {sidebar.pendingProposal.confirmability === "applying" ? t("components.globalAiSidebar.applying") : t("components.globalAiSidebar.confirm")}
@@ -72,7 +72,7 @@ export function GlobalAiSidebar() {
                 {t("components.globalAiSidebar.refine")}
               </Button>
             </div>
-            {sidebar.errorMessage ? <p className="mt-2 text-sm text-red-700">{sidebar.errorMessage}</p> : null}
+            {sidebar.errorMessage ? <p className="mt-2 text-sm text-destructive">{sidebar.errorMessage}</p> : null}
           </footer>
         ) : null}
       </SheetContent>

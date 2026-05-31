@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe("DayTimeline", () => {
-  it("shows a conflict preview when a dragged block overlaps an existing scheduled block", async () => {
+  it("shows a normal placement preview when a dragged block overlaps an existing scheduled block", async () => {
     render(
       <DayTimeline
         items={[createScheduledItem()]}
@@ -83,8 +83,9 @@ describe("DayTimeline", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/conflict/i)).toBeInTheDocument();
+      expect(screen.getByText(/drop to schedule/i)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/conflict/i)).not.toBeInTheDocument();
   });
 
   it("shows a current-time marker when the selected day is today", () => {
@@ -207,7 +208,7 @@ describe("DayTimeline", () => {
     );
   });
 
-  it("does not commit a keyboard nudge when the adjusted slot conflicts with another block", async () => {
+  it("commits a keyboard nudge even when the adjusted slot overlaps another block", async () => {
     const onScheduleDrop = vi.fn().mockResolvedValue(undefined);
 
     render(
@@ -243,6 +244,10 @@ describe("DayTimeline", () => {
     const block = screen.getByRole("link", { name: /selected task/i });
     fireEvent.keyDown(block, { key: "ArrowDown" });
 
-    expect(onScheduleDrop).not.toHaveBeenCalled();
+    expect(onScheduleDrop).toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: "task-1", kind: "scheduled" }),
+      new Date(2026, 3, 15, 9, 30, 0, 0),
+      new Date(2026, 3, 15, 10, 30, 0, 0),
+    );
   });
 });

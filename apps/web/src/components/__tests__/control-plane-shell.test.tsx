@@ -77,6 +77,7 @@ vi.mock("@chrona/i18n/react", () => ({
         "nav.brandTitle": "Chrona",
         "nav.brandTagline": "Human-AI task work",
         "nav.schedule": "Schedule",
+        "nav.inbox": "Inbox",
         "nav.tasks": "Tasks",
         "nav.settings": "Settings",
         "nav.newTask": "New Task",
@@ -105,6 +106,12 @@ function writePreferences(preferences: ScheduleAiPreferences) {
   );
 }
 
+function expectNavLink(label: string, href: string) {
+  const links = screen.getAllByRole("link", { name: label });
+  expect(links.some((link) => link.getAttribute("href") === href)).toBe(true);
+  return links;
+}
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
@@ -114,7 +121,7 @@ afterEach(() => {
 });
 
 describe("ControlPlaneShell", () => {
-  it("renders simplified navigation with Schedule, Tasks, and Settings", () => {
+  it("renders primary navigation with Schedule, Inbox, Tasks, and Settings", () => {
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
         <div>Workspace body</div>
@@ -124,13 +131,13 @@ describe("ControlPlaneShell", () => {
     const chronaLinks = screen.getAllByRole("link", { name: "Chrona" });
     expect(chronaLinks.length).toBeGreaterThan(0);
     expect(chronaLinks[0]).toHaveAttribute("href", "/en/schedule");
-    expect(screen.getAllByRole("link", { name: "Schedule" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("href", "/en/tasks");
-    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/en/settings");
-    expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("aria-current", "page");
+    expectNavLink("Schedule", "/en/schedule");
+    expectNavLink("Inbox", "/en/inbox");
+    const taskLinks = expectNavLink("Tasks", "/en/tasks");
+    expect(taskLinks.some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
+    expectNavLink("Settings", "/en/settings");
 
-    // Should NOT show legacy navigation items
-    expect(screen.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
+    // Should NOT show inactive or legacy workspace navigation.
     expect(screen.queryByRole("link", { name: "Memory" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Workspaces" })).not.toBeInTheDocument();
   });

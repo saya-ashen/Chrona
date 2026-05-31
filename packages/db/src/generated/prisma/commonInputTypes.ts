@@ -137,6 +137,13 @@ export type EnumCalendarSyncPolicyFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumCalendarSyncPolicyFilter<$PrismaModel> | $Enums.CalendarSyncPolicy
 }
 
+export type EnumCalendarAutomationPolicyFilter<$PrismaModel = never> = {
+  equals?: $Enums.CalendarAutomationPolicy | Prisma.EnumCalendarAutomationPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.CalendarAutomationPolicy[]
+  notIn?: $Enums.CalendarAutomationPolicy[]
+  not?: Prisma.NestedEnumCalendarAutomationPolicyFilter<$PrismaModel> | $Enums.CalendarAutomationPolicy
+}
+
 export type EnumCalendarSyncStateFilter<$PrismaModel = never> = {
   equals?: $Enums.CalendarSyncState | Prisma.EnumCalendarSyncStateFieldRefInput<$PrismaModel>
   in?: $Enums.CalendarSyncState[]
@@ -184,6 +191,16 @@ export type EnumCalendarSyncPolicyWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumCalendarSyncPolicyFilter<$PrismaModel>
   _max?: Prisma.NestedEnumCalendarSyncPolicyFilter<$PrismaModel>
+}
+
+export type EnumCalendarAutomationPolicyWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CalendarAutomationPolicy | Prisma.EnumCalendarAutomationPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.CalendarAutomationPolicy[]
+  notIn?: $Enums.CalendarAutomationPolicy[]
+  not?: Prisma.NestedEnumCalendarAutomationPolicyWithAggregatesFilter<$PrismaModel> | $Enums.CalendarAutomationPolicy
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCalendarAutomationPolicyFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCalendarAutomationPolicyFilter<$PrismaModel>
 }
 
 export type EnumCalendarSyncStateWithAggregatesFilter<$PrismaModel = never> = {
@@ -804,6 +821,13 @@ export type NestedEnumCalendarSyncPolicyFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumCalendarSyncPolicyFilter<$PrismaModel> | $Enums.CalendarSyncPolicy
 }
 
+export type NestedEnumCalendarAutomationPolicyFilter<$PrismaModel = never> = {
+  equals?: $Enums.CalendarAutomationPolicy | Prisma.EnumCalendarAutomationPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.CalendarAutomationPolicy[]
+  notIn?: $Enums.CalendarAutomationPolicy[]
+  not?: Prisma.NestedEnumCalendarAutomationPolicyFilter<$PrismaModel> | $Enums.CalendarAutomationPolicy
+}
+
 export type NestedEnumCalendarSyncStateFilter<$PrismaModel = never> = {
   equals?: $Enums.CalendarSyncState | Prisma.EnumCalendarSyncStateFieldRefInput<$PrismaModel>
   in?: $Enums.CalendarSyncState[]
@@ -840,6 +864,16 @@ export type NestedEnumCalendarSyncPolicyWithAggregatesFilter<$PrismaModel = neve
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumCalendarSyncPolicyFilter<$PrismaModel>
   _max?: Prisma.NestedEnumCalendarSyncPolicyFilter<$PrismaModel>
+}
+
+export type NestedEnumCalendarAutomationPolicyWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.CalendarAutomationPolicy | Prisma.EnumCalendarAutomationPolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.CalendarAutomationPolicy[]
+  notIn?: $Enums.CalendarAutomationPolicy[]
+  not?: Prisma.NestedEnumCalendarAutomationPolicyWithAggregatesFilter<$PrismaModel> | $Enums.CalendarAutomationPolicy
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumCalendarAutomationPolicyFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumCalendarAutomationPolicyFilter<$PrismaModel>
 }
 
 export type NestedEnumCalendarSyncStateWithAggregatesFilter<$PrismaModel = never> = {

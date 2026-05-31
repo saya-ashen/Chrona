@@ -20,11 +20,11 @@ export function normalizeCalendarSourceUrl(input: string): NormalizedCalendarUrl
     throw new CalendarSourceUrlError("invalid_url", "Enter a valid calendar subscription URL.");
   }
 
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:" && parsed.protocol !== "file:") {
-    throw new CalendarSourceUrlError("unsupported_scheme", "Calendar links must use http, https, or a test fixture file URL.");
+  if (parsed.protocol !== "https:") {
+    throw new CalendarSourceUrlError("unsupported_scheme", "Calendar links must use https.");
   }
 
-  if ((parsed.protocol === "http:" || parsed.protocol === "https:") && !parsed.hostname) {
+  if (!parsed.hostname) {
     throw new CalendarSourceUrlError("invalid_url", "Calendar link is missing a host.");
   }
 
@@ -37,8 +37,6 @@ export function normalizeCalendarSourceUrl(input: string): NormalizedCalendarUrl
 
 export function redactCalendarSourceUrl(url: URL | string): string {
   const parsed = typeof url === "string" ? new URL(url) : new URL(url.toString());
-  if (parsed.protocol === "file:") return "local fixture";
-
   const pathName = parsed.pathname.split("/").filter(Boolean).at(-1) ?? "calendar";
   return `${parsed.hostname}/${pathName}`;
 }
@@ -60,6 +58,8 @@ export function safeCalendarErrorMessage(
       return "Calendar feed could not be read.";
     case "too_large":
       return "Calendar feed is too large to import.";
+    case "unknown":
+      return fallback;
     default:
       return fallback;
   }

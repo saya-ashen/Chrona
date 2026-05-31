@@ -42,14 +42,14 @@ function FieldDiffRow({
     <div
       className={cn(
         "grid grid-cols-[120px_1fr_1fr] gap-2 text-xs py-1.5 border-b border-border/30",
-        changed && "bg-amber-50/30 -mx-2 px-2",
+        changed && "bg-warning/10 -mx-2 px-2",
       )}
     >
       <span className="font-medium text-muted-foreground">{label}</span>
-      <span className={cn("text-muted-foreground/70 line-through", changed && "text-red-600/60")}>
+      <span className={cn("text-muted-foreground/70 line-through", changed && "text-destructive/60")}>
         {original || <em>empty</em>}
       </span>
-      <span className={cn(changed && "font-medium text-emerald-700")}>
+      <span className={cn(changed && "font-medium text-success")}>
         {proposed || <em>empty</em>}
       </span>
     </div>
@@ -223,12 +223,12 @@ export function TaskWorkspaceDiffPreview({
       </CardHeader>
 
       {risks.length > 0 ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <div className="rounded-2xl border border-warning/30 bg-warning/15 px-4 py-3">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="size-4 text-amber-600 mt-0.5 shrink-0" />
+            <AlertTriangle className="size-4 text-warning-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-amber-800">High Risk Changes</p>
-              <ul className="mt-1 list-disc pl-4 text-xs text-amber-700 space-y-0.5">
+              <p className="text-sm font-medium text-warning-foreground">High Risk Changes</p>
+              <ul className="mt-1 list-disc pl-4 text-xs text-warning-foreground/90 space-y-0.5">
                 {risks.map((risk, i) => (
                   <li key={i}>{risk}</li>
                 ))}
@@ -242,7 +242,7 @@ export function TaskWorkspaceDiffPreview({
         <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
           {proposal.warnings.map((w, i) => (
             <div key={i} className="flex items-start gap-1.5">
-              <AlertTriangle className="size-3 text-amber-500 mt-0.5 shrink-0" />
+              <AlertTriangle className="size-3 text-warning-foreground mt-0.5 shrink-0" />
               <span>{w}</span>
             </div>
           ))}
@@ -299,7 +299,7 @@ export function TaskWorkspaceDiffPreview({
               const deleteNodes = proposal.planPatch?.operations.filter((op) => op.op === "delete_node") ?? [];
               if (deleteNodes.length > 0) {
                 return (
-                  <div className="mt-2 text-xs text-red-600">
+                  <div className="mt-2 text-xs text-destructive">
                     <span className="font-medium">To delete: </span>
                     {deleteNodes.map((op) => op.nodeId).join(", ")}
                   </div>
@@ -345,7 +345,7 @@ export function TaskWorkspaceDiffPreview({
         </Button>
 
         {applyError ? (
-          <span className="text-sm text-red-600">{applyError}</span>
+          <span className="text-sm text-destructive">{applyError}</span>
         ) : null}
       </div>
     </Card>

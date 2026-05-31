@@ -64,7 +64,6 @@ const task = {
 } satisfies TaskData;
 
 const header = {
-  breadcrumb: ["Tasks", task.title],
   title: task.title,
   canEditTitle: true,
   status: "waiting",
@@ -72,7 +71,6 @@ const header = {
   totalSteps: 1,
   progressPercent: 0,
   actions: [],
-  memberContext: { memberLabel: "Project member", notificationCount: 0 },
   primaryActionLabel: null,
   currentNodeId: null,
 } satisfies TaskHeaderView;

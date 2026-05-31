@@ -5,7 +5,6 @@ import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/pl
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type {
   ExecutionOverviewCard,
-  ExecutionFlowView,
   ExecutionOverviewTone,
   ProgressSummary,
   TaskData,
@@ -14,7 +13,6 @@ import type {
   TaskPlanGenerationStatus,
   TaskWorkspaceUserStatus,
   TaskWorkspaceExecutionConsoleView,
-  WorkspaceNavigationView,
   WorkspaceActivityItem,
   WorkspaceArtifactItem,
 } from "./task-workspace-types";
@@ -22,7 +20,10 @@ import {
   activityToneFromOverviewTone,
   mergeWorkspaceActivity,
 } from "./task-workspace-activity";
-import { buildWorkspaceStateTreatment } from "./task-workspace-actions";
+import {
+  buildWorkspaceStateTreatment,
+  type WorkspaceStateTreatmentCopy,
+} from "./task-workspace-actions";
 
 export type TaskWorkspaceCommandAck = {
   commandId: string;
@@ -39,6 +40,109 @@ export type TaskPlanState = {
   savedPlan: TaskData["savedPlan"] | null;
   generationSession: TaskPlanGenerationSessionReadModel | null;
 };
+
+export type TaskWorkspaceExecutionConsoleCopy = WorkspaceStateTreatmentCopy & {
+  noPlanYet: string;
+  stepsComplete: string;
+  latestResult: string;
+  latestRun: string;
+  runIsStatus: string;
+  reviewResultActions: string;
+  reviewRunContext: string;
+  noExecutionResultYet: string;
+  needsHandling: string;
+  resolveInNodePanel: string;
+  openActionControls: string;
+  blocked: string;
+  readyToSchedule: string;
+  executionReadiness: string;
+  currentWork: string;
+  openRetryControls: string;
+  openRunControls: string;
+  noAcceptedPlanReady: string;
+  noPlanNodeSelected: string;
+  nodeDetailEmptyDescription: string;
+  noActionsAvailableForNode: string;
+  generateAndAcceptPlanBeforeStart: string;
+  acceptGeneratedPlanBeforeStart: string;
+  taskAlreadyRunning: string;
+  taskWaitingForCheckpointInput: string;
+  resolveBlockerBeforeStart: string;
+  taskCompleted: string;
+  noRunningExecutionToStop: string;
+  noRunningExecutionToPause: string;
+  start: string;
+  pause: string;
+  stop: string;
+  moreActions: string;
+};
+
+export const DEFAULT_TASK_WORKSPACE_EXECUTION_CONSOLE_COPY: TaskWorkspaceExecutionConsoleCopy = {
+  syncStaleLabel: "Sync stale",
+  syncStaleGuidance: "Refresh before acting on execution results.",
+  viewOnlyLabel: "View only",
+  viewOnlyGuidance: "You can view this task, but cannot run it.",
+  noPlanYetLabel: "No plan yet",
+  noPlanYetGuidance: "Generate and accept a plan to unlock execution controls.",
+  completedLabel: "Completed",
+  completedGuidance: "Review the latest result and artifacts before closing the task.",
+  degradedLabel: "Degraded",
+  degradedGuidance: "Retry sync or repair this node before continuing execution.",
+  blockedLabel: "Blocked",
+  blockedGuidance: "Resolve the blocker before continuing execution.",
+  approvalRequiredLabel: "Approval required",
+  approvalRequiredGuidance: "Approve or reject the current node to continue.",
+  reviewRequiredLabel: "Review required",
+  reviewRequiredGuidance: "Complete the current node action to continue.",
+  runningLabel: "Running",
+  runningGuidance: "Monitor current execution progress.",
+  idleLabel: "Idle",
+  idleGuidance: "Select a plan node or start execution when ready.",
+  noPlanYet: "No plan yet",
+  stepsComplete: "{completed}/{total} steps complete",
+  latestResult: "Latest result",
+  latestRun: "Latest run",
+  runIsStatus: "Run is {status}",
+  reviewResultActions: "Review result actions",
+  reviewRunContext: "Review run context",
+  noExecutionResultYet: "No execution result yet.",
+  needsHandling: "Needs handling",
+  resolveInNodePanel: "Resolve in node panel",
+  openActionControls: "Open action controls",
+  blocked: "Blocked",
+  readyToSchedule: "Ready to schedule",
+  executionReadiness: "Execution readiness",
+  currentWork: "Current work",
+  openRetryControls: "Open retry controls",
+  openRunControls: "Open run controls",
+  noAcceptedPlanReady: "No accepted plan is ready to run yet.",
+  noPlanNodeSelected: "No plan node selected",
+  nodeDetailEmptyDescription: "Generate or select a plan node to inspect execution details.",
+  noActionsAvailableForNode: "No actions are available for this node.",
+  generateAndAcceptPlanBeforeStart: "Generate and accept a plan before starting execution.",
+  acceptGeneratedPlanBeforeStart: "Accept the generated plan before starting execution.",
+  taskAlreadyRunning: "Task is already running.",
+  taskWaitingForCheckpointInput: "Task is waiting for checkpoint input.",
+  resolveBlockerBeforeStart: "Resolve the blocker before starting execution.",
+  taskCompleted: "Task is completed.",
+  noRunningExecutionToStop: "No running execution session to stop.",
+  noRunningExecutionToPause: "No running execution session to pause.",
+  start: "Start",
+  pause: "Pause",
+  stop: "Stop",
+  moreActions: "More actions",
+};
+
+function resolveExecutionConsoleCopy(copy?: Partial<TaskWorkspaceExecutionConsoleCopy>) {
+  return { ...DEFAULT_TASK_WORKSPACE_EXECUTION_CONSOLE_COPY, ...copy };
+}
+
+function fillTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+    template,
+  );
+}
 
 export const taskWorkspaceQueryKeys = {
   all: ["task-workspace"] as const,
@@ -90,17 +194,6 @@ function deriveTaskStatusFromGraph(
   return taskStatus;
 }
 
-function buildWorkspaceMemberContext(pageData: TaskPageData, hasAttention: boolean) {
-  const notificationCount = pageData.approvals.filter((approval) => approval.status !== "Approved" && approval.status !== "Rejected").length
-    + pageData.scheduleProposals.filter((proposal) => proposal.status === "Pending").length
-    + (hasAttention ? 1 : 0);
-
-  return {
-    memberLabel: "Project member",
-    notificationCount,
-  };
-}
-
 export function mapTaskWorkspaceStatus(status: string): TaskWorkspaceUserStatus {
   if (["done", "completed", "skipped", "cancelled", "invalidated", "Done", "Completed", "Cancelled"].includes(status)) return "completed";
   if (["active", "in_progress", "running", "Running"].includes(status)) return "running";
@@ -122,7 +215,11 @@ function overviewToneForNode(node: PlanNodeDataModel | null): ExecutionOverviewT
   return "neutral";
 }
 
-export function buildProgressSummary(graphPlan: TaskPlanGraphPlan | null): ProgressSummary {
+export function buildProgressSummary(
+  graphPlan: TaskPlanGraphPlan | null,
+  copyInput?: Partial<Pick<TaskWorkspaceExecutionConsoleCopy, "noPlanYet" | "stepsComplete">>,
+): ProgressSummary {
+  const copy = resolveExecutionConsoleCopy(copyInput);
   const nodes = graphPlan?.nodes ?? [];
   const totalSteps = nodes.length;
   const completedSteps = nodes.filter((node) => isDoneStatus(node.status)).length;
@@ -132,7 +229,7 @@ export function buildProgressSummary(graphPlan: TaskPlanGraphPlan | null): Progr
     completedSteps,
     totalSteps,
     percentComplete,
-    label: totalSteps === 0 ? "No plan yet" : `${completedSteps}/${totalSteps} steps complete`,
+    label: totalSteps === 0 ? copy.noPlanYet : fillTemplate(copy.stepsComplete, { completed: completedSteps, total: totalSteps }),
   };
 }
 
@@ -174,19 +271,23 @@ function pickLatestResultNode(graphPlan: TaskPlanGraphPlan | null) {
     ?? null;
 }
 
-function buildLatestResultCard(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null): ExecutionOverviewCard {
+function buildLatestResultCard(
+  pageData: TaskPageData,
+  graphPlan: TaskPlanGraphPlan | null,
+  copy: TaskWorkspaceExecutionConsoleCopy,
+): ExecutionOverviewCard {
   const latestResultNode = pickLatestResultNode(graphPlan);
   const nodeSummary = latestResultNode ? nodeResultSummary(latestResultNode) : null;
 
   if (nodeSummary) {
     return {
       id: `node-result-${latestResultNode?.id ?? "current"}`,
-      title: "Latest result",
+      title: copy.latestResult,
       description: nodeSummary,
       content: latestResultNode ? nodeResultContent(latestResultNode) : undefined,
       statusLabel: latestResultNode?.statusLabel ?? latestResultNode?.status,
       tone: overviewToneForNode(latestResultNode),
-      actionLabel: "Review result actions",
+      actionLabel: copy.reviewResultActions,
       actionNodeId: latestResultNode?.id,
     };
   }
@@ -194,32 +295,36 @@ function buildLatestResultCard(pageData: TaskPageData, graphPlan: TaskPlanGraphP
   if (pageData.latestRunSummary) {
     return {
       id: `run-${pageData.latestRunSummary.id}`,
-      title: "Latest run",
-      description: `Run is ${pageData.latestRunSummary.status}`,
+      title: copy.latestRun,
+      description: fillTemplate(copy.runIsStatus, { status: pageData.latestRunSummary.status }),
       statusLabel: pageData.latestRunSummary.syncStatus,
       tone: pageData.latestRunSummary.status === "Completed" ? "success" : "info",
-      actionLabel: "Review run context",
+      actionLabel: copy.reviewRunContext,
     };
   }
 
   return {
     id: "latest-result-empty",
-    title: "Latest result",
-    description: "No execution result yet.",
+    title: copy.latestResult,
+    description: copy.noExecutionResultYet,
     tone: "neutral",
   };
 }
 
-function buildAttentionCard(pageData: TaskPageData, currentNode: PlanNodeDataModel | null): ExecutionOverviewCard | null {
+function buildAttentionCard(
+  pageData: TaskPageData,
+  currentNode: PlanNodeDataModel | null,
+  copy: TaskWorkspaceExecutionConsoleCopy,
+): ExecutionOverviewCard | null {
   const pendingApproval = pageData.approvals.find((approval) => approval.status !== "Approved" && approval.status !== "Rejected");
   if (pendingApproval) {
     return {
       id: `approval-${pendingApproval.id}`,
-      title: "Needs handling",
+      title: copy.needsHandling,
       description: pendingApproval.title,
       statusLabel: pendingApproval.status,
       tone: "warning",
-      actionLabel: "Resolve in node panel",
+      actionLabel: copy.resolveInNodePanel,
       actionNodeId: currentNode?.id,
     };
   }
@@ -227,11 +332,11 @@ function buildAttentionCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
   if (currentNode && isCheckpointStatus(currentNode.status)) {
     return {
       id: `node-attention-${currentNode.id}`,
-      title: "Needs handling",
+      title: copy.needsHandling,
       description: currentNode.nextAction ?? currentNode.summary ?? currentNode.objective,
       statusLabel: currentNode.statusLabel ?? currentNode.status,
       tone: overviewToneForNode(currentNode),
-      actionLabel: "Open action controls",
+      actionLabel: copy.openActionControls,
       actionNodeId: currentNode.id,
     };
   }
@@ -244,11 +349,11 @@ function buildAttentionCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
     ) ?? currentNode?.id;
     return {
       id: "task-block-reason",
-      title: "Blocked",
+      title: copy.blocked,
       description: pageData.task.blockReason.actionRequired ?? pageData.task.runnabilitySummary,
       statusLabel: pageData.task.blockReason.blockType,
       tone: "critical",
-      actionLabel: actionNodeId ? "Open action controls" : undefined,
+      actionLabel: actionNodeId ? copy.openActionControls : undefined,
       actionNodeId: actionNodeId ?? undefined,
     };
   }
@@ -256,11 +361,11 @@ function buildAttentionCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
   if (currentNode && isAttentionStatus(currentNode.status)) {
     return {
       id: `node-attention-${currentNode.id}`,
-      title: "Needs handling",
+      title: copy.needsHandling,
       description: currentNode.nextAction ?? currentNode.summary ?? currentNode.objective,
       statusLabel: currentNode.statusLabel ?? currentNode.status,
       tone: overviewToneForNode(currentNode),
-      actionLabel: "Open action controls",
+      actionLabel: copy.openActionControls,
       actionNodeId: currentNode.id,
     };
   }
@@ -268,12 +373,16 @@ function buildAttentionCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
   return null;
 }
 
-function buildReadinessCard(pageData: TaskPageData, currentNode: PlanNodeDataModel | null): ExecutionOverviewCard {
+function buildReadinessCard(
+  pageData: TaskPageData,
+  currentNode: PlanNodeDataModel | null,
+  copy: TaskWorkspaceExecutionConsoleCopy,
+): ExecutionOverviewCard {
   const pendingProposal = pageData.scheduleProposals.find((proposal) => proposal.status === "Pending");
   if (pendingProposal) {
     return {
       id: `schedule-proposal-${pendingProposal.id}`,
-      title: "Ready to schedule",
+      title: copy.readyToSchedule,
       description: pendingProposal.summary,
       statusLabel: pendingProposal.status,
       tone: "warning",
@@ -283,7 +392,7 @@ function buildReadinessCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
   if (!pageData.task.isRunnable) {
     return {
       id: "task-not-runnable",
-      title: "Execution readiness",
+      title: copy.executionReadiness,
       description: pageData.task.runnabilitySummary,
       statusLabel: pageData.task.runnabilityState ?? pageData.task.scheduleStatus,
       tone: "warning",
@@ -293,20 +402,20 @@ function buildReadinessCard(pageData: TaskPageData, currentNode: PlanNodeDataMod
   if (currentNode) {
     return {
       id: `current-node-${currentNode.id}`,
-      title: "Current work",
+      title: copy.currentWork,
       description: currentNode.nextAction ?? currentNode.summary ?? currentNode.objective,
       statusLabel: currentNode.statusLabel ?? currentNode.status,
       tone: overviewToneForNode(currentNode),
-      actionLabel: currentNode.status === "blocked" ? "Open retry controls" : "Open run controls",
+      actionLabel: currentNode.status === "blocked" ? copy.openRetryControls : copy.openRunControls,
       actionNodeId: currentNode.id,
     };
   }
 
   return {
     id: "execution-ready-empty",
-    title: "Execution readiness",
+    title: copy.executionReadiness,
     description: pageData.task.scheduleStatus === "Unscheduled"
-      ? "No accepted plan is ready to run yet."
+      ? copy.noAcceptedPlanReady
       : pageData.task.runnabilitySummary,
     statusLabel: pageData.task.scheduleStatus,
     tone: pageData.task.scheduleStatus === "Unscheduled" ? "neutral" : "info",
@@ -401,10 +510,9 @@ function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | nu
 function buildTaskHeaderView(
   pageData: TaskPageData,
   progress: ProgressSummary,
-  hasAttention: boolean,
   currentNode: PlanNodeDataModel | null,
+  copy: TaskWorkspaceExecutionConsoleCopy,
 ): TaskHeaderView {
-  const memberContext = buildWorkspaceMemberContext(pageData, hasAttention);
   const allNodesDone = progress.totalSteps > 0 && progress.completedSteps === progress.totalSteps;
   const currentNodeStatus = !allNodesDone && currentNode && isAttentionStatus(currentNode.status)
     ? mapTaskWorkspaceStatus(currentNode.status)
@@ -415,29 +523,28 @@ function buildTaskHeaderView(
   const hasPlan = progress.totalSteps > 0 || Boolean(pageData.task.savedPlan);
   const hasUnacceptedSavedPlan = Boolean(pageData.task.savedPlan && pageData.task.savedPlan.status !== "accepted");
   const cannotStartReason = !hasPlan
-    ? "Generate and accept a plan before starting execution."
+    ? copy.generateAndAcceptPlanBeforeStart
     : hasUnacceptedSavedPlan
-      ? "Accept the generated plan before starting execution."
+      ? copy.acceptGeneratedPlanBeforeStart
     : !pageData.task.isRunnable
       ? pageData.task.runnabilitySummary
-      : workspaceStatus === "running"
-        ? "Task is already running."
+    : workspaceStatus === "running"
+        ? copy.taskAlreadyRunning
         : workspaceStatus === "approval-needed"
-          ? "Task is waiting for checkpoint input."
+          ? copy.taskWaitingForCheckpointInput
           : workspaceStatus === "blocked"
-            ? "Resolve the blocker before starting execution."
+            ? copy.resolveBlockerBeforeStart
             : workspaceStatus === "completed"
-              ? "Task is completed."
+              ? copy.taskCompleted
               : undefined;
   const cannotStopReason = workspaceStatus === "running" || workspaceStatus === "approval-needed"
     ? undefined
-    : "No running execution session to stop.";
+    : copy.noRunningExecutionToStop;
   const cannotPauseReason = workspaceStatus === "running"
     ? undefined
-    : "No running execution session to pause.";
+    : copy.noRunningExecutionToPause;
 
   return {
-    breadcrumb: ["Tasks", pageData.task.title],
     title: pageData.task.title,
     canEditTitle: true,
     status: workspaceStatus,
@@ -445,75 +552,14 @@ function buildTaskHeaderView(
     totalSteps: progress.totalSteps,
     progressPercent: progress.percentComplete,
     actions: [
-      { id: "start", label: "Start", disabled: Boolean(cannotStartReason), disabledReason: cannotStartReason },
-      { id: "pause", label: "Pause", disabled: Boolean(cannotPauseReason), disabledReason: cannotPauseReason },
-      { id: "stop", label: "Stop", disabled: Boolean(cannotStopReason), disabledReason: cannotStopReason },
-      { id: "more", label: "More actions" },
+      { id: "start", label: copy.start, disabled: Boolean(cannotStartReason), disabledReason: cannotStartReason },
+      { id: "pause", label: copy.pause, disabled: Boolean(cannotPauseReason), disabledReason: cannotPauseReason },
+      { id: "stop", label: copy.stop, disabled: Boolean(cannotStopReason), disabledReason: cannotStopReason },
+      { id: "more", label: copy.moreActions },
     ],
-    memberContext,
     primaryStateLabel: pageData.task.executionSummary?.stateLabel,
     primaryActionLabel: pageData.task.executionSummary?.primaryAction.label ?? null,
     currentNodeId: pageData.task.executionSummary?.currentNodeId ?? null,
-  };
-}
-
-function buildWorkspaceNavigationView(pageData: TaskPageData, hasAttention: boolean): WorkspaceNavigationView {
-  const memberContext = buildWorkspaceMemberContext(pageData, hasAttention);
-
-  return {
-    brandName: "Chrona",
-    primarySections: [
-      { id: "overview", label: "Overview", active: false },
-      { id: "tasks", label: "Tasks", active: true },
-      { id: "plans", label: "Plan library", active: false },
-      { id: "knowledge", label: "Knowledge base", active: false },
-      { id: "tools", label: "Tools", active: false },
-      { id: "integrations", label: "Integrations", active: false },
-    ],
-    activeSection: "tasks",
-    notificationCount: memberContext.notificationCount,
-    settingsAvailable: true,
-    memberIdentity: memberContext.memberLabel,
-  };
-}
-
-function buildExecutionFlowView(
-  graphPlan: TaskPlanGraphPlan | null,
-  selectedNode: PlanNodeDataModel | null,
-): ExecutionFlowView {
-  const nodes = graphPlan?.nodes ?? [];
-
-  return {
-    nodes: nodes.map((node, index) => ({
-      id: node.id,
-      stepNumber: index + 1,
-      title: node.title,
-      status: mapTaskWorkspaceStatus(node.status),
-      timestampLabel: node.statusLabel ?? node.status,
-      hasArtifacts: Boolean(node.resultOutputs?.length || node.resultEvidence),
-      artifactCount: node.resultOutputs?.length ?? 0,
-      requiresHumanAction: node.requiresHumanInput === true || isAttentionStatus(node.status),
-      dependencyIds: node.dependencies ?? [],
-    })),
-    connections: (graphPlan?.edges ?? []).flatMap((edge) => {
-      const from = edge.from ?? edge.fromNodeId;
-      const to = edge.to ?? edge.toNodeId;
-      return from && to ? [{ id: edge.id, from, to }] : [];
-    }),
-    selectedNodeId: selectedNode?.id ?? graphPlan?.currentStepId ?? null,
-    legend: [
-      { status: "completed", label: "Completed" },
-      { status: "running", label: "Running" },
-      { status: "waiting", label: "Waiting" },
-      { status: "approval-needed", label: "Approval needed" },
-      { status: "blocked", label: "Blocked" },
-    ],
-    controls: {
-      canZoom: nodes.length > 0,
-      canFit: nodes.length > 0,
-      canCenter: nodes.length > 0,
-      canExpand: nodes.length > 0,
-    },
   };
 }
 
@@ -521,7 +567,9 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   pageData: TaskPageData;
   graphPlan: TaskPlanGraphPlan | null;
   selectedNode?: PlanNodeDataModel | null;
+  copy?: Partial<TaskWorkspaceExecutionConsoleCopy>;
 }): TaskWorkspaceExecutionConsoleView {
+  const copy = resolveExecutionConsoleCopy(input.copy);
   const graphPlan = appendTaskPrimaryNodeAction(input.pageData, input.graphPlan);
   const task = {
     ...input.pageData.task,
@@ -532,8 +580,8 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
     ? graphPlan?.nodes.find((node) => node.id === input.selectedNode?.id) ?? input.selectedNode
     : null;
   const currentNode = pickWorkspaceCurrentNode(graphPlan, selectedNode);
-  const progress = buildProgressSummary(graphPlan);
-  const attention = buildAttentionCard(pageData, currentNode);
+  const progress = buildProgressSummary(graphPlan, copy);
+  const attention = buildAttentionCard(pageData, currentNode, copy);
   const isPermissionLimited = !pageData.task.isRunnable && !pageData.task.blockReason;
   const isStale = pageData.latestRunSummary?.syncStatus === "stale";
   const errorMessage = graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null;
@@ -541,30 +589,28 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
 
   return {
     task,
-    header: buildTaskHeaderView(pageData, progress, Boolean(attention), currentNode),
-    navigation: buildWorkspaceNavigationView(pageData, Boolean(attention)),
-    executionFlow: buildExecutionFlowView(graphPlan, selectedNode ?? currentNode),
+    header: buildTaskHeaderView(pageData, progress, currentNode, copy),
     graphPlan,
     progress,
     nodeDetail: {
       selectedNode,
       currentNode,
-      title: currentNode?.title ?? "No plan node selected",
-      description: currentNode?.summary ?? currentNode?.objective ?? "Generate or select a plan node to inspect execution details.",
+      title: currentNode?.title ?? copy.noPlanNodeSelected,
+      description: currentNode?.summary ?? currentNode?.objective ?? copy.nodeDetailEmptyDescription,
       status: currentNode ? mapTaskWorkspaceStatus(currentNode.status) : null,
       stepPosition: currentNode ? `${(graphPlan?.nodes ?? []).findIndex((node) => node.id === currentNode.id) + 1}/${graphPlan?.nodes.length ?? 0}` : "0/0",
       autoRefreshEnabled: currentNode ? ["running", "approval-needed"].includes(mapTaskWorkspaceStatus(currentNode.status)) : false,
       tabs: ["result", "activity", "action", "configuration"],
       disabledActionReason:
-        currentNode &&
+        Boolean(currentNode) &&
         (currentNode.availableActions?.length ?? 0) === 0 &&
         (currentNode.interactiveFields?.length ?? 0) === 0
-          ? "No actions are available for this node."
+          ? copy.noActionsAvailableForNode
           : undefined,
       isEmpty: !currentNode,
     },
-    readiness: buildReadinessCard(pageData, currentNode),
-    latestResult: buildLatestResultCard(pageData, graphPlan),
+    readiness: buildReadinessCard(pageData, currentNode, copy),
+    latestResult: buildLatestResultCard(pageData, graphPlan, copy),
     attention,
     artifacts: buildArtifactItems(pageData, graphPlan),
     activity,
@@ -582,6 +628,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
         isPermissionLimited,
         permissionSummary: pageData.task.runnabilitySummary,
         blockActionRequired: pageData.task.blockReason?.actionRequired,
+        copy,
       }),
     },
   };
@@ -626,9 +673,8 @@ export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState>
 }
 
 export async function fetchCurrentTaskExecution(taskId: string): Promise<PlanExecutionResult> {
-  const response = await fetch(`/api/tasks/${taskId}/execution/current`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
+  const response = await api.tasks[":taskId"].execution.current.$get({
+    param: { taskId },
   });
 
   if (!response.ok) {
@@ -636,20 +682,16 @@ export async function fetchCurrentTaskExecution(taskId: string): Promise<PlanExe
     throw new Error((err as { error?: string }).error ?? "Failed to load current execution state");
   }
 
-  return await response.json() as PlanExecutionResult;
+  return await response.json() as unknown as PlanExecutionResult;
 }
 
 export async function dispatchTaskExecutionAction(
   taskId: string,
   action: ExecutionActionInput,
 ): Promise<TaskWorkspaceCommandAck> {
-  const response = await fetch(`/api/work/${taskId}/commands`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ type: "execution.action", ...action }),
+  const response = await api.work[":taskId"].commands.$post({
+    param: { taskId },
+    json: { type: "execution.action", ...action },
   });
 
   if (!response.ok) {
@@ -657,7 +699,7 @@ export async function dispatchTaskExecutionAction(
     throw new Error((err as { error?: string }).error ?? "Failed to dispatch execution action");
   }
 
-  const ack = await response.json() as Omit<TaskWorkspaceCommandAck, "message">;
+  const ack = await response.json() as unknown as Omit<TaskWorkspaceCommandAck, "message">;
   return { ...ack, message: "Command accepted. Workspace will update shortly." };
 }
 
@@ -665,19 +707,15 @@ export async function submitTaskCheckpointAction(
   taskId: string,
   action: SubmitCheckpointActionInput,
 ): Promise<TaskWorkspaceCommandAck> {
-  const response = await fetch(`/api/work/${taskId}/commands`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
+  const response = await api.work[":taskId"].commands.$post({
+    param: { taskId },
+    json: {
       type: "checkpoint.action",
       checkpointId: action.checkpointId,
       action: action.action,
-      payload: action.payload,
+      payload: action.payload as Record<string, unknown> | undefined,
       idempotencyKey: action.idempotencyKey,
-    }),
+    },
   });
 
   if (!response.ok) {
@@ -685,6 +723,6 @@ export async function submitTaskCheckpointAction(
     throw new Error((err as { error?: string }).error ?? "Failed to submit checkpoint action");
   }
 
-  const ack = await response.json() as Omit<TaskWorkspaceCommandAck, "message">;
+  const ack = await response.json() as unknown as Omit<TaskWorkspaceCommandAck, "message">;
   return { ...ack, message: "Command accepted. Workspace will update shortly." };
 }

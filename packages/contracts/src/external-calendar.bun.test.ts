@@ -15,6 +15,7 @@ describe("external calendar contracts", () => {
       redactedUrlLabel: "calendar.example/work.ics",
       color: "#2563eb",
       syncPolicy: "keep_active",
+      automationPolicy: "auto_plan",
       lifecycleState: "active",
       lastSuccessfulRefreshAt: "2026-05-30T00:00:00.000Z",
     });
