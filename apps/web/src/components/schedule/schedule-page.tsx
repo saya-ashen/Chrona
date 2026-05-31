@@ -242,6 +242,7 @@ export function SchedulePage({
               >
                 {copy.firstRunConnectAi}
               </Button>
+
             </div>
           </div>
         </section>

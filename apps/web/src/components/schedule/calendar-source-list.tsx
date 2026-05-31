@@ -71,7 +71,6 @@ export function CalendarSourceList({ workspaceId, createdSources = EMPTY_CREATED
     blockedNetworkRefresh?.();
     setBlockedNetworkRefresh(null);
   }
-
   const managed = sources.find((item) => item.source.id === managedId) ?? null;
 
   return (

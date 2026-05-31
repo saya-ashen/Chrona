@@ -116,10 +116,12 @@ export function SchedulePageHeader({
       ]}
       actions={[
         {
+
           label: copy.cockpitConnectAi,
           href: localizeHref(locale, "/settings?panel=ai-clients"),
           description: copy.cockpitConnectAiHint,
         },
+
       ]}
       onNavigate={onNavigate}
     />

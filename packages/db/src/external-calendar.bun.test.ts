@@ -261,7 +261,6 @@ describe("external calendar repository", () => {
     expect(importedEvent.task?.projection?.scheduledStartAt).toBeNull();
     expect(importedEvent.task?.workBlocks[0]?.status).toBe("Cancelled");
   });
-
   it("recreates imported event tasks when a stale taskId is left behind", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Calendar stale task DB", defaultRuntime: "debug", status: "Active" },
