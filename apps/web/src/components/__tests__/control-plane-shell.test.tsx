@@ -106,6 +106,12 @@ function writePreferences(preferences: ScheduleAiPreferences) {
   );
 }
 
+function expectNavLink(label: string, href: string) {
+  const links = screen.getAllByRole("link", { name: label });
+  expect(links.some((link) => link.getAttribute("href") === href)).toBe(true);
+  return links;
+}
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
@@ -125,11 +131,11 @@ describe("ControlPlaneShell", () => {
     const chronaLinks = screen.getAllByRole("link", { name: "Chrona" });
     expect(chronaLinks.length).toBeGreaterThan(0);
     expect(chronaLinks[0]).toHaveAttribute("href", "/en/schedule");
-    expect(screen.getAllByRole("link", { name: "Schedule" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "Inbox" })).toHaveAttribute("href", "/en/inbox");
-    expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("href", "/en/tasks");
-    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/en/settings");
-    expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("aria-current", "page");
+    expectNavLink("Schedule", "/en/schedule");
+    expectNavLink("Inbox", "/en/inbox");
+    const taskLinks = expectNavLink("Tasks", "/en/tasks");
+    expect(taskLinks.some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
+    expectNavLink("Settings", "/en/settings");
 
     // Should NOT show inactive or legacy workspace navigation.
     expect(screen.queryByRole("link", { name: "Memory" })).not.toBeInTheDocument();
