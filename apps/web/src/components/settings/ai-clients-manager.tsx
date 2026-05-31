@@ -237,9 +237,11 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
 
 const DEFAULTS: Record<string, string> = {
   title: "AI Clients",
-  subtitle: "Manage AI clients and configure which client each feature uses",
+  subtitle: "Connect Hermes so Chrona can plan tasks and safely execute approved work.",
   addClient: "+ Add Client",
-  emptyState: "No AI Clients configured yet. Click the button above to add one.",
+  emptyState: "No AI client is connected yet. Start with local Hermes to unlock planning, suggestions, and execution previews.",
+  emptyStateCta: "Connect local Hermes",
+  hermesIntro: "Hermes is Chrona's local AI runtime. It generates task plans, proposes schedule changes, and only executes after your approval.",
   loading: "Loading...",
   defaultBadge: "Default",
   enabled: "Enabled",
@@ -763,6 +765,7 @@ export function AiClientsManager() {
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-semibold tracking-tight">{copy.title}</h2>
           <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
+          <p className="text-sm text-muted-foreground">{copy.hermesIntro}</p>
         </div>
         <Button type="button" onClick={() => setShowForm(true)}>
           {copy.addClient}
@@ -773,7 +776,12 @@ export function AiClientsManager() {
 
       {clients.length === 0 && !showForm && (
         <Card className="border-dashed">
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">{copy.emptyState}</CardContent>
+          <CardContent className="flex flex-col items-center gap-3 py-8 text-center text-sm text-muted-foreground">
+            <p className="max-w-md">{copy.emptyState}</p>
+            <Button type="button" onClick={() => setShowForm(true)}>
+              {copy.emptyStateCta}
+            </Button>
+          </CardContent>
         </Card>
       )}
 

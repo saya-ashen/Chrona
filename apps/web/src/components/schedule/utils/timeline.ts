@@ -131,22 +131,12 @@ export function buildCompressedTimeline(items: ScheduledItem[]) {
 }
 
 export function detectScheduleConflicts(
-  items: ScheduledItem[],
-  candidate: { taskId?: string; startAt: Date; endAt: Date },
+  _items: ScheduledItem[],
+  _candidate: { taskId?: string; startAt: Date; endAt: Date },
 ) {
-  const conflicts = items.filter((item) => {
-    if (!item.scheduledStartAt || !item.scheduledEndAt) {
-      return false;
-    }
-    if (candidate.taskId && item.taskId === candidate.taskId) {
-      return false;
-    }
-    return candidate.startAt < item.scheduledEndAt && candidate.endAt > item.scheduledStartAt;
-  });
-
   return {
-    hasConflict: conflicts.length > 0,
-    conflictingTaskIds: conflicts.map((item) => item.taskId),
+    hasConflict: false,
+    conflictingTaskIds: [],
   };
 }
 

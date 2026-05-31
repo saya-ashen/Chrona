@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { CalendarPlus } from "lucide-react";
 import type {
+  CalendarAutomationPolicy,
   CalendarSourceSummary,
   CalendarSourceSyncPolicy,
   CalendarSyncStatus,
@@ -11,12 +13,13 @@ import type {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,15 +37,70 @@ type ConnectedSource = {
 };
 
 export function CalendarSourceSetup({ workspaceId }: { workspaceId: string }) {
+  const [connectedSources, setConnectedSources] = useState<ConnectedSource[]>([]);
+  const [isConnectOpen, setIsConnectOpen] = useState(false);
+
+  function handleConnected(created: ConnectedSource) {
+    setConnectedSources((current) => [created, ...current.filter((item) => item.source.id !== created.source.id)]);
+    window.dispatchEvent(new CustomEvent("chrona:external-calendar-source-created"));
+  }
+
+  return (
+    <section className="flex flex-col gap-3">
+      <header className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-sm font-semibold text-foreground" role="heading" aria-level={2}>
+            {externalCalendarMessages.setupTitle}
+          </h2>
+          <Badge variant="outline">{externalCalendarMessages.readOnlyLabel}</Badge>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">{externalCalendarMessages.setupDescription}</p>
+      </header>
+
+      <Button type="button" size="sm" className="w-full" onClick={() => setIsConnectOpen(true)}>
+        <CalendarPlus />
+        {externalCalendarMessages.connectAction}
+      </Button>
+
+      <CalendarSourceList workspaceId={workspaceId} createdSources={connectedSources} />
+
+      <ConnectCalendarDialog
+        workspaceId={workspaceId}
+        open={isConnectOpen}
+        onOpenChange={setIsConnectOpen}
+        onConnected={handleConnected}
+      />
+    </section>
+  );
+}
+
+type ConnectCalendarDialogProps = {
+  workspaceId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConnected: (created: ConnectedSource) => void;
+};
+
+function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }: ConnectCalendarDialogProps) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [color, setColor] = useState("#2563eb");
   const [syncPolicy, setSyncPolicy] = useState<CalendarSourceSyncPolicy>("auto_complete_past_events");
+  const [automationPolicy, setAutomationPolicy] = useState<CalendarAutomationPolicy>("auto_plan");
   const [validation, setValidation] = useState<ValidateCalendarSourceResponse | null>(null);
-  const [connectedSources, setConnectedSources] = useState<ConnectedSource[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function reset() {
+    setName("");
+    setUrl("");
+    setColor("#2563eb");
+    setSyncPolicy("auto_complete_past_events");
+    setAutomationPolicy("auto_plan");
+    setValidation(null);
+    setErrorMessage(null);
+  }
 
   async function handleValidate() {
     setErrorMessage(null);
@@ -67,12 +125,13 @@ export function CalendarSourceSetup({ workspaceId }: { workspaceId: string }) {
         url: url.trim(),
         color,
         syncPolicy,
+        automationPolicy,
       });
       if (created.syncStatus) {
-        setConnectedSources((current) => [created as ConnectedSource, ...current.filter((item) => item.source.id !== created.source.id)]);
-        window.dispatchEvent(new CustomEvent("chrona:external-calendar-source-created"));
+        onConnected(created as ConnectedSource);
+        reset();
+        onOpenChange(false);
       }
-      setValidation(null);
     } catch (error) {
       setErrorMessage(getExternalCalendarErrorMessage(error));
     } finally {
@@ -81,85 +140,105 @@ export function CalendarSourceSetup({ workspaceId }: { workspaceId: string }) {
   }
 
   const trimmedUrl = url.trim();
-  const canValidate = Boolean(trimmedUrl) && !isValidating;
+  const canValidate = Boolean(trimmedUrl) && !isValidating && !isSubmitting;
   const canSubmit = Boolean(name.trim()) && Boolean(trimmedUrl) && !isSubmitting;
 
   return (
-    <Card className="border-blue-100 bg-blue-50/60 shadow-sm">
-      <CardHeader className="gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle role="heading" aria-level={2}>{externalCalendarMessages.setupTitle}</CardTitle>
-          <Badge variant="outline" className="border-blue-200 bg-white/70 text-blue-700">
-            {externalCalendarMessages.readOnlyLabel}
-          </Badge>
-        </div>
-        <CardDescription>{externalCalendarMessages.setupDescription}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <form className="space-y-4" onSubmit={handleSubmit}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset();
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <DialogHeader className="border-b px-6 py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <DialogTitle>{externalCalendarMessages.connectDialogTitle}</DialogTitle>
+            <Badge variant="outline">{externalCalendarMessages.readOnlyLabel}</Badge>
+          </div>
+          <DialogDescription>{externalCalendarMessages.setupDescription}</DialogDescription>
+        </DialogHeader>
+
+        <form className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto px-6 py-5" onSubmit={handleSubmit}>
           <FieldGroup className="gap-4">
             <Field>
-              <FieldLabel htmlFor="calendar-source-name">Display name</FieldLabel>
+              <FieldLabel htmlFor="calendar-source-name">{externalCalendarMessages.displayNameLabel}</FieldLabel>
               <Input
                 id="calendar-source-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="Team calendar"
+                placeholder={externalCalendarMessages.displayNamePlaceholder}
                 autoComplete="off"
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="calendar-source-url">Calendar URL</FieldLabel>
+              <FieldLabel htmlFor="calendar-source-url">{externalCalendarMessages.calendarUrlLabel}</FieldLabel>
               <Input
                 id="calendar-source-url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://calendar.example/team.ics"
+                placeholder={externalCalendarMessages.calendarUrlPlaceholder}
                 autoComplete="off"
               />
-              <FieldDescription>Private tokens stay server-side and are redacted from responses.</FieldDescription>
+              <FieldDescription>{externalCalendarMessages.urlPrivacyHint}</FieldDescription>
             </Field>
             <Field>
-              <FieldLabel htmlFor="calendar-source-color">Calendar color</FieldLabel>
-              <Input
-                id="calendar-source-color"
-                type="color"
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-                className="h-10 w-20 cursor-pointer p-1"
-              />
+              <FieldLabel htmlFor="calendar-source-color">{externalCalendarMessages.calendarColorLabel}</FieldLabel>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="calendar-source-color"
+                  type="color"
+                  value={color}
+                  onChange={(event) => setColor(event.target.value)}
+                  className="h-10 w-14 shrink-0 cursor-pointer p-1"
+                />
+                <span className="font-mono text-sm text-muted-foreground">{color.toUpperCase()}</span>
+              </div>
             </Field>
             <Field>
-              <FieldLabel htmlFor="calendar-source-sync-policy">Sync policy</FieldLabel>
+              <FieldLabel htmlFor="calendar-source-sync-policy">{externalCalendarMessages.syncPolicyLabel}</FieldLabel>
               <Select value={syncPolicy} onValueChange={(value) => setSyncPolicy(value as CalendarSourceSyncPolicy)}>
                 <SelectTrigger id="calendar-source-sync-policy" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto_complete_past_events">Complete past events</SelectItem>
-                  <SelectItem value="keep_active">Keep events active</SelectItem>
+                  <SelectItem value="auto_complete_past_events">{externalCalendarMessages.syncPolicyAutoComplete}</SelectItem>
+                  <SelectItem value="keep_active">{externalCalendarMessages.syncPolicyKeepActive}</SelectItem>
                 </SelectContent>
               </Select>
-              <FieldDescription>Google calendar sources use completed past events by default; choose keep active for backlog-style calendars.</FieldDescription>
+              <FieldDescription>{externalCalendarMessages.syncPolicyHint}</FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="calendar-source-automation-policy">{externalCalendarMessages.automationPolicyLabel}</FieldLabel>
+              <Select value={automationPolicy} onValueChange={(value) => setAutomationPolicy(value as CalendarAutomationPolicy)}>
+                <SelectTrigger id="calendar-source-automation-policy" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto_plan">{externalCalendarMessages.automationPolicyAutoPlan}</SelectItem>
+                  <SelectItem value="auto_execute">{externalCalendarMessages.automationPolicyAutoExecute}</SelectItem>
+                  <SelectItem value="manual">{externalCalendarMessages.automationPolicyManual}</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>{externalCalendarMessages.automationPolicyDescription}</FieldDescription>
             </Field>
           </FieldGroup>
 
           {validation ? <ValidationResult validation={validation} /> : null}
           {errorMessage ? <FieldError>{errorMessage}</FieldError> : null}
 
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0">
             <Button type="button" variant="outline" onClick={handleValidate} disabled={!canValidate}>
-              {isValidating ? "Validating..." : "Validate"}
+              {isValidating ? externalCalendarMessages.validateState : "Validate"}
             </Button>
             <Button type="submit" disabled={!canSubmit}>
-              {isSubmitting ? "Connecting..." : "Connect calendar"}
+              {isSubmitting ? externalCalendarMessages.connectState : externalCalendarMessages.connectAction}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-
-        <CalendarSourceList workspaceId={workspaceId} createdSources={connectedSources} />
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -169,8 +248,8 @@ function ValidationResult({ validation }: { validation: ValidateCalendarSourceRe
   }
 
   return (
-    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-      <p className="font-medium">Calendar link validated.</p>
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+      <p className="font-medium">{externalCalendarMessages.validatedTitle}</p>
       <p className="mt-1">
         {validation.detectedName ?? "Calendar feed"} has {validation.eventPreviewCount} events from {validation.redactedUrlLabel}.
       </p>

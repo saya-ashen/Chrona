@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ClipboardList, Plus, Settings } from "lucide-react";
+import { CalendarDays, ClipboardList, Inbox, Plus, Settings } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assistant-surface-dropdown";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
@@ -62,6 +62,7 @@ export function ControlPlaneShell({
     .map((segment) => {
       if (segment === "schedule") return t("nav.schedule");
       if (segment === "tasks") return t("nav.tasks");
+      if (segment === "inbox") return t("nav.inbox");
       if (segment === "settings") return t("nav.settings");
       if (segment === "work") return t("common.work");
       return segment;
@@ -78,6 +79,12 @@ export function ControlPlaneShell({
       label: t("nav.tasks"),
       icon: ClipboardList,
       active: pathname.startsWith("/tasks"),
+    },
+    {
+      href: "/inbox",
+      label: t("nav.inbox"),
+      icon: Inbox,
+      active: pathname.startsWith("/inbox"),
     },
     {
       href: "/settings",

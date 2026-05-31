@@ -46,6 +46,7 @@ export type CalendarSourceMinAggregateOutputType = {
   color: string | null
   lifecycleState: $Enums.CalendarSourceLifecycleState | null
   syncPolicy: $Enums.CalendarSyncPolicy | null
+  automationPolicy: $Enums.CalendarAutomationPolicy | null
   syncState: $Enums.CalendarSyncState | null
   lastSuccessfulRefreshAt: Date | null
   nextExpectedRefreshAt: Date | null
@@ -67,6 +68,7 @@ export type CalendarSourceMaxAggregateOutputType = {
   color: string | null
   lifecycleState: $Enums.CalendarSourceLifecycleState | null
   syncPolicy: $Enums.CalendarSyncPolicy | null
+  automationPolicy: $Enums.CalendarAutomationPolicy | null
   syncState: $Enums.CalendarSyncState | null
   lastSuccessfulRefreshAt: Date | null
   nextExpectedRefreshAt: Date | null
@@ -88,6 +90,7 @@ export type CalendarSourceCountAggregateOutputType = {
   color: number
   lifecycleState: number
   syncPolicy: number
+  automationPolicy: number
   syncState: number
   lastSuccessfulRefreshAt: number
   nextExpectedRefreshAt: number
@@ -121,6 +124,7 @@ export type CalendarSourceMinAggregateInputType = {
   color?: true
   lifecycleState?: true
   syncPolicy?: true
+  automationPolicy?: true
   syncState?: true
   lastSuccessfulRefreshAt?: true
   nextExpectedRefreshAt?: true
@@ -142,6 +146,7 @@ export type CalendarSourceMaxAggregateInputType = {
   color?: true
   lifecycleState?: true
   syncPolicy?: true
+  automationPolicy?: true
   syncState?: true
   lastSuccessfulRefreshAt?: true
   nextExpectedRefreshAt?: true
@@ -163,6 +168,7 @@ export type CalendarSourceCountAggregateInputType = {
   color?: true
   lifecycleState?: true
   syncPolicy?: true
+  automationPolicy?: true
   syncState?: true
   lastSuccessfulRefreshAt?: true
   nextExpectedRefreshAt?: true
@@ -271,6 +277,7 @@ export type CalendarSourceGroupByOutputType = {
   color: string
   lifecycleState: $Enums.CalendarSourceLifecycleState
   syncPolicy: $Enums.CalendarSyncPolicy
+  automationPolicy: $Enums.CalendarAutomationPolicy
   syncState: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt: Date | null
   nextExpectedRefreshAt: Date | null
@@ -315,6 +322,7 @@ export type CalendarSourceWhereInput = {
   color?: Prisma.StringFilter<"CalendarSource"> | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFilter<"CalendarSource"> | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFilter<"CalendarSource"> | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFilter<"CalendarSource"> | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFilter<"CalendarSource"> | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   nextExpectedRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
@@ -338,6 +346,7 @@ export type CalendarSourceOrderByWithRelationInput = {
   color?: Prisma.SortOrder
   lifecycleState?: Prisma.SortOrder
   syncPolicy?: Prisma.SortOrder
+  automationPolicy?: Prisma.SortOrder
   syncState?: Prisma.SortOrder
   lastSuccessfulRefreshAt?: Prisma.SortOrderInput | Prisma.SortOrder
   nextExpectedRefreshAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -365,6 +374,7 @@ export type CalendarSourceWhereUniqueInput = Prisma.AtLeast<{
   color?: Prisma.StringFilter<"CalendarSource"> | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFilter<"CalendarSource"> | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFilter<"CalendarSource"> | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFilter<"CalendarSource"> | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFilter<"CalendarSource"> | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   nextExpectedRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
@@ -388,6 +398,7 @@ export type CalendarSourceOrderByWithAggregationInput = {
   color?: Prisma.SortOrder
   lifecycleState?: Prisma.SortOrder
   syncPolicy?: Prisma.SortOrder
+  automationPolicy?: Prisma.SortOrder
   syncState?: Prisma.SortOrder
   lastSuccessfulRefreshAt?: Prisma.SortOrderInput | Prisma.SortOrder
   nextExpectedRefreshAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -417,6 +428,7 @@ export type CalendarSourceScalarWhereWithAggregatesInput = {
   color?: Prisma.StringWithAggregatesFilter<"CalendarSource"> | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateWithAggregatesFilter<"CalendarSource"> | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyWithAggregatesFilter<"CalendarSource"> | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyWithAggregatesFilter<"CalendarSource"> | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateWithAggregatesFilter<"CalendarSource"> | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CalendarSource"> | Date | string | null
   nextExpectedRefreshAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CalendarSource"> | Date | string | null
@@ -437,6 +449,7 @@ export type CalendarSourceCreateInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -460,6 +473,7 @@ export type CalendarSourceUncheckedCreateInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -481,6 +495,7 @@ export type CalendarSourceUpdateInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -504,6 +519,7 @@ export type CalendarSourceUncheckedUpdateInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -526,6 +542,7 @@ export type CalendarSourceCreateManyInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -546,6 +563,7 @@ export type CalendarSourceUpdateManyMutationInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -567,6 +585,7 @@ export type CalendarSourceUncheckedUpdateManyInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -603,6 +622,7 @@ export type CalendarSourceCountOrderByAggregateInput = {
   color?: Prisma.SortOrder
   lifecycleState?: Prisma.SortOrder
   syncPolicy?: Prisma.SortOrder
+  automationPolicy?: Prisma.SortOrder
   syncState?: Prisma.SortOrder
   lastSuccessfulRefreshAt?: Prisma.SortOrder
   nextExpectedRefreshAt?: Prisma.SortOrder
@@ -629,6 +649,7 @@ export type CalendarSourceMaxOrderByAggregateInput = {
   color?: Prisma.SortOrder
   lifecycleState?: Prisma.SortOrder
   syncPolicy?: Prisma.SortOrder
+  automationPolicy?: Prisma.SortOrder
   syncState?: Prisma.SortOrder
   lastSuccessfulRefreshAt?: Prisma.SortOrder
   nextExpectedRefreshAt?: Prisma.SortOrder
@@ -650,6 +671,7 @@ export type CalendarSourceMinOrderByAggregateInput = {
   color?: Prisma.SortOrder
   lifecycleState?: Prisma.SortOrder
   syncPolicy?: Prisma.SortOrder
+  automationPolicy?: Prisma.SortOrder
   syncState?: Prisma.SortOrder
   lastSuccessfulRefreshAt?: Prisma.SortOrder
   nextExpectedRefreshAt?: Prisma.SortOrder
@@ -721,6 +743,10 @@ export type EnumCalendarSyncPolicyFieldUpdateOperationsInput = {
   set?: $Enums.CalendarSyncPolicy
 }
 
+export type EnumCalendarAutomationPolicyFieldUpdateOperationsInput = {
+  set?: $Enums.CalendarAutomationPolicy
+}
+
 export type EnumCalendarSyncStateFieldUpdateOperationsInput = {
   set?: $Enums.CalendarSyncState
 }
@@ -760,6 +786,7 @@ export type CalendarSourceCreateWithoutWorkspaceInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -781,6 +808,7 @@ export type CalendarSourceUncheckedCreateWithoutWorkspaceInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -831,6 +859,7 @@ export type CalendarSourceScalarWhereInput = {
   color?: Prisma.StringFilter<"CalendarSource"> | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFilter<"CalendarSource"> | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFilter<"CalendarSource"> | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFilter<"CalendarSource"> | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFilter<"CalendarSource"> | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
   nextExpectedRefreshAt?: Prisma.DateTimeNullableFilter<"CalendarSource"> | Date | string | null
@@ -851,6 +880,7 @@ export type CalendarSourceCreateWithoutEventsInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -873,6 +903,7 @@ export type CalendarSourceUncheckedCreateWithoutEventsInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -909,6 +940,7 @@ export type CalendarSourceUpdateWithoutEventsInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -931,6 +963,7 @@ export type CalendarSourceUncheckedUpdateWithoutEventsInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -951,6 +984,7 @@ export type CalendarSourceCreateManyWorkspaceInput = {
   color: string
   lifecycleState?: $Enums.CalendarSourceLifecycleState
   syncPolicy?: $Enums.CalendarSyncPolicy
+  automationPolicy?: $Enums.CalendarAutomationPolicy
   syncState?: $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Date | string | null
   nextExpectedRefreshAt?: Date | string | null
@@ -971,6 +1005,7 @@ export type CalendarSourceUpdateWithoutWorkspaceInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -992,6 +1027,7 @@ export type CalendarSourceUncheckedUpdateWithoutWorkspaceInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1013,6 +1049,7 @@ export type CalendarSourceUncheckedUpdateManyWithoutWorkspaceInput = {
   color?: Prisma.StringFieldUpdateOperationsInput | string
   lifecycleState?: Prisma.EnumCalendarSourceLifecycleStateFieldUpdateOperationsInput | $Enums.CalendarSourceLifecycleState
   syncPolicy?: Prisma.EnumCalendarSyncPolicyFieldUpdateOperationsInput | $Enums.CalendarSyncPolicy
+  automationPolicy?: Prisma.EnumCalendarAutomationPolicyFieldUpdateOperationsInput | $Enums.CalendarAutomationPolicy
   syncState?: Prisma.EnumCalendarSyncStateFieldUpdateOperationsInput | $Enums.CalendarSyncState
   lastSuccessfulRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   nextExpectedRefreshAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1065,6 +1102,7 @@ export type CalendarSourceSelect<ExtArgs extends runtime.Types.Extensions.Intern
   color?: boolean
   lifecycleState?: boolean
   syncPolicy?: boolean
+  automationPolicy?: boolean
   syncState?: boolean
   lastSuccessfulRefreshAt?: boolean
   nextExpectedRefreshAt?: boolean
@@ -1089,6 +1127,7 @@ export type CalendarSourceSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   color?: boolean
   lifecycleState?: boolean
   syncPolicy?: boolean
+  automationPolicy?: boolean
   syncState?: boolean
   lastSuccessfulRefreshAt?: boolean
   nextExpectedRefreshAt?: boolean
@@ -1111,6 +1150,7 @@ export type CalendarSourceSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   color?: boolean
   lifecycleState?: boolean
   syncPolicy?: boolean
+  automationPolicy?: boolean
   syncState?: boolean
   lastSuccessfulRefreshAt?: boolean
   nextExpectedRefreshAt?: boolean
@@ -1133,6 +1173,7 @@ export type CalendarSourceSelectScalar = {
   color?: boolean
   lifecycleState?: boolean
   syncPolicy?: boolean
+  automationPolicy?: boolean
   syncState?: boolean
   lastSuccessfulRefreshAt?: boolean
   nextExpectedRefreshAt?: boolean
@@ -1144,7 +1185,7 @@ export type CalendarSourceSelectScalar = {
   updatedAt?: boolean
 }
 
-export type CalendarSourceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "sourceType" | "sourceUrl" | "redactedUrlLabel" | "color" | "lifecycleState" | "syncPolicy" | "syncState" | "lastSuccessfulRefreshAt" | "nextExpectedRefreshAt" | "lastErrorCode" | "lastErrorMessage" | "importedCount" | "skippedCount" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarSource"]>
+export type CalendarSourceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "name" | "sourceType" | "sourceUrl" | "redactedUrlLabel" | "color" | "lifecycleState" | "syncPolicy" | "automationPolicy" | "syncState" | "lastSuccessfulRefreshAt" | "nextExpectedRefreshAt" | "lastErrorCode" | "lastErrorMessage" | "importedCount" | "skippedCount" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarSource"]>
 export type CalendarSourceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   events?: boolean | Prisma.CalendarSource$eventsArgs<ExtArgs>
@@ -1173,6 +1214,7 @@ export type $CalendarSourcePayload<ExtArgs extends runtime.Types.Extensions.Inte
     color: string
     lifecycleState: $Enums.CalendarSourceLifecycleState
     syncPolicy: $Enums.CalendarSyncPolicy
+    automationPolicy: $Enums.CalendarAutomationPolicy
     syncState: $Enums.CalendarSyncState
     lastSuccessfulRefreshAt: Date | null
     nextExpectedRefreshAt: Date | null
@@ -1616,6 +1658,7 @@ export interface CalendarSourceFieldRefs {
   readonly color: Prisma.FieldRef<"CalendarSource", 'String'>
   readonly lifecycleState: Prisma.FieldRef<"CalendarSource", 'CalendarSourceLifecycleState'>
   readonly syncPolicy: Prisma.FieldRef<"CalendarSource", 'CalendarSyncPolicy'>
+  readonly automationPolicy: Prisma.FieldRef<"CalendarSource", 'CalendarAutomationPolicy'>
   readonly syncState: Prisma.FieldRef<"CalendarSource", 'CalendarSyncState'>
   readonly lastSuccessfulRefreshAt: Prisma.FieldRef<"CalendarSource", 'DateTime'>
   readonly nextExpectedRefreshAt: Prisma.FieldRef<"CalendarSource", 'DateTime'>

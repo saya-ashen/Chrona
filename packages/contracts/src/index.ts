@@ -1,5 +1,6 @@
 // AI plan contracts — new architecture
 export type {
+  CalendarAutomationPolicy,
   CalendarEventStatus,
   CalendarSourceLifecycleState,
   CalendarSourceSummary,
@@ -18,6 +19,7 @@ export type {
 
 export {
   calendarEventStatusSchema,
+  calendarAutomationPolicySchema,
   calendarSourceDeleteResponseSchema,
   calendarSourceLifecycleStateSchema,
   calendarSourceListResponseSchema,

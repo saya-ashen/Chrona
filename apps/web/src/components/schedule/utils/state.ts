@@ -209,38 +209,6 @@ function getScheduledMinutesForItem(item: {
   );
 }
 
-function countScheduleConflicts(items: ScheduledItem[]) {
-  const byDay = new Map<string, ScheduledItem[]>();
-
-  for (const item of items) {
-    const dayKey = getDayKey(item.scheduledStartAt);
-    const group = byDay.get(dayKey) ?? [];
-    group.push(item);
-    byDay.set(dayKey, group);
-  }
-
-  let conflicts = 0;
-
-  for (const dayItems of byDay.values()) {
-    const sorted = [...dayItems].sort((left, right) => {
-      const leftStart = toTimestamp(left.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
-      const rightStart = toTimestamp(right.scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
-      return leftStart - rightStart;
-    });
-
-    for (let index = 1; index < sorted.length; index += 1) {
-      const previousEnd = toTimestamp(sorted[index - 1].scheduledEndAt) ?? 0;
-      const currentStart = toTimestamp(sorted[index].scheduledStartAt) ?? Number.MAX_SAFE_INTEGER;
-
-      if (currentStart < previousEnd) {
-        conflicts += 1;
-      }
-    }
-  }
-
-  return conflicts;
-}
-
 function countOverloadedDays(items: ScheduledItem[]) {
   const minutesByDay = new Map<string, number>();
 
@@ -340,7 +308,7 @@ export function buildPlanningSummary(input: {
       0,
     ),
     runnableQueueCount: input.unscheduled.filter((item) => item.isRunnable).length,
-    conflictCount: countScheduleConflicts(input.scheduled),
+    conflictCount: 0,
     overloadedDayCount: countOverloadedDays(input.scheduled),
     proposalCount: input.proposals.length,
     riskCount: input.risks.length,

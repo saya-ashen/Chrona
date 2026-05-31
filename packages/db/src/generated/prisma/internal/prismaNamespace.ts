@@ -2937,6 +2937,7 @@ export const CalendarSourceScalarFieldEnum = {
   color: 'color',
   lifecycleState: 'lifecycleState',
   syncPolicy: 'syncPolicy',
+  automationPolicy: 'automationPolicy',
   syncState: 'syncState',
   lastSuccessfulRefreshAt: 'lastSuccessfulRefreshAt',
   nextExpectedRefreshAt: 'nextExpectedRefreshAt',
@@ -3679,6 +3680,13 @@ export type EnumCalendarSourceLifecycleStateFieldRefInput<$PrismaModel> = FieldR
  * Reference to a field of type 'CalendarSyncPolicy'
  */
 export type EnumCalendarSyncPolicyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSyncPolicy'>
+    
+
+
+/**
+ * Reference to a field of type 'CalendarAutomationPolicy'
+ */
+export type EnumCalendarAutomationPolicyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarAutomationPolicy'>
     
 
 

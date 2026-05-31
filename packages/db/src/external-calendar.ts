@@ -1,6 +1,7 @@
 import { db } from "./db";
 import type {
   CalendarSource,
+  CalendarAutomationPolicy,
   CalendarSourceLifecycleState,
   CalendarSyncPolicy,
   CalendarSyncState,
@@ -17,6 +18,7 @@ export type CalendarSourceCreateData = {
   redactedUrlLabel: string;
   color: string;
   syncPolicy?: CalendarSyncPolicy;
+  automationPolicy?: CalendarAutomationPolicy;
 };
 
 export type ImportedCalendarEventWrite = {
@@ -35,7 +37,18 @@ export type ImportedCalendarEventWrite = {
 
 type ImportedCalendarSyncOptions = {
   policy: CalendarSyncPolicy;
+  automationPolicy: CalendarAutomationPolicy;
   now: Date;
+};
+
+export type ImportedCalendarAutomationRequest = {
+  taskId: string;
+  accept: boolean;
+};
+
+export type ImportedCalendarReplacementResult = {
+  importedCount: number;
+  automationRequests: ImportedCalendarAutomationRequest[];
 };
 
 export function listCalendarSources(workspaceId: string): Promise<CalendarSource[]> {
@@ -88,15 +101,17 @@ export async function replaceImportedCalendarEvents(
   calendarSourceId: string,
   events: ImportedCalendarEventWrite[],
   options?: Partial<ImportedCalendarSyncOptions>,
-): Promise<number> {
+): Promise<ImportedCalendarReplacementResult> {
   let importedCount = 0;
+  const automationRequests: ImportedCalendarAutomationRequest[] = [];
   await db.$transaction(async (tx) => {
     const source = await tx.calendarSource.findUniqueOrThrow({
       where: { id: calendarSourceId },
-      select: { workspaceId: true, name: true, syncPolicy: true },
+      select: { workspaceId: true, name: true, syncPolicy: true, automationPolicy: true },
     });
     const syncOptions: ImportedCalendarSyncOptions = {
       policy: options?.policy ?? source.syncPolicy,
+      automationPolicy: options?.automationPolicy ?? source.automationPolicy,
       now: options?.now ?? new Date(),
     };
     const workspace = await tx.workspace.findUniqueOrThrow({
@@ -123,11 +138,12 @@ export async function replaceImportedCalendarEvents(
           recurrenceId: event.recurrenceId,
         },
       });
-      await syncImportedCalendarEventTask(tx, importedEvent, workspace.defaultRuntime, syncOptions);
+      const automationRequest = await syncImportedCalendarEventTask(tx, importedEvent, workspace.defaultRuntime, syncOptions);
+      if (automationRequest) automationRequests.push(automationRequest);
       importedCount += 1;
     }
   });
-  return importedCount;
+  return { importedCount, automationRequests };
 }
 
 async function syncImportedCalendarEventTask(
@@ -137,6 +153,7 @@ async function syncImportedCalendarEventTask(
   options: ImportedCalendarSyncOptions,
 ) {
   const syncedStatus = getImportedCalendarTaskStatus(event, options);
+  let automationRequest: ImportedCalendarAutomationRequest | null = null;
   let task = event.taskId
     ? await tx.task.findUnique({ where: { id: event.taskId } })
     : null;
@@ -150,6 +167,7 @@ async function syncImportedCalendarEventTask(
       },
     });
   } else {
+    const automation = getImportedCalendarTaskAutomation(event, syncedStatus, options);
     task = await tx.task.create({
       data: {
         workspaceId: event.workspaceId,
@@ -159,10 +177,13 @@ async function syncImportedCalendarEventTask(
         executionConfig: {},
         status: syncedStatus,
         priority: "Medium",
-        autoPlanGeneration: false,
-        autoExecute: false,
+        autoPlanGeneration: automation.autoPlanGeneration,
+        autoExecute: automation.autoExecute,
       },
     });
+    if (automation.shouldStartPlan) {
+      automationRequest = { taskId: task.id, accept: automation.autoExecute };
+    }
     await tx.importedCalendarEvent.update({
       where: { id: event.id },
       data: { taskId: task.id },
@@ -175,7 +196,7 @@ async function syncImportedCalendarEventTask(
       data: { status: syncedStatus },
     });
     await upsertImportedCalendarTaskProjection(tx, task.id, event.workspaceId, syncedStatus, null, null, null, null);
-    return;
+    return automationRequest;
   }
 
   const workBlockStatus = syncedStatus === "Completed" ? "Completed" : "Scheduled";
@@ -221,6 +242,22 @@ async function syncImportedCalendarEventTask(
     syncedStatus === "Completed" ? "Completed" : "Scheduled",
     "system",
   );
+
+  return automationRequest;
+}
+
+function getImportedCalendarTaskAutomation(
+  event: ImportedCalendarEvent,
+  syncedStatus: string,
+  options: ImportedCalendarSyncOptions,
+) {
+  const autoExecute = options.automationPolicy === "auto_execute";
+  const autoPlanGeneration = autoExecute || options.automationPolicy === "auto_plan";
+  const shouldStartPlan = autoPlanGeneration
+    && event.status === "confirmed"
+    && syncedStatus === "Ready"
+    && event.startsAt.getTime() > options.now.getTime();
+  return { autoPlanGeneration, autoExecute, shouldStartPlan };
 }
 
 function getImportedCalendarTaskStatus(

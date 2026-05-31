@@ -122,6 +122,7 @@ export const CalendarSourceScalarFieldEnum = {
   color: 'color',
   lifecycleState: 'lifecycleState',
   syncPolicy: 'syncPolicy',
+  automationPolicy: 'automationPolicy',
   syncState: 'syncState',
   lastSuccessfulRefreshAt: 'lastSuccessfulRefreshAt',
   nextExpectedRefreshAt: 'nextExpectedRefreshAt',

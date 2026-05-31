@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { CalendarSourceSummary, CalendarSourceSyncPolicy, CalendarSyncStatus } from "@chrona/contracts";
+import type { CalendarAutomationPolicy, CalendarSourceSummary, CalendarSourceSyncPolicy, CalendarSyncStatus } from "@chrona/contracts";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -34,6 +34,7 @@ export function CalendarSourceActions({
   const [name, setName] = useState(source.name);
   const [color, setColor] = useState(source.color);
   const [syncPolicy, setSyncPolicy] = useState<CalendarSourceSyncPolicy>(source.syncPolicy);
+  const [automationPolicy, setAutomationPolicy] = useState<CalendarAutomationPolicy>(source.automationPolicy);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export function CalendarSourceActions({
         name: name.trim(),
         color,
         syncPolicy,
+        automationPolicy,
       });
       onSourceChange(updated.source, updated.syncStatus);
     });
@@ -108,27 +110,45 @@ export function CalendarSourceActions({
         </Field>
         <Field>
           <FieldLabel htmlFor={`source-color-${source.id}`}>Calendar color</FieldLabel>
-          <Input
-            id={`source-color-${source.id}`}
-            type="color"
-            value={color}
-            onChange={(event) => setColor(event.target.value)}
-            className="h-10 w-20 cursor-pointer p-1"
-          />
+          <div className="flex items-center gap-3">
+            <Input
+              id={`source-color-${source.id}`}
+              type="color"
+              value={color}
+              onChange={(event) => setColor(event.target.value)}
+              className="h-10 w-14 shrink-0 cursor-pointer p-1"
+            />
+            <span className="font-mono text-sm text-muted-foreground">{color.toUpperCase()}</span>
+          </div>
         </Field>
       </FieldGroup>
 
       <Field>
-        <FieldLabel htmlFor={`source-sync-policy-${source.id}`}>Sync policy</FieldLabel>
+        <FieldLabel htmlFor={`source-sync-policy-${source.id}`}>{externalCalendarMessages.syncPolicyLabel}</FieldLabel>
         <Select value={syncPolicy} onValueChange={(value) => setSyncPolicy(value as CalendarSourceSyncPolicy)} disabled={isPending}>
           <SelectTrigger id={`source-sync-policy-${source.id}`} className="w-full sm:w-72">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="auto_complete_past_events">Complete past events</SelectItem>
-            <SelectItem value="keep_active">Keep events active</SelectItem>
+            <SelectItem value="auto_complete_past_events">{externalCalendarMessages.syncPolicyAutoComplete}</SelectItem>
+            <SelectItem value="keep_active">{externalCalendarMessages.syncPolicyKeepActive}</SelectItem>
           </SelectContent>
         </Select>
+      </Field>
+
+      <Field>
+        <FieldLabel htmlFor={`source-automation-policy-${source.id}`}>{externalCalendarMessages.automationPolicyLabel}</FieldLabel>
+        <Select value={automationPolicy} onValueChange={(value) => setAutomationPolicy(value as CalendarAutomationPolicy)} disabled={isPending}>
+          <SelectTrigger id={`source-automation-policy-${source.id}`} className="w-full sm:w-72">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto_plan">{externalCalendarMessages.automationPolicyAutoPlan}</SelectItem>
+            <SelectItem value="auto_execute">{externalCalendarMessages.automationPolicyAutoExecute}</SelectItem>
+            <SelectItem value="manual">{externalCalendarMessages.automationPolicyManual}</SelectItem>
+          </SelectContent>
+        </Select>
+        <FieldDescription>{externalCalendarMessages.automationPolicyDescription}</FieldDescription>
       </Field>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">

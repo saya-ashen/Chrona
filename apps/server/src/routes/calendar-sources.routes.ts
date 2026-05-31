@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import type { CalendarFeedTransport } from "@chrona/integrations";
+import { startAutoPlanGenerationForTask } from "@chrona/engine";
 import {
   createCalendarSourceRequestSchema,
   updateCalendarSourceRequestSchema,
@@ -52,7 +53,10 @@ function defaultRouteTransport() {
 }
 
 export function createCalendarSourceRoutes(options: CalendarSourceRouteOptions = {}) {
-  const service = createExternalCalendarService({ transport: options.transport ?? defaultRouteTransport() });
+  const service = createExternalCalendarService({
+    transport: options.transport ?? defaultRouteTransport(),
+    autoPlanTask: startAutoPlanGenerationForTask,
+  });
 
   return new Hono()
     .post(

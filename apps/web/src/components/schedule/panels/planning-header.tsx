@@ -21,7 +21,7 @@ export function PlanningHeader({
   summary,
   dayLinks,
   metrics,
-  actions: _actions,
+  actions,
   activeView,
   timelineHref,
   listHref,
@@ -46,7 +46,6 @@ export function PlanningHeader({
   newTaskLabel?: string;
   onNavigate?: (href: string) => void;
 }) {
-  void _actions;
   // Only show queue + risk metrics (first two)
   const keyMetrics = metrics.slice(0, 2);
 
@@ -144,6 +143,36 @@ export function PlanningHeader({
           </div>
         ))}
       </div>
+
+      {actions.length > 0 ? (
+        <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto">
+          {actions.map((action, index) => (
+            <button
+              key={`${action.label}-${index}`}
+              type="button"
+              disabled={action.disabled}
+              title={action.description}
+              onClick={() => {
+                if (action.disabled) return;
+                if (action.onClick) {
+                  action.onClick();
+                  return;
+                }
+                if (action.href) onNavigate?.(action.href);
+              }}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                index === 0
+                  ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "border-border/60 bg-background/85 text-foreground hover:bg-muted",
+                action.disabled && "cursor-not-allowed opacity-50",
+              )}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </header>
   );
 }

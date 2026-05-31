@@ -181,8 +181,7 @@ export type ScheduleViewMode = "timeline" | "list";
 export type SecondaryPlanningView =
   | "queue"
   | "risks"
-  | "proposals"
-  | "conflicts";
+  | "proposals";
 
 /**
  * Conflict type.

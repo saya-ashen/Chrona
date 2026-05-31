@@ -98,16 +98,14 @@ export function buildSchedulePageViewModel({
     viewData.unscheduled.find((item) => item.taskId === activeSelectedTaskId) ??
     null;
   const todayFocusItems = buildTodayFocusItems(viewData, activeGroup, copy);
-  const conflictTaskIds = new Set(viewData.risks.map((item) => item.taskId));
+  const conflictTaskIds = new Set<string>();
 
   const activeRailLabel =
     secondaryView === "risks"
       ? copy.conflictsTitle
       : secondaryView === "proposals"
         ? copy.aiProposalsTitle
-        : secondaryView === "conflicts"
-          ? copy.conflictDetectionTitle
-          : copy.unscheduledQueue;
+        : copy.unscheduledQueue;
 
   const activeDayDate = parseDayKey(activeDay) ?? startOfDay(new Date());
   const calendarMonthDate = startOfDay(

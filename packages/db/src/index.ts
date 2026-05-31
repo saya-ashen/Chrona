@@ -14,4 +14,9 @@ export {
   updateCalendarSource,
   updateCalendarSourceSyncStatus,
 } from "./external-calendar";
-export type { CalendarSourceCreateData, ImportedCalendarEventWrite } from "./external-calendar";
+export type {
+  CalendarSourceCreateData,
+  ImportedCalendarAutomationRequest,
+  ImportedCalendarEventWrite,
+  ImportedCalendarReplacementResult,
+} from "./external-calendar";

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,6 +32,7 @@ const activeSource = {
   redactedUrlLabel: "calendar.example/team.ics",
   color: "#2563eb",
   syncPolicy: "auto_complete_past_events" as const,
+  automationPolicy: "auto_plan" as const,
   lifecycleState: "active" as const,
   lastSuccessfulRefreshAt: "2026-05-30T10:00:00.000Z",
   nextExpectedRefreshAt: "2026-05-30T11:00:00.000Z",
@@ -48,14 +49,17 @@ describe("CalendarSourceList", () => {
   });
 
   it("renders source health fields and redacted URL labels", async () => {
+    const user = userEvent.setup();
     render(<CalendarSourceList workspaceId="workspace-1" />);
 
     expect(await screen.findByText("Team calendar")).toBeInTheDocument();
     expect(screen.getByText("calendar.example/team.ics")).toBeInTheDocument();
-    expect(screen.getByText(/active/i)).toBeInTheDocument();
-    expect(screen.getByText(/last successful refresh/i)).toBeInTheDocument();
-    expect(screen.getByText(/next expected refresh/i)).toBeInTheDocument();
-    expect(screen.getByText(/latest error/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /manage/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/last successful refresh/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/next expected refresh/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/latest error/i)).toBeInTheDocument();
   });
 
   it("renames, recolors, disables, enables, and refreshes a source", async () => {
@@ -71,27 +75,30 @@ describe("CalendarSourceList", () => {
 
     render(<CalendarSourceList workspaceId="workspace-1" />);
 
-    const nameInput = await screen.findByLabelText(/display name/i);
+    await user.click(await screen.findByRole("button", { name: /manage/i }));
+    const dialog = await screen.findByRole("dialog");
+    const nameInput = within(dialog).getByLabelText(/display name/i);
     await user.clear(nameInput);
     await user.type(nameInput, "Renamed calendar");
-    await user.click(screen.getByRole("button", { name: /save changes/i }));
+    await user.click(within(dialog).getByRole("button", { name: /save changes/i }));
     await waitFor(() => expect(updateMock).toHaveBeenCalledWith("workspace-1", "source-1", {
       name: "Renamed calendar",
       color: "#2563eb",
       syncPolicy: "auto_complete_past_events",
+      automationPolicy: "auto_plan",
     }));
 
-    await user.click(screen.getByRole("button", { name: /disable/i }));
+    await user.click(within(dialog).getByRole("button", { name: /disable/i }));
     await waitFor(() => expect(updateMock).toHaveBeenCalledWith("workspace-1", "source-1", { enabled: false }));
-    expect(await screen.findByRole("button", { name: /enable/i })).toBeInTheDocument();
+    expect(await within(dialog).findByRole("button", { name: /enable/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /enable/i }));
+    await user.click(within(dialog).getByRole("button", { name: /enable/i }));
     await waitFor(() => expect(updateMock).toHaveBeenCalledWith("workspace-1", "source-1", { enabled: true }));
 
-    await user.click(screen.getByRole("button", { name: /refresh/i }));
+    await user.click(within(dialog).getByRole("button", { name: /refresh/i }));
     await waitFor(() => expect(refreshMock).toHaveBeenCalledWith("workspace-1", "source-1"));
-    expect(await screen.findByText(/partial/i)).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(await within(dialog).findByText(/partial/i)).toBeInTheDocument();
+    expect(within(dialog).getByText("2")).toBeInTheDocument();
   });
 
   it("confirms removal before deleting a source", async () => {
@@ -101,10 +108,12 @@ describe("CalendarSourceList", () => {
     render(<CalendarSourceList workspaceId="workspace-1" />);
 
     await screen.findByText("Team calendar");
-    await user.click(screen.getByRole("button", { name: /remove/i }));
-    expect(screen.getByText(/remove this calendar source/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /manage/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /remove/i }));
+    expect(within(dialog).getByText(/remove this calendar source/i)).toBeInTheDocument();
     expect(deleteMock).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: /remove/i }));
+    await user.click(within(dialog).getByRole("button", { name: /remove/i }));
     await waitFor(() => expect(deleteMock).toHaveBeenCalledWith("workspace-1", "source-1"));
     expect(screen.queryByText("Team calendar")).not.toBeInTheDocument();
   });
@@ -124,8 +133,10 @@ describe("CalendarSourceList", () => {
 
     render(<CalendarSourceList workspaceId="workspace-1" />);
 
-    expect(await screen.findByText("Calendar feed could not be read.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /refresh/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Calendar could not be reached.");
+    await user.click(await screen.findByRole("button", { name: /manage/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Calendar feed could not be read.")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: /refresh/i }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Calendar could not be reached.");
   });
 });

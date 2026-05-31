@@ -41,6 +41,7 @@ describe("PlanningHeader", () => {
     expect(screen.getByText("2h")).toBeInTheDocument();
     expect(screen.getByText("Queue")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /auto arrange/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /review suggestions/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /auto arrange/i })).toBeDisabled();
   });
 });

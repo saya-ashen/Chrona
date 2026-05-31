@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,8 +38,7 @@ describe("CalendarSourceSetup", () => {
     expect(screen.getByRole("heading", { name: /connect external calendar/i })).toBeInTheDocument();
     expect(screen.getAllByText(/read-only/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/no external calendars connected/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/display name/i)).toHaveValue("");
-    expect(screen.getByLabelText(/calendar url/i)).toHaveValue("");
+    expect(screen.getByRole("button", { name: /connect calendar/i })).toBeInTheDocument();
   });
 
   it("validates a source link and shows preview feedback", async () => {
@@ -54,8 +53,10 @@ describe("CalendarSourceSetup", () => {
 
     render(<CalendarSourceSetup workspaceId="workspace-1" />);
 
-    await user.type(screen.getByLabelText(/calendar url/i), "https://calendar.example.test/team.ics?token=secret");
-    await user.click(screen.getByRole("button", { name: /validate/i }));
+    await user.click(screen.getByRole("button", { name: /connect calendar/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/calendar url/i), "https://calendar.example.test/team.ics?token=secret");
+    await user.click(within(dialog).getByRole("button", { name: /^validate$/i }));
 
     await waitFor(() => {
       expect(validateMock).toHaveBeenCalledWith("workspace-1", "https://calendar.example.test/team.ics?token=secret");
@@ -75,6 +76,7 @@ describe("CalendarSourceSetup", () => {
         redactedUrlLabel: "team.ics",
         color: "#2563eb",
         syncPolicy: "auto_complete_past_events",
+        automationPolicy: "auto_plan",
         lifecycleState: "active",
       },
       syncStatus: {
@@ -87,9 +89,11 @@ describe("CalendarSourceSetup", () => {
 
     render(<CalendarSourceSetup workspaceId="workspace-1" />);
 
-    await user.type(screen.getByLabelText(/display name/i), "Team calendar");
-    await user.type(screen.getByLabelText(/calendar url/i), "https://calendar.example.test/team.ics");
     await user.click(screen.getByRole("button", { name: /connect calendar/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/display name/i), "Team calendar");
+    await user.type(within(dialog).getByLabelText(/calendar url/i), "https://calendar.example.test/team.ics");
+    await user.click(within(dialog).getByRole("button", { name: /connect calendar/i }));
 
     await waitFor(() => {
       expect(createMock).toHaveBeenCalledWith("workspace-1", {
@@ -97,12 +101,11 @@ describe("CalendarSourceSetup", () => {
         url: "https://calendar.example.test/team.ics",
         color: "#2563eb",
         syncPolicy: "auto_complete_past_events",
+        automationPolicy: "auto_plan",
       });
     });
-    expect(screen.getByText(/Team calendar/i)).toBeInTheDocument();
-    expect(screen.getByText(/Imported events/i)).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
-    expect(screen.getByText(/team.ics/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Team calendar/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /manage/i })).toBeInTheDocument();
   });
 
   it("maps invalid-link errors into actionable feedback", async () => {
@@ -113,9 +116,11 @@ describe("CalendarSourceSetup", () => {
 
     render(<CalendarSourceSetup workspaceId="workspace-1" />);
 
-    await user.type(screen.getByLabelText(/display name/i), "Bad calendar");
-    await user.type(screen.getByLabelText(/calendar url/i), "ftp://calendar.example.test/team.ics");
     await user.click(screen.getByRole("button", { name: /connect calendar/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText(/display name/i), "Bad calendar");
+    await user.type(within(dialog).getByLabelText(/calendar url/i), "ftp://calendar.example.test/team.ics");
+    await user.click(within(dialog).getByRole("button", { name: /connect calendar/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Use an http, https, or file calendar link.");
     expect(screen.getByText(/no external calendars connected/i)).toBeInTheDocument();
