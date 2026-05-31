@@ -1,10 +1,11 @@
 import type { CheckpointActionKind, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import { api } from "@/lib/rpc-client";
 import type {
   PlanNodeAction,
   PlanNodeDataModel,
   PlanNodeField,
 } from "@/components/tasks/plan/task-plan-graph/types";
-import type { ExecutionOverviewTone, WorkspaceActivityPage, WorkspaceStateTreatment } from "./task-workspace-types";
+import type { WorkspaceActivityPage, WorkspaceStateTreatment } from "./task-workspace-types";
 
 export type LoadWorkspaceActivityPageInput = {
   taskId: string;
@@ -17,13 +18,12 @@ export type LoadNodeWorkspaceActivityPageInput = LoadWorkspaceActivityPageInput 
 };
 
 export async function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
-  const params = new URLSearchParams();
-  if (input.cursor) params.set("cursor", input.cursor);
-  if (input.limit !== undefined) params.set("limit", String(input.limit));
-
-  const response = await fetch(`/api/tasks/${input.taskId}/activity?${params.toString()}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
+  const response = await api.tasks[":taskId"].activity.$get({
+    param: { taskId: input.taskId },
+    query: {
+      ...(input.cursor ? { cursor: input.cursor } : {}),
+      ...(input.limit !== undefined ? { limit: String(input.limit) } : {}),
+    },
   });
 
   if (!response.ok) {
@@ -31,17 +31,16 @@ export async function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPage
     throw new Error((err as { error?: string }).error ?? "Failed to load task activity");
   }
 
-  return await response.json() as WorkspaceActivityPage;
+  return await response.json() as unknown as WorkspaceActivityPage;
 }
 
 export async function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
-  const params = new URLSearchParams();
-  if (input.cursor) params.set("cursor", input.cursor);
-  if (input.limit !== undefined) params.set("limit", String(input.limit));
-
-  const response = await fetch(`/api/tasks/${input.taskId}/nodes/${input.nodeId}/activity?${params.toString()}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
+  const response = await api.tasks[":taskId"].nodes[":nodeId"].activity.$get({
+    param: { taskId: input.taskId, nodeId: input.nodeId },
+    query: {
+      ...(input.cursor ? { cursor: input.cursor } : {}),
+      ...(input.limit !== undefined ? { limit: String(input.limit) } : {}),
+    },
   });
 
   if (!response.ok) {
@@ -49,7 +48,7 @@ export async function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActi
     throw new Error((err as { error?: string }).error ?? "Failed to load node activity");
   }
 
-  return await response.json() as WorkspaceActivityPage;
+  return await response.json() as unknown as WorkspaceActivityPage;
 }
 
 type WorkspacePresentationInput = {
@@ -61,106 +60,166 @@ type WorkspacePresentationInput = {
   isPermissionLimited?: boolean;
   permissionSummary?: string;
   blockActionRequired?: string | null;
+  copy?: Partial<WorkspaceStateTreatmentCopy>;
 };
 
-const workspaceStateToneByLabel = {
-  "Sync stale": "warning",
-  "View only": "warning",
-  "No plan yet": "neutral",
-  Blocked: "critical",
-  Degraded: "critical",
-  "Review required": "warning",
-  "Approval required": "warning",
-  Running: "info",
-  Completed: "success",
-  Idle: "neutral",
-} satisfies Record<string, ExecutionOverviewTone>;
+export type WorkspaceStateTreatmentCopy = {
+  syncStaleLabel: string;
+  syncStaleGuidance: string;
+  viewOnlyLabel: string;
+  viewOnlyGuidance: string;
+  noPlanYetLabel: string;
+  noPlanYetGuidance: string;
+  completedLabel: string;
+  completedGuidance: string;
+  degradedLabel: string;
+  degradedGuidance: string;
+  blockedLabel: string;
+  blockedGuidance: string;
+  approvalRequiredLabel: string;
+  approvalRequiredGuidance: string;
+  reviewRequiredLabel: string;
+  reviewRequiredGuidance: string;
+  runningLabel: string;
+  runningGuidance: string;
+  idleLabel: string;
+  idleGuidance: string;
+};
+
+export const DEFAULT_WORKSPACE_STATE_TREATMENT_COPY: WorkspaceStateTreatmentCopy = {
+  syncStaleLabel: "Sync stale",
+  syncStaleGuidance: "Refresh before acting on execution results.",
+  viewOnlyLabel: "View only",
+  viewOnlyGuidance: "You can view this task, but cannot run it.",
+  noPlanYetLabel: "No plan yet",
+  noPlanYetGuidance: "Generate and accept a plan to unlock execution controls.",
+  completedLabel: "Completed",
+  completedGuidance: "Review the latest result and artifacts before closing the task.",
+  degradedLabel: "Degraded",
+  degradedGuidance: "Retry sync or repair this node before continuing execution.",
+  blockedLabel: "Blocked",
+  blockedGuidance: "Resolve the blocker before continuing execution.",
+  approvalRequiredLabel: "Approval required",
+  approvalRequiredGuidance: "Approve or reject the current node to continue.",
+  reviewRequiredLabel: "Review required",
+  reviewRequiredGuidance: "Complete the current node action to continue.",
+  runningLabel: "Running",
+  runningGuidance: "Monitor current execution progress.",
+  idleLabel: "Idle",
+  idleGuidance: "Select a plan node or start execution when ready.",
+};
+
+export type WorkspaceActionDisabledReasonCopy = {
+  actionAlreadySending: string;
+  completeRequiredField: string;
+  completeRequiredFields: string;
+};
+
+export const DEFAULT_WORKSPACE_ACTION_DISABLED_REASON_COPY: WorkspaceActionDisabledReasonCopy = {
+  actionAlreadySending: "Action is already being sent.",
+  completeRequiredField: "Complete required field: {fields}.",
+  completeRequiredFields: "Complete required fields: {fields}.",
+};
+
+function resolveStateTreatmentCopy(copy?: Partial<WorkspaceStateTreatmentCopy>) {
+  return { ...DEFAULT_WORKSPACE_STATE_TREATMENT_COPY, ...copy };
+}
+
+function resolveActionDisabledReasonCopy(copy?: Partial<WorkspaceActionDisabledReasonCopy>) {
+  return { ...DEFAULT_WORKSPACE_ACTION_DISABLED_REASON_COPY, ...copy };
+}
+
+function fillFields(template: string, fields: string) {
+  return template.replace("{fields}", fields);
+}
 
 export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput): WorkspaceStateTreatment {
+  const copy = resolveStateTreatmentCopy(input.copy);
+
   if (input.isStale) {
     return {
-      label: "Sync stale",
-      tone: workspaceStateToneByLabel["Sync stale"],
-      guidance: "Refresh before acting on execution results.",
+      label: copy.syncStaleLabel,
+      tone: "warning",
+      guidance: copy.syncStaleGuidance,
     };
   }
 
   if (input.isPermissionLimited) {
     return {
-      label: "View only",
-      tone: workspaceStateToneByLabel["View only"],
-      guidance: input.permissionSummary ?? "You can view this task, but cannot run it.",
+      label: copy.viewOnlyLabel,
+      tone: "warning",
+      guidance: input.permissionSummary ?? copy.viewOnlyGuidance,
     };
   }
 
   if (!input.hasPlan) {
     return {
-      label: "No plan yet",
-      tone: workspaceStateToneByLabel["No plan yet"],
-      guidance: "Generate and accept a plan to unlock execution controls.",
+      label: copy.noPlanYetLabel,
+      tone: "neutral",
+      guidance: copy.noPlanYetGuidance,
     };
   }
 
   if (input.allNodesDone) {
     return {
-      label: "Completed",
-      tone: workspaceStateToneByLabel.Completed,
-      guidance: "Review the latest result and artifacts before closing the task.",
+      label: copy.completedLabel,
+      tone: "success",
+      guidance: copy.completedGuidance,
     };
   }
 
   if (input.currentNode?.status === "degraded") {
     return {
-      label: "Degraded",
-      tone: workspaceStateToneByLabel.Degraded,
-      guidance: input.currentNode.nextAction ?? "Retry sync or repair this node before continuing execution.",
+      label: copy.degradedLabel,
+      tone: "critical",
+      guidance: input.currentNode.nextAction ?? copy.degradedGuidance,
     };
   }
 
   if (input.currentNode?.status === "blocked" || input.currentNode?.status === "failed") {
     return {
-      label: "Blocked",
-      tone: workspaceStateToneByLabel.Blocked,
-      guidance: input.blockActionRequired ?? input.currentNode?.nextAction ?? "Resolve the blocker before continuing execution.",
+      label: copy.blockedLabel,
+      tone: "critical",
+      guidance: input.blockActionRequired ?? input.currentNode?.nextAction ?? copy.blockedGuidance,
     };
   }
 
   if (input.currentNode?.status === "waiting_for_approval") {
     return {
-      label: "Approval required",
-      tone: workspaceStateToneByLabel["Approval required"],
-      guidance: input.currentNode.nextAction ?? "Approve or reject the current node to continue.",
+      label: copy.approvalRequiredLabel,
+      tone: "warning",
+      guidance: input.currentNode.nextAction ?? copy.approvalRequiredGuidance,
     };
   }
 
   if (input.currentNode?.status === "waiting_for_user" || input.currentNode?.requiresHumanInput === true) {
     return {
-      label: "Review required",
-      tone: workspaceStateToneByLabel["Review required"],
-      guidance: input.currentNode.nextAction ?? "Complete the current node action to continue.",
+      label: copy.reviewRequiredLabel,
+      tone: "warning",
+      guidance: input.currentNode.nextAction ?? copy.reviewRequiredGuidance,
     };
   }
 
   if (input.currentNode?.status === "active" || input.currentNode?.status === "in_progress") {
     return {
-      label: "Running",
-      tone: workspaceStateToneByLabel.Running,
-      guidance: input.currentNode.nextAction ?? "Monitor current execution progress.",
+      label: copy.runningLabel,
+      tone: "info",
+      guidance: input.currentNode.nextAction ?? copy.runningGuidance,
     };
   }
 
   if (input.isBlocked) {
     return {
-      label: "Blocked",
-      tone: workspaceStateToneByLabel.Blocked,
-      guidance: input.blockActionRequired ?? "Resolve the blocker before continuing execution.",
+      label: copy.blockedLabel,
+      tone: "critical",
+      guidance: input.blockActionRequired ?? copy.blockedGuidance,
     };
   }
 
   return {
-    label: "Idle",
-    tone: workspaceStateToneByLabel.Idle,
-    guidance: input.currentNode?.nextAction ?? "Select a plan node or start execution when ready.",
+    label: copy.idleLabel,
+    tone: "neutral",
+    guidance: input.currentNode?.nextAction ?? copy.idleGuidance,
   };
 }
 
@@ -188,13 +247,17 @@ export function getWorkspaceActionDisabledReason(input: {
   values: Record<string, string>;
   isDispatching: boolean;
   baseReason?: string;
+  copy?: Partial<WorkspaceActionDisabledReasonCopy>;
 }) {
-  if (input.isDispatching) return "Action is already being sent.";
+  const copy = resolveActionDisabledReasonCopy(input.copy);
+
+  if (input.isDispatching) return copy.actionAlreadySending;
   if (input.baseReason) return input.baseReason;
 
   const missingFields = getMissingWorkspaceActionFields(input.fields, input.values);
   if (missingFields.length > 0) {
-    return `Complete required field${missingFields.length === 1 ? "" : "s"}: ${missingFields.map((field) => field.label).join(", ")}.`;
+    const template = missingFields.length === 1 ? copy.completeRequiredField : copy.completeRequiredFields;
+    return fillFields(template, missingFields.map((field) => field.label).join(", "));
   }
 
   return null;

@@ -291,3 +291,39 @@ Task: "Add e2e mobile no-horizontal-scroll coverage in e2e/specs/task-workspace-
 - Browser verification must use the same representative route when feasible: `http://localhost:3100/en/workspaces/cmp72s4oy0007hgfu74srky2u/tasks/cmp72tzoq00008hfurndtr5q9`.
 - Mobile verification must confirm no horizontal page scroll at `390x844`.
 - Use existing `fetch-json-event-source` helper for any SSE path touched by implementation.
+
+---
+
+## Deferred Follow-ups
+
+### DF-1: Model-layer i18n for execution console view (deferred)
+
+**Status:** Deferred. Component-layer i18n is complete (85 keys under
+`components.taskWorkspace` in `en.json` + `zh.json`, full parity). The
+view-model layer still emits hardcoded English.
+
+**Gap:** `apps/web/src/components/tasks/workspace/model/task-workspace-query.ts`
+and `task-workspace-actions.ts` build the execution console view with ~20-25
+hardcoded English literals that render to the execution overview UI via
+`consoleView.readiness` / `.attention` / `.latestResult` / `.progress`
+(consumed in `sections/task-workspace-plan-section.tsx:453-455` →
+`execution/task-workspace-execution-overview.tsx`). Examples: `No plan yet`,
+`Latest result`, `Latest run`, `Needs handling`, `Blocked`,
+`Ready to schedule`, `Current work`, `Execution readiness`,
+`Open action controls`, `Open run controls`, `Resolve in node panel`,
+`Review result actions`, `Review run context`, `No execution result yet.`,
+plus `nodeDetail` fallbacks (`No plan node selected`, etc.) and
+`buildTaskHeaderView` disabled-reason strings.
+
+**Why deferred:** Larger than a string swap. Requires threading a `copy`
+param into `createTaskWorkspaceExecutionConsoleView`
+(`task-workspace-query.ts:443`) and every builder
+(`buildProgressSummary`, `buildLatestResultCard`, `buildAttentionCard`,
+`buildReadinessCard`, `buildTaskHeaderView`, `nodeDetail`), adding ~22 keys to
+both `en.json` + `zh.json`, AND updating `task-workspace-query.test.ts` /
+`task-workspace-actions.test.ts` which assert the exact English literals
+(e.g. `title: "Current work"`, `label: "No plan yet"`).
+
+**Scope when resumed:** thread `copy` → builders; add keys (en+zh parity);
+migrate test assertions to reference `copy`. Verify with
+`bunx vitest run apps/web/src/components/tasks/workspace`.

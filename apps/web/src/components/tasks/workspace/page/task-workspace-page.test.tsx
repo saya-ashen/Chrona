@@ -151,12 +151,6 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", asy
           <p>detail-disabled:{consoleView.nodeDetail.disabledActionReason ?? "none"}</p>
           <p>workspace-treatment:{consoleView.states.treatment.label}</p>
           <p>workspace-guidance:{consoleView.states.treatment.guidance}</p>
-          <p>nav-brand:{consoleView.navigation.brandName}</p>
-          <p>nav-active:{consoleView.navigation.activeSection}</p>
-          <p>nav-member:{consoleView.navigation.memberIdentity}</p>
-          <p>nav-notifications:{consoleView.navigation.notificationCount}</p>
-          <p>header-member:{consoleView.header.memberContext.memberLabel}</p>
-          <p>header-notifications:{consoleView.header.memberContext.notificationCount}</p>
           <button type="button" disabled={planGenerationStatus === "generating"}>{planGenerationStatus === "generating" ? "Generating..." : plan ? "Regenerate plan" : "Generate plan"}</button>
           {canAcceptPlan && plan ? <button type="button" onClick={() => onApplyPlan?.(plan)}>Apply Plan</button> : null}
           <section aria-label="Execution flow" />
@@ -292,7 +286,6 @@ describe("TaskWorkspacePage", () => {
 
     expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByText("header-notifications:0")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
   });
 
@@ -384,22 +377,6 @@ describe("TaskWorkspacePage", () => {
     }));
   });
 
-  it("passes navigation and member notification context through the workspace page", () => {
-    const fixture = taskWorkspaceStateFixtures.approvalNeeded;
-    mocks.plan = { id: "plan-1", status: "accepted" };
-    mocks.graphPlan = fixture.graphPlan;
-
-    render(<TaskWorkspacePage data={fixture.pageData} />);
-
-    expect(screen.getByText("nav-brand:Chrona")).toBeInTheDocument();
-    expect(screen.getByText("nav-active:tasks")).toBeInTheDocument();
-    expect(screen.getByText("nav-member:Project member")).toBeInTheDocument();
-    expect(screen.getByText("header-member:Project member")).toBeInTheDocument();
-    expect(screen.getByText("nav-notifications:2")).toBeInTheDocument();
-    expect(screen.getByText("header-notifications:2")).toBeInTheDocument();
-    expect(screen.getByText("workspace-status:approval-needed")).toBeInTheDocument();
-  });
-
   it("renders running task header progress with task-level actions", () => {
     const fixture = taskWorkspaceStateFixtures.running;
     mocks.planGenerationStatus = "accepted";
@@ -427,7 +404,6 @@ describe("TaskWorkspacePage", () => {
 
     expect(screen.getByText("header-status:Queued")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByText("header-notifications:1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
   });
 

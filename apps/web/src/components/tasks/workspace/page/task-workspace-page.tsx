@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useI18n } from "@chrona/i18n/react";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "../sections/task-workspace-edit-section";
@@ -185,6 +186,8 @@ function createHeaderPlanAction({
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
+  const { messages } = useI18n();
+  const executionConsoleCopy = messages.components?.taskWorkspace ?? {};
   const { registerHandlers, setPageContext } = useAssistantSurface();
   const { pageData, setTask, refreshWorkspace, workspaceEvents } = useTaskWorkspacePageState(data);
   const task = pageData.task;
@@ -222,10 +225,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     submitCheckpointAction,
     handleGeneratePlanFromHeader,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
-  const consoleView = createTaskWorkspaceExecutionConsoleView({
-    pageData,
-    graphPlan,
-  });
+  const consoleView = useMemo(
+    () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
+    [pageData, graphPlan, executionConsoleCopy],
+  );
   const header = createPlanAcceptanceHeader(consoleView.header, plan);
   const planAction = createHeaderPlanAction({
     plan,

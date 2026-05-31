@@ -113,6 +113,37 @@ describe("task workspace execution console view model", () => {
     ]))).toMatchObject({ completedSteps: 1, totalSteps: 3, percentComplete: 33 });
   });
 
+  it("uses injected copy for execution console labels", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([node({ id: "ready", status: "ready" })]),
+      copy: {
+        stepsComplete: "{completed} of {total} done",
+        currentWork: "Localized current work",
+        openRunControls: "Localized run controls",
+        noExecutionResultYet: "Localized empty result.",
+        noRunningExecutionToPause: "Localized no pause.",
+        noRunningExecutionToStop: "Localized no stop.",
+        moreActions: "Localized more",
+        idleLabel: "Localized idle",
+        idleGuidance: "Localized idle guidance",
+      },
+    });
+
+    expect(view.progress.label).toBe("0 of 1 done");
+    expect(view.readiness).toMatchObject({
+      title: "Localized current work",
+      actionLabel: "Localized run controls",
+    });
+    expect(view.latestResult.description).toBe("Localized empty result.");
+    expect(view.header.actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "pause", disabledReason: "Localized no pause." }),
+      expect.objectContaining({ id: "stop", disabledReason: "Localized no stop." }),
+      expect.objectContaining({ id: "more", label: "Localized more" }),
+    ]));
+    expect(view.states.treatment).toMatchObject({ label: "Localized idle", guidance: "Localized idle guidance" });
+  });
+
   it("prefers selected node before current or active nodes", () => {
     const selected = node({ id: "selected", status: "idle" });
     const current = node({ id: "current", status: "ready" });
@@ -131,9 +162,6 @@ describe("task workspace execution console view model", () => {
 
     expect(view.nodeDetail.currentNode?.id).toBe("active");
     expect(view.header).toMatchObject({ title: "Launch task", status: "running", completedSteps: 0, totalSteps: 1 });
-    expect(view.header.memberContext).toMatchObject({ memberLabel: "Project member", notificationCount: 2 });
-    expect(view.navigation).toMatchObject({ brandName: "Chrona", activeSection: "tasks", settingsAvailable: true, memberIdentity: "Project member", notificationCount: 2 });
-    expect(view.executionFlow.nodes[0]).toMatchObject({ id: "active", stepNumber: 1, status: "running" });
     expect(view.readiness).toMatchObject({ title: "Current work", statusLabel: "Running", tone: "info", actionNodeId: "active" });
     expect(view.latestResult).toMatchObject({ title: "Latest run" });
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "artifact-1" }));
@@ -362,10 +390,6 @@ describe("task workspace execution console view model", () => {
     });
     expect(view.states.treatment).toMatchObject({ label: "Degraded", tone: "critical", guidance: "Retry sync" });
     expect(view.attention).toMatchObject({ title: "Needs handling", tone: "critical", actionNodeId: "sync" });
-    expect(view.executionFlow.nodes.find((item) => item.id === "sync")).toMatchObject({
-      status: "blocked",
-      requiresHumanAction: true,
-    });
   });
 
   it("attaches the orchestrator recovery action to the target node", () => {
@@ -612,7 +636,6 @@ describe("task workspace execution console view model", () => {
       tabs: ["result", "activity", "action", "configuration"],
       isEmpty: false,
     });
-    expect(view.executionFlow.selectedNodeId).toBe("approval");
   });
 
   it("surfaces action disabled reasons only when the selected node has no actions", () => {

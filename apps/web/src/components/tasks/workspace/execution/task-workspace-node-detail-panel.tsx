@@ -33,6 +33,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { useI18n } from "@chrona/i18n/react";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
@@ -46,12 +47,12 @@ import {
 import type { NodeDetailPanelState, WorkspaceActivityItem } from "../model/task-workspace-types";
 import { WorkspaceActivityFeed } from "./workspace-activity-feed";
 
-const TAB_LABELS: Record<NodeDetailPanelState["tabs"][number], string> = {
-  result: "Result",
-  action: "Action",
-  activity: "Activity",
-  configuration: "Details",
-};
+type TaskWorkspaceCopy = Record<string, string | undefined>;
+
+function useTaskWorkspaceCopy(): TaskWorkspaceCopy {
+  const { messages } = useI18n();
+  return messages.components?.taskWorkspace ?? {};
+}
 
 type NodeDetailVariant = "panel" | "rail" | "drawer";
 export type NodeDrawerSize = "collapsed" | "expanded";
@@ -73,15 +74,16 @@ function statusTone(status: NodeDetailPanelState["status"]) {
 }
 
 function EmptyDetailState() {
+  const copy = useTaskWorkspaceCopy();
   return (
     <section
       id="task-workspace-node-actions"
-      aria-label="Current node details"
+      aria-label={copy.currentNodeDetails ?? "Current node details"}
       className="scroll-mt-4"
     >
       <div className="rounded-[1.35rem] border border-dashed border-border bg-card/75 px-4 py-5 shadow-sm backdrop-blur">
         <p className="text-sm font-semibold text-foreground">
-          No active node selected
+          {copy.emptyDetailState ?? "No active node selected"}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           Select a plan node, generate a plan, or wait for execution to expose the current node details here.
@@ -99,6 +101,7 @@ function outputsContainText(outputs: NodeResultOutput[], text: string | null) {
 }
 
 function ResultTab({ node }: { node: PlanNodeDataModel }) {
+  const copy = useTaskWorkspaceCopy();
   const rawRunResult = useMemo(() => extractRunResult(node), [node]);
   const runError = useMemo(() => extractRunError(node), [node]);
   const outputs = node.resultOutputs ?? [];
@@ -113,9 +116,9 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
 
     try {
       await navigator.clipboard.writeText(copyText);
-      setCopyStatus("Copied result.");
+      setCopyStatus(copy.copiedResult ?? "Copied result.");
     } catch {
-      setCopyStatus("Copy failed. Select the result text manually.");
+      setCopyStatus(copy.copyFailed ?? "Copy failed. Select the result text manually.");
     }
   }
 
@@ -124,7 +127,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
       <div className="rounded-[1rem] border border-border/70 bg-card/90 p-3 shadow-sm">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-foreground">
-            Result summary
+            {copy.resultSummary ?? "Result summary"}
           </p>
           {runResult || outputs.length > 0 ? (
             <Button
@@ -135,7 +138,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
               className="h-8 rounded-full px-3 text-xs"
             >
               <Copy className="size-3.5" />
-              Copy result
+              {copy.copyResult ?? "Copy result"}
             </Button>
           ) : null}
         </div>
@@ -165,7 +168,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
           <p className="text-sm leading-5 text-foreground/80">{runResult}</p>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No run result yet for this node.
+            {copy.noRunResult ?? "No run result yet for this node."}
           </p>
         )}
       </div>
@@ -189,17 +192,18 @@ function RunField({
   readOnly?: boolean;
 }) {
   const fieldId = `node-action-${field.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const copy = useTaskWorkspaceCopy();
   const label = (
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium text-foreground/90">{field.label}</span>
       {field.required ? (
         <span className="rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning-foreground">
-          required
+          {copy.requiredLabel ?? "Required"}
         </span>
       ) : null}
       {readOnly ? (
         <span className="rounded-full bg-success/12 px-1.5 py-0.5 text-[10px] text-success">
-          submitted
+          {copy.submittedLabel ?? "submitted"}
         </span>
       ) : null}
     </div>
@@ -227,7 +231,11 @@ function RunField({
   }
 
   if (field.control === "select" || field.control === "approval") {
-    const options = field.options ?? ["Approve", "Reject", "Needs changes"];
+    const options = field.options ?? [
+      copy.approve ?? "Approve",
+      copy.reject ?? "Reject",
+      copy.needsChanges ?? "Needs changes",
+    ];
     const shouldShowSubmittedOption = readOnly && value && !options.includes(value);
 
     return (
@@ -239,7 +247,7 @@ function RunField({
           onValueChange={onChange}
         >
           <SelectTrigger id={fieldId} aria-invalid={invalid} className="w-full rounded-xl border-border bg-background text-sm shadow-sm">
-            <SelectValue placeholder="Select..." />
+            <SelectValue placeholder={copy.selectPlaceholder ?? "Select..."} />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -283,6 +291,68 @@ function isTerminalStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "skipped";
 }
 
+function AutoRefreshIndicator({ enabled }: { enabled: boolean }) {
+  const copy = useTaskWorkspaceCopy();
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground"
+      title={enabled
+        ? (copy.liveUpdatesOn ?? "Live updates are on while this node is active.")
+        : (copy.liveUpdatesResume ?? "Live updates resume when this node becomes active.")}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "size-1.5 rounded-full",
+          enabled ? "animate-pulse bg-success" : "bg-muted-foreground/40",
+        )}
+      />
+      <span>{enabled ? (copy.live ?? "Live") : (copy.idle ?? "Idle")}</span>
+    </span>
+  );
+}
+
+function WorkspaceActionSubmit({
+  asSubmit,
+  isDispatching,
+  selectedActionLabel,
+  submitDisabledReason,
+  onClick,
+  className,
+}: {
+  asSubmit: boolean;
+  isDispatching: boolean;
+  selectedActionLabel?: string;
+  submitDisabledReason?: string | null;
+  onClick?: () => void;
+  className?: string;
+}) {
+  const copy = useTaskWorkspaceCopy();
+  const submitLabel = isDispatching
+    ? (copy.sending ?? "Sending...")
+    : selectedActionLabel
+      ? `${copy.sendPrefix ?? "Send"} ${selectedActionLabel}`
+      : (copy.sendInput ?? "Send input");
+  return (
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      <Button
+        type={asSubmit ? "submit" : "button"}
+        disabled={Boolean(submitDisabledReason)}
+        title={submitDisabledReason ?? undefined}
+        onClick={onClick}
+        variant="default"
+        size="sm"
+        className="h-8 rounded-full px-3 text-xs shadow-sm"
+      >
+        {submitLabel}
+      </Button>
+      {submitDisabledReason ? (
+        <span className="text-xs text-muted-foreground">{submitDisabledReason}</span>
+      ) : null}
+    </div>
+  );
+}
+
 function hasSubmittedInputFields(inputFields: Record<string, string> | undefined) {
   return Boolean(inputFields && Object.values(inputFields).some((value) => value.trim()));
 }
@@ -305,6 +375,7 @@ export function WorkspaceNodeActionControls({
   className?: string;
 }) {
   const actions = node.availableActions ?? [];
+  const copy = useTaskWorkspaceCopy();
   const fields = useMemo(() => node.interactiveFields ?? [], [node.interactiveFields]);
   const fieldStructureKey = fields
     .map((field) => `${field.key}:${field.control ?? "text"}:${field.required ? "required" : "optional"}:${field.options?.join(",") ?? ""}`)
@@ -333,6 +404,7 @@ export function WorkspaceNodeActionControls({
     values: fieldValues,
     isDispatching,
     baseReason: disabledActionReason,
+    copy,
   });
 
   useEffect(() => {
@@ -358,7 +430,7 @@ export function WorkspaceNodeActionControls({
     try {
       if (selectedAction?.executionAction) {
         if (!onDispatchExecutionAction) {
-          throw new Error("Execution actions are not available for this view.");
+          throw new Error(copy.executionActionsUnavailable ?? "Execution actions are not available for this view.");
         }
         const result = await onDispatchExecutionAction(selectedAction.executionAction);
         setActionStatus(result.message);
@@ -366,7 +438,7 @@ export function WorkspaceNodeActionControls({
       }
 
       if (!onSubmitCheckpointAction) {
-        throw new Error("Checkpoint actions are not available for this view.");
+        throw new Error(copy.checkpointActionsUnavailable ?? "Checkpoint actions are not available for this view.");
       }
 
       const result = await onSubmitCheckpointAction(buildWorkspaceCheckpointActionInput({
@@ -377,7 +449,7 @@ export function WorkspaceNodeActionControls({
       }));
       setActionStatus(result.message);
     } catch (cause) {
-      setActionStatus(cause instanceof Error ? cause.message : "Failed to dispatch execution action.");
+      setActionStatus(cause instanceof Error ? cause.message : (copy.failedDispatchExecution ?? "Failed to dispatch execution action."));
     } finally {
       setIsDispatching(false);
     }
@@ -385,11 +457,11 @@ export function WorkspaceNodeActionControls({
 
   return (
     <div className={cn("rounded-[1rem] border border-warning/40 bg-warning/10 p-3 shadow-sm", className)}>
-      <p className="text-sm font-semibold text-foreground">Action required</p>
+      <p className="text-sm font-semibold text-foreground">{copy.actionRequiredTitle ?? "Action required"}</p>
       <p className="mt-1 break-words text-sm text-muted-foreground">
         {node.nextAction ??
           node.summary ??
-          "Review the current node state before continuing."}
+          (copy.reviewNodeState ?? "Review the current node state before continuing.")}
       </p>
       {disabledActionReason ? (
         <div className="mt-2 rounded-lg border border-warning/40 bg-background/80 px-2.5 py-1.5 text-sm text-warning-foreground">
@@ -404,7 +476,7 @@ export function WorkspaceNodeActionControls({
             onValueChange={setSelectedActionId}
           >
             <SelectTrigger className="w-full rounded-xl border-border bg-background text-sm shadow-sm">
-              <SelectValue placeholder="Select action" />
+              <SelectValue placeholder={copy.selectActionLabel ?? "Select action"} />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -446,21 +518,12 @@ export function WorkspaceNodeActionControls({
             ))}
           </FieldGroup>
           {hasActionPayload ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="submit"
-                disabled={Boolean(submitDisabledReason)}
-                title={submitDisabledReason ?? undefined}
-                variant="default"
-                size="sm"
-                className="h-8 rounded-full px-3 text-xs shadow-sm"
-              >
-                {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send input"}
-              </Button>
-              {submitDisabledReason ? (
-                <span className="text-xs text-muted-foreground">{submitDisabledReason}</span>
-              ) : null}
-            </div>
+            <WorkspaceActionSubmit
+              asSubmit
+              isDispatching={isDispatching}
+              selectedActionLabel={selectedAction?.label}
+              submitDisabledReason={submitDisabledReason}
+            />
           ) : null}
         </form>
       ) : (
@@ -471,22 +534,14 @@ export function WorkspaceNodeActionControls({
         </p>
       )}
       {hasActionPayload && fields.length === 0 ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            disabled={Boolean(submitDisabledReason)}
-            title={submitDisabledReason ?? undefined}
-            onClick={() => void form.handleSubmit(handleSubmitAction)()}
-            variant="default"
-            size="sm"
-            className="h-8 rounded-full px-3 text-xs shadow-sm"
-          >
-            {isDispatching ? "Sending..." : selectedAction ? `Send ${selectedAction.label}` : "Send input"}
-          </Button>
-          {submitDisabledReason ? (
-            <span className="text-xs text-muted-foreground">{submitDisabledReason}</span>
-          ) : null}
-        </div>
+        <WorkspaceActionSubmit
+          asSubmit={false}
+          isDispatching={isDispatching}
+          selectedActionLabel={selectedAction?.label}
+          submitDisabledReason={submitDisabledReason}
+          onClick={() => void form.handleSubmit(handleSubmitAction)()}
+          className="mt-3"
+        />
       ) : null}
       {actionStatus ? (
         <p className="mt-2 rounded-xl border border-border/70 bg-background/85 px-2.5 py-1.5 text-sm text-muted-foreground" role="status">
@@ -550,6 +605,13 @@ export function TaskWorkspaceNodeDetailPanel({
   ) => Promise<TaskExecutionDispatchResult>;
 }) {
   const currentNode = detail.currentNode;
+  const copy = useTaskWorkspaceCopy();
+  const tabLabels: Record<NodeDetailPanelState["tabs"][number], string> = {
+    result: copy.tabResult ?? "Result",
+    action: copy.tabAction ?? "Action",
+    activity: copy.tabActivity ?? "Activity",
+    configuration: copy.tabDetails ?? "Details",
+  };
   const [activeTab, setActiveTab] = useState<
     NodeDetailPanelState["tabs"][number]
   >(detail.tabs[0] ?? "result");
@@ -577,29 +639,29 @@ export function TaskWorkspaceNodeDetailPanel({
   const node = currentNode;
   const orderedTabs = TAB_ORDER.filter((tab) => detail.tabs.includes(tab));
   const isDrawer = variant === "drawer";
-  const drawerNodeTitle = detail.title || node.title || "Selected node";
+  const drawerNodeTitle = detail.title || node.title || (copy.selectedNode ?? "Selected node");
   const tabs = (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as NodeDetailPanelState["tabs"][number])} className="min-h-0 flex-1 gap-0">
-      <TabsList aria-label="Node detail tabs" className="flex h-auto justify-start gap-1 rounded-none border-b border-border/70 bg-card/70 px-2.5 py-1.5">
+      <TabsList aria-label={copy.nodeDetailTabsAria ?? "Node detail tabs"} className="flex h-auto justify-start gap-1 rounded-none border-b border-border/70 bg-card/70 px-2.5 py-1.5">
         {orderedTabs.map((tab) => (
-          <TabsTrigger key={tab} value={tab} className="flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm" onClick={() => setActiveTab(tab)}>
-            {TAB_LABELS[tab]}
+          <TabsTrigger key={tab} value={tab} onClick={() => setActiveTab(tab)} className="flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm">
+            {tabLabels[tab]}
           </TabsTrigger>
         ))}
       </TabsList>
 
-      <TabsContent value="result" aria-label={`${TAB_LABELS.result} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
+      <TabsContent value="result" aria-label={`${tabLabels.result} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
         <ResultTab node={node} />
       </TabsContent>
-      <TabsContent value="activity" aria-label={`${TAB_LABELS.activity} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
+      <TabsContent value="activity" aria-label={`${tabLabels.activity} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
         <WorkspaceActivityFeed
           activity={activity}
           runtimeEvents={runtimeEvents}
           title={taskWorkspaceActivityMessages.nodeTitle}
-          emptyMessage={isActivityLoading ? "Loading node activity..." : taskWorkspaceActivityMessages.nodeEmpty}
+          emptyMessage={isActivityLoading ? (copy.loadingNodeActivity ?? "Loading node activity...") : taskWorkspaceActivityMessages.nodeEmpty}
         />
       </TabsContent>
-      <TabsContent value="action" aria-label={`${TAB_LABELS.action} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
+      <TabsContent value="action" aria-label={`${tabLabels.action} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
         <WorkspaceNodeActionControls
           node={node}
           disabledActionReason={detail.disabledActionReason}
@@ -607,7 +669,7 @@ export function TaskWorkspaceNodeDetailPanel({
           onSubmitCheckpointAction={onSubmitCheckpointAction}
         />
       </TabsContent>
-      <TabsContent value="configuration" aria-label={`${TAB_LABELS.configuration} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
+      <TabsContent value="configuration" aria-label={`${tabLabels.configuration} tab`} className={cn("min-h-0 flex-1 overflow-y-auto bg-muted/40 p-2", variant === "rail" && "max-h-none")}>
         <ConfigurationTab node={node} nodes={selectedNodes} />
       </TabsContent>
     </Tabs>
@@ -619,7 +681,7 @@ export function TaskWorkspaceNodeDetailPanel({
         <button
           id="task-workspace-node-actions"
           type="button"
-          aria-label="Open selected node drawer"
+          aria-label={copy.openNodeDrawer ?? "Open selected node drawer"}
           data-node-detail-drawer="true"
           onClick={() => onDrawerSizeChange?.("expanded")}
           className="pointer-events-auto flex h-[52px] w-full min-w-0 items-center justify-between gap-2 rounded-[1.35rem] border border-border/70 bg-card/95 px-2.5 py-1.5 text-left shadow-lg backdrop-blur transition hover:border-primary/40 hover:bg-primary-soft"
@@ -639,20 +701,7 @@ export function TaskWorkspaceNodeDetailPanel({
             </span>
           </span>
           <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <span className="hidden sm:inline">Auto-refresh</span>
-            <span
-              className={cn(
-                "h-5 w-9 rounded-full p-0.5",
-                detail.autoRefreshEnabled ? "bg-primary" : "bg-muted",
-              )}
-            >
-              <span
-                className={cn(
-                  "block size-4 rounded-full bg-background transition-transform",
-                  detail.autoRefreshEnabled && "translate-x-4",
-                )}
-              />
-            </span>
+            <AutoRefreshIndicator enabled={detail.autoRefreshEnabled} />
             <span className="flex size-7 items-center justify-center rounded-full border border-primary/30 bg-primary-soft text-primary">
               <ChevronUp />
             </span>
@@ -664,7 +713,7 @@ export function TaskWorkspaceNodeDetailPanel({
     return (
       <section
         id="task-workspace-node-actions"
-        aria-label="Current node details"
+        aria-label={copy.currentNodeDetails ?? "Current node details"}
         data-node-detail-drawer="true"
         className="pointer-events-auto fixed inset-x-2 bottom-2 z-50 mx-auto flex h-[min(72vh,680px)] max-w-[calc(100vw-1rem)] select-text flex-col overflow-hidden rounded-[1.35rem] border border-border/70 bg-card/95 text-sm text-popover-foreground shadow-xl backdrop-blur"
         style={drawerFrame ? { left: drawerFrame.left, right: "auto", width: drawerFrame.width } : undefined}
@@ -688,23 +737,8 @@ export function TaskWorkspaceNodeDetailPanel({
                 Inspect result, activity, actions, and details for the selected plan node.
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <span className="hidden sm:inline">Auto-refresh</span>
-              <span
-                className={cn(
-                  "h-5 w-9 rounded-full p-0.5",
-                  detail.autoRefreshEnabled ? "bg-primary" : "bg-muted",
-                )}
-              >
-                <span
-                  className={cn(
-                    "block size-4 rounded-full bg-background transition-transform",
-                    detail.autoRefreshEnabled && "translate-x-4",
-                  )}
-                />
-              </span>
-            </div>
-            <Button type="button" variant="ghost" size="icon-xs" aria-label="Close selected node drawer" className="rounded-full" onClick={() => onDrawerSizeChange?.("collapsed")}>
+            <AutoRefreshIndicator enabled={detail.autoRefreshEnabled} />
+            <Button type="button" variant="ghost" size="icon-xs" aria-label={copy.closeNodeDrawer ?? "Close selected node drawer"} className="rounded-full" onClick={() => onDrawerSizeChange?.("collapsed")}>
               <X />
             </Button>
           </div>
@@ -717,7 +751,7 @@ export function TaskWorkspaceNodeDetailPanel({
   return (
     <section
       id="task-workspace-node-actions"
-      aria-label="Current node details"
+      aria-label={copy.currentNodeDetails ?? "Current node details"}
       className={cn(
         "flex min-w-0 scroll-mt-2 flex-col overflow-hidden backdrop-blur",
         variant === "rail"
@@ -743,22 +777,7 @@ export function TaskWorkspaceNodeDetailPanel({
             Step {detail.stepPosition}
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <span className="hidden sm:inline">Auto-refresh</span>
-          <span
-            className={cn(
-              "h-5 w-9 rounded-full p-0.5",
-              detail.autoRefreshEnabled ? "bg-primary" : "bg-muted",
-            )}
-          >
-            <span
-              className={cn(
-                "block size-4 rounded-full bg-background transition-transform",
-                detail.autoRefreshEnabled && "translate-x-4",
-              )}
-            />
-          </span>
-        </div>
+        <AutoRefreshIndicator enabled={detail.autoRefreshEnabled} />
       </div>
 
       {tabs}

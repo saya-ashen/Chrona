@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
+import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
@@ -25,6 +26,10 @@ import {
   createTaskWorkspaceExecutionConsoleView,
   type TaskExecutionDispatchResult,
 } from "../model/task-workspace-query";
+import {
+  dispatchInputForPrimaryAction,
+  resolveCommandCenterPrimaryAction,
+} from "../model/task-workspace-primary-action";
 import { loadNodeWorkspaceActivityPage } from "../model/task-workspace-actions";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
@@ -75,53 +80,6 @@ function graphNodeIdForAction(action: TaskAction | null | undefined, pageData: T
     ?? null;
 }
 
-function dispatchInputForPrimaryAction(
-  action: TaskAction,
-  nodeId: string | null,
-): ExecutionActionInput | null {
-  switch (action.type) {
-    case "start":
-      return { action: "start_manual" };
-    case "retry_sync":
-      return nodeId ? { action: "retry_node", nodeId } : null;
-    case "resume":
-      return { action: "resume_after_unblock", ...(nodeId ? { nodeId } : {}) };
-    case "cancel":
-      return { action: "cancel_session" };
-    case "pause":
-      return { action: "pause_session" };
-    case "provide_input":
-    case "approve":
-    case "replan":
-    case "none":
-    case "cancel_execution":
-    case "replan_from_node":
-    case "repair_inconsistency":
-      return null;
-  }
-}
-
-function primaryActionTone(action: TaskAction): CommandCenterPrimaryAction["tone"] {
-  switch (action.type) {
-    case "retry_sync":
-    case "cancel":
-    case "cancel_execution":
-      return "critical";
-    case "provide_input":
-    case "approve":
-    case "resume":
-    case "replan":
-    case "replan_from_node":
-      return "warning";
-    case "start":
-      return "success";
-    case "pause":
-    case "none":
-    case "repair_inconsistency":
-      return "neutral";
-  }
-}
-
 function isNodeDetailDrawerTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
 
@@ -131,7 +89,7 @@ function isNodeDetailDrawerTarget(target: EventTarget | null) {
 function isPlanGraphTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
 
-  return Boolean(target.closest(".react-flow__node,.react-flow__edge,.react-flow__controls"));
+  return Boolean(target.closest("[data-plan-graph-surface]"));
 }
 
 type TaskWorkspacePlanSectionProps = {
@@ -191,16 +149,26 @@ export function TaskWorkspacePlanSection({
   const shouldAutoOpenDrawerRef = useRef(false);
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
-  const consoleView = createTaskWorkspaceExecutionConsoleView({
-    pageData,
-    graphPlan,
-    selectedNode: selectedPlanNode,
-  });
-  const operationConsoleView = createTaskWorkspaceExecutionConsoleView({
-    pageData,
-    graphPlan,
-    selectedNode: null,
-  });
+  const { messages } = useI18n();
+  const copy = messages.components?.taskWorkspace ?? {};
+  const consoleView = useMemo(
+    () => createTaskWorkspaceExecutionConsoleView({
+      pageData,
+      graphPlan,
+      selectedNode: selectedPlanNode,
+      copy,
+    }),
+    [pageData, graphPlan, selectedPlanNode, copy],
+  );
+  const operationConsoleView = useMemo(
+    () => createTaskWorkspaceExecutionConsoleView({
+      pageData,
+      graphPlan,
+      selectedNode: null,
+      copy,
+    }),
+    [pageData, graphPlan, copy],
+  );
   const stateMessage =
     consoleView.states.errorMessage ??
     (consoleView.states.isPermissionLimited
@@ -210,7 +178,7 @@ export function TaskWorkspacePlanSection({
       ? consoleView.states.treatment.guidance
       : null) ??
     (planGenerationStatus === "generating"
-      ? "Generating a fresh plan. The graph will update when the run completes."
+      ? (copy.generatingFreshPlan ?? "Generating a fresh plan. The graph will update when the run completes.")
       : null);
   const recoveryActions = pageData.reconciliation?.repairActions ?? [];
   const recoveryIssue = pageData.reconciliation?.issues.find((issue) => issue.severity === "error") ?? null;
@@ -263,38 +231,53 @@ export function TaskWorkspacePlanSection({
   const handleRegeneratePlan = () => {
     onGeneratePlan({ userInstruction: regenerationInstruction });
   };
-  const primaryAction: CommandCenterPrimaryAction = !plan
-    ? {
-        label: isGeneratingPlan ? "Generating..." : "Generate plan",
-        description: isGeneratingPlan
-          ? "A fresh plan is being generated for this task."
-          : "Create an execution plan before starting task work.",
-        statusLabel: planGenerationStatus,
-        tone: "info",
-        disabled: isGeneratingPlan,
-        isLoading: isGeneratingPlan,
-        onClick: () => onGeneratePlan(),
-      }
-    : isPlanAwaitingAcceptance
+  const primaryActionDescriptor = resolveCommandCenterPrimaryAction({
+    hasPlan: Boolean(plan),
+    planStatus: plan?.status ?? null,
+    isPlanAwaitingAcceptance,
+    planGenerationStatus,
+    isGeneratingPlan,
+    hasTaskCompleted,
+    hasGraphExecutionStarted,
+    shouldUseTaskPrimaryAction,
+    taskPrimaryAction,
+    shouldShowCurrentOperation: shouldShowCurrentOperation && Boolean(currentOperationNode),
+    currentOperationStatusLabel: currentOperationNode?.statusLabel ?? currentOperationNode?.status ?? null,
+    currentOperationDescription: currentOperationNode?.nextAction ?? currentOperationNode?.summary ?? null,
+    currentOperationTone: operationConsoleView.attention?.tone ?? operationConsoleView.readiness.tone,
+    primaryStateLabel: consoleView.header.primaryStateLabel ?? null,
+    taskStatus: pageData.task.status,
+    runnabilitySummary: pageData.task.runnabilitySummary || null,
+    blockActionRequired: pageData.task.blockReason?.actionRequired ?? null,
+    blockType: pageData.task.blockReason?.blockType ?? null,
+  });
+  const primaryAction: CommandCenterPrimaryAction = {
+    ...primaryActionDescriptor,
+    ...(primaryActionDescriptor.kind === "generate"
+      ? { onClick: () => onGeneratePlan() }
+      : {}),
+    ...(primaryActionDescriptor.kind === "task-primary-action" && primaryActionDispatch
+      ? { onClick: () => void onDispatchExecutionAction(primaryActionDispatch) }
+      : {}),
+    ...(primaryActionDescriptor.kind === "start-plan"
+      ? { onClick: () => void onDispatchExecutionAction({ action: "start_manual" }) }
+      : {}),
+    ...(primaryActionDescriptor.kind === "accept-or-regenerate" && plan
       ? {
-          label: "Accept or regenerate plan",
-          description: "Review this draft plan. Accept it to enable execution, or regenerate it with user instructions.",
-          statusLabel: planGenerationStatus === "waiting_acceptance" ? planGenerationStatus : plan.status,
-          tone: "info",
           actionControls: (
             <div className="space-y-3">
               {visibleGenerationInstruction ? (
-                <div className="rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-950">
-                  <div className="font-semibold">User instruction for this plan revision</div>
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-foreground">
+                  <div className="font-semibold">{copy.instructionLabel ?? "User instruction for this plan revision"}</div>
                   <p className="mt-1 whitespace-pre-wrap leading-relaxed">{visibleGenerationInstruction}</p>
                 </div>
               ) : null}
               <Textarea
                 value={regenerationInstruction}
                 onChange={(event) => setRegenerationInstruction(event.target.value)}
-                placeholder="Tell Chrona what to change in the regenerated plan..."
+                placeholder={copy.instructionPlaceholder ?? "Tell Chrona what to change in the regenerated plan..."}
                 className="min-h-24 resize-y rounded-xl bg-background text-sm"
-                aria-label="Plan regeneration instruction"
+                aria-label={copy.instructionAria ?? "Plan regeneration instruction"}
               />
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -304,7 +287,7 @@ export function TaskWorkspacePlanSection({
                   disabled={!canAcceptPlan}
                   onClick={() => void onApplyPlan(plan)}
                 >
-                  Accept plan
+                  {copy.accept ?? "Accept plan"}
                 </Button>
                 <Button
                   type="button"
@@ -314,62 +297,28 @@ export function TaskWorkspacePlanSection({
                   disabled={isGeneratingPlan}
                   onClick={handleRegeneratePlan}
                 >
-                  {isGeneratingPlan ? "Generating..." : "Regenerate with instruction"}
+                  {isGeneratingPlan ? (copy.generating ?? "Generating...") : (copy.regenerateWithInstruction ?? "Regenerate with instruction")}
                 </Button>
               </div>
               {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
             </div>
           ),
         }
-    : hasTaskCompleted
+      : {}),
+    ...(primaryActionDescriptor.kind === "current-operation" && currentOperationNode
       ? {
-          label: "Task completed",
-          description: "Execution has finished. Review the result, artifacts, or activity history if needed.",
-          statusLabel: consoleView.header.primaryStateLabel ?? pageData.task.status,
-          tone: "success",
-          suppressAttentionCard: true,
+          actionControls: (
+            <WorkspaceNodeActionControls
+              node={currentOperationNode}
+              disabledActionReason={operationConsoleView.nodeDetail.disabledActionReason}
+              onDispatchExecutionAction={onDispatchExecutionAction}
+              onSubmitCheckpointAction={onSubmitCheckpointAction}
+              className="border-0 bg-transparent p-0 shadow-none"
+            />
+          ),
         }
-    : shouldUseTaskPrimaryAction && taskPrimaryAction
-           ? {
-               label: taskPrimaryAction.label,
-               description: pageData.task.runnabilitySummary || pageData.task.blockReason?.actionRequired || "Complete the required execution action to continue the accepted plan.",
-               statusLabel: pageData.task.blockReason?.blockType ?? consoleView.header.primaryStateLabel ?? pageData.task.status,
-               tone: primaryActionTone(taskPrimaryAction),
-               onClick: primaryActionDispatch
-                 ? () => void onDispatchExecutionAction(primaryActionDispatch)
-                 : undefined,
-             }
-        : !hasGraphExecutionStarted
-            ? {
-               label: "Start plan",
-               description: "Run the accepted plan and move into the first executable step.",
-               statusLabel: plan.status,
-               tone: "success",
-               onClick: () => void onDispatchExecutionAction({ action: "start_manual" }),
-             }
-        : shouldShowCurrentOperation && currentOperationNode
-          ? {
-              label: "Current node action",
-              description: currentOperationNode.nextAction ?? currentOperationNode.summary ?? "Complete the current node action to continue.",
-              statusLabel: currentOperationNode.statusLabel ?? currentOperationNode.status,
-              tone: operationConsoleView.attention?.tone ?? operationConsoleView.readiness.tone,
-              actionControls: (
-                  <WorkspaceNodeActionControls
-                    node={currentOperationNode}
-                    disabledActionReason={operationConsoleView.nodeDetail.disabledActionReason}
-                    onDispatchExecutionAction={onDispatchExecutionAction}
-                    onSubmitCheckpointAction={onSubmitCheckpointAction}
-                    className="border-0 bg-transparent p-0 shadow-none"
-                  />
-              ),
-            }
-        : {
-            label: "No current operation",
-            description: "The accepted plan is running, but the engine has not returned an actionable checkpoint yet.",
-            statusLabel: consoleView.header.primaryStateLabel ?? pageData.task.status,
-            tone: "neutral",
-            suppressAttentionCard: true,
-          };
+      : {}),
+  };
   const handlePlanNodeChange = useCallback((
     node: PlanNodeDataModel | null,
     nodes: PlanNodeDataModel[],
@@ -439,7 +388,7 @@ export function TaskWorkspacePlanSection({
 
   return (
     <section
-      aria-label="Task execution workspace"
+      aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
       className="relative flex flex-col overflow-visible rounded-[1.5rem] border border-border/70 bg-[radial-gradient(circle_at_18%_0%,color-mix(in_oklab,var(--primary)_14%,transparent),transparent_34%),radial-gradient(circle_at_82%_6%,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_30%),linear-gradient(135deg,color-mix(in_oklab,var(--card)_98%,transparent),color-mix(in_oklab,var(--muted)_60%,var(--card))_46%,var(--card))] p-2 pb-0 shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
       <div className="pointer-events-none absolute inset-x-8 top-0 h-32 rounded-full bg-primary/15 blur-3xl" />
@@ -457,20 +406,22 @@ export function TaskWorkspacePlanSection({
           className="relative mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-sm"
           role="alert"
         >
-          <div className="font-semibold">Recovery needed</div>
+          <div className="font-semibold">{copy.recoveryNeeded ?? "Recovery needed"}</div>
           <div className="mt-0.5">{recoveryIssue.message}</div>
           {recoveryActions.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {recoveryActions.map((action) => (
-                <button
+                <Button
                   key={action.type}
                   type="button"
-                  className="rounded-lg bg-destructive px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 rounded-lg px-2.5 text-xs"
                   disabled={!action.enabled}
                   onClick={() => focusNodeActions(recoveryCurrentNodeId)}
                 >
                   {action.label}
-                </button>
+                </Button>
               ))}
             </div>
           ) : null}
@@ -479,7 +430,11 @@ export function TaskWorkspacePlanSection({
 
       <div className="relative flex min-h-[700px] flex-1 flex-col gap-2 xl:min-h-0">
         <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
-          <section aria-label="Execution flow" className="min-h-0 min-w-0">
+          <section
+            aria-label={copy.executionFlow ?? "Execution flow"}
+            className="min-h-0 min-w-0"
+            data-plan-graph-surface
+          >
             <TaskWorkspacePlanContent
               label={label}
               graphPlan={graphPlan}
@@ -494,7 +449,7 @@ export function TaskWorkspacePlanSection({
 
           <aside
             className="min-h-0 space-y-2 overflow-y-auto rounded-[1.2rem] border border-border/70 bg-card/82 p-2 shadow-sm backdrop-blur"
-            aria-label="Task command center"
+            aria-label={copy.commandCenterAria ?? "Task command center"}
           >
             <TaskWorkspaceExecutionOverview
               readiness={consoleView.readiness}

@@ -124,35 +124,6 @@ export type TaskHeaderAction = {
   disabledReason?: string;
 };
 
-export type WorkspaceActionDecision = "keep-working" | "wire" | "disable-with-reason" | "convert-to-info" | "remove";
-
-export type WorkspaceComponentInventoryItem = {
-  id: string;
-  region: string;
-  filePath: string;
-  controlLabel: string;
-  decision: WorkspaceActionDecision;
-  evidence: string;
-};
-
-export type WorkspaceActionInventory = {
-  featureId: string;
-  auditedAt: string;
-  items: WorkspaceComponentInventoryItem[];
-};
-
-export type WorkspaceActionContract = {
-  id: string;
-  trigger: string;
-  availability: "available" | "disabled" | "removed" | "informational";
-  disabledReason?: string;
-  progressLabel?: string;
-  successLabel?: string;
-  failureLabel?: string;
-  preventsDuplicateSubmission: boolean;
-  refreshesData: boolean;
-};
-
 export type TaskWorkspaceState = {
   taskId: string;
   selectedNodeId: string | null;
@@ -162,7 +133,6 @@ export type TaskWorkspaceState = {
 };
 
 export type TaskHeaderView = {
-  breadcrumb: string[];
   title: string;
   canEditTitle: boolean;
   status: TaskWorkspaceUserStatus;
@@ -170,56 +140,9 @@ export type TaskHeaderView = {
   totalSteps: number;
   progressPercent: number;
   actions: TaskHeaderAction[];
-  memberContext: {
-    memberLabel: string;
-    notificationCount: number;
-  };
   primaryStateLabel?: string;
   primaryActionLabel?: string | null;
   currentNodeId?: string | null;
-};
-
-export type WorkspaceNavigationView = {
-  brandName: string;
-  primarySections: Array<{
-    id: string;
-    label: string;
-    active: boolean;
-  }>;
-  activeSection: string;
-  notificationCount: number;
-  settingsAvailable: boolean;
-  memberIdentity: string;
-};
-
-export type ExecutionFlowView = {
-  nodes: Array<{
-    id: string;
-    stepNumber: number;
-    title: string;
-    status: TaskWorkspaceUserStatus;
-    timestampLabel: string;
-    hasArtifacts: boolean;
-    artifactCount: number;
-    requiresHumanAction: boolean;
-    dependencyIds: string[];
-  }>;
-  connections: Array<{
-    id: string;
-    from: string;
-    to: string;
-  }>;
-  selectedNodeId: string | null;
-  legend: Array<{
-    status: TaskWorkspaceUserStatus;
-    label: string;
-  }>;
-  controls: {
-    canZoom: boolean;
-    canFit: boolean;
-    canCenter: boolean;
-    canExpand: boolean;
-  };
 };
 
 export type ExecutionOverviewTone = "neutral" | "info" | "success" | "warning" | "critical";
@@ -323,8 +246,6 @@ export type NodeDetailPanelState = {
 export type TaskWorkspaceExecutionConsoleView = {
   task: TaskData;
   header: TaskHeaderView;
-  navigation: WorkspaceNavigationView;
-  executionFlow: ExecutionFlowView;
   graphPlan: TaskPlanGraphPlan | null;
   progress: ProgressSummary;
   nodeDetail: NodeDetailPanelState;

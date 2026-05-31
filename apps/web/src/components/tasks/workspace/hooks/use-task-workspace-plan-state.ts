@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/rpc-client";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
@@ -306,13 +307,9 @@ type WorkspaceCommandAck = {
 };
 
 async function dispatchWorkspaceCommand(taskId: string, body: Record<string, unknown>) {
-  const response = await fetch(`/api/work/${taskId}/commands`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(body),
+  const response = await api.work[":taskId"].commands.$post({
+    param: { taskId },
+    json: body as never,
   });
 
   if (!response.ok) {
@@ -320,7 +317,7 @@ async function dispatchWorkspaceCommand(taskId: string, body: Record<string, unk
     throw new Error((err as { error?: string }).error ?? "Failed to dispatch workspace command");
   }
 
-  return await response.json() as WorkspaceCommandAck;
+  return await response.json() as unknown as WorkspaceCommandAck;
 }
 
 export function useTaskWorkspacePlanState(

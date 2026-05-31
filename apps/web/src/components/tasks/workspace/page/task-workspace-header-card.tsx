@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
+import { useI18n } from "@chrona/i18n/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -36,11 +37,6 @@ function userStatusTone(status: TaskHeaderView["status"]) {
   if (status === "approval-needed") return "secondary" as const;
   if (status === "blocked") return "destructive" as const;
   return "outline" as const;
-}
-
-function userStatusLabel(status: TaskHeaderView["status"]) {
-  if (status === "approval-needed") return "Approval needed";
-  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 function shouldShowPersistedTaskStatus(taskStatus: string, primaryStatusLabel: string) {
@@ -101,16 +97,21 @@ export function TaskWorkspaceHeaderCard({
   onCancelDeleteConfirm,
   onDelete,
 }: TaskWorkspaceHeaderCardProps) {
+  const { messages } = useI18n();
+  const copy = messages.components?.taskWorkspace ?? {};
   const [pendingActionId, setPendingActionId] = useState<TaskHeaderAction["id"] | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const visibleActions = header.actions.filter((action) => action.id !== "more");
-  const primaryStatusLabel = header.primaryStateLabel ?? userStatusLabel(header.status);
+  const primaryStatusLabel = header.primaryStateLabel
+    ?? (header.status === "approval-needed"
+      ? copy.approvalNeeded
+      : header.status.charAt(0).toUpperCase() + header.status.slice(1));
   const showTaskStatus = shouldShowPersistedTaskStatus(task.status, primaryStatusLabel);
   const menuItems: TaskActionsMenuItem[] = [
     ...(header.canEditTitle
       ? [{
           id: "edit",
-          label: "Edit",
+          label: copy.edit ?? "Edit",
           icon: Pencil,
           onSelect: onEdit,
         }]
@@ -132,7 +133,7 @@ export function TaskWorkspaceHeaderCard({
       : []),
     {
       id: "delete",
-      label: "Delete Task",
+      label: copy.deleteTask ?? "Delete Task",
       icon: Trash2,
       destructive: true,
       onSelect: onStartDeleteConfirm,
@@ -145,9 +146,9 @@ export function TaskWorkspaceHeaderCard({
     setActionStatus(null);
     try {
       await onAction(action);
-      setActionStatus(`${action.label} request sent.`);
+      setActionStatus(`${action.label} ${copy.requestSentSuffix ?? "request sent."}`);
     } catch (error) {
-      setActionStatus(error instanceof Error ? error.message : `Failed to ${action.label.toLowerCase()}.`);
+      setActionStatus(error instanceof Error ? error.message : `${copy.actionFailedPrefix ?? "Failed to"} ${action.label.toLowerCase()}.`);
     } finally {
       setPendingActionId(null);
     }
@@ -180,7 +181,7 @@ export function TaskWorkspaceHeaderCard({
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span>
-              {header.totalSteps} steps · {header.completedSteps} accepted · {header.progressPercent}%
+              {header.totalSteps} {copy.stepsUnit ?? "steps"} · {header.completedSteps} {copy.acceptedUnit ?? "accepted"} · {header.progressPercent}%
               {header.primaryActionLabel ? ` · ${header.primaryActionLabel}` : ""}
             </span>
             {workspaceStateGuidance ? (
@@ -224,7 +225,7 @@ export function TaskWorkspaceHeaderCard({
               </Button>
             );
           })}
-          <TaskActionsMenu label="More task actions" items={menuItems} />
+          <TaskActionsMenu label={copy.moreActions ?? "More task actions"} items={menuItems} />
         </div>
       </CardHeader>
 
@@ -242,9 +243,9 @@ export function TaskWorkspaceHeaderCard({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete &ldquo;{task.title}&rdquo;?</DialogTitle>
+            <DialogTitle>{copy.deleteConfirmTitlePrefix ?? "Delete"} &ldquo;{task.title}&rdquo;{copy.deleteConfirmTitleSuffix ?? "?"}</DialogTitle>
             <DialogDescription>
-              This will permanently delete the task and cannot be undone.
+              {copy.deleteConfirmDescription ?? "This will permanently delete the task and cannot be undone."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -254,7 +255,7 @@ export function TaskWorkspaceHeaderCard({
               variant="outline"
               disabled={isDeleting}
             >
-              Cancel
+              {copy.cancel ?? "Cancel"}
             </Button>
             <Button
               type="button"
@@ -262,7 +263,7 @@ export function TaskWorkspaceHeaderCard({
               variant="destructive"
               disabled={isDeleting}
             >
-              {isDeleting ? "Deleting..." : "Delete task"}
+              {isDeleting ? (copy.deleting ?? "Deleting...") : (copy.deleteTaskConfirm ?? "Delete task")}
             </Button>
           </DialogFooter>
         </DialogContent>

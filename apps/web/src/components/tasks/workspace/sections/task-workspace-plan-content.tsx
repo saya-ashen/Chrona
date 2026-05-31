@@ -1,4 +1,5 @@
 import { Loader2, Sparkles } from "lucide-react";
+import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -28,6 +29,8 @@ export function TaskWorkspacePlanContent({
   onGeneratePlan,
   onSelectedNodeChange,
 }: TaskWorkspacePlanContentProps) {
+  const { messages } = useI18n();
+  const copy = messages.components?.taskWorkspace ?? {};
   const planSummary = graphPlan && plan
     ? `${plan.status} / ${graphPlan.nodes.length} steps / ${graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`
     : null;
@@ -40,7 +43,11 @@ export function TaskWorkspacePlanContent({
       variant="secondary" size="sm" className="rounded-xl"
     >
       {isGeneratingPlan ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-      {isGeneratingPlan ? "Generating..." : plan ? "Regenerate plan" : "Generate plan"}
+      {isGeneratingPlan
+        ? (copy.generating ?? "Generating...")
+        : plan
+          ? (copy.regeneratePlan ?? "Regenerate plan")
+          : (copy.generatePlan ?? "Generate plan")}
     </Button>
   );
 
@@ -73,7 +80,9 @@ export function TaskWorkspacePlanContent({
             {isGraphPlanPending ? null : generatePlanButton}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-muted/40 px-5 text-center text-sm text-muted-foreground">
-            {isGraphPlanPending ? "Preparing plan graph..." : "The plan graph will appear here once AI generates a plan."}
+            {isGraphPlanPending
+              ? (copy.preparingPlanGraph ?? "Preparing plan graph...")
+              : (copy.planGraphPlaceholder ?? "The plan graph will appear here once AI generates a plan.")}
           </div>
         </Card>
       )}
