@@ -61,6 +61,11 @@ export type TaskListRouteData = {
       runStatus: string | null;
       isRunnable: boolean;
     } | null;
+    source: {
+      source: "external_calendar";
+      sourceName: string;
+      sourceColor: string;
+    } | null;
   }[];
   workspaceId: string;
   total: number;

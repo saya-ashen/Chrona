@@ -93,10 +93,18 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
 
   const where = buildWhere(input);
 
-  const [tasks, total, counts] = await Promise.all([
+  const [rows, total, counts] = await Promise.all([
     db.task.findMany({
       where,
-      include: { projection: true },
+      include: {
+        projection: true,
+        importedCalendarEvents: {
+          take: 1,
+          include: {
+            calendarSource: { select: { name: true, color: true } },
+          },
+        },
+      },
       orderBy: { [sortField]: order },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -106,6 +114,23 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
     // so every filter tab shows its own total.
     computeCounts(input.workspaceId, input.search),
   ]);
+
+  // Derive the task source from a linked imported calendar event so the UI can
+  // mark externally-synced tasks. Tasks created in Chrona have no linked event
+  // and report a null source (fully editable).
+  const tasks = rows.map(({ importedCalendarEvents, ...task }) => {
+    const importedEvent = importedCalendarEvents[0] ?? null;
+    return {
+      ...task,
+      source: importedEvent
+        ? {
+            source: "external_calendar" as const,
+            sourceName: importedEvent.calendarSource.name,
+            sourceColor: importedEvent.calendarSource.color,
+          }
+        : null,
+    };
+  });
 
   return {
     tasks,

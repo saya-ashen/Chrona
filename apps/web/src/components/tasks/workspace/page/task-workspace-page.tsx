@@ -322,6 +322,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             defaultExecutionRuntime: data.defaultExecutionRuntime,
             isSaving,
             taskConfigInitialValues,
+            sourceManaged: consoleView.task.sourceManaged,
             saveSuccess,
             saveError,
             editSummary,

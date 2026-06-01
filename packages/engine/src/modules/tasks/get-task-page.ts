@@ -595,6 +595,12 @@ export async function getTaskPage(taskId: string) {
       workspace: {
         select: { defaultRuntime: true },
       },
+      importedCalendarEvents: {
+        take: 1,
+        include: {
+          calendarSource: { select: { name: true, color: true } },
+        },
+      },
       dependencies: {
         include: {
           dependsOnTask: {
@@ -606,6 +612,17 @@ export async function getTaskPage(taskId: string) {
   });
 
   const latestRun = task.runs[0] ?? null;
+  const importedEvent = task.importedCalendarEvents[0] ?? null;
+  const sourceManaged = importedEvent
+    ? {
+        source: "external_calendar" as const,
+        eventId: importedEvent.id,
+        sourceName: importedEvent.calendarSource.name,
+        sourceColor: importedEvent.calendarSource.color,
+        description: importedEvent.description,
+        immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+      }
+    : null;
   const runnability = deriveTaskRunnability({
     executionRuntime: task.executionRuntime || task.workspace.defaultRuntime,
     executionConfig: task.executionConfig,
@@ -632,7 +649,11 @@ export async function getTaskPage(taskId: string) {
       id: task.id,
       workspaceId: task.workspaceId,
       title: task.title,
-      description: task.description,
+      description:
+        importedEvent && task.description === importedEvent.description
+          ? null
+          : task.description,
+      sourceManaged,
       executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig,
       autoPlanGeneration: task.autoPlanGeneration,

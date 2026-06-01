@@ -23,6 +23,14 @@ export type TaskData = {
   scheduledEndAt: string | null;
   scheduleStatus: string;
   scheduleSource: string | null;
+  sourceManaged?: {
+    source: "external_calendar";
+    eventId: string;
+    sourceName: string;
+    sourceColor: string;
+    description: string | null;
+    immutableFields: readonly ["title", "scheduledStartAt", "scheduledEndAt"];
+  } | null;
   isRunnable: boolean;
   runnabilitySummary: string;
   runnabilityState?: string;

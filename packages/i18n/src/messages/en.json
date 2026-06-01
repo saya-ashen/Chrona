@@ -1015,6 +1015,8 @@
     },
     "taskWorkspace": {
       "approvalNeeded": "Approval needed",
+      "externalSourceTitle": "Synced from {source}. Title and time are managed by the calendar source.",
+      "externalLockedHint": "Synced from {source}. Title and time are managed by the calendar source.",
       "edit": "Edit",
       "deleteTask": "Delete Task",
       "moreActions": "More task actions",
@@ -1261,6 +1263,7 @@
       "duePrefix": "Due",
       "updatedPrefix": "Updated",
       "recurringBadge": "Recurring",
+      "externalSourceTitle": "Synced from {source}. Title and time are managed by the calendar source.",
       "emptyFiltered": "No tasks match the current filter.",
       "relativeJustNow": "just now",
       "relativeMinutesAgo": "{count}m ago",

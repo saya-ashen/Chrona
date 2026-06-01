@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
+import { CalendarDays, Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -178,6 +178,20 @@ export function TaskWorkspaceHeaderCard({
             <Badge variant={priorityTone(task.priority)}>
               {task.priority}
             </Badge>
+            {task.sourceManaged ? (
+              <Badge
+                variant="outline"
+                className="gap-1"
+                title={(copy.externalSourceTitle ?? "Synced from {source}. Title and time are managed by the calendar source.").replace("{source}", task.sourceManaged.sourceName)}
+              >
+                <span
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: task.sourceManaged.sourceColor }}
+                />
+                <CalendarDays className="size-3" />
+                {task.sourceManaged.sourceName}
+              </Badge>
+            ) : null}
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span>

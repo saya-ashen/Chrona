@@ -1015,6 +1015,8 @@
     },
     "taskWorkspace": {
       "approvalNeeded": "等待审批",
+      "externalSourceTitle": "同步自 {source}。标题和时间由日历来源管理。",
+      "externalLockedHint": "同步自 {source}。标题和时间由日历来源管理。",
       "edit": "编辑",
       "deleteTask": "删除任务",
       "moreActions": "更多任务操作",
@@ -1261,6 +1263,7 @@
       "duePrefix": "截止",
       "updatedPrefix": "更新",
       "recurringBadge": "循环",
+      "externalSourceTitle": "同步自 {source}。标题和时间由日历来源管理。",
       "emptyFiltered": "当前筛选下没有匹配任务。",
       "relativeJustNow": "刚刚",
       "relativeMinutesAgo": "{count} 分钟前",

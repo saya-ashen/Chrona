@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  CalendarDays,
   ExternalLink,
   Play,
   Repeat,
@@ -50,6 +51,11 @@ type TaskItem = {
   projection: {
     runStatus: string | null;
     isRunnable: boolean;
+  } | null;
+  source: {
+    source: "external_calendar";
+    sourceName: string;
+    sourceColor: string;
   } | null;
 };
 
@@ -291,6 +297,21 @@ function TaskRow({
               <Badge variant="outline" className="gap-1">
                 <Repeat className="size-3" />
                 {copy.recurringBadge}
+              </Badge>
+            )}
+            {task.source?.source === "external_calendar" && (
+              <Badge
+                variant="outline"
+                className="gap-1"
+                title={copy.externalSourceTitle.replace("{source}", task.source.sourceName)}
+              >
+                <span
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: task.source.sourceColor }}
+                  aria-hidden="true"
+                />
+                <CalendarDays className="size-3" />
+                {task.source.sourceName}
               </Badge>
             )}
             {task.projection?.runStatus && task.projection.runStatus !== "idle" && (

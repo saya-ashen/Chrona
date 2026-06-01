@@ -46,6 +46,7 @@ import {
   snapMinuteToGrid,
 } from "@/components/schedule/schedule-page-utils";
 import { type TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
+import { CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { externalCalendarMessages } from "@/lib/i18n/messages";
@@ -576,6 +577,19 @@ export function DayTimeline({
           <p className="truncate text-xs text-muted-foreground">
             {formatTimeRange(info.event.start, info.event.end, locale, copy)}
           </p>
+          {item.sourceManaged ? (
+            <span
+              className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground"
+              title={externalCalendarMessages.readOnlyLabel}
+            >
+              <span
+                className="size-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: item.sourceManaged.sourceColor }}
+              />
+              <CalendarDays className="size-3 shrink-0" />
+              <span className="truncate">{item.sourceManaged.sourceName}</span>
+            </span>
+          ) : null}
           {hasConflict || item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
             <div className="flex flex-wrap gap-1 text-[10px]">
               {hasConflict ? <Badge variant="destructive">{copy.conflictPreviewLabel}</Badge> : null}
@@ -698,7 +712,8 @@ export function DayTimeline({
             select={handleDateSelect}
             eventClick={(info) => {
               info.jsEvent.preventDefault();
-              onSelectTask(info.event.id);
+              const clicked = selectedItemById.get(info.event.id);
+              onSelectTask(clicked?.taskId ?? info.event.id);
             }}
             eventDragStart={(info) => setHiddenTaskId(info.event.id)}
             eventDragStop={() => {

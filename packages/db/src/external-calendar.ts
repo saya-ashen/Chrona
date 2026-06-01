@@ -381,6 +381,7 @@ export function listImportedCalendarEventsInRange(
       startsAt: { lt: to },
       endsAt: { gt: from },
       calendarSource: { lifecycleState: "active" },
+      workBlockId: null,
     },
     include: { calendarSource: true },
     orderBy: { startsAt: "asc" },
