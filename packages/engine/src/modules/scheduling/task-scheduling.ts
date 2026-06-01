@@ -4,6 +4,7 @@ import { startAutoStartScheduler } from "./auto-start-runner";
 import { clearSchedule } from "./clear-schedule";
 import { decideScheduleProposal } from "./decide-schedule-proposal";
 import { getSchedulePage } from "./get-schedule-page";
+import { moveWorkBlock } from "./move-work-block";
 import { proposeSchedule } from "./propose-schedule";
 
 export class TaskScheduling {
@@ -13,6 +14,10 @@ export class TaskScheduling {
 
   clear(input: Parameters<typeof clearSchedule>[0]) {
     return clearSchedule(input);
+  }
+
+  moveWorkBlock(input: Parameters<typeof moveWorkBlock>[0]) {
+    return moveWorkBlock(input);
   }
 
   propose(input: Parameters<typeof proposeSchedule>[0]) {

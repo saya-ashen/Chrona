@@ -73,6 +73,9 @@ buildScheduleViewHref: (...args: any[]) => string;
           executionConfig: {},
           scheduledStartAt: input.scheduledStartAt,
           scheduledEndAt: input.scheduledEndAt,
+          recurrenceRule: input.recurrenceRule,
+          recurrenceAnchorStartAt: input.recurrenceAnchorStartAt,
+          recurrenceAnchorEndAt: input.recurrenceAnchorEndAt,
         });
         onCloseQuickAdd();
       }}

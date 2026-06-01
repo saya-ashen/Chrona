@@ -26,9 +26,11 @@ function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
 export function createTaskBodySchemaForSupportedRuntimes(
   supportedRuntimes: readonly string[],
 ) {
-  return createTaskBodySchema.extend({
-    executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
-  });
+  return refineRecurrenceAnchors(
+    createTaskBodySchema.extend({
+      executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
+    }),
+  );
 }
 
 export function updateTaskBodySchemaForSupportedRuntimes(
@@ -118,7 +120,30 @@ export const createTaskBodySchema = z.object({
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   parentTaskId: z.string().nullable().optional(),
+  recurrenceRule: z.string().trim().min(1).nullable().optional(),
+  recurrenceAnchorStartAt: z.string().datetime().nullable().optional(),
+  recurrenceAnchorEndAt: z.string().datetime().nullable().optional(),
 });
+
+/** Recurrence requires both schedule anchors so we can materialize occurrences. */
+export function refineRecurrenceAnchors<
+  T extends z.ZodType<{
+    recurrenceRule?: string | null;
+    recurrenceAnchorStartAt?: string | null;
+    recurrenceAnchorEndAt?: string | null;
+  }>,
+>(schema: T) {
+  return schema.refine(
+    (body) =>
+      !body.recurrenceRule ||
+      (Boolean(body.recurrenceAnchorStartAt) && Boolean(body.recurrenceAnchorEndAt)),
+    {
+      message:
+        "recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set",
+      path: ["recurrenceAnchorStartAt"],
+    },
+  );
+}
 
 // ── PATCH /tasks/:taskId ──
 export const updateTaskParamSchema = z.object({

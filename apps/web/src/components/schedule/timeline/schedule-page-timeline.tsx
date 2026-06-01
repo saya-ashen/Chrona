@@ -73,6 +73,7 @@ function buildDragItem(item: ScheduledItem, startAt: Date, endAt: Date): Timelin
   return {
     kind: "scheduled",
     taskId: item.taskId,
+    workBlockId: item.workBlockId,
     title: item.title,
     dueAt: item.dueAt,
     durationMinutes: Math.max(
@@ -116,6 +117,9 @@ function TimelineComposer({
           executionConfig: {},
           scheduledStartAt: input.scheduledStartAt,
           scheduledEndAt: input.scheduledEndAt,
+          recurrenceRule: input.recurrenceRule,
+          recurrenceAnchorStartAt: input.recurrenceAnchorStartAt,
+          recurrenceAnchorEndAt: input.recurrenceAnchorEndAt,
         });
       }}
     />
@@ -165,7 +169,7 @@ export function DayTimeline({
   const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components?.schedulePage);
   const selectedItemById = useMemo(
-    () => new Map(items.map((item) => [item.taskId, item])),
+    () => new Map(items.map((item) => [item.workBlockId ?? item.taskId, item])),
     [items],
   );
   const calendarRef = useRef<FullCalendar | null>(null);
@@ -217,7 +221,7 @@ export function DayTimeline({
     const hasConflict = conflictTaskIds?.has(item.taskId) ?? false;
 
     return {
-      id: item.taskId,
+      id: item.workBlockId ?? item.taskId,
       title: item.title,
       start,
       end,
@@ -374,6 +378,7 @@ export function DayTimeline({
       {
         kind: "scheduled",
         taskId: item.taskId,
+        workBlockId: item.workBlockId,
         title: item.title,
         dueAt: item.dueAt,
         durationMinutes: preview.endMinute - preview.startMinute,
@@ -410,6 +415,7 @@ export function DayTimeline({
           {
             kind: "scheduled",
             taskId: item.taskId,
+            workBlockId: item.workBlockId,
             title: item.title,
             dueAt: item.dueAt,
             durationMinutes: preview.endMinute - preview.startMinute,

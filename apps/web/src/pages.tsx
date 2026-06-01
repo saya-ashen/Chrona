@@ -53,6 +53,8 @@ export type TaskListRouteData = {
     description: string | null;
     status: string;
     priority: string;
+    kind: string;
+    recurrenceRule: string | null;
     dueAt: string | null;
     updatedAt: string;
     projection: {

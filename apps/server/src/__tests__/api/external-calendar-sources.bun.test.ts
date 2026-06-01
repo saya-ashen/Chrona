@@ -99,7 +99,7 @@ describe("External calendar source API", () => {
 
     const importedEvents = await db.importedCalendarEvent.findMany({
       where: { workspaceId },
-      include: { task: { include: { workBlocks: true } } },
+      include: { task: true, workBlock: true },
       orderBy: { startsAt: "asc" },
     });
 
@@ -109,7 +109,33 @@ describe("External calendar source API", () => {
       "2026-05-19T14:00:00.000Z",
     ]);
     expect(importedEvents.every((event: { recurrenceId: string | null }) => event.recurrenceId)).toBe(true);
-    expect(importedEvents.every((event: { task: { workBlocks: unknown[] } | null }) => event.task?.workBlocks.length === 1)).toBe(true);
+
+    // All occurrences collapse into a single recurring series task.
+    const seriesTaskIds = new Set(importedEvents.map((event: { taskId: string | null }) => event.taskId));
+    expect(seriesTaskIds.size).toBe(1);
+
+    const tasks = await db.task.findMany({
+      where: { workspaceId },
+      include: { workBlocks: true },
+    });
+    expect(tasks.length).toBe(1);
+    const seriesTask = tasks[0];
+    expect(seriesTask.kind).toBe("recurring");
+    expect(seriesTask.recurrenceRule).toContain("FREQ=WEEKLY");
+    expect(seriesTask.seriesExternalUid).toBe("recurring-planning@example.test");
+
+    // One work block per occurrence, each linked back to its imported event.
+    expect(seriesTask.workBlocks.length).toBe(3);
+    expect(
+      seriesTask.workBlocks
+        .map((block: { scheduledStartAt: Date }) => block.scheduledStartAt.toISOString())
+        .sort(),
+    ).toEqual([
+      "2026-05-05T14:00:00.000Z",
+      "2026-05-12T14:00:00.000Z",
+      "2026-05-19T14:00:00.000Z",
+    ]);
+    expect(importedEvents.every((event: { workBlockId: string | null }) => event.workBlockId)).toBe(true);
   });
 
   it("rejects unsupported URLs without saving", async () => {

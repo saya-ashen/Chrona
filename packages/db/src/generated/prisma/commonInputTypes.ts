@@ -273,6 +273,13 @@ export type EnumCalendarEventStatusWithAggregatesFilter<$PrismaModel = never> = 
   _max?: Prisma.NestedEnumCalendarEventStatusFilter<$PrismaModel>
 }
 
+export type EnumTaskKindFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaskKind | Prisma.EnumTaskKindFieldRefInput<$PrismaModel>
+  in?: $Enums.TaskKind[]
+  notIn?: $Enums.TaskKind[]
+  not?: Prisma.NestedEnumTaskKindFilter<$PrismaModel> | $Enums.TaskKind
+}
+
 export type JsonFilter<$PrismaModel = never> =
 | Prisma.PatchUndefined<
     Prisma.Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
@@ -323,6 +330,16 @@ export type JsonNullableFilterBase<$PrismaModel = never> = {
   array_starts_with?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel> | null
   array_ends_with?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel> | null
   not?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel> | Prisma.JsonNullValueFilter
+}
+
+export type EnumTaskKindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaskKind | Prisma.EnumTaskKindFieldRefInput<$PrismaModel>
+  in?: $Enums.TaskKind[]
+  notIn?: $Enums.TaskKind[]
+  not?: Prisma.NestedEnumTaskKindWithAggregatesFilter<$PrismaModel> | $Enums.TaskKind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTaskKindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTaskKindFilter<$PrismaModel>
 }
 
 export type JsonWithAggregatesFilter<$PrismaModel = never> =
@@ -957,6 +974,13 @@ export type NestedEnumCalendarEventStatusWithAggregatesFilter<$PrismaModel = nev
   _max?: Prisma.NestedEnumCalendarEventStatusFilter<$PrismaModel>
 }
 
+export type NestedEnumTaskKindFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaskKind | Prisma.EnumTaskKindFieldRefInput<$PrismaModel>
+  in?: $Enums.TaskKind[]
+  notIn?: $Enums.TaskKind[]
+  not?: Prisma.NestedEnumTaskKindFilter<$PrismaModel> | $Enums.TaskKind
+}
+
 export type NestedEnumTaskStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.TaskStatus | Prisma.EnumTaskStatusFieldRefInput<$PrismaModel>
   in?: $Enums.TaskStatus[]
@@ -969,6 +993,16 @@ export type NestedEnumTaskPriorityFilter<$PrismaModel = never> = {
   in?: $Enums.TaskPriority[]
   notIn?: $Enums.TaskPriority[]
   not?: Prisma.NestedEnumTaskPriorityFilter<$PrismaModel> | $Enums.TaskPriority
+}
+
+export type NestedEnumTaskKindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TaskKind | Prisma.EnumTaskKindFieldRefInput<$PrismaModel>
+  in?: $Enums.TaskKind[]
+  notIn?: $Enums.TaskKind[]
+  not?: Prisma.NestedEnumTaskKindWithAggregatesFilter<$PrismaModel> | $Enums.TaskKind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTaskKindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTaskKindFilter<$PrismaModel>
 }
 
 export type NestedJsonFilter<$PrismaModel = never> =

@@ -1,6 +1,7 @@
 import {
   applySchedule,
   createTaskFromSchedule,
+  moveWorkBlock,
   updateTaskConfigFromSchedule,
 } from "@/lib/task-actions-client";
 import {
@@ -129,6 +130,28 @@ function patchScheduledWindow(
       item.taskId === taskId
         ? applyScheduleToListItem(item, startAt, endAt)
         : item,
+    ),
+  };
+}
+
+function patchWorkBlockWindow(
+  current: SchedulePageData,
+  workBlockId: string,
+  startAt: Date,
+  endAt: Date,
+): SchedulePageData {
+  return {
+    ...current,
+    scheduled: sortScheduledItems(
+      current.scheduled.map((item) =>
+        item.workBlockId === workBlockId
+          ? {
+              ...item,
+              scheduledStartAt: startAt,
+              scheduledEndAt: endAt,
+            }
+          : item,
+      ),
     ),
   };
 }
@@ -269,18 +292,32 @@ export async function handleScheduleDropAction({
     }
 
     if (item.kind === "scheduled") {
-      applyOptimisticViewData((current) =>
-        patchScheduledWindow(current, item.taskId, startAt, endAt, item.dueAt),
-      );
+      if (item.workBlockId) {
+        applyOptimisticViewData((current) =>
+          patchWorkBlockWindow(current, item.workBlockId!, startAt, endAt),
+        );
+      } else {
+        applyOptimisticViewData((current) =>
+          patchScheduledWindow(current, item.taskId, startAt, endAt, item.dueAt),
+        );
+      }
     }
 
-    await applySchedule({
-      taskId: item.taskId,
-      dueAt: item.dueAt ?? null,
-      scheduledStartAt: startAt,
-      scheduledEndAt: endAt,
-      scheduleSource: "human",
-    });
+    if (item.kind === "scheduled" && item.workBlockId) {
+      await moveWorkBlock({
+        workBlockId: item.workBlockId,
+        scheduledStartAt: startAt,
+        scheduledEndAt: endAt,
+      });
+    } else {
+      await applySchedule({
+        taskId: item.taskId,
+        dueAt: item.dueAt ?? null,
+        scheduledStartAt: startAt,
+        scheduledEndAt: endAt,
+        scheduleSource: "human",
+      });
+    }
 
     await refreshProjection();
   } catch (error) {
@@ -356,6 +393,9 @@ export async function handleCreateTaskBlockAction({
       autoExecuteTiming: input.autoExecuteTiming,
       executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
+      recurrenceRule: input.recurrenceRule ?? null,
+      recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? null,
+      recurrenceAnchorEndAt: input.recurrenceAnchorEndAt ?? null,
     })) as { taskId: string };
 
     const createdItem = createScheduledItemFromCreateInput(

@@ -122,7 +122,7 @@ type TaskConfigSelectOption = {
   label: string;
 };
 
-function TaskConfigField({
+export function TaskConfigField({
   label,
   hint,
   tooltip,
@@ -158,7 +158,7 @@ function TaskConfigField({
   );
 }
 
-function InfoPopover({ label, content }: { label: string; content: string }) {
+export function InfoPopover({ label, content }: { label: string; content: string }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -184,7 +184,7 @@ function InfoPopover({ label, content }: { label: string; content: string }) {
   );
 }
 
-function TaskConfigSection({
+export function TaskConfigSection({
   title,
   info,
   actions,
@@ -211,7 +211,7 @@ function TaskConfigSection({
   );
 }
 
-function TaskConfigSelect({
+export function TaskConfigSelect({
   name,
   id,
   value,
@@ -263,7 +263,7 @@ function TaskConfigSelect({
   );
 }
 
-function TaskConfigDatePicker({
+export function TaskConfigDatePicker({
   name,
   value,
   placeholder,

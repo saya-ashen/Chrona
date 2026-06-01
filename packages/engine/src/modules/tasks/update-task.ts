@@ -80,7 +80,7 @@ export async function updateTask(
       },
     },
   });
-  const importedCalendarEvent = await db.importedCalendarEvent.findUnique({
+  const importedCalendarEvent = await db.importedCalendarEvent.findFirst({
     where: { taskId: input.taskId },
     select: { title: true },
   });

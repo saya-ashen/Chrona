@@ -982,6 +982,18 @@
       "cancel": "Cancel",
       "save": "Save",
       "saving": "Saving...",
+      "autoPlanGeneration": "Auto-generate plan",
+      "autoPlanGenerationDescription": "Automatically generate an execution plan after saving. Required when auto-execute is enabled.",
+      "recurrence": "Repeat",
+      "recurrenceDescription": "Schedule this task at a recurring interval.",
+      "recurrencePresets": {
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "custom": "Custom..."
+      },
+      "recurrenceCustomLabel": "RRULE",
+      "recurrenceCustomPlaceholder": "e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR",
       "priorities": {
         "Low": "Low",
         "Medium": "Medium",
@@ -1248,6 +1260,7 @@
       "deleting": "Deleting...",
       "duePrefix": "Due",
       "updatedPrefix": "Updated",
+      "recurringBadge": "Recurring",
       "emptyFiltered": "No tasks match the current filter.",
       "relativeJustNow": "just now",
       "relativeMinutesAgo": "{count}m ago",

@@ -37,10 +37,26 @@ async function seedImportedEvent(input: {
   endsAt: Date;
   status?: "confirmed" | "tentative" | "cancelled";
 }) {
+  // Busy blocks surface recurring-series occurrences, so link each seeded
+  // event to a recurring task the way the importer does.
+  const task = await db.task.create({
+    data: {
+      workspaceId: input.workspaceId,
+      title: input.title,
+      executionRuntime: "debug",
+      executionConfig: {},
+      status: "Ready",
+      priority: "Medium",
+      kind: "recurring",
+      recurrenceRule: "FREQ=WEEKLY",
+      seriesExternalUid: crypto.randomUUID(),
+    },
+  });
   return await db.importedCalendarEvent.create({
     data: {
       workspaceId: input.workspaceId,
       calendarSourceId: input.calendarSourceId,
+      taskId: task.id,
       externalUid: crypto.randomUUID(),
       dedupeKey: crypto.randomUUID(),
       title: input.title,
@@ -138,12 +154,14 @@ describe("External calendar event API", () => {
       endsAt: new Date("2026-04-15T10:00:00.000Z"),
     });
 
+    const before = await db.task.count({ where: { workspaceId } });
+
     await app().request(
       `http://local/api/workspaces/${workspaceId}/calendar-events?from=2026-04-15&to=2026-04-16`,
     );
 
-    const tasks: Array<{ title: string }> = await db.task.findMany({ where: { workspaceId }, select: { title: true } });
-    expect(tasks.map((task) => task.title)).toEqual(["Existing task"]);
+    const after = await db.task.count({ where: { workspaceId } });
+    expect(after).toBe(before);
   });
 
   it("rejects invalid date ranges", async () => {

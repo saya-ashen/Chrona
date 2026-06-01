@@ -19,7 +19,7 @@ export async function applySchedule(input: {
     where: { id: input.taskId },
     select: { id: true, workspaceId: true, title: true, updatedAt: true },
   });
-  const importedCalendarEvent = await db.importedCalendarEvent.findUnique({
+  const importedCalendarEvent = await db.importedCalendarEvent.findFirst({
     where: { taskId: input.taskId },
     select: { startsAt: true, endsAt: true },
   });

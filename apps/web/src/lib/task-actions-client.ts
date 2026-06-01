@@ -1,4 +1,5 @@
 import { api } from "./rpc-client";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "./access-key";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 
@@ -30,6 +31,9 @@ export function createTaskFromSchedule(input: {
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
   parentTaskId?: string | null;
+  recurrenceRule?: string | null;
+  recurrenceAnchorStartAt?: string | null;
+  recurrenceAnchorEndAt?: string | null;
 }) {
   return api.tasks
     .$post({
@@ -50,6 +54,9 @@ export function createTaskFromSchedule(input: {
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
         parentTaskId: input.parentTaskId,
+        recurrenceRule: input.recurrenceRule ?? undefined,
+        recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? undefined,
+        recurrenceAnchorEndAt: input.recurrenceAnchorEndAt ?? undefined,
       },
     })
     .then(parseActionResponse);
@@ -129,6 +136,24 @@ export function clearSchedule(input: { taskId: string }) {
       param: { taskId: input.taskId },
     })
     .then(parseActionResponse);
+}
+
+export function moveWorkBlock(input: {
+  workBlockId: string;
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+}) {
+  return fetch(`/api/tasks/work-blocks/${encodeURIComponent(input.workBlockId)}/schedule`, {
+    method: "PUT",
+    headers: buildAccessKeyHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      scheduledStartAt: input.scheduledStartAt.toISOString(),
+      scheduledEndAt: input.scheduledEndAt.toISOString(),
+    }),
+  }).then(async (res) => {
+    handleUnauthorizedResponse(res);
+    return parseActionResponse(res);
+  });
 }
 
 export function decideScheduleProposal(input: {

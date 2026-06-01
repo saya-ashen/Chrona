@@ -72,6 +72,7 @@ export type ScheduleAiPlanGenerationStatus =
 
 export type ScheduleRecord = {
   taskId: string;
+  workBlockId?: string;
   workspaceId: string;
   title: string;
   description: string | null;
@@ -304,6 +305,7 @@ export type TimelineResizeDraft = TimelinePlacementPreview & {
 export type TimelineDragItem = {
   kind: "queue" | "scheduled";
   taskId: string;
+  workBlockId?: string;
   title: string;
   dueAt: Date | null | undefined;
   durationMinutes: number;
@@ -322,6 +324,9 @@ export type TimelineCreateInput = {
   dueAt: Date | null;
   scheduledStartAt: Date;
   scheduledEndAt: Date;
+  recurrenceRule?: string | null;
+  recurrenceAnchorStartAt?: string | null;
+  recurrenceAnchorEndAt?: string | null;
 };
 
 export type QuickCreateDraft = {

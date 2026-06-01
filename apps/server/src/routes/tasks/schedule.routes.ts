@@ -9,6 +9,8 @@ import {
   scheduleProposalParamSchema,
   scheduleProposalBodySchema,
   scheduleProposalDecisionBodySchema,
+  workBlockScheduleParamSchema,
+  workBlockScheduleBodySchema,
 } from "@chrona/contracts/api";
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
@@ -92,6 +94,35 @@ export function createTaskScheduleRoutes(engine: ChronaEngine) {
             "DELETE /api/tasks/:taskId/schedule",
             cause,
             "Failed to clear schedule",
+          );
+        }
+      },
+    )
+    .put(
+      "/work-blocks/:workBlockId/schedule",
+      zValidator("param", workBlockScheduleParamSchema),
+      zValidator("json", workBlockScheduleBodySchema),
+      async (c) => {
+        try {
+          const { workBlockId } = c.req.valid("param");
+          const body = c.req.valid("json");
+          const result = await engine.tasks.schedule.moveWorkBlock({
+            workBlockId,
+            scheduledStartAt: new Date(body.scheduledStartAt),
+            scheduledEndAt: new Date(body.scheduledEndAt),
+          });
+
+          return json(c, result);
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) {
+            return error(c, httpError.message, httpError.status);
+          }
+          return internalServerError(
+            c,
+            "PUT /api/work-blocks/:workBlockId/schedule",
+            cause,
+            "Failed to move work block",
           );
         }
       },

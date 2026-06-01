@@ -958,6 +958,18 @@
       "cancel": "取消",
       "save": "保存",
       "saving": "保存中...",
+      "autoPlanGeneration": "自动生成计划",
+      "autoPlanGenerationDescription": "保存后自动生成任务执行计划。开启自动执行时强制生效。",
+      "recurrence": "重复",
+      "recurrenceDescription": "按固定间隔循环安排此任务。",
+      "recurrencePresets": {
+        "daily": "每天",
+        "weekly": "每周",
+        "monthly": "每月",
+        "custom": "自定义..."
+      },
+      "recurrenceCustomLabel": "RRULE",
+      "recurrenceCustomPlaceholder": "例如 FREQ=WEEKLY;BYDAY=MO,WE,FR",
       "priorities": {
         "Low": "低",
         "Medium": "中",
@@ -1248,6 +1260,7 @@
       "deleting": "删除中...",
       "duePrefix": "截止",
       "updatedPrefix": "更新",
+      "recurringBadge": "循环",
       "emptyFiltered": "当前筛选下没有匹配任务。",
       "relativeJustNow": "刚刚",
       "relativeMinutesAgo": "{count} 分钟前",

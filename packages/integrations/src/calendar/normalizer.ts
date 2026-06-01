@@ -4,6 +4,7 @@ import type { CalendarEventStatus } from "@chrona/contracts";
 export type NormalizedCalendarEvent = {
   externalUid: string;
   recurrenceId?: string | null;
+  recurrenceRule: string | null;
   dedupeKey: string;
   title: string;
   description: string | null;
@@ -58,10 +59,22 @@ function recurrenceIdFrom(event: ICAL.Event) {
   return recurrenceId ? recurrenceId.toString() : null;
 }
 
-function toNormalizedEvent(event: ICAL.Event, startsAt: Date, endsAt: Date, recurrenceId: string | null): NormalizedCalendarEvent {
+function recurrenceRuleFrom(event: ICAL.Event): string | null {
+  const rrule = event.component.getFirstPropertyValue("rrule");
+  return rrule ? rrule.toString() : null;
+}
+
+function toNormalizedEvent(
+  event: ICAL.Event,
+  startsAt: Date,
+  endsAt: Date,
+  recurrenceId: string | null,
+  recurrenceRule: string | null,
+): NormalizedCalendarEvent {
   return {
     externalUid: event.uid,
     recurrenceId,
+    recurrenceRule,
     dedupeKey: eventDedupeKey(event, recurrenceId, startsAt),
     title: event.summary || "Untitled external event",
     description: eventDescription(event),
@@ -87,6 +100,7 @@ function recurringRangeFor(event: ICAL.Event, range?: ParseCalendarRange): Parse
 function expandRecurringEvent(event: ICAL.Event, range?: ParseCalendarRange) {
   const effectiveRange = recurringRangeFor(event, range);
   const maxOccurrences = effectiveRange.maxOccurrences ?? DEFAULT_MAX_RECURRING_OCCURRENCES;
+  const recurrenceRule = recurrenceRuleFrom(event);
   const iterator = event.iterator();
   const events: NormalizedCalendarEvent[] = [];
   let scanned = 0;
@@ -106,7 +120,7 @@ function expandRecurringEvent(event: ICAL.Event, range?: ParseCalendarRange) {
     if (overlapsRange(startsAt, endsAt, effectiveRange)) {
       const occurrenceEvent = details.item;
       const recurrenceId = occurrence.toString();
-      events.push(toNormalizedEvent(occurrenceEvent, startsAt, endsAt, recurrenceId));
+      events.push(toNormalizedEvent(occurrenceEvent, startsAt, endsAt, recurrenceId, recurrenceRule));
     }
 
     if (events.length >= maxOccurrences || scanned >= maxOccurrences * 20) break;
@@ -156,7 +170,7 @@ function normalizeDetachedException(exception: ICAL.Event, range?: ParseCalendar
   if (!eventRange) return null;
   if (range && !overlapsRange(eventRange.startsAt, eventRange.endsAt, range)) return null;
 
-  return toNormalizedEvent(exception, eventRange.startsAt, eventRange.endsAt, recurrenceIdFrom(exception));
+  return toNormalizedEvent(exception, eventRange.startsAt, eventRange.endsAt, recurrenceIdFrom(exception), recurrenceRuleFrom(exception));
 }
 
 function normalizeMasterEvent(event: ICAL.Event, range?: ParseCalendarRange) {
@@ -166,7 +180,7 @@ function normalizeMasterEvent(event: ICAL.Event, range?: ParseCalendarRange) {
   if (!eventRange) return [];
   if (range && !overlapsRange(eventRange.startsAt, eventRange.endsAt, range)) return [];
 
-  return [toNormalizedEvent(event, eventRange.startsAt, eventRange.endsAt, recurrenceIdFrom(event))];
+  return [toNormalizedEvent(event, eventRange.startsAt, eventRange.endsAt, recurrenceIdFrom(event), null)];
 }
 
 function normalizeCollectedEvents(collected: CollectedCalendarEvents, range?: ParseCalendarRange) {

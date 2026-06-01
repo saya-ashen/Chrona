@@ -71,6 +71,9 @@ export function createTasksRoutes(engine: ChronaEngine) {
           autoExecuteTiming: body.autoExecuteTiming,
           executionRuntime: body.executionRuntime,
           executionConfig: body.executionConfig,
+          recurrenceRule: body.recurrenceRule,
+          recurrenceAnchorStartAt: body.recurrenceAnchorStartAt,
+          recurrenceAnchorEndAt: body.recurrenceAnchorEndAt,
         });
 
         return json(c, result, 201);

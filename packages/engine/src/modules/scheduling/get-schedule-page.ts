@@ -33,21 +33,24 @@ function mapProjectionItem(
       autoExecute: boolean;
       autoPlanGenerationTiming: string;
       autoExecuteTiming: string;
-      importedCalendarEvent: {
+      kind: string;
+      recurrenceRule: string | null;
+      importedCalendarEvents: Array<{
         id: string;
         description: string | null;
         calendarSource: { name: string; color: string };
-      } | null;
+      }>;
     };
   },
 ) {
+  const importedEvent = item.task.importedCalendarEvents[0] ?? null;
   return {
     taskId: item.taskId,
     workspaceId: item.workspaceId,
     parentTaskId: item.task.parentTaskId,
     title: item.task.title,
     description:
-      item.task.importedCalendarEvent && item.task.description === item.task.importedCalendarEvent.description
+      importedEvent && item.task.description === importedEvent.description
         ? null
         : item.task.description,
     priority: item.task.priority,
@@ -67,13 +70,15 @@ function mapProjectionItem(
     autoExecute: item.task.autoExecute,
     autoPlanGenerationTiming: item.task.autoPlanGenerationTiming,
     autoExecuteTiming: item.task.autoExecuteTiming,
-    sourceManaged: item.task.importedCalendarEvent
+    kind: item.task.kind,
+    recurrenceRule: item.task.recurrenceRule,
+    sourceManaged: importedEvent
       ? {
           source: "external_calendar" as const,
-          eventId: item.task.importedCalendarEvent.id,
-          sourceName: item.task.importedCalendarEvent.calendarSource.name,
-          sourceColor: item.task.importedCalendarEvent.calendarSource.color,
-          description: item.task.importedCalendarEvent.description,
+          eventId: importedEvent.id,
+          sourceName: importedEvent.calendarSource.name,
+          sourceColor: importedEvent.calendarSource.color,
+          description: importedEvent.description,
           immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
         }
       : null,
@@ -324,8 +329,9 @@ export async function getSchedulePage(workspaceId: string) {
         task: {
           include: {
             workspace: { select: { defaultRuntime: true } },
-            importedCalendarEvent: {
+            importedCalendarEvents: {
               include: { calendarSource: { select: { name: true, color: true } } },
+              orderBy: { startsAt: "asc" },
             },
           },
         },
@@ -397,7 +403,7 @@ export async function getSchedulePage(workspaceId: string) {
   );
 
   const scheduled = topLevelItems
-    .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
+    .filter((item) => item.kind !== "recurring" && item.scheduledStartAt && item.scheduledEndAt)
     .map((item) => item);
 
   const unscheduled = topLevelItems
@@ -433,22 +439,37 @@ export async function getSchedulePage(workspaceId: string) {
     scheduledEndAt: proposal.scheduledEndAt,
   }));
 
-  const planningSummary = buildPlanningSummary({
-    scheduled,
-    unscheduled,
-    risks,
-    proposals: mappedProposals,
-  });
-  const focusZones = buildFocusZones(scheduled);
-  const automationCandidates = await buildAutomationCandidates({
-    scheduled,
-    unscheduled,
-    risks,
-    proposals: topLevelProposals,
-  });
-
   const workBlocks = await db.workBlock.findMany({
     where: { workspaceId, status: { in: ["Scheduled", "Active"] } },
+    include: {
+      task: {
+        select: {
+          kind: true,
+          title: true,
+          description: true,
+          priority: true,
+          executionRuntime: true,
+          executionConfig: true,
+          autoPlanGeneration: true,
+          autoExecute: true,
+          autoPlanGenerationTiming: true,
+          autoExecuteTiming: true,
+          recurrenceRule: true,
+          parentTaskId: true,
+          importedCalendarEvents: {
+            include: { calendarSource: { select: { name: true, color: true } } },
+            take: 1,
+          },
+        },
+      },
+      importedCalendarEvent: {
+        select: {
+          id: true,
+          description: true,
+          calendarSource: { select: { name: true, color: true } },
+        },
+      },
+    },
     orderBy: { scheduledStartAt: "asc" },
   });
 
@@ -464,11 +485,89 @@ export async function getSchedulePage(workspaceId: string) {
     trigger: block.trigger,
   }));
 
+  const recurringWorkBlockItems: Array<
+    ReturnType<typeof mapProjectionItem> & { workBlockId: string }
+  > = [];
+  for (const block of workBlocks) {
+    if (block.task.kind !== "recurring") continue;
+    const task = block.task;
+    const importedEvent = block.importedCalendarEvent ?? null;
+    const executionRuntime = task.executionRuntime || workspace.defaultRuntime;
+    const runnability = deriveTaskRunnability({
+      executionRuntime,
+      executionConfig: task.executionConfig,
+    });
+
+    recurringWorkBlockItems.push({
+      taskId: block.taskId,
+      workBlockId: block.id,
+      workspaceId: block.workspaceId,
+      parentTaskId: task.parentTaskId,
+      title: task.title,
+      kind: "recurring" as const,
+      recurrenceRule: task.recurrenceRule,
+      description: importedEvent
+        ? ((task.description && task.description !== importedEvent.description) ? task.description : null)
+        : task.description,
+      priority: task.priority,
+      persistedStatus: "Scheduled",
+      displayState: null,
+      actionRequired: null,
+      approvalPendingCount: 0,
+      scheduleStatus: "Scheduled",
+      scheduleSource: block.trigger,
+      dueAt: null,
+      scheduledStartAt: block.scheduledStartAt,
+      scheduledEndAt: block.scheduledEndAt,
+      latestRunStatus: null,
+      scheduleProposalCount: 0,
+      lastActivityAt: null,
+      autoPlanGeneration: task.autoPlanGeneration,
+      autoExecute: task.autoExecute,
+      autoPlanGenerationTiming: task.autoPlanGenerationTiming,
+      autoExecuteTiming: task.autoExecuteTiming,
+      executionRuntime,
+      executionConfig: task.executionConfig,
+      isRunnable: runnability.isRunnable,
+      runnabilityState: runnability.state,
+      runnabilitySummary: runnability.summary,
+      sourceManaged: importedEvent
+        ? {
+            source: "external_calendar" as const,
+            eventId: importedEvent.id,
+            sourceName: importedEvent.calendarSource.name,
+            sourceColor: importedEvent.calendarSource.color,
+            description: importedEvent.description,
+            immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+          }
+        : null,
+    });
+  }
+
+  const allScheduled = [
+    ...scheduled,
+    ...recurringWorkBlockItems,
+  ].sort((a, b) => (a.scheduledStartAt?.getTime() ?? 0) - (b.scheduledStartAt?.getTime() ?? 0));
+
+  const planningSummary = buildPlanningSummary({
+    scheduled: allScheduled,
+    unscheduled,
+    risks,
+    proposals: mappedProposals,
+  });
+  const focusZones = buildFocusZones(allScheduled);
+  const automationCandidates = await buildAutomationCandidates({
+    scheduled: allScheduled,
+    unscheduled,
+    risks,
+    proposals: topLevelProposals,
+  });
+
   return {
     defaultExecutionRuntime: workspace.defaultRuntime,
     executionRuntimes,
     summary: {
-      scheduledCount: scheduled.length,
+      scheduledCount: allScheduled.length,
       unscheduledCount: unscheduled.length,
       proposalCount: mappedProposals.length,
       riskCount: risks.length,
@@ -476,7 +575,7 @@ export async function getSchedulePage(workspaceId: string) {
     planningSummary,
     focusZones,
     automationCandidates,
-    scheduled,
+    scheduled: allScheduled,
     unscheduled,
     risks,
     listItems: listItemsWithPlanState,

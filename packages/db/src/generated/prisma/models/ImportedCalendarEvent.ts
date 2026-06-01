@@ -29,8 +29,10 @@ export type ImportedCalendarEventMinAggregateOutputType = {
   workspaceId: string | null
   calendarSourceId: string | null
   taskId: string | null
+  workBlockId: string | null
   externalUid: string | null
   recurrenceId: string | null
+  recurrenceRule: string | null
   dedupeKey: string | null
   title: string | null
   description: string | null
@@ -47,8 +49,10 @@ export type ImportedCalendarEventMaxAggregateOutputType = {
   workspaceId: string | null
   calendarSourceId: string | null
   taskId: string | null
+  workBlockId: string | null
   externalUid: string | null
   recurrenceId: string | null
+  recurrenceRule: string | null
   dedupeKey: string | null
   title: string | null
   description: string | null
@@ -65,8 +69,10 @@ export type ImportedCalendarEventCountAggregateOutputType = {
   workspaceId: number
   calendarSourceId: number
   taskId: number
+  workBlockId: number
   externalUid: number
   recurrenceId: number
+  recurrenceRule: number
   dedupeKey: number
   title: number
   description: number
@@ -85,8 +91,10 @@ export type ImportedCalendarEventMinAggregateInputType = {
   workspaceId?: true
   calendarSourceId?: true
   taskId?: true
+  workBlockId?: true
   externalUid?: true
   recurrenceId?: true
+  recurrenceRule?: true
   dedupeKey?: true
   title?: true
   description?: true
@@ -103,8 +111,10 @@ export type ImportedCalendarEventMaxAggregateInputType = {
   workspaceId?: true
   calendarSourceId?: true
   taskId?: true
+  workBlockId?: true
   externalUid?: true
   recurrenceId?: true
+  recurrenceRule?: true
   dedupeKey?: true
   title?: true
   description?: true
@@ -121,8 +131,10 @@ export type ImportedCalendarEventCountAggregateInputType = {
   workspaceId?: true
   calendarSourceId?: true
   taskId?: true
+  workBlockId?: true
   externalUid?: true
   recurrenceId?: true
+  recurrenceRule?: true
   dedupeKey?: true
   title?: true
   description?: true
@@ -212,8 +224,10 @@ export type ImportedCalendarEventGroupByOutputType = {
   workspaceId: string
   calendarSourceId: string
   taskId: string | null
+  workBlockId: string | null
   externalUid: string
   recurrenceId: string | null
+  recurrenceRule: string | null
   dedupeKey: string
   title: string
   description: string | null
@@ -251,8 +265,10 @@ export type ImportedCalendarEventWhereInput = {
   workspaceId?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   calendarSourceId?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   taskId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
+  workBlockId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
   externalUid?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   recurrenceId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
+  recurrenceRule?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
   dedupeKey?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   title?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   description?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
@@ -265,6 +281,7 @@ export type ImportedCalendarEventWhereInput = {
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   calendarSource?: Prisma.XOR<Prisma.CalendarSourceScalarRelationFilter, Prisma.CalendarSourceWhereInput>
   task?: Prisma.XOR<Prisma.TaskNullableScalarRelationFilter, Prisma.TaskWhereInput> | null
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
 }
 
 export type ImportedCalendarEventOrderByWithRelationInput = {
@@ -272,8 +289,10 @@ export type ImportedCalendarEventOrderByWithRelationInput = {
   workspaceId?: Prisma.SortOrder
   calendarSourceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrderInput | Prisma.SortOrder
+  workBlockId?: Prisma.SortOrderInput | Prisma.SortOrder
   externalUid?: Prisma.SortOrder
   recurrenceId?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrderInput | Prisma.SortOrder
   dedupeKey?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -286,19 +305,22 @@ export type ImportedCalendarEventOrderByWithRelationInput = {
   workspace?: Prisma.WorkspaceOrderByWithRelationInput
   calendarSource?: Prisma.CalendarSourceOrderByWithRelationInput
   task?: Prisma.TaskOrderByWithRelationInput
+  workBlock?: Prisma.WorkBlockOrderByWithRelationInput
 }
 
 export type ImportedCalendarEventWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  taskId?: string
+  workBlockId?: string
   calendarSourceId_dedupeKey?: Prisma.ImportedCalendarEventCalendarSourceIdDedupeKeyCompoundUniqueInput
   AND?: Prisma.ImportedCalendarEventWhereInput | Prisma.ImportedCalendarEventWhereInput[]
   OR?: Prisma.ImportedCalendarEventWhereInput[]
   NOT?: Prisma.ImportedCalendarEventWhereInput | Prisma.ImportedCalendarEventWhereInput[]
   workspaceId?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   calendarSourceId?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
+  taskId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
   externalUid?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   recurrenceId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
+  recurrenceRule?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
   dedupeKey?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   title?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   description?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
@@ -311,15 +333,18 @@ export type ImportedCalendarEventWhereUniqueInput = Prisma.AtLeast<{
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   calendarSource?: Prisma.XOR<Prisma.CalendarSourceScalarRelationFilter, Prisma.CalendarSourceWhereInput>
   task?: Prisma.XOR<Prisma.TaskNullableScalarRelationFilter, Prisma.TaskWhereInput> | null
-}, "id" | "taskId" | "calendarSourceId_dedupeKey">
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
+}, "id" | "workBlockId" | "calendarSourceId_dedupeKey">
 
 export type ImportedCalendarEventOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   calendarSourceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrderInput | Prisma.SortOrder
+  workBlockId?: Prisma.SortOrderInput | Prisma.SortOrder
   externalUid?: Prisma.SortOrder
   recurrenceId?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrderInput | Prisma.SortOrder
   dedupeKey?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -342,8 +367,10 @@ export type ImportedCalendarEventScalarWhereWithAggregatesInput = {
   workspaceId?: Prisma.StringWithAggregatesFilter<"ImportedCalendarEvent"> | string
   calendarSourceId?: Prisma.StringWithAggregatesFilter<"ImportedCalendarEvent"> | string
   taskId?: Prisma.StringNullableWithAggregatesFilter<"ImportedCalendarEvent"> | string | null
+  workBlockId?: Prisma.StringNullableWithAggregatesFilter<"ImportedCalendarEvent"> | string | null
   externalUid?: Prisma.StringWithAggregatesFilter<"ImportedCalendarEvent"> | string
   recurrenceId?: Prisma.StringNullableWithAggregatesFilter<"ImportedCalendarEvent"> | string | null
+  recurrenceRule?: Prisma.StringNullableWithAggregatesFilter<"ImportedCalendarEvent"> | string | null
   dedupeKey?: Prisma.StringWithAggregatesFilter<"ImportedCalendarEvent"> | string
   title?: Prisma.StringWithAggregatesFilter<"ImportedCalendarEvent"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"ImportedCalendarEvent"> | string | null
@@ -359,6 +386,7 @@ export type ImportedCalendarEventCreateInput = {
   id?: string
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -370,7 +398,8 @@ export type ImportedCalendarEventCreateInput = {
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutImportedCalendarEventsInput
   calendarSource: Prisma.CalendarSourceCreateNestedOneWithoutEventsInput
-  task?: Prisma.TaskCreateNestedOneWithoutImportedCalendarEventInput
+  task?: Prisma.TaskCreateNestedOneWithoutImportedCalendarEventsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutImportedCalendarEventInput
 }
 
 export type ImportedCalendarEventUncheckedCreateInput = {
@@ -378,8 +407,10 @@ export type ImportedCalendarEventUncheckedCreateInput = {
   workspaceId: string
   calendarSourceId: string
   taskId?: string | null
+  workBlockId?: string | null
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -395,6 +426,7 @@ export type ImportedCalendarEventUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -406,7 +438,8 @@ export type ImportedCalendarEventUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutImportedCalendarEventsNestedInput
   calendarSource?: Prisma.CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
-  task?: Prisma.TaskUpdateOneWithoutImportedCalendarEventNestedInput
+  task?: Prisma.TaskUpdateOneWithoutImportedCalendarEventsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutImportedCalendarEventNestedInput
 }
 
 export type ImportedCalendarEventUncheckedUpdateInput = {
@@ -414,8 +447,10 @@ export type ImportedCalendarEventUncheckedUpdateInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   calendarSourceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -432,8 +467,10 @@ export type ImportedCalendarEventCreateManyInput = {
   workspaceId: string
   calendarSourceId: string
   taskId?: string | null
+  workBlockId?: string | null
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -449,6 +486,7 @@ export type ImportedCalendarEventUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -465,8 +503,10 @@ export type ImportedCalendarEventUncheckedUpdateManyInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   calendarSourceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -498,8 +538,10 @@ export type ImportedCalendarEventCountOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   calendarSourceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   externalUid?: Prisma.SortOrder
   recurrenceId?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrder
   dedupeKey?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
@@ -516,8 +558,10 @@ export type ImportedCalendarEventMaxOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   calendarSourceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   externalUid?: Prisma.SortOrder
   recurrenceId?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrder
   dedupeKey?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
@@ -534,8 +578,10 @@ export type ImportedCalendarEventMinOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   calendarSourceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   externalUid?: Prisma.SortOrder
   recurrenceId?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrder
   dedupeKey?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
@@ -644,42 +690,85 @@ export type EnumCalendarEventStatusFieldUpdateOperationsInput = {
   set?: $Enums.CalendarEventStatus
 }
 
-export type ImportedCalendarEventCreateNestedOneWithoutTaskInput = {
-  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput>
-  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput
+export type ImportedCalendarEventCreateNestedManyWithoutTaskInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput> | Prisma.ImportedCalendarEventCreateWithoutTaskInput[] | Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput[]
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput | Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput[]
+  createMany?: Prisma.ImportedCalendarEventCreateManyTaskInputEnvelope
+  connect?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+}
+
+export type ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput> | Prisma.ImportedCalendarEventCreateWithoutTaskInput[] | Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput[]
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput | Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput[]
+  createMany?: Prisma.ImportedCalendarEventCreateManyTaskInputEnvelope
+  connect?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+}
+
+export type ImportedCalendarEventUpdateManyWithoutTaskNestedInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput> | Prisma.ImportedCalendarEventCreateWithoutTaskInput[] | Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput[]
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput | Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput[]
+  upsert?: Prisma.ImportedCalendarEventUpsertWithWhereUniqueWithoutTaskInput | Prisma.ImportedCalendarEventUpsertWithWhereUniqueWithoutTaskInput[]
+  createMany?: Prisma.ImportedCalendarEventCreateManyTaskInputEnvelope
+  set?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  disconnect?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  delete?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  connect?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  update?: Prisma.ImportedCalendarEventUpdateWithWhereUniqueWithoutTaskInput | Prisma.ImportedCalendarEventUpdateWithWhereUniqueWithoutTaskInput[]
+  updateMany?: Prisma.ImportedCalendarEventUpdateManyWithWhereWithoutTaskInput | Prisma.ImportedCalendarEventUpdateManyWithWhereWithoutTaskInput[]
+  deleteMany?: Prisma.ImportedCalendarEventScalarWhereInput | Prisma.ImportedCalendarEventScalarWhereInput[]
+}
+
+export type ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput> | Prisma.ImportedCalendarEventCreateWithoutTaskInput[] | Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput[]
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput | Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput[]
+  upsert?: Prisma.ImportedCalendarEventUpsertWithWhereUniqueWithoutTaskInput | Prisma.ImportedCalendarEventUpsertWithWhereUniqueWithoutTaskInput[]
+  createMany?: Prisma.ImportedCalendarEventCreateManyTaskInputEnvelope
+  set?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  disconnect?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  delete?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  connect?: Prisma.ImportedCalendarEventWhereUniqueInput | Prisma.ImportedCalendarEventWhereUniqueInput[]
+  update?: Prisma.ImportedCalendarEventUpdateWithWhereUniqueWithoutTaskInput | Prisma.ImportedCalendarEventUpdateWithWhereUniqueWithoutTaskInput[]
+  updateMany?: Prisma.ImportedCalendarEventUpdateManyWithWhereWithoutTaskInput | Prisma.ImportedCalendarEventUpdateManyWithWhereWithoutTaskInput[]
+  deleteMany?: Prisma.ImportedCalendarEventScalarWhereInput | Prisma.ImportedCalendarEventScalarWhereInput[]
+}
+
+export type ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutWorkBlockInput>
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutWorkBlockInput
   connect?: Prisma.ImportedCalendarEventWhereUniqueInput
 }
 
-export type ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput = {
-  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput>
-  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput
+export type ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutWorkBlockInput>
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutWorkBlockInput
   connect?: Prisma.ImportedCalendarEventWhereUniqueInput
 }
 
-export type ImportedCalendarEventUpdateOneWithoutTaskNestedInput = {
-  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput>
-  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput
-  upsert?: Prisma.ImportedCalendarEventUpsertWithoutTaskInput
+export type ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutWorkBlockInput>
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutWorkBlockInput
+  upsert?: Prisma.ImportedCalendarEventUpsertWithoutWorkBlockInput
   disconnect?: Prisma.ImportedCalendarEventWhereInput | boolean
   delete?: Prisma.ImportedCalendarEventWhereInput | boolean
   connect?: Prisma.ImportedCalendarEventWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.ImportedCalendarEventUpdateToOneWithWhereWithoutTaskInput, Prisma.ImportedCalendarEventUpdateWithoutTaskInput>, Prisma.ImportedCalendarEventUncheckedUpdateWithoutTaskInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ImportedCalendarEventUpdateToOneWithWhereWithoutWorkBlockInput, Prisma.ImportedCalendarEventUpdateWithoutWorkBlockInput>, Prisma.ImportedCalendarEventUncheckedUpdateWithoutWorkBlockInput>
 }
 
-export type ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput = {
-  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput>
-  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutTaskInput
-  upsert?: Prisma.ImportedCalendarEventUpsertWithoutTaskInput
+export type ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput = {
+  create?: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutWorkBlockInput>
+  connectOrCreate?: Prisma.ImportedCalendarEventCreateOrConnectWithoutWorkBlockInput
+  upsert?: Prisma.ImportedCalendarEventUpsertWithoutWorkBlockInput
   disconnect?: Prisma.ImportedCalendarEventWhereInput | boolean
   delete?: Prisma.ImportedCalendarEventWhereInput | boolean
   connect?: Prisma.ImportedCalendarEventWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.ImportedCalendarEventUpdateToOneWithWhereWithoutTaskInput, Prisma.ImportedCalendarEventUpdateWithoutTaskInput>, Prisma.ImportedCalendarEventUncheckedUpdateWithoutTaskInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ImportedCalendarEventUpdateToOneWithWhereWithoutWorkBlockInput, Prisma.ImportedCalendarEventUpdateWithoutWorkBlockInput>, Prisma.ImportedCalendarEventUncheckedUpdateWithoutWorkBlockInput>
 }
 
 export type ImportedCalendarEventCreateWithoutWorkspaceInput = {
   id?: string
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -690,15 +779,18 @@ export type ImportedCalendarEventCreateWithoutWorkspaceInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   calendarSource: Prisma.CalendarSourceCreateNestedOneWithoutEventsInput
-  task?: Prisma.TaskCreateNestedOneWithoutImportedCalendarEventInput
+  task?: Prisma.TaskCreateNestedOneWithoutImportedCalendarEventsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutImportedCalendarEventInput
 }
 
 export type ImportedCalendarEventUncheckedCreateWithoutWorkspaceInput = {
   id?: string
   calendarSourceId: string
   taskId?: string | null
+  workBlockId?: string | null
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -743,8 +835,10 @@ export type ImportedCalendarEventScalarWhereInput = {
   workspaceId?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   calendarSourceId?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   taskId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
+  workBlockId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
   externalUid?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   recurrenceId?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
+  recurrenceRule?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
   dedupeKey?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   title?: Prisma.StringFilter<"ImportedCalendarEvent"> | string
   description?: Prisma.StringNullableFilter<"ImportedCalendarEvent"> | string | null
@@ -760,6 +854,7 @@ export type ImportedCalendarEventCreateWithoutCalendarSourceInput = {
   id?: string
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -770,15 +865,18 @@ export type ImportedCalendarEventCreateWithoutCalendarSourceInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutImportedCalendarEventsInput
-  task?: Prisma.TaskCreateNestedOneWithoutImportedCalendarEventInput
+  task?: Prisma.TaskCreateNestedOneWithoutImportedCalendarEventsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutImportedCalendarEventInput
 }
 
 export type ImportedCalendarEventUncheckedCreateWithoutCalendarSourceInput = {
   id?: string
   workspaceId: string
   taskId?: string | null
+  workBlockId?: string | null
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -819,6 +917,7 @@ export type ImportedCalendarEventCreateWithoutTaskInput = {
   id?: string
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -830,14 +929,17 @@ export type ImportedCalendarEventCreateWithoutTaskInput = {
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutImportedCalendarEventsInput
   calendarSource: Prisma.CalendarSourceCreateNestedOneWithoutEventsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutImportedCalendarEventInput
 }
 
 export type ImportedCalendarEventUncheckedCreateWithoutTaskInput = {
   id?: string
   workspaceId: string
   calendarSourceId: string
+  workBlockId?: string | null
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -854,21 +956,85 @@ export type ImportedCalendarEventCreateOrConnectWithoutTaskInput = {
   create: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput>
 }
 
-export type ImportedCalendarEventUpsertWithoutTaskInput = {
-  update: Prisma.XOR<Prisma.ImportedCalendarEventUpdateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedUpdateWithoutTaskInput>
-  create: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput>
-  where?: Prisma.ImportedCalendarEventWhereInput
+export type ImportedCalendarEventCreateManyTaskInputEnvelope = {
+  data: Prisma.ImportedCalendarEventCreateManyTaskInput | Prisma.ImportedCalendarEventCreateManyTaskInput[]
 }
 
-export type ImportedCalendarEventUpdateToOneWithWhereWithoutTaskInput = {
-  where?: Prisma.ImportedCalendarEventWhereInput
+export type ImportedCalendarEventUpsertWithWhereUniqueWithoutTaskInput = {
+  where: Prisma.ImportedCalendarEventWhereUniqueInput
+  update: Prisma.XOR<Prisma.ImportedCalendarEventUpdateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedUpdateWithoutTaskInput>
+  create: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutTaskInput>
+}
+
+export type ImportedCalendarEventUpdateWithWhereUniqueWithoutTaskInput = {
+  where: Prisma.ImportedCalendarEventWhereUniqueInput
   data: Prisma.XOR<Prisma.ImportedCalendarEventUpdateWithoutTaskInput, Prisma.ImportedCalendarEventUncheckedUpdateWithoutTaskInput>
 }
 
-export type ImportedCalendarEventUpdateWithoutTaskInput = {
+export type ImportedCalendarEventUpdateManyWithWhereWithoutTaskInput = {
+  where: Prisma.ImportedCalendarEventScalarWhereInput
+  data: Prisma.XOR<Prisma.ImportedCalendarEventUpdateManyMutationInput, Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskInput>
+}
+
+export type ImportedCalendarEventCreateWithoutWorkBlockInput = {
+  id?: string
+  externalUid: string
+  recurrenceId?: string | null
+  recurrenceRule?: string | null
+  dedupeKey: string
+  title: string
+  description?: string | null
+  startsAt: Date | string
+  endsAt: Date | string
+  isAllDay?: boolean
+  status?: $Enums.CalendarEventStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutImportedCalendarEventsInput
+  calendarSource: Prisma.CalendarSourceCreateNestedOneWithoutEventsInput
+  task?: Prisma.TaskCreateNestedOneWithoutImportedCalendarEventsInput
+}
+
+export type ImportedCalendarEventUncheckedCreateWithoutWorkBlockInput = {
+  id?: string
+  workspaceId: string
+  calendarSourceId: string
+  taskId?: string | null
+  externalUid: string
+  recurrenceId?: string | null
+  recurrenceRule?: string | null
+  dedupeKey: string
+  title: string
+  description?: string | null
+  startsAt: Date | string
+  endsAt: Date | string
+  isAllDay?: boolean
+  status?: $Enums.CalendarEventStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type ImportedCalendarEventCreateOrConnectWithoutWorkBlockInput = {
+  where: Prisma.ImportedCalendarEventWhereUniqueInput
+  create: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutWorkBlockInput>
+}
+
+export type ImportedCalendarEventUpsertWithoutWorkBlockInput = {
+  update: Prisma.XOR<Prisma.ImportedCalendarEventUpdateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedUpdateWithoutWorkBlockInput>
+  create: Prisma.XOR<Prisma.ImportedCalendarEventCreateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedCreateWithoutWorkBlockInput>
+  where?: Prisma.ImportedCalendarEventWhereInput
+}
+
+export type ImportedCalendarEventUpdateToOneWithWhereWithoutWorkBlockInput = {
+  where?: Prisma.ImportedCalendarEventWhereInput
+  data: Prisma.XOR<Prisma.ImportedCalendarEventUpdateWithoutWorkBlockInput, Prisma.ImportedCalendarEventUncheckedUpdateWithoutWorkBlockInput>
+}
+
+export type ImportedCalendarEventUpdateWithoutWorkBlockInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -880,14 +1046,17 @@ export type ImportedCalendarEventUpdateWithoutTaskInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutImportedCalendarEventsNestedInput
   calendarSource?: Prisma.CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
+  task?: Prisma.TaskUpdateOneWithoutImportedCalendarEventsNestedInput
 }
 
-export type ImportedCalendarEventUncheckedUpdateWithoutTaskInput = {
+export type ImportedCalendarEventUncheckedUpdateWithoutWorkBlockInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   calendarSourceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -903,8 +1072,10 @@ export type ImportedCalendarEventCreateManyWorkspaceInput = {
   id?: string
   calendarSourceId: string
   taskId?: string | null
+  workBlockId?: string | null
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -920,6 +1091,7 @@ export type ImportedCalendarEventUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -930,15 +1102,18 @@ export type ImportedCalendarEventUpdateWithoutWorkspaceInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   calendarSource?: Prisma.CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
-  task?: Prisma.TaskUpdateOneWithoutImportedCalendarEventNestedInput
+  task?: Prisma.TaskUpdateOneWithoutImportedCalendarEventsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutImportedCalendarEventNestedInput
 }
 
 export type ImportedCalendarEventUncheckedUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   calendarSourceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -954,8 +1129,10 @@ export type ImportedCalendarEventUncheckedUpdateManyWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   calendarSourceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -971,8 +1148,10 @@ export type ImportedCalendarEventCreateManyCalendarSourceInput = {
   id?: string
   workspaceId: string
   taskId?: string | null
+  workBlockId?: string | null
   externalUid: string
   recurrenceId?: string | null
+  recurrenceRule?: string | null
   dedupeKey: string
   title: string
   description?: string | null
@@ -988,6 +1167,7 @@ export type ImportedCalendarEventUpdateWithoutCalendarSourceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -998,15 +1178,18 @@ export type ImportedCalendarEventUpdateWithoutCalendarSourceInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutImportedCalendarEventsNestedInput
-  task?: Prisma.TaskUpdateOneWithoutImportedCalendarEventNestedInput
+  task?: Prisma.TaskUpdateOneWithoutImportedCalendarEventsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutImportedCalendarEventNestedInput
 }
 
 export type ImportedCalendarEventUncheckedUpdateWithoutCalendarSourceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1022,8 +1205,86 @@ export type ImportedCalendarEventUncheckedUpdateManyWithoutCalendarSourceInput =
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   externalUid?: Prisma.StringFieldUpdateOperationsInput | string
   recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startsAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endsAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isAllDay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ImportedCalendarEventCreateManyTaskInput = {
+  id?: string
+  workspaceId: string
+  calendarSourceId: string
+  workBlockId?: string | null
+  externalUid: string
+  recurrenceId?: string | null
+  recurrenceRule?: string | null
+  dedupeKey: string
+  title: string
+  description?: string | null
+  startsAt: Date | string
+  endsAt: Date | string
+  isAllDay?: boolean
+  status?: $Enums.CalendarEventStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type ImportedCalendarEventUpdateWithoutTaskInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  externalUid?: Prisma.StringFieldUpdateOperationsInput | string
+  recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startsAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endsAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isAllDay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutImportedCalendarEventsNestedInput
+  calendarSource?: Prisma.CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutImportedCalendarEventNestedInput
+}
+
+export type ImportedCalendarEventUncheckedUpdateWithoutTaskInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  calendarSourceId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  externalUid?: Prisma.StringFieldUpdateOperationsInput | string
+  recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startsAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endsAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isAllDay?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ImportedCalendarEventUncheckedUpdateManyWithoutTaskInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  calendarSourceId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  externalUid?: Prisma.StringFieldUpdateOperationsInput | string
+  recurrenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupeKey?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1042,8 +1303,10 @@ export type ImportedCalendarEventSelect<ExtArgs extends runtime.Types.Extensions
   workspaceId?: boolean
   calendarSourceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   externalUid?: boolean
   recurrenceId?: boolean
+  recurrenceRule?: boolean
   dedupeKey?: boolean
   title?: boolean
   description?: boolean
@@ -1056,6 +1319,7 @@ export type ImportedCalendarEventSelect<ExtArgs extends runtime.Types.Extensions
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   calendarSource?: boolean | Prisma.CalendarSourceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.ImportedCalendarEvent$taskArgs<ExtArgs>
+  workBlock?: boolean | Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs>
 }, ExtArgs["result"]["importedCalendarEvent"]>
 
 export type ImportedCalendarEventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1063,8 +1327,10 @@ export type ImportedCalendarEventSelectCreateManyAndReturn<ExtArgs extends runti
   workspaceId?: boolean
   calendarSourceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   externalUid?: boolean
   recurrenceId?: boolean
+  recurrenceRule?: boolean
   dedupeKey?: boolean
   title?: boolean
   description?: boolean
@@ -1077,6 +1343,7 @@ export type ImportedCalendarEventSelectCreateManyAndReturn<ExtArgs extends runti
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   calendarSource?: boolean | Prisma.CalendarSourceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.ImportedCalendarEvent$taskArgs<ExtArgs>
+  workBlock?: boolean | Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs>
 }, ExtArgs["result"]["importedCalendarEvent"]>
 
 export type ImportedCalendarEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1084,8 +1351,10 @@ export type ImportedCalendarEventSelectUpdateManyAndReturn<ExtArgs extends runti
   workspaceId?: boolean
   calendarSourceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   externalUid?: boolean
   recurrenceId?: boolean
+  recurrenceRule?: boolean
   dedupeKey?: boolean
   title?: boolean
   description?: boolean
@@ -1098,6 +1367,7 @@ export type ImportedCalendarEventSelectUpdateManyAndReturn<ExtArgs extends runti
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   calendarSource?: boolean | Prisma.CalendarSourceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.ImportedCalendarEvent$taskArgs<ExtArgs>
+  workBlock?: boolean | Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs>
 }, ExtArgs["result"]["importedCalendarEvent"]>
 
 export type ImportedCalendarEventSelectScalar = {
@@ -1105,8 +1375,10 @@ export type ImportedCalendarEventSelectScalar = {
   workspaceId?: boolean
   calendarSourceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   externalUid?: boolean
   recurrenceId?: boolean
+  recurrenceRule?: boolean
   dedupeKey?: boolean
   title?: boolean
   description?: boolean
@@ -1118,21 +1390,24 @@ export type ImportedCalendarEventSelectScalar = {
   updatedAt?: boolean
 }
 
-export type ImportedCalendarEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "calendarSourceId" | "taskId" | "externalUid" | "recurrenceId" | "dedupeKey" | "title" | "description" | "startsAt" | "endsAt" | "isAllDay" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["importedCalendarEvent"]>
+export type ImportedCalendarEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "calendarSourceId" | "taskId" | "workBlockId" | "externalUid" | "recurrenceId" | "recurrenceRule" | "dedupeKey" | "title" | "description" | "startsAt" | "endsAt" | "isAllDay" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["importedCalendarEvent"]>
 export type ImportedCalendarEventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   calendarSource?: boolean | Prisma.CalendarSourceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.ImportedCalendarEvent$taskArgs<ExtArgs>
+  workBlock?: boolean | Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs>
 }
 export type ImportedCalendarEventIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   calendarSource?: boolean | Prisma.CalendarSourceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.ImportedCalendarEvent$taskArgs<ExtArgs>
+  workBlock?: boolean | Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs>
 }
 export type ImportedCalendarEventIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   calendarSource?: boolean | Prisma.CalendarSourceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.ImportedCalendarEvent$taskArgs<ExtArgs>
+  workBlock?: boolean | Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs>
 }
 
 export type $ImportedCalendarEventPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1141,14 +1416,17 @@ export type $ImportedCalendarEventPayload<ExtArgs extends runtime.Types.Extensio
     workspace: Prisma.$WorkspacePayload<ExtArgs>
     calendarSource: Prisma.$CalendarSourcePayload<ExtArgs>
     task: Prisma.$TaskPayload<ExtArgs> | null
+    workBlock: Prisma.$WorkBlockPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     workspaceId: string
     calendarSourceId: string
     taskId: string | null
+    workBlockId: string | null
     externalUid: string
     recurrenceId: string | null
+    recurrenceRule: string | null
     dedupeKey: string
     title: string
     description: string | null
@@ -1555,6 +1833,7 @@ export interface Prisma__ImportedCalendarEventClient<T, Null = never, ExtArgs ex
   workspace<T extends Prisma.WorkspaceDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkspaceDefaultArgs<ExtArgs>>): Prisma.Prisma__WorkspaceClient<runtime.Types.Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   calendarSource<T extends Prisma.CalendarSourceDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.CalendarSourceDefaultArgs<ExtArgs>>): Prisma.Prisma__CalendarSourceClient<runtime.Types.Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   task<T extends Prisma.ImportedCalendarEvent$taskArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ImportedCalendarEvent$taskArgs<ExtArgs>>): Prisma.Prisma__TaskClient<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  workBlock<T extends Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ImportedCalendarEvent$workBlockArgs<ExtArgs>>): Prisma.Prisma__WorkBlockClient<runtime.Types.Result.GetResult<Prisma.$WorkBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1588,8 +1867,10 @@ export interface ImportedCalendarEventFieldRefs {
   readonly workspaceId: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
   readonly calendarSourceId: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
   readonly taskId: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
+  readonly workBlockId: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
   readonly externalUid: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
   readonly recurrenceId: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
+  readonly recurrenceRule: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
   readonly dedupeKey: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
   readonly title: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
   readonly description: Prisma.FieldRef<"ImportedCalendarEvent", 'String'>
@@ -2014,6 +2295,25 @@ export type ImportedCalendarEvent$taskArgs<ExtArgs extends runtime.Types.Extensi
    */
   include?: Prisma.TaskInclude<ExtArgs> | null
   where?: Prisma.TaskWhereInput
+}
+
+/**
+ * ImportedCalendarEvent.workBlock
+ */
+export type ImportedCalendarEvent$workBlockArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkBlock
+   */
+  select?: Prisma.WorkBlockSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WorkBlock
+   */
+  omit?: Prisma.WorkBlockOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WorkBlockInclude<ExtArgs> | null
+  where?: Prisma.WorkBlockWhereInput
 }
 
 /**

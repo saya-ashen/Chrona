@@ -141,6 +141,7 @@
         "@chrona/domain": "workspace:*",
         "@chrona/graph-runtime": "workspace:*",
         "@chrona/hermes": "workspace:*",
+        "@chrona/integrations": "workspace:*",
         "@chrona/providers-debug": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
