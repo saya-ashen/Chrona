@@ -58,6 +58,8 @@ function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; t
     executionConfig: {},
     autoPlanGeneration: false,
     autoExecute: false,
+    autoPlanGenerationTiming: "at_start",
+    autoExecuteTiming: "at_start",
     isRunnable: true,
     runnabilityState: "Ready",
     runnabilitySummary: "Ready",

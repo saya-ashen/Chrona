@@ -60,6 +60,8 @@ export function createTasksRoutes(engine: ChronaEngine) {
           priority: body.priority,
           autoPlanGeneration: body.autoPlanGeneration,
           autoExecute: body.autoExecute,
+          autoPlanGenerationTiming: body.autoPlanGenerationTiming,
+          autoExecuteTiming: body.autoExecuteTiming,
           executionRuntime: body.executionRuntime,
           executionConfig: body.executionConfig,
         });
@@ -172,6 +174,8 @@ export function createTasksRoutes(engine: ChronaEngine) {
             priority: body.priority,
             autoPlanGeneration: body.autoPlanGeneration,
             autoExecute: body.autoExecute,
+            autoPlanGenerationTiming: body.autoPlanGenerationTiming,
+            autoExecuteTiming: body.autoExecuteTiming,
             status: body.status,
             executionRuntime: body.executionRuntime,
             executionConfig: body.executionConfig,

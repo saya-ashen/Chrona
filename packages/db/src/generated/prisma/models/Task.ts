@@ -34,6 +34,8 @@ export type TaskMinAggregateOutputType = {
   priority: $Enums.TaskPriority | null
   autoPlanGeneration: boolean | null
   autoExecute: boolean | null
+  autoPlanGenerationTiming: string | null
+  autoExecuteTiming: string | null
   parentTaskId: string | null
   dueAt: Date | null
   defaultSessionId: string | null
@@ -57,6 +59,8 @@ export type TaskMaxAggregateOutputType = {
   priority: $Enums.TaskPriority | null
   autoPlanGeneration: boolean | null
   autoExecute: boolean | null
+  autoPlanGenerationTiming: string | null
+  autoExecuteTiming: string | null
   parentTaskId: string | null
   dueAt: Date | null
   defaultSessionId: string | null
@@ -81,6 +85,8 @@ export type TaskCountAggregateOutputType = {
   priority: number
   autoPlanGeneration: number
   autoExecute: number
+  autoPlanGenerationTiming: number
+  autoExecuteTiming: number
   parentTaskId: number
   dueAt: number
   blockReason: number
@@ -107,6 +113,8 @@ export type TaskMinAggregateInputType = {
   priority?: true
   autoPlanGeneration?: true
   autoExecute?: true
+  autoPlanGenerationTiming?: true
+  autoExecuteTiming?: true
   parentTaskId?: true
   dueAt?: true
   defaultSessionId?: true
@@ -130,6 +138,8 @@ export type TaskMaxAggregateInputType = {
   priority?: true
   autoPlanGeneration?: true
   autoExecute?: true
+  autoPlanGenerationTiming?: true
+  autoExecuteTiming?: true
   parentTaskId?: true
   dueAt?: true
   defaultSessionId?: true
@@ -154,6 +164,8 @@ export type TaskCountAggregateInputType = {
   priority?: true
   autoPlanGeneration?: true
   autoExecute?: true
+  autoPlanGenerationTiming?: true
+  autoExecuteTiming?: true
   parentTaskId?: true
   dueAt?: true
   blockReason?: true
@@ -252,6 +264,8 @@ export type TaskGroupByOutputType = {
   priority: $Enums.TaskPriority
   autoPlanGeneration: boolean
   autoExecute: boolean
+  autoPlanGenerationTiming: string
+  autoExecuteTiming: string
   parentTaskId: string | null
   dueAt: Date | null
   blockReason: runtime.JsonValue | null
@@ -298,6 +312,8 @@ export type TaskWhereInput = {
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
@@ -350,6 +366,8 @@ export type TaskOrderByWithRelationInput = {
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -405,6 +423,8 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
@@ -457,6 +477,8 @@ export type TaskOrderByWithAggregationInput = {
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -488,6 +510,8 @@ export type TaskScalarWhereWithAggregatesInput = {
   priority?: Prisma.EnumTaskPriorityWithAggregatesFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolWithAggregatesFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolWithAggregatesFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringWithAggregatesFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringWithAggregatesFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableWithAggregatesFilter<"Task">
@@ -512,6 +536,8 @@ export type TaskCreateInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -564,6 +590,8 @@ export type TaskUncheckedCreateInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -614,6 +642,8 @@ export type TaskUpdateInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -666,6 +696,8 @@ export type TaskUncheckedUpdateInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -717,6 +749,8 @@ export type TaskCreateManyInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -741,6 +775,8 @@ export type TaskUpdateManyMutationInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -766,6 +802,8 @@ export type TaskUncheckedUpdateManyInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -806,6 +844,8 @@ export type TaskCountOrderByAggregateInput = {
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
   blockReason?: Prisma.SortOrder
@@ -830,6 +870,8 @@ export type TaskMaxOrderByAggregateInput = {
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
@@ -853,6 +895,8 @@ export type TaskMinOrderByAggregateInput = {
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
@@ -1305,6 +1349,8 @@ export type TaskCreateWithoutWorkspaceInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1355,6 +1401,8 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1434,6 +1482,8 @@ export type TaskScalarWhereInput = {
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
@@ -1458,6 +1508,8 @@ export type TaskCreateWithoutImportedCalendarEventInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1509,6 +1561,8 @@ export type TaskUncheckedCreateWithoutImportedCalendarEventInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1574,6 +1628,8 @@ export type TaskUpdateWithoutImportedCalendarEventInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1625,6 +1681,8 @@ export type TaskUncheckedUpdateWithoutImportedCalendarEventInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1674,6 +1732,8 @@ export type TaskCreateWithoutGraphVersionsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1725,6 +1785,8 @@ export type TaskUncheckedCreateWithoutGraphVersionsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1790,6 +1852,8 @@ export type TaskUpdateWithoutGraphVersionsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1841,6 +1905,8 @@ export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1890,6 +1956,8 @@ export type TaskCreateWithoutGraphMutationsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1941,6 +2009,8 @@ export type TaskUncheckedCreateWithoutGraphMutationsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2006,6 +2076,8 @@ export type TaskUpdateWithoutGraphMutationsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2057,6 +2129,8 @@ export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2106,6 +2180,8 @@ export type TaskCreateWithoutReconciliationEventsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2157,6 +2233,8 @@ export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2222,6 +2300,8 @@ export type TaskUpdateWithoutReconciliationEventsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2273,6 +2353,8 @@ export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2322,6 +2404,8 @@ export type TaskCreateWithoutSchedulerEventsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2373,6 +2457,8 @@ export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2438,6 +2524,8 @@ export type TaskUpdateWithoutSchedulerEventsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2489,6 +2577,8 @@ export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2538,6 +2628,8 @@ export type TaskCreateWithoutSessionsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2589,6 +2681,8 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2654,6 +2748,8 @@ export type TaskUpdateWithoutSessionsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2705,6 +2801,8 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2754,6 +2852,8 @@ export type TaskCreateWithoutDependenciesInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2805,6 +2905,8 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2859,6 +2961,8 @@ export type TaskCreateWithoutDependentTasksInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2910,6 +3014,8 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2975,6 +3081,8 @@ export type TaskUpdateWithoutDependenciesInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3026,6 +3134,8 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3086,6 +3196,8 @@ export type TaskUpdateWithoutDependentTasksInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3137,6 +3249,8 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3186,6 +3300,8 @@ export type TaskCreateWithoutTaskPlansInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3237,6 +3353,8 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3302,6 +3420,8 @@ export type TaskUpdateWithoutTaskPlansInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3353,6 +3473,8 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3402,6 +3524,8 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3453,6 +3577,8 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3518,6 +3644,8 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3569,6 +3697,8 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3618,6 +3748,8 @@ export type TaskCreateWithoutTaskPlanNodeAttemptsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3669,6 +3801,8 @@ export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3734,6 +3868,8 @@ export type TaskUpdateWithoutTaskPlanNodeAttemptsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3785,6 +3921,8 @@ export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3834,6 +3972,8 @@ export type TaskCreateWithoutTaskPlanProviderRunsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3885,6 +4025,8 @@ export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3950,6 +4092,8 @@ export type TaskUpdateWithoutTaskPlanProviderRunsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4001,6 +4145,8 @@ export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4050,6 +4196,8 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4101,6 +4249,8 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4166,6 +4316,8 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4217,6 +4369,8 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4266,6 +4420,8 @@ export type TaskCreateWithoutRunsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4317,6 +4473,8 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4382,6 +4540,8 @@ export type TaskUpdateWithoutRunsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4433,6 +4593,8 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4482,6 +4644,8 @@ export type TaskCreateWithoutApprovalsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4533,6 +4697,8 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4598,6 +4764,8 @@ export type TaskUpdateWithoutApprovalsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4649,6 +4817,8 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4698,6 +4868,8 @@ export type TaskCreateWithoutArtifactsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4749,6 +4921,8 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4814,6 +4988,8 @@ export type TaskUpdateWithoutArtifactsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4865,6 +5041,8 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4914,6 +5092,8 @@ export type TaskCreateWithoutMemoriesInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4965,6 +5145,8 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5030,6 +5212,8 @@ export type TaskUpdateWithoutMemoriesInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5081,6 +5265,8 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5130,6 +5316,8 @@ export type TaskCreateWithoutEventsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5181,6 +5369,8 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5246,6 +5436,8 @@ export type TaskUpdateWithoutEventsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5297,6 +5489,8 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5346,6 +5540,8 @@ export type TaskCreateWithoutRawEventLogsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5397,6 +5593,8 @@ export type TaskUncheckedCreateWithoutRawEventLogsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5462,6 +5660,8 @@ export type TaskUpdateWithoutRawEventLogsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5513,6 +5713,8 @@ export type TaskUncheckedUpdateWithoutRawEventLogsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5562,6 +5764,8 @@ export type TaskCreateWithoutToolInvocationsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5613,6 +5817,8 @@ export type TaskUncheckedCreateWithoutToolInvocationsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5678,6 +5884,8 @@ export type TaskUpdateWithoutToolInvocationsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5729,6 +5937,8 @@ export type TaskUncheckedUpdateWithoutToolInvocationsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5778,6 +5988,8 @@ export type TaskCreateWithoutTimelineItemsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5829,6 +6041,8 @@ export type TaskUncheckedCreateWithoutTimelineItemsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5894,6 +6108,8 @@ export type TaskUpdateWithoutTimelineItemsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5945,6 +6161,8 @@ export type TaskUncheckedUpdateWithoutTimelineItemsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5994,6 +6212,8 @@ export type TaskCreateWithoutProjectionInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6045,6 +6265,8 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6110,6 +6332,8 @@ export type TaskUpdateWithoutProjectionInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6161,6 +6385,8 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6210,6 +6436,8 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6261,6 +6489,8 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6326,6 +6556,8 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6377,6 +6609,8 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6426,6 +6660,8 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6477,6 +6713,8 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6542,6 +6780,8 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6593,6 +6833,8 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6642,6 +6884,8 @@ export type TaskCreateWithoutWorkBlocksInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6693,6 +6937,8 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6758,6 +7004,8 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6809,6 +7057,8 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6858,6 +7108,8 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6909,6 +7161,8 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6974,6 +7228,8 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7025,6 +7281,8 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7074,6 +7332,8 @@ export type TaskCreateManyWorkspaceInput = {
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7098,6 +7358,8 @@ export type TaskUpdateWithoutWorkspaceInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7148,6 +7410,8 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7198,6 +7462,8 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7461,6 +7727,8 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7514,6 +7782,8 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7540,6 +7810,8 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7566,6 +7838,8 @@ export type TaskSelectScalar = {
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7580,7 +7854,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoPlanGeneration" | "autoExecute" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoPlanGeneration" | "autoExecute" | "autoPlanGenerationTiming" | "autoExecuteTiming" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -7660,6 +7934,8 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     priority: $Enums.TaskPriority
     autoPlanGeneration: boolean
     autoExecute: boolean
+    autoPlanGenerationTiming: string
+    autoExecuteTiming: string
     parentTaskId: string | null
     dueAt: Date | null
     blockReason: runtime.JsonValue | null
@@ -8132,6 +8408,8 @@ export interface TaskFieldRefs {
   readonly priority: Prisma.FieldRef<"Task", 'TaskPriority'>
   readonly autoPlanGeneration: Prisma.FieldRef<"Task", 'Boolean'>
   readonly autoExecute: Prisma.FieldRef<"Task", 'Boolean'>
+  readonly autoPlanGenerationTiming: Prisma.FieldRef<"Task", 'String'>
+  readonly autoExecuteTiming: Prisma.FieldRef<"Task", 'String'>
   readonly parentTaskId: Prisma.FieldRef<"Task", 'String'>
   readonly dueAt: Prisma.FieldRef<"Task", 'DateTime'>
   readonly blockReason: Prisma.FieldRef<"Task", 'Json'>

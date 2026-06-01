@@ -1,5 +1,6 @@
 import { api } from "./rpc-client";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import type { AutomationTimingPreset } from "@chrona/contracts";
 
 async function parseActionResponse(response: {
   ok: boolean;
@@ -24,6 +25,8 @@ export function createTaskFromSchedule(input: {
   priority?: string;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
   parentTaskId?: string | null;
@@ -42,6 +45,8 @@ export function createTaskFromSchedule(input: {
           | undefined,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
+        autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+        autoExecuteTiming: input.autoExecuteTiming,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
         parentTaskId: input.parentTaskId,
@@ -59,6 +64,8 @@ export function updateTaskConfigFromSchedule(input: {
   executionConfig?: Record<string, unknown>;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
 }) {
   return api.tasks[":taskId"]
     .$patch({
@@ -76,6 +83,8 @@ export function updateTaskConfigFromSchedule(input: {
         executionConfig: input.executionConfig,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
+        autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+        autoExecuteTiming: input.autoExecuteTiming,
       },
     })
     .then(parseActionResponse);

@@ -7,6 +7,7 @@ import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projec
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
 import { deriveTaskStaticState } from "@chrona/domain";
+import { normalizeAutomationTiming } from "@chrona/contracts";
 import type { UpdateTaskInput } from "@chrona/contracts";
 
 function normalizeRequiredUpdateTextField(
@@ -136,6 +137,14 @@ export async function updateTask(
   const nextAutoPlanGeneration = nextAutoExecute
     ? true
     : input.autoPlanGeneration ?? currentTask.autoPlanGeneration;
+  const nextAutoPlanGenerationTiming =
+    input.autoPlanGenerationTiming !== undefined
+      ? normalizeAutomationTiming(input.autoPlanGenerationTiming)
+      : normalizeAutomationTiming(currentTask.autoPlanGenerationTiming);
+  const nextAutoExecuteTiming =
+    input.autoExecuteTiming !== undefined
+      ? normalizeAutomationTiming(input.autoExecuteTiming)
+      : normalizeAutomationTiming(currentTask.autoExecuteTiming);
 
   const changedFields = [
     input.title !== undefined ? "title" : null,
@@ -143,6 +152,8 @@ export async function updateTask(
     input.priority !== undefined ? "priority" : null,
     input.autoPlanGeneration !== undefined || input.autoExecute === true ? "autoPlanGeneration" : null,
     input.autoExecute !== undefined ? "autoExecute" : null,
+    input.autoPlanGenerationTiming !== undefined ? "autoPlanGenerationTiming" : null,
+    input.autoExecuteTiming !== undefined ? "autoExecuteTiming" : null,
     input.status !== undefined ? "status" : null,
     input.executionRuntime !== undefined ? "executionRuntime" : null,
     input.executionConfig !== undefined ? "executionConfig" : null,
@@ -160,6 +171,12 @@ export async function updateTask(
           ? nextAutoPlanGeneration
           : undefined,
       autoExecute: input.autoExecute,
+      autoPlanGenerationTiming:
+        input.autoPlanGenerationTiming !== undefined
+          ? nextAutoPlanGenerationTiming
+          : undefined,
+      autoExecuteTiming:
+        input.autoExecuteTiming !== undefined ? nextAutoExecuteTiming : undefined,
       executionRuntime: shouldPersistResolvedRuntimeConfig
         ? validatedRuntimeConfig.executionRuntime
         : undefined,
@@ -187,6 +204,7 @@ export async function updateTask(
 
   if (
     nextAutoPlanGeneration &&
+    nextAutoPlanGenerationTiming === "immediate" &&
     (
       (input.autoPlanGeneration === true && currentTask.autoPlanGeneration !== true) ||
       (input.autoExecute === true && currentTask.autoExecute !== true)

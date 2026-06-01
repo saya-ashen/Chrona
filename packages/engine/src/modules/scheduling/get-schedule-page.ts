@@ -31,6 +31,8 @@ function mapProjectionItem(
       executionConfig: unknown;
       autoPlanGeneration: boolean;
       autoExecute: boolean;
+      autoPlanGenerationTiming: string;
+      autoExecuteTiming: string;
       importedCalendarEvent: {
         id: string;
         description: string | null;
@@ -63,6 +65,8 @@ function mapProjectionItem(
     lastActivityAt: item.lastActivityAt,
     autoPlanGeneration: item.task.autoPlanGeneration,
     autoExecute: item.task.autoExecute,
+    autoPlanGenerationTiming: item.task.autoPlanGenerationTiming,
+    autoExecuteTiming: item.task.autoExecuteTiming,
     sourceManaged: item.task.importedCalendarEvent
       ? {
           source: "external_calendar" as const,

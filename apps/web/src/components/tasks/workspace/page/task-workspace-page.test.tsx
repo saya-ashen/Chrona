@@ -190,6 +190,8 @@ function taskData(): TaskPageData {
       executionConfig: null,
       autoPlanGeneration: false,
       autoExecute: false,
+      autoPlanGenerationTiming: "at_start",
+      autoExecuteTiming: "at_start",
       status: "Ready",
       priority: "High",
       dueAt: null,

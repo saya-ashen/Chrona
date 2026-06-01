@@ -170,6 +170,8 @@ export const TaskScalarFieldEnum = {
   priority: 'priority',
   autoPlanGeneration: 'autoPlanGeneration',
   autoExecute: 'autoExecute',
+  autoPlanGenerationTiming: 'autoPlanGenerationTiming',
+  autoExecuteTiming: 'autoExecuteTiming',
   parentTaskId: 'parentTaskId',
   dueAt: 'dueAt',
   blockReason: 'blockReason',

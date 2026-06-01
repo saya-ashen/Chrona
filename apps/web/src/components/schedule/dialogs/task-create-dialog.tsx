@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
 import { useI18n } from "@chrona/i18n/react";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
+import { AUTOMATION_TIMING_PRESETS, normalizeAutomationTiming } from "@chrona/contracts";
+import type { AutomationTimingPreset } from "@chrona/contracts";
 
 /* ------------------------------------------------------------------ */
 /*  Priority badge color map                                          */
@@ -38,6 +40,15 @@ const DEFAULT_DIALOG_COPY = {
   autoExecuteDescription: "Force plan generation on, accept the generated plan, then start execution at the scheduled time.",
   autoPlanGeneration: "Generate plan after saving",
   autoPlanGenerationDescription: "Create a draft execution plan after saving. Required when auto-execute is enabled.",
+  automationTimingLabel: "Start timing",
+  automationTiming: {
+    immediate: "Immediately",
+    at_start: "At scheduled start",
+    before_30m: "30 minutes before start",
+    before_1h: "1 hour before start",
+    before_2h: "2 hours before start",
+    before_1d: "1 day before start",
+  },
   description: "Description (optional)",
   descriptionPlaceholder: "Add description",
   priority: "Priority",
@@ -65,6 +76,8 @@ type TaskCreateDialogProps = {
     priority: "Low" | "Medium" | "High" | "Urgent";
     autoExecute: boolean;
     autoPlanGenerationEnabled: boolean;
+    autoPlanGenerationTiming: AutomationTimingPreset;
+    autoExecuteTiming: AutomationTimingPreset;
     dueAt: Date | null;
     scheduledStartAt: Date;
     scheduledEndAt: Date;
@@ -101,6 +114,8 @@ export function TaskCreateDialog({
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [autoExecute, setAutoExecute] = useState(defaultAutoExecuteEnabled);
   const [autoPlanGenerationEnabled, setAutoPlanGenerationEnabled] = useState(defaultAutoPlanGenerationEnabled);
+  const [autoPlanGenerationTiming, setAutoPlanGenerationTiming] = useState<AutomationTimingPreset>("at_start");
+  const [autoExecuteTiming, setAutoExecuteTiming] = useState<AutomationTimingPreset>("at_start");
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -160,6 +175,8 @@ export function TaskCreateDialog({
       setPriority("Medium");
       setAutoExecute(defaultAutoExecuteEnabled);
       setAutoPlanGenerationEnabled(defaultAutoPlanGenerationEnabled);
+      setAutoPlanGenerationTiming("at_start");
+      setAutoExecuteTiming("at_start");
       setShowAutoComplete(false);
       suppressRef.current = false;
     }
@@ -183,6 +200,8 @@ export function TaskCreateDialog({
       priority,
       autoExecute,
       autoPlanGenerationEnabled: autoExecute || autoPlanGenerationEnabled,
+      autoPlanGenerationTiming,
+      autoExecuteTiming,
       dueAt: null,
       scheduledStartAt,
       scheduledEndAt,
@@ -416,6 +435,16 @@ export function TaskCreateDialog({
             </span>
           </label>
 
+          {autoExecute && (
+            <TimingSelect
+              label={dialogCopy.automationTimingLabel}
+              value={autoExecuteTiming}
+              copy={dialogCopy.automationTiming}
+              disabled={isPending}
+              onChange={setAutoExecuteTiming}
+            />
+          )}
+
           <label className="flex items-start gap-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-3 text-sm text-foreground">
             <input
               type="checkbox"
@@ -431,6 +460,16 @@ export function TaskCreateDialog({
               </span>
             </span>
           </label>
+
+          {(autoExecute || autoPlanGenerationEnabled) && (
+            <TimingSelect
+              label={dialogCopy.automationTimingLabel}
+              value={autoPlanGenerationTiming}
+              copy={dialogCopy.automationTiming}
+              disabled={isPending}
+              onChange={setAutoPlanGenerationTiming}
+            />
+          )}
 
           {/* Description */}
           <div>
@@ -494,5 +533,33 @@ export function TaskCreateDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type TimingSelectProps = {
+  label: string;
+  value: AutomationTimingPreset;
+  copy: Record<AutomationTimingPreset, string>;
+  disabled?: boolean;
+  onChange: (value: AutomationTimingPreset) => void;
+};
+
+function TimingSelect({ label, value, copy, disabled, onChange }: TimingSelectProps) {
+  return (
+    <div className="ml-7 grid gap-1.5">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(normalizeAutomationTiming(e.target.value))}
+        disabled={disabled}
+        className="h-9 w-full rounded-lg border border-border/70 bg-background px-3 text-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+      >
+        {AUTOMATION_TIMING_PRESETS.map((preset) => (
+          <option key={preset} value={preset}>
+            {copy[preset]}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

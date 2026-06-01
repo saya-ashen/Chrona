@@ -34,6 +34,8 @@ export type ScheduleTaskListItem = {
   lastActivityAt: Date | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: string;
+  autoExecuteTiming: string;
   sourceManaged?: {
     source: "external_calendar";
     eventId: string;
@@ -193,6 +195,8 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
     scheduledEndAt: item.scheduledEndAt,
     autoPlanGeneration: item.autoPlanGeneration,
     autoExecute: item.autoExecute,
+    autoPlanGenerationTiming: item.autoPlanGenerationTiming,
+    autoExecuteTiming: item.autoExecuteTiming,
   };
 }
 

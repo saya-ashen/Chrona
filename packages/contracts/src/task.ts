@@ -1,3 +1,5 @@
+import type { AutomationTimingPreset } from "./automation-timing";
+
 export const TASK_STATUSES = [
   "Draft",
   "Ready",
@@ -67,6 +69,8 @@ export type CreateTaskInput = {
   priority?: TaskPriority;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
   parentTaskId?: string | null;
 } & Partial<TaskRuntimeFields>;
 
@@ -77,5 +81,7 @@ export type UpdateTaskInput = {
   priority?: TaskPriority;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
   status?: TaskStatus;
 } & Partial<TaskRuntimeFields>;

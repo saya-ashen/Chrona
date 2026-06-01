@@ -109,6 +109,8 @@ function TimelineComposer({
           priority: input.priority,
           autoExecute: input.autoExecute,
           autoPlanGenerationEnabled: input.autoPlanGenerationEnabled,
+          autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+          autoExecuteTiming: input.autoExecuteTiming,
           dueAt: input.dueAt,
           executionRuntime: defaultExecutionRuntime,
           executionConfig: {},

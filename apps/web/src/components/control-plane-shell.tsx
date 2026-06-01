@@ -259,6 +259,8 @@ export function ControlPlaneShell({
               priority: input.priority,
               autoPlanGeneration: input.autoPlanGenerationEnabled || input.autoExecute,
               autoExecute: input.autoExecute,
+              autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+              autoExecuteTiming: input.autoExecuteTiming,
             });
             router.refresh();
           } finally {

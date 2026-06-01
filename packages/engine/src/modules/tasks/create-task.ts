@@ -7,6 +7,7 @@ import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
 import { deriveTaskStaticState } from "@chrona/domain";
+import { normalizeAutomationTiming } from "@chrona/contracts";
 import type { CreateTaskInput } from "@chrona/contracts";
 
 function normalizeExecutionConfig(
@@ -62,6 +63,10 @@ export async function createTask(input: CreateTaskInput) {
   });
   const autoExecute = input.autoExecute ?? false;
   const autoPlanGeneration = autoExecute || (input.autoPlanGeneration ?? false);
+  const autoPlanGenerationTiming = normalizeAutomationTiming(
+    input.autoPlanGenerationTiming,
+  );
+  const autoExecuteTiming = normalizeAutomationTiming(input.autoExecuteTiming);
 
   const staticState = deriveTaskStaticState({
     runtimeSpec: getRuntimeTaskConfigSpec(validatedRuntimeConfig.executionRuntime),
@@ -83,6 +88,8 @@ export async function createTask(input: CreateTaskInput) {
         : TaskPriority.Medium,
       autoPlanGeneration,
       autoExecute,
+      autoPlanGenerationTiming,
+      autoExecuteTiming,
       status,
       parentTaskId: input.parentTaskId ?? null,
     },
@@ -127,6 +134,8 @@ export async function createTask(input: CreateTaskInput) {
       priority: task.priority,
       autoPlanGeneration: task.autoPlanGeneration,
       autoExecute: task.autoExecute,
+      autoPlanGenerationTiming: task.autoPlanGenerationTiming,
+      autoExecuteTiming: task.autoExecuteTiming,
       status: task.status,
       parentTaskId: task.parentTaskId,
     },
@@ -135,7 +144,7 @@ export async function createTask(input: CreateTaskInput) {
 
   await rebuildTaskProjection(task.id);
 
-  if (task.autoPlanGeneration) {
+  if (task.autoPlanGeneration && autoPlanGenerationTiming === "immediate") {
     startAutoPlanGenerationForTask({ taskId: task.id, accept: task.autoExecute });
   }
 
@@ -144,5 +153,7 @@ export async function createTask(input: CreateTaskInput) {
     workspaceId: task.workspaceId,
     autoPlanGeneration: task.autoPlanGeneration,
     autoExecute: task.autoExecute,
+    autoPlanGenerationTiming: task.autoPlanGenerationTiming,
+    autoExecuteTiming: task.autoExecuteTiming,
   };
 }

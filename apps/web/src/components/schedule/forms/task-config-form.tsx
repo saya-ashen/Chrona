@@ -27,6 +27,11 @@ import {
   validateTaskConfigAgainstSpec,
 } from "@chrona/runtime-core";
 import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@chrona/runtime-core";
+import {
+  AUTOMATION_TIMING_PRESETS,
+  normalizeAutomationTiming,
+} from "@chrona/contracts";
+import type { AutomationTimingPreset } from "@chrona/contracts";
 
 export type TaskConfigFormDraft = {
   title: string;
@@ -42,6 +47,8 @@ export type TaskConfigFormInput = TaskConfigFormDraft & {
   executionConfig: RuntimeInput;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: AutomationTimingPreset;
+  autoExecuteTiming: AutomationTimingPreset;
 };
 
 export type TaskConfigExecutionRuntime = {
@@ -70,6 +77,8 @@ type TaskConfigFormState = {
   extraExecutionConfig: string;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: AutomationTimingPreset;
+  autoExecuteTiming: AutomationTimingPreset;
 };
 
 export type TaskConfigDraftState = {
@@ -92,6 +101,8 @@ type TaskConfigFormProps = {
     executionConfig?: unknown;
     autoPlanGeneration?: boolean;
     autoExecute?: boolean;
+    autoPlanGenerationTiming?: AutomationTimingPreset | string | null;
+    autoExecuteTiming?: AutomationTimingPreset | string | null;
   };
   lockedFields?: readonly ("title" | "scheduledStartAt" | "scheduledEndAt")[];
   lockedFieldsHint?: string;
@@ -330,8 +341,12 @@ function TaskAutomationSection({
   copy,
   autoPlanGeneration,
   autoExecute,
+  autoPlanGenerationTiming,
+  autoExecuteTiming,
   onAutoPlanGenerationChange,
   onAutoExecuteChange,
+  onAutoPlanGenerationTimingChange,
+  onAutoExecuteTimingChange,
   compact = false,
 }: {
   copy: {
@@ -340,14 +355,24 @@ function TaskAutomationSection({
     autoExecuteDescription: string;
     autoPlanGeneration: string;
     autoPlanGenerationDescription: string;
+    automationTimingLabel: string;
+    automationTiming: Record<AutomationTimingPreset, string>;
   };
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: AutomationTimingPreset;
+  autoExecuteTiming: AutomationTimingPreset;
   onAutoPlanGenerationChange: (checked: boolean) => void;
   onAutoExecuteChange: (checked: boolean) => void;
+  onAutoPlanGenerationTimingChange: (value: AutomationTimingPreset) => void;
+  onAutoExecuteTimingChange: (value: AutomationTimingPreset) => void;
   compact?: boolean;
 }) {
   const effectiveAutoPlanGeneration = autoExecute || autoPlanGeneration;
+  const timingOptions = AUTOMATION_TIMING_PRESETS.map((preset) => ({
+    value: preset,
+    label: copy.automationTiming[preset],
+  }));
 
   return (
     <TaskConfigSection
@@ -356,23 +381,71 @@ function TaskAutomationSection({
       actions={effectiveAutoPlanGeneration || autoExecute ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span> : null}
     >
       <div className="grid gap-2">
-        <TaskAutomationOption
-          name="autoPlanGeneration"
-          checked={effectiveAutoPlanGeneration}
-          disabled={autoExecute}
-          label={copy.autoPlanGeneration}
-          description={copy.autoPlanGenerationDescription}
-          onCheckedChange={onAutoPlanGenerationChange}
-        />
-        <TaskAutomationOption
-          name="autoExecute"
-          checked={autoExecute}
-          label={copy.autoExecute}
-          description={copy.autoExecuteDescription}
-          onCheckedChange={onAutoExecuteChange}
-        />
+        <div className="grid gap-2">
+          <TaskAutomationOption
+            name="autoPlanGeneration"
+            checked={effectiveAutoPlanGeneration}
+            disabled={autoExecute}
+            label={copy.autoPlanGeneration}
+            description={copy.autoPlanGenerationDescription}
+            onCheckedChange={onAutoPlanGenerationChange}
+          />
+          {effectiveAutoPlanGeneration ? (
+            <TaskAutomationTimingSelect
+              name="autoPlanGenerationTiming"
+              label={copy.automationTimingLabel}
+              value={autoPlanGenerationTiming}
+              options={timingOptions}
+              onValueChange={onAutoPlanGenerationTimingChange}
+            />
+          ) : null}
+        </div>
+        <div className="grid gap-2">
+          <TaskAutomationOption
+            name="autoExecute"
+            checked={autoExecute}
+            label={copy.autoExecute}
+            description={copy.autoExecuteDescription}
+            onCheckedChange={onAutoExecuteChange}
+          />
+          {autoExecute ? (
+            <TaskAutomationTimingSelect
+              name="autoExecuteTiming"
+              label={copy.automationTimingLabel}
+              value={autoExecuteTiming}
+              options={timingOptions}
+              onValueChange={onAutoExecuteTimingChange}
+            />
+          ) : null}
+        </div>
       </div>
     </TaskConfigSection>
+  );
+}
+
+function TaskAutomationTimingSelect({
+  name,
+  label,
+  value,
+  options,
+  onValueChange,
+}: {
+  name: string;
+  label: string;
+  value: AutomationTimingPreset;
+  options: { value: AutomationTimingPreset; label: string }[];
+  onValueChange: (value: AutomationTimingPreset) => void;
+}) {
+  return (
+    <div className="ml-9 grid gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <TaskConfigSelect
+        name={name}
+        value={value}
+        options={options}
+        onValueChange={(next) => onValueChange(normalizeAutomationTiming(next))}
+      />
+    </div>
   );
 }
 
@@ -413,6 +486,15 @@ const DEFAULT_COPY = {
   autoPlanGenerationDescription: "Create a draft execution plan automatically. You can turn this off unless auto-execute is enabled.",
   autoExecute: "Auto-execute at scheduled time",
   autoExecuteDescription: "Force plan generation on, accept the generated plan, then start execution at the scheduled time.",
+  automationTimingLabel: "Start timing",
+  automationTiming: {
+    immediate: "Immediately",
+    at_start: "At scheduled start",
+    before_30m: "30 minutes before start",
+    before_1h: "1 hour before start",
+    before_2h: "2 hours before start",
+    before_1d: "1 day before start",
+  },
   errorInvalidJson: "Runtime params must be valid JSON",
   errorJsonObject: "Runtime params must be a JSON object",
   errorIncompleteSchedule: "Set date, start, and end time together",
@@ -635,6 +717,8 @@ function toFormState(
     scheduledEndTime: formatLocalTimeInput(initialValues?.scheduledEndAt),
     autoPlanGeneration: initialValues?.autoExecute || (initialValues?.autoPlanGeneration ?? false),
     autoExecute: initialValues?.autoExecute ?? false,
+    autoPlanGenerationTiming: normalizeAutomationTiming(initialValues?.autoPlanGenerationTiming),
+    autoExecuteTiming: normalizeAutomationTiming(initialValues?.autoExecuteTiming),
     ...runtimeState,
   };
 }
@@ -691,6 +775,8 @@ function buildTaskConfigFormInput(
     executionConfig,
     autoPlanGeneration: formState.autoExecute || formState.autoPlanGeneration,
     autoExecute: formState.autoExecute,
+    autoPlanGenerationTiming: normalizeAutomationTiming(formState.autoPlanGenerationTiming),
+    autoExecuteTiming: normalizeAutomationTiming(formState.autoExecuteTiming),
   };
 }
 
@@ -745,6 +831,14 @@ function applyPresetValues(
 
   if ("autoPlanGeneration" in values) {
     next.autoPlanGeneration = next.autoExecute || (values.autoPlanGeneration ?? false);
+  }
+
+  if ("autoPlanGenerationTiming" in values) {
+    next.autoPlanGenerationTiming = normalizeAutomationTiming(values.autoPlanGenerationTiming);
+  }
+
+  if ("autoExecuteTiming" in values) {
+    next.autoExecuteTiming = normalizeAutomationTiming(values.autoExecuteTiming);
   }
 
   if ("priority" in values && values.priority) {
@@ -852,6 +946,10 @@ export function TaskConfigForm({
       ...DEFAULT_COPY.priorities,
       ...(taskConfigFormMessages?.priorities ?? {}),
     },
+    automationTiming: {
+      ...DEFAULT_COPY.automationTiming,
+      ...(taskConfigFormMessages?.automationTiming ?? {}),
+    },
   }), [taskConfigFormMessages]);
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
   const lockedFieldSet = useMemo(() => new Set(lockedFields), [lockedFields]);
@@ -870,6 +968,8 @@ export function TaskConfigForm({
   const initialExecutionConfig = initialValues?.executionConfig;
   const initialAutoPlanGeneration = initialValues?.autoPlanGeneration;
   const initialAutoExecute = initialValues?.autoExecute;
+  const initialAutoPlanGenerationTiming = initialValues?.autoPlanGenerationTiming;
+  const initialAutoExecuteTiming = initialValues?.autoExecuteTiming;
   const initialState = useMemo(
     () =>
       toFormState(
@@ -884,6 +984,8 @@ export function TaskConfigForm({
           executionConfig: initialExecutionConfig,
           autoPlanGeneration: initialAutoPlanGeneration,
           autoExecute: initialAutoExecute,
+          autoPlanGenerationTiming: initialAutoPlanGenerationTiming,
+          autoExecuteTiming: initialAutoExecuteTiming,
         },
         executionRuntimes,
         defaultExecutionRuntime,
@@ -901,6 +1003,8 @@ export function TaskConfigForm({
       initialExecutionConfig,
       initialAutoPlanGeneration,
       initialAutoExecute,
+      initialAutoPlanGenerationTiming,
+      initialAutoExecuteTiming,
     ],
   );
   const {
@@ -1161,6 +1265,8 @@ export function TaskConfigForm({
                   copy={copy}
                   autoPlanGeneration={formState.autoPlanGeneration}
                   autoExecute={formState.autoExecute}
+                  autoPlanGenerationTiming={formState.autoPlanGenerationTiming}
+                  autoExecuteTiming={formState.autoExecuteTiming}
                   onAutoPlanGenerationChange={(checked) => setValue("autoPlanGeneration", checked, { shouldDirty: true })}
                   onAutoExecuteChange={(checked) => {
                     setValue("autoExecute", checked, { shouldDirty: true });
@@ -1168,6 +1274,8 @@ export function TaskConfigForm({
                       setValue("autoPlanGeneration", true, { shouldDirty: true });
                     }
                   }}
+                  onAutoPlanGenerationTimingChange={(value) => setValue("autoPlanGenerationTiming", value, { shouldDirty: true })}
+                  onAutoExecuteTimingChange={(value) => setValue("autoExecuteTiming", value, { shouldDirty: true })}
                 />
             </div>
           </div>
@@ -1321,6 +1429,8 @@ export function TaskConfigForm({
                   copy={copy}
                   autoPlanGeneration={formState.autoPlanGeneration}
                   autoExecute={formState.autoExecute}
+                  autoPlanGenerationTiming={formState.autoPlanGenerationTiming}
+                  autoExecuteTiming={formState.autoExecuteTiming}
                   onAutoPlanGenerationChange={(checked) => setValue("autoPlanGeneration", checked, { shouldDirty: true })}
                   onAutoExecuteChange={(checked) => {
                     setValue("autoExecute", checked, { shouldDirty: true });
@@ -1328,6 +1438,8 @@ export function TaskConfigForm({
                       setValue("autoPlanGeneration", true, { shouldDirty: true });
                     }
                   }}
+                  onAutoPlanGenerationTimingChange={(value) => setValue("autoPlanGenerationTiming", value, { shouldDirty: true })}
+                  onAutoExecuteTimingChange={(value) => setValue("autoExecuteTiming", value, { shouldDirty: true })}
                 />
               </>
 

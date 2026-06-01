@@ -113,6 +113,8 @@ function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
     lastActivityAt: null,
     autoPlanGeneration: false,
     autoExecute: false,
+    autoPlanGenerationTiming: "at_start",
+    autoExecuteTiming: "at_start",
     parentTaskId: null,
     executionRuntime: "hermes",
     executionConfig: {},

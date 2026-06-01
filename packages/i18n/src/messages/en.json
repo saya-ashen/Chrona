@@ -243,7 +243,16 @@
       "errorJsonObject": "Runtime params must be a JSON object",
       "actionFailed": "Action failed",
       "saveTaskConfig": "Save task config",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "automationTimingLabel": "Start timing",
+      "automationTiming": {
+        "immediate": "Immediately",
+        "at_start": "At scheduled start",
+        "before_30m": "30 minutes before start",
+        "before_1h": "1 hour before start",
+        "before_2h": "2 hours before start",
+        "before_1d": "1 day before start"
+      }
     },
     "scheduleEditorForm": {
       "applySchedule": "Apply Schedule",
@@ -978,6 +987,15 @@
         "Medium": "Medium",
         "High": "High",
         "Urgent": "Urgent"
+      },
+      "automationTimingLabel": "Start timing",
+      "automationTiming": {
+        "immediate": "Immediately",
+        "at_start": "At scheduled start",
+        "before_30m": "30 minutes before start",
+        "before_1h": "1 hour before start",
+        "before_2h": "2 hours before start",
+        "before_1d": "1 day before start"
       }
     },
     "scheduleCommandBar": {

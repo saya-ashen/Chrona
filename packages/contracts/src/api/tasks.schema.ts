@@ -5,6 +5,7 @@ import {
   taskStatusEnum,
   workspaceId,
 } from "./common";
+import { automationTimingSchema } from "../automation-timing";
 
 function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
   const schema = z.string().trim().min(1, "executionRuntime is required");
@@ -60,6 +61,8 @@ export const createTaskBodySchema = z.object({
   priority: taskPriorityEnum.optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),
+  autoPlanGenerationTiming: automationTimingSchema.optional(),
+  autoExecuteTiming: automationTimingSchema.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   parentTaskId: z.string().nullable().optional(),
@@ -76,6 +79,8 @@ export const updateTaskBodySchema = z.object({
   priority: taskPriorityEnum.optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),
+  autoPlanGenerationTiming: automationTimingSchema.optional(),
+  autoExecuteTiming: automationTimingSchema.optional(),
   status: taskStatusEnum.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),

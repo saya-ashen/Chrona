@@ -34,6 +34,9 @@ import {
 
 const DEFAULT_SOURCE_COLOR = "#2563eb";
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const IMPORT_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+const IMPORT_LOOKAHEAD_MS = 180 * 24 * 60 * 60 * 1000;
+const MAX_IMPORTED_OCCURRENCES = 500;
 
 export type ExternalCalendarServiceOptions = {
   transport?: CalendarFeedTransport;
@@ -93,6 +96,14 @@ function errorCode(cause: unknown): CalendarValidationErrorCode {
   return "unknown";
 }
 
+function importRangeFrom(value: Date) {
+  return {
+    from: new Date(value.getTime() - IMPORT_LOOKBACK_MS),
+    to: new Date(value.getTime() + IMPORT_LOOKAHEAD_MS),
+    maxOccurrences: MAX_IMPORTED_OCCURRENCES,
+  };
+}
+
 export function createExternalCalendarService(options: ExternalCalendarServiceOptions = {}) {
   const now = options.now ?? (() => new Date());
   const autoPlanTask = options.autoPlanTask ?? (() => undefined);
@@ -124,16 +135,16 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
     }
 
     try {
+      const refreshedAt = now();
       await updateCalendarSourceSyncStatus(workspaceId, sourceId, { syncState: "syncing" });
       const feed = await fetchCalendarFeed(source.sourceUrl, options.transport, { allowBlockedNetwork });
-      const parsed = parseICalendarFeed(feed);
+      const parsed = parseICalendarFeed(feed, importRangeFrom(refreshedAt));
       const normalizedEvents = normalizeImportedEvents(parsed.events);
       const writes: ImportedCalendarEventWrite[] = normalizedEvents.map((event) => ({
         ...event,
         workspaceId,
         calendarSourceId: sourceId,
       }));
-      const refreshedAt = now();
       const replacement = await replaceImportedCalendarEvents(sourceId, writes, {
         policy: source.syncPolicy,
         automationPolicy: source.automationPolicy,

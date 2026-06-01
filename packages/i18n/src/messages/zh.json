@@ -243,7 +243,16 @@
       "errorJsonObject": "运行参数必须是 JSON 对象",
       "actionFailed": "操作失败",
       "saveTaskConfig": "保存任务配置",
-      "saving": "保存中…"
+      "saving": "保存中…",
+      "automationTimingLabel": "开始时机",
+      "automationTiming": {
+        "immediate": "立即",
+        "at_start": "计划开始时",
+        "before_30m": "提前30分钟",
+        "before_1h": "提前1小时",
+        "before_2h": "提前2小时",
+        "before_1d": "提前1天"
+      }
     },
     "scheduleEditorForm": {
       "applySchedule": "应用日程",
@@ -954,6 +963,15 @@
         "Medium": "中",
         "High": "高",
         "Urgent": "紧急"
+      },
+      "automationTimingLabel": "开始时机",
+      "automationTiming": {
+        "immediate": "立即",
+        "at_start": "计划开始时",
+        "before_30m": "提前30分钟",
+        "before_1h": "提前1小时",
+        "before_2h": "提前2小时",
+        "before_1d": "提前1天"
       }
     },
     "scheduleCommandBar": {

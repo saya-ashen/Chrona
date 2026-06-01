@@ -45,6 +45,8 @@ const task = {
   executionConfig: {},
   autoPlanGeneration: false,
   autoExecute: false,
+  autoPlanGenerationTiming: "at_start",
+  autoExecuteTiming: "at_start",
   status: "Draft",
   priority: "Medium",
   dueAt: null,

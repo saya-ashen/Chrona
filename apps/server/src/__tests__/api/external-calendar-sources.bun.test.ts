@@ -83,6 +83,35 @@ describe("External calendar source API", () => {
     await expectImportedFixtureEvent(workspaceId);
   });
 
+  it("imports bounded recurring calendar occurrences as tasks", async () => {
+    const { workspaceId } = await seedWorkspace("Calendar recurring API");
+    const url = fixtureUrl("recurring.ics");
+
+    const createRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Recurring calendar", url }),
+    });
+
+    expect(createRes.status).toBe(201);
+    const created = await json<{ syncStatus: { importedCount: number; state: string } }>(createRes);
+    expect(created.syncStatus).toMatchObject({ importedCount: 3, state: "success" });
+
+    const importedEvents = await db.importedCalendarEvent.findMany({
+      where: { workspaceId },
+      include: { task: { include: { workBlocks: true } } },
+      orderBy: { startsAt: "asc" },
+    });
+
+    expect(importedEvents.map((event: { startsAt: Date }) => event.startsAt.toISOString())).toEqual([
+      "2026-05-05T14:00:00.000Z",
+      "2026-05-12T14:00:00.000Z",
+      "2026-05-19T14:00:00.000Z",
+    ]);
+    expect(importedEvents.every((event: { recurrenceId: string | null }) => event.recurrenceId)).toBe(true);
+    expect(importedEvents.every((event: { task: { workBlocks: unknown[] } | null }) => event.task?.workBlocks.length === 1)).toBe(true);
+  });
+
   it("rejects unsupported URLs without saving", async () => {
     const { workspaceId } = await seedWorkspace("Calendar invalid URL");
 

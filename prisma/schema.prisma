@@ -251,6 +251,8 @@ model Task {
   priority             TaskPriority
   autoPlanGeneration   Boolean                @default(false)
   autoExecute          Boolean                @default(false)
+  autoPlanGenerationTiming String             @default("at_start")
+  autoExecuteTiming    String                 @default("at_start")
   parentTaskId         String?
   dueAt                DateTime?
   blockReason          Json?

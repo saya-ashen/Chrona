@@ -40,6 +40,8 @@ const mockItem: ScheduledItem = {
   executionConfig: {},
   autoPlanGeneration: false,
   autoExecute: false,
+  autoPlanGenerationTiming: "at_start",
+  autoExecuteTiming: "at_start",
   isRunnable: true,
   runnabilityState: "ready",
   runnabilitySummary: "Ready",

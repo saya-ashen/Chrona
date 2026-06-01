@@ -14,6 +14,8 @@ export type TaskData = {
   executionConfig: unknown;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: string;
+  autoExecuteTiming: string;
   status: string;
   priority: string;
   dueAt: string | null;

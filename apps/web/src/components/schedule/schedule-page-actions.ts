@@ -352,6 +352,8 @@ export async function handleCreateTaskBlockAction({
       priority: input.priority,
       autoPlanGeneration: autoPlanGenerationEnabled || input.autoExecute,
       autoExecute: input.autoExecute,
+      autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+      autoExecuteTiming: input.autoExecuteTiming,
       executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
     })) as { taskId: string };
@@ -450,6 +452,8 @@ export async function handleTaskConfigSaveAction({
       executionConfig: input.executionConfig,
       autoPlanGeneration: input.autoPlanGeneration,
       autoExecute: input.autoExecute,
+      autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+      autoExecuteTiming: input.autoExecuteTiming,
     });
 
     if (input.scheduledStartAt && input.scheduledEndAt) {

@@ -87,6 +87,17 @@ export type {
 
 export { TASK_PRIORITIES, TASK_STATUSES } from "./task";
 
+export type { AutomationTimingPreset } from "./automation-timing";
+
+export {
+  AUTOMATION_TIMING_PRESETS,
+  DEFAULT_AUTOMATION_TIMING,
+  automationTimingOffsetMs,
+  automationTimingSchema,
+  normalizeAutomationTiming,
+  resolveAutomationTriggerAt,
+} from "./automation-timing";
+
 export type {
   GraphMutationOperation as TaskOrchestratorGraphMutationOperation,
   GraphMutationRequest as TaskOrchestratorGraphMutationRequest,
