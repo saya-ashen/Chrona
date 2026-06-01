@@ -237,18 +237,10 @@ export function SchedulePage({
             <div className="flex shrink-0 flex-wrap gap-2">
               <Button
                 type="button"
-                size="sm"
+                size="default"
                 onClick={() => router.push(localizeHref(locale, "/settings?panel=ai-clients"))}
               >
                 {copy.firstRunConnectAi}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => router.push(localizeHref(locale, `/schedule?day=${encodeURIComponent(viewModel.activeDay)}&new=1`))}
-              >
-                {copy.firstRunCreateTask}
               </Button>
             </div>
           </div>

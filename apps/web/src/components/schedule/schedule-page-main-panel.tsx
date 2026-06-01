@@ -116,29 +116,9 @@ export function SchedulePageHeader({
       ]}
       actions={[
         {
-          label: copy.cockpitCreateTask,
-          href: localizeHref(
-            locale,
-            `/schedule?day=${encodeURIComponent(viewModel.activeDay)}&new=1`,
-          ),
-          description: copy.cockpitCreateTaskHint,
-        },
-        {
           label: copy.cockpitConnectAi,
           href: localizeHref(locale, "/settings?panel=ai-clients"),
           description: copy.cockpitConnectAiHint,
-        },
-        {
-          label: copy.cockpitReviewSuggestions,
-          href: localizeHref(
-            locale,
-            buildScheduleViewHref(
-              viewModel.activeDay,
-              "list",
-              viewModel.activeSelectedTaskId,
-            ),
-          ),
-          description: copy.cockpitReviewSuggestionsHint,
         },
       ]}
       onNavigate={onNavigate}
