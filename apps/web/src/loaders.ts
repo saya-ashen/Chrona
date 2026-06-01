@@ -78,15 +78,32 @@ export async function loadTaskListData({ params, request }: LoaderFunctionArgs):
   );
   const workspaceId = workspace.id;
 
-  const result = await apiJson<{ tasks: TaskListRouteData["tasks"]; count: number }>(
-    `${origin}/api/tasks?workspaceId=${encodeURIComponent(workspaceId)}&limit=200`,
-  );
+  const requestUrl = new URL(request.url);
+  const query = new URLSearchParams({ workspaceId });
+  for (const key of ["filter", "priority", "search", "sort", "order", "page", "pageSize"] as const) {
+    const value = requestUrl.searchParams.get(key);
+    if (value) query.set(key, value);
+  }
+
+  const result = await apiJson<{
+    tasks: TaskListRouteData["tasks"];
+    total: number;
+    page: number;
+    pageSize: number;
+    pageCount: number;
+    counts: TaskListRouteData["counts"];
+  }>(`${origin}/api/tasks?${query.toString()}`);
 
   return {
     locale,
     dictionary,
     tasks: result.tasks,
     workspaceId,
+    total: result.total,
+    page: result.page,
+    pageSize: result.pageSize,
+    pageCount: result.pageCount,
+    counts: result.counts,
   };
 }
 

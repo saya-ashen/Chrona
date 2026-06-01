@@ -1253,6 +1253,23 @@
       "relativeMinutesAgo": "{count} 分钟前",
       "relativeHoursAgo": "{count} 小时前",
       "relativeDaysAgo": "{count} 天前",
+      "searchPlaceholder": "按标题或描述搜索",
+      "priorityAll": "全部优先级",
+      "sortLabel": "排序方式",
+      "sortFields": {
+        "updatedAt": "最近更新",
+        "createdAt": "创建时间",
+        "dueAt": "截止时间",
+        "title": "标题"
+      },
+      "sortAscending": "升序",
+      "sortDescending": "降序",
+      "paginationRange": "第 {start}-{end} 项，共 {total} 项",
+      "paginationPage": "第 {page} / {pageCount} 页",
+      "paginationPrevious": "上一页",
+      "paginationNext": "下一页",
+      "pageSizeLabel": "每页",
+      "pageSizeOption": "{count} 条/页",
       "filters": {
         "Running": "运行中",
         "WaitingForApproval": "等待审批",

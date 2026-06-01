@@ -1253,6 +1253,23 @@
       "relativeMinutesAgo": "{count}m ago",
       "relativeHoursAgo": "{count}h ago",
       "relativeDaysAgo": "{count}d ago",
+      "searchPlaceholder": "Search by title or description",
+      "priorityAll": "All priorities",
+      "sortLabel": "Sort by",
+      "sortFields": {
+        "updatedAt": "Last updated",
+        "createdAt": "Created",
+        "dueAt": "Due date",
+        "title": "Title"
+      },
+      "sortAscending": "Ascending",
+      "sortDescending": "Descending",
+      "paginationRange": "{start}-{end} of {total}",
+      "paginationPage": "Page {page} of {pageCount}",
+      "paginationPrevious": "Previous page",
+      "paginationNext": "Next page",
+      "pageSizeLabel": "Per page",
+      "pageSizeOption": "{count} / page",
       "filters": {
         "Running": "Running",
         "WaitingForApproval": "WaitingForApproval",

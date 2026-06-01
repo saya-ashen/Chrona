@@ -27,12 +27,19 @@ export function createTasksRoutes(engine: ChronaEngine) {
   return new Hono()
     .get("/tasks", zValidator("query", listTasksQuerySchema), async (c) => {
       try {
-        const { workspaceId, status, limit } = c.req.valid("query");
+        const { workspaceId, status, filter, priority, search, sort, order, page, pageSize } =
+          c.req.valid("query");
 
         const result = await engine.tasks.list({
           workspaceId,
           status: status ?? undefined,
-          limit,
+          filter,
+          priority,
+          search,
+          sort,
+          order,
+          page,
+          pageSize,
         });
 
         return json(c, result);

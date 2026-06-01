@@ -61,6 +61,18 @@ export type TaskListRouteData = {
     } | null;
   }[];
   workspaceId: string;
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  counts: {
+    all: number;
+    needsMe: number;
+    ready: number;
+    running: number;
+    completed: number;
+    failed: number;
+  };
 };
 
 export type WorkPageRouteData = {
@@ -185,8 +197,20 @@ export function SettingsRoutePage() {
 }
 
 export function TaskListRoutePage() {
-  const { tasks, workspaceId, dictionary } = useLoaderData() as TaskListRouteData;
-  return <TaskListPage tasks={tasks} workspaceId={workspaceId} copy={dictionary} />;
+  const { tasks, workspaceId, dictionary, total, page, pageSize, pageCount, counts } =
+    useLoaderData() as TaskListRouteData;
+  return (
+    <TaskListPage
+      tasks={tasks}
+      workspaceId={workspaceId}
+      copy={dictionary}
+      total={total}
+      page={page}
+      pageSize={pageSize}
+      pageCount={pageCount}
+      counts={counts}
+    />
+  );
 }
 
 export function TaskDetailRoutePage() {
