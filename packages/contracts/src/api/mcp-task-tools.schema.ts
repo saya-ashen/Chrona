@@ -110,6 +110,7 @@ export const taskCompletePayloadSchema = z.object({
   evidence: nodeEvidencePayloadSchema,
 }).strict();
 export const conditionSelectPayloadSchema = z.object({
+  nodeId: z.string().min(1),
   branchRef: z.string().min(1),
   summary: z.string().min(1),
   outputs: z.array(nodeResultOutputSchema).optional(),

@@ -476,8 +476,6 @@ const DEFAULT_COPY = {
   chronaNotesHelp: "Stored only in Chrona. It does not update the calendar source.",
   chronaNotesEmpty: "No Chrona notes yet.",
   calendarDescription: "Calendar description",
-  calendarDescriptionEmpty: "No calendar description provided.",
-  calendarDescriptionHelp: "Read-only calendar text. Edit it in the source calendar.",
   descriptionPlaceholder: "Optional execution context or desired outcome",
   runtimeParams: "Additional runtime params (JSON)",
   runtimeParamsPlaceholder: '{"customFlag": true}',
@@ -955,9 +953,10 @@ export function TaskConfigForm({
   const lockedFieldSet = useMemo(() => new Set(lockedFields), [lockedFields]);
   const isTitleLocked = lockedFieldSet.has("title");
   const isScheduleLocked = lockedFieldSet.has("scheduledStartAt") || lockedFieldSet.has("scheduledEndAt");
-  const hasSourceDescription = sourceDescription !== undefined;
-  const descriptionLabel = hasSourceDescription ? copy.chronaNotes : copy.description;
-  const descriptionPlaceholder = hasSourceDescription ? copy.chronaNotesPlaceholder : copy.descriptionPlaceholder;
+  const sourceDescriptionText = sourceDescription?.trim() ?? "";
+  const hasSourceDescription = sourceDescriptionText.length > 0;
+  const descriptionLabel = copy.description;
+  const descriptionPlaceholder = sourceDescription !== undefined ? copy.chronaNotesPlaceholder : copy.descriptionPlaceholder;
   const initialTitle = initialValues?.title;
   const initialDescription = initialValues?.description;
   const initialPriority = initialValues?.priority;
@@ -1177,7 +1176,15 @@ export function TaskConfigForm({
                 name="description"
                 control={control}
                 render={({ field, fieldState }) => (
-                  <TaskConfigSection title={descriptionLabel} info={hasSourceDescription ? copy.chronaNotesHelp : undefined}>
+                  <TaskConfigSection title={descriptionLabel}>
+                    {hasSourceDescription ? (
+                      <div className="mb-3 space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">{sourceDescriptionLabel ?? copy.calendarDescription}</p>
+                        <p className="min-h-20 select-text whitespace-pre-wrap rounded-md border border-dashed border-border/70 bg-muted/45 px-3 py-2 text-sm text-muted-foreground shadow-inner cursor-default">
+                          {sourceDescriptionText}
+                        </p>
+                      </div>
+                    ) : null}
                     <TaskConfigField
                       label={descriptionLabel}
                       htmlFor={field.name}
@@ -1198,14 +1205,6 @@ export function TaskConfigForm({
                   </TaskConfigSection>
                   )}
                 />
-
-                {hasSourceDescription ? (
-                  <TaskConfigSection title={sourceDescriptionLabel ?? copy.calendarDescription} info={copy.calendarDescriptionHelp}>
-                    <p className="mt-2 min-h-20 whitespace-pre-wrap rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-sm text-foreground">
-                      {sourceDescription || copy.calendarDescriptionEmpty}
-                    </p>
-                  </TaskConfigSection>
-                ) : null}
 
                 <TaskConfigSection
                   title={copy.schedule}
@@ -1394,7 +1393,15 @@ export function TaskConfigForm({
                   </TaskConfigField>
                 ) : null}
 
-                <TaskConfigSection title={descriptionLabel} info={hasSourceDescription ? copy.chronaNotesHelp : undefined} compact>
+                <TaskConfigSection title={descriptionLabel} compact>
+                  {hasSourceDescription ? (
+                    <div className="mb-3 space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">{sourceDescriptionLabel ?? copy.calendarDescription}</p>
+                      <p className="min-h-16 select-text whitespace-pre-wrap rounded-md border border-dashed border-border/70 bg-muted/45 px-3 py-2 text-sm text-muted-foreground shadow-inner cursor-default">
+                        {sourceDescriptionText}
+                      </p>
+                    </div>
+                  ) : null}
                   <TaskConfigField
                     label={descriptionLabel}
                     hideTitle
@@ -1415,14 +1422,6 @@ export function TaskConfigForm({
                     />
                   </TaskConfigField>
                 </TaskConfigSection>
-
-                {hasSourceDescription ? (
-                  <TaskConfigSection title={sourceDescriptionLabel ?? copy.calendarDescription} info={copy.calendarDescriptionHelp} compact>
-                    <p className="mt-2 min-h-16 whitespace-pre-wrap rounded-md border border-border/50 bg-muted/20 px-3 py-2 text-sm text-foreground">
-                      {sourceDescription || copy.calendarDescriptionEmpty}
-                    </p>
-                  </TaskConfigSection>
-                ) : null}
 
                 <TaskAutomationSection
                   compact

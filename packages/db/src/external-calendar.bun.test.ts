@@ -15,6 +15,37 @@ async function reset() {
   await db.calendarSource.deleteMany();
 }
 
+async function createWorkspaceAndCalendarSource(name: string) {
+  const workspace = await db.workspace.create({
+    data: { name, defaultRuntime: "debug", status: "Active" },
+  });
+  const source = await createCalendarSource({
+    workspaceId: workspace.id,
+    name: "Work",
+    sourceUrl: `https://calendar.example/${workspace.id}.ics`,
+    redactedUrlLabel: `calendar.example/${workspace.id}.ics`,
+    color: "#2563eb",
+  });
+  return { workspace, source };
+}
+
+async function syncMovedEventFixture(sourceId: string, workspaceId: string, startHour: number, title: string, description: string) {
+  const startsAt = `2026-05-30T${String(startHour).padStart(2, "0")}:00:00.000Z`;
+  const endsAt = `2026-05-30T${String(startHour + 1).padStart(2, "0")}:30:00.000Z`;
+  await replaceImportedCalendarEvents(sourceId, [{
+    workspaceId,
+    calendarSourceId: sourceId,
+    externalUid: "moved-event-1",
+    dedupeKey: `moved-event-1:single:${startsAt}`,
+    title,
+    description,
+    startsAt: new Date(startsAt),
+    endsAt: new Date(endsAt),
+    isAllDay: false,
+    status: "confirmed",
+  }], { now: new Date("2026-05-29T10:00:00.000Z") });
+}
+
 describe("external calendar repository", () => {
   beforeEach(reset);
 
@@ -182,6 +213,53 @@ describe("external calendar repository", () => {
     expect(importedEvent.task?.autoPlanGeneration).toBe(false);
     expect(importedEvent.task?.autoExecute).toBe(false);
     expect(result.automationRequests).toHaveLength(0);
+  });
+
+  it("moves imported tasks when the remote event time changes", async () => {
+    const { workspace, source } = await createWorkspaceAndCalendarSource("Calendar moved event DB");
+    await syncMovedEventFixture(source.id, workspace.id, 10, "Original meeting", "Original calendar description");
+    const firstImportedEvent = await db.importedCalendarEvent.findFirstOrThrow({
+      where: { workspaceId: workspace.id },
+      include: { task: true, workBlock: true },
+    });
+    if (!firstImportedEvent.taskId || !firstImportedEvent.workBlockId) throw new Error("Expected linked import");
+    await db.task.update({
+      where: { id: firstImportedEvent.taskId },
+      data: { description: "Chrona local notes" },
+    });
+
+    await syncMovedEventFixture(source.id, workspace.id, 12, "Moved meeting", "Updated calendar description");
+
+    const importedEvents = await db.importedCalendarEvent.findMany({
+      where: { workspaceId: workspace.id },
+      include: { task: { include: { projection: true } }, workBlock: true },
+    });
+    expect(importedEvents).toHaveLength(1);
+    expect(importedEvents[0]?.id).toBe(firstImportedEvent.id);
+    expect(importedEvents[0]?.taskId).toBe(firstImportedEvent.taskId);
+    expect(importedEvents[0]?.workBlockId).toBe(firstImportedEvent.workBlockId);
+    expect(importedEvents[0]?.description).toBe("Updated calendar description");
+    expect(importedEvents[0]?.task?.description).toBe("Chrona local notes");
+    expect(importedEvents[0]?.task?.title).toBe("Moved meeting");
+    expect(importedEvents[0]?.task?.projection?.scheduledStartAt?.toISOString()).toBe("2026-05-30T12:00:00.000Z");
+    expect(importedEvents[0]?.workBlock?.scheduledEndAt.toISOString()).toBe("2026-05-30T13:30:00.000Z");
+  });
+
+  it("cancels imported tasks when remote events disappear", async () => {
+    const { workspace, source } = await createWorkspaceAndCalendarSource("Calendar removed event DB");
+    await syncMovedEventFixture(source.id, workspace.id, 10, "Removed meeting", "Removed calendar description");
+
+    await replaceImportedCalendarEvents(source.id, [], { now: new Date("2026-05-29T10:00:00.000Z") });
+
+    const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
+      where: { workspaceId: workspace.id },
+      include: { task: { include: { projection: true, workBlocks: true } } },
+    });
+    expect(importedEvent.status).toBe("cancelled");
+    expect(importedEvent.task?.status).toBe("Cancelled");
+    expect(importedEvent.task?.projection?.persistedStatus).toBe("Cancelled");
+    expect(importedEvent.task?.projection?.scheduledStartAt).toBeNull();
+    expect(importedEvent.task?.workBlocks[0]?.status).toBe("Cancelled");
   });
 
   it("recreates imported event tasks when a stale taskId is left behind", async () => {

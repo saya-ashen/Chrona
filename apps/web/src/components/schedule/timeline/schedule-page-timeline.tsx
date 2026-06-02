@@ -545,6 +545,13 @@ export function DayTimeline({
 
     const hasConflict = Boolean(info.event.extendedProps.hasConflict);
     const isCurrent = Boolean(info.event.extendedProps.isCurrent);
+    const sourceManaged = item.sourceManaged ?? null;
+    const sourceStyle = sourceManaged
+      ? {
+          borderColor: sourceManaged.sourceColor,
+          backgroundColor: `${sourceManaged.sourceColor}18`,
+        }
+      : undefined;
 
     return (
       <div
@@ -556,6 +563,7 @@ export function DayTimeline({
               ? "border-primary/70 bg-primary/18"
               : "border-primary/45 bg-primary/12",
         )}
+        style={sourceStyle}
         draggable={!isPending}
         onDragStart={() => {
           setHiddenTaskId(item.taskId);
@@ -566,28 +574,43 @@ export function DayTimeline({
           onDragEnd();
         }}
       >
-        <div className={cn("w-1 shrink-0 rounded-full", isCurrent ? "bg-primary" : getPriorityAccent(item.priority))} />
+        <div
+          className={cn("w-1 shrink-0 rounded-full", !sourceManaged && (isCurrent ? "bg-primary" : getPriorityAccent(item.priority)))}
+          style={sourceManaged ? { backgroundColor: sourceManaged.sourceColor } : undefined}
+        />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-w-0 items-start justify-between gap-2">
             <p className="line-clamp-1 text-sm font-medium text-foreground">{info.event.title}</p>
-            <Badge variant="secondary" className="shrink-0 px-2 py-0 text-[10px]">
-              {item.priority}
-            </Badge>
+            <div className="flex shrink-0 items-center gap-1">
+              {sourceManaged ? (
+                <Badge
+                  variant="outline"
+                  className="gap-1 px-1.5 py-0 text-[10px]"
+                  title={externalCalendarMessages.readOnlyLabel}
+                >
+                  <CalendarDays className="size-3" />
+                  <span className="max-w-20 truncate">{sourceManaged.sourceName}</span>
+                </Badge>
+              ) : null}
+              <Badge variant="secondary" className="px-2 py-0 text-[10px]">
+                {item.priority}
+              </Badge>
+            </div>
           </div>
           <p className="truncate text-xs text-muted-foreground">
             {formatTimeRange(info.event.start, info.event.end, locale, copy)}
           </p>
-          {item.sourceManaged ? (
+          {sourceManaged ? (
             <span
               className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground"
               title={externalCalendarMessages.readOnlyLabel}
             >
               <span
                 className="size-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: item.sourceManaged.sourceColor }}
+                style={{ backgroundColor: sourceManaged.sourceColor }}
               />
               <CalendarDays className="size-3 shrink-0" />
-              <span className="truncate">{item.sourceManaged.sourceName}</span>
+              <span className="truncate">{sourceManaged.sourceName}</span>
             </span>
           ) : null}
           {hasConflict || item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
@@ -663,6 +686,7 @@ export function DayTimeline({
                   }}
                 >
                   {item.title}
+                  {item.sourceManaged ? ` · ${item.sourceManaged.sourceName} · ${externalCalendarMessages.readOnlyLabel}` : null}
                 </a>
                 <button
                   type="button"

@@ -123,31 +123,72 @@ export async function replaceImportedCalendarEvents(
       select: { defaultRuntime: true },
     });
 
+    const existingEvents = await tx.importedCalendarEvent.findMany({
+      where: { calendarSourceId },
+      orderBy: { updatedAt: "desc" },
+    });
+    const existingByIdentity = new Map<string, ImportedCalendarEvent>();
+    for (const event of existingEvents) {
+      const identity = importedCalendarEventIdentity(event);
+      if (!existingByIdentity.has(identity)) existingByIdentity.set(identity, event);
+    }
+
     const grouped = new Map<string, ImportedCalendarEvent[]>();
+    const syncedEventIds = new Set<string>();
     for (const event of events) {
-      const importedEvent = await tx.importedCalendarEvent.upsert({
-        where: {
-          calendarSourceId_dedupeKey: {
-            calendarSourceId,
+      const existingByStableIdentity = existingByIdentity.get(importedCalendarEventIdentity(event));
+      const importedEvent = existingByStableIdentity
+        ? await tx.importedCalendarEvent.update({
+          where: { id: existingByStableIdentity.id },
+          data: {
             dedupeKey: event.dedupeKey,
+            title: event.title,
+            description: event.description,
+            startsAt: event.startsAt,
+            endsAt: event.endsAt,
+            isAllDay: event.isAllDay,
+            status: event.status,
+            recurrenceId: event.recurrenceId,
+            recurrenceRule: event.recurrenceRule,
           },
-        },
-        create: event,
-        update: {
-          title: event.title,
-          description: event.description,
-          startsAt: event.startsAt,
-          endsAt: event.endsAt,
-          isAllDay: event.isAllDay,
-          status: event.status,
-          recurrenceId: event.recurrenceId,
-          recurrenceRule: event.recurrenceRule,
-        },
-      });
+        })
+        : await tx.importedCalendarEvent.upsert({
+          where: {
+            calendarSourceId_dedupeKey: {
+              calendarSourceId,
+              dedupeKey: event.dedupeKey,
+            },
+          },
+          create: event,
+          update: {
+            title: event.title,
+            description: event.description,
+            startsAt: event.startsAt,
+            endsAt: event.endsAt,
+            isAllDay: event.isAllDay,
+            status: event.status,
+            recurrenceId: event.recurrenceId,
+            recurrenceRule: event.recurrenceRule,
+          },
+        });
+      syncedEventIds.add(importedEvent.id);
       const group = grouped.get(importedEvent.externalUid) ?? [];
       group.push(importedEvent);
       grouped.set(importedEvent.externalUid, group);
       importedCount += 1;
+    }
+
+    const staleEvents = existingEvents.filter((event) => !syncedEventIds.has(event.id));
+    for (const event of staleEvents) {
+      const cancelledEvent = event.status === "cancelled"
+        ? event
+        : await tx.importedCalendarEvent.update({
+          where: { id: event.id },
+          data: { status: "cancelled" },
+        });
+      const group = grouped.get(cancelledEvent.externalUid) ?? [];
+      group.push(cancelledEvent);
+      grouped.set(cancelledEvent.externalUid, group);
     }
 
     for (const occurrences of grouped.values()) {
@@ -161,6 +202,12 @@ export async function replaceImportedCalendarEvents(
     }
   });
   return { importedCount, automationRequests };
+}
+
+function importedCalendarEventIdentity(
+  event: Pick<ImportedCalendarEventWrite, "externalUid" | "recurrenceId">,
+) {
+  return [event.externalUid, event.recurrenceId ?? "single"].join(":");
 }
 
 async function syncImportedCalendarSeries(

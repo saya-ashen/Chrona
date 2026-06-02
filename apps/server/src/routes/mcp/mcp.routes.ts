@@ -82,7 +82,7 @@ const externalTools = {
   chrona_condition_select: {
     internalName: "chrona.node.condition_select",
     title: "Chrona Condition Select",
-    description: "Select the current condition branch by branchRef. Does not accept backend node IDs.",
+    description: "Select a condition branch by nodeId and branchRef. Chrona validates the node against the current task.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.condition_select"]),
   },
   chrona_node_block: {

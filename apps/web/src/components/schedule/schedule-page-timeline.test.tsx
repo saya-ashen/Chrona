@@ -46,6 +46,7 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     runnabilityState: overrides.runnabilityState ?? "ready",
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",
     parentTaskId: null,
+    sourceManaged: overrides.sourceManaged ?? null,
   };
 }
 
@@ -56,7 +57,7 @@ afterEach(() => {
 
 describe("DayTimeline", () => {
   it("shows a normal placement preview when a dragged block overlaps an existing scheduled block", async () => {
-    render(
+    const { container } = render(
       <DayTimeline
         items={[createScheduledItem()]}
         dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
@@ -94,7 +95,7 @@ describe("DayTimeline", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 15, 9, 45, 0, 0));
 
-    render(
+    const { container } = render(
       <DayTimeline
         items={[createScheduledItem()]}
         dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
@@ -117,7 +118,7 @@ describe("DayTimeline", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 15, 9, 45, 0, 0));
 
-    render(
+    const { container } = render(
       <DayTimeline
         items={[createScheduledItem()]}
         dayDate={new Date(2026, 3, 16, 0, 0, 0, 0)}
@@ -134,6 +135,52 @@ describe("DayTimeline", () => {
     );
 
     expect(screen.queryByLabelText(/current time/i)).not.toBeInTheDocument();
+  });
+
+  it("marks source-managed calendar tasks with source name and color", async () => {
+    const { container } = render(
+      <DayTimeline
+        items={[
+          createScheduledItem({
+            title: "Synced calendar task",
+            sourceManaged: {
+              source: "external_calendar",
+              eventId: "event-1",
+              sourceName: "Product Calendar",
+              sourceColor: "#0f766e",
+              description: "Imported event",
+              immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"],
+            },
+          }),
+        ]}
+        dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
+        selectedDay="2026-04-15"
+        draggedItem={null}
+        executionRuntimes={[]}
+        defaultExecutionRuntime="hermes"
+        isPending={false}
+        onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
+        onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+        onScheduledDragStart={vi.fn()}
+        onDragEnd={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Product Calendar").length).toBeGreaterThan(0);
+    });
+    const taskLink = screen.getByRole("link", {
+      name: /Synced calendar task.*Product Calendar.*Read-only/i,
+    });
+    expect(taskLink).toBeInTheDocument();
+    const sourceCard = Array.from(container.querySelectorAll("[style]")).find(
+      (element): element is HTMLDivElement =>
+        element instanceof HTMLDivElement &&
+        ["#0f766e", "rgb(15, 118, 110)"].includes(element.style.borderColor),
+    );
+    expect(sourceCard).toHaveStyle({
+      borderColor: "#0f766e",
+    });
   });
 
   it("resizes a scheduled block from its end handle and commits the new end time", async () => {
