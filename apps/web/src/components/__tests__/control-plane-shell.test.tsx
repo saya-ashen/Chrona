@@ -96,8 +96,8 @@ import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 
 const defaultWorkspace = { id: "ws-1", name: "Default" };
-const mockCreateTaskFromSchedule = vi.mocked(createTaskFromSchedule);
-const mockStartTaskPlanGenerationSession = vi.mocked(startTaskPlanGenerationSession);
+const mockCreateTaskFromSchedule = createTaskFromSchedule as ReturnType<typeof vi.fn>;
+const mockStartTaskPlanGenerationSession = startTaskPlanGenerationSession as ReturnType<typeof vi.fn>;
 
 function writePreferences(preferences: ScheduleAiPreferences) {
   window.localStorage.setItem(

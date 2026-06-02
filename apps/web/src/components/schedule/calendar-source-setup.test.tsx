@@ -20,10 +20,10 @@ vi.mock("@/lib/external-calendar-client", () => ({
   validateCalendarSource: vi.fn(),
 }));
 
-const validateMock = vi.mocked(validateCalendarSource);
-const createMock = vi.mocked(createExternalCalendarSource);
-const errorMessageMock = vi.mocked(getExternalCalendarErrorMessage);
-const listMock = vi.mocked(listExternalCalendarSources);
+const validateMock = validateCalendarSource as ReturnType<typeof vi.fn>;
+const createMock = createExternalCalendarSource as ReturnType<typeof vi.fn>;
+const errorMessageMock = getExternalCalendarErrorMessage as ReturnType<typeof vi.fn>;
+const listMock = listExternalCalendarSources as ReturnType<typeof vi.fn>;
 
 afterEach(() => {
   cleanup();

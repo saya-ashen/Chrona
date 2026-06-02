@@ -145,6 +145,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         workspaceId,
         calendarSourceId: sourceId,
       }));
+
       const replacement = await replaceImportedCalendarEvents(sourceId, writes, {
         policy: source.syncPolicy,
         automationPolicy: source.automationPolicy,

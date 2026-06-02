@@ -119,6 +119,7 @@ function toPreviewText(value: string): string {
   return value
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/gi, " ")
+
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
@@ -529,7 +530,6 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
             {order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending}
           </Button>
         </div>
-
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
           <label className="flex items-center gap-2 font-medium text-foreground">
             <Checkbox

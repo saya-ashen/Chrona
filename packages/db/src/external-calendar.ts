@@ -335,6 +335,7 @@ async function syncImportedCalendarSeries(
     );
   }
 
+
   return automationRequest;
 }
 
