@@ -4,7 +4,7 @@
 
 1. Review `specs/012-activity-feed/spec.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/activity-feed-contract.md`.
 2. Run CodeGraph/GitNexus impact analysis before editing symbols that shape task page activity, runtime event state, node drawer tabs, or Command Center activity.
-3. Capture pre-edit `agent-browser` observation and screenshots for the task workspace at desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
+3. Capture pre-edit screenshots for the task workspace at desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
 4. Confirm current task, active/selected node, blocked/review state, and primary action are visible before changing UI.
 
 ## 2. Phase 1 Implementation Slice
@@ -56,7 +56,7 @@ bun run check:ui-foundation
 
 ## 6. Browser Verification
 
-After implementation, rerun `agent-browser` verification and capture evidence for:
+After implementation, rerun capture evidence for:
 
 - Desktop `1440x900`: Command Center Activity shows task-wide provider/tool activity; node drawer Activity shows selected-node activity.
 - Tablet `1024x768`: Feed remains readable; expandable tool details do not hide primary action.

@@ -185,7 +185,6 @@ description: "Task list for Improve Workspace UX implementation"
 - [X] T069 Capture post-edit desktop screenshot at 1440x900 in specs/007-improve-workspace-ux/post-desktop-1440x900.png
 - [X] T070 Capture post-edit tablet screenshot at 1024x768 in specs/007-improve-workspace-ux/post-tablet-1024x768.png
 - [X] T071 Capture post-edit mobile screenshot at 390x844 in specs/007-improve-workspace-ux/post-mobile-390x844.png
-- [X] T072 Capture post-edit `agent-browser snapshot -i` output and final diagnostics in specs/007-improve-workspace-ux/browser-evidence.md
 - [X] T073 Validate every acceptance scenario and success criterion in specs/007-improve-workspace-ux/spec.md against implementation evidence in specs/007-improve-workspace-ux/browser-evidence.md
 - [X] T074 Run final git diff review to confirm changed files match planned scope in specs/007-improve-workspace-ux/plan.md
 

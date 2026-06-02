@@ -23,8 +23,8 @@ description: "Task list for Global AI Sidebar implementation"
 **Purpose**: Prepare evidence folders and inspect current UI before editing.
 
 - [ ] T001 Create `specs/009-global-ai-sidebar/evidence/` for browser screenshots, snapshots, and validation notes
-- [ ] T002 Capture pre-edit `agent-browser` task workspace evidence at 1440x900, 1024x768, and 390x844 in `specs/009-global-ai-sidebar/evidence/pre-edit-task.md`
-- [ ] T003 Capture pre-edit `agent-browser` schedule page evidence at 1440x900, 1024x768, and 390x844 in `specs/009-global-ai-sidebar/evidence/pre-edit-schedule.md`
+- [ ] T002 Capture pre-edit task workspace evidence at 1440x900, 1024x768, and 390x844 in `specs/009-global-ai-sidebar/evidence/pre-edit-task.md`
+- [ ] T003 Capture pre-edit schedule page evidence at 1440x900, 1024x768, and 390x844 in `specs/009-global-ai-sidebar/evidence/pre-edit-schedule.md`
 - [X] T004 [P] Review current global shell integration points in `apps/web/src/components/control-plane-shell.tsx`
 - [X] T005 [P] Review current task workspace apply/proposal ownership in `apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx`
 - [X] T006 [P] Review current schedule apply/drag/drop ownership in `apps/web/src/components/schedule/schedule-page.tsx`
@@ -74,7 +74,7 @@ description: "Task list for Global AI Sidebar implementation"
 - [X] T025 [P] [US1] Implement conversation thread empty, loading, informational, proposal, error, and success message states in `apps/web/src/components/global-ai-sidebar/conversation-thread.tsx`
 - [X] T026 [US1] Wire `GlobalAiSidebarProvider`, `GlobalAiSidebarEntry`, and `GlobalAiSidebar` into the top-level app chrome in `apps/web/src/components/control-plane-shell.tsx`
 - [ ] T027 [US1] Ensure route navigation updates sidebar context without closing the panel in `apps/web/src/router.tsx`
-- [ ] T028 [US1] Capture post-edit `agent-browser` evidence for global entry, open, close, navigation context switching, and no mobile horizontal scroll in `specs/009-global-ai-sidebar/evidence/us1-post-edit.md`
+- [ ] T028 [US1] Capture post-edit for global entry, open, close, navigation context switching, and no mobile horizontal scroll in `specs/009-global-ai-sidebar/evidence/us1-post-edit.md`
 
 **Checkpoint**: MVP is usable independently and does not apply any data changes.
 
@@ -100,7 +100,7 @@ description: "Task list for Global AI Sidebar implementation"
 - [X] T035 [US2] Route task confirm, dismiss, and refine controls through existing task proposal/apply handlers while blocking stale confirmations in `apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx`
 - [ ] T036 [US2] Add task-specific loading, unavailable, success, failure, and safe retry copy to `apps/web/src/i18n/messages/en.json`
 - [ ] T037 [US2] Add task-specific loading, unavailable, success, failure, and safe retry copy to `apps/web/src/i18n/messages/zh.json`
-- [ ] T038 [US2] Capture post-edit `agent-browser` evidence for task context, blocker/review visibility, task preview, confirm, dismiss, stale state, and mobile no-horizontal-scroll in `specs/009-global-ai-sidebar/evidence/us2-post-edit.md`
+- [ ] T038 [US2] Capture post-edit for task context, blocker/review visibility, task preview, confirm, dismiss, stale state, and mobile no-horizontal-scroll in `specs/009-global-ai-sidebar/evidence/us2-post-edit.md`
 
 **Checkpoint**: Task assistance is independently testable and every task mutation requires explicit confirmation.
 
@@ -128,7 +128,7 @@ description: "Task list for Global AI Sidebar implementation"
 - [X] T047 [US3] Route schedule confirm, dismiss, and refine controls through existing schedule apply/refresh paths while removing ghost blocks on dismiss, regenerate, route change, or successful confirm in `apps/web/src/components/schedule/schedule-page.tsx`
 - [ ] T048 [US3] Add schedule-specific quick action and preview copy to `apps/web/src/i18n/messages/en.json`
 - [ ] T049 [US3] Add schedule-specific quick action and preview copy to `apps/web/src/i18n/messages/zh.json`
-- [ ] T050 [US3] Capture post-edit `agent-browser` evidence for schedule context, ghost blocks, conflicts, confirm, dismiss, stale state, and mobile no-horizontal-scroll in `specs/009-global-ai-sidebar/evidence/us3-post-edit.md`
+- [ ] T050 [US3] Capture post-edit for schedule context, ghost blocks, conflicts, confirm, dismiss, stale state, and mobile no-horizontal-scroll in `specs/009-global-ai-sidebar/evidence/us3-post-edit.md`
 
 **Checkpoint**: Schedule assistance is independently testable and ghost blocks never persist before confirmation.
 
@@ -153,7 +153,7 @@ description: "Task list for Global AI Sidebar implementation"
 - [X] T056 [US4] Ensure informational responses are visually distinct from actionable previews and never render confirm controls in `apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx`
 - [ ] T057 [US4] Add follow-up, alternative, informational-only, and refine copy to `apps/web/src/i18n/messages/en.json`
 - [ ] T058 [US4] Add follow-up, alternative, informational-only, and refine copy to `apps/web/src/i18n/messages/zh.json`
-- [ ] T059 [US4] Capture post-edit `agent-browser` evidence for follow-up conversation, informational-only response, proposal refinement, and mobile no-horizontal-scroll in `specs/009-global-ai-sidebar/evidence/us4-post-edit.md`
+- [ ] T059 [US4] Capture post-edit for follow-up conversation, informational-only response, proposal refinement, and mobile no-horizontal-scroll in `specs/009-global-ai-sidebar/evidence/us4-post-edit.md`
 
 **Checkpoint**: Conversation and refinement work without weakening preview-before-confirm safety.
 
@@ -200,7 +200,7 @@ description: "Task list for Global AI Sidebar implementation"
 - Write story tests before implementation and verify failures where feasible.
 - Implement adapters before wiring page integration.
 - Keep confirmed mutations owned by existing task and schedule page flows.
-- Capture story-specific `agent-browser` evidence before closing the story.
+- Capture story-specific before closing the story.
 - Validate no mutating AI action runs before a visible preview and explicit confirmation.
 
 ---
@@ -279,5 +279,5 @@ Task: "Add e2e coverage for follow-up explanation and alternative proposal refin
 
 - Existing backend APIs remain unchanged unless an implementation gap is documented before coding.
 - Existing task and schedule mutation paths remain authoritative; sidebar confirm handlers call those paths only after a visible preview and explicit confirmation.
-- `agent-browser` evidence is mandatory for UI changes at 1440x900, 1024x768, and 390x844.
+- is mandatory for UI changes at 1440x900, 1024x768, and 390x844.
 - Mobile layouts must not horizontally scroll while the sidebar is open.

@@ -36,18 +36,16 @@ export function TaskPlanGraphPanel({
   return (
     <div
       className={cn(
-        "relative flex min-w-0 flex-col overflow-hidden rounded-[1.25rem] border border-slate-900/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94)_64%,rgba(30,41,59,0.96))] p-1.5 text-slate-100 shadow-[0_18px_60px_rgba(15,23,42,0.22)] ring-1 ring-white/8",
+        "relative flex min-w-0 flex-col overflow-hidden text-foreground",
         fillHeight && "h-full min-h-0",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-24 rounded-full bg-cyan-400/16 blur-3xl" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-900/70 to-transparent" />
       <div className="sr-only">
         {label} {summary}
       </div>
       {actions ? (
-        <div className="absolute right-2.5 top-2.5 z-[8] rounded-full border border-white/10 bg-slate-950/70 p-1 shadow-[0_12px_34px_rgba(15,23,42,0.28)] backdrop-blur [&_button]:border-white/10 [&_button]:bg-white/10 [&_button]:text-slate-100 [&_button]:shadow-sm [&_button:hover]:bg-white/15">
+        <div className="absolute right-2.5 top-2.5 z-[8] rounded-full border border-border bg-card p-1 shadow-sm [&_button]:border-border [&_button]:bg-background [&_button]:text-foreground [&_button]:shadow-sm [&_button:hover]:bg-accent/40">
           {actions}
         </div>
       ) : null}

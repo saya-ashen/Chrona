@@ -21,12 +21,14 @@ import { EmptyState } from "./schedule-panel-primitives";
  */
 
 export function ScheduleLeftSidebar({
+  copy,
   locale,
   activeView,
   viewModel,
   localizeHref,
   buildScheduleViewHref,
 }: {
+  copy: SchedulePageCopy;
   locale: Locale | undefined;
   activeView: ScheduleViewMode;
   viewModel: SchedulePageViewModel;
@@ -58,20 +60,20 @@ export function ScheduleLeftSidebar({
 
       <Card className="space-y-3">
         <CardHeader>
-          <CardTitle>Insights</CardTitle>
-          <CardDescription>Task distribution and risk signals</CardDescription>
+          <CardTitle>{copy.insightsTitle}</CardTitle>
+          <CardDescription>{copy.insightsDescription}</CardDescription>
         </CardHeader>
         <div className="space-y-2 text-sm">
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
-            <p className="text-xs text-muted-foreground">Selected day</p>
+            <p className="text-xs text-muted-foreground">{copy.selectedDay}</p>
             <p className="mt-1 font-medium text-foreground">{selectedDay?.label ?? "-"}</p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
-            <p className="text-xs text-muted-foreground">Scheduled items</p>
+            <p className="text-xs text-muted-foreground">{copy.scheduledItems}</p>
             <p className="mt-1 text-lg font-semibold text-foreground">{selectedDay?.scheduledCount ?? 0}</p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
-            <p className="text-xs text-muted-foreground">Risk items</p>
+            <p className="text-xs text-muted-foreground">{copy.riskItems}</p>
             <p className="mt-1 text-lg font-semibold text-destructive">{selectedDay?.riskCount ?? 0}</p>
           </div>
         </div>
@@ -107,7 +109,7 @@ export function ScheduleRightSidebar({
           <CardTitle>{copy.unscheduledQueue}</CardTitle>
           <CardDescription>{copy.unscheduledQueueDescription}</CardDescription>
         </CardHeader>
-        <CardContent className="max-h-[26rem] overflow-y-auto pr-3 xl:max-h-[calc(100vh-19rem)]">
+        <CardContent className="overflow-visible pr-0 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-3">
           {viewData.unscheduled.length === 0 ? (
             <EmptyState>{copy.noUnscheduledWork}</EmptyState>
           ) : (

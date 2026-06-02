@@ -209,7 +209,7 @@ export function TaskPlanGraphFrame({
     <div
       aria-label={graphCopy.ariaLabel}
       className={cn(
-        "relative min-w-0 max-w-full overflow-hidden rounded-[28px] border border-white/10 bg-slate-950 text-slate-100 shadow-[0_28px_90px_rgba(2,6,23,0.24)]",
+        "relative min-w-0 max-w-full overflow-hidden rounded-[28px] border border-border bg-[linear-gradient(180deg,var(--background),var(--canvas))] text-card-foreground shadow-sm",
         fillHeight && "flex h-full min-h-0 flex-col",
       )}
       data-canvas-pan="true"
@@ -222,8 +222,7 @@ export function TaskPlanGraphFrame({
       data-renderer="react-flow"
       data-testid={testId}
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_78%_24%,rgba(168,85,247,0.20),transparent_30%),linear-gradient(135deg,rgba(15,23,42,0.72),rgba(2,6,23,0.96)_62%,rgba(15,23,42,0.92))]" />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.055)_1px,transparent_1px)] [background-size:42px_42px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] opacity-30 [background-size:42px_42px]" />
       <div className={cn("relative min-w-0 max-w-full", fillHeight && "flex min-h-0 flex-1 flex-col")}>
         {overview ? <div className="absolute inset-x-3 top-3 z-[7]">{overview}</div> : null}
         <div
@@ -286,29 +285,29 @@ export function TaskPlanGraphFrame({
           graphCopy={graphCopy}
           placement={hasOverview ? "bottom" : "top"}
         />
-        <div className="absolute bottom-3 right-3 top-auto z-[7] flex flex-wrap justify-end gap-1.5 rounded-[18px] border border-white/10 bg-slate-950/62 p-1.5 shadow-[0_18px_50px_rgba(2,6,23,0.32)] backdrop-blur-xl sm:top-3 sm:bottom-auto" aria-label={graphCopy.controlPanel} data-testid="task-plan-graph-controls">
+        <div className="absolute bottom-3 right-3 top-auto z-[7] flex flex-wrap justify-end gap-1.5 rounded-[18px] border border-border bg-background p-1.5 shadow-sm sm:top-3 sm:bottom-auto" aria-label={graphCopy.controlPanel} data-testid="task-plan-graph-controls">
           <span
             className={cn(
-              "pointer-events-none basis-full px-2 text-right text-[0.68rem] font-medium text-cyan-100/78 transition-opacity duration-200 sm:basis-auto sm:self-center",
+              "pointer-events-none basis-full px-2 text-right text-[0.68rem] font-medium text-muted-foreground transition-opacity duration-200 sm:basis-auto sm:self-center",
               showWheelZoomHint ? "opacity-100" : "opacity-0",
             )}
             data-testid="task-plan-graph-wheel-hint"
           >
             {graphCopy.wheelZoomHint}
           </span>
-          <Button type="button" aria-label={graphCopy.zoomIn} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={handleZoomIn}>
+          <Button type="button" aria-label={graphCopy.zoomIn} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleZoomIn}>
             <Plus className="size-4" />
           </Button>
-          <Button type="button" aria-label={graphCopy.zoomOut} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={handleZoomOut}>
+          <Button type="button" aria-label={graphCopy.zoomOut} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleZoomOut}>
             <Minus className="size-4" />
           </Button>
-          <Button type="button" aria-label={graphCopy.fitGraph} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={() => fitGraph()}>
+          <Button type="button" aria-label={graphCopy.fitGraph} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={() => fitGraph()}>
             <Scan className="size-4" />
           </Button>
-          <Button type="button" aria-label={graphCopy.centerCurrentNode} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={handleCenterCurrentNode}>
+          <Button type="button" aria-label={graphCopy.centerCurrentNode} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleCenterCurrentNode}>
             <LocateFixed className="size-4" />
           </Button>
-          <Button type="button" aria-label={graphCopy.expandGraph} variant="ghost" size="icon" className="size-8 rounded-xl border border-white/10 bg-white/8 text-slate-100 shadow-none backdrop-blur transition hover:bg-white/14 hover:text-white focus-visible:ring-cyan-300/60" onClick={onExpandGraph}>
+          <Button type="button" aria-label={graphCopy.expandGraph} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={onExpandGraph}>
             <Maximize2 className="size-4" />
           </Button>
         </div>

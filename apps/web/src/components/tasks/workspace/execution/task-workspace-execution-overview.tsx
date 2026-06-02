@@ -72,8 +72,8 @@ export function TaskWorkspaceExecutionOverview({
   ];
 
   return (
-    <aside aria-label={ws.executionOverviewAria ?? "Execution overview"} className="min-h-0 min-w-0">
-      <div className="rounded-[1.15rem] border border-border/70 bg-card/90 p-3 shadow-sm backdrop-blur">
+    <aside aria-label={ws.executionOverviewAria ?? "Execution overview"} className="min-h-0 min-w-0 rounded-[1.15rem] bg-background/75 p-3">
+      <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
@@ -86,7 +86,7 @@ export function TaskWorkspaceExecutionOverview({
           </div>
         </div>
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CommandCenterTab)} className="gap-2">
-          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-[0.9rem] border border-border/70 bg-muted/60 p-1">
+          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-[0.9rem] bg-muted/70 p-1">
             {tabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id} onClick={() => setActiveTab(tab.id)} className="rounded-[0.7rem] px-2 py-1.5 text-xs font-semibold data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm">
                 {tab.label}
@@ -116,7 +116,7 @@ export function TaskWorkspaceExecutionOverview({
 
 function PrimaryActionCard({ action, copy }: { action: CommandCenterPrimaryAction; copy: TaskWorkspaceCopy }) {
   return (
-    <section className={cn("rounded-[1rem] border p-3 shadow-sm", cardToneClass(action.tone ?? "info"))}>
+    <section className={cn("rounded-[1rem] border p-3", cardToneClass(action.tone ?? "info"))}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{copy.currentOperation ?? "Current operation"}</p>
@@ -142,18 +142,18 @@ function PrimaryActionCard({ action, copy }: { action: CommandCenterPrimaryActio
 }
 
 function cardToneClass(tone: ExecutionOverviewCard["tone"]) {
-  if (tone === "critical") return "border-destructive/30 bg-destructive/10 ring-1 ring-destructive/15";
-  if (tone === "warning") return "border-warning/40 bg-warning/10 ring-1 ring-warning/20";
-  if (tone === "success") return "border-success/30 bg-success/10 ring-1 ring-success/15";
-  if (tone === "info") return "border-info/30 bg-info/10 ring-1 ring-info/15";
-  return "border-border bg-card/85";
+  if (tone === "critical") return "border-destructive/30 bg-destructive/10";
+  if (tone === "warning") return "border-warning/40 bg-warning/10";
+  if (tone === "success") return "border-success/30 bg-success/10";
+  if (tone === "info") return "border-info/30 bg-info/10";
+  return "border-border bg-muted/45";
 }
 
 function LatestResultCard({ card, onAction, copy }: { card: ExecutionOverviewCard; onAction?: OverviewAction; copy: TaskWorkspaceCopy }) {
   const resultText = card.content?.trim() || card.description;
 
   return (
-    <section className="rounded-[1rem] border border-border/70 bg-card/90 p-3 shadow-sm">
+    <section className="rounded-[1rem] bg-transparent p-1">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -163,7 +163,7 @@ function LatestResultCard({ card, onAction, copy }: { card: ExecutionOverviewCar
         </div>
         {card.statusLabel ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{card.statusLabel}</span> : null}
       </div>
-      <div className="mt-2 max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-muted/40 px-2.5 py-2 text-[13px] leading-[1.45] text-foreground/80">
+      <div className="mt-2 max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-muted/50 px-2.5 py-2 text-[13px] leading-[1.45] text-foreground/80">
         {resultText === (copy.noResultYet ?? "No execution result yet.")
           ? (copy.resultPlaceholder ?? "Result summary will appear here after the current node finishes.")
           : resultText}
@@ -185,7 +185,7 @@ function ArtifactsCard({ artifacts, onAction, copy }: { artifacts: WorkspaceArti
   const visibleArtifacts = showAll ? artifacts : artifacts.slice(0, COLLAPSED_LIMIT);
 
   return (
-    <section className="rounded-[1rem] border border-border/70 bg-card/90 p-3 shadow-sm">
+    <section className="rounded-[1rem] bg-transparent p-1">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Archive className="size-4 text-primary" />
@@ -197,7 +197,7 @@ function ArtifactsCard({ artifacts, onAction, copy }: { artifacts: WorkspaceArti
       ) : (
         <div className="mt-2 space-y-1.5">
           {visibleArtifacts.map((artifact) => (
-            <div key={artifact.id} className="rounded-xl border border-border/60 bg-muted/40 px-2 py-1.5">
+            <div key={artifact.id} className="rounded-xl bg-muted/45 px-2 py-1.5">
               <button
                 type="button"
                 className="flex w-full items-center gap-2 text-left"
@@ -213,7 +213,7 @@ function ArtifactsCard({ artifacts, onAction, copy }: { artifacts: WorkspaceArti
                 </span>
               </button>
               {expandedArtifactId === artifact.id ? (
-                <div className="mt-2 rounded-lg border border-border/70 bg-background/85 p-2">
+                <div className="mt-2 rounded-lg bg-background/80 p-2">
                   {artifact.content ? (
                     <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{artifact.content}</pre>
                   ) : (

@@ -36,7 +36,7 @@
 
 **Alternatives considered**: New `/api/ai/sidebar` endpoint was rejected for this phase because the spec emphasizes preview and confirmation UX, not a new AI backend contract.
 
-## Decision: Required browser evidence via `agent-browser`
+## Decision: Required browser evidence via 
 
 **Rationale**: Constitution requires pre-edit observation and post-edit desktop, tablet, and mobile verification for frontend UX changes. The sidebar changes layout and navigation behavior, so screenshots and snapshots are release evidence.
 

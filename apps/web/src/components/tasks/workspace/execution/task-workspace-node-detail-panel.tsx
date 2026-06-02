@@ -81,7 +81,7 @@ function EmptyDetailState() {
       aria-label={copy.currentNodeDetails ?? "Current node details"}
       className="scroll-mt-4"
     >
-      <div className="rounded-[1.35rem] border border-dashed border-border bg-card/75 px-4 py-5 shadow-sm backdrop-blur">
+      <div className="rounded-[1.15rem] border border-dashed border-border bg-muted/45 px-4 py-5">
         <p className="text-sm font-semibold text-foreground">
           {copy.emptyDetailState ?? "No active node selected"}
         </p>
@@ -124,7 +124,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
 
   return (
     <div className="grid gap-3">
-      <div className="rounded-[1rem] border border-border/70 bg-card/90 p-3 shadow-sm">
+      <div className="rounded-[1rem] bg-transparent p-1">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <p className="text-sm font-semibold text-foreground">
             {copy.resultSummary ?? "Result summary"}
@@ -456,7 +456,7 @@ export function WorkspaceNodeActionControls({
   }
 
   return (
-    <div className={cn("rounded-[1rem] border border-warning/40 bg-warning/10 p-3 shadow-sm", className)}>
+    <div className={cn("rounded-[1rem] border border-warning/40 bg-warning/10 p-3", className)}>
       <p className="text-sm font-semibold text-foreground">{copy.actionRequiredTitle ?? "Action required"}</p>
       <p className="mt-1 break-words text-sm text-muted-foreground">
         {node.nextAction ??
@@ -527,7 +527,7 @@ export function WorkspaceNodeActionControls({
           ) : null}
         </form>
       ) : (
-        <p className="mt-2 rounded-xl border border-border/70 bg-background/80 px-2.5 py-1.5 text-sm text-muted-foreground">
+        <p className="mt-2 rounded-xl bg-background/70 px-2.5 py-1.5 text-sm text-muted-foreground">
           {node.interactionType === "wait"
             ? "This node is waiting on an external event, so there is no manual form to fill here."
             : "This node does not require free-form input."}
@@ -544,7 +544,7 @@ export function WorkspaceNodeActionControls({
         />
       ) : null}
       {actionStatus ? (
-        <p className="mt-2 rounded-xl border border-border/70 bg-background/85 px-2.5 py-1.5 text-sm text-muted-foreground" role="status">
+        <p className="mt-2 rounded-xl bg-background/75 px-2.5 py-1.5 text-sm text-muted-foreground" role="status">
           {actionStatus}
         </p>
       ) : null}
@@ -560,7 +560,7 @@ function ConfigurationTab({
   nodes: PlanNodeDataModel[];
 }) {
   return (
-    <div className="rounded-[1rem] border border-border/70 bg-card/90 p-3 shadow-sm">
+    <div className="rounded-[1rem] bg-transparent p-1">
       <TaskPlanGraphInspectorDetails
         node={node}
         graphCopy={DEFAULT_GRAPH_COPY}

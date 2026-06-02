@@ -50,7 +50,7 @@
 
 ## Decision: Required Validation Uses Browser Evidence And E2E
 
-**Decision**: Implementation must include `agent-browser` observation before UI edits, post-edit verification at `1440x900`, `1024x768`, and `390x844`, plus `bun run test:e2e` because navigation/task/schedule flows are affected.
+**Decision**: Implementation must include before UI edits, post-edit verification at `1440x900`, `1024x768`, and `390x844`, plus `bun run test:e2e` because navigation/task/schedule flows are affected.
 
 **Rationale**: Constitution requires browser evidence for frontend UX changes and e2e coverage when task, schedule, or navigation flows change.
 

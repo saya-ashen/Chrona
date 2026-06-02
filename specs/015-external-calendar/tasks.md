@@ -67,12 +67,10 @@
 
 ### Implementation for User Story 1
 
-- [X] T026 [US1] Capture pre-edit agent-browser schedule/settings observation for source setup at 1440x900, 1024x768, and 390x844 in specs/015-external-calendar/verification/us1-pre-ui.md
 - [X] T027 [US1] Implement calendar source setup form with name, URL, color, validation result, read-only guidance, and submit states in apps/web/src/components/schedule/calendar-source-setup.tsx
 - [X] T028 [US1] Integrate source setup form into the schedule/settings surface without changing unrelated task behavior in apps/web/src/components/schedule/schedule-view.tsx
 - [X] T029 [US1] Wire add-source API state, optimistic-safe submit handling, and invalid-link error mapping in apps/web/src/lib/external-calendar-client.ts
 - [X] T030 [US1] Show connected source empty state and initial imported-event count after create in apps/web/src/components/schedule/calendar-source-setup.tsx
-- [X] T031 [US1] Capture post-edit agent-browser verification for valid source add, invalid source rejection, empty source state, and no mobile horizontal scroll in specs/015-external-calendar/verification/us1-post-ui.md
 - [X] T032 [US1] Validate US1 performance budget for source validation/save under 2 seconds with fixture transport in specs/015-external-calendar/verification/us1-performance.md
 
 **Checkpoint**: US1 is fully functional and independently testable as MVP.
@@ -99,7 +97,6 @@
 - [X] T039 [US2] Fetch external events alongside existing schedule data without changing task scheduling contracts in apps/web/src/components/schedule/schedule-view.tsx
 - [X] T040 [US2] Render external calendar event blocks with title, time range, source name/color, read-only marker, and overlap distinction in apps/web/src/components/schedule/external-calendar-event-block.tsx
 - [X] T041 [US2] Preserve current task, active node, blocked/review state, and primary action clarity while external events are visible in apps/web/src/components/schedule/schedule-view.tsx
-- [X] T042 [US2] Capture agent-browser verification for external event display, overlaps, desktop/tablet/mobile responsiveness, and no mobile horizontal scroll in specs/015-external-calendar/verification/us2-post-ui.md
 - [X] T043 [US2] Validate schedule responsiveness with 5 sources and 500 visible imported events in specs/015-external-calendar/verification/us2-performance.md
 
 **Checkpoint**: US2 is independently testable with fixture calendar data and does not create Chrona tasks.
@@ -125,7 +122,6 @@
 - [X] T049 [US3] Implement rename, recolor, disable, enable, refresh, and remove actions with loading, success, partial-sync, failure, and destructive confirmation states in apps/web/src/components/schedule/calendar-source-actions.tsx
 - [X] T050 [US3] Complete PATCH, refresh, and DELETE route behavior for source metadata, lifecycle state, sync status, and idempotent removal in apps/server/src/routes/calendar-sources.routes.ts
 - [X] T051 [US3] Ensure disabled and removed source events disappear from schedule queries immediately while re-enabled sources avoid duplicates in apps/server/src/services/external-calendar-service.ts
-- [X] T052 [US3] Capture agent-browser verification for source management states and desktop/tablet/mobile no-horizontal-scroll behavior in specs/015-external-calendar/verification/us3-post-ui.md
 
 **Checkpoint**: US3 is independently testable and source state changes are reflected in source management and schedule views.
 
@@ -170,7 +166,7 @@
 
 - Tests are written first and should fail before implementation.
 - Services and routes rely on foundational contracts, persistence, and import logic.
-- UI work requires pre-edit `agent-browser` evidence where specified and post-edit verification before story closure.
+- UI work requires pre-edit where specified and post-edit verification before story closure.
 - Story is complete only when its independent test criteria, automated tests, browser evidence, and performance notes are satisfied.
 
 ## Parallel Opportunities

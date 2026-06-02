@@ -201,7 +201,7 @@ export function ControlPlaneShell({
                 onClick={() => setShowCreateTaskDialog(true)}
                 variant="default"
                 size="sm"
-                className="h-8 gap-1.5 px-2.5 sm:px-3"
+                className="h-10 gap-1.5 px-3 sm:px-3.5"
               >
                 <Plus className="size-4" />
                 <span className="hidden sm:inline">{t("nav.newTask")}</span>

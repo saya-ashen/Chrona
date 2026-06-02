@@ -69,7 +69,7 @@ function ToolDetails({ item }: { item: WorkspaceActivityItem }) {
   if (detailRows.length === 0) return null;
 
   return (
-    <div className="mt-1.5 rounded-xl border border-border/70 bg-card/75 p-2">
+    <div className="mt-1.5 rounded-xl bg-muted/45 p-2">
       <Button type="button" variant="ghost" size="sm" className="h-7 rounded-full px-2 text-xs" onClick={() => setExpanded((value) => !value)}>
         {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
         {expanded ? taskWorkspaceActivityMessages.hideToolDetails : taskWorkspaceActivityMessages.showToolDetails}
@@ -106,7 +106,7 @@ function ActivityRow({ item }: { item: WorkspaceActivityItem }) {
           {item.tool ? <Badge variant={toneBadgeVariant(item.tone)} className="gap-1 text-[10px]"><Wrench className="size-3" />{item.tool.state}</Badge> : null}
         </div>
         {isReasoning ? (
-          <details className="mt-1 rounded-lg border border-border/70 bg-card/70 px-2 py-1.5 text-xs text-muted-foreground">
+          <details className="mt-1 rounded-lg bg-muted/45 px-2 py-1.5 text-xs text-muted-foreground">
             <summary className="cursor-pointer font-medium text-foreground/80">{taskWorkspaceActivityMessages.reasoningDetails}</summary>
             <CollapsibleActivityText text={text} className="mt-1 leading-5" />
           </details>
@@ -141,7 +141,7 @@ export function WorkspaceActivityFeed({
   const items = mergeWorkspaceActivity([...runtimeEventsToWorkspaceActivity(runtimeEvents, limit), ...activity], limit);
 
   return (
-    <section className="rounded-[1rem] border border-border/70 bg-card/90 p-3 shadow-sm">
+    <section className="rounded-[1rem] bg-transparent p-1">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <CalendarClock className="size-4 text-primary" />

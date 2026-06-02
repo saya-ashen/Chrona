@@ -11,7 +11,7 @@
 
 **Purpose**: Capture current behavior and prepare shared feature workspace before implementation.
 
-- [ ] T001 Capture pre-edit `agent-browser` baseline for current top-bar AI entry, sidebar open behavior, Schedule page, Task workspace page, and mobile overflow evidence in specs/010-ai-dropdown-surface/quickstart.md
+- [ ] T001 Capture pre-edit baseline for current top-bar AI entry, sidebar open behavior, Schedule page, Task workspace page, and mobile overflow evidence in specs/010-ai-dropdown-surface/quickstart.md
 - [X] T002 [P] Inventory all current global AI sidebar imports and usage sites in specs/010-ai-dropdown-surface/research.md
 - [X] T003 [P] Review existing sidebar contracts and note migration mapping from packages/contracts/src/ai-sidebar.ts to Assistant Surface State in specs/010-ai-dropdown-surface/contracts/assistant-surface-state.md
 - [X] T004 [P] Review existing schedule and task proposal preview ownership paths and document target routing in specs/010-ai-dropdown-surface/contracts/proposal-routing.md
@@ -70,7 +70,7 @@
 - [X] T032 [US1] Remove or stop importing standalone sidebar panel components from apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx
 - [X] T033 [US1] Apply assistant surface localized strings in apps/web/src/i18n/messages/en.json
 - [X] T034 [US1] Apply assistant surface localized strings in apps/web/src/i18n/messages/zh.json
-- [X] T035 [US1] Capture post-edit `agent-browser` verification for US1 at desktop 1440x900, tablet 1024x768, and mobile 390x844 in specs/010-ai-dropdown-surface/quickstart.md
+- [X] T035 [US1] Capture post-edit for US1 at desktop 1440x900, tablet 1024x768, and mobile 390x844 in specs/010-ai-dropdown-surface/quickstart.md
 
 **Checkpoint**: User Story 1 works independently as the MVP: one top-bar dropdown entry, no sidebar, visible active-page status.
 
@@ -101,7 +101,7 @@
 - [ ] T047 [US2] Render server-provided quick actions, descriptions, severity, preview expectation, disabled reasons, and empty state in apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx
 - [ ] T048 [US2] Remove hardcoded quick-action derivation from Schedule AI sidebar adapter path in apps/web/src/components/schedule/adapters/schedule-ai-sidebar-adapter.ts
 - [ ] T049 [US2] Remove hardcoded quick-action derivation from Task AI sidebar adapter path in apps/web/src/components/tasks/workspace/adapters/task-ai-sidebar-adapter.ts
-- [ ] T050 [US2] Capture post-edit `agent-browser` verification for server-provided actions on Schedule, Task, and Workbench states in specs/010-ai-dropdown-surface/quickstart.md
+- [ ] T050 [US2] Capture post-edit for server-provided actions on Schedule, Task, and Workbench states in specs/010-ai-dropdown-surface/quickstart.md
 
 **Checkpoint**: User Story 2 works independently: quick actions and disabled reasons are supplied through AssistantSurfaceState and match active page severity.
 
@@ -132,7 +132,7 @@
 - [ ] T062 [US3] Route Workbench result proposal results to result preview/review panel in apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx
 - [ ] T063 [US3] Remove dropdown confirm/dismiss/refine mutation controls from the old sidebar provider path in apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx
 - [X] T064 [US3] Ensure assistant action result handling creates proposal route entries and never applies commands from dropdown code in apps/web/src/components/assistant-surface/assistant-surface-provider.tsx
-- [ ] T065 [US3] Capture post-edit `agent-browser` verification for proposal routing and no dropdown mutation at desktop 1440x900, tablet 1024x768, and mobile 390x844 in specs/010-ai-dropdown-surface/quickstart.md
+- [ ] T065 [US3] Capture post-edit for proposal routing and no dropdown mutation at desktop 1440x900, tablet 1024x768, and mobile 390x844 in specs/010-ai-dropdown-surface/quickstart.md
 
 **Checkpoint**: User Story 3 works independently: dropdown initiates proposals only, and page surfaces own preview and confirmation.
 

@@ -3,7 +3,6 @@
 **Feature Branch**: `007-improve-workspace-ux`  
 **Created**: 2026-05-16  
 **Status**: Draft  
-**Input**: User description: "Improve Chrona task workspace UX. The current task workspace mostly works functionally, but the interaction design is unclear and visually rough. Scope: Improve the task workspace page only. Improve visual hierarchy, spacing, responsive layout, active task/node visibility, blocked/review state visibility, and primary action clarity. Preserve existing task creation, plan generation, plan acceptance, task execution, assistant interaction, schedule, and navigation behavior. Do not change backend APIs unless the plan proves it is necessary. Use agent-browser to observe the current UI before planning and implementation."
 
 ## User Scenarios & Testing *(mandatory)*
 

@@ -83,8 +83,8 @@ describe("TaskCreateDialog – Core functionality", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i })).toBeChecked();
-      expect(screen.getByRole("checkbox", { name: /generate plan after saving/i })).toBeChecked();
-      expect(screen.getByRole("checkbox", { name: /generate plan after saving/i })).toBeDisabled();
+      expect(screen.getByRole("checkbox", { name: /auto-generate plan/i })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: /auto-generate plan/i })).toBeDisabled();
     });
   });
 
@@ -98,7 +98,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     render(<TaskCreateDialog {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: /generate plan after saving/i })).not.toBeChecked();
+      expect(screen.getByRole("checkbox", { name: /auto-generate plan/i })).not.toBeChecked();
     });
   });
 
@@ -114,7 +114,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     render(<TaskCreateDialog {...defaultProps} onSubmit={onSubmit} />);
 
     const autoExecuteCheckbox = await screen.findByRole("checkbox", { name: /auto-execute at scheduled time/i });
-    const planGenerationCheckbox = await screen.findByRole("checkbox", { name: /generate plan after saving/i });
+    const planGenerationCheckbox = await screen.findByRole("checkbox", { name: /auto-generate plan/i });
     expect(autoExecuteCheckbox).toBeChecked();
     expect(planGenerationCheckbox).toBeChecked();
     expect(planGenerationCheckbox).toBeDisabled();

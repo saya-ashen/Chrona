@@ -18,7 +18,7 @@
 **Purpose**: Establish context, pre-edit evidence, and the concrete migration inventory before changing UI code.
 
 - [X] T001 Record branch, feature context, and no-backend-change constraint in `specs/011-shadcn-ui-refactor/verification/context.md`
-- [X] T002 Capture pre-edit `agent-browser` observations and screenshots for affected schedule, tasks/work, inbox, memory, shell/access-key surfaces in `specs/011-shadcn-ui-refactor/verification/pre-edit-browser.md`
+- [X] T002 Capture pre-edit s and screenshots for affected schedule, tasks/work, inbox, memory, shell/access-key surfaces in `specs/011-shadcn-ui-refactor/verification/pre-edit-browser.md`
 - [X] T003 Build active legacy UI consumer inventory for `buttonVariants`, `StatusBadge`, `SurfaceCard`, `Field`, `inputClassName`, `textareaClassName`, and `selectClassName` in `specs/011-shadcn-ui-refactor/ui-inventory.md`
 - [X] T004 Classify each inventory item as `shared-foundation`, `chrona-wrapper`, `page-composition`, or `remove` with replacement targets in `specs/011-shadcn-ui-refactor/ui-inventory.md`
 
@@ -90,7 +90,7 @@
 
 ### Implementation For User Story 2
 
-- [X] T033 [US2] Capture post-edit `agent-browser` evidence for desktop `1440x900`, tablet `1024x768`, and mobile `390x844` in `specs/011-shadcn-ui-refactor/verification/post-edit-browser.md`
+- [X] T033 [US2] Capture post-edit for desktop `1440x900`, tablet `1024x768`, and mobile `390x844` in `specs/011-shadcn-ui-refactor/verification/post-edit-browser.md`
 - [X] T034 [US2] Verify light and dark mode contrast, borders, focus rings, and muted backgrounds for affected screens in `specs/011-shadcn-ui-refactor/verification/post-edit-browser.md`
 - [X] T035 [US2] Verify mobile `390x844` has no horizontal scrolling for affected screens in `specs/011-shadcn-ui-refactor/verification/post-edit-browser.md`
 - [X] T036 [US2] Verify current task, active node, blocked/review state, status meaning, and primary action visibility on migrated task/work/schedule screens in `specs/011-shadcn-ui-refactor/verification/product-behavior.md`

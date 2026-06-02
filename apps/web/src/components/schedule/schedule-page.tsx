@@ -249,12 +249,13 @@ export function SchedulePage({
 
       {errorMessage ? (
         <div className="mx-2 mt-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-sm">
-          Error: {errorMessage}
+          {copy.errorPrefix}: {errorMessage}
         </div>
       ) : null}
 
       <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-3xl bg-muted/40 p-2 lg:gap-4 lg:p-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
         <ScheduleLeftSidebar
+          copy={copy}
           locale={locale}
           activeView={activeView}
           viewModel={viewModel}
@@ -286,8 +287,8 @@ export function SchedulePage({
         <div className="min-h-0 overflow-visible xl:overflow-hidden xl:pl-1">
           <Tabs defaultValue="queue" className="h-full min-h-0">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="queue">Queue</TabsTrigger>
-              <TabsTrigger value="calendar">Calendar</TabsTrigger>
+              <TabsTrigger value="queue">{copy.queueTab}</TabsTrigger>
+              <TabsTrigger value="calendar">{copy.calendarTab}</TabsTrigger>
             </TabsList>
             <TabsContent value="queue" className="min-h-0 overflow-visible xl:overflow-y-auto">
               <ScheduleRightSidebar

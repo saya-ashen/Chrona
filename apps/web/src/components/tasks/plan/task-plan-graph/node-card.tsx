@@ -83,65 +83,65 @@ type StatusChipTheme = {
 
 const STATUS_CHIP_THEME_BY_STATUS: Partial<Record<PlanNodeStatus, StatusChipTheme>> = {
   done: {
-    className: "border-emerald-100/55 bg-emerald-300/18 text-emerald-50 shadow-[0_0_18px_rgba(110,231,183,0.28)]",
+    className: "border-border bg-muted text-foreground",
     icon: <Check className="size-2.5" aria-hidden="true" />,
   },
   completed: {
-    className: "border-emerald-100/55 bg-emerald-300/18 text-emerald-50 shadow-[0_0_18px_rgba(110,231,183,0.28)]",
+    className: "border-border bg-muted text-foreground",
     icon: <Check className="size-2.5" aria-hidden="true" />,
   },
   active: {
-    className: "animate-pulse border-cyan-100/60 bg-cyan-300/20 text-cyan-50 shadow-[0_0_18px_rgba(34,211,238,0.32)]",
+    className: "border-primary/35 bg-primary-soft text-primary",
     icon: <MoreHorizontal className="size-3" aria-hidden="true" />,
   },
   in_progress: {
-    className: "animate-pulse border-cyan-100/60 bg-cyan-300/20 text-cyan-50 shadow-[0_0_18px_rgba(34,211,238,0.32)]",
+    className: "border-primary/35 bg-primary-soft text-primary",
     icon: <MoreHorizontal className="size-3" aria-hidden="true" />,
   },
   waiting: {
-    className: "border-fuchsia-100/55 bg-fuchsia-300/18 text-fuchsia-50 shadow-[0_0_18px_rgba(217,70,239,0.28)]",
+    className: "border-primary/25 bg-primary-soft text-primary",
     icon: <Hand className="size-2.5" aria-hidden="true" />,
   },
   waiting_for_user: {
-    className: "border-fuchsia-100/55 bg-fuchsia-300/18 text-fuchsia-50 shadow-[0_0_18px_rgba(217,70,239,0.28)]",
+    className: "border-primary/25 bg-primary-soft text-primary",
     icon: <Hand className="size-2.5" aria-hidden="true" />,
   },
   waiting_for_approval: {
-    className: "border-fuchsia-100/55 bg-fuchsia-300/18 text-fuchsia-50 shadow-[0_0_18px_rgba(217,70,239,0.28)]",
+    className: "border-primary/25 bg-primary-soft text-primary",
     icon: <Hand className="size-2.5" aria-hidden="true" />,
   },
   blocked: {
-    className: "border-rose-100/65 bg-rose-300/22 text-rose-50 shadow-[0_0_18px_rgba(251,113,133,0.32)]",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
     icon: <TriangleAlert className="size-2.5" aria-hidden="true" />,
   },
   failed: {
-    className: "border-rose-100/65 bg-rose-300/22 text-rose-50 shadow-[0_0_18px_rgba(251,113,133,0.32)]",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
     icon: <TriangleAlert className="size-2.5" aria-hidden="true" />,
   },
   degraded: {
-    className: "border-rose-100/65 bg-rose-300/22 text-rose-50 shadow-[0_0_18px_rgba(251,113,133,0.32)]",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
     icon: <TriangleAlert className="size-2.5" aria-hidden="true" />,
   },
   skipped: {
-    className: "border-slate-300/40 bg-slate-600/20 text-slate-300",
+    className: "border-border bg-muted text-muted-foreground",
     icon: <Minus className="size-2.5" aria-hidden="true" />,
   },
   cancelled: {
-    className: "border-slate-400/35 bg-slate-700/22 text-slate-300",
+    className: "border-border bg-muted text-muted-foreground",
     icon: <X className="size-2.5" aria-hidden="true" />,
   },
   invalidated: {
-    className: "border-slate-400/35 bg-slate-700/22 text-slate-300",
+    className: "border-border bg-muted text-muted-foreground",
     icon: <X className="size-2.5" aria-hidden="true" />,
   },
   ready: {
-    className: "border-violet-200/40 bg-violet-300/12 text-violet-100",
+    className: "border-primary/25 bg-primary-soft text-primary",
     icon: <Circle className="size-2.5 fill-current/20" aria-hidden="true" />,
   },
 } satisfies Partial<Record<PlanNodeStatus, StatusChipTheme>>;
 
 const IDLE_STATUS_CHIP_THEME = {
-  className: "border-slate-300/30 bg-slate-600/16 text-slate-300",
+  className: "border-border bg-muted text-muted-foreground",
   icon: <Circle className="size-2.5" aria-hidden="true" />,
 } satisfies StatusChipTheme;
 
@@ -167,13 +167,13 @@ const SHAPE_OUTLINE_POINTS: Partial<Record<NodeShape, string>> = {
 };
 
 const SHAPE_OUTLINE_CLASS_BY_TONE: Record<NodeTone, string> = {
-  active: "text-cyan-200/85",
-  attention: "text-fuchsia-200/80",
-  blocked: "text-rose-200/90",
-  done: "text-emerald-300/44",
-  skipped: "text-slate-500/48",
-  upcoming: "text-violet-300/65",
-  idle: "text-slate-500/45",
+  active: "text-primary/45",
+  attention: "text-primary/35",
+  blocked: "text-destructive/45",
+  done: "text-border",
+  skipped: "text-border",
+  upcoming: "text-primary/30",
+  idle: "text-border",
 };
 
 function ShapeOutline({ shape, tone }: { shape: NodeShape; tone: NodeTone }) {
@@ -244,26 +244,26 @@ function NodeFrameShell({
       data-node-step={stepNumber}
       data-node-execution-status={executionStatus}
       className={cn(
-        "rf-node-button group relative w-full overflow-hidden border text-left text-slate-100 transition duration-200",
-        "shadow-[0_18px_45px_rgba(2,6,23,0.28)] backdrop-blur hover:-translate-y-0.5 hover:border-white/28 hover:shadow-[0_22px_60px_rgba(8,47,73,0.34)]",
+        "rf-node-button group relative w-full overflow-hidden border text-left text-foreground transition-colors duration-200",
+        "bg-card shadow-sm hover:border-primary/35 hover:bg-accent/30",
         className,
         styles.border,
         styles.bg,
         styles.text,
         SHAPE_OUTLINE_POINTS[shape] && "border-transparent",
-        isSelected && "ring-2 ring-white/55",
-        isCurrent && "shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_24px_80px_rgba(34,211,238,0.25)]",
+        isSelected && "ring-2 ring-primary/40",
+        isCurrent && "border-primary/45 shadow-md",
         runtimeSpotlight?.ring,
         TASK_PLAN_GRAPH_THEME.visualWeightClassNames[visualWeight],
         visualWeight === "normal" && isFocus && "brightness-100",
       )}
       style={getShapeStyle(shape)}
     >
-      {runtimeSpotlight ? <span aria-hidden="true" className={cn("pointer-events-none absolute inset-0 animate-pulse", runtimeSpotlight.glow, className)} /> : null}
+      {runtimeSpotlight ? <span aria-hidden="true" className={cn("pointer-events-none absolute inset-0", runtimeSpotlight.glow, className)} /> : null}
       <ShapeOutline shape={shape} tone={tone} />
       <span aria-hidden="true" className={cn("pointer-events-none absolute top-0 h-1 bg-gradient-to-r", accentClassName, interactionFrame.accent)} />
       {rail}
-      <span aria-hidden="true" className={cn("pointer-events-none absolute -right-10 -top-10 size-24 rounded-full blur-2xl transition group-hover:bg-cyan-200/13", kindTheme.halo)} />
+      <span aria-hidden="true" className={cn("pointer-events-none absolute -right-10 -top-10 size-24 rounded-full transition-colors", kindTheme.halo)} />
       <span aria-hidden="true" className={cn("pointer-events-none absolute z-10 grid size-4 place-items-center rounded-full border", kindTheme.statusOffset, statusTheme.className)}>
         {statusTheme.icon}
       </span>
@@ -303,8 +303,8 @@ function ConditionNodeFrame(props: NodeFrameProps) {
       decorations={
         <>
           <span aria-hidden="true" className="pointer-events-none absolute bottom-2 right-8 flex gap-1">
-            <span className="h-1 w-2 rounded-full bg-fuchsia-100/38" />
-            <span className="h-1 w-2 rounded-full bg-fuchsia-100/22" />
+            <span className="h-1 w-2 rounded-full bg-primary/30" />
+            <span className="h-1 w-2 rounded-full bg-primary/20" />
           </span>
         </>
       }
@@ -319,7 +319,7 @@ function WaitNodeFrame(props: NodeFrameProps) {
       accentClassName="left-6 right-6"
       className={props.kindTheme.card}
       rail={<span aria-hidden="true" className={cn("pointer-events-none absolute left-3 top-0 h-1/2 w-1 translate-y-1/2 rounded-full", props.kindTheme.rail)} />}
-      decorations={<span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-1 h-px bg-gradient-to-r from-transparent via-slate-200/24 to-transparent" />}
+      decorations={<span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-1 h-px bg-border" />}
     />
   );
 }
@@ -332,23 +332,23 @@ function NodeCardContent({ data, estimatedLabel, kindTheme, runtimeSpotlight, st
     <div className={cn("relative grid items-start", kindTheme.content, isWaitNode(node) && "items-center")}>
       <TypeAnchor node={node} stepNumber={stepNumber} className={anchorClassName} />
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5 pr-6 text-[8px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-          <span className={cn("size-2 rounded-full shadow-[0_0_14px_currentColor]", styles.dot)} />
+        <div className="flex min-w-0 items-center gap-1.5 pr-6 text-[10px] font-medium text-muted-foreground">
+          <span className={cn("size-2 rounded-full", styles.dot)} />
           <span className={cn("truncate rounded-full border px-1.5 py-0.5", kindTheme.badge)}>{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
         </div>
 
-        <p className="mt-1.5 break-words pr-6 text-[13px] font-semibold leading-snug text-slate-50 line-clamp-2">{node.title}</p>
+        <p className="mt-1.5 break-words pr-6 text-[13px] font-semibold leading-snug text-foreground line-clamp-2">{node.title}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {runtimeSpotlight ? (
-            <span className={cn("rounded-full border px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em]", runtimeSpotlight.badge)}>
+            <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", runtimeSpotlight.badge)}>
               {runtimeSpotlight.label}
             </span>
           ) : (
-            <span className="rounded-full border border-white/10 bg-white/8 px-2 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-300">{node.statusLabel ?? node.status}</span>
+            <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{node.statusLabel ?? node.status}</span>
           )}
           {estimatedLabel ? (
-            <span className="truncate rounded-full border border-white/8 bg-slate-950/35 px-2 py-0.5 text-[10px] font-medium text-slate-300">{estimatedLabel}</span>
+            <span className="truncate rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{estimatedLabel}</span>
           ) : null}
         </div>
       </div>
@@ -360,9 +360,9 @@ function TypeAnchor({ node, stepNumber, className }: { node: FlowGraphNode["data
   const kindTheme = resolveNodeKindTheme(node);
   const shapeClassName = isConditionNode(node) ? "rounded-[14px]" : isWaitNode(node) ? "rounded-[999px]" : "rounded-xl";
   return (
-    <div className={cn("relative grid size-8 shrink-0 place-items-center border shadow-inner shadow-white/10", shapeClassName, kindTheme.anchor, className)}>
+    <div className={cn("relative grid size-8 shrink-0 place-items-center border", shapeClassName, kindTheme.anchor, className)}>
       <TypeIcon node={node} className="size-3.5" />
-      <span className="absolute -bottom-1 -right-1 grid size-3.5 place-items-center rounded-full border border-slate-950/70 bg-slate-950/85 text-[8px] font-bold leading-none text-slate-100">
+      <span className="absolute -bottom-1 -right-1 grid size-3.5 place-items-center rounded-full border border-border bg-background text-[8px] font-bold leading-none text-foreground">
         {stepNumber}
       </span>
     </div>

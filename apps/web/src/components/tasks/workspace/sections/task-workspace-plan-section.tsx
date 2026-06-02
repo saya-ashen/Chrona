@@ -389,9 +389,8 @@ export function TaskWorkspacePlanSection({
   return (
     <section
       aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
-      className="relative flex flex-col overflow-visible rounded-[1.5rem] border border-border/70 bg-[radial-gradient(circle_at_18%_0%,color-mix(in_oklab,var(--primary)_14%,transparent),transparent_34%),radial-gradient(circle_at_82%_6%,color-mix(in_oklab,var(--primary)_10%,transparent),transparent_30%),linear-gradient(135deg,color-mix(in_oklab,var(--card)_98%,transparent),color-mix(in_oklab,var(--muted)_60%,var(--card))_46%,var(--card))] p-2 pb-0 shadow-sm xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+      className="relative flex flex-col overflow-visible rounded-[1.5rem] border border-border bg-canvas p-2 pb-0 xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-32 rounded-full bg-primary/15 blur-3xl" />
       {stateMessage ? (
         <div
           className="relative mb-2 rounded-xl border border-warning/40 bg-warning/15 px-3 py-2 text-sm text-warning-foreground shadow-sm"
@@ -448,7 +447,7 @@ export function TaskWorkspacePlanSection({
           </section>
 
           <aside
-            className="min-h-0 space-y-2 overflow-y-auto rounded-[1.2rem] border border-border/70 bg-card/82 p-2 shadow-sm backdrop-blur"
+            className="min-h-0 space-y-2 overflow-y-auto p-1"
             aria-label={copy.commandCenterAria ?? "Task command center"}
           >
             <TaskWorkspaceExecutionOverview

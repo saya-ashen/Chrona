@@ -106,7 +106,7 @@
   Chrona product behavior, patterns, terminology, i18n message requirements, and
   loading/empty/success/error states.
 - For frontend visual or interaction changes, define the required
-  `agent-browser` pre-edit observation and post-edit verification evidence,
+  pre-edit observation and post-edit verification evidence,
   including desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
 - Define whether current task, active node, blocked/review state, and primary
   action must be visible, and how the feature will prevent mobile horizontal

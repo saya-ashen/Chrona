@@ -25,7 +25,7 @@ Replace the node drawer Evidence workflow with a unified Activity experience tha
 
 - **Code Quality**: PASS. Activity shaping belongs in contracts/engine/model layers; React components render already-shaped activity and do not own business rules. The plan prefers one shared Activity model and feed component over duplicate Command Center and drawer implementations.
 - **Testing**: PASS. Required commands are `bun run typecheck`, `bun run lint`, `bun run test`, and `bun run test:e2e` because drawer/navigation/live task workspace behavior changes. Focused tests must cover contract validation, backend activity mapping, live/persisted deduplication, node filtering, tool detail rendering, empty states, and final legacy removal.
-- **Frontend UX Evidence**: PASS. Implementation must capture pre-edit `agent-browser` observation and screenshots before UI changes, then post-edit verification at desktop `1440x900`, tablet `1024x768`, and mobile `390x844` with no horizontal scroll.
+- **Frontend UX Evidence**: PASS. Implementation must capture pre-edit screenshots before UI changes, then post-edit verification at desktop `1440x900`, tablet `1024x768`, and mobile `390x844` with no horizontal scroll.
 - **Product Behavior & API Scope**: PASS. Existing task execution, approval, artifact, schedule, and provider run behavior are preserved. Backend read surfaces may change because structured node-aware activity is required for the specified UX and cannot be reliably produced from the current coarse presentation.
 - **UX Clarity & Responsiveness**: PASS. Activity must keep current task, active/selected node, blocked/review state, and primary action visible. Existing workspace tab/drawer patterns, shadcn primitives, i18n, loading/empty/error states, and responsive behavior are required.
 - **Performance Budgets**: PASS. Initial activity view budget is under 2 seconds for 3,000 recorded events. Phase 2 must add progressive browsing so longer histories do not force unbounded initial payloads or rendering.
@@ -88,7 +88,7 @@ See [data-model.md](./data-model.md) and [contracts/activity-feed-contract.md](.
 
 - **Code Quality**: PASS. Data model and contracts keep activity semantics outside React components and assign shaping/filtering ownership to model/server layers.
 - **Testing**: PASS. Quickstart defines focused tests plus full required commands, including e2e because workspace drawer/navigation/live behavior changes.
-- **Frontend UX Evidence**: PASS. Quickstart requires pre-edit and post-edit `agent-browser` evidence across all mandated viewports.
+- **Frontend UX Evidence**: PASS. Quickstart requires pre-edit and post-edit across all mandated viewports.
 - **Product Behavior & API Scope**: PASS. Contract changes are justified by structured, node-aware operational history requirements; task execution behavior itself is preserved.
 - **UX Clarity & Responsiveness**: PASS. Design includes task-wide feed, node-scoped feed, empty states, expandable details, state visibility, and no horizontal scroll checks.
 - **Performance Budgets**: PASS. Initial feed budget and progressive history behavior are specified with validation steps.

@@ -39,7 +39,7 @@
   `bun run typecheck`, `bun run lint`, `bun run test`, and `bun run test:e2e`
   when task, schedule, or navigation flows are affected.
 - **Frontend UX Evidence**: For frontend visual or interaction changes, record
-  the required pre-edit `agent-browser` snapshot/screenshots and post-edit
+  the required pre-edit post-edit
   verification evidence.
 - **Product Behavior & API Scope**: Identify the existing Chrona behavior that
   must be preserved. Confirm backend APIs are unchanged for visual/interaction

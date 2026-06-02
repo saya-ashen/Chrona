@@ -52,7 +52,6 @@ This contract documents user-visible behavior for the task workspace redesign. I
 
 ## Evidence Contract
 
-- Before implementation: capture `agent-browser snapshot -i`, screenshots at `1440x900`, `1024x768`, and `390x844`, and diagnostics.
 - After implementation: repeat the same route, snapshot, screenshots, diagnostics, and mobile horizontal-scroll check.
 - Automated checks before completion: `bun run typecheck`, `bun run lint`, and `bun run test`.
 - Run `bun run test:e2e` if implementation changes task navigation or workflow interactions.

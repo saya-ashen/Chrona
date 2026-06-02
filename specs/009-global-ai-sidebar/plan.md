@@ -35,9 +35,9 @@ Add a product-native global AI sidebar opened from the top-level Chrona entry (`
   when task, schedule, or navigation flows are affected.
 - **PASS**: Unit/domain tests cover proposal state transitions and stale detection; component tests cover sidebar shell, task adapter, schedule adapter, preview cards, confirm/dismiss/refine; e2e covers global entry, task flow, schedule ghost blocks, navigation context switching, and mobile no-horizontal-scroll. Validation commands: `bun run typecheck`, `bun run lint`, `bun run test`, `bun run test:e2e`.
 - **Frontend UX Evidence**: For frontend visual or interaction changes, record
-  the required pre-edit `agent-browser` snapshot/screenshots and post-edit
+  the required pre-edit post-edit
   verification evidence.
-- **PASS**: Implementation tasks must capture pre-edit `agent-browser` snapshots/screenshots for current task and schedule pages, then post-edit desktop `1440x900`, tablet `1024x768`, and mobile `390x844` verification with the sidebar open.
+- **PASS**: Implementation tasks must capture pre-edit snapshots/screenshots for current task and schedule pages, then post-edit desktop `1440x900`, tablet `1024x768`, and mobile `390x844` verification with the sidebar open.
 - **Product Behavior & API Scope**: Identify the existing Chrona behavior that
   must be preserved. Confirm backend APIs are unchanged for visual/interaction
   polish, or justify the API change here.

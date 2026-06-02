@@ -25,7 +25,7 @@ Replace the existing context-aware AI sidebar with a single global top-bar AI dr
 
 - **Code Quality**: PASS. Plan keeps contracts in `packages/contracts`, pure mapping/priority rules in shared domain/service layers, backend aggregation in server route/service code, and React components focused on rendering and navigation. Complexity is limited to replacing the sidebar surface with an assistant surface model and page-owned preview routing.
 - **Testing**: PASS. Required commands are `bun run typecheck`, `bun run lint`, `bun run test`, and `bun run test:e2e` because task, schedule, workbench, and navigation flows are affected. Coverage must include contract schema tests, action mapping tests, dropdown rendering tests, page preview routing tests, and no-mutation-before-confirm tests.
-- **Frontend UX Evidence**: PASS. Implementation tasks must start with `agent-browser` observation of current sidebar/top-bar behavior and end with screenshots/snapshots for desktop `1440x900`, tablet `1024x768`, and mobile `390x844` with no horizontal scroll.
+- **Frontend UX Evidence**: PASS. Implementation tasks must start with of current sidebar/top-bar behavior and end with screenshots/snapshots for desktop `1440x900`, tablet `1024x768`, and mobile `390x844` with no horizontal scroll.
 - **Product Behavior & API Scope**: PASS. Existing schedule/task execution behavior stays intact except the AI entry changes from sidebar to dropdown. Backend/API changes are justified only to provide Assistant Surface State and proposal-oriented action results; visual polish must not create unrelated API changes.
 - **UX Clarity & Responsiveness**: PASS. The dropdown must preserve existing Chrona navigation/top-bar patterns, use i18n strings, show loading/empty/disabled/error states, prioritize blocked/error/conflict summaries, and make primary action and review state visually obvious.
 - **Performance Budgets**: PASS. Budgets are defined for dropdown open latency, assistant state lookup, summary rotation layout stability, and mobile responsiveness; validation belongs in quickstart and tasks.
@@ -91,7 +91,7 @@ See [data-model.md](./data-model.md) and [contracts/](./contracts/). Key entitie
 
 - **Code Quality**: PASS. Design assigns ownership to contracts/domain/server/page components and avoids business logic inside React rendering components.
 - **Testing**: PASS. Design identifies unit, integration, contract, component, and e2e tests plus required commands.
-- **Frontend UX Evidence**: PASS. Quickstart requires pre-edit and post-edit `agent-browser` evidence at all mandated viewports.
+- **Frontend UX Evidence**: PASS. Quickstart requires pre-edit and post-edit at all mandated viewports.
 - **Product Behavior & API Scope**: PASS. API changes are scoped to Assistant Surface State/action proposal contracts; dropdown cannot apply mutations.
 - **UX Clarity & Responsiveness**: PASS. Contracts include priority severity, disabled reasons, preview surfaces, fallback states, and mobile constraints.
 - **Performance Budgets**: PASS. Quickstart includes latency/layout/mobile validation; no unresolved budget remains.

@@ -4,7 +4,7 @@
 
 - Branch: `009-global-ai-sidebar`.
 - Read `specs/009-global-ai-sidebar/spec.md`, this plan, and `contracts/ui-contract.md` before implementation.
-- Use `agent-browser` before editing UI to capture current task and schedule page snapshots/screenshots.
+- Use before editing UI to capture current task and schedule page snapshots/screenshots.
 
 ## Implementation Order
 
