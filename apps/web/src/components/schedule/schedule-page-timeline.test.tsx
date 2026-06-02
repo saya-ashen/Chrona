@@ -57,7 +57,7 @@ afterEach(() => {
 
 describe("DayTimeline", () => {
   it("shows a normal placement preview when a dragged block overlaps an existing scheduled block", async () => {
-    const { container } = render(
+    render(
       <DayTimeline
         items={[createScheduledItem()]}
         dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
@@ -95,7 +95,7 @@ describe("DayTimeline", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 15, 9, 45, 0, 0));
 
-    const { container } = render(
+    render(
       <DayTimeline
         items={[createScheduledItem()]}
         dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
@@ -118,7 +118,7 @@ describe("DayTimeline", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 15, 9, 45, 0, 0));
 
-    const { container } = render(
+    render(
       <DayTimeline
         items={[createScheduledItem()]}
         dayDate={new Date(2026, 3, 16, 0, 0, 0, 0)}
