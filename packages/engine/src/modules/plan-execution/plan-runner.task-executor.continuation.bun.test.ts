@@ -5,6 +5,7 @@ import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
 import {
   executeTaskNodeCapabilityMock,
   makeInputCheckpointThenTaskPlan,
+  makeSingleTaskPlan,
   makeTwoEntryTaskPlan,
   makeTwoTaskPlan,
   seedAcceptedCompiledPlan,
@@ -65,6 +66,60 @@ describe("plan-runner task executor continuation", () => {
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Completed);
+  });
+
+  it("keeps recurring series ready after completing one scheduled occurrence", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "done",
+      summary: "Recurring occurrence complete",
+      evidence: { sessionId: "main-session", runId: "run_recurring" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner recurring occurrence");
+    await db.task.update({
+      where: { id: task.id },
+      data: { kind: "recurring", recurrenceRule: "FREQ=DAILY", autoExecute: true },
+    });
+    const firstBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-01T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-01T10:00:00.000Z"),
+        trigger: "scheduled",
+      },
+    });
+    const secondBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-02T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-02T10:00:00.000Z"),
+        trigger: "scheduled",
+      },
+    });
+    const compiledPlan = makeSingleTaskPlan("graph_recurring_occurrence");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.start({
+      taskId: task.id,
+      trigger: "scheduler",
+      workBlockId: firstBlock.id,
+    });
+
+    expect(result.status).toBe("completed");
+    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    const blocks = await db.workBlock.findMany({ where: { taskId: task.id }, orderBy: { scheduledStartAt: "asc" } });
+    expect(updatedTask.status).toBe(TaskStatus.Ready);
+    expect(updatedTask.completedAt).toBeNull();
+    expect(blocks.map((block) => [block.id, block.status])).toEqual([
+      [firstBlock.id, "Completed"],
+      [secondBlock.id, "Scheduled"],
+    ]);
   });
 
   it("starts the downstream provider run after syncing a completed runtime run", async () => {

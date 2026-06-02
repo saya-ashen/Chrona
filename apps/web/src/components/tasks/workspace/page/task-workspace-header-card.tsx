@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CalendarDays, Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
-import { useI18n } from "@chrona/i18n/react";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -60,6 +60,20 @@ function actionVariant(actionId: TaskHeaderAction["id"]) {
   return "secondary" as const;
 }
 
+function formatOccurrenceWindow(start: string | null, end: string | null, locale: string) {
+  if (!start) return null;
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return null;
+  const endDate = end ? new Date(end) : null;
+  const dateLabel = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", weekday: "short" }).format(startDate);
+  const startLabel = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(startDate);
+  const endLabel = endDate && !Number.isNaN(endDate.getTime())
+    ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(endDate)
+    : null;
+
+  return endLabel ? `${dateLabel} ${startLabel}-${endLabel}` : `${dateLabel} ${startLabel}`;
+}
+
 type TaskWorkspaceHeaderCardProps = {
   task: TaskData;
   header: TaskHeaderView;
@@ -98,7 +112,9 @@ export function TaskWorkspaceHeaderCard({
   onDelete,
 }: TaskWorkspaceHeaderCardProps) {
   const { messages } = useI18n();
+  const locale = useLocale();
   const copy = messages.components?.taskWorkspace ?? {};
+  const occurrenceWindow = formatOccurrenceWindow(task.scheduledStartAt, task.scheduledEndAt, locale);
   const [pendingActionId, setPendingActionId] = useState<TaskHeaderAction["id"] | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const visibleActions = header.actions.filter((action) => action.id !== "more");
@@ -178,6 +194,17 @@ export function TaskWorkspaceHeaderCard({
             <Badge variant={priorityTone(task.priority)}>
               {task.priority}
             </Badge>
+            {occurrenceWindow ? (
+              <Badge
+                variant="outline"
+                className="gap-1"
+                title={copy.occurrenceFallbackLabel ?? "Scheduled window"}
+              >
+                <CalendarDays className="size-3" />
+                <span className="font-medium">{copy.occurrenceWindowLabel ?? "Occurrence"}</span>
+                {occurrenceWindow}
+              </Badge>
+            ) : null}
             {task.sourceManaged ? (
               <Badge
                 variant="outline"

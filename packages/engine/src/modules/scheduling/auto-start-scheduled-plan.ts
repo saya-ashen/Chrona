@@ -117,7 +117,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
         data: { status: "Active", startedAt: now },
       });
 
-      const startedRun = await taskPlanExecution.start({ taskId: task.id, trigger: "scheduler" });
+      const startedRun = await taskPlanExecution.start({ taskId: task.id, trigger: "scheduler", workBlockId: block.id });
       result.started.push({ taskId: task.id, workBlockId: block.id, runId: startedRun.planId ?? task.id });
     } catch (parentError) {
       const message = parentError instanceof Error ? parentError.message : "Unknown error during auto-start";

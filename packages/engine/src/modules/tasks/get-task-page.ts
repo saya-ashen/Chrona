@@ -561,7 +561,37 @@ export async function getTaskActivityPage(input: TaskActivityPageInput) {
   };
 }
 
-export async function getTaskPage(taskId: string) {
+type TaskPageWorkBlock = {
+  id: string;
+  status: string;
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+  trigger: string;
+};
+
+function pickTaskPageWorkBlock(workBlocks: TaskPageWorkBlock[], selectedWorkBlockId: string | null, now: Date) {
+  if (selectedWorkBlockId) {
+    const selected = workBlocks.find((block) => block.id === selectedWorkBlockId);
+    if (selected) return selected;
+  }
+
+  const active = workBlocks.find((block) => block.status === "Active");
+  if (active) return active;
+
+  const nextScheduled = workBlocks.find(
+    (block) => block.status === "Scheduled" && block.scheduledStartAt.getTime() >= now.getTime(),
+  );
+  if (nextScheduled) return nextScheduled;
+
+  const overdueScheduled = workBlocks.find((block) => block.status === "Scheduled");
+  if (overdueScheduled) return overdueScheduled;
+
+  return workBlocks.find((block) => block.status === "Completed") ?? null;
+}
+
+export async function getTaskPage(input: { taskId: string; workBlockId?: string | null } | string) {
+  const taskId = typeof input === "string" ? input : input.taskId;
+  const selectedWorkBlockId = typeof input === "string" ? null : input.workBlockId ?? null;
   const savedPlan = await getLatestTaskPlanReadModel(taskId);
   const aiPlanGenerationStatus: TaskPlanGenerationStatus =
     isTaskPlanGenerationRunning(taskId)
@@ -595,6 +625,15 @@ export async function getTaskPage(taskId: string) {
       workspace: {
         select: { defaultRuntime: true },
       },
+      workBlocks: {
+        where: { status: { in: ["Scheduled", "Active", "Completed"] } },
+        orderBy: [
+          { status: "asc" },
+          { scheduledStartAt: "asc" },
+          { updatedAt: "desc" },
+        ],
+        take: 50,
+      },
       importedCalendarEvents: {
         take: 1,
         include: {
@@ -612,6 +651,7 @@ export async function getTaskPage(taskId: string) {
   });
 
   const latestRun = task.runs[0] ?? null;
+  const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
   const importedEvent = task.importedCalendarEvents[0] ?? null;
   const sourceManaged = importedEvent
     ? {
@@ -664,10 +704,24 @@ export async function getTaskPage(taskId: string) {
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
       scheduledStartAt:
-        task.projection?.scheduledStartAt?.toISOString() ?? null,
-      scheduledEndAt: task.projection?.scheduledEndAt?.toISOString() ?? null,
-      scheduleStatus: task.projection?.scheduleStatus ?? "Unscheduled",
-      scheduleSource: task.projection?.scheduleSource ?? null,
+        currentWorkBlock?.scheduledStartAt.toISOString() ?? task.projection?.scheduledStartAt?.toISOString() ?? null,
+      scheduledEndAt: currentWorkBlock?.scheduledEndAt.toISOString() ?? task.projection?.scheduledEndAt?.toISOString() ?? null,
+      scheduleStatus: currentWorkBlock?.status ?? task.projection?.scheduleStatus ?? "Unscheduled",
+      scheduleSource: currentWorkBlock
+        ? currentWorkBlock.trigger === "scheduled"
+          ? "ai"
+          : currentWorkBlock.trigger === "manual"
+            ? "human"
+            : null
+        : task.projection?.scheduleSource ?? null,
+      currentWorkBlock: currentWorkBlock
+        ? {
+            id: currentWorkBlock.id,
+            status: currentWorkBlock.status,
+            scheduledStartAt: currentWorkBlock.scheduledStartAt.toISOString(),
+            scheduledEndAt: currentWorkBlock.scheduledEndAt.toISOString(),
+          }
+        : null,
       isRunnable: runnability.isRunnable,
       runnabilityState: runnability.state,
       runnabilitySummary: runnability.summary,

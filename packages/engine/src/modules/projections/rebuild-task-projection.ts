@@ -4,6 +4,28 @@ import { SYNC_STALE_MS } from "../../constants";
 import { deriveScheduleState, deriveTaskState } from "@chrona/domain";
 import { appendTaskWorkspaceEvent } from "./task-projection-events";
 
+
+type ProjectionWorkBlock = {
+  status: string;
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+  trigger: string;
+};
+
+function pickProjectionWorkBlock(workBlocks: ProjectionWorkBlock[], now: Date) {
+  const active = workBlocks.find((block) => block.status === "Active");
+  if (active) return active;
+
+  const nextScheduled = workBlocks.find(
+    (block) => block.status === "Scheduled" && block.scheduledStartAt.getTime() >= now.getTime(),
+  );
+  if (nextScheduled) return nextScheduled;
+
+  const overdueScheduled = workBlocks.find((block) => block.status === "Scheduled");
+  if (overdueScheduled) return overdueScheduled;
+
+  return workBlocks.find((block) => block.status === "Completed") ?? null;
+}
 export async function rebuildTaskProjection(taskId: string) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -21,10 +43,11 @@ export async function rebuildTaskProjection(taskId: string) {
       workBlocks: {
         where: { status: { in: ["Scheduled", "Active", "Completed"] } },
         orderBy: [
+          { status: "asc" },
           { scheduledStartAt: "asc" },
           { updatedAt: "desc" },
         ],
-        take: 1,
+        take: 50,
       },
     },
   });
@@ -33,8 +56,9 @@ export async function rebuildTaskProjection(taskId: string) {
     (run) => run.lastSyncedAt && Date.now() - run.lastSyncedAt.getTime() > SYNC_STALE_MS,
   );
 
+  const now = new Date();
   const activeSession = task.executionSessions[0] ?? null;
-  const currentWorkBlock = task.workBlocks[0] ?? null;
+  const currentWorkBlock = pickProjectionWorkBlock(task.workBlocks, now);
   const latestEvent = task.events[0] ?? null;
   const currentNode = activeSession?.currentNodeId && activeSession.planId
     ? await db.taskPlanRun.findUnique({
@@ -85,7 +109,7 @@ export async function rebuildTaskProjection(taskId: string) {
           endedAt: latestRun.endedAt,
         }
       : null,
-    now: new Date(),
+    now,
   });
 
   // NOTE: Prisma 7 + WASM query compiler can crash when Prisma.DbNull is

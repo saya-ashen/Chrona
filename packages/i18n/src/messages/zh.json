@@ -1124,6 +1124,8 @@
       "approvalNeeded": "等待审批",
       "externalSourceTitle": "同步自 {source}。标题和时间由日历来源管理。",
       "externalLockedHint": "同步自 {source}。标题和时间由日历来源管理。",
+      "occurrenceWindowLabel": "本次循环",
+      "occurrenceFallbackLabel": "计划时间",
       "edit": "编辑",
       "deleteTask": "删除任务",
       "moreActions": "更多任务操作",

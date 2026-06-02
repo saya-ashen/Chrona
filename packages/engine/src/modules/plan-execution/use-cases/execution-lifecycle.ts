@@ -211,11 +211,25 @@ export async function completeExecution(input: {
     await completeActiveRunsForTask(input.taskId);
   }
 
+  let recurringSeriesHasFutureWork = false;
+  if (status === "completed") {
+    await completeWorkBlock(input.taskId, input.session.workBlockId);
+    const remainingScheduledWork = await db.workBlock.findFirst({
+      where: {
+        taskId: input.taskId,
+        status: "Scheduled",
+        task: { kind: "recurring" },
+      },
+      select: { id: true },
+    });
+    recurringSeriesHasFutureWork = Boolean(remainingScheduledWork);
+  }
+
   await db.task.update({
     where: { id: input.taskId },
     data: {
-      status: transition.taskStatus,
-      completedAt: status === "completed" ? new Date() : undefined,
+      status: recurringSeriesHasFutureWork ? "Ready" : transition.taskStatus,
+      completedAt: status === "completed" && !recurringSeriesHasFutureWork ? new Date() : undefined,
       blockReason: transition.blockReason,
     },
   });
@@ -228,7 +242,6 @@ export async function completeExecution(input: {
       eventType: "execution_completed",
       payload: { totalSteps: input.executedNodeIds.length },
     });
-    await completeWorkBlock(input.taskId, input.session.workBlockId);
   }
 
   await rebuildTaskProjection(input.taskId);

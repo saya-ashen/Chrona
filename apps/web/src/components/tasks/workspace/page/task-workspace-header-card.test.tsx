@@ -4,6 +4,7 @@ import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
 import type { TaskData, TaskHeaderView } from "../model/task-workspace-types";
 
 vi.mock("lucide-react", () => ({
+  CalendarDays: () => null,
   Ellipsis: () => null,
   Loader2: () => null,
   Pause: () => null,
@@ -98,5 +99,25 @@ describe("TaskWorkspaceHeaderCard", () => {
 
     expect(screen.getByText("Waiting")).toBeInTheDocument();
     expect(screen.queryByText("Draft")).not.toBeInTheDocument();
+  });
+
+  it("shows the selected occurrence window", () => {
+    render(
+      <TaskWorkspaceHeaderCard
+        task={task}
+        header={header}
+        backToScheduleLabel="Back to schedule"
+        onAction={vi.fn()}
+        onEdit={vi.fn()}
+        showDeleteConfirm={false}
+        isDeleting={false}
+        onStartDeleteConfirm={vi.fn()}
+        onCancelDeleteConfirm={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Occurrence")).toBeInTheDocument();
+    expect(screen.getByText(/May 27/)).toBeInTheDocument();
   });
 });

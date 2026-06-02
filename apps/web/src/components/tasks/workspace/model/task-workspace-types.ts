@@ -23,6 +23,12 @@ export type TaskData = {
   scheduledEndAt: string | null;
   scheduleStatus: string;
   scheduleSource: string | null;
+  currentWorkBlock?: {
+    id: string;
+    status: string;
+    scheduledStartAt: string;
+    scheduledEndAt: string;
+  } | null;
   sourceManaged?: {
     source: "external_calendar";
     eventId: string;

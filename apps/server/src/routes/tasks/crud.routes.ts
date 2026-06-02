@@ -153,7 +153,8 @@ export function createTasksRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, await engine.tasks.getPage({ taskId }));
+          const workBlockId = c.req.query("workBlockId") ?? null;
+          return json(c, await engine.tasks.getPage({ taskId, workBlockId }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {

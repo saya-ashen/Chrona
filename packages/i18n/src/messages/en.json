@@ -1124,6 +1124,8 @@
       "approvalNeeded": "Approval needed",
       "externalSourceTitle": "Synced from {source}. Title and time are managed by the calendar source.",
       "externalLockedHint": "Synced from {source}. Title and time are managed by the calendar source.",
+      "occurrenceWindowLabel": "Occurrence",
+      "occurrenceFallbackLabel": "Scheduled window",
       "edit": "Edit",
       "deleteTask": "Delete Task",
       "moreActions": "More task actions",

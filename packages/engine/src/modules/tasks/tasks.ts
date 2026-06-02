@@ -29,8 +29,8 @@ export class Tasks {
     return deleteTask(input.taskId);
   }
 
-  getPage(input: { taskId: string }) {
-    return getTaskPage(input.taskId);
+  getPage(input: { taskId: string; workBlockId?: string | null }) {
+    return getTaskPage(input);
   }
 
   getActivityPage(input: Parameters<typeof getTaskActivityPage>[0]) {

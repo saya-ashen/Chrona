@@ -116,10 +116,16 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
     throw new Response("Task id is required", { status: 400 });
   }
 
+  const requestUrl = new URL(request.url);
+  const query = new URLSearchParams();
+  const workBlockId = requestUrl.searchParams.get("workBlockId");
+  if (workBlockId) query.set("workBlockId", workBlockId);
+  const suffix = query.size ? `?${query.toString()}` : "";
+
   return {
     locale,
     dictionary,
-    task: await apiJson<TaskPageRouteData["task"]>(`${origin}/api/tasks/${params.taskId}`),
+    task: await apiJson<TaskPageRouteData["task"]>(`${origin}/api/tasks/${params.taskId}${suffix}`),
   };
 }
 

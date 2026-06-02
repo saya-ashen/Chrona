@@ -270,6 +270,7 @@ export async function startPlanExecution(input: {
   taskId: string;
   trigger: OrchestratorTrigger;
   prompt?: string;
+  workBlockId?: string | null;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId);
   if (!runtime) {
@@ -292,6 +293,7 @@ export async function startPlanExecution(input: {
     taskId: input.taskId,
     planId: runtime.planId,
     trigger: input.trigger,
+    workBlockId: input.workBlockId,
   });
   const mainSession = await ensurePlanMainSession({
     taskId: input.taskId,
