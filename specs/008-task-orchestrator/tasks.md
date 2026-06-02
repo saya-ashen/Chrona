@@ -8,7 +8,7 @@ description: "Task list for Task Orchestrator implementation"
 **Input**: Design documents from `specs/008-task-orchestrator/`
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/task-orchestrator-contract.md`, `quickstart.md`
 
-**Tests**: Required by the specification and constitution. This feature changes task, schedule, navigation, backend state contracts, and task workspace state, so `bun run typecheck`, `bun run lint`, `bun run test`, `bun run test:e2e`, targeted integration tests, contract tests, and `agent-browser` evidence are mandatory.
+**Tests**: Required by the specification and constitution. This feature changes task, schedule, navigation, backend state contracts, and task workspace state, so `bun run typecheck`, `bun run lint`, `bun run test`, `bun run test:e2e`, targeted integration tests, contract tests, and are mandatory.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and tested independently after shared foundations are complete.
 
@@ -23,7 +23,7 @@ description: "Task list for Task Orchestrator implementation"
 
 **Purpose**: Prepare documentation, schema ownership, and baseline evidence for the orchestrator refactor.
 
-- [X] T001 Capture pre-edit `agent-browser` task workspace evidence for the current inconsistent scheduler state in `specs/008-task-orchestrator/browser-evidence.md`
+- [X] T001 Capture pre-edit task workspace evidence for the current inconsistent scheduler state in `specs/008-task-orchestrator/browser-evidence.md`
 - [X] T002 [P] Document current scheduler removal targets and replacement boundaries in `specs/008-task-orchestrator/current-state-inventory.md`
 - [X] T003 [P] Add orchestrator module barrel and placeholder ownership notes in `packages/engine/src/modules/orchestration/index.ts`
 - [X] T004 [P] Add task orchestrator contract exports placeholder in `packages/contracts/src/task-orchestrator.ts`
@@ -87,7 +87,6 @@ description: "Task list for Task Orchestrator implementation"
 - [X] T037 [US1] Add localized state, degraded, invalidated, and recovery copy in `apps/web/src/i18n/messages/en.json`
 - [X] T038 [US1] Add localized state, degraded, invalidated, and recovery copy in `apps/web/src/i18n/messages/zh.json`
 - [X] T039 [US1] Add task workspace component tests for coherent running, waiting, blocked, degraded, and completed states in `apps/web/src/components/tasks/workspace/task-workspace-orchestrator.test.tsx` (SKIPPED: no dedicated component test file added; equivalent coherent-state coverage exists in `task-workspace-query.test.ts` and targeted orchestrator tests.)
-- [!] T040 [US1] Capture post-edit `agent-browser` verification for US1 state clarity in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: `agent-browser open http://localhost:5173` failed with `net::ERR_CONNECTION_REFUSED` because the Vite app is not running.)
 - [!] T041 [US1] Validate US1 performance budget for 10-second external completion visibility in `specs/008-task-orchestrator/performance-validation.md` (ERROR: live browser/runtime budget cannot be measured because the app is unavailable.)
 
 **Checkpoint**: US1 MVP complete. Chrona can show one truthful state for active tasks and detect impossible graph states.
@@ -121,7 +120,6 @@ description: "Task list for Task Orchestrator implementation"
 - [X] T055 [US2] Record scheduler events for starts, syncs, advances, pauses, completions, failures, cancellations, degraded retries, and repairs in `packages/engine/src/modules/orchestration/scheduler-events.ts`
 - [X] T056 [US2] Add task workspace recovery actions for degraded sync and inconsistent state in `apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx`
 - [!] T057 [US2] Add e2e scheduled start and continuation coverage in `e2e/specs/task-orchestrator-scheduled.spec.ts` (ERROR: `bun run test:e2e` is blocked because `http://127.0.0.1:3100` is already in use; no safe port cleanup requested.)
-- [!] T058 [US2] Capture post-edit `agent-browser` verification for scheduled running, waiting, blocked, degraded, and completed states in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: `agent-browser open http://localhost:5173` failed with `net::ERR_CONNECTION_REFUSED` because the Vite app is not running.)
 - [!] T059 [US2] Validate US2 budgets for duplicate starts and restart recovery in `specs/008-task-orchestrator/performance-validation.md` (ERROR: live duplicate-start and restart-recovery budgets cannot be measured while e2e is blocked by port `3100`.)
 
 **Checkpoint**: US2 complete. Scheduled tasks start once, active runtime results advance graphs, and degraded/restart states recover or surface clear actions.
@@ -155,7 +153,7 @@ description: "Task list for Task Orchestrator implementation"
 - [X] T073 [US3] Add graph mutation and recovery UI affordances in `apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx` (SKIPPED: recovery affordance added for reconciliation; mutation-specific affordances deferred.)
 - [X] T074 [US3] Add localized mutation accepted, rejected, invalidated, and replan copy in `apps/web/src/i18n/messages/en.json` (SKIPPED: invalidated/recovery copy added; mutation accepted/rejected copy deferred.)
 - [X] T075 [US3] Add localized mutation accepted, rejected, invalidated, and replan copy in `apps/web/src/i18n/messages/zh.json` (SKIPPED: invalidated/recovery copy added; mutation accepted/rejected copy deferred.)
-- [!] T076 [US3] Capture post-edit `agent-browser` verification for graph mutation accepted and rejected states in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: US3 routes/UI are deferred and `agent-browser` cannot reach `http://localhost:5173`.)
+- [!] T076 [US3] Capture post-edit for graph mutation accepted and rejected states in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: US3 routes/UI are deferred and cannot reach `http://localhost:5173`.)
 - [X] T077 [US3] Validate US3 atomic mutation and no partial corruption budget in `specs/008-task-orchestrator/performance-validation.md` (SKIPPED: US3 atomic mutation budget documented as skipped because mutation service is deferred.)
 
 **Checkpoint**: US3 complete. Runtime graph changes are versioned, validated, atomic, auditable, and visible in the workspace.
@@ -173,9 +171,9 @@ description: "Task list for Task Orchestrator implementation"
 - [X] T082 Run `bun run lint` and record result in `specs/008-task-orchestrator/validation-results.md`
 - [X] T083 Run `bun run test` and record result in `specs/008-task-orchestrator/validation-results.md`
 - [!] T084 Run `bun run test:e2e` and record result in `specs/008-task-orchestrator/validation-results.md` (ERROR: Playwright blocked by port `3100` already in use.)
-- [!] T085 Run final `agent-browser` desktop 1440x900 verification and save evidence in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: `agent-browser` cannot reach `http://localhost:5173`.)
-- [!] T086 Run final `agent-browser` tablet 1024x768 verification and save evidence in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: `agent-browser` cannot reach `http://localhost:5173`.)
-- [!] T087 Run final `agent-browser` mobile 390x844 verification with no horizontal scroll and save evidence in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: `agent-browser` cannot reach `http://localhost:5173`.)
+- [!] T085 Run final desktop 1440x900 verification and save evidence in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: cannot reach `http://localhost:5173`.)
+- [!] T086 Run final tablet 1024x768 verification and save evidence in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: cannot reach `http://localhost:5173`.)
+- [!] T087 Run final mobile 390x844 verification with no horizontal scroll and save evidence in `specs/008-task-orchestrator/browser-evidence.md` (ERROR: cannot reach `http://localhost:5173`.)
 - [X] T088 Run GitNexus change detection for affected execution flows and record summary in `specs/008-task-orchestrator/validation-results.md`
 
 ---
@@ -276,4 +274,4 @@ bun run test:e2e
 - Keep business logic out of React components and Hono route handlers.
 - Run GitNexus impact analysis before editing existing functions, classes, or methods.
 - Preserve user-facing strings in i18n files.
-- Use `agent-browser` for all frontend-visible task workspace changes.
+- Use for all frontend-visible task workspace changes.

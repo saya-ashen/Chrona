@@ -13,6 +13,7 @@ export const calendarAutomationPolicySchema = z.enum(["manual", "auto_plan", "au
 export const calendarValidationErrorCodeSchema = z.enum([
   "invalid_url",
   "unsupported_scheme",
+  "blocked_network",
   "unreachable",
   "unauthorized",
   "malformed_calendar",
@@ -61,6 +62,7 @@ export const importedCalendarEventSummarySchema = z.object({
 
 export const validateCalendarSourceRequestSchema = z.object({
   url: z.string().min(1),
+  allowBlockedNetwork: z.boolean().optional(),
 });
 
 export const validateCalendarSourceSuccessSchema = z.object({
@@ -88,7 +90,12 @@ export const createCalendarSourceRequestSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   syncPolicy: calendarSourceSyncPolicySchema.optional(),
   automationPolicy: calendarAutomationPolicySchema.optional(),
+  allowBlockedNetwork: z.boolean().optional(),
 });
+
+export const refreshCalendarSourceRequestSchema = z.object({
+  allowBlockedNetwork: z.boolean().optional(),
+}).optional();
 
 export const updateCalendarSourceRequestSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
@@ -127,6 +134,7 @@ export type CalendarSyncStatus = z.infer<typeof calendarSyncStatusSchema>;
 export type ImportedCalendarEventSummary = z.infer<typeof importedCalendarEventSummarySchema>;
 export type ValidateCalendarSourceResponse = z.infer<typeof validateCalendarSourceResponseSchema>;
 export type CreateCalendarSourceRequest = z.infer<typeof createCalendarSourceRequestSchema>;
+export type RefreshCalendarSourceRequest = z.infer<typeof refreshCalendarSourceRequestSchema>;
 export type UpdateCalendarSourceRequest = z.infer<typeof updateCalendarSourceRequestSchema>;
 export type CalendarSourceResponse = z.infer<typeof calendarSourceResponseSchema>;
 export type CalendarSourceListResponse = z.infer<typeof calendarSourceListResponseSchema>;

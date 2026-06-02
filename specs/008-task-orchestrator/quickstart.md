@@ -67,7 +67,7 @@ bun run test:e2e
 
 ## Browser Evidence
 
-Because task workspace presentation changes are expected, collect `agent-browser` evidence before and after UI changes.
+Because task workspace presentation changes are expected, collect before and after UI changes.
 
 Required viewports:
 
@@ -117,4 +117,3 @@ Evidence must show:
 - `bun run test`: PASS.
 - Targeted orchestrator Bun tests: PASS.
 - `bun run test:e2e`: ERROR because port `3100` is already in use.
-- `agent-browser open http://localhost:5173`: ERROR because the Vite app is not running.

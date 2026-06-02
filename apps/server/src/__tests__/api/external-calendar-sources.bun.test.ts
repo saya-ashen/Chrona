@@ -83,6 +83,61 @@ describe("External calendar source API", () => {
     await expectImportedFixtureEvent(workspaceId);
   });
 
+  it("imports bounded recurring calendar occurrences as tasks", async () => {
+    const { workspaceId } = await seedWorkspace("Calendar recurring API");
+    const url = fixtureUrl("recurring.ics");
+
+    const createRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Recurring calendar", url }),
+    });
+
+    expect(createRes.status).toBe(201);
+    const created = await json<{ syncStatus: { importedCount: number; state: string } }>(createRes);
+    expect(created.syncStatus).toMatchObject({ importedCount: 3, state: "success" });
+
+    const importedEvents = await db.importedCalendarEvent.findMany({
+      where: { workspaceId },
+      include: { task: true, workBlock: true },
+      orderBy: { startsAt: "asc" },
+    });
+
+    expect(importedEvents.map((event: { startsAt: Date }) => event.startsAt.toISOString())).toEqual([
+      "2026-05-05T14:00:00.000Z",
+      "2026-05-12T14:00:00.000Z",
+      "2026-05-19T14:00:00.000Z",
+    ]);
+    expect(importedEvents.every((event: { recurrenceId: string | null }) => event.recurrenceId)).toBe(true);
+
+    // All occurrences collapse into a single recurring series task.
+    const seriesTaskIds = new Set(importedEvents.map((event: { taskId: string | null }) => event.taskId));
+    expect(seriesTaskIds.size).toBe(1);
+
+    const tasks = await db.task.findMany({
+      where: { workspaceId },
+      include: { workBlocks: true },
+    });
+    expect(tasks.length).toBe(1);
+    const seriesTask = tasks[0];
+    expect(seriesTask.kind).toBe("recurring");
+    expect(seriesTask.recurrenceRule).toContain("FREQ=WEEKLY");
+    expect(seriesTask.seriesExternalUid).toBe("recurring-planning@example.test");
+
+    // One work block per occurrence, each linked back to its imported event.
+    expect(seriesTask.workBlocks.length).toBe(3);
+    expect(
+      seriesTask.workBlocks
+        .map((block: { scheduledStartAt: Date }) => block.scheduledStartAt.toISOString())
+        .sort(),
+    ).toEqual([
+      "2026-05-05T14:00:00.000Z",
+      "2026-05-12T14:00:00.000Z",
+      "2026-05-19T14:00:00.000Z",
+    ]);
+    expect(importedEvents.every((event: { workBlockId: string | null }) => event.workBlockId)).toBe(true);
+  });
+
   it("rejects unsupported URLs without saving", async () => {
     const { workspaceId } = await seedWorkspace("Calendar invalid URL");
 
@@ -99,6 +154,34 @@ describe("External calendar source API", () => {
     const listRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-sources`);
     const listed = await json<{ sources: unknown[] }>(listRes);
     expect(listed.sources).toEqual([]);
+  });
+
+  it("requires confirmation before saving blocked-network calendar sources", async () => {
+    const { workspaceId } = await seedWorkspace("Calendar blocked network");
+    const url = fixtureUrl("valid.ics");
+    const blockedTransport: CalendarFeedTransport = async () => {
+      const { CalendarFeedError } = await import("@chrona/integrations");
+      throw new CalendarFeedError("blocked_network", "Calendar host resolves to a blocked network.");
+    };
+
+    const rejectedRes = await app(blockedTransport).request(`http://local/api/workspaces/${workspaceId}/calendar-sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Proxy calendar", url }),
+    });
+    expect(rejectedRes.status).toBe(400);
+    const rejected = await json<{ valid: boolean; errorCode: string }>(rejectedRes);
+    expect(rejected.valid).toBe(false);
+    expect(rejected.errorCode).toBe("blocked_network");
+
+    const acceptedRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-sources`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Proxy calendar", url, allowBlockedNetwork: true }),
+    });
+    expect(acceptedRes.status).toBe(201);
+    const source = await db.calendarSource.findFirstOrThrow({ where: { workspaceId } });
+    expect(source.blockedNetworkConfirmedAt).toBeInstanceOf(Date);
   });
 
   it("rejects malformed feeds without saving", async () => {

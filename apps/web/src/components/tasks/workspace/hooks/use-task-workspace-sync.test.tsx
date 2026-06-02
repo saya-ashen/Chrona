@@ -229,6 +229,8 @@ function pageData(input: {
       executionConfig: null,
       autoPlanGeneration: false,
       autoExecute: false,
+      autoPlanGenerationTiming: "at_start",
+      autoExecuteTiming: "at_start",
       status: input.taskStatus,
       priority: "High",
       dueAt: null,

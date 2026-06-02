@@ -4,6 +4,11 @@ import { TaskPlanStatus } from "@/generated/prisma/client";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
+import { AUTOMATION_TIMING_PRESETS, automationTimingOffsetMs } from "@chrona/contracts";
+
+const MAX_AUTOMATION_TIMING_OFFSET_MS = Math.max(
+  ...AUTOMATION_TIMING_PRESETS.map((preset) => automationTimingOffsetMs(preset)),
+);
 
 export type AutoStartScheduledPlanResult = {
   started: Array<{ taskId: string; workBlockId: string; runId: string }>;
@@ -14,10 +19,11 @@ export type AutoStartScheduledPlanResult = {
 
 export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promise<AutoStartScheduledPlanResult> {
   const now = input?.now ?? new Date();
+  const windowUpperBound = new Date(now.getTime() + MAX_AUTOMATION_TIMING_OFFSET_MS);
   const dueWorkBlocks = await db.workBlock.findMany({
     where: {
       status: "Scheduled",
-      scheduledStartAt: { lte: now },
+      scheduledStartAt: { lte: windowUpperBound },
       task: {
         status: { in: ["Draft", "Ready", "Scheduled", "Queued"] },
         autoExecute: true,
@@ -30,6 +36,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           workspaceId: true,
           status: true,
           autoExecute: true,
+          autoExecuteTiming: true,
           executionRuntime: true,
           taskPlans: {
             where: { status: TaskPlanStatus.Accepted },
@@ -65,6 +72,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
             status: task.status,
             executionRuntime: task.executionRuntime,
             hasAcceptedPlan: task.taskPlans.length > 0,
+            autoExecuteTiming: task.autoExecuteTiming,
           },
           workBlock: { scheduledStartAt: block.scheduledStartAt },
           now,
@@ -73,6 +81,13 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
 
       if (!eligibility.ok) {
         result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: eligibility.reason });
+
+        // `not_due` is the expected steady state for blocks inside the widened
+        // look-ahead window; emitting a canonical event every tick would flood
+        // the log, so only record actionable skip reasons.
+        if (eligibility.reason === "not_due") {
+          continue;
+        }
 
         await appendCanonicalEvent({
           eventType: "task.auto_start.skipped",
@@ -102,7 +117,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
         data: { status: "Active", startedAt: now },
       });
 
-      const startedRun = await taskPlanExecution.start({ taskId: task.id, trigger: "scheduler" });
+      const startedRun = await taskPlanExecution.start({ taskId: task.id, trigger: "scheduler", workBlockId: block.id });
       result.started.push({ taskId: task.id, workBlockId: block.id, runId: startedRun.planId ?? task.id });
     } catch (parentError) {
       const message = parentError instanceof Error ? parentError.message : "Unknown error during auto-start";

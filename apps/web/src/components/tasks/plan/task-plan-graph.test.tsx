@@ -294,7 +294,7 @@ describe("TaskPlanGraph", () => {
     );
 
     expect(screen.getByText("No node selected")).toBeInTheDocument();
-    expect(screen.getByText(/Select a plan node to inspect its goal/)).toBeInTheDocument();
+    expect(screen.getByText(DEFAULT_GRAPH_COPY.inspectorEmpty)).toBeInTheDocument();
   });
 
   it("dispatches execution actions from the node inspector", async () => {

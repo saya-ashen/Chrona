@@ -1,5 +1,7 @@
 import { api } from "./rpc-client";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "./access-key";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import type { AutomationTimingPreset } from "@chrona/contracts";
 
 async function parseActionResponse(response: {
   ok: boolean;
@@ -24,9 +26,14 @@ export function createTaskFromSchedule(input: {
   priority?: string;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
   parentTaskId?: string | null;
+  recurrenceRule?: string | null;
+  recurrenceAnchorStartAt?: string | null;
+  recurrenceAnchorEndAt?: string | null;
 }) {
   return api.tasks
     .$post({
@@ -42,9 +49,14 @@ export function createTaskFromSchedule(input: {
           | undefined,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
+        autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+        autoExecuteTiming: input.autoExecuteTiming,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
         parentTaskId: input.parentTaskId,
+        recurrenceRule: input.recurrenceRule ?? undefined,
+        recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? undefined,
+        recurrenceAnchorEndAt: input.recurrenceAnchorEndAt ?? undefined,
       },
     })
     .then(parseActionResponse);
@@ -59,6 +71,8 @@ export function updateTaskConfigFromSchedule(input: {
   executionConfig?: Record<string, unknown>;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
 }) {
   return api.tasks[":taskId"]
     .$patch({
@@ -76,6 +90,8 @@ export function updateTaskConfigFromSchedule(input: {
         executionConfig: input.executionConfig,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
+        autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+        autoExecuteTiming: input.autoExecuteTiming,
       },
     })
     .then(parseActionResponse);
@@ -120,6 +136,24 @@ export function clearSchedule(input: { taskId: string }) {
       param: { taskId: input.taskId },
     })
     .then(parseActionResponse);
+}
+
+export function moveWorkBlock(input: {
+  workBlockId: string;
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+}) {
+  return fetch(`/api/tasks/work-blocks/${encodeURIComponent(input.workBlockId)}/schedule`, {
+    method: "PUT",
+    headers: buildAccessKeyHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      scheduledStartAt: input.scheduledStartAt.toISOString(),
+      scheduledEndAt: input.scheduledEndAt.toISOString(),
+    }),
+  }).then(async (res) => {
+    handleUnauthorizedResponse(res);
+    return parseActionResponse(res);
+  });
 }
 
 export function decideScheduleProposal(input: {

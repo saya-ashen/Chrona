@@ -8,6 +8,7 @@ import { useI18n } from "@chrona/i18n/react";
 
 type TaskContextLinksProps = {
   taskId: string;
+  workBlockId?: string | null;
   taskLabel?: string;
   size?: "xs" | "sm" | "default" | "lg";
   className?: string;
@@ -15,6 +16,7 @@ type TaskContextLinksProps = {
 
 export function TaskContextLinks({
   taskId,
+  workBlockId,
   taskLabel,
   size = "default",
   className,
@@ -24,7 +26,7 @@ export function TaskContextLinks({
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
       <Button asChild variant="outline" size={size}>
-        <LocalizedLink href={`/tasks/${taskId}`}>
+        <LocalizedLink href={workBlockId ? `/tasks/${taskId}?workBlockId=${encodeURIComponent(workBlockId)}` : `/tasks/${taskId}`}>
           <ExternalLink className="size-3.5" />
           {taskLabel ?? t("common.openTask")}
         </LocalizedLink>

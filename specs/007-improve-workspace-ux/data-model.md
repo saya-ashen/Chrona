@@ -91,7 +91,6 @@ Represents required verification artifacts for this UX feature.
 **Fields**:
 
 - `route`: Target workspace route used for observation and verification.
-- `snapshot`: `agent-browser snapshot -i` output before and after implementation.
 - `screenshots`: Desktop `1440x900`, tablet `1024x768`, and mobile `390x844` image artifacts.
 - `diagnostics`: Console, page error, and network request output where supported.
 - `mobileOverflowResult`: Confirmation that `390px` viewport has no horizontal page scroll.

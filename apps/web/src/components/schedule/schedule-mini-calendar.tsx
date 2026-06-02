@@ -1,6 +1,9 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
+import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useEffect, useState, type ComponentProps } from "react";
+import type { DayButton } from "react-day-picker";
 
 type ScheduleMiniCalendarDay = {
   key: string;
@@ -16,59 +19,96 @@ type ScheduleMiniCalendarDay = {
 };
 
 export function ScheduleMiniCalendar({
-  monthLabel,
   days,
+  selectedDate,
 }: {
-  monthLabel: string;
   days: ScheduleMiniCalendarDay[];
+  selectedDate: Date;
 }) {
+  const daysByKey = new Map(days.map((day) => [day.key, day]));
+  const [month, setMonth] = useState(selectedDate);
+
+  useEffect(() => {
+    setMonth(selectedDate);
+  }, [selectedDate]);
+
   return (
-    <Card className="space-y-4 rounded-[30px]">
-      <div className="flex items-center justify-between gap-3 px-1">
-        <div>
+    <Card className="max-w-full overflow-hidden rounded-[30px]">
+      <div className="mx-auto w-full max-w-full">
+        <div className="px-1">
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Calendar
           </p>
-          <h2 className="mt-1 text-sm font-semibold text-foreground">{monthLabel}</h2>
         </div>
-      </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label) => (
-          <span key={label} className="py-1">
-            {label}
-          </span>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-7 gap-1.5">
-        {days.map((day) => (
-          <LocalizedLink
-            key={day.key}
-            href={day.href}
-            aria-current={day.isSelected ? "date" : undefined}
-            aria-label={day.label}
-            className={cn(
-              "group flex aspect-square min-h-10 flex-col items-center justify-center rounded-2xl border text-xs transition-all duration-150",
-              day.isSelected
-                ? "border-primary/30 bg-primary/12 text-primary shadow-[0_6px_18px_rgba(79,70,229,0.2)]"
-                : day.isToday
-                  ? "border-border/80 bg-background text-foreground ring-2 ring-primary/20"
-                  : "border-transparent bg-transparent text-foreground hover:-translate-y-0.5 hover:border-border/70 hover:bg-background/90",
-              !day.isCurrentMonth && "text-muted-foreground/40",
-            )}
-          >
-            <span className="text-sm font-medium">{day.dateNumber}</span>
-            {day.riskCount > 0 ? (
-              <span className="mt-1 size-1.5 rounded-full bg-destructive" />
-            ) : day.scheduledCount > 0 ? (
-              <span className="mt-1 size-1.5 rounded-full bg-primary/70" />
-            ) : null}
-          </LocalizedLink>
-        ))}
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          month={month}
+          onMonthChange={setMonth}
+          showOutsideDays
+          fixedWeeks
+          className="mt-2 max-w-full p-0 [--cell-size:clamp(1.75rem,11.5vw,2.25rem)] sm:[--cell-size:--spacing(9)] xl:[--cell-size:clamp(1.65rem,2.1vw,2.25rem)] [&_.rdp-month]:w-full [&_.rdp-months]:w-full [&_.rdp-week]:w-full [&_.rdp-weekdays]:w-full"
+          components={{
+            DayButton: (props) => (
+              <ScheduleMiniCalendarDayButton {...props} daysByKey={daysByKey} />
+            ),
+          }}
+        />
       </div>
     </Card>
   );
 }
 
+function ScheduleMiniCalendarDayButton({
+  day,
+  modifiers,
+  className,
+  daysByKey,
+}: ComponentProps<typeof DayButton> & {
+  daysByKey: Map<string, ScheduleMiniCalendarDay>;
+}) {
+  const dayKey = formatCalendarDayKey(day.date);
+  const calendarDay = daysByKey.get(dayKey);
+  const isSelected = Boolean(calendarDay?.isSelected);
+  const activityDot = getCalendarDayActivityDot(calendarDay, isSelected);
 
+  return (
+    <LocalizedLink
+      href={calendarDay?.href ?? `/schedule?day=${encodeURIComponent(dayKey)}`}
+      aria-current={isSelected ? "date" : undefined}
+      aria-label={calendarDay?.label ?? day.date.toDateString()}
+      className={cn(
+        "flex aspect-square size-auto min-w-(--cell-size) flex-col items-center justify-center gap-1 rounded-(--cell-radius) text-sm leading-none font-normal transition-all outline-none hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+        isSelected && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+        modifiers.today && !isSelected && "bg-muted text-foreground",
+        modifiers.outside && "text-muted-foreground opacity-50",
+        className,
+      )}
+    >
+      <span>{day.date.getDate()}</span>
+      {activityDot}
+    </LocalizedLink>
+  );
+}
+
+function getCalendarDayActivityDot(
+  day: ScheduleMiniCalendarDay | undefined,
+  isSelected: boolean,
+) {
+  if (!day) return null;
+
+  if (day.riskCount) {
+    return <span className="size-1.5 rounded-full bg-destructive" />;
+  }
+
+  if (day.scheduledCount) {
+    return <span className={cn("size-1.5 rounded-full", isSelected ? "bg-primary-foreground/80" : "bg-primary/70")} />;
+  }
+
+  return null;
+}
+
+function formatCalendarDayKey(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}

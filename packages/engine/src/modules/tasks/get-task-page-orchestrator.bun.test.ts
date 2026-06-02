@@ -11,6 +11,7 @@ async function resetDb() {
   await db.taskPlanRun.deleteMany();
   await db.taskPlan.deleteMany();
   await db.executionSession.deleteMany();
+  await db.workBlock.deleteMany();
   await db.taskProjection.deleteMany();
   await db.run.deleteMany();
   await db.task.deleteMany();
@@ -98,6 +99,40 @@ function definitionLayerId(graph: ReturnType<typeof createPlanGraphFromCompiledP
 describe("getTaskPage orchestrator read model", () => {
   beforeEach(async () => {
     await resetDb();
+  });
+
+  it("returns requested recurring occurrence schedule", async () => {
+    const { workspace, task } = await seedTask("Recurring page task");
+    const firstBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-01T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-01T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const secondBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-02T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-02T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    await rebuildTaskProjection(task.id);
+
+    const page = await getTaskPage({ taskId: task.id, workBlockId: secondBlock.id });
+
+    expect(page.task.currentWorkBlock?.id).toBe(secondBlock.id);
+    expect(page.task.scheduledStartAt).toBe("2026-06-02T09:00:00.000Z");
+    expect(page.task.scheduledEndAt).toBe("2026-06-02T10:00:00.000Z");
+    expect(page.task.currentWorkBlock?.id).not.toBe(firstBlock.id);
   });
 
   it("returns one coherent execution summary from the effective plan graph", async () => {

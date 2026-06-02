@@ -7,7 +7,12 @@ import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
 import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
 import { deriveTaskStaticState } from "@chrona/domain";
+import { normalizeAutomationTiming } from "@chrona/contracts";
 import type { CreateTaskInput } from "@chrona/contracts";
+import { expandRecurrenceRule } from "@chrona/integrations";
+
+const SELF_SERIES_WINDOW_DAYS = 180;
+const SELF_SERIES_MAX_OCCURRENCES = 365;
 
 function normalizeExecutionConfig(
   value: Prisma.InputJsonObject | null | undefined,
@@ -62,6 +67,10 @@ export async function createTask(input: CreateTaskInput) {
   });
   const autoExecute = input.autoExecute ?? false;
   const autoPlanGeneration = autoExecute || (input.autoPlanGeneration ?? false);
+  const autoPlanGenerationTiming = normalizeAutomationTiming(
+    input.autoPlanGenerationTiming,
+  );
+  const autoExecuteTiming = normalizeAutomationTiming(input.autoExecuteTiming);
 
   const staticState = deriveTaskStaticState({
     runtimeSpec: getRuntimeTaskConfigSpec(validatedRuntimeConfig.executionRuntime),
@@ -70,11 +79,39 @@ export async function createTask(input: CreateTaskInput) {
   });
   const status = TaskStatus[staticState.persistedStatus];
 
+  const recurrenceRule = input.recurrenceRule?.trim() || null;
+  const recurrenceAnchorStartAt = recurrenceRule
+    ? new Date(input.recurrenceAnchorStartAt ?? "")
+    : null;
+  const recurrenceAnchorEndAt = recurrenceRule
+    ? new Date(input.recurrenceAnchorEndAt ?? "")
+    : null;
+
+  if (recurrenceRule) {
+    if (
+      !recurrenceAnchorStartAt ||
+      !recurrenceAnchorEndAt ||
+      Number.isNaN(recurrenceAnchorStartAt.getTime()) ||
+      Number.isNaN(recurrenceAnchorEndAt.getTime())
+    ) {
+      throw new Error(
+        "recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set",
+      );
+    }
+
+    if (recurrenceAnchorEndAt.getTime() <= recurrenceAnchorStartAt.getTime()) {
+      throw new Error("recurrenceAnchorEndAt must be after recurrenceAnchorStartAt");
+    }
+  }
+
   const task = await db.task.create({
     data: {
       workspaceId: input.workspaceId,
       title,
       description,
+      kind: recurrenceRule ? "recurring" : "single",
+      recurrenceRule,
+      seriesExternalUid: null,
       executionRuntime: validatedRuntimeConfig.executionRuntime,
       executionConfig:
         validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject,
@@ -83,6 +120,8 @@ export async function createTask(input: CreateTaskInput) {
         : TaskPriority.Medium,
       autoPlanGeneration,
       autoExecute,
+      autoPlanGenerationTiming,
+      autoExecuteTiming,
       status,
       parentTaskId: input.parentTaskId ?? null,
     },
@@ -115,6 +154,39 @@ export async function createTask(input: CreateTaskInput) {
     defaultSessionId: task.defaultSessionId,
   });
 
+  if (recurrenceRule && recurrenceAnchorStartAt && recurrenceAnchorEndAt) {
+    const durationMs =
+      recurrenceAnchorEndAt.getTime() - recurrenceAnchorStartAt.getTime();
+    const windowTo = new Date(
+      recurrenceAnchorStartAt.getTime() +
+        SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const occurrences = expandRecurrenceRule(
+      recurrenceRule,
+      recurrenceAnchorStartAt,
+      durationMs,
+      {
+        from: recurrenceAnchorStartAt,
+        to: windowTo,
+        maxOccurrences: SELF_SERIES_MAX_OCCURRENCES,
+      },
+    );
+
+    if (occurrences.length > 0) {
+      await db.workBlock.createMany({
+        data: occurrences.map((occurrence) => ({
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          title: task.title,
+          status: "Scheduled" as const,
+          scheduledStartAt: occurrence.startsAt,
+          scheduledEndAt: occurrence.endsAt,
+          trigger: "manual" as const,
+        })),
+      });
+    }
+  }
+
   await appendCanonicalEvent({
     eventType: "task.created",
     workspaceId: task.workspaceId,
@@ -127,6 +199,8 @@ export async function createTask(input: CreateTaskInput) {
       priority: task.priority,
       autoPlanGeneration: task.autoPlanGeneration,
       autoExecute: task.autoExecute,
+      autoPlanGenerationTiming: task.autoPlanGenerationTiming,
+      autoExecuteTiming: task.autoExecuteTiming,
       status: task.status,
       parentTaskId: task.parentTaskId,
     },
@@ -135,7 +209,7 @@ export async function createTask(input: CreateTaskInput) {
 
   await rebuildTaskProjection(task.id);
 
-  if (task.autoPlanGeneration) {
+  if (task.autoPlanGeneration && autoPlanGenerationTiming === "immediate") {
     startAutoPlanGenerationForTask({ taskId: task.id, accept: task.autoExecute });
   }
 
@@ -144,5 +218,7 @@ export async function createTask(input: CreateTaskInput) {
     workspaceId: task.workspaceId,
     autoPlanGeneration: task.autoPlanGeneration,
     autoExecute: task.autoExecute,
+    autoPlanGenerationTiming: task.autoPlanGenerationTiming,
+    autoExecuteTiming: task.autoExecuteTiming,
   };
 }

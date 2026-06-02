@@ -34,11 +34,18 @@ import {
 
 const DEFAULT_SOURCE_COLOR = "#2563eb";
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const IMPORT_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+const IMPORT_LOOKAHEAD_MS = 180 * 24 * 60 * 60 * 1000;
+const MAX_IMPORTED_OCCURRENCES = 500;
 
 export type ExternalCalendarServiceOptions = {
   transport?: CalendarFeedTransport;
   now?: () => Date;
   autoPlanTask?: (input: { taskId: string; accept?: boolean }) => void | Promise<void>;
+};
+
+type CalendarFetchOptions = {
+  allowBlockedNetwork?: boolean;
 };
 
 function iso(date?: Date | null) {
@@ -89,14 +96,22 @@ function errorCode(cause: unknown): CalendarValidationErrorCode {
   return "unknown";
 }
 
+function importRangeFrom(value: Date) {
+  return {
+    from: new Date(value.getTime() - IMPORT_LOOKBACK_MS),
+    to: new Date(value.getTime() + IMPORT_LOOKAHEAD_MS),
+    maxOccurrences: MAX_IMPORTED_OCCURRENCES,
+  };
+}
+
 export function createExternalCalendarService(options: ExternalCalendarServiceOptions = {}) {
   const now = options.now ?? (() => new Date());
   const autoPlanTask = options.autoPlanTask ?? (() => undefined);
 
-  async function validateSourceUrl(url: string): Promise<ValidateCalendarSourceResponse> {
+  async function validateSourceUrl(url: string, fetchOptions: CalendarFetchOptions = {}): Promise<ValidateCalendarSourceResponse> {
     try {
       const normalized = normalizeCalendarSourceUrl(url);
-      const feed = await fetchCalendarFeed(normalized.url, options.transport);
+      const feed = await fetchCalendarFeed(normalized.url, options.transport, fetchOptions);
       const parsed = parseICalendarFeed(feed);
       return {
         valid: true,
@@ -111,21 +126,25 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
     }
   }
 
-  async function refreshSource(workspaceId: string, sourceId: string) {
+  async function refreshSource(workspaceId: string, sourceId: string, fetchOptions: CalendarFetchOptions = {}) {
     const source = await getCalendarSource(workspaceId, sourceId);
     if (!source) throw new Error("calendar_source_not_found");
+    const allowBlockedNetwork = Boolean(fetchOptions.allowBlockedNetwork || source.blockedNetworkConfirmedAt);
+    if (fetchOptions.allowBlockedNetwork && !source.blockedNetworkConfirmedAt) {
+      await updateCalendarSource(workspaceId, sourceId, { blockedNetworkConfirmedAt: now() });
+    }
 
     try {
+      const refreshedAt = now();
       await updateCalendarSourceSyncStatus(workspaceId, sourceId, { syncState: "syncing" });
-      const feed = await fetchCalendarFeed(source.sourceUrl, options.transport);
-      const parsed = parseICalendarFeed(feed);
+      const feed = await fetchCalendarFeed(source.sourceUrl, options.transport, { allowBlockedNetwork });
+      const parsed = parseICalendarFeed(feed, importRangeFrom(refreshedAt));
       const normalizedEvents = normalizeImportedEvents(parsed.events);
       const writes: ImportedCalendarEventWrite[] = normalizedEvents.map((event) => ({
         ...event,
         workspaceId,
         calendarSourceId: sourceId,
       }));
-      const refreshedAt = now();
       const replacement = await replaceImportedCalendarEvents(sourceId, writes, {
         policy: source.syncPolicy,
         automationPolicy: source.automationPolicy,
@@ -163,7 +182,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         const code = errorCode(cause);
         return { validation: { valid: false as const, errorCode: code, message: safeCalendarErrorMessage(code) } };
       }
-      const validation = await validateSourceUrl(normalized.url);
+      const validation = await validateSourceUrl(normalized.url, { allowBlockedNetwork: input.allowBlockedNetwork });
       if (!validation.valid) return { validation };
 
       const source = await createCalendarSource({
@@ -174,6 +193,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         color: input.color ?? DEFAULT_SOURCE_COLOR,
         syncPolicy: input.syncPolicy ?? defaultSyncPolicyForUrl(normalized.url),
         automationPolicy: input.automationPolicy ?? "auto_plan",
+        blockedNetworkConfirmedAt: input.allowBlockedNetwork ? now() : null,
       });
       return await refreshSource(workspaceId, source.id);
     },

@@ -64,6 +64,7 @@ describe("createTask auto plan generation", () => {
       title: "Create task with auto plan",
       description: "Plan generation should start in the background.",
       autoExecute: true,
+      autoPlanGenerationTiming: "immediate",
       executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
@@ -82,6 +83,7 @@ describe("createTask auto plan generation", () => {
       description: "Plan generation should start without accepting the plan.",
       autoPlanGeneration: true,
       autoExecute: false,
+      autoPlanGenerationTiming: "immediate",
       executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
@@ -104,6 +106,7 @@ describe("createTask auto plan generation", () => {
       workspaceId: workspace.id,
       title: "Explicit auto execute enabled",
       autoExecute: true,
+      autoPlanGenerationTiming: "immediate",
       executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });

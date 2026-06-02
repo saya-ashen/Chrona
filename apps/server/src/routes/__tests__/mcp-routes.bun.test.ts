@@ -170,10 +170,10 @@ describe("MCP routes", () => {
       (tool: { name: string }) => tool.name === "chrona_condition_select",
     );
 
-    expect(conditionSelect.description).toBe("Select the current condition branch by branchRef. Does not accept backend node IDs.");
-    expect(conditionSelect.inputSchema.required).toEqual(["branchRef", "summary"]);
+    expect(conditionSelect.description).toBe("Select a condition branch by nodeId and branchRef. Chrona validates the node against the current task.");
+    expect(conditionSelect.inputSchema.required).toEqual(["nodeId", "branchRef", "summary"]);
+    expect(conditionSelect.inputSchema.properties.nodeId).toMatchObject({ type: "string" });
     expect(conditionSelect.inputSchema.properties.branchRef).toMatchObject({ type: "string" });
-    expect(conditionSelect.inputSchema.properties.nodeId).toBeUndefined();
     expect(conditionSelect.inputSchema.properties.nextNodeId).toBeUndefined();
     expect(conditionSelect.inputSchema.properties.idempotencyKey).toBeUndefined();
     expect(conditionSelect.inputSchema.properties.evidence).toBeUndefined();
@@ -289,7 +289,7 @@ describe("MCP routes", () => {
       }],
       ["chrona_node_read", "chrona.node.read", {}, {}],
       ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
-      ["chrona_condition_select", "chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Yes" }, { branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
       ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
       ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
@@ -410,7 +410,7 @@ describe("MCP routes", () => {
       }],
       ["chrona_node_read", "chrona.node.read", {}, {}],
       ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
-      ["chrona_condition_select", "chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Yes" }, { branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
       ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
       ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
@@ -585,11 +585,11 @@ describe("MCP routes", () => {
     expect(JSON.stringify(body)).toContain("Invalid discriminator value");
   });
 
-  it("rejects backend IDs in public condition terminal schema", async () => {
+  it("rejects branch target IDs in public condition terminal schema", async () => {
     const response = await postRpc(
       rpc("tools/call", {
         name: "chrona_condition_select",
-        arguments: { branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No ids" },
+        arguments: { nodeId: "condition-node", branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No branch target ids" },
         _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
     );

@@ -24,7 +24,7 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to delete task");
       }
     },
-    async getPage(input: { taskId: string }) {
+    async getPage(input: Parameters<typeof tasks.getPage>[0]) {
       try {
         return await tasks.getPage(input);
       } catch (cause) {

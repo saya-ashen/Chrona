@@ -97,11 +97,11 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T015 [US1] Implement [Service] in src/services/[service].py (depends on T013, T014)
 - [ ] T016 [US1] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T017 [US1] Add validation and error handling
-- [ ] T018 [US1] Capture pre-edit `agent-browser` snapshot and screenshots for affected UI
+- [ ] T018 [US1] Capture pre-edit snapshot and screenshots for affected UI
 - [ ] T019 [US1] Verify loading, empty, success, and error states for the story
 - [ ] T020 [US1] Verify desktop 1440x900, tablet 1024x768, and mobile 390x844 with no mobile horizontal scrolling
 - [ ] T021 [US1] Verify current task, active node, blocked/review state, and primary action are visually obvious when applicable
-- [ ] T022 [US1] Capture post-edit `agent-browser` verification for affected UI
+- [ ] T022 [US1] Capture post-edit for affected UI
 - [ ] T023 [US1] Capture performance validation for the defined budget
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
@@ -126,7 +126,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T024 [US2] Implement [Service] in src/services/[service].py
 - [ ] T025 [US2] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T026 [US2] Integrate with User Story 1 components (if needed)
-- [ ] T027 [US2] Capture pre-edit and post-edit `agent-browser` evidence for affected UI
+- [ ] T027 [US2] Capture pre-edit and post-edit for affected UI
 - [ ] T028 [US2] Verify loading, empty, success, and error states for the story
 - [ ] T029 [US2] Verify desktop 1440x900, tablet 1024x768, and mobile 390x844 with no mobile horizontal scrolling
 - [ ] T030 [US2] Capture performance validation for the defined budget
@@ -152,7 +152,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T032 [P] [US3] Create [Entity] model in src/models/[entity].py
 - [ ] T033 [US3] Implement [Service] in src/services/[service].py
 - [ ] T034 [US3] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T035 [US3] Capture pre-edit and post-edit `agent-browser` evidence for affected UI
+- [ ] T035 [US3] Capture pre-edit and post-edit for affected UI
 - [ ] T036 [US3] Verify loading, empty, success, and error states for the story
 - [ ] T037 [US3] Verify desktop 1440x900, tablet 1024x768, and mobile 390x844 with no mobile horizontal scrolling
 - [ ] T038 [US3] Capture performance validation for the defined budget
@@ -204,7 +204,7 @@ Examples of foundational tasks (adjust based on your project):
 - Models before services
 - Services before endpoints
 - Core implementation before integration
-- Story-specific `agent-browser` UX evidence and performance validation before closing the story
+- Story-specific UX evidence and performance validation before closing the story
 - Story complete before moving to next priority
 
 ### Parallel Opportunities
@@ -270,7 +270,7 @@ With multiple developers:
 - [Story] label maps task to specific user story for traceability
 - Each user story should be independently completable and testable
 - Verify tests fail before implementing
-- Verify frontend UX with `agent-browser` before and after UI edits
+- Verify frontend UX with before and after UI edits
 - Verify desktop 1440x900, tablet 1024x768, and mobile 390x844 before closing UI work
 - Verify UX states, i18n strings, product behavior, API scope, and performance budgets before closing each story
 - Commit after each task or logical group

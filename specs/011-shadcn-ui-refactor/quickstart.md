@@ -9,7 +9,7 @@
 
 ## 2. Capture Pre-Edit Browser Evidence
 
-Use `agent-browser` before editing UI.
+Use before editing UI.
 
 Required viewports:
 
@@ -68,7 +68,7 @@ Run when task, schedule, or navigation flows are affected:
 bun run test:e2e
 ```
 
-Use `agent-browser` after edits for:
+Use after edits for:
 
 - Desktop `1440x900`
 - Tablet `1024x768`

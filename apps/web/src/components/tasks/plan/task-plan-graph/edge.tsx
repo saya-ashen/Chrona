@@ -41,9 +41,8 @@ function TaskPlanGraphEdge({
   const glowStyle = {
     ...style,
     stroke,
-    strokeOpacity: 0.32,
-    strokeWidth: Number(style?.strokeWidth ?? 1.8) + 6,
-    filter: "blur(5px)",
+    strokeOpacity: 0.12,
+    strokeWidth: Number(style?.strokeWidth ?? 1.8) + 2,
   };
 
   return (
@@ -54,7 +53,7 @@ function TaskPlanGraphEdge({
       {label ? (
         <EdgeLabelRenderer>
           <div
-            className="pointer-events-none absolute rounded-full border border-white/12 bg-slate-950/82 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-200 shadow-[0_8px_24px_rgba(2,6,23,0.35)] backdrop-blur"
+            className="pointer-events-none absolute rounded-full border border-border bg-background px-2 py-1 text-[10px] font-medium text-muted-foreground shadow-sm"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             }}

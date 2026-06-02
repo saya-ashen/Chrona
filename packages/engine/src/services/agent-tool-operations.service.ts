@@ -307,7 +307,8 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
 
     async resolveInputContext(input: unknown) {
       const raw = asInputRecord(input);
-      const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
+      const rawSessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
+      const sessionId = rawSessionId;
       if (!sessionId && raw.taskId) {
         logger.info("context.resolve.explicit_task", {
           toolName: typeof raw.toolName === "string" ? raw.toolName : undefined,
@@ -371,6 +372,7 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
 
       return chronaToolInputSchema.parse({
         ...raw,
+        sessionId: sessionId || undefined,
         taskId: typeof raw.taskId === "string" ? raw.taskId : session?.task.id ?? runtimeRun?.taskId,
         workspaceId,
       });
@@ -514,6 +516,7 @@ async function startToolAudit(input: {
   const auditScope = await resolveToolAuditScope({
     taskId,
     sessionId: operation.input.sessionId ?? null,
+    nodeId: nodeIdFromOperation(operation) ?? null,
   });
   const node = auditScope.nodeId
     ? await nodeTitleForExecutionSession(taskId, auditScope.planId ?? null, auditScope.nodeId)
@@ -585,11 +588,17 @@ async function startToolAudit(input: {
 async function resolveToolAuditScope(input: {
   taskId: string | null;
   sessionId: string | null;
+  nodeId: string | null;
 }): Promise<ToolAuditScope> {
-  const run = await findToolAuditRun(input.sessionId);
-  const providerRun = await findToolAuditProviderRun(input.taskId, fieldValue(run, "runtimeRunRef"));
-  const session = await findToolAuditExecutionSession(input.taskId, input.sessionId);
+  const sessionId = input.sessionId;
+  const run = await findToolAuditRun(sessionId);
+  const session = await findToolAuditExecutionSession(input.taskId, sessionId);
+  const nodeAttemptByNode = await findToolAuditNodeAttemptByNode(input.taskId, input.nodeId);
+  const providerRun = nodeAttemptByNode
+    ? await findToolAuditProviderRunByNodeAttempt(input.taskId, fieldValue(nodeAttemptByNode, "id"))
+    : await findToolAuditProviderRun(input.taskId, fieldValue(run, "runtimeRunRef"));
   const nodeAttemptId = firstValue(
+    fieldValue(nodeAttemptByNode, "id"),
     fieldValue(providerRun, "nodeAttemptId"),
     fieldValue(session, "currentNodeAttemptId"),
   );
@@ -606,7 +615,7 @@ async function resolveToolAuditScope(input: {
     planRunId: firstValue(fieldValue(providerRun, "planRunId"), fieldValue(nodeAttempt, "planRunId")),
     nodeAttemptId,
     providerRunId: fieldValue(providerRun, "id"),
-    nodeId: firstValue(fieldValue(nodeAttempt, "nodeId"), fieldValue(session, "currentNodeId")),
+    nodeId: firstValue(input.nodeId, fieldValue(nodeAttempt, "nodeId"), fieldValue(session, "currentNodeId")),
   };
 }
 
@@ -641,6 +650,18 @@ async function findToolAuditProviderRun(taskId: string | null, providerRunRef: s
   });
 }
 
+async function findToolAuditProviderRunByNodeAttempt(
+  taskId: string | null,
+  nodeAttemptId: string | null,
+) {
+  if (!taskId || !nodeAttemptId) return null;
+  return db.taskPlanProviderRun.findFirst({
+    where: { taskId, nodeAttemptId },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, planId: true, planRunId: true, nodeAttemptId: true },
+  });
+}
+
 async function findToolAuditExecutionSession(taskId: string | null, sessionId: string | null) {
   if (!taskId) return null;
   const select = { id: true, planId: true, currentNodeId: true, currentNodeAttemptId: true };
@@ -664,6 +685,15 @@ async function findToolAuditNodeAttempt(taskId: string | null, nodeAttemptId: st
   return db.taskPlanNodeAttempt.findFirst({
     where: { taskId, id: nodeAttemptId },
     select: { planId: true, planRunId: true, nodeId: true },
+  });
+}
+
+async function findToolAuditNodeAttemptByNode(taskId: string | null, nodeId: string | null) {
+  if (!taskId || !nodeId) return null;
+  return db.taskPlanNodeAttempt.findFirst({
+    where: { taskId, nodeId, status: { in: ["running", "blocked", "waiting_for_user", "waiting_for_approval"] } },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, planId: true, planRunId: true, nodeId: true },
   });
 }
 
@@ -840,6 +870,13 @@ function branchRefFromOperation(operation: ChronaToolOperation) {
     : undefined;
 }
 
+function nodeIdFromOperation(operation: ChronaToolOperation) {
+  const payload = operation.input.payload;
+  return payload && typeof payload === "object" && !Array.isArray(payload) && typeof (payload as { nodeId?: unknown }).nodeId === "string"
+    ? (payload as { nodeId: string }).nodeId
+    : undefined;
+}
+
 function summaryFromOperationPayload(operation: ChronaToolOperation) {
   const payload = operation.input.payload;
   return payload && typeof payload === "object" && !Array.isArray(payload) && typeof (payload as { summary?: unknown }).summary === "string"
@@ -947,6 +984,7 @@ async function executeValidatedTool(
       const body = payload as {
         summary?: string;
         outputs?: unknown;
+        nodeId?: string;
         branchRef?: string;
         decision?: "approved" | "rejected" | "needs_input" | "completed";
         feedback?: string;
@@ -964,6 +1002,7 @@ async function executeValidatedTool(
         action: {
           action: "complete_manual_node" as const,
           sessionId: input.sessionId,
+          nodeId: body.nodeId,
           summary: body.summary,
           output: body.outputs ?? body.input,
           terminalKind,

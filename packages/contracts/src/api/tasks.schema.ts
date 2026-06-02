@@ -5,6 +5,8 @@ import {
   taskStatusEnum,
   workspaceId,
 } from "./common";
+import { automationTimingSchema } from "../automation-timing";
+import type { TaskStatus } from "../task";
 
 function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
   const schema = z.string().trim().min(1, "executionRuntime is required");
@@ -24,9 +26,11 @@ function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
 export function createTaskBodySchemaForSupportedRuntimes(
   supportedRuntimes: readonly string[],
 ) {
-  return createTaskBodySchema.extend({
-    executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
-  });
+  return refineRecurrenceAnchors(
+    createTaskBodySchema.extend({
+      executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
+    }),
+  );
 }
 
 export function updateTaskBodySchemaForSupportedRuntimes(
@@ -38,18 +42,69 @@ export function updateTaskBodySchemaForSupportedRuntimes(
 }
 
 // ── GET /tasks ──
+/** Semantic filter tabs surfaced in the task list UI. */
+export const TASK_LIST_FILTERS = [
+  "all",
+  "needs_me",
+  "ready",
+  "running",
+  "completed",
+  "failed",
+] as const;
+
+export type TaskListFilter = (typeof TASK_LIST_FILTERS)[number];
+
+/** Maps each semantic filter tab to the concrete task statuses it includes. */
+export const TASK_FILTER_STATUS_MAP: Record<
+  Exclude<TaskListFilter, "all">,
+  readonly TaskStatus[]
+> = {
+  needs_me: ["WaitingForInput", "WaitingForApproval", "Blocked"],
+  ready: ["Ready", "Queued", "Draft"],
+  running: ["Running"],
+  completed: ["Completed", "Done"],
+  failed: ["Failed"],
+};
+
+export const TASK_LIST_SORT_FIELDS = [
+  "updatedAt",
+  "createdAt",
+  "dueAt",
+  "title",
+] as const;
+
+export type TaskListSortField = (typeof TASK_LIST_SORT_FIELDS)[number];
+
+const pageParam = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (!v) return 1;
+    const n = Number.parseInt(v, 10);
+    if (!Number.isFinite(n)) throw new Error("page must be a valid integer");
+    return Math.max(n, 1);
+  });
+
+const pageSizeParam = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (!v) return 20;
+    const n = Number.parseInt(v, 10);
+    if (!Number.isFinite(n)) throw new Error("pageSize must be a valid integer");
+    return Math.min(Math.max(n, 1), 100);
+  });
+
 export const listTasksQuerySchema = z.object({
   workspaceId: workspaceId,
   status: taskStatusEnum.optional(),
-  limit: z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (!v) return 50;
-      const n = Number.parseInt(v, 10);
-      if (!Number.isFinite(n)) throw new Error("limit must be a valid integer");
-      return Math.min(Math.max(n, 1), 200);
-    }),
+  filter: z.enum(TASK_LIST_FILTERS).optional(),
+  priority: taskPriorityEnum.optional(),
+  search: z.string().trim().min(1).optional(),
+  sort: z.enum(TASK_LIST_SORT_FIELDS).optional(),
+  order: z.enum(["asc", "desc"]).optional(),
+  page: pageParam,
+  pageSize: pageSizeParam,
 });
 
 // ── POST /tasks ──
@@ -60,10 +115,35 @@ export const createTaskBodySchema = z.object({
   priority: taskPriorityEnum.optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),
+  autoPlanGenerationTiming: automationTimingSchema.optional(),
+  autoExecuteTiming: automationTimingSchema.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   parentTaskId: z.string().nullable().optional(),
+  recurrenceRule: z.string().trim().min(1).nullable().optional(),
+  recurrenceAnchorStartAt: z.string().datetime().nullable().optional(),
+  recurrenceAnchorEndAt: z.string().datetime().nullable().optional(),
 });
+
+/** Recurrence requires both schedule anchors so we can materialize occurrences. */
+export function refineRecurrenceAnchors<
+  T extends z.ZodType<{
+    recurrenceRule?: string | null;
+    recurrenceAnchorStartAt?: string | null;
+    recurrenceAnchorEndAt?: string | null;
+  }>,
+>(schema: T) {
+  return schema.refine(
+    (body) =>
+      !body.recurrenceRule ||
+      (Boolean(body.recurrenceAnchorStartAt) && Boolean(body.recurrenceAnchorEndAt)),
+    {
+      message:
+        "recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set",
+      path: ["recurrenceAnchorStartAt"],
+    },
+  );
+}
 
 // ── PATCH /tasks/:taskId ──
 export const updateTaskParamSchema = z.object({
@@ -76,6 +156,8 @@ export const updateTaskBodySchema = z.object({
   priority: taskPriorityEnum.optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),
+  autoPlanGenerationTiming: automationTimingSchema.optional(),
+  autoExecuteTiming: automationTimingSchema.optional(),
   status: taskStatusEnum.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),

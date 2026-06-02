@@ -33,6 +33,8 @@ export function taskToTaskConfigInitialValues(task: TaskData) {
     executionConfig: task.executionConfig,
     autoPlanGeneration: task.autoPlanGeneration,
     autoExecute: task.autoExecute,
+    autoPlanGenerationTiming: task.autoPlanGenerationTiming,
+    autoExecuteTiming: task.autoExecuteTiming,
   };
 }
 

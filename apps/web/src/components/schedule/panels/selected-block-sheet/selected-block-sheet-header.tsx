@@ -44,6 +44,7 @@ export function SelectedBlockSheetHeader({
         <div className="flex flex-wrap items-center justify-end gap-2">
           <TaskContextLinks
             taskId={item.taskId}
+            workBlockId={item.workBlockId ?? null}
             size="sm"
           />
           <Button

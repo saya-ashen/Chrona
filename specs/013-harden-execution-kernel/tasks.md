@@ -125,7 +125,6 @@ description: "Task list for hardening Chrona execution kernel"
 - [X] T050 [US3] Update inspector result panel copy or fields for stale/ignored result evidence if needed in `apps/web/src/components/tasks/plan/task-plan-graph/inspector-run-panel.tsx`
 - [X] T051 [US3] Add or update localized messages for stale callbacks and ignored events in `apps/web/src/lib/i18n/messages.ts`
 - [X] T052 [US3] Run US3 focused tests and record output in `specs/013-harden-execution-kernel/verification/us3-result-stability.md`
-- [X] T053 [US3] If UI status/history changed, capture agent-browser desktop/tablet/mobile evidence in `specs/013-harden-execution-kernel/verification/us3-browser.md`
 
 **Checkpoint**: User Story 3 is independently complete when completed results remain stable and stale events are auditable.
 

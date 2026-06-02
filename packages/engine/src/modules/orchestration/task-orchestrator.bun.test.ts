@@ -71,6 +71,7 @@ describe("default task orchestrator workers", () => {
     expect(createDefaultTaskOrchestratorWorkers().map((worker) => worker.name)).toEqual([
       "restart-recovery",
       "due-scheduled-work",
+      "due-auto-plan-generation",
       "graph-advancement",
     ]);
   });

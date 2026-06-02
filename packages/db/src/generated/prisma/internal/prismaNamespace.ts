@@ -2943,6 +2943,7 @@ export const CalendarSourceScalarFieldEnum = {
   nextExpectedRefreshAt: 'nextExpectedRefreshAt',
   lastErrorCode: 'lastErrorCode',
   lastErrorMessage: 'lastErrorMessage',
+  blockedNetworkConfirmedAt: 'blockedNetworkConfirmedAt',
   importedCount: 'importedCount',
   skippedCount: 'skippedCount',
   createdAt: 'createdAt',
@@ -2957,8 +2958,10 @@ export const ImportedCalendarEventScalarFieldEnum = {
   workspaceId: 'workspaceId',
   calendarSourceId: 'calendarSourceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   externalUid: 'externalUid',
   recurrenceId: 'recurrenceId',
+  recurrenceRule: 'recurrenceRule',
   dedupeKey: 'dedupeKey',
   title: 'title',
   description: 'description',
@@ -2978,12 +2981,17 @@ export const TaskScalarFieldEnum = {
   workspaceId: 'workspaceId',
   title: 'title',
   description: 'description',
+  kind: 'kind',
+  recurrenceRule: 'recurrenceRule',
+  seriesExternalUid: 'seriesExternalUid',
   executionRuntime: 'executionRuntime',
   executionConfig: 'executionConfig',
   status: 'status',
   priority: 'priority',
   autoPlanGeneration: 'autoPlanGeneration',
   autoExecute: 'autoExecute',
+  autoPlanGenerationTiming: 'autoPlanGenerationTiming',
+  autoExecuteTiming: 'autoExecuteTiming',
   parentTaskId: 'parentTaskId',
   dueAt: 'dueAt',
   blockReason: 'blockReason',
@@ -3715,6 +3723,13 @@ export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
  * Reference to a field of type 'CalendarEventStatus'
  */
 export type EnumCalendarEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarEventStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'TaskKind'
+ */
+export type EnumTaskKindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TaskKind'>
     
 
 

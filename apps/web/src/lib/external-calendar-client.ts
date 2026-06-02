@@ -3,6 +3,7 @@ import type {
   CalendarSourceResponse,
   CreateCalendarSourceRequest,
   ImportedCalendarEventListResponse,
+  RefreshCalendarSourceRequest,
   UpdateCalendarSourceRequest,
   ValidateCalendarSourceResponse,
 } from "@chrona/contracts";
@@ -12,10 +13,10 @@ import { externalCalendarMessages } from "@/lib/i18n/messages";
 
 const base = (workspaceId: string) => `/api/workspaces/${encodeURIComponent(workspaceId)}`;
 
-export function validateCalendarSource(workspaceId: string, url: string) {
+export function validateCalendarSource(workspaceId: string, url: string, allowBlockedNetwork?: boolean) {
   return apiJson<ValidateCalendarSourceResponse>(`${base(workspaceId)}/calendar-sources/validate`, {
     method: "POST",
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, allowBlockedNetwork }),
   });
 }
 
@@ -44,10 +45,14 @@ export function updateExternalCalendarSource(
   );
 }
 
-export function refreshExternalCalendarSource(workspaceId: string, sourceId: string) {
+export function refreshExternalCalendarSource(
+  workspaceId: string,
+  sourceId: string,
+  input?: RefreshCalendarSourceRequest,
+) {
   return apiJson<CalendarSourceResponse>(
     `${base(workspaceId)}/calendar-sources/${encodeURIComponent(sourceId)}/refresh`,
-    { method: "POST" },
+    { method: "POST", body: JSON.stringify(input ?? {}) },
   );
 }
 
@@ -71,6 +76,7 @@ export function getExternalCalendarErrorMessage(error: unknown) {
       const code = "errorCode" in data ? (data as { errorCode?: unknown }).errorCode : undefined;
       if (code === "invalid_url") return externalCalendarMessages.invalidUrl;
       if (code === "unsupported_scheme") return externalCalendarMessages.unsupportedScheme;
+      if (code === "blocked_network") return externalCalendarMessages.blockedNetwork;
       if (code === "unreachable") return externalCalendarMessages.unreachable;
       if (code === "unauthorized") return externalCalendarMessages.unauthorized;
       if (code === "malformed_calendar") return externalCalendarMessages.malformedCalendar;
@@ -82,4 +88,10 @@ export function getExternalCalendarErrorMessage(error: unknown) {
 
   if (error instanceof Error && error.message) return error.message;
   return externalCalendarMessages.unknownError;
+}
+
+export function isBlockedNetworkCalendarError(error: unknown) {
+  if (!error || typeof error !== "object" || !("data" in error)) return false;
+  const data = (error as { data?: unknown }).data;
+  return Boolean(data && typeof data === "object" && "errorCode" in data && (data as { errorCode?: unknown }).errorCode === "blocked_network");
 }

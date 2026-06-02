@@ -1,3 +1,5 @@
+import type { AutomationTimingPreset } from "./automation-timing";
+
 export const TASK_STATUSES = [
   "Draft",
   "Ready",
@@ -18,6 +20,10 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const TASK_PRIORITIES = ["Low", "Medium", "High", "Urgent"] as const;
 
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+export const TASK_KINDS = ["single", "recurring"] as const;
+
+export type TaskKind = (typeof TASK_KINDS)[number];
 
 export type ExecutionRuntime = string;
 
@@ -50,6 +56,8 @@ export type TaskCore = {
   description: string | null;
   status: TaskStatus;
   priority: TaskPriority;
+  kind: TaskKind;
+  recurrenceRule: string | null;
 };
 
 export type TaskReadModel = TaskCore &
@@ -67,7 +75,12 @@ export type CreateTaskInput = {
   priority?: TaskPriority;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
   parentTaskId?: string | null;
+  recurrenceRule?: string | null;
+  recurrenceAnchorStartAt?: string | null;
+  recurrenceAnchorEndAt?: string | null;
 } & Partial<TaskRuntimeFields>;
 
 export type UpdateTaskInput = {
@@ -77,5 +90,7 @@ export type UpdateTaskInput = {
   priority?: TaskPriority;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
+  autoPlanGenerationTiming?: AutomationTimingPreset;
+  autoExecuteTiming?: AutomationTimingPreset;
   status?: TaskStatus;
 } & Partial<TaskRuntimeFields>;

@@ -504,7 +504,7 @@ describe("agent tool operations service", () => {
     });
   });
 
-  it("maps node terminal tools to execution dispatch without model-supplied node ids", async () => {
+  it("maps node terminal tools to execution dispatch with model-supplied condition node ids", async () => {
     const agentTools = service();
 
     await expect(
@@ -530,7 +530,7 @@ describe("agent tool operations service", () => {
           sessionId: "session-1",
           actorType: "agent",
           idempotencyKey: "node-condition-select-1",
-          payload: { branchRef: "B20260516-01-A", summary: "Condition met" },
+          payload: { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
@@ -581,6 +581,7 @@ describe("agent tool operations service", () => {
       {
         action: "complete_manual_node",
         sessionId: "session-1",
+        nodeId: "condition-node",
         summary: "Condition met",
         terminalKind: "condition",
         branchRef: "B20260516-01-A",
@@ -611,10 +612,10 @@ describe("agent tool operations service", () => {
         input: {
           workspaceId: "workspace-audit",
           taskId: task.id,
-          sessionId: "runtime-run-audit",
+          sessionId: "runtime-session-audit",
           actorType: "agent",
           idempotencyKey: "condition-audit-key",
-          payload: { branchRef: "branch-a", summary: "Select A" },
+          payload: { nodeId: "node-condition", branchRef: "branch-a", summary: "Select A" },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });

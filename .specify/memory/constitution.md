@@ -43,9 +43,9 @@ are affected. Rationale: shipping without proof of behavior turns regressions
 into user-visible defects.
 
 ### III. Frontend UX Changes Need Browser Evidence
-Every frontend visual or interaction change MUST use `agent-browser`. Before
+Every frontend visual or interaction change MUST use . Before
 editing UI, the implementer MUST capture browser observation with an
-`agent-browser` snapshot and screenshots. After editing UI, the implementer MUST
+snapshot and screenshots. After editing UI, the implementer MUST
 rerun browser verification and validate desktop `1440x900`, tablet `1024x768`,
 and mobile `390x844`. Mobile verification MUST show no horizontal scrolling.
 Rationale: Chrona UX quality depends on observed behavior, not code inspection

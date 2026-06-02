@@ -15,6 +15,7 @@ import { useI18n, useLocale } from "@chrona/i18n/react";
 
 export type ScheduleTaskListItem = {
   taskId: string;
+  workBlockId?: string;
   workspaceId: string;
   parentTaskId: string | null;
   title: string;
@@ -34,6 +35,8 @@ export type ScheduleTaskListItem = {
   lastActivityAt: Date | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: string;
+  autoExecuteTiming: string;
   sourceManaged?: {
     source: "external_calendar";
     eventId: string;
@@ -193,6 +196,8 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
     scheduledEndAt: item.scheduledEndAt,
     autoPlanGeneration: item.autoPlanGeneration,
     autoExecute: item.autoExecute,
+    autoPlanGenerationTiming: item.autoPlanGenerationTiming,
+    autoExecuteTiming: item.autoExecuteTiming,
   };
 }
 
@@ -316,7 +321,7 @@ export function ScheduleTaskList({
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <LocalizedLink
-                          href={`/tasks/${item.taskId}`}
+                          href={item.workBlockId ? `/tasks/${item.taskId}?workBlockId=${encodeURIComponent(item.workBlockId)}` : `/tasks/${item.taskId}`}
                           className="text-base font-semibold text-foreground transition-colors hover:text-primary"
                         >
                           {item.title}

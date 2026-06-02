@@ -8,7 +8,7 @@ import {
   type TaskConfigDraftState,
 } from "@/components/schedule/forms/task-config-form";
 import { TaskWorkspaceDiffPreview } from "../assistant/task-workspace-diff-preview";
-import type { CurrentProposalState } from "../model/task-workspace-types";
+import type { CurrentProposalState, TaskData } from "../model/task-workspace-types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +27,7 @@ type TaskWorkspaceEditSectionProps = {
   taskConfigInitialValues: ComponentProps<
     typeof TaskConfigForm
   >["initialValues"];
+  sourceManaged?: TaskData["sourceManaged"];
   saveSuccess: boolean;
   saveError: string | null;
   editSummary: { description: string; schedule: string; model: string };
@@ -46,6 +47,7 @@ export function TaskWorkspaceEditSection({
   defaultExecutionRuntime,
   isSaving,
   taskConfigInitialValues,
+  sourceManaged,
   saveSuccess,
   saveError,
   hasUnsavedConfigChanges,
@@ -60,6 +62,16 @@ export function TaskWorkspaceEditSection({
 }: TaskWorkspaceEditSectionProps) {
   const { messages } = useI18n();
   const copy = messages.components?.taskWorkspace ?? {};
+  const formCopy = messages.components?.taskConfigForm ?? {};
+  const sourceDescriptionLabel = sourceManaged
+    ? `${formCopy.calendarDescription ?? "Calendar description"} · ${sourceManaged.sourceName}`
+    : undefined;
+  const lockedFieldsHint = sourceManaged
+    ? (copy.externalLockedHint ?? "Synced from {source}. Title and time are managed by the calendar source.").replace(
+        "{source}",
+        sourceManaged.sourceName,
+      )
+    : undefined;
   const handleOpenChange = (open: boolean) => {
     if (open !== isEditExpanded) {
       onToggleExpanded();
@@ -104,6 +116,10 @@ export function TaskWorkspaceEditSection({
               defaultExecutionRuntime={defaultExecutionRuntime}
               isPending={isSaving}
               initialValues={taskConfigInitialValues}
+              lockedFields={sourceManaged?.immutableFields}
+              lockedFieldsHint={lockedFieldsHint}
+              sourceDescription={sourceManaged ? sourceManaged.description : undefined}
+              sourceDescriptionLabel={sourceDescriptionLabel}
               submitLabel={copy.saveChanges ?? "Save changes"}
               pendingLabel={copy.saving ?? "Saving..."}
               onDraftStateChange={onDraftStateChange}

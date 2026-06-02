@@ -130,10 +130,6 @@ Descriptive source labels for `search(source: "label")`.
 
 ## Frontend development principles
 
-- Use `agent-browser` for every frontend UX change.
-- Before editing UI, run browser observation with an `agent-browser` snapshot and
-  screenshots.
-- After editing UI, rerun browser verification with `agent-browser`.
 - Preserve existing Chrona product behavior unless the spec explicitly changes it.
 - Do not change backend APIs for visual or interaction polish unless justified in
   the plan.

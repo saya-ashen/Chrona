@@ -36,6 +36,11 @@ enum TaskPriority {
   Urgent
 }
 
+enum TaskKind {
+  single
+  recurring
+}
+
 enum ScheduleStatus {
   Unscheduled
   Scheduled
@@ -202,6 +207,7 @@ model CalendarSource {
   nextExpectedRefreshAt   DateTime?
   lastErrorCode           String?
   lastErrorMessage        String?
+  blockedNetworkConfirmedAt DateTime?
   importedCount           Int                          @default(0)
   skippedCount            Int                          @default(0)
   createdAt               DateTime                     @default(now())
@@ -217,9 +223,11 @@ model ImportedCalendarEvent {
   id               String              @id @default(cuid())
   workspaceId      String
   calendarSourceId String
-  taskId           String?             @unique
+  taskId           String?
+  workBlockId      String?             @unique
   externalUid      String
   recurrenceId     String?
+  recurrenceRule   String?
   dedupeKey        String
   title            String
   description      String?
@@ -232,6 +240,7 @@ model ImportedCalendarEvent {
   workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   calendarSource   CalendarSource      @relation(fields: [calendarSourceId], references: [id], onDelete: Cascade)
   task             Task?               @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  workBlock        WorkBlock?          @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
 
   @@unique([calendarSourceId, dedupeKey])
   @@index([taskId])
@@ -244,12 +253,17 @@ model Task {
   workspaceId          String
   title                String
   description          String?
+  kind                 TaskKind               @default(single)
+  recurrenceRule       String?
+  seriesExternalUid    String?
   executionRuntime     String
   executionConfig      Json
   status               TaskStatus
   priority             TaskPriority
   autoPlanGeneration   Boolean                @default(false)
   autoExecute          Boolean                @default(false)
+  autoPlanGenerationTiming String             @default("at_start")
+  autoExecuteTiming    String                 @default("at_start")
   parentTaskId         String?
   dueAt                DateTime?
   blockReason          Json?
@@ -288,10 +302,11 @@ model Task {
   graphMutations       GraphMutationRecord[]
   reconciliationEvents ReconciliationEvent[]
   schedulerEvents      SchedulerEvent[]
-  importedCalendarEvent ImportedCalendarEvent?
+  importedCalendarEvents ImportedCalendarEvent[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
+  @@index([workspaceId, seriesExternalUid])
   @@index([defaultSessionId])
 }
 
@@ -997,6 +1012,7 @@ model WorkBlock {
   workspace         Workspace          @relation(fields: [workspaceId], references: [id])
   task              Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
   executionSessions ExecutionSession[]
+  importedCalendarEvent ImportedCalendarEvent?
 
   @@index([workspaceId, status])
   @@index([taskId, status])

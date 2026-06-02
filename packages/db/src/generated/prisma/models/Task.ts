@@ -29,11 +29,16 @@ export type TaskMinAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
+  kind: $Enums.TaskKind | null
+  recurrenceRule: string | null
+  seriesExternalUid: string | null
   executionRuntime: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
   autoPlanGeneration: boolean | null
   autoExecute: boolean | null
+  autoPlanGenerationTiming: string | null
+  autoExecuteTiming: string | null
   parentTaskId: string | null
   dueAt: Date | null
   defaultSessionId: string | null
@@ -52,11 +57,16 @@ export type TaskMaxAggregateOutputType = {
   workspaceId: string | null
   title: string | null
   description: string | null
+  kind: $Enums.TaskKind | null
+  recurrenceRule: string | null
+  seriesExternalUid: string | null
   executionRuntime: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
   autoPlanGeneration: boolean | null
   autoExecute: boolean | null
+  autoPlanGenerationTiming: string | null
+  autoExecuteTiming: string | null
   parentTaskId: string | null
   dueAt: Date | null
   defaultSessionId: string | null
@@ -75,12 +85,17 @@ export type TaskCountAggregateOutputType = {
   workspaceId: number
   title: number
   description: number
+  kind: number
+  recurrenceRule: number
+  seriesExternalUid: number
   executionRuntime: number
   executionConfig: number
   status: number
   priority: number
   autoPlanGeneration: number
   autoExecute: number
+  autoPlanGenerationTiming: number
+  autoExecuteTiming: number
   parentTaskId: number
   dueAt: number
   blockReason: number
@@ -102,11 +117,16 @@ export type TaskMinAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  kind?: true
+  recurrenceRule?: true
+  seriesExternalUid?: true
   executionRuntime?: true
   status?: true
   priority?: true
   autoPlanGeneration?: true
   autoExecute?: true
+  autoPlanGenerationTiming?: true
+  autoExecuteTiming?: true
   parentTaskId?: true
   dueAt?: true
   defaultSessionId?: true
@@ -125,11 +145,16 @@ export type TaskMaxAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  kind?: true
+  recurrenceRule?: true
+  seriesExternalUid?: true
   executionRuntime?: true
   status?: true
   priority?: true
   autoPlanGeneration?: true
   autoExecute?: true
+  autoPlanGenerationTiming?: true
+  autoExecuteTiming?: true
   parentTaskId?: true
   dueAt?: true
   defaultSessionId?: true
@@ -148,12 +173,17 @@ export type TaskCountAggregateInputType = {
   workspaceId?: true
   title?: true
   description?: true
+  kind?: true
+  recurrenceRule?: true
+  seriesExternalUid?: true
   executionRuntime?: true
   executionConfig?: true
   status?: true
   priority?: true
   autoPlanGeneration?: true
   autoExecute?: true
+  autoPlanGenerationTiming?: true
+  autoExecuteTiming?: true
   parentTaskId?: true
   dueAt?: true
   blockReason?: true
@@ -246,12 +276,17 @@ export type TaskGroupByOutputType = {
   workspaceId: string
   title: string
   description: string | null
+  kind: $Enums.TaskKind
+  recurrenceRule: string | null
+  seriesExternalUid: string | null
   executionRuntime: string
   executionConfig: runtime.JsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration: boolean
   autoExecute: boolean
+  autoPlanGenerationTiming: string
+  autoExecuteTiming: string
   parentTaskId: string | null
   dueAt: Date | null
   blockReason: runtime.JsonValue | null
@@ -292,12 +327,17 @@ export type TaskWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  kind?: Prisma.EnumTaskKindFilter<"Task"> | $Enums.TaskKind
+  recurrenceRule?: Prisma.StringNullableFilter<"Task"> | string | null
+  seriesExternalUid?: Prisma.StringNullableFilter<"Task"> | string | null
   executionRuntime?: Prisma.StringFilter<"Task"> | string
   executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
@@ -336,7 +376,7 @@ export type TaskWhereInput = {
   graphMutations?: Prisma.GraphMutationRecordListRelationFilter
   reconciliationEvents?: Prisma.ReconciliationEventListRelationFilter
   schedulerEvents?: Prisma.SchedulerEventListRelationFilter
-  importedCalendarEvent?: Prisma.XOR<Prisma.ImportedCalendarEventNullableScalarRelationFilter, Prisma.ImportedCalendarEventWhereInput> | null
+  importedCalendarEvents?: Prisma.ImportedCalendarEventListRelationFilter
 }
 
 export type TaskOrderByWithRelationInput = {
@@ -344,12 +384,17 @@ export type TaskOrderByWithRelationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrderInput | Prisma.SortOrder
+  seriesExternalUid?: Prisma.SortOrderInput | Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -388,7 +433,7 @@ export type TaskOrderByWithRelationInput = {
   graphMutations?: Prisma.GraphMutationRecordOrderByRelationAggregateInput
   reconciliationEvents?: Prisma.ReconciliationEventOrderByRelationAggregateInput
   schedulerEvents?: Prisma.SchedulerEventOrderByRelationAggregateInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventOrderByWithRelationInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventOrderByRelationAggregateInput
 }
 
 export type TaskWhereUniqueInput = Prisma.AtLeast<{
@@ -399,12 +444,17 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  kind?: Prisma.EnumTaskKindFilter<"Task"> | $Enums.TaskKind
+  recurrenceRule?: Prisma.StringNullableFilter<"Task"> | string | null
+  seriesExternalUid?: Prisma.StringNullableFilter<"Task"> | string | null
   executionRuntime?: Prisma.StringFilter<"Task"> | string
   executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
@@ -443,7 +493,7 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   graphMutations?: Prisma.GraphMutationRecordListRelationFilter
   reconciliationEvents?: Prisma.ReconciliationEventListRelationFilter
   schedulerEvents?: Prisma.SchedulerEventListRelationFilter
-  importedCalendarEvent?: Prisma.XOR<Prisma.ImportedCalendarEventNullableScalarRelationFilter, Prisma.ImportedCalendarEventWhereInput> | null
+  importedCalendarEvents?: Prisma.ImportedCalendarEventListRelationFilter
 }, "id">
 
 export type TaskOrderByWithAggregationInput = {
@@ -451,12 +501,17 @@ export type TaskOrderByWithAggregationInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrderInput | Prisma.SortOrder
+  seriesExternalUid?: Prisma.SortOrderInput | Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrderInput | Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
   blockReason?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -482,12 +537,17 @@ export type TaskScalarWhereWithAggregatesInput = {
   workspaceId?: Prisma.StringWithAggregatesFilter<"Task"> | string
   title?: Prisma.StringWithAggregatesFilter<"Task"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  kind?: Prisma.EnumTaskKindWithAggregatesFilter<"Task"> | $Enums.TaskKind
+  recurrenceRule?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  seriesExternalUid?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   executionRuntime?: Prisma.StringWithAggregatesFilter<"Task"> | string
   executionConfig?: Prisma.JsonWithAggregatesFilter<"Task">
   status?: Prisma.EnumTaskStatusWithAggregatesFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityWithAggregatesFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolWithAggregatesFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolWithAggregatesFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringWithAggregatesFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringWithAggregatesFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableWithAggregatesFilter<"Task">
@@ -506,12 +566,17 @@ export type TaskCreateInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -550,7 +615,7 @@ export type TaskCreateInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateInput = {
@@ -558,12 +623,17 @@ export type TaskUncheckedCreateInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -601,19 +671,24 @@ export type TaskUncheckedCreateInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -652,7 +727,7 @@ export type TaskUpdateInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateInput = {
@@ -660,12 +735,17 @@ export type TaskUncheckedUpdateInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -703,7 +783,7 @@ export type TaskUncheckedUpdateInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateManyInput = {
@@ -711,12 +791,17 @@ export type TaskCreateManyInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -735,12 +820,17 @@ export type TaskUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -760,12 +850,17 @@ export type TaskUncheckedUpdateManyInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -800,12 +895,17 @@ export type TaskCountOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrder
+  seriesExternalUid?: Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
   blockReason?: Prisma.SortOrder
@@ -825,11 +925,16 @@ export type TaskMaxOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrder
+  seriesExternalUid?: Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
@@ -848,11 +953,16 @@ export type TaskMinOrderByAggregateInput = {
   workspaceId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   description?: Prisma.SortOrder
+  kind?: Prisma.SortOrder
+  recurrenceRule?: Prisma.SortOrder
+  seriesExternalUid?: Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   autoPlanGeneration?: Prisma.SortOrder
   autoExecute?: Prisma.SortOrder
+  autoPlanGenerationTiming?: Prisma.SortOrder
+  autoExecuteTiming?: Prisma.SortOrder
   parentTaskId?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
   defaultSessionId?: Prisma.SortOrder
@@ -913,20 +1023,24 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceNestedInput = {
   deleteMany?: Prisma.TaskScalarWhereInput | Prisma.TaskScalarWhereInput[]
 }
 
-export type TaskCreateNestedOneWithoutImportedCalendarEventInput = {
-  create?: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventInput>
-  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutImportedCalendarEventInput
+export type TaskCreateNestedOneWithoutImportedCalendarEventsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventsInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutImportedCalendarEventsInput
   connect?: Prisma.TaskWhereUniqueInput
 }
 
-export type TaskUpdateOneWithoutImportedCalendarEventNestedInput = {
-  create?: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventInput>
-  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutImportedCalendarEventInput
-  upsert?: Prisma.TaskUpsertWithoutImportedCalendarEventInput
+export type TaskUpdateOneWithoutImportedCalendarEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventsInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutImportedCalendarEventsInput
+  upsert?: Prisma.TaskUpsertWithoutImportedCalendarEventsInput
   disconnect?: Prisma.TaskWhereInput | boolean
   delete?: Prisma.TaskWhereInput | boolean
   connect?: Prisma.TaskWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutImportedCalendarEventInput, Prisma.TaskUpdateWithoutImportedCalendarEventInput>, Prisma.TaskUncheckedUpdateWithoutImportedCalendarEventInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutImportedCalendarEventsInput, Prisma.TaskUpdateWithoutImportedCalendarEventsInput>, Prisma.TaskUncheckedUpdateWithoutImportedCalendarEventsInput>
+}
+
+export type EnumTaskKindFieldUpdateOperationsInput = {
+  set?: $Enums.TaskKind
 }
 
 export type EnumTaskStatusFieldUpdateOperationsInput = {
@@ -1299,12 +1413,17 @@ export type TaskCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1342,19 +1461,24 @@ export type TaskCreateWithoutWorkspaceInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1392,7 +1516,7 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutWorkspaceInput = {
@@ -1428,12 +1552,17 @@ export type TaskScalarWhereInput = {
   workspaceId?: Prisma.StringFilter<"Task"> | string
   title?: Prisma.StringFilter<"Task"> | string
   description?: Prisma.StringNullableFilter<"Task"> | string | null
+  kind?: Prisma.EnumTaskKindFilter<"Task"> | $Enums.TaskKind
+  recurrenceRule?: Prisma.StringNullableFilter<"Task"> | string | null
+  seriesExternalUid?: Prisma.StringNullableFilter<"Task"> | string | null
   executionRuntime?: Prisma.StringFilter<"Task"> | string
   executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFilter<"Task"> | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFilter<"Task"> | boolean
   autoExecute?: Prisma.BoolFilter<"Task"> | boolean
+  autoPlanGenerationTiming?: Prisma.StringFilter<"Task"> | string
+  autoExecuteTiming?: Prisma.StringFilter<"Task"> | string
   parentTaskId?: Prisma.StringNullableFilter<"Task"> | string | null
   dueAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   blockReason?: Prisma.JsonNullableFilter<"Task">
@@ -1448,16 +1577,21 @@ export type TaskScalarWhereInput = {
   completedAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
 }
 
-export type TaskCreateWithoutImportedCalendarEventInput = {
+export type TaskCreateWithoutImportedCalendarEventsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1498,17 +1632,22 @@ export type TaskCreateWithoutImportedCalendarEventInput = {
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
 }
 
-export type TaskUncheckedCreateWithoutImportedCalendarEventInput = {
+export type TaskUncheckedCreateWithoutImportedCalendarEventsInput = {
   id?: string
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1548,32 +1687,37 @@ export type TaskUncheckedCreateWithoutImportedCalendarEventInput = {
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
-export type TaskCreateOrConnectWithoutImportedCalendarEventInput = {
+export type TaskCreateOrConnectWithoutImportedCalendarEventsInput = {
   where: Prisma.TaskWhereUniqueInput
-  create: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventsInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventsInput>
 }
 
-export type TaskUpsertWithoutImportedCalendarEventInput = {
-  update: Prisma.XOR<Prisma.TaskUpdateWithoutImportedCalendarEventInput, Prisma.TaskUncheckedUpdateWithoutImportedCalendarEventInput>
-  create: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventInput>
+export type TaskUpsertWithoutImportedCalendarEventsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutImportedCalendarEventsInput, Prisma.TaskUncheckedUpdateWithoutImportedCalendarEventsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutImportedCalendarEventsInput, Prisma.TaskUncheckedCreateWithoutImportedCalendarEventsInput>
   where?: Prisma.TaskWhereInput
 }
 
-export type TaskUpdateToOneWithWhereWithoutImportedCalendarEventInput = {
+export type TaskUpdateToOneWithWhereWithoutImportedCalendarEventsInput = {
   where?: Prisma.TaskWhereInput
-  data: Prisma.XOR<Prisma.TaskUpdateWithoutImportedCalendarEventInput, Prisma.TaskUncheckedUpdateWithoutImportedCalendarEventInput>
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutImportedCalendarEventsInput, Prisma.TaskUncheckedUpdateWithoutImportedCalendarEventsInput>
 }
 
-export type TaskUpdateWithoutImportedCalendarEventInput = {
+export type TaskUpdateWithoutImportedCalendarEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1614,17 +1758,22 @@ export type TaskUpdateWithoutImportedCalendarEventInput = {
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
 }
 
-export type TaskUncheckedUpdateWithoutImportedCalendarEventInput = {
+export type TaskUncheckedUpdateWithoutImportedCalendarEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1668,12 +1817,17 @@ export type TaskCreateWithoutGraphVersionsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1711,7 +1865,7 @@ export type TaskCreateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutGraphVersionsInput = {
@@ -1719,12 +1873,17 @@ export type TaskUncheckedCreateWithoutGraphVersionsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1761,7 +1920,7 @@ export type TaskUncheckedCreateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutGraphVersionsInput = {
@@ -1784,12 +1943,17 @@ export type TaskUpdateWithoutGraphVersionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1827,7 +1991,7 @@ export type TaskUpdateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
@@ -1835,12 +1999,17 @@ export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1877,19 +2046,24 @@ export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutGraphMutationsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1927,7 +2101,7 @@ export type TaskCreateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutGraphMutationsInput = {
@@ -1935,12 +2109,17 @@ export type TaskUncheckedCreateWithoutGraphMutationsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1977,7 +2156,7 @@ export type TaskUncheckedCreateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutGraphMutationsInput = {
@@ -2000,12 +2179,17 @@ export type TaskUpdateWithoutGraphMutationsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2043,7 +2227,7 @@ export type TaskUpdateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
@@ -2051,12 +2235,17 @@ export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2093,19 +2282,24 @@ export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutReconciliationEventsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2143,7 +2337,7 @@ export type TaskCreateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
@@ -2151,12 +2345,17 @@ export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2193,7 +2392,7 @@ export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutReconciliationEventsInput = {
@@ -2216,12 +2415,17 @@ export type TaskUpdateWithoutReconciliationEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2259,7 +2463,7 @@ export type TaskUpdateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
@@ -2267,12 +2471,17 @@ export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2309,19 +2518,24 @@ export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutSchedulerEventsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2359,7 +2573,7 @@ export type TaskCreateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
@@ -2367,12 +2581,17 @@ export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2409,7 +2628,7 @@ export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutSchedulerEventsInput = {
@@ -2432,12 +2651,17 @@ export type TaskUpdateWithoutSchedulerEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2475,7 +2699,7 @@ export type TaskUpdateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
@@ -2483,12 +2707,17 @@ export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2525,19 +2754,24 @@ export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutSessionsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2575,7 +2809,7 @@ export type TaskCreateWithoutSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutSessionsInput = {
@@ -2583,12 +2817,17 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2625,7 +2864,7 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutSessionsInput = {
@@ -2648,12 +2887,17 @@ export type TaskUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2691,7 +2935,7 @@ export type TaskUpdateWithoutSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutSessionsInput = {
@@ -2699,12 +2943,17 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2741,19 +2990,24 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutDependenciesInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2791,7 +3045,7 @@ export type TaskCreateWithoutDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependenciesInput = {
@@ -2799,12 +3053,17 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2841,7 +3100,7 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependenciesInput = {
@@ -2853,12 +3112,17 @@ export type TaskCreateWithoutDependentTasksInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2896,7 +3160,7 @@ export type TaskCreateWithoutDependentTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutDependentTasksInput = {
@@ -2904,12 +3168,17 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2946,7 +3215,7 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutDependentTasksInput = {
@@ -2969,12 +3238,17 @@ export type TaskUpdateWithoutDependenciesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3012,7 +3286,7 @@ export type TaskUpdateWithoutDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependenciesInput = {
@@ -3020,12 +3294,17 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3062,7 +3341,7 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUpsertWithoutDependentTasksInput = {
@@ -3080,12 +3359,17 @@ export type TaskUpdateWithoutDependentTasksInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3123,7 +3407,7 @@ export type TaskUpdateWithoutDependentTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutDependentTasksInput = {
@@ -3131,12 +3415,17 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3173,19 +3462,24 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlansInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3223,7 +3517,7 @@ export type TaskCreateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlansInput = {
@@ -3231,12 +3525,17 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3273,7 +3572,7 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlansInput = {
@@ -3296,12 +3595,17 @@ export type TaskUpdateWithoutTaskPlansInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3339,7 +3643,7 @@ export type TaskUpdateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlansInput = {
@@ -3347,12 +3651,17 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3389,19 +3698,24 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlanRunsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3439,7 +3753,7 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
@@ -3447,12 +3761,17 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3489,7 +3808,7 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlanRunsInput = {
@@ -3512,12 +3831,17 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3555,7 +3879,7 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
@@ -3563,12 +3887,17 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3605,19 +3934,24 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlanNodeAttemptsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3655,7 +3989,7 @@ export type TaskCreateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
@@ -3663,12 +3997,17 @@ export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3705,7 +4044,7 @@ export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlanNodeAttemptsInput = {
@@ -3728,12 +4067,17 @@ export type TaskUpdateWithoutTaskPlanNodeAttemptsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3771,7 +4115,7 @@ export type TaskUpdateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
@@ -3779,12 +4123,17 @@ export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3821,19 +4170,24 @@ export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlanProviderRunsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3871,7 +4225,7 @@ export type TaskCreateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
@@ -3879,12 +4233,17 @@ export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3921,7 +4280,7 @@ export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlanProviderRunsInput = {
@@ -3944,12 +4303,17 @@ export type TaskUpdateWithoutTaskPlanProviderRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3987,7 +4351,7 @@ export type TaskUpdateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
@@ -3995,12 +4359,17 @@ export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4037,19 +4406,24 @@ export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTaskPlanLayersInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4087,7 +4461,7 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
@@ -4095,12 +4469,17 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4137,7 +4516,7 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTaskPlanLayersInput = {
@@ -4160,12 +4539,17 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4203,7 +4587,7 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
@@ -4211,12 +4595,17 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4253,19 +4642,24 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutRunsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4303,7 +4697,7 @@ export type TaskCreateWithoutRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutRunsInput = {
@@ -4311,12 +4705,17 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4353,7 +4752,7 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutRunsInput = {
@@ -4376,12 +4775,17 @@ export type TaskUpdateWithoutRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4419,7 +4823,7 @@ export type TaskUpdateWithoutRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutRunsInput = {
@@ -4427,12 +4831,17 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4469,19 +4878,24 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutApprovalsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4519,7 +4933,7 @@ export type TaskCreateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutApprovalsInput = {
@@ -4527,12 +4941,17 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4569,7 +4988,7 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutApprovalsInput = {
@@ -4592,12 +5011,17 @@ export type TaskUpdateWithoutApprovalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4635,7 +5059,7 @@ export type TaskUpdateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutApprovalsInput = {
@@ -4643,12 +5067,17 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4685,19 +5114,24 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutArtifactsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4735,7 +5169,7 @@ export type TaskCreateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutArtifactsInput = {
@@ -4743,12 +5177,17 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4785,7 +5224,7 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutArtifactsInput = {
@@ -4808,12 +5247,17 @@ export type TaskUpdateWithoutArtifactsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4851,7 +5295,7 @@ export type TaskUpdateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutArtifactsInput = {
@@ -4859,12 +5303,17 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4901,19 +5350,24 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutMemoriesInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4951,7 +5405,7 @@ export type TaskCreateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutMemoriesInput = {
@@ -4959,12 +5413,17 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5001,7 +5460,7 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutMemoriesInput = {
@@ -5024,12 +5483,17 @@ export type TaskUpdateWithoutMemoriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5067,7 +5531,7 @@ export type TaskUpdateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutMemoriesInput = {
@@ -5075,12 +5539,17 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5117,19 +5586,24 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutEventsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5167,7 +5641,7 @@ export type TaskCreateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutEventsInput = {
@@ -5175,12 +5649,17 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5217,7 +5696,7 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutEventsInput = {
@@ -5240,12 +5719,17 @@ export type TaskUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5283,7 +5767,7 @@ export type TaskUpdateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutEventsInput = {
@@ -5291,12 +5775,17 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5333,19 +5822,24 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutRawEventLogsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5383,7 +5877,7 @@ export type TaskCreateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutRawEventLogsInput = {
@@ -5391,12 +5885,17 @@ export type TaskUncheckedCreateWithoutRawEventLogsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5433,7 +5932,7 @@ export type TaskUncheckedCreateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutRawEventLogsInput = {
@@ -5456,12 +5955,17 @@ export type TaskUpdateWithoutRawEventLogsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5499,7 +6003,7 @@ export type TaskUpdateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutRawEventLogsInput = {
@@ -5507,12 +6011,17 @@ export type TaskUncheckedUpdateWithoutRawEventLogsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5549,19 +6058,24 @@ export type TaskUncheckedUpdateWithoutRawEventLogsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutToolInvocationsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5599,7 +6113,7 @@ export type TaskCreateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutToolInvocationsInput = {
@@ -5607,12 +6121,17 @@ export type TaskUncheckedCreateWithoutToolInvocationsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5649,7 +6168,7 @@ export type TaskUncheckedCreateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutToolInvocationsInput = {
@@ -5672,12 +6191,17 @@ export type TaskUpdateWithoutToolInvocationsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5715,7 +6239,7 @@ export type TaskUpdateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutToolInvocationsInput = {
@@ -5723,12 +6247,17 @@ export type TaskUncheckedUpdateWithoutToolInvocationsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5765,19 +6294,24 @@ export type TaskUncheckedUpdateWithoutToolInvocationsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutTimelineItemsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5815,7 +6349,7 @@ export type TaskCreateWithoutTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutTimelineItemsInput = {
@@ -5823,12 +6357,17 @@ export type TaskUncheckedCreateWithoutTimelineItemsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5865,7 +6404,7 @@ export type TaskUncheckedCreateWithoutTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutTimelineItemsInput = {
@@ -5888,12 +6427,17 @@ export type TaskUpdateWithoutTimelineItemsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5931,7 +6475,7 @@ export type TaskUpdateWithoutTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutTimelineItemsInput = {
@@ -5939,12 +6483,17 @@ export type TaskUncheckedUpdateWithoutTimelineItemsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5981,19 +6530,24 @@ export type TaskUncheckedUpdateWithoutTimelineItemsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutProjectionInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6031,7 +6585,7 @@ export type TaskCreateWithoutProjectionInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutProjectionInput = {
@@ -6039,12 +6593,17 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6081,7 +6640,7 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutProjectionInput = {
@@ -6104,12 +6663,17 @@ export type TaskUpdateWithoutProjectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6147,7 +6711,7 @@ export type TaskUpdateWithoutProjectionInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutProjectionInput = {
@@ -6155,12 +6719,17 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6197,19 +6766,24 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutScheduleProposalsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6247,7 +6821,7 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
@@ -6255,12 +6829,17 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6297,7 +6876,7 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutScheduleProposalsInput = {
@@ -6320,12 +6899,17 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6363,7 +6947,7 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
@@ -6371,12 +6955,17 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6413,19 +7002,24 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutAssistantMessagesInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6463,7 +7057,7 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
@@ -6471,12 +7065,17 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6513,7 +7112,7 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutAssistantMessagesInput = {
@@ -6536,12 +7135,17 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6579,7 +7183,7 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
@@ -6587,12 +7191,17 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6629,19 +7238,24 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutWorkBlocksInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6679,7 +7293,7 @@ export type TaskCreateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutWorkBlocksInput = {
@@ -6687,12 +7301,17 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6729,7 +7348,7 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutWorkBlocksInput = {
@@ -6752,12 +7371,17 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6795,7 +7419,7 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
@@ -6803,12 +7427,17 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6845,19 +7474,24 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateWithoutExecutionSessionsInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6895,7 +7529,7 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
 }
 
 export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
@@ -6903,12 +7537,17 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   workspaceId: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6945,7 +7584,7 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
 }
 
 export type TaskCreateOrConnectWithoutExecutionSessionsInput = {
@@ -6968,12 +7607,17 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7011,7 +7655,7 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
@@ -7019,12 +7663,17 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7061,19 +7710,24 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskCreateManyWorkspaceInput = {
   id?: string
   title: string
   description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
   priority: $Enums.TaskPriority
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
   parentTaskId?: string | null
   dueAt?: Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7092,12 +7746,17 @@ export type TaskUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7135,19 +7794,24 @@ export type TaskUpdateWithoutWorkspaceInput = {
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7185,19 +7849,24 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
   schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
-  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
 }
 
 export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
   priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
   autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
   autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
   parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -7242,6 +7911,7 @@ export type TaskCountOutputType = {
   graphMutations: number
   reconciliationEvents: number
   schedulerEvents: number
+  importedCalendarEvents: number
 }
 
 export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -7269,6 +7939,7 @@ export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   graphMutations?: boolean | TaskCountOutputTypeCountGraphMutationsArgs
   reconciliationEvents?: boolean | TaskCountOutputTypeCountReconciliationEventsArgs
   schedulerEvents?: boolean | TaskCountOutputTypeCountSchedulerEventsArgs
+  importedCalendarEvents?: boolean | TaskCountOutputTypeCountImportedCalendarEventsArgs
 }
 
 /**
@@ -7449,18 +8120,30 @@ export type TaskCountOutputTypeCountSchedulerEventsArgs<ExtArgs extends runtime.
   where?: Prisma.SchedulerEventWhereInput
 }
 
+/**
+ * TaskCountOutputType without action
+ */
+export type TaskCountOutputTypeCountImportedCalendarEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ImportedCalendarEventWhereInput
+}
+
 
 export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  kind?: boolean
+  recurrenceRule?: boolean
+  seriesExternalUid?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7499,7 +8182,7 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   graphMutations?: boolean | Prisma.Task$graphMutationsArgs<ExtArgs>
   reconciliationEvents?: boolean | Prisma.Task$reconciliationEventsArgs<ExtArgs>
   schedulerEvents?: boolean | Prisma.Task$schedulerEventsArgs<ExtArgs>
-  importedCalendarEvent?: boolean | Prisma.Task$importedCalendarEventArgs<ExtArgs>
+  importedCalendarEvents?: boolean | Prisma.Task$importedCalendarEventsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["task"]>
 
@@ -7508,12 +8191,17 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  kind?: boolean
+  recurrenceRule?: boolean
+  seriesExternalUid?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7534,12 +8222,17 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  kind?: boolean
+  recurrenceRule?: boolean
+  seriesExternalUid?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7560,12 +8253,17 @@ export type TaskSelectScalar = {
   workspaceId?: boolean
   title?: boolean
   description?: boolean
+  kind?: boolean
+  recurrenceRule?: boolean
+  seriesExternalUid?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
   priority?: boolean
   autoPlanGeneration?: boolean
   autoExecute?: boolean
+  autoPlanGenerationTiming?: boolean
+  autoExecuteTiming?: boolean
   parentTaskId?: boolean
   dueAt?: boolean
   blockReason?: boolean
@@ -7580,7 +8278,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoPlanGeneration" | "autoExecute" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "kind" | "recurrenceRule" | "seriesExternalUid" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoPlanGeneration" | "autoExecute" | "autoPlanGenerationTiming" | "autoExecuteTiming" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -7608,7 +8306,7 @@ export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   graphMutations?: boolean | Prisma.Task$graphMutationsArgs<ExtArgs>
   reconciliationEvents?: boolean | Prisma.Task$reconciliationEventsArgs<ExtArgs>
   schedulerEvents?: boolean | Prisma.Task$schedulerEventsArgs<ExtArgs>
-  importedCalendarEvent?: boolean | Prisma.Task$importedCalendarEventArgs<ExtArgs>
+  importedCalendarEvents?: boolean | Prisma.Task$importedCalendarEventsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TaskIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -7647,19 +8345,24 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     graphMutations: Prisma.$GraphMutationRecordPayload<ExtArgs>[]
     reconciliationEvents: Prisma.$ReconciliationEventPayload<ExtArgs>[]
     schedulerEvents: Prisma.$SchedulerEventPayload<ExtArgs>[]
-    importedCalendarEvent: Prisma.$ImportedCalendarEventPayload<ExtArgs> | null
+    importedCalendarEvents: Prisma.$ImportedCalendarEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     workspaceId: string
     title: string
     description: string | null
+    kind: $Enums.TaskKind
+    recurrenceRule: string | null
+    seriesExternalUid: string | null
     executionRuntime: string
     executionConfig: runtime.JsonValue
     status: $Enums.TaskStatus
     priority: $Enums.TaskPriority
     autoPlanGeneration: boolean
     autoExecute: boolean
+    autoPlanGenerationTiming: string
+    autoExecuteTiming: string
     parentTaskId: string | null
     dueAt: Date | null
     blockReason: runtime.JsonValue | null
@@ -8092,7 +8795,7 @@ export interface Prisma__TaskClient<T, Null = never, ExtArgs extends runtime.Typ
   graphMutations<T extends Prisma.Task$graphMutationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$graphMutationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GraphMutationRecordPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   reconciliationEvents<T extends Prisma.Task$reconciliationEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$reconciliationEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReconciliationEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   schedulerEvents<T extends Prisma.Task$schedulerEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$schedulerEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SchedulerEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  importedCalendarEvent<T extends Prisma.Task$importedCalendarEventArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$importedCalendarEventArgs<ExtArgs>>): Prisma.Prisma__ImportedCalendarEventClient<runtime.Types.Result.GetResult<Prisma.$ImportedCalendarEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  importedCalendarEvents<T extends Prisma.Task$importedCalendarEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$importedCalendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ImportedCalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -8126,12 +8829,17 @@ export interface TaskFieldRefs {
   readonly workspaceId: Prisma.FieldRef<"Task", 'String'>
   readonly title: Prisma.FieldRef<"Task", 'String'>
   readonly description: Prisma.FieldRef<"Task", 'String'>
+  readonly kind: Prisma.FieldRef<"Task", 'TaskKind'>
+  readonly recurrenceRule: Prisma.FieldRef<"Task", 'String'>
+  readonly seriesExternalUid: Prisma.FieldRef<"Task", 'String'>
   readonly executionRuntime: Prisma.FieldRef<"Task", 'String'>
   readonly executionConfig: Prisma.FieldRef<"Task", 'Json'>
   readonly status: Prisma.FieldRef<"Task", 'TaskStatus'>
   readonly priority: Prisma.FieldRef<"Task", 'TaskPriority'>
   readonly autoPlanGeneration: Prisma.FieldRef<"Task", 'Boolean'>
   readonly autoExecute: Prisma.FieldRef<"Task", 'Boolean'>
+  readonly autoPlanGenerationTiming: Prisma.FieldRef<"Task", 'String'>
+  readonly autoExecuteTiming: Prisma.FieldRef<"Task", 'String'>
   readonly parentTaskId: Prisma.FieldRef<"Task", 'String'>
   readonly dueAt: Prisma.FieldRef<"Task", 'DateTime'>
   readonly blockReason: Prisma.FieldRef<"Task", 'Json'>
@@ -9138,9 +9846,9 @@ export type Task$schedulerEventsArgs<ExtArgs extends runtime.Types.Extensions.In
 }
 
 /**
- * Task.importedCalendarEvent
+ * Task.importedCalendarEvents
  */
-export type Task$importedCalendarEventArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type Task$importedCalendarEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the ImportedCalendarEvent
    */
@@ -9154,6 +9862,11 @@ export type Task$importedCalendarEventArgs<ExtArgs extends runtime.Types.Extensi
    */
   include?: Prisma.ImportedCalendarEventInclude<ExtArgs> | null
   where?: Prisma.ImportedCalendarEventWhereInput
+  orderBy?: Prisma.ImportedCalendarEventOrderByWithRelationInput | Prisma.ImportedCalendarEventOrderByWithRelationInput[]
+  cursor?: Prisma.ImportedCalendarEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ImportedCalendarEventScalarFieldEnum | Prisma.ImportedCalendarEventScalarFieldEnum[]
 }
 
 /**

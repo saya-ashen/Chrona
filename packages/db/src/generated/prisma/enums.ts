@@ -45,6 +45,14 @@ export const TaskPriority = {
 export type TaskPriority = (typeof TaskPriority)[keyof typeof TaskPriority]
 
 
+export const TaskKind = {
+  single: 'single',
+  recurring: 'recurring'
+} as const
+
+export type TaskKind = (typeof TaskKind)[keyof typeof TaskKind]
+
+
 export const ScheduleStatus = {
   Unscheduled: 'Unscheduled',
   Scheduled: 'Scheduled',

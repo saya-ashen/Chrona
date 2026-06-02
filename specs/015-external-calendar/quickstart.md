@@ -70,7 +70,7 @@ Focused route tests:
 
 ## 6. Add UI and Schedule Integration
 
-Before editing UI, capture `agent-browser` observation and screenshots.
+Before editing UI, capture screenshots.
 
 Add source management UI using existing Chrona patterns and shadcn primitives.
 
@@ -128,7 +128,7 @@ DATABASE_URL=file:/absolute/path/to/.tmp/external-calendar.db NODE_ENV=test bun 
 
 ## 8. Browser Evidence
 
-After editing UI, rerun `agent-browser` verification for:
+After editing UI, rerun for:
 
 - Desktop: `1440x900`.
 - Tablet: `1024x768`.

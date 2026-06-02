@@ -9,7 +9,6 @@ Date: 2026-05-17
 - `bun run test`: PASS. Vitest reported `43` files and `252` tests passed.
 - Targeted orchestrator tests: PASS. Bun reported `31` tests passed across `10` files.
 - `bun run test:e2e`: ERROR. Playwright refused to start because `http://127.0.0.1:3100` is already in use and config does not reuse the existing server.
-- `agent-browser open http://localhost:5173`: ERROR. Browser navigation failed with `net::ERR_CONNECTION_REFUSED` because the Vite app is not running.
 
 ## GitNexus Change Detection
 

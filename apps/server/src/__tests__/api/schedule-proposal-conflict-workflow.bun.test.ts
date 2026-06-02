@@ -109,8 +109,8 @@ describe("schedule proposal conflict workflow", () => {
   it("rejecting a conflicting proposal preserves accepted schedule projection", async () => {
     const { workspaceId } = await seedWorkspace("Schedule reject conflict workflow");
     const { taskId } = await seedTask(workspaceId);
-    const accepted = await createProposal(taskId, "2026-06-02T13:00:00.000Z", "2026-06-02T14:00:00.000Z", "Accepted slot");
-    const rejected = await createProposal(taskId, "2026-06-02T13:30:00.000Z", "2026-06-02T15:00:00.000Z", "Conflicting slot");
+    const accepted = await createProposal(taskId, "2026-06-10T13:00:00.000Z", "2026-06-10T14:00:00.000Z", "Accepted slot");
+    const rejected = await createProposal(taskId, "2026-06-10T13:30:00.000Z", "2026-06-10T15:00:00.000Z", "Conflicting slot");
 
     await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
@@ -128,8 +128,8 @@ describe("schedule proposal conflict workflow", () => {
     const rejectedProposal = await db.scheduleProposal.findUniqueOrThrow({ where: { id: rejected.proposalId } });
 
     expect(projection.scheduleStatus).toBe("Scheduled");
-    expect(projection.scheduledStartAt?.toISOString()).toBe("2026-06-02T13:00:00.000Z");
-    expect(projection.scheduledEndAt?.toISOString()).toBe("2026-06-02T14:00:00.000Z");
+    expect(projection.scheduledStartAt?.toISOString()).toBe("2026-06-10T13:00:00.000Z");
+    expect(projection.scheduledEndAt?.toISOString()).toBe("2026-06-10T14:00:00.000Z");
     expect(rejectedProposal.status).toBe("Rejected");
     expect(rejectedProposal.resolutionNote).toBe("Conflicts with focus block");
   });

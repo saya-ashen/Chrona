@@ -27,12 +27,19 @@ export function createTasksRoutes(engine: ChronaEngine) {
   return new Hono()
     .get("/tasks", zValidator("query", listTasksQuerySchema), async (c) => {
       try {
-        const { workspaceId, status, limit } = c.req.valid("query");
+        const { workspaceId, status, filter, priority, search, sort, order, page, pageSize } =
+          c.req.valid("query");
 
         const result = await engine.tasks.list({
           workspaceId,
           status: status ?? undefined,
-          limit,
+          filter,
+          priority,
+          search,
+          sort,
+          order,
+          page,
+          pageSize,
         });
 
         return json(c, result);
@@ -60,8 +67,13 @@ export function createTasksRoutes(engine: ChronaEngine) {
           priority: body.priority,
           autoPlanGeneration: body.autoPlanGeneration,
           autoExecute: body.autoExecute,
+          autoPlanGenerationTiming: body.autoPlanGenerationTiming,
+          autoExecuteTiming: body.autoExecuteTiming,
           executionRuntime: body.executionRuntime,
           executionConfig: body.executionConfig,
+          recurrenceRule: body.recurrenceRule,
+          recurrenceAnchorStartAt: body.recurrenceAnchorStartAt,
+          recurrenceAnchorEndAt: body.recurrenceAnchorEndAt,
         });
 
         return json(c, result, 201);
@@ -141,7 +153,8 @@ export function createTasksRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, await engine.tasks.getPage({ taskId }));
+          const workBlockId = c.req.query("workBlockId") ?? null;
+          return json(c, await engine.tasks.getPage({ taskId, workBlockId }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {
@@ -172,6 +185,8 @@ export function createTasksRoutes(engine: ChronaEngine) {
             priority: body.priority,
             autoPlanGeneration: body.autoPlanGeneration,
             autoExecute: body.autoExecute,
+            autoPlanGenerationTiming: body.autoPlanGenerationTiming,
+            autoExecuteTiming: body.autoExecuteTiming,
             status: body.status,
             executionRuntime: body.executionRuntime,
             executionConfig: body.executionConfig,

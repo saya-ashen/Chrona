@@ -36,7 +36,7 @@
 
 **Alternatives considered**: Inline strings in React components were rejected because they violate repository guidance and make localization incomplete.
 
-## Decision: Use `agent-browser` for browser evidence before and after implementation
+## Decision: Use for browser evidence before and after implementation
 
 **Rationale**: The constitution requires browser evidence for frontend UX changes. Pre-edit evidence has been captured on the representative route with screenshots at `1440x900`, `1024x768`, and `390x844`, plus diagnostics showing task API calls returning `200` and no visible console/error output.
 

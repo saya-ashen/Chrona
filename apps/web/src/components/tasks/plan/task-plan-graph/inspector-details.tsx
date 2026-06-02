@@ -35,29 +35,29 @@ type InspectorDetailsTone = "dark" | "light";
 const INSPECTOR_DETAILS_TONE_CLASSNAMES = {
   dark: {
     action: {
-      primary: "border border-cyan-300/20 bg-cyan-300/10 text-cyan-100",
+      primary: "border border-primary/20 bg-primary-soft text-primary",
       warning: "border border-amber-300/20 bg-amber-300/10 text-amber-100",
-      default: "border border-white/10 bg-white/[0.06] text-slate-300",
+      default: "border border-border bg-muted text-muted-foreground",
     },
-    card: "border-white/10 bg-white/[0.055]",
-    dependency: "border-violet-300/20 bg-violet-300/10 text-violet-100",
-    fieldMeta: "text-slate-300",
-    label: "text-slate-400",
-    sectionTitle: "text-cyan-100/85",
-    text: "text-slate-100",
+    card: "border-border bg-background/75",
+    dependency: "border-primary/20 bg-primary-soft text-primary",
+    fieldMeta: "text-muted-foreground",
+    label: "text-muted-foreground",
+    sectionTitle: "text-foreground",
+    text: "text-foreground",
   },
   light: {
     action: {
-      primary: "border border-cyan-700/25 bg-cyan-50 text-cyan-900",
+      primary: "border border-primary/20 bg-primary-soft text-primary",
       warning: "border border-amber-700/25 bg-amber-50 text-amber-900",
-      default: "border border-slate-300 bg-white text-slate-700",
+      default: "border border-border bg-muted text-muted-foreground",
     },
-    card: "border-slate-200 bg-white",
-    dependency: "border-violet-300 bg-violet-50 text-violet-950",
-    fieldMeta: "text-slate-700",
-    label: "text-slate-600",
-    sectionTitle: "text-slate-950",
-    text: "text-slate-950",
+    card: "border-border bg-background/75",
+    dependency: "border-primary/20 bg-primary-soft text-primary",
+    fieldMeta: "text-muted-foreground",
+    label: "text-muted-foreground",
+    sectionTitle: "text-foreground",
+    text: "text-foreground",
   },
 } satisfies Record<InspectorDetailsTone, {
   action: { primary: string; warning: string; default: string };
@@ -74,7 +74,7 @@ function InfoRow({ label, tone, value }: { label: string; tone: InspectorDetails
   const toneClassNames = INSPECTOR_DETAILS_TONE_CLASSNAMES[tone];
   return (
     <div className={cn("rounded-2xl border px-3 py-2", toneClassNames.card)}>
-      <p className={cn("text-[10px] font-semibold uppercase tracking-[0.14em]", toneClassNames.label)}>{label}</p>
+      <p className={cn("text-[10px] font-medium", toneClassNames.label)}>{label}</p>
       <p className={cn("mt-1 text-sm", toneClassNames.text)}>{value}</p>
     </div>
   );
@@ -98,16 +98,16 @@ function ActionChip({ action, tone }: { action: PlanNodeAction; tone: InspectorD
   );
 }
 
-function FieldCard({ field, tone }: { field: PlanNodeField; tone: InspectorDetailsTone }) {
+function FieldCard({ field, graphCopy, tone }: { field: PlanNodeField; graphCopy: GraphCopy; tone: InspectorDetailsTone }) {
   const toneClassNames = INSPECTOR_DETAILS_TONE_CLASSNAMES[tone];
   return (
     <div className={cn("rounded-2xl border px-3 py-2.5", toneClassNames.card)}>
       <div className="flex items-center justify-between gap-2">
         <p className={cn("text-sm font-medium", toneClassNames.text)}>{field.label}</p>
-        {field.required ? <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-1.5 py-0.5 text-[10px] text-amber-100">required</span> : null}
+        {field.required ? <span className="rounded-full border border-primary/20 bg-primary-soft px-1.5 py-0.5 text-[10px] text-primary">{graphCopy.fieldRequired}</span> : null}
       </div>
-      <p className={cn("mt-1 text-[11px] font-medium", toneClassNames.fieldMeta)}>control: {field.control ?? "text"}</p>
-      {field.options?.length ? <p className={cn("mt-1 text-[11px] font-medium", toneClassNames.fieldMeta)}>options: {field.options.join(", ")}</p> : null}
+      <p className={cn("mt-1 text-[11px] font-medium", toneClassNames.fieldMeta)}>{graphCopy.fieldControl}: {field.control ?? "text"}</p>
+      {field.options?.length ? <p className={cn("mt-1 text-[11px] font-medium", toneClassNames.fieldMeta)}>{graphCopy.fieldOptions}: {field.options.join(", ")}</p> : null}
     </div>
   );
 }
@@ -138,17 +138,17 @@ export function TaskPlanGraphInspectorDetails({
   return (
     <>
       <section className="space-y-2">
-        <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", toneClassNames.sectionTitle)}>{graphCopy.inspectorWhy}</p>
+        <p className={cn("text-xs font-semibold", toneClassNames.sectionTitle)}>{graphCopy.inspectorWhy}</p>
         <InfoRow label={graphCopy.detailObjective} tone={tone} value={node.objective} />
         <InfoRow label={graphCopy.detailNextAction} tone={tone} value={node.nextAction ?? null} />
         <InfoRow label={graphCopy.detailReadiness} tone={tone} value={node.readiness ?? null} />
       </section>
 
       <section className="space-y-2">
-        <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", toneClassNames.sectionTitle)}>{graphCopy.inspectorDependencies}</p>
+        <p className={cn("text-xs font-semibold", toneClassNames.sectionTitle)}>{graphCopy.inspectorDependencies}</p>
         {dependencyNames.length > 0 ? (
           <div className={cn("rounded-2xl border px-3 py-2", toneClassNames.card)}>
-            <p className={cn("text-[10px] font-semibold uppercase tracking-[0.14em]", toneClassNames.label)}>{graphCopy.detailDependencies}</p>
+            <p className={cn("text-[10px] font-medium", toneClassNames.label)}>{graphCopy.detailDependencies}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {dependencyNames.map((dependencyName) => (
                 <DependencyChip key={dependencyName} title={dependencyName} tone={tone} />
@@ -160,7 +160,7 @@ export function TaskPlanGraphInspectorDetails({
       </section>
 
       <section className="space-y-2">
-        <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", toneClassNames.sectionTitle)}>{graphCopy.inspectorExecution}</p>
+        <p className={cn("text-xs font-semibold", toneClassNames.sectionTitle)}>{graphCopy.inspectorExecution}</p>
         <div className="grid gap-2 sm:grid-cols-2">
           <InfoRow label={graphCopy.detailPhase} tone={tone} value={node.phase} />
           <InfoRow label={graphCopy.detailExecutionMode} tone={tone} value={node.executionMode ?? null} />
@@ -171,10 +171,10 @@ export function TaskPlanGraphInspectorDetails({
       </section>
 
       <section className="space-y-2">
-        <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", toneClassNames.sectionTitle)}>{graphCopy.inspectorOutcomes}</p>
+        <p className={cn("text-xs font-semibold", toneClassNames.sectionTitle)}>{graphCopy.inspectorOutcomes}</p>
         <InfoRow label={graphCopy.detailCompletionSummary} tone={tone} value={node.completionSummary ?? null} />
-        <InfoRow label="Branches" tone={tone} value={(node.branchLabels ?? []).join(", ") || null} />
-        <InfoRow label="Options" tone={tone} value={(node.options ?? []).join(", ") || null} />
+        <InfoRow label={graphCopy.detailBranches} tone={tone} value={(node.branchLabels ?? []).join(", ") || null} />
+        <InfoRow label={graphCopy.detailOptions} tone={tone} value={(node.options ?? []).join(", ") || null} />
         {(node.availableActions ?? []).length > 0 ? (
           <div className="flex flex-wrap gap-2 pt-1">
             {(node.availableActions ?? []).map((action) => (
@@ -186,10 +186,10 @@ export function TaskPlanGraphInspectorDetails({
 
       {(node.interactiveFields ?? []).length > 0 ? (
         <section className="space-y-2">
-          <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", toneClassNames.sectionTitle)}>{graphCopy.inspectorFields}</p>
+          <p className={cn("text-xs font-semibold", toneClassNames.sectionTitle)}>{graphCopy.inspectorFields}</p>
           <div className="space-y-2">
             {(node.interactiveFields ?? []).map((field) => (
-              <FieldCard key={field.key} field={field} tone={tone} />
+              <FieldCard key={field.key} field={field} graphCopy={graphCopy} tone={tone} />
             ))}
           </div>
         </section>

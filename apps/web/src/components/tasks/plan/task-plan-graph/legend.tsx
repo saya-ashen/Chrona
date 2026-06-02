@@ -30,16 +30,16 @@ export function EdgeLegend({
     >
       <div
         className={cn(
-          "inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-white/10 bg-slate-950/54 px-2.5 py-1.5 text-slate-300 shadow-[0_14px_38px_rgba(2,6,23,0.24)] backdrop-blur-xl",
-          placement === "top" && "bg-slate-950/46 shadow-[0_10px_30px_rgba(2,6,23,0.20)]",
+          "inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-border bg-background px-2.5 py-1.5 text-muted-foreground shadow-sm",
+          placement === "top" && "bg-background",
         )}
         data-testid="task-plan-graph-legend"
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-200/80">{graphCopy.legendEdges}</p>
+            <p className="text-[10px] font-semibold text-foreground">{graphCopy.legendEdges}</p>
             {visibleEdgeItems.map((item) => (
-              <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-slate-300">
+              <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <svg aria-hidden="true" className="shrink-0" height="8" viewBox="0 0 24 8" width="24">
                   <line stroke={item.stroke} strokeDasharray={item.dash} strokeLinecap="round" strokeWidth={item.width} x1="1" x2="23" y1="4" y2="4" />
                 </svg>
@@ -48,9 +48,9 @@ export function EdgeLegend({
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="task-plan-graph-node-legend">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-200/80">{graphCopy.legendStates}</p>
+            <p className="text-[10px] font-semibold text-foreground">{graphCopy.legendStates}</p>
             {visibleNodeItems.map((item) => (
-              <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-slate-300">
+              <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <ShapeChip shape={item.shape} tone={item.tone} />
                 <span className="whitespace-nowrap">{item.label}</span>
               </div>

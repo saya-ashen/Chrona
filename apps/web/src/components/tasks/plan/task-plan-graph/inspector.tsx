@@ -22,38 +22,36 @@ export function TaskPlanGraphInspector({
 }) {
   if (!node) {
     return (
-      <aside className="w-full min-w-0 max-w-full rounded-[24px] border border-white/10 bg-slate-950/88 p-4 text-slate-100 shadow-[0_18px_48px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-        <p className="text-sm font-semibold text-white">No node selected</p>
-        <p className="mt-2 break-words text-sm text-slate-400">
-          Select a plan node to inspect its goal, status, dependencies, and available next action.
-        </p>
+      <aside className="w-full min-w-0 max-w-full rounded-[24px] border border-border bg-card p-4 text-card-foreground shadow-sm">
+        <p className="text-sm font-semibold text-foreground">{graphCopy.inspectorEmptyTitle}</p>
+        <p className="mt-2 break-words text-sm text-muted-foreground">{graphCopy.inspectorEmpty}</p>
       </aside>
     );
   }
 
-  const guidance = resolveInspectorGuidance(node);
+  const guidance = resolveInspectorGuidance(node, graphCopy);
 
   return (
-    <aside className="flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/88 p-4 text-slate-100 shadow-[0_24px_70px_rgba(2,6,23,0.45)] backdrop-blur-xl xl:max-h-[calc(100dvh-2rem)]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_30%_0%,rgba(34,211,238,0.18),transparent_48%)]" />
-      <div className="relative shrink-0 border-b border-white/10 pb-4">
+    <aside className="flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-[26px] border border-border bg-card p-4 text-card-foreground shadow-sm xl:max-h-[calc(100dvh-2rem)]">
+      <div className="relative shrink-0 border-b border-border pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-300">{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
-          <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100">{node.statusLabel ?? node.status}</span>
-          <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-violet-100">{interactionLabel(node.interactionType)}</span>
+          <span className="rounded-full border border-border bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground">{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
+          <span className="rounded-full border border-primary/20 bg-primary-soft px-2 py-1 text-[10px] font-medium text-primary">{node.statusLabel ?? node.status}</span>
+          <span className="rounded-full border border-border bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground">{interactionLabel(node.interactionType)}</span>
         </div>
-        <h3 className="mt-3 break-words text-lg font-semibold text-white">{node.title}</h3>
-        <p className="mt-2 break-words text-sm text-slate-400">{node.summary}</p>
-        <p className="mt-3 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.07] px-3 py-2 text-sm text-slate-300">
-          <span className="font-medium text-cyan-100">Next: </span>
+        <h3 className="mt-3 break-words text-lg font-semibold text-foreground">{node.title}</h3>
+        <p className="mt-2 break-words text-sm text-muted-foreground">{node.summary}</p>
+        <p className="mt-3 rounded-2xl border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{graphCopy.inspectorNextPrefix}: </span>
           <span className="break-words">{guidance}</span>
         </p>
       </div>
 
       <div className="relative mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-        <TaskPlanGraphInspectorDetails node={node} graphCopy={graphCopy} nodes={nodes} />
+        <TaskPlanGraphInspectorDetails node={node} graphCopy={graphCopy} nodes={nodes} tone="light" />
         <TaskPlanGraphInspectorRunPanel
           node={node}
+          graphCopy={graphCopy}
           onSubmitCheckpointAction={onSubmitCheckpointAction}
           onDispatchExecutionAction={onDispatchExecutionAction}
         />
@@ -62,11 +60,11 @@ export function TaskPlanGraphInspector({
   );
 }
 
-function resolveInspectorGuidance(node: PlanNodeDataModel) {
+function resolveInspectorGuidance(node: PlanNodeDataModel, graphCopy: GraphCopy) {
   if (node.nextAction) return node.nextAction;
-  if (node.status === "blocked") return "Resolve the blocker before continuing execution.";
-  if (node.status === "waiting_for_user" || node.requiresHumanInput) return "Complete the required review or input to continue.";
-  if (node.status === "done" || node.status === "skipped") return "Review the completion summary and generated evidence.";
-  if (node.status === "active" || node.status === "in_progress") return "Monitor this node while execution continues.";
-  return "Select this node when you need to inspect its required inputs and execution context.";
+  if (node.status === "blocked") return graphCopy.inspectorGuidanceBlocked;
+  if (node.status === "waiting_for_user" || node.requiresHumanInput) return graphCopy.inspectorGuidanceInput;
+  if (node.status === "done" || node.status === "skipped") return graphCopy.inspectorGuidanceDone;
+  if (node.status === "active" || node.status === "in_progress") return graphCopy.inspectorGuidanceActive;
+  return graphCopy.inspectorGuidanceDefault;
 }

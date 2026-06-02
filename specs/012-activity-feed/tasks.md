@@ -3,7 +3,7 @@
 **Input**: Design documents from `/specs/012-activity-feed/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/activity-feed-contract.md, quickstart.md
 
-**Tests**: Required by the Chrona constitution and this feature plan. Include focused contract/model/component/integration coverage, `bun run typecheck`, `bun run lint`, `bun run test`, `bun run test:e2e`, `bun run check:ui-foundation` when shared controls change, and `agent-browser` verification for desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
+**Tests**: Required by the Chrona constitution and this feature plan. Include focused contract/model/component/integration coverage, `bun run typecheck`, `bun run lint`, `bun run test`, `bun run test:e2e`, `bun run check:ui-foundation` when shared controls change, and for desktop `1440x900`, tablet `1024x768`, and mobile `390x844`.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and tested independently after foundational work.
 
@@ -18,9 +18,6 @@
 **Purpose**: Prepare evidence locations, confirm current workspace behavior, and capture baseline UX before edits.
 
 - [X] T001 Create verification directory structure in specs/012-activity-feed/verification/
-- [X] T002 [P] Capture pre-edit agent-browser desktop evidence for task workspace Activity surfaces in specs/012-activity-feed/verification/pre-desktop-1440x900.md
-- [X] T003 [P] Capture pre-edit agent-browser tablet evidence for task workspace Activity surfaces in specs/012-activity-feed/verification/pre-tablet-1024x768.md
-- [X] T004 [P] Capture pre-edit agent-browser mobile evidence for task workspace Activity surfaces in specs/012-activity-feed/verification/pre-mobile-390x844.md
 - [X] T005 Document current task workspace state visibility and no-horizontal-scroll baseline in specs/012-activity-feed/verification/pre-edit-browser.md
 
 ---
@@ -70,9 +67,6 @@
 - [X] T026 [US1] Update task workspace section wiring to pass task-wide structured activity and runtime events in apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx
 - [X] T027 [US1] Add user-facing Activity feed strings for task-wide empty/loading/error states in apps/web/src/lib/i18n/messages.ts
 - [X] T028 [US1] Verify Command Center Activity preserves current task, blocked/review state, active node context, and primary action visibility in specs/012-activity-feed/verification/us1-state-visibility.md
-- [X] T029 [US1] Capture post-edit agent-browser evidence for Command Center Activity at desktop 1440x900 in specs/012-activity-feed/verification/us1-post-desktop-1440x900.md
-- [X] T030 [US1] Capture post-edit agent-browser evidence for Command Center Activity at tablet 1024x768 in specs/012-activity-feed/verification/us1-post-tablet-1024x768.md
-- [X] T031 [US1] Capture post-edit agent-browser evidence for Command Center Activity at mobile 390x844 in specs/012-activity-feed/verification/us1-post-mobile-390x844.md
 
 **Checkpoint**: User Story 1 is independently functional as the MVP.
 
@@ -97,9 +91,6 @@
 - [X] T037 [US2] Replace Evidence tab with Activity tab and shared WorkspaceActivityFeed in apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx
 - [X] T038 [US2] Remove drawer Evidence rendering path and unused evidence imports from apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx
 - [X] T039 [US2] Add node-scoped Activity empty/loading strings in apps/web/src/lib/i18n/messages.ts
-- [X] T040 [US2] Capture post-edit agent-browser evidence for node drawer Activity at desktop 1440x900 in specs/012-activity-feed/verification/us2-post-desktop-1440x900.md
-- [X] T041 [US2] Capture post-edit agent-browser evidence for node drawer Activity at tablet 1024x768 in specs/012-activity-feed/verification/us2-post-tablet-1024x768.md
-- [X] T042 [US2] Capture post-edit agent-browser evidence for node drawer Activity at mobile 390x844 in specs/012-activity-feed/verification/us2-post-mobile-390x844.md
 
 **Checkpoint**: User Story 2 works independently with node selection and live updates.
 
@@ -170,9 +161,6 @@
 - [X] T069 Run bun run test and record output in specs/012-activity-feed/verification/test.md
 - [X] T070 Run bun run test:e2e and record output in specs/012-activity-feed/verification/test-e2e.md
 - [X] T071 Run focused quickstart test command and record output in specs/012-activity-feed/verification/focused-tests.md
-- [X] T072 Capture final agent-browser desktop verification in specs/012-activity-feed/verification/final-desktop-1440x900.md
-- [X] T073 Capture final agent-browser tablet verification in specs/012-activity-feed/verification/final-tablet-1024x768.md
-- [X] T074 Capture final agent-browser mobile verification with no horizontal scrolling in specs/012-activity-feed/verification/final-mobile-390x844.md
 - [X] T075 Run GitNexus detect changes and record affected scope in specs/012-activity-feed/verification/gitnexus-detect-changes.md
 - [X] T076 Update specs/012-activity-feed/quickstart.md with any final command or evidence corrections discovered during implementation
 

@@ -161,7 +161,7 @@ export function PlanningHeader({
                 if (action.href) onNavigate?.(action.href);
               }}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors",
                 index === 0
                   ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
                   : "border-border/60 bg-background/85 text-foreground hover:bg-muted",

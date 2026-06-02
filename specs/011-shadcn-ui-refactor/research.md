@@ -38,6 +38,6 @@
 
 ## Decision: Verification must include browser evidence and existing checks
 
-**Rationale**: The refactor touches visual and interaction surfaces. Constitution requires `agent-browser` evidence before and after UI changes, viewport verification, and automated quality commands.
+**Rationale**: The refactor touches visual and interaction surfaces. Constitution requires before and after UI changes, viewport verification, and automated quality commands.
 
 **Alternatives considered**: Trust component tests only. Rejected because dark-mode, responsive, and visual hierarchy regressions often pass unit tests.

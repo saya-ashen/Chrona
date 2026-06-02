@@ -213,14 +213,14 @@ function GraphOverviewBar({
   };
 
   return (
-    <div className="rounded-[22px] border border-white/10 bg-slate-950/64 p-3 shadow-[0_18px_50px_rgba(2,6,23,0.34)] backdrop-blur-xl">
+    <div className="rounded-[22px] border border-border bg-card p-3 shadow-sm">
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200/85">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
             <Clock3 className="size-3.5" />
             {graphCopy.overviewTitle}
           </div>
-          <p className="mt-1 truncate text-sm font-semibold text-slate-50">
+          <p className="mt-1 truncate text-sm font-semibold text-foreground">
             {selectedTitle ? `${graphCopy.selectedNode}: ${selectedTitle}` : currentTitle ? `${graphCopy.currentNode}: ${currentTitle}` : graphCopy.criticalPath}
           </p>
         </div>
@@ -228,12 +228,12 @@ function GraphOverviewBar({
           {items.map((item) => {
             const Icon = iconByTone[item.tone];
             return (
-              <div key={item.label} className="min-w-[6rem] rounded-2xl border border-white/8 bg-white/[0.055] px-3 py-2 text-slate-100">
-                <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <div key={item.label} className="min-w-[6rem] rounded-2xl border border-border bg-background px-3 py-2 text-foreground">
+                <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
                   <Icon className="size-3" />
                   <span className="truncate">{item.label}</span>
                 </div>
-                <p className="mt-1 text-base font-semibold text-white">{item.value}</p>
+                <p className="mt-1 text-base font-semibold text-foreground">{item.value}</p>
               </div>
             );
           })}
@@ -491,14 +491,14 @@ export function TaskPlanGraph({
     <Dialog open={isFullDialogOpen} onOpenChange={setIsFullDialogOpen}>
       <DialogContent
         showCloseButton={false}
-        className="flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[32px] border border-white/10 bg-slate-950 p-0 text-slate-100 shadow-[0_32px_120px_rgba(0,0,0,0.55)]"
+        className="flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[32px] border border-border bg-background p-0 text-foreground shadow-xl"
       >
-        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-white/10 bg-white/[0.035] px-6 py-5">
+        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-border bg-card px-6 py-5">
           <div className="flex flex-col gap-1">
-            <DialogTitle className="text-lg font-semibold tracking-tight text-white">
+            <DialogTitle className="text-lg font-semibold tracking-tight text-foreground">
               {graphCopy.fullTitle}
             </DialogTitle>
-            <DialogDescription className="text-sm text-slate-400">
+            <DialogDescription className="text-sm text-muted-foreground">
               {graphCopy.fullDescription}
             </DialogDescription>
           </div>
@@ -507,7 +507,7 @@ export function TaskPlanGraph({
               <button
                 type="button"
                 aria-label={graphCopy.closeDialog}
-                className="flex size-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
+                className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
               />
             }
           >
@@ -556,23 +556,22 @@ export function TaskPlanGraph({
         >
           <div
             aria-label={graphCopy.ariaLabel}
-            className="relative overflow-hidden rounded-[28px] border border-white/10 bg-slate-950 p-4 text-slate-100 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+            className="relative overflow-hidden rounded-[28px] border border-border bg-card p-4 text-card-foreground shadow-sm"
             data-graph-mode="compact"
             data-testid="task-plan-graph"
           >
-            <div className="pointer-events-none absolute inset-x-6 top-0 h-24 bg-[radial-gradient(circle_at_20%_0%,rgba(34,211,238,0.22),transparent_42%),radial-gradient(circle_at_78%_10%,rgba(168,85,247,0.20),transparent_38%)]" />
             <div className="relative flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200/85">
+                <p className="text-sm font-semibold text-foreground">
                   {graphCopy.compactTitle}
                 </p>
-                <p className="mt-1 max-w-2xl text-sm text-slate-400">
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                   {graphCopy.compactDescription}
                 </p>
               </div>
               <button
                 type="button"
-                className="shrink-0 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-100 shadow-lg transition hover:border-cyan-300/40 hover:bg-cyan-300/10"
+                className="shrink-0 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:bg-primary-soft"
                 onClick={() => setIsFullDialogOpen(true)}
               >
                 {graphCopy.openFullGraph}
@@ -583,12 +582,12 @@ export function TaskPlanGraph({
               {overviewItems.map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-[18px] border border-white/10 bg-white/[0.055] px-3 py-2 shadow-[0_12px_34px_rgba(2,6,23,0.18)]"
+                  className="rounded-[18px] border border-border bg-background px-3 py-2"
                 >
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  <p className="text-[10px] font-medium text-muted-foreground">
                     {item.label}
                   </p>
-                  <p className="mt-1 text-lg font-semibold text-white">
+                  <p className="mt-1 text-lg font-semibold text-foreground">
                     {item.value}
                   </p>
                 </div>
@@ -599,10 +598,10 @@ export function TaskPlanGraph({
               <CompactStageStrip stages={compact.stages} />
               <section className="space-y-2">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                  <p className="text-sm font-semibold text-foreground">
                     {graphCopy.focusTitle}
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {graphCopy.focusDescription}
                   </p>
                 </div>

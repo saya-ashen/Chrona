@@ -1,6 +1,7 @@
 export type ImportedEventCandidate = {
   externalUid: string;
   recurrenceId?: string | null;
+  recurrenceRule?: string | null;
   title?: string | null;
   description?: string | null;
   startsAt: Date;
@@ -23,6 +24,7 @@ export function normalizeImportedEvents(candidates: ImportedEventCandidate[]) {
     return [{
       externalUid: candidate.externalUid,
       recurrenceId: candidate.recurrenceId ?? null,
+      recurrenceRule: candidate.recurrenceRule ?? null,
       dedupeKey,
       title: candidate.title?.trim() || "Untitled external event",
       description: candidate.description?.trim() || null,

@@ -277,6 +277,15 @@ export const scheduleBodySchema = z.object({
 // ── DELETE /tasks/:taskId/schedule ──
 export const clearScheduleParamSchema = z.object({ taskId: taskIdParam });
 
+// ── PUT /work-blocks/:workBlockId/schedule ──
+export const workBlockScheduleParamSchema = z.object({
+  workBlockId: workBlockIdSchema,
+});
+export const workBlockScheduleBodySchema = z.object({
+  scheduledStartAt: z.string().min(1, "scheduledStartAt is required"),
+  scheduledEndAt: z.string().min(1, "scheduledEndAt is required"),
+});
+
 // ── POST /tasks/:taskId/schedule/proposals ──
 export const scheduleProposalParamSchema = z.object({ taskId: taskIdParam });
 export const scheduleProposalBodySchema = z.object({

@@ -1,6 +1,7 @@
 import type { ScheduleTaskListItem } from "@/components/schedule/schedule-task-list";
 import type { TaskConfigExecutionRuntime } from "@/components/schedule/forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import type { AutomationTimingPreset } from "@chrona/contracts";
 
 type SchedulePageSummary = {
   scheduledCount: number;
@@ -71,6 +72,7 @@ export type ScheduleAiPlanGenerationStatus =
 
 export type ScheduleRecord = {
   taskId: string;
+  workBlockId?: string;
   workspaceId: string;
   title: string;
   description: string | null;
@@ -89,6 +91,8 @@ export type ScheduleRecord = {
   lastActivityAt: Date | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: string;
+  autoExecuteTiming: string;
   sourceManaged?: {
     source: "external_calendar";
     eventId: string;
@@ -301,6 +305,7 @@ export type TimelineResizeDraft = TimelinePlacementPreview & {
 export type TimelineDragItem = {
   kind: "queue" | "scheduled";
   taskId: string;
+  workBlockId?: string;
   title: string;
   dueAt: Date | null | undefined;
   durationMinutes: number;
@@ -314,9 +319,14 @@ export type TimelineCreateInput = {
   executionConfig: RuntimeInput;
   autoExecute: boolean;
   autoPlanGenerationEnabled: boolean;
+  autoPlanGenerationTiming: AutomationTimingPreset;
+  autoExecuteTiming: AutomationTimingPreset;
   dueAt: Date | null;
   scheduledStartAt: Date;
   scheduledEndAt: Date;
+  recurrenceRule?: string | null;
+  recurrenceAnchorStartAt?: string | null;
+  recurrenceAnchorEndAt?: string | null;
 };
 
 export type QuickCreateDraft = {

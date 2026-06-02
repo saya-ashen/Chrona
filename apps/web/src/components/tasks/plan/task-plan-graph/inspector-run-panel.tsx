@@ -14,55 +14,56 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "@/components/tasks/task-workspace-query";
 import { buildWorkspaceCheckpointActionInput } from "@/components/tasks/workspace/model/task-workspace-actions";
+import { DEFAULT_GRAPH_COPY } from "./constants";
 import { interactionLabel } from "./logic";
 import { jsonOutputText } from "./result-output-format";
-import type { PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./types";
+import type { GraphCopy, PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./types";
 
 type RunPanelMode = PlanNodeDataModel["interactionType"];
 
 function getRunPanelTheme(mode: RunPanelMode) {
   switch (mode) {
     case "execute":
-      return { badge: "bg-violet-500/12 text-violet-700 dark:text-violet-200", card: "border-violet-200/70 bg-violet-50/70 dark:border-violet-400/20 dark:bg-violet-500/10" };
+      return { badge: "border-primary/20 bg-primary-soft text-primary", card: "border-primary/20 bg-primary-soft/60" };
     case "confirm":
-      return { badge: "bg-indigo-500/12 text-indigo-700 dark:text-indigo-200", card: "border-indigo-200/70 bg-indigo-50/70 dark:border-indigo-400/20 dark:bg-indigo-500/10" };
+      return { badge: "border-primary/20 bg-primary-soft text-primary", card: "border-primary/20 bg-primary-soft/60" };
     case "choose":
-      return { badge: "bg-amber-500/14 text-amber-800 dark:text-amber-200", card: "border-amber-200/70 bg-amber-50/70 dark:border-amber-400/20 dark:bg-amber-500/10" };
+      return { badge: "border-amber-300/30 bg-amber-500/10 text-amber-800 dark:text-amber-200", card: "border-amber-300/30 bg-amber-500/10" };
     case "input":
       return { badge: "bg-amber-500/14 text-amber-800 dark:text-amber-200", card: "border-amber-200/70 bg-amber-50/70 dark:border-amber-400/20 dark:bg-amber-500/10" };
     case "edit":
-      return { badge: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-200", card: "border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-400/20 dark:bg-emerald-500/10" };
+      return { badge: "border-primary/20 bg-primary-soft text-primary", card: "border-primary/20 bg-primary-soft/60" };
     case "approve":
-      return { badge: "bg-fuchsia-500/12 text-fuchsia-700 dark:text-fuchsia-200", card: "border-fuchsia-200/70 bg-fuchsia-50/70 dark:border-fuchsia-400/20 dark:bg-fuchsia-500/10" };
+      return { badge: "border-primary/20 bg-primary-soft text-primary", card: "border-primary/20 bg-primary-soft/60" };
     case "retry":
-      return { badge: "bg-rose-500/12 text-rose-700 dark:text-rose-200", card: "border-rose-200/70 bg-rose-50/70 dark:border-rose-400/20 dark:bg-rose-500/10" };
+      return { badge: "border-destructive/30 bg-destructive/10 text-destructive", card: "border-destructive/25 bg-destructive/10" };
     case "wait":
-      return { badge: "bg-slate-500/12 text-slate-700 dark:text-slate-200", card: "border-slate-200/70 bg-slate-50/70 dark:border-slate-400/20 dark:bg-slate-500/10" };
+      return { badge: "border-border bg-muted text-muted-foreground", card: "border-border bg-muted/45" };
     default:
-      return { badge: "bg-sky-500/12 text-sky-700 dark:text-sky-200", card: "border-sky-200/70 bg-sky-50/70 dark:border-sky-400/20 dark:bg-sky-500/10" };
+      return { badge: "border-border bg-muted text-muted-foreground", card: "border-border bg-muted/45" };
   }
 }
 
-function getRunPanelHints(mode: RunPanelMode) {
+function getRunPanelHints(mode: RunPanelMode, graphCopy: GraphCopy) {
   switch (mode) {
     case "execute":
-      return ["Review dependencies and objective.", "Execution starts from the plan entry node, not from an arbitrary selected node."];
+      return [graphCopy.runHintExecuteReview, graphCopy.runHintExecuteEntry];
     case "confirm":
-      return ["Read the checkpoint summary carefully.", "Confirm only when the prerequisite condition is truly satisfied."];
+      return [graphCopy.runHintConfirmReview, graphCopy.runHintConfirmPrereq];
     case "choose":
-      return ["Pick one branch or decision path.", "The selected option determines downstream execution."];
+      return [graphCopy.runHintChoosePick, graphCopy.runHintChooseDownstream];
     case "input":
-      return ["Fill in the required fields.", "Submitted input becomes the runtime context for the next step."];
+      return [graphCopy.runHintInputFill, graphCopy.runHintInputContext];
     case "edit":
-      return ["Revise the requested content before continuing.", "Treat this as a correction checkpoint, not a new task step."];
+      return [graphCopy.runHintEditRevise, graphCopy.runHintEditCheckpoint];
     case "approve":
-      return ["This is a sign-off gate for a sensitive operation.", "Approval here should represent explicit intent, not just observation."];
+      return [graphCopy.runHintApproveGate, graphCopy.runHintApproveIntent];
     case "retry":
-      return ["Capture why the node needs another attempt.", "Use retry only after the blocking cause is understood."];
+      return [graphCopy.runHintRetryCause, graphCopy.runHintRetryUse];
     case "wait":
-      return ["No manual action is needed yet.", "Monitor the wait condition and related downstream context."];
+      return [graphCopy.runHintWaitManual, graphCopy.runHintWaitMonitor];
     default:
-      return ["Use this panel to inspect the live node context.", "Advance the run only when the current state is clear."];
+      return [graphCopy.runHintObserveContext, graphCopy.runHintObserveAdvance];
   }
 }
 
@@ -90,12 +91,12 @@ function ActionButton({ action, isActive, onClick }: { action: PlanNodeAction; i
   );
 }
 
-function RunField({ field, value, invalid, error, onChange }: { field: PlanNodeField; value: string; invalid?: boolean; error?: { message?: string }; onChange: (value: string) => void }) {
+function RunField({ field, value, invalid, error, graphCopy, onChange }: { field: PlanNodeField; value: string; invalid?: boolean; error?: { message?: string }; graphCopy: GraphCopy; onChange: (value: string) => void }) {
   const fieldId = `run-panel-${field.key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const commonLabel = (
     <div className="flex items-center gap-2">
       <span className="text-sm font-medium text-foreground">{field.label}</span>
-      {field.required ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">required</span> : null}
+      {field.required ? <span className="rounded-full border border-primary/20 bg-primary-soft px-1.5 py-0.5 text-[10px] text-primary">{graphCopy.fieldRequired}</span> : null}
     </div>
   );
 
@@ -110,7 +111,7 @@ function RunField({ field, value, invalid, error, onChange }: { field: PlanNodeF
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className="min-h-24 rounded-xl border-border/70 bg-background/80 text-sm"
-          placeholder={`Enter ${field.label.toLowerCase()}...`}
+          placeholder={`${graphCopy.runFieldPlaceholderPrefix} ${field.label.toLowerCase()}...`}
         />
         {invalid ? <FieldError errors={[error]} /> : null}
       </Field>
@@ -123,11 +124,11 @@ function RunField({ field, value, invalid, error, onChange }: { field: PlanNodeF
         <FieldLabel htmlFor={fieldId}>{commonLabel}</FieldLabel>
         <Select value={value || undefined} onValueChange={onChange}>
           <SelectTrigger id={fieldId} aria-invalid={invalid} className="w-full rounded-xl border-border/70 bg-background/80 text-sm">
-            <SelectValue placeholder="Select..." />
+            <SelectValue placeholder={graphCopy.runSelectPlaceholder} />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-          {(field.options ?? ["Approve", "Reject", "Needs changes"]).map((option) => (
+          {(field.options ?? [graphCopy.runApprovalOptionApprove, graphCopy.runApprovalOptionReject, graphCopy.runApprovalOptionNeedsChanges]).map((option) => (
                 <SelectItem key={option} value={option}>{option}</SelectItem>
           ))}
             </SelectGroup>
@@ -148,53 +149,53 @@ function RunField({ field, value, invalid, error, onChange }: { field: PlanNodeF
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="rounded-xl border-border/70 bg-background/80 text-sm"
-        placeholder={`Enter ${field.label.toLowerCase()}...`}
+        placeholder={`${graphCopy.runFieldPlaceholderPrefix} ${field.label.toLowerCase()}...`}
       />
       {invalid ? <FieldError errors={[error]} /> : null}
     </Field>
   );
 }
 
-function getActionVerb(action: PlanNodeAction | null) {
-  if (!action) return "Send";
-  if (action.kind === "approve") return "Approve";
-  if (action.kind === "confirm") return "Confirm";
-  if (action.kind === "choose") return "Choose";
-  if (action.kind === "edit") return "Submit";
-  if (action.kind === "resolve") return "Resolve";
-  if (action.kind === "retry") return "Retry";
-  if (action.kind === "observe") return "Observe";
-  if (action.kind === "trigger") return "Start plan";
-  if (action.kind === "open") return "Open";
-  return "Send";
+function getActionVerb(action: PlanNodeAction | null, graphCopy: GraphCopy) {
+  if (!action) return graphCopy.runActionSend;
+  if (action.kind === "approve") return graphCopy.runActionApprove;
+  if (action.kind === "confirm") return graphCopy.runActionConfirm;
+  if (action.kind === "choose") return graphCopy.runActionChoose;
+  if (action.kind === "edit") return graphCopy.runActionSubmit;
+  if (action.kind === "resolve") return graphCopy.runActionResolve;
+  if (action.kind === "retry") return graphCopy.runActionRetry;
+  if (action.kind === "observe") return graphCopy.runActionObserve;
+  if (action.kind === "trigger") return graphCopy.runActionStartPlan;
+  if (action.kind === "open") return graphCopy.runActionOpen;
+  return graphCopy.runActionSend;
 }
 
-function getRunPanelCopy(mode: RunPanelMode) {
+function getRunPanelCopy(mode: RunPanelMode, graphCopy: GraphCopy) {
   switch (mode) {
     case "execute":
-      return { eyebrow: "Execution panel", title: "Ready to execute", description: "Execution starts from the plan entry node. This action starts or continues the plan.", submitLabel: "Start plan", submitIcon: Play };
+      return { eyebrow: graphCopy.runPanelExecuteEyebrow, title: graphCopy.runPanelExecuteTitle, description: graphCopy.runPanelExecuteDescription, submitLabel: graphCopy.runActionStartPlan, submitIcon: Play };
     case "confirm":
-      return { eyebrow: "Confirmation panel", title: "Waiting for confirmation", description: "This node needs a clear confirmation before the run can proceed.", submitLabel: "Confirm", submitIcon: Check };
+      return { eyebrow: graphCopy.runPanelConfirmEyebrow, title: graphCopy.runPanelConfirmTitle, description: graphCopy.runPanelConfirmDescription, submitLabel: graphCopy.runActionConfirm, submitIcon: Check };
     case "choose":
-      return { eyebrow: "Decision panel", title: "Waiting for a choice", description: "Select the branch or decision needed to continue this plan.", submitLabel: "Submit choice", submitIcon: Check };
+      return { eyebrow: graphCopy.runPanelChooseEyebrow, title: graphCopy.runPanelChooseTitle, description: graphCopy.runPanelChooseDescription, submitLabel: graphCopy.runActionChoose, submitIcon: Check };
     case "input":
-      return { eyebrow: "Input panel", title: "Waiting for user input", description: "This node is paused until the required input is submitted.", submitLabel: "Submit input", submitIcon: Send };
+      return { eyebrow: graphCopy.runPanelInputEyebrow, title: graphCopy.runPanelInputTitle, description: graphCopy.runPanelInputDescription, submitLabel: graphCopy.runActionSubmit, submitIcon: Send };
     case "edit":
-      return { eyebrow: "Edit panel", title: "Waiting for edits", description: "This node expects a structured revision before execution can continue.", submitLabel: "Submit edits", submitIcon: Send };
+      return { eyebrow: graphCopy.runPanelEditEyebrow, title: graphCopy.runPanelEditTitle, description: graphCopy.runPanelEditDescription, submitLabel: graphCopy.runActionSubmit, submitIcon: Send };
     case "approve":
-      return { eyebrow: "Approval panel", title: "Waiting for approval", description: "This node needs an explicit approval decision before execution can continue.", submitLabel: "Send approval", submitIcon: Check };
+      return { eyebrow: graphCopy.runPanelApproveEyebrow, title: graphCopy.runPanelApproveTitle, description: graphCopy.runPanelApproveDescription, submitLabel: graphCopy.runActionApprove, submitIcon: Check };
     case "wait":
-      return { eyebrow: "Wait panel", title: "Waiting on an external event", description: "This node is paused by design until its wait condition is satisfied.", submitLabel: "Observe wait", submitIcon: Sparkles };
+      return { eyebrow: graphCopy.runPanelWaitEyebrow, title: graphCopy.runPanelWaitTitle, description: graphCopy.runPanelWaitDescription, submitLabel: graphCopy.runActionObserve, submitIcon: Sparkles };
     case "retry":
-      return { eyebrow: "Retry panel", title: "Node needs recovery", description: "This node is blocked. Capture the retry rationale and restart from here.", submitLabel: "Retry node", submitIcon: RotateCcw };
+      return { eyebrow: graphCopy.runPanelRetryEyebrow, title: graphCopy.runPanelRetryTitle, description: graphCopy.runPanelRetryDescription, submitLabel: graphCopy.runActionRetry, submitIcon: RotateCcw };
     default:
-      return { eyebrow: "Observe panel", title: "Current run focus", description: "Use this surface to monitor the active node and advance the run when ready.", submitLabel: "Continue run", submitIcon: Play };
+      return { eyebrow: graphCopy.runPanelObserveEyebrow, title: graphCopy.runPanelObserveTitle, description: graphCopy.runPanelObserveDescription, submitLabel: graphCopy.runActionStartPlan, submitIcon: Play };
   }
 }
 
-function resolvePrimarySubmitLabel(node: PlanNodeDataModel, mode: RunPanelMode, fallbackLabel: string) {
-  if (mode === "execute") return node.executionMode === "manual" ? "Mark done" : "Start plan";
-  if (mode === "observe" && (node.status === "active" || node.active)) return "Continue run";
+function resolvePrimarySubmitLabel(node: PlanNodeDataModel, mode: RunPanelMode, fallbackLabel: string, graphCopy: GraphCopy) {
+  if (mode === "execute") return node.executionMode === "manual" ? graphCopy.runActionMarkDone : graphCopy.runActionStartPlan;
+  if (mode === "observe" && (node.status === "active" || node.active)) return graphCopy.runActionStartPlan;
   return fallbackLabel;
 }
 
@@ -252,19 +253,19 @@ function outputTitle(output: NodeResultOutput, fallback: string) {
   return fallback;
 }
 
-export function ResultOutputCard({ output, disableInternalScroll = false }: { output: NodeResultOutput; disableInternalScroll?: boolean }) {
+export function ResultOutputCard({ output, graphCopy = DEFAULT_GRAPH_COPY, disableInternalScroll = false }: { output: NodeResultOutput; graphCopy?: GraphCopy; disableInternalScroll?: boolean }) {
   switch (output.kind) {
     case "text":
       return (
         <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{outputTitle(output, output.kind)}</p>
+          <p className="text-xs font-semibold text-muted-foreground">{outputTitle(output, output.kind)}</p>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{output.content}</p>
         </div>
       );
     case "markdown":
       return (
         <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{outputTitle(output, "markdown")}</p>
+          <p className="text-xs font-semibold text-muted-foreground">{outputTitle(output, "markdown")}</p>
           <div className="mt-2">
             <MarkdownContent content={output.content} disableInternalScroll={disableInternalScroll} />
           </div>
@@ -276,7 +277,7 @@ export function ResultOutputCard({ output, disableInternalScroll = false }: { ou
         if (text) {
           return (
             <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{output.title ?? "Result"}</p>
+              <p className="text-xs font-semibold text-muted-foreground">{output.title ?? graphCopy.runResultTitle}</p>
               <div className="mt-2">
                 <MarkdownContent content={text} disableInternalScroll={disableInternalScroll} />
               </div>
@@ -285,8 +286,8 @@ export function ResultOutputCard({ output, disableInternalScroll = false }: { ou
         }
       }
       return (
-        <div className="rounded-xl border border-border/60 bg-slate-950 px-3 py-2 text-slate-50">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">{output.title ?? "JSON"}</p>
+        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2 text-foreground">
+          <p className="text-xs font-semibold text-muted-foreground">{output.title ?? graphCopy.runOutputJsonTitle}</p>
           <pre className={cn(
             "mt-2 whitespace-pre-wrap break-words text-xs leading-5",
             !disableInternalScroll && "max-h-64 overflow-auto",
@@ -295,44 +296,44 @@ export function ResultOutputCard({ output, disableInternalScroll = false }: { ou
       );
     case "file":
       return (
-        <div className="rounded-xl border border-sky-200/70 bg-sky-50/70 px-3 py-2 dark:border-sky-400/20 dark:bg-sky-500/10">
+        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
           <div className="flex items-start gap-2">
-            <FileText className="mt-0.5 size-4 text-sky-700 dark:text-sky-200" />
+            <FileText className="mt-0.5 size-4 text-muted-foreground" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground">{output.title ?? "File output"}</p>
+              <p className="text-sm font-semibold text-foreground">{output.title ?? graphCopy.runOutputFileTitle}</p>
               <code className="mt-1 block break-all rounded-lg bg-background/80 px-2 py-1 text-xs text-foreground">{output.path}</code>
               {output.description ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{output.description}</p> : null}
-              {output.language ? <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{output.language}</p> : null}
+              {output.language ? <p className="mt-1 text-[11px] font-medium text-muted-foreground">{output.language}</p> : null}
             </div>
           </div>
         </div>
       );
     case "artifact":
       return (
-        <div className="rounded-xl border border-purple-200/70 bg-purple-50/70 px-3 py-2 dark:border-purple-400/20 dark:bg-purple-500/10">
+        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
           <p className="text-sm font-semibold text-foreground">{output.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Artifact: {output.artifactId}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{graphCopy.runOutputArtifactPrefix}: {output.artifactId}</p>
           {output.description ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{output.description}</p> : null}
         </div>
       );
     case "command":
       return (
-        <div className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-50">
+        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2 text-foreground">
           <div className="flex items-center gap-2">
-            <Terminal className="size-4 text-zinc-300" />
-            <p className="text-sm font-semibold">{output.title ?? "Command"}</p>
-            {typeof output.exitCode === "number" ? <span className="ml-auto text-xs text-zinc-400">exit {output.exitCode}</span> : null}
+            <Terminal className="size-4 text-muted-foreground" />
+            <p className="text-sm font-semibold">{output.title ?? graphCopy.runOutputCommandTitle}</p>
+            {typeof output.exitCode === "number" ? <span className="ml-auto text-xs text-muted-foreground">{graphCopy.runOutputExitPrefix} {output.exitCode}</span> : null}
           </div>
           <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-zinc-100",
+            "mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-foreground",
             !disableInternalScroll && "overflow-auto",
           )}>{output.command}</pre>
           {output.stdout ? <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words border-t border-zinc-800 pt-2 text-xs text-emerald-200",
+            "mt-2 whitespace-pre-wrap break-words border-t border-border pt-2 text-xs text-foreground",
             !disableInternalScroll && "max-h-40 overflow-auto",
           )}>{output.stdout}</pre> : null}
           {output.stderr ? <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words border-t border-zinc-800 pt-2 text-xs text-rose-200",
+            "mt-2 whitespace-pre-wrap break-words border-t border-border pt-2 text-xs text-destructive",
             !disableInternalScroll && "max-h-40 overflow-auto",
           )}>{output.stderr}</pre> : null}
         </div>
@@ -394,10 +395,12 @@ function summarizeFieldValues(fields: PlanNodeField[], values: Record<string, st
 
 export function TaskPlanGraphInspectorRunPanel({
   node,
+  graphCopy,
   onSubmitCheckpointAction,
   onDispatchExecutionAction,
 }: {
   node: PlanNodeDataModel;
+  graphCopy: GraphCopy;
   onSubmitCheckpointAction?: (action: SubmitCheckpointActionInput) => Promise<TaskExecutionDispatchResult>;
   onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<{ message: string }>;
 }) {
@@ -423,14 +426,14 @@ export function TaskPlanGraphInspectorRunPanel({
   const resultEvidence = useMemo(() => evidenceLines(node.resultEvidence), [node.resultEvidence]);
   const runPanelMode = useMemo(() => node.interactionType, [node]);
   const resolvedRunPanelMode = runPanelMode ?? "observe";
-  const runPanelCopy = useMemo(() => getRunPanelCopy(resolvedRunPanelMode), [resolvedRunPanelMode]);
+  const runPanelCopy = useMemo(() => getRunPanelCopy(resolvedRunPanelMode, graphCopy), [graphCopy, resolvedRunPanelMode]);
   const runPanelTheme = useMemo(() => getRunPanelTheme(resolvedRunPanelMode), [resolvedRunPanelMode]);
-  const runPanelHints = useMemo(() => getRunPanelHints(resolvedRunPanelMode), [resolvedRunPanelMode]);
+  const runPanelHints = useMemo(() => getRunPanelHints(resolvedRunPanelMode, graphCopy), [graphCopy, resolvedRunPanelMode]);
   const availableActions = node.availableActions ?? [];
   const hasExecutionAction = availableActions.some((action) => action.executionAction);
   const showRunControls = hasExecutionAction || node.status === "ready" || node.status === "active" || node.status === "waiting" || node.status === "blocked";
   const SubmitIcon = runPanelCopy.submitIcon;
-  const primarySubmitLabel = resolvePrimarySubmitLabel(node, resolvedRunPanelMode, runPanelCopy.submitLabel);
+  const primarySubmitLabel = resolvePrimarySubmitLabel(node, resolvedRunPanelMode, runPanelCopy.submitLabel, graphCopy);
   const interactiveFields = node.interactiveFields ?? [];
   const canSubmitRunAction = interactiveFields.every((field) => !field.required || Boolean(fieldValues[field.key]?.trim()));
 
@@ -438,11 +441,11 @@ export function TaskPlanGraphInspectorRunPanel({
     const payload = summarizeFieldValues(interactiveFields, values);
     const label = selectedAction?.kind === "trigger"
       ? primarySubmitLabel
-      : selectedAction?.label ?? node.nextAction ?? "Run action";
+      : selectedAction?.label ?? node.nextAction ?? graphCopy.runActionDefaultLabel;
 
     if (selectedAction?.executionAction) {
       if (!onDispatchExecutionAction) {
-        setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: "No backend handler is connected for this surface." }, ...current].slice(0, 4));
+        setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: graphCopy.runActionBackendMissing }, ...current].slice(0, 4));
         return;
       }
 
@@ -451,8 +454,8 @@ export function TaskPlanGraphInspectorRunPanel({
         const result = await onDispatchExecutionAction(selectedAction.executionAction);
         setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
       } catch (cause) {
-        const message = cause instanceof Error ? cause.message : "Failed to dispatch execution action";
-        setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} still running` : `${label} failed`, detail: message }, ...current].slice(0, 4));
+        const message = cause instanceof Error ? cause.message : graphCopy.runActionDispatchFailed;
+        setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} ${graphCopy.runActionStillRunningSuffix}` : `${label} ${graphCopy.runActionFailedSuffix}`, detail: message }, ...current].slice(0, 4));
       } finally {
         setIsDispatching(false);
       }
@@ -460,7 +463,7 @@ export function TaskPlanGraphInspectorRunPanel({
     }
 
     if (!onSubmitCheckpointAction) {
-      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || "No backend handler is connected for this surface." }, ...current].slice(0, 4));
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || graphCopy.runActionBackendMissing }, ...current].slice(0, 4));
       return;
     }
 
@@ -469,19 +472,19 @@ export function TaskPlanGraphInspectorRunPanel({
       const result = await onSubmitCheckpointAction(buildWorkspaceCheckpointActionInput({ node, selectedAction, fields: interactiveFields, values }));
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to dispatch execution action";
-      setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} still running` : `${label} failed`, detail: message }, ...current].slice(0, 4));
+      const message = cause instanceof Error ? cause.message : graphCopy.runActionDispatchFailed;
+      setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} ${graphCopy.runActionStillRunningSuffix}` : `${label} ${graphCopy.runActionFailedSuffix}`, detail: message }, ...current].slice(0, 4));
     } finally {
       setIsDispatching(false);
     }
   }
 
   async function handleMarkDone() {
-    const label = "Mark done";
-    const summary = summarizeFieldValues(interactiveFields, fieldValues) || runResult || `Manual node ${node.title} completed`;
+    const label = graphCopy.runActionMarkDone;
+    const summary = summarizeFieldValues(interactiveFields, fieldValues) || runResult || `${graphCopy.runActionManualCompleteFallbackPrefix}: ${node.title}`;
 
     if (!onSubmitCheckpointAction || !node.checkpoint) {
-      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: "No backend handler is connected for this surface." }, ...current].slice(0, 4));
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: graphCopy.runActionBackendMissing }, ...current].slice(0, 4));
       return;
     }
 
@@ -494,7 +497,7 @@ export function TaskPlanGraphInspectorRunPanel({
       });
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
     } catch (cause) {
-      setRunLog((current) => [{ id: `${Date.now()}`, title: `${label} failed`, detail: cause instanceof Error ? cause.message : "Failed to mark node done" }, ...current].slice(0, 4));
+      setRunLog((current) => [{ id: `${Date.now()}`, title: `${label} ${graphCopy.runActionFailedSuffix}`, detail: cause instanceof Error ? cause.message : graphCopy.runActionMarkDoneFailed }, ...current].slice(0, 4));
     } finally {
       setIsDispatching(false);
     }
@@ -506,7 +509,7 @@ export function TaskPlanGraphInspectorRunPanel({
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{runPanelCopy.eyebrow}</p>
+              <p className="text-xs font-semibold text-muted-foreground">{runPanelCopy.eyebrow}</p>
               <p className="mt-1 text-sm font-semibold text-foreground">{runPanelCopy.title}</p>
             </div>
             <span className={cn("rounded-full px-2 py-1 text-[10px] font-medium", runPanelTheme.badge)}>{interactionLabel(resolvedRunPanelMode)}</span>
@@ -524,7 +527,7 @@ export function TaskPlanGraphInspectorRunPanel({
               ))}
             </ul>
 
-            {node.nextAction ? <p className="mt-3 text-xs text-muted-foreground">Next UI step: {node.nextAction}</p> : null}
+            {node.nextAction ? <p className="mt-3 text-xs text-muted-foreground">{graphCopy.runNextUiStep}: {node.nextAction}</p> : null}
 
             {availableActions.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -542,13 +545,14 @@ export function TaskPlanGraphInspectorRunPanel({
                       key={field.key}
                       name={field.key}
                       control={form.control}
-                      rules={{ required: field.required ? "Required" : false }}
+                  rules={{ required: field.required ? graphCopy.fieldRequired : false }}
                       render={({ field: controllerField, fieldState }) => (
                         <RunField
                           field={field}
                           value={controllerField.value ?? ""}
                           invalid={fieldState.invalid}
                           error={fieldState.error}
+                          graphCopy={graphCopy}
                           onChange={controllerField.onChange}
                         />
                       )}
@@ -560,14 +564,14 @@ export function TaskPlanGraphInspectorRunPanel({
             {interactiveFields.length === 0 && ["confirm", "approve", "execute", "observe", "wait", "retry"].includes(resolvedRunPanelMode) ? (
               <div className="mt-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
                 {resolvedRunPanelMode === "wait"
-                  ? "This node is waiting on an external event, so there is no manual form to fill here."
+                  ? graphCopy.runNoFormWait
                   : resolvedRunPanelMode === "execute"
                     ? node.executionMode === "manual"
-                      ? "Complete the manual work outside Chrona, then mark this node done here."
-                      : "Execution starts from the plan entry node. This action starts or continues the plan."
+                      ? graphCopy.runNoFormManualExecute
+                      : graphCopy.runNoFormExecute
                     : resolvedRunPanelMode === "retry"
-                      ? "This node is blocked. Use retry once the failure cause is understood."
-                      : "This node does not require free-form input. The action here is a direct decision or execution step."}
+                      ? graphCopy.runNoFormRetry
+                      : graphCopy.runNoFormDefault}
               </div>
             ) : null}
 
@@ -588,7 +592,7 @@ export function TaskPlanGraphInspectorRunPanel({
                       : selectedAction?.kind === "trigger"
                         ? <Sparkles className="size-4" />
                         : <SubmitIcon className="size-4" />}
-                {isDispatching ? "Sending..." : selectedAction?.kind === "trigger" ? primarySubmitLabel : selectedAction ? getActionVerb(selectedAction) : primarySubmitLabel}
+                {isDispatching ? graphCopy.runActionSending : selectedAction?.kind === "trigger" ? primarySubmitLabel : selectedAction ? getActionVerb(selectedAction, graphCopy) : primarySubmitLabel}
               </Button>
 
               {(node.status === "active" || node.active) && node.checkpoint ? (
@@ -599,11 +603,11 @@ export function TaskPlanGraphInspectorRunPanel({
                   onClick={handleMarkDone}
                 >
                   <Check className="size-4" />
-                  Mark done
+                  {graphCopy.runActionMarkDone}
                 </Button>
               ) : null}
 
-              <span className="text-xs text-muted-foreground">Actions are sent to the task execution backend.</span>
+              <span className="text-xs text-muted-foreground">{graphCopy.runActionBackendNotice}</span>
             </div>
             </form>
           </div>
@@ -611,7 +615,7 @@ export function TaskPlanGraphInspectorRunPanel({
       ) : null}
 
       <section className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Run result</p>
+        <p className="text-xs font-semibold text-muted-foreground">{graphCopy.runResultTitle}</p>
         <div className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-3">
           {runError ? (
             <pre className="whitespace-pre-wrap text-xs leading-5 text-red-700">{runError}</pre>
@@ -620,25 +624,25 @@ export function TaskPlanGraphInspectorRunPanel({
               {runResult ? <p className="text-sm leading-6 text-muted-foreground">{runResult}</p> : null}
               <div className="space-y-2">
                 {resultOutputs.map((output, index) => (
-                  <ResultOutputCard key={`${output.kind}:${index}`} output={output} />
+                  <ResultOutputCard key={`${output.kind}:${index}`} output={output} graphCopy={graphCopy} />
                 ))}
               </div>
             </>
           ) : runResult ? (
             <p className="text-sm leading-6 text-foreground">{runResult}</p>
           ) : (
-            <p className="text-sm text-muted-foreground">No run result yet for this node.</p>
+            <p className="text-sm text-muted-foreground">{graphCopy.runResultEmpty}</p>
           )}
           {resultEvidence.length > 0 ? (
             <details className="rounded-xl border border-dashed border-border/60 bg-muted/[0.16] px-3 py-2">
-              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Evidence</summary>
+              <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">{graphCopy.runEvidenceTitle}</summary>
               <pre className="mt-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">{resultEvidence.join("\n")}</pre>
             </details>
           ) : null}
         </div>
 
         <div className="rounded-2xl border border-dashed border-border/60 bg-muted/[0.14] p-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Run feed</p>
+            <p className="text-xs font-semibold text-muted-foreground">{graphCopy.runFeedTitle}</p>
           {runLog.length > 0 ? (
             <div className="mt-3 space-y-2">
               {runLog.map((entry) => (
@@ -651,8 +655,8 @@ export function TaskPlanGraphInspectorRunPanel({
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
               {showRunControls
-                ? "Select a node action, fill required fields, then send it to the execution backend."
-                : "Run controls appear only for the current node. Results for this node still show here."}
+                ? graphCopy.runFeedEmptyWithControls
+                : graphCopy.runFeedEmptyWithoutControls}
             </p>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { readTaskOrchestratorConfig, type TaskOrchestratorConfig } from "./orchestrator-config";
+import { runDueAutoPlanGenerationWorker } from "./due-auto-plan-generation-worker";
 import { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 import { runGraphAdvancementWorker } from "./graph-advancement-worker";
 import { runRestartRecoveryWorker } from "./restart-recovery-worker";
@@ -138,6 +139,12 @@ export function createDefaultTaskOrchestratorWorkers(): TaskOrchestratorWorker[]
       name: "due-scheduled-work",
       async run() {
         await runDueScheduledWorkWorker();
+      },
+    },
+    {
+      name: "due-auto-plan-generation",
+      async run() {
+        await runDueAutoPlanGenerationWorker();
       },
     },
     {

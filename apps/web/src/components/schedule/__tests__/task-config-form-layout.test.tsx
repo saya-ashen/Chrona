@@ -80,7 +80,7 @@ describe("TaskConfigForm – field layout", () => {
     ).toBeInTheDocument();
   });
 
-  it("separates source calendar description from editable Chrona notes", () => {
+  it("renders source calendar description inside the description section", () => {
     render(
       <TaskConfigForm
         {...defaultProps}
@@ -89,11 +89,11 @@ describe("TaskConfigForm – field layout", () => {
       />,
     );
 
-    expect(screen.getByRole("textbox", { name: /chrona notes/i })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /description/i })).toBeInTheDocument();
     expect(screen.getByText("Calendar description · Team calendar")).toBeInTheDocument();
     expect(screen.getByText("Discuss sync blockers and handoff notes.")).toBeInTheDocument();
-    expect(screen.getByLabelText(/chrona notes info/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/calendar description .* info/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/description info/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/calendar description .* info/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/does not update the calendar source/i)).not.toBeInTheDocument();
   });
 

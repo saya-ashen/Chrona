@@ -80,9 +80,8 @@ export function buildSchedulePageViewModel({
   const tomorrowKey = formatDateKey(
     addDays(parseDayKey(todayKey) ?? startOfDay(new Date()), 1),
   );
-  const selectedGroupKey = scheduledGroups.find(
-    (group) => group.key === selectedDay,
-  )?.key;
+  const selectedDayDate = parseDayKey(selectedDay);
+  const selectedGroupKey = selectedDayDate ? formatDateKey(selectedDayDate) : undefined;
   const todayGroupKey = scheduledGroups.find(
     (group) => group.key === todayKey,
   )?.key;
@@ -107,7 +106,7 @@ export function buildSchedulePageViewModel({
         ? copy.aiProposalsTitle
         : copy.unscheduledQueue;
 
-  const activeDayDate = parseDayKey(activeDay) ?? startOfDay(new Date());
+  const activeDayDate = selectedDayDate ?? parseDayKey(activeDay) ?? startOfDay(new Date());
   const calendarMonthDate = startOfDay(
     new Date(activeDayDate.getFullYear(), activeDayDate.getMonth(), 1),
   );

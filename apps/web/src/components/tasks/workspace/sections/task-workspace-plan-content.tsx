@@ -4,7 +4,6 @@ import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-pa
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { TaskPlanGenerationStatus } from "../model/task-workspace-types";
 
@@ -70,21 +69,17 @@ export function TaskWorkspacePlanContent({
           {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
         </>
       ) : (
-        <Card
-         
-         
-          className="flex h-[520px] min-w-0 max-w-full flex-col rounded-[1.35rem] border-border/70 bg-card/75 shadow-sm ring-0 md:h-[640px] xl:h-full"
-        >
-          <div className="mb-1 flex min-w-0 items-center justify-between gap-2 px-1">
+        <div className="flex h-[520px] min-w-0 max-w-full flex-col md:h-[640px] xl:h-full">
+          <div className="mb-2 flex min-w-0 items-center justify-between gap-2 px-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
             {isGraphPlanPending ? null : generatePlanButton}
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-muted/40 px-5 text-center text-sm text-muted-foreground">
+          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-background/70 px-5 text-center text-sm text-muted-foreground">
             {isGraphPlanPending
               ? (copy.preparingPlanGraph ?? "Preparing plan graph...")
               : (copy.planGraphPlaceholder ?? "The plan graph will appear here once AI generates a plan.")}
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

@@ -1,3 +1,5 @@
+import { automationTimingOffsetMs, normalizeAutomationTiming } from "@chrona/contracts";
+
 type AutoStartEligibility =
   | {
       ok: true;
@@ -21,6 +23,7 @@ export type TaskLike = {
   status: string;
   executionRuntime?: string | null;
   hasAcceptedPlan?: boolean;
+  autoExecuteTiming?: string | null;
 };
 
 export type WorkBlockLike = {
@@ -51,7 +54,12 @@ export function deriveAutoStartEligibility(input: {
   }
 
   const startTime = typeof scheduledStartAt === "string" ? new Date(scheduledStartAt) : scheduledStartAt;
-  if (startTime > input.now) {
+  const timing = normalizeAutomationTiming(input.task.autoExecuteTiming);
+  const triggerTime =
+    timing === "immediate"
+      ? startTime
+      : new Date(startTime.getTime() - automationTimingOffsetMs(timing));
+  if (triggerTime > input.now) {
     return { ok: false, reason: "not_due" };
   }
 

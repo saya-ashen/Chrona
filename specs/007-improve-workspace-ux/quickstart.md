@@ -24,23 +24,9 @@ If local seed data changes, navigate from `Tasks` to any task workspace with vis
 
 ## 2. Pre-Edit Browser Evidence
 
-Capture with `agent-browser`:
+Capture with :
 
 ```bash
-agent-browser open http://localhost:3100
-agent-browser wait --load networkidle
-agent-browser open http://localhost:3100/en/workspaces/cmp72s4oy0007hgfu74srky2u/tasks/cmp72tzoq00008hfurndtr5q9
-agent-browser wait --load networkidle
-agent-browser snapshot -i
-agent-browser set viewport 1440 900
-agent-browser screenshot specs/007-improve-workspace-ux/pre-desktop-1440x900.png
-agent-browser set viewport 1024 768
-agent-browser screenshot specs/007-improve-workspace-ux/pre-tablet-1024x768.png
-agent-browser set viewport 390 844
-agent-browser screenshot specs/007-improve-workspace-ux/pre-mobile-390x844.png
-agent-browser console
-agent-browser errors
-agent-browser network requests
 ```
 
 Pre-edit screenshots already captured during planning:
@@ -91,18 +77,6 @@ bun run test:e2e
 Repeat on the same representative route:
 
 ```bash
-agent-browser open http://localhost:3100/en/workspaces/cmp72s4oy0007hgfu74srky2u/tasks/cmp72tzoq00008hfurndtr5q9
-agent-browser wait --load networkidle
-agent-browser snapshot -i
-agent-browser set viewport 1440 900
-agent-browser screenshot specs/007-improve-workspace-ux/post-desktop-1440x900.png
-agent-browser set viewport 1024 768
-agent-browser screenshot specs/007-improve-workspace-ux/post-tablet-1024x768.png
-agent-browser set viewport 390 844
-agent-browser screenshot specs/007-improve-workspace-ux/post-mobile-390x844.png
-agent-browser console
-agent-browser errors
-agent-browser network requests
 ```
 
 Also verify at `390x844`:

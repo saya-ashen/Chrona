@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   deleteExternalCalendarSource,
   getExternalCalendarErrorMessage,
+  isBlockedNetworkCalendarError,
   refreshExternalCalendarSource,
   updateExternalCalendarSource,
 } from "@/lib/external-calendar-client";
@@ -20,6 +21,7 @@ type CalendarSourceActionsProps = {
   workspaceId: string;
   source: CalendarSourceSummary;
   syncStatus?: CalendarSyncStatus;
+  onBlockedNetworkRefresh: (refresh: () => void) => void;
   onSourceChange: (source: CalendarSourceSummary, syncStatus?: CalendarSyncStatus) => void;
   onSourceRemove: (sourceId: string) => void;
 };
@@ -28,6 +30,7 @@ export function CalendarSourceActions({
   workspaceId,
   source,
   syncStatus,
+  onBlockedNetworkRefresh,
   onSourceChange,
   onSourceRemove,
 }: CalendarSourceActionsProps) {
@@ -74,11 +77,35 @@ export function CalendarSourceActions({
     });
   }
 
-  function handleRefresh() {
+  function handleRefresh(allowBlockedNetwork = false) {
     void run("refresh", async () => {
-      const refreshed = await refreshExternalCalendarSource(workspaceId, source.id);
+      const refreshed = await refreshExternalCalendarSource(
+        workspaceId,
+        source.id,
+        { allowBlockedNetwork: allowBlockedNetwork || undefined },
+      );
       onSourceChange(refreshed.source, refreshed.syncStatus);
     });
+  }
+
+  async function handleRefreshClick() {
+    setErrorMessage(null);
+    setPendingAction("refresh");
+    try {
+      const refreshed = await refreshExternalCalendarSource(workspaceId, source.id);
+      onSourceChange(refreshed.source, refreshed.syncStatus);
+      if (refreshed.source.lastErrorCode === "blocked_network" || refreshed.syncStatus?.latestErrorCode === "blocked_network") {
+        onBlockedNetworkRefresh(() => handleRefresh(true));
+        setErrorMessage(refreshed.source.lastErrorMessage ?? refreshed.syncStatus?.latestErrorMessage ?? externalCalendarMessages.blockedNetwork);
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("chrona:external-calendar-source-created"));
+    } catch (error) {
+      if (isBlockedNetworkCalendarError(error)) onBlockedNetworkRefresh(() => handleRefresh(true));
+      setErrorMessage(getExternalCalendarErrorMessage(error));
+    } finally {
+      setPendingAction(null);
+    }
   }
 
   function handleRemove() {
@@ -155,7 +182,7 @@ export function CalendarSourceActions({
         <Button type="button" size="sm" onClick={handleSave} disabled={isPending || !name.trim()}>
           {pendingAction === "save" ? "Saving..." : "Save changes"}
         </Button>
-        <Button type="button" size="sm" variant="outline" onClick={handleRefresh} disabled={isPending}>
+        <Button type="button" size="sm" variant="outline" onClick={() => void handleRefreshClick()} disabled={isPending}>
           {pendingAction === "refresh" ? "Refreshing..." : externalCalendarMessages.refreshAction}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={handleToggleEnabled} disabled={isPending}>

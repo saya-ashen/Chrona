@@ -89,18 +89,50 @@ describe("task API schemas", () => {
   it("validates task list filters and clamps pagination deterministically", () => {
     expect(listTasksQuerySchema.parse({ workspaceId: "workspace-1" })).toEqual({
       workspaceId: "workspace-1",
-      limit: 50,
+      page: 1,
+      pageSize: 20,
     });
-    expect(listTasksQuerySchema.parse({ workspaceId: "workspace-1", status: "Blocked", limit: "500" })).toEqual({
+    expect(
+      listTasksQuerySchema.parse({
+        workspaceId: "workspace-1",
+        status: "Blocked",
+        pageSize: "500",
+        page: "3",
+      }),
+    ).toEqual({
       workspaceId: "workspace-1",
       status: "Blocked",
-      limit: 200,
+      page: 3,
+      pageSize: 100,
     });
-    expect(listTasksQuerySchema.parse({ workspaceId: "workspace-1", limit: "0" })).toEqual({
+    expect(
+      listTasksQuerySchema.parse({ workspaceId: "workspace-1", pageSize: "0", page: "0" }),
+    ).toEqual({
       workspaceId: "workspace-1",
-      limit: 1,
+      page: 1,
+      pageSize: 1,
+    });
+    expect(
+      listTasksQuerySchema.parse({
+        workspaceId: "workspace-1",
+        filter: "needs_me",
+        priority: "High",
+        search: "  report  ",
+        sort: "dueAt",
+        order: "asc",
+      }),
+    ).toEqual({
+      workspaceId: "workspace-1",
+      filter: "needs_me",
+      priority: "High",
+      search: "report",
+      sort: "dueAt",
+      order: "asc",
+      page: 1,
+      pageSize: 20,
     });
     expect(() => listTasksQuerySchema.parse({ workspaceId: "workspace-1", status: "Unknown" })).toThrow();
+    expect(() => listTasksQuerySchema.parse({ workspaceId: "workspace-1", filter: "nope" })).toThrow();
   });
 
   it("validates structured workspace activity items", () => {

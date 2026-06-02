@@ -78,6 +78,8 @@ function createData(scheduledStartAt: Date): SchedulePageData {
         executionConfig: {},
         autoPlanGeneration: false,
         autoExecute: false,
+        autoPlanGenerationTiming: "at_start",
+        autoExecuteTiming: "at_start",
         isRunnable: true,
         runnabilityState: "ready",
         runnabilitySummary: "Ready",

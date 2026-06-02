@@ -17,6 +17,13 @@ export function createTaskScheduleService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to clear schedule");
       }
     },
+    async moveWorkBlock(input: Parameters<typeof taskScheduling.moveWorkBlock>[0]) {
+      try {
+        return await taskScheduling.moveWorkBlock(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to move work block");
+      }
+    },
     async propose(input: Parameters<typeof taskScheduling.propose>[0]) {
       try {
         return await taskScheduling.propose(input);

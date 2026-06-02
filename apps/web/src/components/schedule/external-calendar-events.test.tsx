@@ -33,6 +33,8 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     executionConfig: overrides.executionConfig ?? {},
     autoPlanGeneration: overrides.autoPlanGeneration ?? false,
     autoExecute: overrides.autoExecute ?? false,
+    autoPlanGenerationTiming: overrides.autoPlanGenerationTiming ?? "at_start",
+    autoExecuteTiming: overrides.autoExecuteTiming ?? "at_start",
     isRunnable: overrides.isRunnable ?? true,
     runnabilityState: overrides.runnabilityState ?? "ready",
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",

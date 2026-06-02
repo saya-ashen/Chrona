@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -33,6 +34,7 @@ export function CalendarSourceList({ workspaceId, createdSources = EMPTY_CREATED
   const [sources, setSources] = useState<CalendarSourceRecord[]>(createdSources);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [managedId, setManagedId] = useState<string | null>(null);
+  const [blockedNetworkRefresh, setBlockedNetworkRefresh] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +61,15 @@ export function CalendarSourceList({ workspaceId, createdSources = EMPTY_CREATED
   function removeSource(sourceId: string) {
     setSources((current) => current.filter((item) => item.source.id !== sourceId));
     setManagedId(null);
+  }
+
+  function confirmBlockedNetworkRefresh(refresh: () => void) {
+    setBlockedNetworkRefresh(() => refresh);
+  }
+
+  function handleBlockedNetworkConfirm() {
+    blockedNetworkRefresh?.();
+    setBlockedNetworkRefresh(null);
   }
 
   const managed = sources.find((item) => item.source.id === managedId) ?? null;
@@ -111,6 +122,7 @@ export function CalendarSourceList({ workspaceId, createdSources = EMPTY_CREATED
                     workspaceId={workspaceId}
                     source={managed.source}
                     syncStatus={managed.syncStatus}
+                    onBlockedNetworkRefresh={confirmBlockedNetworkRefresh}
                     onSourceChange={updateSource}
                     onSourceRemove={removeSource}
                   />
@@ -118,6 +130,22 @@ export function CalendarSourceList({ workspaceId, createdSources = EMPTY_CREATED
               </div>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={blockedNetworkRefresh !== null} onOpenChange={(open) => { if (!open) setBlockedNetworkRefresh(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{externalCalendarMessages.blockedNetworkTitle}</DialogTitle>
+            <DialogDescription>{externalCalendarMessages.blockedNetworkDescription}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setBlockedNetworkRefresh(null)}>
+              {externalCalendarMessages.blockedNetworkCancel}
+            </Button>
+            <Button type="button" onClick={handleBlockedNetworkConfirm}>
+              {externalCalendarMessages.blockedNetworkConfirm}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

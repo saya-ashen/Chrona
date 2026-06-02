@@ -14,6 +14,8 @@ export type TaskData = {
   executionConfig: unknown;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  autoPlanGenerationTiming: string;
+  autoExecuteTiming: string;
   status: string;
   priority: string;
   dueAt: string | null;
@@ -21,6 +23,20 @@ export type TaskData = {
   scheduledEndAt: string | null;
   scheduleStatus: string;
   scheduleSource: string | null;
+  currentWorkBlock?: {
+    id: string;
+    status: string;
+    scheduledStartAt: string;
+    scheduledEndAt: string;
+  } | null;
+  sourceManaged?: {
+    source: "external_calendar";
+    eventId: string;
+    sourceName: string;
+    sourceColor: string;
+    description: string | null;
+    immutableFields: readonly ["title", "scheduledStartAt", "scheduledEndAt"];
+  } | null;
   isRunnable: boolean;
   runnabilitySummary: string;
   runnabilityState?: string;

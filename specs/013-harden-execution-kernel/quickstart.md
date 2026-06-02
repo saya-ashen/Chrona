@@ -50,7 +50,7 @@ Verify that the hardened execution kernel prevents duplicate provider-side node 
    bun run test:e2e
    ```
 
-9. If visible task status, activity history, or graph inspector wording changes, collect browser evidence with `agent-browser` for:
+9. If visible task status, activity history, or graph inspector wording changes, collect browser evidence with for:
 
    - Desktop `1440x900`
    - Tablet `1024x768`

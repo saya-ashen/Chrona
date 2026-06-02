@@ -238,7 +238,7 @@ describe("auto-start-scheduled-plan", () => {
 
   it("starts task execution with trigger scheduler", async () => {
     const workspace = await createWorkspace();
-    await createDueTask(workspace.id);
+    const { workBlock } = await createDueTask(workspace.id);
 
     startMock.mockResolvedValue({
       taskId: "task-1",
@@ -257,6 +257,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(startMock).toHaveBeenCalledTimes(1);
     const callArgs = startMock.mock.calls[0]?.[0];
     expect(callArgs?.trigger).toBe("scheduler");
+    expect(callArgs?.workBlockId).toBe(workBlock.id);
   });
 
   it("starts due Draft tasks when runtime config and accepted plan make them runnable", async () => {

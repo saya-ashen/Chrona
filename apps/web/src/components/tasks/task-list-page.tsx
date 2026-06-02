@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
   ExternalLink,
   Play,
+  Repeat,
   RotateCcw,
+  Search,
   Trash2,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +25,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { TaskActionsMenu, type TaskActionsMenuItem } from "@/components/tasks/shared";
 import { deleteTask, markTaskDone, reopenTask, startExecution } from "@/lib/task-actions-client";
 import type { Dictionary } from "@/pages";
@@ -31,18 +44,39 @@ type TaskItem = {
   description: string | null;
   status: string;
   priority: string;
+  kind: string;
+  recurrenceRule: string | null;
   dueAt: string | null;
   updatedAt: string;
   projection: {
     runStatus: string | null;
     isRunnable: boolean;
   } | null;
+  source: {
+    source: "external_calendar";
+    sourceName: string;
+    sourceColor: string;
+  } | null;
+};
+
+type TaskCounts = {
+  all: number;
+  needsMe: number;
+  ready: number;
+  running: number;
+  completed: number;
+  failed: number;
 };
 
 type Props = {
   tasks: TaskItem[];
   workspaceId: string;
   copy: Dictionary;
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  counts: TaskCounts;
 };
 
 const FILTERS = [
@@ -57,21 +91,13 @@ const FILTERS = [
 type FilterKey = (typeof FILTERS)[number]["key"];
 type TaskListCopy = Dictionary["pages"]["tasks"];
 
-function matchesFilter(task: TaskItem, filter: FilterKey): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "needs_me":
-      return ["WaitingForInput", "WaitingForApproval", "Blocked"].includes(task.status);
-    case "ready":
-      return ["Ready", "Queued", "Draft"].includes(task.status) && Boolean(task.projection?.isRunnable);
-    case "running":
-      return task.status === "Running";
-    case "completed":
-      return ["Completed", "Done"].includes(task.status);
-    case "failed":
-      return task.status === "Failed";
-  }
+const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Urgent"] as const;
+const SORT_OPTIONS = ["updatedAt", "createdAt", "dueAt", "title"] as const;
+type SortOption = (typeof SORT_OPTIONS)[number];
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+
+function isFilterKey(value: string | null): value is FilterKey {
+  return value !== null && FILTERS.some((f) => f.key === value);
 }
 
 function statusTone(status: string) {
@@ -123,15 +149,6 @@ function formatRelativeTime(dateStr: string, copy: TaskListCopy): string {
   if (diffDays < 7) return copy.relativeDaysAgo.replace("{count}", String(diffDays));
   return date.toLocaleDateString();
 }
-
-type TaskCounts = {
-  all: number;
-  needsMe: number;
-  ready: number;
-  running: number;
-  completed: number;
-  failed: number;
-};
 
 function filterLabel(filter: FilterKey, copy: TaskListCopy): string {
   if (filter === "needs_me") return copy.filterNeedsMe;
@@ -276,6 +293,27 @@ function TaskRow({
             <h3 className="truncate text-sm font-semibold text-foreground">{task.title}</h3>
             <Badge variant={statusTone(task.status)}>{task.status}</Badge>
             <Badge variant={priorityTone(task.priority)}>{task.priority}</Badge>
+            {task.kind === "recurring" && (
+              <Badge variant="outline" className="gap-1">
+                <Repeat className="size-3" />
+                {copy.recurringBadge}
+              </Badge>
+            )}
+            {task.source?.source === "external_calendar" && (
+              <Badge
+                variant="outline"
+                className="gap-1"
+                title={copy.externalSourceTitle.replace("{source}", task.source.sourceName)}
+              >
+                <span
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: task.source.sourceColor }}
+                  aria-hidden="true"
+                />
+                <CalendarDays className="size-3" />
+                {task.source.sourceName}
+              </Badge>
+            )}
             {task.projection?.runStatus && task.projection.runStatus !== "idle" && (
               <Badge variant="secondary">{task.projection.runStatus}</Badge>
             )}
@@ -307,8 +345,8 @@ type PendingDelete =
   | { kind: "bulk"; tasks: TaskItem[] }
   | null;
 
-export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) {
-  const [filter, setFilter] = useState<FilterKey>("all");
+export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, page, pageSize, pageCount, counts }: Props) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [isPending, setIsPending] = useState(false);
@@ -316,20 +354,53 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
   const navigate = useNavigate();
   const taskCopy = copy.pages.tasks;
 
-  const filtered = tasks.filter((t) => matchesFilter(t, filter));
-  const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
-  const visibleSelectedCount = filtered.filter((task) => selectedIds.has(task.id)).length;
-  const allVisibleSelected = filtered.length > 0 && visibleSelectedCount === filtered.length;
+  const filterParam = searchParams.get("filter");
+  const filter: FilterKey = isFilterKey(filterParam) ? filterParam : "all";
+  const priority = searchParams.get("priority") ?? "";
+  const sort: SortOption = (SORT_OPTIONS as readonly string[]).includes(searchParams.get("sort") ?? "")
+    ? (searchParams.get("sort") as SortOption)
+    : "updatedAt";
+  const order: "asc" | "desc" = searchParams.get("order") === "asc" ? "asc" : "desc";
+  const [searchDraft, setSearchDraft] = useState(() => searchParams.get("search") ?? "");
 
-  const counts = {
-    all: tasks.length,
-    needsMe: tasks.filter((t) => matchesFilter(t, "needs_me")).length,
-    ready: tasks.filter((t) => matchesFilter(t, "ready")).length,
-    running: tasks.filter((t) => matchesFilter(t, "running")).length,
-    completed: tasks.filter((t) => matchesFilter(t, "completed")).length,
-    failed: tasks.filter((t) => matchesFilter(t, "failed")).length,
-  };
+  const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
+  const visibleSelectedCount = tasks.filter((task) => selectedIds.has(task.id)).length;
+  const allVisibleSelected = tasks.length > 0 && visibleSelectedCount === tasks.length;
+
   const activeFilterLabel = filterLabel(filter, taskCopy);
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+
+  function updateParams(mutate: (params: URLSearchParams) => void, resetPage = true) {
+    const next = new URLSearchParams(searchParams);
+    mutate(next);
+    if (resetPage) next.delete("page");
+    setSearchParams(next, { replace: true });
+  }
+
+  function setFilter(nextFilter: FilterKey) {
+    updateParams((params) => {
+      if (nextFilter === "all") params.delete("filter");
+      else params.set("filter", nextFilter);
+    });
+  }
+
+  function setParam(key: string, value: string) {
+    updateParams((params) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    });
+  }
+
+  function goToPage(nextPage: number) {
+    updateParams((params) => {
+      params.set("page", String(nextPage));
+    }, false);
+  }
+
+  function submitSearch() {
+    setParam("search", searchDraft.trim());
+  }
 
   function refreshTasks() {
     navigate(".", { replace: true });
@@ -347,7 +418,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
   function toggleVisibleSelection(checked: boolean) {
     setSelectedIds((current) => {
       const next = new Set(current);
-      for (const task of filtered) {
+      for (const task of tasks) {
         if (checked) next.add(task.id);
         else next.delete(task.id);
       }
@@ -400,12 +471,71 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
         <TaskListHero title={copy.nav.tasks} copy={taskCopy} activeFilterLabel={activeFilterLabel} counts={counts} />
         <TaskFilterBar filter={filter} counts={counts} copy={taskCopy} onFilterChange={setFilter} />
 
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 shadow-xs">
+          <form
+            className="relative flex min-w-[12rem] flex-1 items-center"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitSearch();
+            }}
+          >
+            <Search className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground" />
+            <Input
+              type="search"
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
+              onBlur={submitSearch}
+              placeholder={taskCopy.searchPlaceholder}
+              aria-label={taskCopy.searchPlaceholder}
+              className="h-8 rounded-lg pl-8 text-xs"
+            />
+          </form>
+          <Select
+            value={priority || "all"}
+            onValueChange={(value) => setParam("priority", value === "all" ? "" : value)}
+          >
+            <SelectTrigger size="sm" className="h-8 w-[8.5rem] rounded-lg text-xs" aria-label={taskCopy.priorityLabel}>
+              <SelectValue placeholder={taskCopy.priorityAll} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{taskCopy.priorityAll}</SelectItem>
+              {PRIORITY_OPTIONS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {taskCopy.priorities[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={sort} onValueChange={(value) => setParam("sort", value)}>
+            <SelectTrigger size="sm" className="h-8 w-[9rem] rounded-lg text-xs" aria-label={taskCopy.sortLabel}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {taskCopy.sortFields[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-lg text-xs"
+            aria-label={order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending}
+            onClick={() => setParam("order", order === "asc" ? "desc" : "asc")}
+          >
+            {order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending}
+          </Button>
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
           <label className="flex items-center gap-2 font-medium text-foreground">
             <Checkbox
               aria-label={taskCopy.selectVisible}
               checked={allVisibleSelected}
-              disabled={filtered.length === 0 || isPending}
+              disabled={tasks.length === 0 || isPending}
               onCheckedChange={(value) => toggleVisibleSelection(value === true)}
             />
             {taskCopy.selectedCount.replace("{count}", String(selectedIds.size))}
@@ -436,13 +566,13 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {tasks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center text-sm text-muted-foreground shadow-xs">
             {taskCopy.emptyFiltered}
           </div>
         ) : (
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {filtered.map((task) => (
+            {tasks.map((task) => (
               <TaskRow
                 key={task.id}
                 task={task}
@@ -456,6 +586,51 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy }: Props) 
             ))}
           </div>
         )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <span>{taskCopy.paginationRange.replace("{start}", String(rangeStart)).replace("{end}", String(rangeEnd)).replace("{total}", String(total))}</span>
+            <Select value={String(pageSize)} onValueChange={(value) => setParam("pageSize", value)}>
+              <SelectTrigger size="sm" className="h-7 w-[6.5rem] rounded-lg text-xs" aria-label={taskCopy.pageSizeLabel}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((value) => (
+                  <SelectItem key={value} value={String(value)}>
+                    {taskCopy.pageSizeOption.replace("{count}", String(value))}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">
+              {taskCopy.paginationPage.replace("{page}", String(page)).replace("{pageCount}", String(pageCount))}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-lg"
+              disabled={page <= 1 || isPending}
+              onClick={() => goToPage(page - 1)}
+              aria-label={taskCopy.paginationPrevious}
+            >
+              <ChevronLeft className="size-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-lg"
+              disabled={page >= pageCount || isPending}
+              onClick={() => goToPage(page + 1)}
+              aria-label={taskCopy.paginationNext}
+            >
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
+        </div>
       </div>
       <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
         <DialogContent className="sm:max-w-md">
