@@ -841,8 +841,8 @@ async function nodeTitleForExecutionSession(
   nodeId: string | null,
 ) {
   if (!taskId || !planId || !nodeId) return null;
-  const planRun = await db.taskPlanRun.findUnique({
-    where: { taskId_planId: { taskId, planId } },
+  const planRun = await db.taskPlanRun.findFirst({
+    where: { taskId, planId },
     select: { planRun: true },
   });
   const nodes = (planRun?.planRun as { mutableGraph?: { graph?: { nodes?: unknown[] } } } | null)

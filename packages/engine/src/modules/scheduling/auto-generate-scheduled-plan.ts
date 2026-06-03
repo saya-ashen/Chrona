@@ -20,8 +20,8 @@ const PLAN_GENERATION_TASK_STATUSES = ["Draft", "Ready", "Scheduled", "Queued"] 
 const ACTIVE_PLAN_STATUSES = [TaskPlanStatus.Draft, TaskPlanStatus.Accepted] as const;
 
 export type AutoGenerateScheduledPlanResult = {
-  triggered: Array<{ taskId: string; reason: "scheduled" | "no_schedule_fallback" }>;
-  skipped: Array<{ taskId: string; reason: string }>;
+  triggered: Array<{ taskId: string; workBlockId: string | null; reason: "scheduled" | "no_schedule_fallback" }>;
+  skipped: Array<{ taskId: string; workBlockId: string | null; reason: string }>;
   now: string;
 };
 
@@ -67,8 +67,7 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
           autoPlanGenerationTiming: true,
           taskPlans: {
             where: { status: { in: [...ACTIVE_PLAN_STATUSES] } },
-            select: { id: true },
-            take: 1,
+            select: { id: true, workBlockId: true },
           },
         },
       },
@@ -78,32 +77,33 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
 
   for (const block of dueWorkBlocks) {
     const task = block.task;
-    if (fired.has(task.id)) continue;
+    const firedKey = `${task.id}:${block.id}`;
+    if (fired.has(firedKey)) continue;
     const timing = normalizeAutomationTiming(task.autoPlanGenerationTiming);
 
     // `immediate` plans already fired synchronously during create/update.
     if (timing === "immediate") {
-      result.skipped.push({ taskId: task.id, reason: "immediate_handled_inline" });
+      result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "immediate_handled_inline" });
       continue;
     }
-    if (task.taskPlans.length > 0) {
-      result.skipped.push({ taskId: task.id, reason: "plan_exists" });
+    if (task.taskPlans.some((plan) => plan.workBlockId === block.id)) {
+      result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "plan_exists" });
       continue;
     }
     if (!block.scheduledStartAt) {
-      result.skipped.push({ taskId: task.id, reason: "no_scheduled_start" });
+      result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "no_scheduled_start" });
       continue;
     }
 
     const triggerTime = new Date(block.scheduledStartAt.getTime() - automationTimingOffsetMs(timing));
     if (triggerTime > now) {
-      result.skipped.push({ taskId: task.id, reason: "not_due" });
+      result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "not_due" });
       continue;
     }
 
-    startAutoPlanGenerationForTask({ taskId: task.id, accept: task.autoExecute });
-    fired.add(task.id);
-    result.triggered.push({ taskId: task.id, reason: "scheduled" });
+    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
+    fired.add(firedKey);
+    result.triggered.push({ taskId: task.id, workBlockId: block.id, reason: "scheduled" });
   }
 }
 
@@ -132,12 +132,12 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
     // past the grace window means scheduling never arrived, so fall back to
     // running now rather than waiting forever.
     if (timing === "immediate") {
-      result.skipped.push({ taskId: task.id, reason: "immediate_handled_inline" });
+      result.skipped.push({ taskId: task.id, workBlockId: null, reason: "immediate_handled_inline" });
       continue;
     }
 
-    startAutoPlanGenerationForTask({ taskId: task.id, accept: task.autoExecute });
+    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: null, accept: task.autoExecute });
     fired.add(task.id);
-    result.triggered.push({ taskId: task.id, reason: "no_schedule_fallback" });
+    result.triggered.push({ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" });
   }
 }

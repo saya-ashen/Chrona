@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
 import type { TaskData, TaskHeaderView } from "../model/task-workspace-types";
@@ -32,6 +32,17 @@ vi.mock("@/components/ui/dialog", () => ({
   DialogFooter: ({ children }: any) => <div>{children}</div>,
   DialogHeader: ({ children }: any) => <div>{children}</div>,
   DialogTitle: ({ children }: any) => <h2>{children}</h2>,
+}));
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ children, value, onValueChange }: any) => (
+    <select aria-label="Select occurrence" value={value} onChange={(event) => onValueChange(event.currentTarget.value)}>
+      {children}
+    </select>
+  ),
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: () => null,
 }));
 vi.mock("@/components/tasks/shared", () => ({
   TaskActionsMenu: ({ label }: { label: string }) => <button>{label}</button>,
@@ -88,6 +99,7 @@ describe("TaskWorkspaceHeaderCard", () => {
         header={header}
         backToScheduleLabel="Back to schedule"
         onAction={vi.fn()}
+        onSelectOccurrence={vi.fn()}
         onEdit={vi.fn()}
         showDeleteConfirm={false}
         isDeleting={false}
@@ -109,6 +121,7 @@ describe("TaskWorkspaceHeaderCard", () => {
         backToScheduleLabel="Back to schedule"
         onAction={vi.fn()}
         onEdit={vi.fn()}
+        onSelectOccurrence={vi.fn()}
         showDeleteConfirm={false}
         isDeleting={false}
         onStartDeleteConfirm={vi.fn()}
@@ -118,6 +131,54 @@ describe("TaskWorkspaceHeaderCard", () => {
     );
 
     expect(screen.getByText("Occurrence")).toBeInTheDocument();
-    expect(screen.getByText(/May 27/)).toBeInTheDocument();
+    expect(screen.getAllByText(/May 27/).length).toBeGreaterThan(0);
+  });
+
+  it("switches to another recurrence occurrence", () => {
+    const onSelectOccurrence = vi.fn();
+    const recurringTask = {
+      ...task,
+      recurrenceOccurrences: [
+        {
+          taskId: "task-1",
+          title: "Scheduled draft task",
+          status: "Scheduled",
+          scheduledStartAt: "2026-05-27T04:30:00.000Z",
+          scheduledEndAt: "2026-05-27T05:30:00.000Z",
+          workBlockId: "block-1",
+          isCurrent: true,
+        },
+        {
+          taskId: "task-2",
+          title: "Scheduled draft task",
+          status: "Scheduled",
+          scheduledStartAt: "2026-05-28T04:30:00.000Z",
+          scheduledEndAt: "2026-05-28T05:30:00.000Z",
+          workBlockId: "block-2",
+          isCurrent: false,
+        },
+      ],
+    } satisfies TaskData;
+
+
+    render(
+      <TaskWorkspaceHeaderCard
+        task={recurringTask}
+        header={header}
+        backToScheduleLabel="Back to schedule"
+        onAction={vi.fn()}
+        onSelectOccurrence={onSelectOccurrence}
+        onEdit={vi.fn()}
+        showDeleteConfirm={false}
+        isDeleting={false}
+        onStartDeleteConfirm={vi.fn()}
+        onCancelDeleteConfirm={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Select occurrence"), { target: { value: "task-2:block-2" } });
+
+    expect(onSelectOccurrence).toHaveBeenCalledWith(expect.objectContaining({ taskId: "task-2", workBlockId: "block-2" }));
   });
 });

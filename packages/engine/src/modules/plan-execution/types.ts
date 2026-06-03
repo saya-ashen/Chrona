@@ -59,6 +59,7 @@ export type PlanExecutionControl = {
 
 export type EngineRuntimeContext = {
   taskId: string;
+  workBlockId?: string | null;
   planId: string;
   mainSession: { id: string; taskId: string; sessionKey: string };
   control?: PlanExecutionControl;

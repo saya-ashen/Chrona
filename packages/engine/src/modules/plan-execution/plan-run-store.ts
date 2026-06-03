@@ -76,9 +76,9 @@ function createEmptyPlanRun(compiledPlan: CompiledPlan): PlanRun {
   };
 }
 
-async function loadCompiledPlanForRun(taskId: string, planId: string) {
+async function loadCompiledPlanForRun(taskId: string, planId: string, workBlockId?: string | null) {
   const row = await db.taskPlan.findFirst({
-    where: { taskId, planId },
+    where: { taskId, planId, workBlockId: workBlockId ?? null },
     select: { compiledPlan: true },
   });
 
@@ -138,6 +138,7 @@ export async function savePlanRun(input: {
   workspaceId: string;
   taskId: string;
   planId: string;
+  workBlockId?: string | null;
   run?: PlanRun;
   compiledPlan?: CompiledPlan;
   graph?: PlanGraph;
@@ -145,17 +146,16 @@ export async function savePlanRun(input: {
   results?: NodeResult[];
   executionContextSnapshots?: ExecutionContextSnapshot[];
 }): Promise<PlanRun> {
-  const existingRow = await db.taskPlanRun.findUnique({
+  const existingRow = await db.taskPlanRun.findFirst({
     where: {
-      taskId_planId: {
-        taskId: input.taskId,
-        planId: input.planId,
-      },
+      taskId: input.taskId,
+      planId: input.planId,
+      workBlockId: input.workBlockId ?? null,
     },
   });
 
   const compiledPlan =
-    input.compiledPlan ?? (await loadCompiledPlanForRun(input.taskId, input.planId));
+    input.compiledPlan ?? (await loadCompiledPlanForRun(input.taskId, input.planId, input.workBlockId));
   const existingRecord = (existingRow?.planRun as PersistedPlanRunRecord | undefined) ?? null;
   const persistedRecord = toPersistedPlanRunRecord({
     existing: existingRecord,
@@ -168,24 +168,28 @@ export async function savePlanRun(input: {
     planRun: input.run,
   });
 
-  await db.taskPlanRun.upsert({
-    where: {
-      taskId_planId: {
-        taskId: input.taskId,
-        planId: input.planId,
+  const runData = {
+    workspaceId: input.workspaceId,
+    taskId: input.taskId,
+    workBlockId: input.workBlockId ?? null,
+    planId: input.planId,
+    planRun: asJsonValue(persistedRecord),
+  };
+
+  if (existingRow) {
+    await db.taskPlanRun.update({
+      where: { id: existingRow.id },
+      data: {
+        workspaceId: input.workspaceId,
+        workBlockId: input.workBlockId ?? null,
+        planRun: asJsonValue(persistedRecord),
       },
-    },
-    create: {
-      workspaceId: input.workspaceId,
-      taskId: input.taskId,
-      planId: input.planId,
-      planRun: asJsonValue(persistedRecord),
-    },
-    update: {
-      workspaceId: input.workspaceId,
-      planRun: asJsonValue(persistedRecord),
-    },
-  });
+    });
+  } else {
+    await db.taskPlanRun.create({
+      data: runData,
+    });
+  }
 
   return persistedRecord.planRun;
 }
@@ -193,15 +197,17 @@ export async function savePlanRun(input: {
 export async function getPlanRun(
   taskId: string,
   planId: string,
+  workBlockId?: string | null,
 ): Promise<SavedPlanRunState | null> {
-  const row = await db.taskPlanRun.findUnique({
+  const row = await db.taskPlanRun.findFirst({
     where: {
-      taskId_planId: {
-        taskId,
-        planId,
-      },
+      taskId,
+      planId,
+      workBlockId: workBlockId ?? null,
     },
   });
+
+
 
   if (!row) {
     return null;
@@ -223,7 +229,7 @@ export async function getPlanRun(
     };
   }
 
-  const compiledPlan = await loadCompiledPlanForRun(taskId, planId);
+  const compiledPlan = await loadCompiledPlanForRun(taskId, planId, workBlockId);
   if (!compiledPlan) {
     return {
       id: row.id,
@@ -250,6 +256,7 @@ export async function getPlanRun(
     workspaceId: row.workspaceId,
     taskId,
     planId,
+    workBlockId,
     run: record.planRun,
     compiledPlan,
     graph: migrated.graph,

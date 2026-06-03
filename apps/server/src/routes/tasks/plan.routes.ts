@@ -106,7 +106,8 @@ export function createPlansRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, await engine.tasks.plan.getState({ taskId }));
+          const workBlockId = c.req.query("workBlockId") || null;
+          return json(c, await engine.tasks.plan.getState({ taskId, workBlockId }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {
@@ -123,9 +124,9 @@ export function createPlansRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          const { planId, workspaceId } = c.req.valid("json");
+          const { planId, workspaceId, workBlockId } = c.req.valid("json");
 
-          return json(c, await engine.tasks.plan.accept({ taskId, planId, workspaceId }));
+          return json(c, await engine.tasks.plan.accept({ taskId, planId, workspaceId, workBlockId }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {
@@ -141,7 +142,8 @@ export function createPlansRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, engine.tasks.plan.getActiveGeneration({ taskId }));
+          const workBlockId = c.req.query("workBlockId") || null;
+          return json(c, engine.tasks.plan.getActiveGeneration({ taskId, workBlockId }));
         } catch (cause) {
           return internalServerError(
             c,
@@ -157,7 +159,8 @@ export function createPlansRoutes(engine: ChronaEngine) {
       zValidator("param", planGenerateActiveParamSchema),
       async (c) => {
         const { taskId } = c.req.valid("param");
-        const active = engine.tasks.plan.getActiveGeneration({ taskId }).generationSession;
+        const workBlockId = c.req.query("workBlockId") || null;
+        const active = engine.tasks.plan.getActiveGeneration({ taskId, workBlockId }).generationSession;
         if (!active) {
           return error(c, "No active task plan generation", 404);
         }
@@ -180,7 +183,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
             resolveClosed = resolve;
           });
 
-          const current = engine.tasks.plan.getActiveGeneration({ taskId }).generationSession;
+          const current = engine.tasks.plan.getActiveGeneration({ taskId, workBlockId }).generationSession;
           if (current && current.generationId === active.generationId) {
             await dump?.write({
               type: "write_sse",
@@ -211,6 +214,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
 
           const subscription = engine.tasks.plan.subscribeToActiveGeneration({
             taskId,
+            workBlockId,
             onEvent(event) {
               void dump?.write({
                 type: "subscription_event",
@@ -255,7 +259,8 @@ export function createPlansRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          return json(c, engine.tasks.plan.stopGeneration({ taskId }));
+          const workBlockId = c.req.query("workBlockId") || null;
+          return json(c, engine.tasks.plan.stopGeneration({ taskId, workBlockId }));
         } catch (cause) {
           return internalServerError(
             c,
@@ -272,7 +277,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
       zValidator("json", planGenerateBodySchema),
       async (c) => {
         const { taskId } = c.req.valid("param");
-        const { forceRefresh, userInstruction } = c.req.valid("json");
+        const { forceRefresh, userInstruction, workBlockId } = c.req.valid("json");
         try {
           const requestId = randomUUID();
           logger.info("request.start", {
@@ -284,7 +289,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
             hasUserInstruction: Boolean(userInstruction?.trim()),
           });
 
-          const generation = engine.tasks.plan.generate({ taskId, forceRefresh, userInstruction });
+          const generation = engine.tasks.plan.generate({ taskId, workBlockId, forceRefresh, userInstruction });
           const generatorDump = await createDebugDump({
             enabledEnv: "CHRONA_AI_STREAM_DUMP",
             directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",

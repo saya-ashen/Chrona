@@ -69,6 +69,7 @@ export function AiInsightsPanel({
 
       <TaskPlanGenerationPanel
         taskId={item.taskId}
+        workBlockId={item.workBlockId ?? null}
         title={item.title}
         description={item.description}
         priority={item.priority}

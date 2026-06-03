@@ -7,7 +7,6 @@ import {
   CalendarDays,
   ExternalLink,
   Play,
-  Repeat,
   RotateCcw,
   Search,
   Trash2,
@@ -294,12 +293,6 @@ function TaskRow({
             <h3 className="truncate text-sm font-semibold text-foreground">{task.title}</h3>
             <Badge variant={statusTone(task.status)}>{task.status}</Badge>
             <Badge variant={priorityTone(task.priority)}>{task.priority}</Badge>
-            {task.kind === "recurring" && (
-              <Badge variant="outline" className="gap-1">
-                <Repeat className="size-3" />
-                {copy.recurringBadge}
-              </Badge>
-            )}
             {task.source?.source === "external_calendar" && (
               <Badge
                 variant="outline"

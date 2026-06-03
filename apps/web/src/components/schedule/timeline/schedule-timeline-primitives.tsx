@@ -123,7 +123,7 @@ export function ScheduledTimelineBlock({
   return (
     <LocalizedLink
       data-timeline-block
-      href={buildScheduleHref(selectedDay, item.taskId)}
+      href={buildScheduleHref(selectedDay, item.taskId, item.workBlockId)}
       draggable={!isPending}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";

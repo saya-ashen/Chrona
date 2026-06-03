@@ -20,6 +20,7 @@ import { upgradeBlueprintToEditable } from "@chrona/contracts";
  */
 export async function materializeGeneratedTaskPlan(input: {
   taskId: string;
+  workBlockId?: string | null;
   workspaceId: string;
   blueprint: PlanBlueprint;
   userInstruction?: string | null;
@@ -35,6 +36,7 @@ export async function materializeGeneratedTaskPlan(input: {
   await saveCompiledPlan({
     workspaceId: input.workspaceId,
     taskId: input.taskId,
+    workBlockId: input.workBlockId ?? null,
     compiledPlan,
     editablePlan: upgradeBlueprintToEditable(input.blueprint, planId, 1),
     status: "draft",
@@ -47,6 +49,7 @@ export async function materializeGeneratedTaskPlan(input: {
   await savePlanRun({
     workspaceId: input.workspaceId,
     taskId: input.taskId,
+    workBlockId: input.workBlockId ?? null,
     planId,
     run,
     compiledPlan,
@@ -67,7 +70,7 @@ export async function materializeGeneratedTaskPlan(input: {
   });
 
   // Fetch the just-saved record for accurate timestamps
-  const saved = await getLatestCompiledPlan(input.taskId);
+  const saved = await getLatestCompiledPlan(input.taskId, input.workBlockId ?? null);
 
   return buildTaskPlanReadModel({
     compiledPlan,

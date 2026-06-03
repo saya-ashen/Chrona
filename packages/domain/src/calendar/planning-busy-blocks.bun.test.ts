@@ -71,4 +71,27 @@ describe("projectPlanningBusyBlocks", () => {
 
     expect(blocks).toEqual([]);
   });
+
+  it("excludes imported events already backed by Chrona task work blocks", () => {
+    const blocks = projectPlanningBusyBlocks({
+      events: [
+        {
+          id: "event-1",
+          calendarSourceId: "source-1",
+          taskId: "task-1",
+          workBlockId: "block-1",
+          sourceName: "Team Calendar",
+          sourceColor: "#0f766e",
+          title: "Synced task",
+          startsAt: "2026-04-15T09:00:00.000Z",
+          endsAt: "2026-04-15T10:00:00.000Z",
+          isAllDay: false,
+          status: "confirmed",
+          readOnly: true,
+        },
+      ],
+    });
+
+    expect(blocks).toEqual([]);
+  });
 });

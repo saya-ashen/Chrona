@@ -45,6 +45,7 @@ async function persistAdvanceOutcome(input: {
   await persistRuntimeState({
     workspaceId: input.runtime.workspaceId,
     taskId: input.taskId,
+    workBlockId: input.runtime.workBlockId,
     planId: input.runtime.planId,
     compiledPlan: input.runtime.compiledPlan,
     graph: input.outcome.state.graph as unknown as PlanGraph,

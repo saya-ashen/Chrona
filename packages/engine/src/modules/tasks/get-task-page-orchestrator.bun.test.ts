@@ -133,6 +133,183 @@ describe("getTaskPage orchestrator read model", () => {
     expect(page.task.scheduledStartAt).toBe("2026-06-02T09:00:00.000Z");
     expect(page.task.scheduledEndAt).toBe("2026-06-02T10:00:00.000Z");
     expect(page.task.currentWorkBlock?.id).not.toBe(firstBlock.id);
+    expect(page.task.recurrenceOccurrences).toEqual([
+      expect.objectContaining({ taskId: task.id, workBlockId: firstBlock.id, isCurrent: false }),
+      expect.objectContaining({ taskId: task.id, workBlockId: secondBlock.id, isCurrent: true }),
+    ]);
+  });
+
+  it("does not reuse a task-level plan for a selected unstarted recurring occurrence", async () => {
+    const { workspace, task } = await seedTask("Recurring plan isolation task");
+    const completedBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Completed",
+        scheduledStartAt: new Date("2026-06-01T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-01T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const futureBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-08T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-08T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const compiledPlan = makeCompiledPlan();
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      compiledPlan,
+      status: "accepted",
+      prompt: compiledPlan.title,
+      summary: compiledPlan.goal,
+      generatedBy: "orchestrator-test",
+    });
+    await savePlanRun({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: compiledPlan.editablePlanId,
+      compiledPlan,
+      graph: createPlanGraphFromCompiledPlan({ taskId: task.id, compiledPlan }),
+      results: [],
+    });
+
+    const page = await getTaskPage({ taskId: task.id, workBlockId: futureBlock.id });
+
+    expect(page.task.currentWorkBlock?.id).toBe(futureBlock.id);
+    expect(page.task.status).toBe("Scheduled");
+    expect(page.task.savedPlan).toBeNull();
+    expect(page.task.aiPlanGenerationStatus).toBe("idle");
+    expect(page.task.executionSummary).toBeNull();
+    expect(page.task.recurrenceOccurrences).toEqual(expect.arrayContaining([
+      expect.objectContaining({ workBlockId: completedBlock.id, status: "Completed", isCurrent: false }),
+      expect.objectContaining({ workBlockId: futureBlock.id, status: "Scheduled", isCurrent: true }),
+    ]));
+  });
+
+  it("returns the plan scoped to the selected recurring occurrence", async () => {
+    const { workspace, task } = await seedTask("Recurring scoped plan task");
+    const firstBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Completed",
+        scheduledStartAt: new Date("2026-06-01T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-01T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const secondBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-08T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-08T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const firstPlan = { ...makeCompiledPlan(), editablePlanId: "first-occurrence-plan", title: "First occurrence plan" };
+    const secondPlan = { ...makeCompiledPlan(), editablePlanId: "second-occurrence-plan", title: "Second occurrence plan" };
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      workBlockId: firstBlock.id,
+      compiledPlan: firstPlan,
+      status: "accepted",
+      prompt: firstPlan.title,
+      summary: firstPlan.goal,
+      generatedBy: "orchestrator-test",
+    });
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      workBlockId: secondBlock.id,
+      compiledPlan: secondPlan,
+      status: "accepted",
+      prompt: secondPlan.title,
+      summary: secondPlan.goal,
+      generatedBy: "orchestrator-test",
+    });
+
+    const firstPage = await getTaskPage({ taskId: task.id, workBlockId: firstBlock.id });
+    const secondPage = await getTaskPage({ taskId: task.id, workBlockId: secondBlock.id });
+
+    expect(firstPage.task.savedPlan?.id).toBe("first-occurrence-plan");
+    expect(secondPage.task.savedPlan?.id).toBe("second-occurrence-plan");
+    expect(firstPage.task.savedPlan?.id).not.toBe(secondPage.task.savedPlan?.id);
+  });
+
+  it("returns recurrence series occurrences for workspace switching", async () => {
+    const { workspace, task } = await seedTask("Recurring series task");
+    await db.task.update({ where: { id: task.id }, data: { recurrenceRule: "FREQ=DAILY", seriesExternalUid: task.id } });
+    const nextTask = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: task.title,
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: { prompt: "Run recurring task" },
+        recurrenceRule: "FREQ=DAILY",
+        seriesExternalUid: task.id,
+      },
+    });
+    const firstBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-01T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-01T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const nextBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: nextTask.id,
+        title: nextTask.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-02T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-02T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+
+    const page = await getTaskPage(task.id);
+
+    expect(page.task.recurrenceOccurrences).toEqual([
+      {
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: "2026-06-01T09:00:00.000Z",
+        scheduledEndAt: "2026-06-01T10:00:00.000Z",
+        workBlockId: firstBlock.id,
+        isCurrent: true,
+      },
+      {
+        taskId: nextTask.id,
+        title: nextTask.title,
+        status: "Scheduled",
+        scheduledStartAt: "2026-06-02T09:00:00.000Z",
+        scheduledEndAt: "2026-06-02T10:00:00.000Z",
+        workBlockId: nextBlock.id,
+        isCurrent: false,
+      },
+    ]);
   });
 
   it("returns one coherent execution summary from the effective plan graph", async () => {

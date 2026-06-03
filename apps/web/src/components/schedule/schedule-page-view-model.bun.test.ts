@@ -112,4 +112,25 @@ describe("buildSchedulePageViewModel", () => {
 
     expect(viewModel.activeDay).toBe(formatDateKey(today));
   });
+
+  it("selects a scheduled occurrence by work block id", () => {
+    const day = new Date("2026-06-04T22:00:00");
+    const data = createData(day);
+    data.scheduled = [
+      { ...data.scheduled[0], workBlockId: "block-1", title: "First occurrence" },
+      { ...data.scheduled[0], workBlockId: "block-2", title: "Second occurrence", scheduledStartAt: new Date("2026-06-04T23:00:00") },
+    ];
+
+    const viewModel = buildSchedulePageViewModel({
+      viewData: data,
+      selectedDay: "2026-06-04",
+      localSelectedTaskId: "block-2",
+      activeView: "timeline",
+      secondaryView: "queue",
+      locale: "en",
+      copy: DEFAULT_SCHEDULE_PAGE_COPY,
+    });
+
+    expect(viewModel.selectedItem?.title).toBe("Second occurrence");
+  });
 });

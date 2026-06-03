@@ -16,6 +16,7 @@ export type TaskData = {
   autoExecute: boolean;
   autoPlanGenerationTiming: string;
   autoExecuteTiming: string;
+  recurrenceRule?: string | null;
   status: string;
   priority: string;
   dueAt: string | null;
@@ -29,6 +30,15 @@ export type TaskData = {
     scheduledStartAt: string;
     scheduledEndAt: string;
   } | null;
+  recurrenceOccurrences?: Array<{
+    taskId: string;
+    title: string;
+    status: string;
+    scheduledStartAt: string | null;
+    scheduledEndAt: string | null;
+    workBlockId: string | null;
+    isCurrent: boolean;
+  }>;
   sourceManaged?: {
     source: "external_calendar";
     eventId: string;
@@ -111,6 +121,7 @@ export type EditableTask = {
   executionConfig: unknown;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
+  recurrenceRule: string | null;
 };
 
 export type CurrentProposalState = {

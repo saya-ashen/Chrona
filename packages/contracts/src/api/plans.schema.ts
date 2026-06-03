@@ -12,6 +12,7 @@ export const planAcceptParamSchema = z.object({
 });
 export const planAcceptBodySchema = z.object({
   planId: z.string().min(1, "planId is required"),
+  workBlockId: z.string().min(1).nullable().optional(),
   workspaceId: z.string().optional(),
 });
 
@@ -21,6 +22,7 @@ export const planGenerateParamSchema = z.object({
 });
 export const planGenerateBodySchema = z.object({
   forceRefresh: z.boolean().optional(),
+  workBlockId: z.string().min(1).nullable().optional(),
   userInstruction: z.string().trim().nullable().optional(),
 });
 

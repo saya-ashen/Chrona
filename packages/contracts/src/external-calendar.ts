@@ -50,6 +50,8 @@ export const calendarSyncStatusSchema = z.object({
 export const importedCalendarEventSummarySchema = z.object({
   id: z.string().min(1),
   calendarSourceId: z.string().min(1),
+  taskId: z.string().min(1).nullable().optional(),
+  workBlockId: z.string().min(1).nullable().optional(),
   sourceName: z.string().min(1),
   sourceColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   title: z.string().min(1),

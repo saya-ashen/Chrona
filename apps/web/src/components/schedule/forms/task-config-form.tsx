@@ -33,6 +33,26 @@ import {
 } from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 
+const RECURRENCE_PRESETS = ["none", "daily", "weekly", "monthly", "custom"] as const;
+type RecurrencePreset = (typeof RECURRENCE_PRESETS)[number];
+const RECURRENCE_PRESET_RRULE: Record<Exclude<RecurrencePreset, "none" | "custom">, string> = {
+  daily: "FREQ=DAILY",
+  weekly: "FREQ=WEEKLY",
+  monthly: "FREQ=MONTHLY",
+};
+
+function recurrencePresetFromRule(rule: string | null | undefined): RecurrencePreset {
+  if (!rule) return "none";
+  const preset = Object.entries(RECURRENCE_PRESET_RRULE).find(([, value]) => value === rule)?.[0];
+  return (preset as RecurrencePreset | undefined) ?? "custom";
+}
+
+function recurrenceRuleFromState(mode: RecurrencePreset, customRule: string) {
+  if (mode === "none") return null;
+  if (mode === "custom") return customRule.trim() || null;
+  return RECURRENCE_PRESET_RRULE[mode];
+}
+
 export type TaskConfigFormDraft = {
   title: string;
   description: string;
@@ -49,6 +69,9 @@ export type TaskConfigFormInput = TaskConfigFormDraft & {
   autoExecute: boolean;
   autoPlanGenerationTiming: AutomationTimingPreset;
   autoExecuteTiming: AutomationTimingPreset;
+  recurrenceRule: string | null;
+  recurrenceAnchorStartAt: Date | null;
+  recurrenceAnchorEndAt: Date | null;
 };
 
 export type TaskConfigExecutionRuntime = {
@@ -79,6 +102,8 @@ type TaskConfigFormState = {
   autoExecute: boolean;
   autoPlanGenerationTiming: AutomationTimingPreset;
   autoExecuteTiming: AutomationTimingPreset;
+  recurrenceMode: RecurrencePreset;
+  recurrenceCustomRule: string;
 };
 
 export type TaskConfigDraftState = {
@@ -103,6 +128,7 @@ type TaskConfigFormProps = {
     autoExecute?: boolean;
     autoPlanGenerationTiming?: AutomationTimingPreset | string | null;
     autoExecuteTiming?: AutomationTimingPreset | string | null;
+    recurrenceRule?: string | null;
   };
   lockedFields?: readonly ("title" | "scheduledStartAt" | "scheduledEndAt")[];
   lockedFieldsHint?: string;
@@ -468,6 +494,17 @@ const DEFAULT_COPY = {
     High: "High",
     Urgent: "Urgent",
   },
+  recurrence: "Repeat",
+  recurrenceDescription: "Create independent task occurrences from this schedule.",
+  recurrencePresets: {
+    none: "Does not repeat",
+    daily: "Daily",
+    weekly: "Weekly",
+    monthly: "Monthly",
+    custom: "Custom RRULE",
+  },
+  recurrenceCustomLabel: "RRULE",
+  recurrenceCustomPlaceholder: "e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR",
   adapter: "Adapter",
   advancedFields: "Advanced fields",
   description: "Description",
@@ -717,6 +754,10 @@ function toFormState(
     autoExecute: initialValues?.autoExecute ?? false,
     autoPlanGenerationTiming: normalizeAutomationTiming(initialValues?.autoPlanGenerationTiming),
     autoExecuteTiming: normalizeAutomationTiming(initialValues?.autoExecuteTiming),
+    recurrenceMode: recurrencePresetFromRule(initialValues?.recurrenceRule),
+    recurrenceCustomRule: recurrencePresetFromRule(initialValues?.recurrenceRule) === "custom"
+      ? (initialValues?.recurrenceRule ?? "")
+      : "",
     ...runtimeState,
   };
 }
@@ -762,6 +803,8 @@ function buildTaskConfigFormInput(
     return null;
   }
 
+  const recurrenceRule = recurrenceRuleFromState(formState.recurrenceMode, formState.recurrenceCustomRule);
+
   return {
     title: formState.title,
     description: formState.description,
@@ -775,6 +818,9 @@ function buildTaskConfigFormInput(
     autoExecute: formState.autoExecute,
     autoPlanGenerationTiming: normalizeAutomationTiming(formState.autoPlanGenerationTiming),
     autoExecuteTiming: normalizeAutomationTiming(formState.autoExecuteTiming),
+    recurrenceRule,
+    recurrenceAnchorStartAt: recurrenceRule ? scheduledStartAt : null,
+    recurrenceAnchorEndAt: recurrenceRule ? scheduledEndAt : null,
   };
 }
 
@@ -948,6 +994,10 @@ export function TaskConfigForm({
       ...DEFAULT_COPY.automationTiming,
       ...(taskConfigFormMessages?.automationTiming ?? {}),
     },
+    recurrencePresets: {
+      ...DEFAULT_COPY.recurrencePresets,
+      ...((taskConfigFormMessages as { recurrencePresets?: Partial<Record<RecurrencePreset, string>> } | undefined)?.recurrencePresets ?? {}),
+    },
   }), [taskConfigFormMessages]);
   const [localErrorMessage, setLocalErrorMessage] = useState<string | null>(null);
   const lockedFieldSet = useMemo(() => new Set(lockedFields), [lockedFields]);
@@ -969,6 +1019,7 @@ export function TaskConfigForm({
   const initialAutoExecute = initialValues?.autoExecute;
   const initialAutoPlanGenerationTiming = initialValues?.autoPlanGenerationTiming;
   const initialAutoExecuteTiming = initialValues?.autoExecuteTiming;
+  const initialRecurrenceRule = initialValues?.recurrenceRule;
   const initialState = useMemo(
     () =>
       toFormState(
@@ -985,6 +1036,7 @@ export function TaskConfigForm({
           autoExecute: initialAutoExecute,
           autoPlanGenerationTiming: initialAutoPlanGenerationTiming,
           autoExecuteTiming: initialAutoExecuteTiming,
+          recurrenceRule: initialRecurrenceRule,
         },
         executionRuntimes,
         defaultExecutionRuntime,
@@ -1004,6 +1056,7 @@ export function TaskConfigForm({
       initialAutoExecute,
       initialAutoPlanGenerationTiming,
       initialAutoExecuteTiming,
+      initialRecurrenceRule,
     ],
   );
   const {
@@ -1256,6 +1309,32 @@ export function TaskConfigForm({
                       />
                     </TaskConfigField>
                   </FieldGroup>
+
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                    <TaskConfigField label={copy.recurrence} hint={copy.recurrenceDescription} className="text-xs text-foreground">
+                      <TaskConfigSelect
+                        name="recurrenceMode"
+                        value={formState.recurrenceMode}
+                        options={RECURRENCE_PRESETS.map((preset) => ({ value: preset, label: copy.recurrencePresets[preset] }))}
+                        disabled={isScheduleLocked}
+                        onValueChange={(value) => {
+                          if (!isScheduleLocked) setValue("recurrenceMode", value as RecurrencePreset, { shouldDirty: true });
+                        }}
+                      />
+                    </TaskConfigField>
+
+                    {formState.recurrenceMode === "custom" ? (
+                      <TaskConfigField label={copy.recurrenceCustomLabel} className="text-xs text-foreground">
+                        <Input
+                          name="recurrenceCustomRule"
+                          value={formState.recurrenceCustomRule}
+                          disabled={isScheduleLocked}
+                          placeholder={copy.recurrenceCustomPlaceholder}
+                          onChange={(event) => setValue("recurrenceCustomRule", event.target.value, { shouldDirty: true })}
+                        />
+                      </TaskConfigField>
+                    ) : null}
+                  </div>
                 </TaskConfigSection>
             </div>
 

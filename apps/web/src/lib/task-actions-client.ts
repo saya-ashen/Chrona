@@ -73,6 +73,9 @@ export function updateTaskConfigFromSchedule(input: {
   autoExecute?: boolean;
   autoPlanGenerationTiming?: AutomationTimingPreset;
   autoExecuteTiming?: AutomationTimingPreset;
+  recurrenceRule?: string | null;
+  recurrenceAnchorStartAt?: string | null;
+  recurrenceAnchorEndAt?: string | null;
 }) {
   return api.tasks[":taskId"]
     .$patch({
@@ -92,6 +95,9 @@ export function updateTaskConfigFromSchedule(input: {
         autoExecute: input.autoExecute,
         autoPlanGenerationTiming: input.autoPlanGenerationTiming,
         autoExecuteTiming: input.autoExecuteTiming,
+        recurrenceRule: input.recurrenceRule ?? undefined,
+        recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? undefined,
+        recurrenceAnchorEndAt: input.recurrenceAnchorEndAt ?? undefined,
       },
     })
     .then(parseActionResponse);

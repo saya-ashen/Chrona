@@ -18,7 +18,7 @@ function createPlanLifecycleRouter() {
     try {
       const taskId = c.req.param("taskId");
       const savedPlan = await getLatestTaskPlanReadModel(taskId);
-      const aiPlanGenerationStatus = isTaskPlanGenerationRunning(taskId)
+      const aiPlanGenerationStatus = isTaskPlanGenerationRunning({ taskId })
         ? "generating"
         : savedPlan?.status === "accepted"
           ? "accepted"

@@ -37,8 +37,8 @@ async function seedImportedEvent(input: {
   endsAt: Date;
   status?: "confirmed" | "tentative" | "cancelled";
 }) {
-  // Busy blocks surface recurring-series occurrences, so link each seeded
-  // event to a recurring task the way the importer does.
+  // Busy blocks surface imported occurrences, so link each seeded event to its
+  // own occurrence task the way the importer does.
   const task = await db.task.create({
     data: {
       workspaceId: input.workspaceId,
@@ -47,7 +47,7 @@ async function seedImportedEvent(input: {
       executionConfig: {},
       status: "Ready",
       priority: "Medium",
-      kind: "recurring",
+      kind: "single",
       recurrenceRule: "FREQ=WEEKLY",
       seriesExternalUid: crypto.randomUUID(),
     },

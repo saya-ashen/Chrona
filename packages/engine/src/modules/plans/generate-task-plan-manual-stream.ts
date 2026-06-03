@@ -7,7 +7,7 @@ import { resolveExecutionRuntime } from "@/modules/task-execution/registry";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { updateLatestCompiledPlanPrompt } from "@/modules/plan-execution/compiled-plan-store";
 import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
-import type { GeneratePlanSSEEvent, PlanBlueprint } from "@chrona/contracts";
+import type { GeneratePlanSSEEvent, PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts";
 import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
 
 const PLAN_GENERATE_TOOL_NAME = "chrona_plan_generate";
@@ -53,20 +53,22 @@ async function wait(ms: number): Promise<void> {
 
 async function readSavedPlanAfterToolCompletion(input: {
   taskId: string;
+  workBlockId?: string | null;
   userInstruction?: string | null;
   signal?: AbortSignal;
 }) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (input.signal?.aborted) return null;
-    let savedPlan = await getLatestTaskPlanReadModel(input.taskId);
+    let savedPlan = await getLatestTaskPlanReadModel(input.taskId, input.workBlockId ?? null);
     if (savedPlan) {
       const userInstruction = input.userInstruction?.trim() || null;
       if (savedPlan.prompt !== userInstruction) {
         await updateLatestCompiledPlanPrompt({
           taskId: input.taskId,
+          workBlockId: input.workBlockId ?? null,
           prompt: userInstruction,
         });
-        savedPlan = await getLatestTaskPlanReadModel(input.taskId);
+        savedPlan = await getLatestTaskPlanReadModel(input.taskId, input.workBlockId ?? null);
       }
       return savedPlan;
     }
@@ -169,6 +171,7 @@ async function recordPlanGenerationStatus(input: {
  */
 export async function* generateTaskPlanManualStream(input: {
   taskId: string;
+  workBlockId?: string | null;
   generationId?: string;
   forceRefresh?: boolean;
   userInstruction?: string | null;
@@ -288,6 +291,7 @@ export async function* generateTaskPlanManualStream(input: {
 
   let hasPlanGenerateToolCall = false;
   let persistedPlanId: string | null = null;
+  let materializedPlan: TaskPlanReadModel | null = null;
 
   if (input.signal?.aborted) {
     const event: GeneratePlanSSEEvent = { type: "cancelled" };
@@ -364,10 +368,12 @@ export async function* generateTaskPlanManualStream(input: {
               const savedPlan = await materializeGeneratedTaskPlan({
                 taskId: task.id,
                 workspaceId: task.workspaceId,
+                workBlockId: input.workBlockId ?? null,
                 blueprint: event.input,
                 generatedBy: "hermes",
                 userInstruction,
               });
+              materializedPlan = savedPlan;
               persistedPlanId = savedPlan.id;
               await recordPlanGenerationEvent({
                 type: "draft_saved",
@@ -462,10 +468,10 @@ export async function* generateTaskPlanManualStream(input: {
           });
           await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(savingEvent) });
           yield savingEvent;
-
-          const savedPlan = await readSavedPlanAfterToolCompletion({
+          const savedPlan = materializedPlan ?? await readSavedPlanAfterToolCompletion({
             taskId: task.id,
             userInstruction,
+            workBlockId: input.workBlockId ?? null,
             signal: input.signal,
           });
 

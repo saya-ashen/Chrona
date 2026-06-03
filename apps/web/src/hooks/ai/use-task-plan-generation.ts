@@ -10,6 +10,7 @@ import {
 
 type UseTaskPlanGenerationOptions = {
   taskId?: string;
+  workBlockId?: string | null;
   autoRequest?: boolean;
   forceRefresh?: boolean;
   onPlanLoaded?: (savedPlan: TaskPlanReadModel | null) => void;
@@ -17,11 +18,12 @@ type UseTaskPlanGenerationOptions = {
 
 export function useTaskPlanGeneration({
   taskId,
+  workBlockId = null,
   autoRequest = false,
   forceRefresh = false,
   onPlanLoaded,
 }: UseTaskPlanGenerationOptions) {
-  const state = useTaskPlanGenerationSession(taskId, { hydrate: autoRequest });
+  const state = useTaskPlanGenerationSession(taskId, workBlockId, { hydrate: autoRequest });
   const onPlanLoadedRef = useRef(onPlanLoaded);
 
   useEffect(() => {
@@ -36,11 +38,12 @@ export function useTaskPlanGeneration({
 
       void startTaskPlanGenerationSession({
         taskId,
+        workBlockId,
         forceRefresh: input?.forceRefresh ?? true,
         userInstruction: input?.userInstruction,
       });
     },
-    [taskId],
+    [taskId, workBlockId],
   );
 
   const stopGeneration = useCallback(() => {
@@ -48,8 +51,8 @@ export function useTaskPlanGeneration({
       return Promise.resolve();
     }
 
-    return stopTaskPlanGenerationSession(taskId);
-  }, [taskId]);
+    return stopTaskPlanGenerationSession(taskId, workBlockId);
+  }, [taskId, workBlockId]);
 
   useEffect(() => {
     if (!autoRequest || !taskId) {
@@ -57,9 +60,9 @@ export function useTaskPlanGeneration({
     }
 
     if (state.hydrated && state.sessionStatus === "idle" && !state.result) {
-      void startTaskPlanGenerationSession({ taskId, forceRefresh });
+      void startTaskPlanGenerationSession({ taskId, workBlockId, forceRefresh });
     }
-  }, [autoRequest, forceRefresh, state.hydrated, state.result, state.sessionStatus, taskId]);
+  }, [autoRequest, forceRefresh, state.hydrated, state.result, state.sessionStatus, taskId, workBlockId]);
 
   useEffect(() => {
     if (!state.result) {

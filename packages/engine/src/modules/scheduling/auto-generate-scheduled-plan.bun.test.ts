@@ -75,27 +75,27 @@ describe("auto-generate-scheduled-plan", () => {
       autoPlanGenerationTiming: "at_start",
       autoExecute: true,
     });
-    await createScheduledBlock(workspace.id, task.id, {
+    const block = await createScheduledBlock(workspace.id, task.id, {
       scheduledStartAt: new Date(Date.now() - 60_000),
     });
 
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
-    expect(result.triggered).toEqual([{ taskId: task.id, reason: "scheduled" }]);
-    expect(startAutoPlanMock).toHaveBeenCalledWith({ taskId: task.id, accept: true });
+    expect(result.triggered).toEqual([{ taskId: task.id, workBlockId: block.id, reason: "scheduled" }]);
+    expect(startAutoPlanMock).toHaveBeenCalledWith({ taskId: task.id, workBlockId: block.id, accept: true });
   });
 
   it("skips immediate timing (handled inline at create/update)", async () => {
     const workspace = await createWorkspace();
     const task = await createTaskRow(workspace.id, { autoPlanGenerationTiming: "immediate" });
-    await createScheduledBlock(workspace.id, task.id, {
+    const block = await createScheduledBlock(workspace.id, task.id, {
       scheduledStartAt: new Date(Date.now() - 60_000),
     });
 
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
     expect(result.triggered).toEqual([]);
-    expect(result.skipped).toContainEqual({ taskId: task.id, reason: "immediate_handled_inline" });
+    expect(result.skipped).toContainEqual({ taskId: task.id, workBlockId: block.id, reason: "immediate_handled_inline" });
     expect(startAutoPlanMock).not.toHaveBeenCalled();
   });
 
@@ -118,26 +118,27 @@ describe("auto-generate-scheduled-plan", () => {
     const workspace = await createWorkspace();
     const task = await createTaskRow(workspace.id, { autoPlanGenerationTiming: "before_1h" });
     // start in 30m → trigger (start - 60m) was 30m ago → due
-    await createScheduledBlock(workspace.id, task.id, {
+    const block = await createScheduledBlock(workspace.id, task.id, {
       scheduledStartAt: new Date(Date.now() + 30 * 60_000),
       scheduledEndAt: new Date(Date.now() + 90 * 60_000),
     });
 
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
-    expect(result.triggered).toEqual([{ taskId: task.id, reason: "scheduled" }]);
+    expect(result.triggered).toEqual([{ taskId: task.id, workBlockId: block.id, reason: "scheduled" }]);
     expect(startAutoPlanMock).toHaveBeenCalledTimes(1);
   });
 
   it("skips when an active plan already exists", async () => {
     const workspace = await createWorkspace();
     const task = await createTaskRow(workspace.id, { autoPlanGenerationTiming: "at_start" });
-    await createScheduledBlock(workspace.id, task.id, {
+    const block = await createScheduledBlock(workspace.id, task.id, {
       scheduledStartAt: new Date(Date.now() - 60_000),
     });
     await saveCompiledPlan({
       workspaceId: workspace.id,
       taskId: task.id,
+      workBlockId: block.id,
       status: "accepted",
       summary: "accepted graph",
       generatedBy: "auto-generate-test",
@@ -161,7 +162,7 @@ describe("auto-generate-scheduled-plan", () => {
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
     expect(result.triggered).toEqual([]);
-    expect(result.skipped).toContainEqual({ taskId: task.id, reason: "plan_exists" });
+    expect(result.skipped).toContainEqual({ taskId: task.id, workBlockId: block.id, reason: "plan_exists" });
     expect(startAutoPlanMock).not.toHaveBeenCalled();
   });
 
@@ -174,8 +175,8 @@ describe("auto-generate-scheduled-plan", () => {
 
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
-    expect(result.triggered).toEqual([{ taskId: task.id, reason: "no_schedule_fallback" }]);
-    expect(startAutoPlanMock).toHaveBeenCalledWith({ taskId: task.id, accept: false });
+    expect(result.triggered).toEqual([{ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" }]);
+    expect(startAutoPlanMock).toHaveBeenCalledWith({ taskId: task.id, workBlockId: null, accept: false });
   });
 
   it("waits during the grace window before the no-schedule fallback", async () => {

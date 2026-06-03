@@ -14,6 +14,7 @@ export function taskToEditableTask(task: TaskData): EditableTask {
     executionConfig: task.executionConfig,
     autoPlanGeneration: task.autoPlanGeneration,
     autoExecute: task.autoExecute,
+    recurrenceRule: task.recurrenceRule ?? null,
   };
 }
 
@@ -35,6 +36,7 @@ export function taskToTaskConfigInitialValues(task: TaskData) {
     autoExecute: task.autoExecute,
     autoPlanGenerationTiming: task.autoPlanGenerationTiming,
     autoExecuteTiming: task.autoExecuteTiming,
+    recurrenceRule: task.recurrenceRule ?? null,
   };
 }
 
@@ -51,6 +53,7 @@ export function taskConfigInputToEditableTask(input: TaskConfigFormInput, schedu
     executionConfig: input.executionConfig,
     autoPlanGeneration: input.autoPlanGeneration,
     autoExecute: input.autoExecute,
+    recurrenceRule: input.recurrenceRule,
   };
 }
 

@@ -82,6 +82,7 @@ export type SubmitCheckpointActionInput = {
   checkpointId: string;
   action: CheckpointActionKind;
   payload?: unknown;
+  workBlockId?: string | null;
   idempotencyKey?: string;
 };
 

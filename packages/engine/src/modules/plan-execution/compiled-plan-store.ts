@@ -22,6 +22,7 @@ export type SavedCompiledPlan = {
   recordId: string;
   workspaceId: string;
   taskId: string;
+  workBlockId: string | null;
   compiledPlan: CompiledPlan;
   editablePlan: EditablePlan | null;
   status: PlanStatus;
@@ -47,6 +48,7 @@ function toSavedCompiledPlan(row: {
   id: string;
   workspaceId: string;
   taskId: string;
+  workBlockId: string | null;
   compiledPlan: unknown;
   editablePlan: unknown;
   status: TaskPlanStatus;
@@ -60,6 +62,7 @@ function toSavedCompiledPlan(row: {
     recordId: row.id,
     workspaceId: row.workspaceId,
     taskId: row.taskId,
+    workBlockId: row.workBlockId,
     compiledPlan: row.compiledPlan as CompiledPlan,
     editablePlan: (row.editablePlan as EditablePlan | null) ?? null,
     status: TASK_PLAN_STATUS_FROM_DB[row.status],
@@ -75,6 +78,7 @@ function toSavedCompiledPlan(row: {
 export async function saveCompiledPlan(input: {
   workspaceId: string;
   taskId: string;
+  workBlockId?: string | null;
   compiledPlan: CompiledPlan;
   editablePlan?: EditablePlan | null;
   status: PlanStatus;
@@ -90,6 +94,7 @@ export async function saveCompiledPlan(input: {
       await tx.taskPlan.updateMany({
         where: {
           taskId: input.taskId,
+          workBlockId: input.workBlockId ?? null,
           planId: { not: planId },
           status: { in: [TaskPlanStatus.Draft, TaskPlanStatus.Accepted] },
         },
@@ -104,6 +109,7 @@ export async function saveCompiledPlan(input: {
       create: {
         workspaceId: input.workspaceId,
         taskId: input.taskId,
+        workBlockId: input.workBlockId ?? null,
         planId,
         revision: input.compiledPlan.sourceVersion,
         status,
@@ -116,6 +122,7 @@ export async function saveCompiledPlan(input: {
       update: {
         workspaceId: input.workspaceId,
         taskId: input.taskId,
+        workBlockId: input.workBlockId ?? null,
         revision: input.compiledPlan.sourceVersion,
         status,
         prompt: input.prompt ?? null,
@@ -130,10 +137,12 @@ export async function saveCompiledPlan(input: {
 
 export async function getAcceptedCompiledPlan(
   taskId: string,
+  workBlockId?: string | null,
 ): Promise<SavedCompiledPlan | null> {
   const row = await db.taskPlan.findFirst({
     where: {
       taskId,
+      workBlockId: workBlockId ?? null,
       status: TaskPlanStatus.Accepted,
     },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
@@ -144,9 +153,10 @@ export async function getAcceptedCompiledPlan(
 
 export async function getLatestCompiledPlan(
   taskId: string,
+  workBlockId?: string | null,
 ): Promise<SavedCompiledPlan | null> {
   const row = await db.taskPlan.findFirst({
-    where: { taskId },
+    where: { taskId, workBlockId: workBlockId ?? null },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
 
@@ -156,9 +166,10 @@ export async function getLatestCompiledPlan(
 export async function updateLatestCompiledPlanPrompt(input: {
   taskId: string;
   prompt: string | null;
+  workBlockId?: string | null;
 }): Promise<void> {
   const row = await db.taskPlan.findFirst({
-    where: { taskId: input.taskId },
+    where: { taskId: input.taskId, workBlockId: input.workBlockId ?? null },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     select: { id: true },
   });

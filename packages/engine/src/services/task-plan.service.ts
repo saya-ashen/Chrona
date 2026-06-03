@@ -14,7 +14,7 @@ import { materializeGeneratedTaskPlan } from "../modules/plans/materialize-gener
 import { TaskPlanGenerationInFlightError } from "../modules/plans/task-plan-generation-registry";
 
 export type TaskPlanService = {
-  getState(input: { taskId: string }): Promise<{
+  getState(input: { taskId: string; workBlockId?: string | null }): Promise<{
     taskId: string;
     aiPlanGenerationStatus:
       | "accepted"
@@ -24,7 +24,7 @@ export type TaskPlanService = {
     savedPlan: TaskPlanReadModel | null;
     generationSession: TaskPlanGenerationSessionReadModel | null;
   }>;
-  getActiveGeneration(input: { taskId: string }): {
+  getActiveGeneration(input: { taskId: string; workBlockId?: string | null }): {
     generationSession: TaskPlanGenerationSessionReadModel | null;
   };
   getGenerationSession(input: { generationId: string }): {
@@ -32,6 +32,7 @@ export type TaskPlanService = {
   };
   subscribeToActiveGeneration(input: {
     taskId: string;
+    workBlockId?: string | null;
     onEvent: (event: GeneratePlanSSEEvent) => void;
   }): ReturnType<typeof taskPlanning.subscribeToActiveGeneration>;
   subscribeToGeneration(input: {
@@ -41,9 +42,10 @@ export type TaskPlanService = {
   accept(input: {
     taskId: string;
     planId: string;
+    workBlockId?: string | null;
     workspaceId?: string;
   }): Promise<{ savedPlan: TaskPlanReadModel | null }>;
-  generate(input: { taskId: string; forceRefresh?: boolean; userInstruction?: string | null }): {
+  generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null }): {
     generationId: string;
     events: AsyncGenerator<GeneratePlanSSEEvent>;
     emit: (event: GeneratePlanSSEEvent) => void;
@@ -52,11 +54,12 @@ export type TaskPlanService = {
   materialize(input: {
     taskId: string;
     workspaceId: string;
+    workBlockId?: string | null;
     blueprint: PlanBlueprint;
     userInstruction?: string | null;
     generatedBy?: string | null;
   }): Promise<TaskPlanReadModel>;
-  stopGeneration(input: { taskId: string }): {
+  stopGeneration(input: { taskId: string; workBlockId?: string | null }): {
     taskId: string;
     stopped: boolean;
   };
@@ -70,7 +73,7 @@ export type TaskPlanService = {
 
 export function createTaskPlanService(): TaskPlanService {
   return {
-    async getState(input: { taskId: string }) {
+    async getState(input: { taskId: string; workBlockId?: string | null }) {
       try {
         return await taskPlanning.getState(input);
       } catch (cause) {
@@ -102,6 +105,7 @@ export function createTaskPlanService(): TaskPlanService {
     async accept(input: {
       taskId: string;
       planId: string;
+      workBlockId?: string | null;
       workspaceId?: string;
     }) {
       try {
@@ -114,7 +118,7 @@ export function createTaskPlanService(): TaskPlanService {
         );
       }
     },
-    generate(input: { taskId: string; forceRefresh?: boolean; userInstruction?: string | null }) {
+    generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null }) {
       try {
         return taskPlanning.generate(input);
       } catch (cause) {
@@ -136,6 +140,7 @@ export function createTaskPlanService(): TaskPlanService {
       taskId: string;
       workspaceId: string;
       blueprint: PlanBlueprint;
+      workBlockId?: string | null;
       userInstruction?: string | null;
       generatedBy?: string | null;
     }) {

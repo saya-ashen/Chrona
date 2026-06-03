@@ -93,7 +93,7 @@ export function buildSchedulePageViewModel({
     scheduledGroups.find((group) => group.key === activeDay) ?? null;
   const activeSelectedTaskId = localSelectedTaskId ?? selectedTaskId;
   const selectedItem =
-    activeGroup?.items.find((item) => item.taskId === activeSelectedTaskId) ??
+    activeGroup?.items.find((item) => (item.workBlockId ?? item.taskId) === activeSelectedTaskId || item.taskId === activeSelectedTaskId) ??
     viewData.unscheduled.find((item) => item.taskId === activeSelectedTaskId) ??
     null;
   const todayFocusItems = buildTodayFocusItems(viewData, activeGroup, copy);

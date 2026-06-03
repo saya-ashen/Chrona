@@ -51,7 +51,7 @@ export function useSelectedBlockPlanState({
   item: ScheduledItem;
   onMutatedAction: () => Promise<void>;
 }) {
-  const generationSession = useTaskPlanGenerationSession(item.taskId);
+  const generationSession = useTaskPlanGenerationSession(item.taskId, item.workBlockId ?? null);
   const [displayedSavedPlan, setDisplayedSavedPlan] = useState<SavedTaskPlan | null>(() => hasFullPlan(item.savedPlan) ? item.savedPlan : null);
   const [generationStatus, setGenerationStatus] = useState(item.aiPlanGenerationStatus ?? "idle");
   const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanReadModel | null>(() => hasFullPlan(item.savedPlan) ? acceptedResponseFromSavedPlan(item.savedPlan) : null);
@@ -104,7 +104,7 @@ export function useSelectedBlockPlanState({
 
   useEffect(() => {
     lastDisplayedSavedPlanKeyRef.current = savedPlanKey(item.savedPlan ?? null);
-  }, [item.taskId, item.savedPlan]);
+  }, [item.taskId, item.workBlockId, item.savedPlan]);
 
   useEffect(() => {
     const snapshot = item.savedPlan ?? null;
@@ -119,9 +119,9 @@ export function useSelectedBlockPlanState({
 
     let cancelled = false;
     void (async () => {
-      const response = await api.tasks[":taskId"].plan.$get({
-        param: { taskId: item.taskId },
-      });
+      const response = await fetch(
+        `/api/tasks/${item.taskId}/plan${item.workBlockId ? `?workBlockId=${encodeURIComponent(item.workBlockId)}` : ""}`,
+      );
       if (!response.ok || cancelled) {
         return;
       }
@@ -143,7 +143,7 @@ export function useSelectedBlockPlanState({
     return () => {
       cancelled = true;
     };
-  }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.savedPlan, item.taskId]);
+  }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.savedPlan, item.taskId, item.workBlockId, item.aiPlanGenerationStatus]);
 
   useEffect(() => {
     const nextSavedPlan = generationSession.result ?? displayedSavedPlan;
@@ -193,15 +193,11 @@ export function useSelectedBlockPlanState({
     try {
       const res = await api.tasks[":taskId"].plan.accept.$post({
         param: { taskId: item.taskId },
-        json: { planId: result.id },
+        json: { planId: result.id, workBlockId: item.workBlockId ?? null },
       });
       if (!res.ok) throw new Error("Failed to accept plan");
-
-      // Mark as accepted in local state mirrors
-      const accepted: TaskPlanReadModel = {
-        ...result,
-        status: "accepted",
-      };
+      const payload = await res.json() as { savedPlan?: TaskPlanReadModel | null };
+      const accepted = payload.savedPlan ?? { ...result, status: "accepted" as const };
       setAcceptedPlan(accepted);
       setDisplayedSavedPlan(accepted);
       generationStatusRef.current = "accepted";
@@ -214,7 +210,7 @@ export function useSelectedBlockPlanState({
     } finally {
       setIsApplying(false);
     }
-  }, [item.taskId, onMutatedAction]);
+  }, [item.taskId, item.workBlockId, onMutatedAction]);
 
   return {
     displayedSavedPlan,

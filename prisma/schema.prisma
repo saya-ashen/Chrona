@@ -256,6 +256,9 @@ model Task {
   kind                 TaskKind               @default(single)
   recurrenceRule       String?
   seriesExternalUid    String?
+  recurrenceAnchorStartAt DateTime?
+  recurrenceAnchorEndAt   DateTime?
+  recurrenceWindowUntil   DateTime?
   executionRuntime     String
   executionConfig      Json
   status               TaskStatus
@@ -438,6 +441,7 @@ model TaskPlan {
   id           String          @id @default(cuid())
   workspaceId  String
   taskId       String
+  workBlockId  String?
   planId       String          @unique
   revision     Int
   status       TaskPlanStatus
@@ -450,17 +454,20 @@ model TaskPlan {
   updatedAt    DateTime        @updatedAt
   workspace    Workspace       @relation(fields: [workspaceId], references: [id])
   task         Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workBlock    WorkBlock?      @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   runs         TaskPlanRun[]
   layers       TaskPlanLayer[]
 
   @@index([workspaceId, taskId, updatedAt])
-  @@index([taskId, status, updatedAt])
+  @@index([taskId, workBlockId, status, updatedAt])
+  @@index([workBlockId, status, updatedAt])
 }
 
 model TaskPlanRun {
   id                  String                @id @default(cuid())
   workspaceId         String
   taskId              String
+  workBlockId         String?
   planId              String
   planRun             Json
   executionOwnerId    String?
@@ -473,12 +480,14 @@ model TaskPlanRun {
   updatedAt           DateTime              @updatedAt
   workspace           Workspace             @relation(fields: [workspaceId], references: [id])
   task                Task                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workBlock           WorkBlock?            @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   plan                TaskPlan              @relation(fields: [planId], references: [planId], onDelete: Cascade)
   nodeAttempts        TaskPlanNodeAttempt[]
   providerRuns        TaskPlanProviderRun[]
 
-  @@unique([taskId, planId])
+  @@unique([taskId, planId, workBlockId])
   @@index([taskId, planId, executionOwnerId])
+  @@index([taskId, workBlockId, planId])
   @@index([executionLeaseUntil])
   @@index([workspaceId, taskId, updatedAt])
 }
@@ -1000,6 +1009,7 @@ model WorkBlock {
   workspaceId       String
   taskId            String
   planId            String?
+  recurrenceKey     String?
   title             String
   status            WorkBlockStatus    @default(Scheduled)
   scheduledStartAt  DateTime
@@ -1011,11 +1021,14 @@ model WorkBlock {
   updatedAt         DateTime           @updatedAt
   workspace         Workspace          @relation(fields: [workspaceId], references: [id])
   task              Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskPlans         TaskPlan[]
+  taskPlanRuns      TaskPlanRun[]
   executionSessions ExecutionSession[]
   importedCalendarEvent ImportedCalendarEvent?
 
   @@index([workspaceId, status])
   @@index([taskId, status])
+  @@unique([taskId, recurrenceKey])
   @@index([workspaceId, scheduledStartAt])
 }
 

@@ -32,6 +32,9 @@ export type TaskMinAggregateOutputType = {
   kind: $Enums.TaskKind | null
   recurrenceRule: string | null
   seriesExternalUid: string | null
+  recurrenceAnchorStartAt: Date | null
+  recurrenceAnchorEndAt: Date | null
+  recurrenceWindowUntil: Date | null
   executionRuntime: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
@@ -60,6 +63,9 @@ export type TaskMaxAggregateOutputType = {
   kind: $Enums.TaskKind | null
   recurrenceRule: string | null
   seriesExternalUid: string | null
+  recurrenceAnchorStartAt: Date | null
+  recurrenceAnchorEndAt: Date | null
+  recurrenceWindowUntil: Date | null
   executionRuntime: string | null
   status: $Enums.TaskStatus | null
   priority: $Enums.TaskPriority | null
@@ -88,6 +94,9 @@ export type TaskCountAggregateOutputType = {
   kind: number
   recurrenceRule: number
   seriesExternalUid: number
+  recurrenceAnchorStartAt: number
+  recurrenceAnchorEndAt: number
+  recurrenceWindowUntil: number
   executionRuntime: number
   executionConfig: number
   status: number
@@ -120,6 +129,9 @@ export type TaskMinAggregateInputType = {
   kind?: true
   recurrenceRule?: true
   seriesExternalUid?: true
+  recurrenceAnchorStartAt?: true
+  recurrenceAnchorEndAt?: true
+  recurrenceWindowUntil?: true
   executionRuntime?: true
   status?: true
   priority?: true
@@ -148,6 +160,9 @@ export type TaskMaxAggregateInputType = {
   kind?: true
   recurrenceRule?: true
   seriesExternalUid?: true
+  recurrenceAnchorStartAt?: true
+  recurrenceAnchorEndAt?: true
+  recurrenceWindowUntil?: true
   executionRuntime?: true
   status?: true
   priority?: true
@@ -176,6 +191,9 @@ export type TaskCountAggregateInputType = {
   kind?: true
   recurrenceRule?: true
   seriesExternalUid?: true
+  recurrenceAnchorStartAt?: true
+  recurrenceAnchorEndAt?: true
+  recurrenceWindowUntil?: true
   executionRuntime?: true
   executionConfig?: true
   status?: true
@@ -279,6 +297,9 @@ export type TaskGroupByOutputType = {
   kind: $Enums.TaskKind
   recurrenceRule: string | null
   seriesExternalUid: string | null
+  recurrenceAnchorStartAt: Date | null
+  recurrenceAnchorEndAt: Date | null
+  recurrenceWindowUntil: Date | null
   executionRuntime: string
   executionConfig: runtime.JsonValue
   status: $Enums.TaskStatus
@@ -330,6 +351,9 @@ export type TaskWhereInput = {
   kind?: Prisma.EnumTaskKindFilter<"Task"> | $Enums.TaskKind
   recurrenceRule?: Prisma.StringNullableFilter<"Task"> | string | null
   seriesExternalUid?: Prisma.StringNullableFilter<"Task"> | string | null
+  recurrenceAnchorStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  recurrenceWindowUntil?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   executionRuntime?: Prisma.StringFilter<"Task"> | string
   executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
@@ -387,6 +411,9 @@ export type TaskOrderByWithRelationInput = {
   kind?: Prisma.SortOrder
   recurrenceRule?: Prisma.SortOrderInput | Prisma.SortOrder
   seriesExternalUid?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceAnchorStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceAnchorEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceWindowUntil?: Prisma.SortOrderInput | Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -447,6 +474,9 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   kind?: Prisma.EnumTaskKindFilter<"Task"> | $Enums.TaskKind
   recurrenceRule?: Prisma.StringNullableFilter<"Task"> | string | null
   seriesExternalUid?: Prisma.StringNullableFilter<"Task"> | string | null
+  recurrenceAnchorStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  recurrenceWindowUntil?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   executionRuntime?: Prisma.StringFilter<"Task"> | string
   executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
@@ -504,6 +534,9 @@ export type TaskOrderByWithAggregationInput = {
   kind?: Prisma.SortOrder
   recurrenceRule?: Prisma.SortOrderInput | Prisma.SortOrder
   seriesExternalUid?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceAnchorStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceAnchorEndAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  recurrenceWindowUntil?: Prisma.SortOrderInput | Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -540,6 +573,9 @@ export type TaskScalarWhereWithAggregatesInput = {
   kind?: Prisma.EnumTaskKindWithAggregatesFilter<"Task"> | $Enums.TaskKind
   recurrenceRule?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
   seriesExternalUid?: Prisma.StringNullableWithAggregatesFilter<"Task"> | string | null
+  recurrenceAnchorStartAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
+  recurrenceWindowUntil?: Prisma.DateTimeNullableWithAggregatesFilter<"Task"> | Date | string | null
   executionRuntime?: Prisma.StringWithAggregatesFilter<"Task"> | string
   executionConfig?: Prisma.JsonWithAggregatesFilter<"Task">
   status?: Prisma.EnumTaskStatusWithAggregatesFilter<"Task"> | $Enums.TaskStatus
@@ -569,6 +605,9 @@ export type TaskCreateInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -626,6 +665,9 @@ export type TaskUncheckedCreateInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -681,6 +723,9 @@ export type TaskUpdateInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -738,6 +783,9 @@ export type TaskUncheckedUpdateInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -794,6 +842,9 @@ export type TaskCreateManyInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -823,6 +874,9 @@ export type TaskUpdateManyMutationInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -853,6 +907,9 @@ export type TaskUncheckedUpdateManyInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -898,6 +955,9 @@ export type TaskCountOrderByAggregateInput = {
   kind?: Prisma.SortOrder
   recurrenceRule?: Prisma.SortOrder
   seriesExternalUid?: Prisma.SortOrder
+  recurrenceAnchorStartAt?: Prisma.SortOrder
+  recurrenceAnchorEndAt?: Prisma.SortOrder
+  recurrenceWindowUntil?: Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   executionConfig?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -928,6 +988,9 @@ export type TaskMaxOrderByAggregateInput = {
   kind?: Prisma.SortOrder
   recurrenceRule?: Prisma.SortOrder
   seriesExternalUid?: Prisma.SortOrder
+  recurrenceAnchorStartAt?: Prisma.SortOrder
+  recurrenceAnchorEndAt?: Prisma.SortOrder
+  recurrenceWindowUntil?: Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
@@ -956,6 +1019,9 @@ export type TaskMinOrderByAggregateInput = {
   kind?: Prisma.SortOrder
   recurrenceRule?: Prisma.SortOrder
   seriesExternalUid?: Prisma.SortOrder
+  recurrenceAnchorStartAt?: Prisma.SortOrder
+  recurrenceAnchorEndAt?: Prisma.SortOrder
+  recurrenceWindowUntil?: Prisma.SortOrder
   executionRuntime?: Prisma.SortOrder
   status?: Prisma.SortOrder
   priority?: Prisma.SortOrder
@@ -1416,6 +1482,9 @@ export type TaskCreateWithoutWorkspaceInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -1471,6 +1540,9 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -1555,6 +1627,9 @@ export type TaskScalarWhereInput = {
   kind?: Prisma.EnumTaskKindFilter<"Task"> | $Enums.TaskKind
   recurrenceRule?: Prisma.StringNullableFilter<"Task"> | string | null
   seriesExternalUid?: Prisma.StringNullableFilter<"Task"> | string | null
+  recurrenceAnchorStartAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
+  recurrenceWindowUntil?: Prisma.DateTimeNullableFilter<"Task"> | Date | string | null
   executionRuntime?: Prisma.StringFilter<"Task"> | string
   executionConfig?: Prisma.JsonFilter<"Task">
   status?: Prisma.EnumTaskStatusFilter<"Task"> | $Enums.TaskStatus
@@ -1584,6 +1659,9 @@ export type TaskCreateWithoutImportedCalendarEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -1640,6 +1718,9 @@ export type TaskUncheckedCreateWithoutImportedCalendarEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -1710,6 +1791,9 @@ export type TaskUpdateWithoutImportedCalendarEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -1766,6 +1850,9 @@ export type TaskUncheckedUpdateWithoutImportedCalendarEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -1820,6 +1907,9 @@ export type TaskCreateWithoutGraphVersionsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -1876,6 +1966,9 @@ export type TaskUncheckedCreateWithoutGraphVersionsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -1946,6 +2039,9 @@ export type TaskUpdateWithoutGraphVersionsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2002,6 +2098,9 @@ export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2056,6 +2155,9 @@ export type TaskCreateWithoutGraphMutationsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2112,6 +2214,9 @@ export type TaskUncheckedCreateWithoutGraphMutationsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2182,6 +2287,9 @@ export type TaskUpdateWithoutGraphMutationsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2238,6 +2346,9 @@ export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2292,6 +2403,9 @@ export type TaskCreateWithoutReconciliationEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2348,6 +2462,9 @@ export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2418,6 +2535,9 @@ export type TaskUpdateWithoutReconciliationEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2474,6 +2594,9 @@ export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2528,6 +2651,9 @@ export type TaskCreateWithoutSchedulerEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2584,6 +2710,9 @@ export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2654,6 +2783,9 @@ export type TaskUpdateWithoutSchedulerEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2710,6 +2842,9 @@ export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2764,6 +2899,9 @@ export type TaskCreateWithoutSessionsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2820,6 +2958,9 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -2890,6 +3031,9 @@ export type TaskUpdateWithoutSessionsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -2946,6 +3090,9 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3000,6 +3147,9 @@ export type TaskCreateWithoutDependenciesInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3056,6 +3206,9 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3115,6 +3268,9 @@ export type TaskCreateWithoutDependentTasksInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3171,6 +3327,9 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3241,6 +3400,9 @@ export type TaskUpdateWithoutDependenciesInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3297,6 +3459,9 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3362,6 +3527,9 @@ export type TaskUpdateWithoutDependentTasksInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3418,6 +3586,9 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3472,6 +3643,9 @@ export type TaskCreateWithoutTaskPlansInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3528,6 +3702,9 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3598,6 +3775,9 @@ export type TaskUpdateWithoutTaskPlansInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3654,6 +3834,9 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3708,6 +3891,9 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3764,6 +3950,9 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -3834,6 +4023,9 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3890,6 +4082,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -3944,6 +4139,9 @@ export type TaskCreateWithoutTaskPlanNodeAttemptsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4000,6 +4198,9 @@ export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4070,6 +4271,9 @@ export type TaskUpdateWithoutTaskPlanNodeAttemptsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4126,6 +4330,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4180,6 +4387,9 @@ export type TaskCreateWithoutTaskPlanProviderRunsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4236,6 +4446,9 @@ export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4306,6 +4519,9 @@ export type TaskUpdateWithoutTaskPlanProviderRunsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4362,6 +4578,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4416,6 +4635,9 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4472,6 +4694,9 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4542,6 +4767,9 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4598,6 +4826,9 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4652,6 +4883,9 @@ export type TaskCreateWithoutRunsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4708,6 +4942,9 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4778,6 +5015,9 @@ export type TaskUpdateWithoutRunsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4834,6 +5074,9 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -4888,6 +5131,9 @@ export type TaskCreateWithoutApprovalsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -4944,6 +5190,9 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5014,6 +5263,9 @@ export type TaskUpdateWithoutApprovalsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5070,6 +5322,9 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5124,6 +5379,9 @@ export type TaskCreateWithoutArtifactsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5180,6 +5438,9 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5250,6 +5511,9 @@ export type TaskUpdateWithoutArtifactsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5306,6 +5570,9 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5360,6 +5627,9 @@ export type TaskCreateWithoutMemoriesInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5416,6 +5686,9 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5486,6 +5759,9 @@ export type TaskUpdateWithoutMemoriesInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5542,6 +5818,9 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5596,6 +5875,9 @@ export type TaskCreateWithoutEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5652,6 +5934,9 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5722,6 +6007,9 @@ export type TaskUpdateWithoutEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5778,6 +6066,9 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -5832,6 +6123,9 @@ export type TaskCreateWithoutRawEventLogsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5888,6 +6182,9 @@ export type TaskUncheckedCreateWithoutRawEventLogsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -5958,6 +6255,9 @@ export type TaskUpdateWithoutRawEventLogsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6014,6 +6314,9 @@ export type TaskUncheckedUpdateWithoutRawEventLogsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6068,6 +6371,9 @@ export type TaskCreateWithoutToolInvocationsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6124,6 +6430,9 @@ export type TaskUncheckedCreateWithoutToolInvocationsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6194,6 +6503,9 @@ export type TaskUpdateWithoutToolInvocationsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6250,6 +6562,9 @@ export type TaskUncheckedUpdateWithoutToolInvocationsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6304,6 +6619,9 @@ export type TaskCreateWithoutTimelineItemsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6360,6 +6678,9 @@ export type TaskUncheckedCreateWithoutTimelineItemsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6430,6 +6751,9 @@ export type TaskUpdateWithoutTimelineItemsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6486,6 +6810,9 @@ export type TaskUncheckedUpdateWithoutTimelineItemsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6540,6 +6867,9 @@ export type TaskCreateWithoutProjectionInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6596,6 +6926,9 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6666,6 +6999,9 @@ export type TaskUpdateWithoutProjectionInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6722,6 +7058,9 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6776,6 +7115,9 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6832,6 +7174,9 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -6902,6 +7247,9 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -6958,6 +7306,9 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7012,6 +7363,9 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -7068,6 +7422,9 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -7138,6 +7495,9 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7194,6 +7554,9 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7248,6 +7611,9 @@ export type TaskCreateWithoutWorkBlocksInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -7304,6 +7670,9 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -7374,6 +7743,9 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7430,6 +7802,9 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7484,6 +7859,9 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -7540,6 +7918,9 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -7610,6 +7991,9 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7666,6 +8050,9 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7720,6 +8107,9 @@ export type TaskCreateManyWorkspaceInput = {
   kind?: $Enums.TaskKind
   recurrenceRule?: string | null
   seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
   executionRuntime: string
   executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status: $Enums.TaskStatus
@@ -7749,6 +8139,9 @@ export type TaskUpdateWithoutWorkspaceInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7804,6 +8197,9 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -7859,6 +8255,9 @@ export type TaskUncheckedUpdateManyWithoutWorkspaceInput = {
   kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
   recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
   executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
@@ -8136,6 +8535,9 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   kind?: boolean
   recurrenceRule?: boolean
   seriesExternalUid?: boolean
+  recurrenceAnchorStartAt?: boolean
+  recurrenceAnchorEndAt?: boolean
+  recurrenceWindowUntil?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
@@ -8194,6 +8596,9 @@ export type TaskSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   kind?: boolean
   recurrenceRule?: boolean
   seriesExternalUid?: boolean
+  recurrenceAnchorStartAt?: boolean
+  recurrenceAnchorEndAt?: boolean
+  recurrenceWindowUntil?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
@@ -8225,6 +8630,9 @@ export type TaskSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   kind?: boolean
   recurrenceRule?: boolean
   seriesExternalUid?: boolean
+  recurrenceAnchorStartAt?: boolean
+  recurrenceAnchorEndAt?: boolean
+  recurrenceWindowUntil?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
@@ -8256,6 +8664,9 @@ export type TaskSelectScalar = {
   kind?: boolean
   recurrenceRule?: boolean
   seriesExternalUid?: boolean
+  recurrenceAnchorStartAt?: boolean
+  recurrenceAnchorEndAt?: boolean
+  recurrenceWindowUntil?: boolean
   executionRuntime?: boolean
   executionConfig?: boolean
   status?: boolean
@@ -8278,7 +8689,7 @@ export type TaskSelectScalar = {
   completedAt?: boolean
 }
 
-export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "kind" | "recurrenceRule" | "seriesExternalUid" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoPlanGeneration" | "autoExecute" | "autoPlanGenerationTiming" | "autoExecuteTiming" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
+export type TaskOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "title" | "description" | "kind" | "recurrenceRule" | "seriesExternalUid" | "recurrenceAnchorStartAt" | "recurrenceAnchorEndAt" | "recurrenceWindowUntil" | "executionRuntime" | "executionConfig" | "status" | "priority" | "autoPlanGeneration" | "autoExecute" | "autoPlanGenerationTiming" | "autoExecuteTiming" | "parentTaskId" | "dueAt" | "blockReason" | "defaultSessionId" | "latestRunId" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["task"]>
 export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.Task$runsArgs<ExtArgs>
@@ -8355,6 +8766,9 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     kind: $Enums.TaskKind
     recurrenceRule: string | null
     seriesExternalUid: string | null
+    recurrenceAnchorStartAt: Date | null
+    recurrenceAnchorEndAt: Date | null
+    recurrenceWindowUntil: Date | null
     executionRuntime: string
     executionConfig: runtime.JsonValue
     status: $Enums.TaskStatus
@@ -8832,6 +9246,9 @@ export interface TaskFieldRefs {
   readonly kind: Prisma.FieldRef<"Task", 'TaskKind'>
   readonly recurrenceRule: Prisma.FieldRef<"Task", 'String'>
   readonly seriesExternalUid: Prisma.FieldRef<"Task", 'String'>
+  readonly recurrenceAnchorStartAt: Prisma.FieldRef<"Task", 'DateTime'>
+  readonly recurrenceAnchorEndAt: Prisma.FieldRef<"Task", 'DateTime'>
+  readonly recurrenceWindowUntil: Prisma.FieldRef<"Task", 'DateTime'>
   readonly executionRuntime: Prisma.FieldRef<"Task", 'String'>
   readonly executionConfig: Prisma.FieldRef<"Task", 'Json'>
   readonly status: Prisma.FieldRef<"Task", 'TaskStatus'>

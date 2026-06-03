@@ -75,7 +75,7 @@ describe("external calendar management repository", () => {
       status: "confirmed",
     }]);
 
-    expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(0);
+    expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(1);
     const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
       where: { workspaceId: workspace.id },
       include: { task: { include: { projection: true, workBlocks: true } } },
@@ -86,7 +86,7 @@ describe("external calendar management repository", () => {
     await updateCalendarSource(workspace.id, source.id, { lifecycleState: "disabled" });
     expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(0);
     await updateCalendarSource(workspace.id, source.id, { lifecycleState: "active" });
-    expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(0);
+    expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(1);
 
     await markCalendarSourceRemoved(workspace.id, source.id);
     expect(await listCalendarSources(workspace.id)).toHaveLength(0);

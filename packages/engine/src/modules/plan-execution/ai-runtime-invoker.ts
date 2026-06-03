@@ -297,12 +297,10 @@ async function ensureProviderRunRecord(input: {
 }) {
   if (!input.nodeAttempt || !input.providerRunIdempotencyKey) return null;
 
-  const planRun = await db.taskPlanRun.findUnique({
+  const planRun = await db.taskPlanRun.findFirst({
     where: {
-      taskId_planId: {
-        taskId: input.taskId,
-        planId: input.nodeAttempt.graphId,
-      },
+      taskId: input.taskId,
+      planId: input.nodeAttempt.graphId,
     },
     select: { id: true, executionEpoch: true },
   });

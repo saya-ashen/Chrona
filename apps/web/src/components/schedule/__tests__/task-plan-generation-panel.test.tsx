@@ -244,6 +244,7 @@ describe("TaskPlanGenerationPanel", () => {
     expect(screen.getByText("Review existing documentation")).toBeInTheDocument();
   });
 
+
   it("stops an active generation job", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);

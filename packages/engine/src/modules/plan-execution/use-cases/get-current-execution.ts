@@ -11,8 +11,8 @@ import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
 import { currentNodeFromEffective } from "../projection/execution-graph-selectors";
 import { buildExecutionResponse } from "../projection/execution-response";
 
-export async function getCurrentExecution(input: { taskId: string }): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+export async function getCurrentExecution(input: { taskId: string; workBlockId?: string | null }): Promise<PlanExecutionResult> {
+  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId ?? null);
   if (!runtime) {
     return {
       taskId: input.taskId,
@@ -31,6 +31,7 @@ export async function getCurrentExecution(input: { taskId: string }): Promise<Pl
   const executionSession = await db.executionSession.findFirst({
     where: {
       taskId: input.taskId,
+      workBlockId: input.workBlockId ?? null,
       planId: runtime.planId,
       status: { in: ["Active", "Paused"] },
     },

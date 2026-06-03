@@ -61,7 +61,8 @@ export function createExecutionRoutes(engine: ChronaEngine) {
     async (c) => {
       try {
         const { taskId } = c.req.valid("param");
-        const result = await engine.tasks.execution.current({ taskId });
+        const workBlockId = c.req.query("workBlockId") || null;
+        const result = await engine.tasks.execution.current({ taskId, workBlockId });
         return c.json(result);
       } catch (cause) {
         const httpError = toHttpError(cause);

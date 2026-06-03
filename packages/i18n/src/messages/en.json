@@ -1126,6 +1126,7 @@
       "externalLockedHint": "Synced from {source}. Title and time are managed by the calendar source.",
       "occurrenceWindowLabel": "Occurrence",
       "occurrenceFallbackLabel": "Scheduled window",
+      "occurrenceSelectorLabel": "Select occurrence",
       "edit": "Edit",
       "deleteTask": "Delete Task",
       "moreActions": "More task actions",

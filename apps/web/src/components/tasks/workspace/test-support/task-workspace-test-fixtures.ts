@@ -92,6 +92,7 @@ export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixtu
       autoExecute: false,
       autoPlanGenerationTiming: "at_start",
       autoExecuteTiming: "at_start",
+      recurrenceRule: null,
       status: "Ready",
       priority: "High",
       dueAt: null,

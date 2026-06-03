@@ -110,24 +110,22 @@ describe("External calendar source API", () => {
     ]);
     expect(importedEvents.every((event: { recurrenceId: string | null }) => event.recurrenceId)).toBe(true);
 
-    // All occurrences collapse into a single recurring series task.
-    const seriesTaskIds = new Set(importedEvents.map((event: { taskId: string | null }) => event.taskId));
-    expect(seriesTaskIds.size).toBe(1);
+    const occurrenceTaskIds = importedEvents.map((event: { taskId: string | null }) => event.taskId);
+    expect(new Set(occurrenceTaskIds).size).toBe(1);
 
     const tasks = await db.task.findMany({
       where: { workspaceId },
-      include: { workBlocks: true },
+      include: { workBlocks: { orderBy: { scheduledStartAt: "asc" } } },
+      orderBy: { createdAt: "asc" },
     });
     expect(tasks.length).toBe(1);
-    const seriesTask = tasks[0];
-    expect(seriesTask.kind).toBe("recurring");
-    expect(seriesTask.recurrenceRule).toContain("FREQ=WEEKLY");
-    expect(seriesTask.seriesExternalUid).toBe("recurring-planning@example.test");
-
-    // One work block per occurrence, each linked back to its imported event.
-    expect(seriesTask.workBlocks.length).toBe(3);
+    expect(tasks[0]?.kind).toBe("recurring");
+    expect(tasks[0]?.recurrenceRule?.includes("FREQ=WEEKLY")).toBe(true);
+    expect(tasks[0]?.seriesExternalUid).toBeNull();
+    expect(tasks[0]?.workBlocks.length).toBe(3);
     expect(
-      seriesTask.workBlocks
+      tasks
+        .flatMap((task) => task.workBlocks)
         .map((block: { scheduledStartAt: Date }) => block.scheduledStartAt.toISOString())
         .sort(),
     ).toEqual([
