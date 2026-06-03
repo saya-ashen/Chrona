@@ -77,7 +77,6 @@ export async function appendRawEventLog(input: AppendRawEventLogInput) {
   const createData = {
       workspaceId: input.workspaceId,
       taskId: input.taskId ?? null,
-      workBlockId: input.workBlockId ?? null,
       runId: input.runId ?? null,
       taskSessionId: input.taskSessionId ?? null,
       executionSessionId: input.executionSessionId ?? null,
