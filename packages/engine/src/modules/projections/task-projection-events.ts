@@ -1,6 +1,7 @@
 type WorkspaceEventBase = {
   taskId: string;
   workspaceId: string;
+  workBlockId?: string | null;
   sequence: number;
   occurredAt: string;
   commandId?: string;
@@ -77,12 +78,14 @@ export function publishTaskProjectionEvent(event: TaskProjectionEvent) {
 export function publishTaskWorkspaceUpdatedEvent(input: {
   taskId: string;
   workspaceId: string;
+  workBlockId?: string | null;
   reason: string;
 }) {
   appendTaskWorkspaceEvent({
     type: "task_workspace_updated",
     taskId: input.taskId,
     workspaceId: input.workspaceId,
+    workBlockId: input.workBlockId,
     reason: input.reason,
     updatedAt: new Date().toISOString(),
   });

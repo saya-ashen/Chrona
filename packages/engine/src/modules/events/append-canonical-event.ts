@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 type EventContext = {
   workspaceId: string;
   taskId?: string | null;
+  workBlockId?: string | null;
   runId?: string | null;
   taskSessionId?: string | null;
   executionSessionId?: string | null;
@@ -76,6 +77,7 @@ export async function appendRawEventLog(input: AppendRawEventLogInput) {
   const createData = {
       workspaceId: input.workspaceId,
       taskId: input.taskId ?? null,
+      workBlockId: input.workBlockId ?? null,
       runId: input.runId ?? null,
       taskSessionId: input.taskSessionId ?? null,
       executionSessionId: input.executionSessionId ?? null,
@@ -123,6 +125,7 @@ export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
     eventVersion: input.eventVersion ?? 1,
     workspaceId: input.workspaceId,
     taskId: input.taskId ?? null,
+    workBlockId: input.workBlockId ?? null,
     runId: input.runId ?? null,
     taskSessionId: input.taskSessionId ?? null,
     executionSessionId: input.executionSessionId ?? null,
@@ -163,6 +166,7 @@ export async function appendTaskTimelineItem(input: AppendTaskTimelineItemInput)
     data: {
       workspaceId: input.workspaceId,
       taskId: input.taskId,
+      workBlockId: input.workBlockId ?? null,
       runId: input.runId ?? null,
       executionSessionId: input.executionSessionId ?? null,
       nodeId: input.nodeId ?? null,

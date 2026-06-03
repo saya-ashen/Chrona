@@ -36,6 +36,7 @@ export type AiRuntimeInvocationInput = {
   taskSessionId: string;
   runtimeName: string;
   runtimeSessionKey: string;
+  workBlockId?: string | null;
   nodeContext?: {
     nodeId: string;
     nodeTitle: string;
@@ -121,6 +122,7 @@ export class AiRuntimeInvoker {
         eventPersistence: {
           workspaceId: task.workspaceId,
           taskId: input.taskId,
+          workBlockId: input.workBlockId,
           runId: run.id,
           runtimeName: input.runtimeName,
           taskSessionId: input.taskSessionId,
@@ -489,6 +491,7 @@ async function collectProviderRunSnapshot(
 type RuntimeEventPersistenceContext = {
   workspaceId: string;
   taskId: string;
+  workBlockId?: string | null;
   runId: string;
   taskSessionId?: string | null;
   planId?: string | null;
@@ -545,6 +548,7 @@ async function persistProviderRuntimeEvent(input: {
       eventType: `provider.${input.event.type}`,
       workspaceId: context.workspaceId,
       taskId: context.taskId,
+      workBlockId: context.workBlockId,
       runId: context.runId,
       taskSessionId: context.taskSessionId ?? null,
       planId: context.planId ?? null,

@@ -34,6 +34,7 @@ async function recordIgnoredRuntimeSync(input: {
     eventType: "execution.runtime_sync_ignored",
     workspaceId: input.workspaceId,
     taskId: input.taskId,
+    workBlockId: null,
     actorType: "runtime",
     actorId: "runtime-sync",
     source: "execution-kernel",

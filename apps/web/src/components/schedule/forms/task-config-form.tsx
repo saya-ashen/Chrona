@@ -33,25 +33,7 @@ import {
 } from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 
-const RECURRENCE_PRESETS = ["none", "daily", "weekly", "monthly", "custom"] as const;
-type RecurrencePreset = (typeof RECURRENCE_PRESETS)[number];
-const RECURRENCE_PRESET_RRULE: Record<Exclude<RecurrencePreset, "none" | "custom">, string> = {
-  daily: "FREQ=DAILY",
-  weekly: "FREQ=WEEKLY",
-  monthly: "FREQ=MONTHLY",
-};
-
-function recurrencePresetFromRule(rule: string | null | undefined): RecurrencePreset {
-  if (!rule) return "none";
-  const preset = Object.entries(RECURRENCE_PRESET_RRULE).find(([, value]) => value === rule)?.[0];
-  return (preset as RecurrencePreset | undefined) ?? "custom";
-}
-
-function recurrenceRuleFromState(mode: RecurrencePreset, customRule: string) {
-  if (mode === "none") return null;
-  if (mode === "custom") return customRule.trim() || null;
-  return RECURRENCE_PRESET_RRULE[mode];
-}
+import { RECURRENCE_PRESETS, recurrencePresetFromRule, recurrenceRuleFromState, type RecurrencePreset } from "@/lib/recurrence-presets";
 
 export type TaskConfigFormDraft = {
   title: string;

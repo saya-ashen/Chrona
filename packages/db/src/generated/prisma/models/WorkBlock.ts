@@ -260,6 +260,8 @@ export type WorkBlockWhereInput = {
   taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
   executionSessions?: Prisma.ExecutionSessionListRelationFilter
   importedCalendarEvent?: Prisma.XOR<Prisma.ImportedCalendarEventNullableScalarRelationFilter, Prisma.ImportedCalendarEventWhereInput> | null
+  events?: Prisma.EventListRelationFilter
+  timelineItems?: Prisma.TaskTimelineItemListRelationFilter
 }
 
 export type WorkBlockOrderByWithRelationInput = {
@@ -283,6 +285,8 @@ export type WorkBlockOrderByWithRelationInput = {
   taskPlanRuns?: Prisma.TaskPlanRunOrderByRelationAggregateInput
   executionSessions?: Prisma.ExecutionSessionOrderByRelationAggregateInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventOrderByWithRelationInput
+  events?: Prisma.EventOrderByRelationAggregateInput
+  timelineItems?: Prisma.TaskTimelineItemOrderByRelationAggregateInput
 }
 
 export type WorkBlockWhereUniqueInput = Prisma.AtLeast<{
@@ -310,6 +314,8 @@ export type WorkBlockWhereUniqueInput = Prisma.AtLeast<{
   taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
   executionSessions?: Prisma.ExecutionSessionListRelationFilter
   importedCalendarEvent?: Prisma.XOR<Prisma.ImportedCalendarEventNullableScalarRelationFilter, Prisma.ImportedCalendarEventWhereInput> | null
+  events?: Prisma.EventListRelationFilter
+  timelineItems?: Prisma.TaskTimelineItemListRelationFilter
 }, "id" | "taskId_recurrenceKey">
 
 export type WorkBlockOrderByWithAggregationInput = {
@@ -371,6 +377,8 @@ export type WorkBlockCreateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUncheckedCreateInput = {
@@ -392,6 +400,8 @@ export type WorkBlockUncheckedCreateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUpdateInput = {
@@ -413,6 +423,8 @@ export type WorkBlockUpdateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateInput = {
@@ -434,6 +446,8 @@ export type WorkBlockUncheckedUpdateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockCreateManyInput = {
@@ -688,6 +702,38 @@ export type WorkBlockUpdateOneWithoutTaskPlanRunsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WorkBlockUpdateToOneWithWhereWithoutTaskPlanRunsInput, Prisma.WorkBlockUpdateWithoutTaskPlanRunsInput>, Prisma.WorkBlockUncheckedUpdateWithoutTaskPlanRunsInput>
 }
 
+export type WorkBlockCreateNestedOneWithoutEventsInput = {
+  create?: Prisma.XOR<Prisma.WorkBlockCreateWithoutEventsInput, Prisma.WorkBlockUncheckedCreateWithoutEventsInput>
+  connectOrCreate?: Prisma.WorkBlockCreateOrConnectWithoutEventsInput
+  connect?: Prisma.WorkBlockWhereUniqueInput
+}
+
+export type WorkBlockUpdateOneWithoutEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkBlockCreateWithoutEventsInput, Prisma.WorkBlockUncheckedCreateWithoutEventsInput>
+  connectOrCreate?: Prisma.WorkBlockCreateOrConnectWithoutEventsInput
+  upsert?: Prisma.WorkBlockUpsertWithoutEventsInput
+  disconnect?: Prisma.WorkBlockWhereInput | boolean
+  delete?: Prisma.WorkBlockWhereInput | boolean
+  connect?: Prisma.WorkBlockWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkBlockUpdateToOneWithWhereWithoutEventsInput, Prisma.WorkBlockUpdateWithoutEventsInput>, Prisma.WorkBlockUncheckedUpdateWithoutEventsInput>
+}
+
+export type WorkBlockCreateNestedOneWithoutTimelineItemsInput = {
+  create?: Prisma.XOR<Prisma.WorkBlockCreateWithoutTimelineItemsInput, Prisma.WorkBlockUncheckedCreateWithoutTimelineItemsInput>
+  connectOrCreate?: Prisma.WorkBlockCreateOrConnectWithoutTimelineItemsInput
+  connect?: Prisma.WorkBlockWhereUniqueInput
+}
+
+export type WorkBlockUpdateOneWithoutTimelineItemsNestedInput = {
+  create?: Prisma.XOR<Prisma.WorkBlockCreateWithoutTimelineItemsInput, Prisma.WorkBlockUncheckedCreateWithoutTimelineItemsInput>
+  connectOrCreate?: Prisma.WorkBlockCreateOrConnectWithoutTimelineItemsInput
+  upsert?: Prisma.WorkBlockUpsertWithoutTimelineItemsInput
+  disconnect?: Prisma.WorkBlockWhereInput | boolean
+  delete?: Prisma.WorkBlockWhereInput | boolean
+  connect?: Prisma.WorkBlockWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorkBlockUpdateToOneWithWhereWithoutTimelineItemsInput, Prisma.WorkBlockUpdateWithoutTimelineItemsInput>, Prisma.WorkBlockUncheckedUpdateWithoutTimelineItemsInput>
+}
+
 export type EnumWorkBlockStatusFieldUpdateOperationsInput = {
   set?: $Enums.WorkBlockStatus
 }
@@ -730,6 +776,8 @@ export type WorkBlockCreateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUncheckedCreateWithoutWorkspaceInput = {
@@ -750,6 +798,8 @@ export type WorkBlockUncheckedCreateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockCreateOrConnectWithoutWorkspaceInput = {
@@ -815,6 +865,8 @@ export type WorkBlockCreateWithoutImportedCalendarEventInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutWorkBlockInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUncheckedCreateWithoutImportedCalendarEventInput = {
@@ -835,6 +887,8 @@ export type WorkBlockUncheckedCreateWithoutImportedCalendarEventInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutWorkBlockInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockCreateOrConnectWithoutImportedCalendarEventInput = {
@@ -871,6 +925,8 @@ export type WorkBlockUpdateWithoutImportedCalendarEventInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutWorkBlockNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateWithoutImportedCalendarEventInput = {
@@ -891,6 +947,8 @@ export type WorkBlockUncheckedUpdateWithoutImportedCalendarEventInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutWorkBlockNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockCreateWithoutTaskInput = {
@@ -911,6 +969,8 @@ export type WorkBlockCreateWithoutTaskInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUncheckedCreateWithoutTaskInput = {
@@ -931,6 +991,8 @@ export type WorkBlockUncheckedCreateWithoutTaskInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockCreateOrConnectWithoutTaskInput = {
@@ -976,6 +1038,8 @@ export type WorkBlockCreateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUncheckedCreateWithoutTaskPlansInput = {
@@ -996,6 +1060,8 @@ export type WorkBlockUncheckedCreateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockCreateOrConnectWithoutTaskPlansInput = {
@@ -1032,6 +1098,8 @@ export type WorkBlockUpdateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateWithoutTaskPlansInput = {
@@ -1052,6 +1120,8 @@ export type WorkBlockUncheckedUpdateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockCreateWithoutTaskPlanRunsInput = {
@@ -1072,6 +1142,8 @@ export type WorkBlockCreateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUncheckedCreateWithoutTaskPlanRunsInput = {
@@ -1092,6 +1164,8 @@ export type WorkBlockUncheckedCreateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutWorkBlockInput
   executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockCreateOrConnectWithoutTaskPlanRunsInput = {
@@ -1128,6 +1202,8 @@ export type WorkBlockUpdateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateWithoutTaskPlanRunsInput = {
@@ -1148,6 +1224,216 @@ export type WorkBlockUncheckedUpdateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
+}
+
+export type WorkBlockCreateWithoutEventsInput = {
+  id?: string
+  planId?: string | null
+  recurrenceKey?: string | null
+  title: string
+  status?: $Enums.WorkBlockStatus
+  scheduledStartAt: Date | string
+  scheduledEndAt: Date | string
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  trigger?: $Enums.WorkBlockTrigger
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutWorkBlocksInput
+  task: Prisma.TaskCreateNestedOneWithoutWorkBlocksInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutWorkBlockInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
+}
+
+export type WorkBlockUncheckedCreateWithoutEventsInput = {
+  id?: string
+  workspaceId: string
+  taskId: string
+  planId?: string | null
+  recurrenceKey?: string | null
+  title: string
+  status?: $Enums.WorkBlockStatus
+  scheduledStartAt: Date | string
+  scheduledEndAt: Date | string
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  trigger?: $Enums.WorkBlockTrigger
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutWorkBlockInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
+}
+
+export type WorkBlockCreateOrConnectWithoutEventsInput = {
+  where: Prisma.WorkBlockWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkBlockCreateWithoutEventsInput, Prisma.WorkBlockUncheckedCreateWithoutEventsInput>
+}
+
+export type WorkBlockUpsertWithoutEventsInput = {
+  update: Prisma.XOR<Prisma.WorkBlockUpdateWithoutEventsInput, Prisma.WorkBlockUncheckedUpdateWithoutEventsInput>
+  create: Prisma.XOR<Prisma.WorkBlockCreateWithoutEventsInput, Prisma.WorkBlockUncheckedCreateWithoutEventsInput>
+  where?: Prisma.WorkBlockWhereInput
+}
+
+export type WorkBlockUpdateToOneWithWhereWithoutEventsInput = {
+  where?: Prisma.WorkBlockWhereInput
+  data: Prisma.XOR<Prisma.WorkBlockUpdateWithoutEventsInput, Prisma.WorkBlockUncheckedUpdateWithoutEventsInput>
+}
+
+export type WorkBlockUpdateWithoutEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkBlockStatusFieldUpdateOperationsInput | $Enums.WorkBlockStatus
+  scheduledStartAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  scheduledEndAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  trigger?: Prisma.EnumWorkBlockTriggerFieldUpdateOperationsInput | $Enums.WorkBlockTrigger
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutWorkBlocksNestedInput
+  task?: Prisma.TaskUpdateOneRequiredWithoutWorkBlocksNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutWorkBlockNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
+}
+
+export type WorkBlockUncheckedUpdateWithoutEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkBlockStatusFieldUpdateOperationsInput | $Enums.WorkBlockStatus
+  scheduledStartAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  scheduledEndAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  trigger?: Prisma.EnumWorkBlockTriggerFieldUpdateOperationsInput | $Enums.WorkBlockTrigger
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutWorkBlockNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
+}
+
+export type WorkBlockCreateWithoutTimelineItemsInput = {
+  id?: string
+  planId?: string | null
+  recurrenceKey?: string | null
+  title: string
+  status?: $Enums.WorkBlockStatus
+  scheduledStartAt: Date | string
+  scheduledEndAt: Date | string
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  trigger?: $Enums.WorkBlockTrigger
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutWorkBlocksInput
+  task: Prisma.TaskCreateNestedOneWithoutWorkBlocksInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutWorkBlockInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutWorkBlockInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+}
+
+export type WorkBlockUncheckedCreateWithoutTimelineItemsInput = {
+  id?: string
+  workspaceId: string
+  taskId: string
+  planId?: string | null
+  recurrenceKey?: string | null
+  title: string
+  status?: $Enums.WorkBlockStatus
+  scheduledStartAt: Date | string
+  scheduledEndAt: Date | string
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  trigger?: $Enums.WorkBlockTrigger
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutWorkBlockInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutWorkBlockInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+}
+
+export type WorkBlockCreateOrConnectWithoutTimelineItemsInput = {
+  where: Prisma.WorkBlockWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorkBlockCreateWithoutTimelineItemsInput, Prisma.WorkBlockUncheckedCreateWithoutTimelineItemsInput>
+}
+
+export type WorkBlockUpsertWithoutTimelineItemsInput = {
+  update: Prisma.XOR<Prisma.WorkBlockUpdateWithoutTimelineItemsInput, Prisma.WorkBlockUncheckedUpdateWithoutTimelineItemsInput>
+  create: Prisma.XOR<Prisma.WorkBlockCreateWithoutTimelineItemsInput, Prisma.WorkBlockUncheckedCreateWithoutTimelineItemsInput>
+  where?: Prisma.WorkBlockWhereInput
+}
+
+export type WorkBlockUpdateToOneWithWhereWithoutTimelineItemsInput = {
+  where?: Prisma.WorkBlockWhereInput
+  data: Prisma.XOR<Prisma.WorkBlockUpdateWithoutTimelineItemsInput, Prisma.WorkBlockUncheckedUpdateWithoutTimelineItemsInput>
+}
+
+export type WorkBlockUpdateWithoutTimelineItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkBlockStatusFieldUpdateOperationsInput | $Enums.WorkBlockStatus
+  scheduledStartAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  scheduledEndAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  trigger?: Prisma.EnumWorkBlockTriggerFieldUpdateOperationsInput | $Enums.WorkBlockTrigger
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutWorkBlocksNestedInput
+  task?: Prisma.TaskUpdateOneRequiredWithoutWorkBlocksNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutWorkBlockNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+}
+
+export type WorkBlockUncheckedUpdateWithoutTimelineItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWorkBlockStatusFieldUpdateOperationsInput | $Enums.WorkBlockStatus
+  scheduledStartAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  scheduledEndAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  trigger?: Prisma.EnumWorkBlockTriggerFieldUpdateOperationsInput | $Enums.WorkBlockTrigger
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutWorkBlockNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
+  importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockCreateWithoutExecutionSessionsInput = {
@@ -1168,6 +1454,8 @@ export type WorkBlockCreateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutWorkBlockInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockUncheckedCreateWithoutExecutionSessionsInput = {
@@ -1188,6 +1476,8 @@ export type WorkBlockUncheckedCreateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutWorkBlockInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutWorkBlockInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedCreateNestedOneWithoutWorkBlockInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutWorkBlockInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput
 }
 
 export type WorkBlockCreateOrConnectWithoutExecutionSessionsInput = {
@@ -1224,6 +1514,8 @@ export type WorkBlockUpdateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutWorkBlockNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateWithoutExecutionSessionsInput = {
@@ -1244,6 +1536,8 @@ export type WorkBlockUncheckedUpdateWithoutExecutionSessionsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutWorkBlockNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockCreateManyWorkspaceInput = {
@@ -1280,6 +1574,8 @@ export type WorkBlockUpdateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateWithoutWorkspaceInput = {
@@ -1300,6 +1596,8 @@ export type WorkBlockUncheckedUpdateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateManyWithoutWorkspaceInput = {
@@ -1352,6 +1650,8 @@ export type WorkBlockUpdateWithoutTaskInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateWithoutTaskInput = {
@@ -1372,6 +1672,8 @@ export type WorkBlockUncheckedUpdateWithoutTaskInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutWorkBlockNestedInput
   executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutWorkBlockNestedInput
   importedCalendarEvent?: Prisma.ImportedCalendarEventUncheckedUpdateOneWithoutWorkBlockNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutWorkBlockNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput
 }
 
 export type WorkBlockUncheckedUpdateManyWithoutTaskInput = {
@@ -1399,12 +1701,16 @@ export type WorkBlockCountOutputType = {
   taskPlans: number
   taskPlanRuns: number
   executionSessions: number
+  events: number
+  timelineItems: number
 }
 
 export type WorkBlockCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   taskPlans?: boolean | WorkBlockCountOutputTypeCountTaskPlansArgs
   taskPlanRuns?: boolean | WorkBlockCountOutputTypeCountTaskPlanRunsArgs
   executionSessions?: boolean | WorkBlockCountOutputTypeCountExecutionSessionsArgs
+  events?: boolean | WorkBlockCountOutputTypeCountEventsArgs
+  timelineItems?: boolean | WorkBlockCountOutputTypeCountTimelineItemsArgs
 }
 
 /**
@@ -1438,6 +1744,20 @@ export type WorkBlockCountOutputTypeCountExecutionSessionsArgs<ExtArgs extends r
   where?: Prisma.ExecutionSessionWhereInput
 }
 
+/**
+ * WorkBlockCountOutputType without action
+ */
+export type WorkBlockCountOutputTypeCountEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.EventWhereInput
+}
+
+/**
+ * WorkBlockCountOutputType without action
+ */
+export type WorkBlockCountOutputTypeCountTimelineItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskTimelineItemWhereInput
+}
+
 
 export type WorkBlockSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1460,6 +1780,8 @@ export type WorkBlockSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   taskPlanRuns?: boolean | Prisma.WorkBlock$taskPlanRunsArgs<ExtArgs>
   executionSessions?: boolean | Prisma.WorkBlock$executionSessionsArgs<ExtArgs>
   importedCalendarEvent?: boolean | Prisma.WorkBlock$importedCalendarEventArgs<ExtArgs>
+  events?: boolean | Prisma.WorkBlock$eventsArgs<ExtArgs>
+  timelineItems?: boolean | Prisma.WorkBlock$timelineItemsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkBlockCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workBlock"]>
 
@@ -1526,6 +1848,8 @@ export type WorkBlockInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   taskPlanRuns?: boolean | Prisma.WorkBlock$taskPlanRunsArgs<ExtArgs>
   executionSessions?: boolean | Prisma.WorkBlock$executionSessionsArgs<ExtArgs>
   importedCalendarEvent?: boolean | Prisma.WorkBlock$importedCalendarEventArgs<ExtArgs>
+  events?: boolean | Prisma.WorkBlock$eventsArgs<ExtArgs>
+  timelineItems?: boolean | Prisma.WorkBlock$timelineItemsArgs<ExtArgs>
   _count?: boolean | Prisma.WorkBlockCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WorkBlockIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1546,6 +1870,8 @@ export type $WorkBlockPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     taskPlanRuns: Prisma.$TaskPlanRunPayload<ExtArgs>[]
     executionSessions: Prisma.$ExecutionSessionPayload<ExtArgs>[]
     importedCalendarEvent: Prisma.$ImportedCalendarEventPayload<ExtArgs> | null
+    events: Prisma.$EventPayload<ExtArgs>[]
+    timelineItems: Prisma.$TaskTimelineItemPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1962,6 +2288,8 @@ export interface Prisma__WorkBlockClient<T, Null = never, ExtArgs extends runtim
   taskPlanRuns<T extends Prisma.WorkBlock$taskPlanRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkBlock$taskPlanRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   executionSessions<T extends Prisma.WorkBlock$executionSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkBlock$executionSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExecutionSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   importedCalendarEvent<T extends Prisma.WorkBlock$importedCalendarEventArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkBlock$importedCalendarEventArgs<ExtArgs>>): Prisma.Prisma__ImportedCalendarEventClient<runtime.Types.Result.GetResult<Prisma.$ImportedCalendarEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  events<T extends Prisma.WorkBlock$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkBlock$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  timelineItems<T extends Prisma.WorkBlock$timelineItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkBlock$timelineItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskTimelineItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2492,6 +2820,54 @@ export type WorkBlock$importedCalendarEventArgs<ExtArgs extends runtime.Types.Ex
    */
   include?: Prisma.ImportedCalendarEventInclude<ExtArgs> | null
   where?: Prisma.ImportedCalendarEventWhereInput
+}
+
+/**
+ * WorkBlock.events
+ */
+export type WorkBlock$eventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Event
+   */
+  select?: Prisma.EventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Event
+   */
+  omit?: Prisma.EventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EventInclude<ExtArgs> | null
+  where?: Prisma.EventWhereInput
+  orderBy?: Prisma.EventOrderByWithRelationInput | Prisma.EventOrderByWithRelationInput[]
+  cursor?: Prisma.EventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.EventScalarFieldEnum | Prisma.EventScalarFieldEnum[]
+}
+
+/**
+ * WorkBlock.timelineItems
+ */
+export type WorkBlock$timelineItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskTimelineItem
+   */
+  select?: Prisma.TaskTimelineItemSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskTimelineItem
+   */
+  omit?: Prisma.TaskTimelineItemOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskTimelineItemInclude<ExtArgs> | null
+  where?: Prisma.TaskTimelineItemWhereInput
+  orderBy?: Prisma.TaskTimelineItemOrderByWithRelationInput | Prisma.TaskTimelineItemOrderByWithRelationInput[]
+  cursor?: Prisma.TaskTimelineItemWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskTimelineItemScalarFieldEnum | Prisma.TaskTimelineItemScalarFieldEnum[]
 }
 
 /**

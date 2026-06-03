@@ -167,6 +167,8 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const queryClient = useQueryClient();
   const taskId = initialData.task.id;
   const selectedWorkBlockId = initialData.task.currentWorkBlock?.id ?? null;
+  const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
+  const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
   const pageQuery = useQuery({
     queryKey: taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId),
@@ -199,6 +201,12 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     setWorkspaceEvents((current) => [...current.slice(-199), event]);
   }, []);
   useTaskWorkspaceEventStream(taskId, refreshWorkspacePage, handleWorkspaceEvent);
+
+  useEffect(() => {
+    if (previousWorkBlockKeyRef.current === selectedWorkBlockKey) return;
+    previousWorkBlockKeyRef.current = selectedWorkBlockKey;
+    setWorkspaceEvents([]);
+  }, [selectedWorkBlockKey]);
 
   useEffect(() => {
     if (!isWorkspaceActive(pageData)) {

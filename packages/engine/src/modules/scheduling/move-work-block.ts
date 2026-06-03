@@ -49,6 +49,7 @@ export async function moveWorkBlock(input: {
     eventType: "task.schedule_changed",
     workspaceId: block.workspaceId,
     taskId: block.taskId,
+    workBlockId: block.id,
     actorType: "user",
     actorId: "server-action",
     source: "ui",

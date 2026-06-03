@@ -612,10 +612,12 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
       timelineItems: {
+        where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
         orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
         take: 100,
       },
       events: {
+        where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
         orderBy: { ingestSequence: "desc" },
         take: 300,
       },
@@ -668,7 +670,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
   const recurrenceOccurrences = [{ id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks }];
   const savedPlan = latestSavedPlan;
   const aiPlanGenerationStatus: TaskPlanGenerationStatus =
-    isTaskPlanGenerationRunning({ taskId })
+    isTaskPlanGenerationRunning({ taskId, workBlockId: selectedWorkBlockId })
       ? "generating"
       : savedPlan !== null && savedPlan.status === "accepted"
         ? "accepted"

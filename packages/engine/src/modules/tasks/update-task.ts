@@ -317,6 +317,7 @@ export async function updateTask(
     eventType: "task.updated",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     actorType: "user",
     actorId: "server-action",
     source: "ui",

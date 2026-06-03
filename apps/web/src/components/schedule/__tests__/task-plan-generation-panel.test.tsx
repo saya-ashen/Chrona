@@ -153,6 +153,13 @@ function createSseResponse(events: Array<{ event: string; data: unknown }>) {
   );
 }
 
+function createJsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -166,18 +173,21 @@ afterAll(() => {
 
 describe("TaskPlanGenerationPanel", () => {
   it("shows empty state and does not request a plan when autoRequest is disabled", () => {
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(createJsonResponse({ generationSession: null }));
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     render(<TaskPlanGenerationPanel {...defaultProps} />);
 
     expect(screen.getByText(/No plan yet/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Generate plan/i })).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/tasks/task_1/plan/generations",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("renders an incoming saved plan without requesting generation", async () => {
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(createJsonResponse({ generationSession: null }));
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     render(
@@ -194,29 +204,47 @@ describe("TaskPlanGenerationPanel", () => {
     expect(await screen.findByLabelText("Task plan graph")).toBeInTheDocument();
     expect(screen.getAllByText("Review existing documentation").length).toBeGreaterThan(0);
     expect(screen.getByText("120 min")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/tasks/task_1/plan/generations",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("shows generation state from the task while a backend job is active", () => {
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(createJsonResponse({ generationSession: null }));
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     render(<TaskPlanGenerationPanel {...defaultProps} generationStatus="generating" />);
 
     expect(screen.getByText(/AI is planning task/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/tasks/task_1/plan/generations",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("requests a new plan on click and forwards the generated saved plan", async () => {
     const onPlanLoaded = vi.fn();
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.endsWith("/plan/generations/active")) {
+        return Promise.resolve(createJsonResponse({ generationSession: null }));
+      }
+
+      return Promise.resolve(
         createSseResponse([
           { event: "status", data: { message: "Thinking" } },
           { event: "partial", data: { text: "Drafting steps" } },
           { event: "result", data: { type: "result", result: sampleReadModel } },
         ]),
       );
+    });
     vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const user = userEvent.setup();

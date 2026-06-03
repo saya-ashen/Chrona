@@ -43,6 +43,7 @@ export type ExecutionActionInput =
       sessionId?: string;
       nodeId?: string;
       inputFields: Record<string, string>;
+      workBlockId?: string;
       idempotencyKey?: string;
     }
   | {
@@ -52,6 +53,7 @@ export type ExecutionActionInput =
       decision: "approve" | "reject" | "request_changes";
       feedback?: string;
       editedContent?: string;
+      workBlockId?: string;
       idempotencyKey?: string;
     }
   | {
@@ -59,6 +61,7 @@ export type ExecutionActionInput =
       sessionId?: string;
       nodeId?: string;
       note?: string;
+      workBlockId?: string;
       idempotencyKey?: string;
     }
   | {

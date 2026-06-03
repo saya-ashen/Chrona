@@ -216,6 +216,7 @@ function pageData(input: {
   plan: TaskPlanReadModel | null;
   aiPlanGenerationStatus?: TaskPageData["task"]["aiPlanGenerationStatus"];
   runStatus?: string | null;
+  workBlockId?: string | null;
 }): TaskPageData {
   return {
     defaultExecutionRuntime: "local",
@@ -256,6 +257,22 @@ function pageData(input: {
     scheduleProposals: [],
     approvals: [],
     artifacts: [],
+  };
+}
+
+function recurringPageData(input: Parameters<typeof pageData>[0] & { workBlockId: string }): TaskPageData {
+  const data = pageData(input);
+  return {
+    ...data,
+    task: {
+      ...data.task,
+      currentWorkBlock: {
+        id: input.workBlockId,
+        status: input.taskStatus,
+        scheduledStartAt: "2026-05-17T00:00:00.000Z",
+        scheduledEndAt: "2026-05-17T01:00:00.000Z",
+      },
+    },
   };
 }
 
@@ -348,6 +365,64 @@ afterEach(() => {
 
 // eslint-disable-next-line max-lines-per-function -- workspace sync scenarios share the same hook fixtures.
 describe("task workspace page synchronization", () => {
+  it("resets plan and activity state when switching recurring work block", async () => {
+    const firstPlan = planReadModel({ id: "plan-first", status: "draft", title: "First occurrence plan" });
+    const secondPlan = planReadModel({ id: "plan-second", status: "accepted", title: "Second occurrence plan" });
+    let task = recurringPageData({
+      taskStatus: "Ready",
+      plan: firstPlan,
+      aiPlanGenerationStatus: "waiting_acceptance",
+      workBlockId: "block-first",
+    }).task;
+    let workspaceEvents: TaskWorkspaceSseEvent[] = [];
+    mocks.currentExecutionResponse = executionResult({ status: "running", message: "First running" });
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: secondPlan },
+    ];
+
+    const { result, rerender } = renderHook(
+      () => useTaskWorkspacePlanState(task, vi.fn(async () => undefined), workspaceEvents),
+      { wrapper: createQueryWrapper() },
+    );
+
+    workspaceEvents = [nextWorkspaceEvent({
+      type: "execution.runtime_event",
+      eventKind: "tool_started",
+      action: "start_manual",
+      nodeId: "node-1",
+      nodeTitle: "First node",
+      runtimeName: "hermes",
+      provider: "hermes",
+      runId: "run-1",
+      event: { type: "assistant_text_delta", text: "First occurrence activity" },
+    })];
+
+    await act(async () => {
+      rerender();
+    });
+
+    expect(result.current.plan?.id).toBe("plan-first");
+    expect(result.current.planGenerationStatus).toBe("waiting_acceptance");
+    expect(result.current.latestActivitySummary).toBe("First occurrence activity");
+
+    task = recurringPageData({
+      taskStatus: "Ready",
+      plan: secondPlan,
+      aiPlanGenerationStatus: "accepted",
+      workBlockId: "block-second",
+    }).task;
+    workspaceEvents = [];
+
+    await act(async () => {
+      rerender();
+    });
+
+    await waitFor(() => expect(result.current.plan?.id).toBe("plan-second"));
+    expect(result.current.planGenerationStatus).toBe("accepted");
+    expect(result.current.latestActivitySummary).toBeNull();
+    expect(result.current.runtimeEvents).toEqual([]);
+  });
+
   it("updates the rendered plan graph when a projection event refetches the full workspace page", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });
     const runningPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });

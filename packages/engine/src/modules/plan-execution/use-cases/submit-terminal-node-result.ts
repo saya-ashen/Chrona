@@ -31,12 +31,13 @@ async function canContinueTerminalResult(input: {
     return { canContinue: false, reason: "no_accepted_plan" };
   }
 
-  const persisted = await getPlanRun(input.taskId, accepted.compiledPlan.editablePlanId);
+  const persisted = await getPlanRun(input.taskId, accepted.compiledPlan.editablePlanId, accepted.workBlockId);
   if (!persisted?.graph) {
-    return {
-      canContinue: false,
-      planId: accepted.compiledPlan.editablePlanId,
-      reason: "no_runtime_graph",
+      return {
+        canContinue: false,
+        planId: accepted.compiledPlan.editablePlanId,
+        workBlockId: accepted.workBlockId,
+        reason: "no_runtime_graph",
     };
   }
 
@@ -47,16 +48,18 @@ async function canContinueTerminalResult(input: {
   });
 
   if (!effective.nodes.some((node) => node.ready)) {
-    return {
-      canContinue: false,
-      planId: accepted.compiledPlan.editablePlanId,
-      reason: "no_ready_node",
+      return {
+        canContinue: false,
+        planId: accepted.compiledPlan.editablePlanId,
+        workBlockId: accepted.workBlockId,
+        reason: "no_ready_node",
     };
   }
 
   return {
     canContinue: true,
     planId: accepted.compiledPlan.editablePlanId,
+    workBlockId: accepted.workBlockId,
   };
 }
 
@@ -118,6 +121,7 @@ export async function submitTerminalNodeResult(input: {
             reason: "terminal_result_continuation",
             sessionId,
             resumeReadyNode: true,
+            workBlockId: continuation.workBlockId,
           });
         })
         .catch((cause: unknown) => {

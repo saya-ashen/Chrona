@@ -257,7 +257,9 @@ export async function getLatestTaskPlanReadModel(
 ): Promise<TaskPlanReadModel | null> {
   const savedPlan =
     (await getAcceptedCompiledPlan(taskId, workBlockId))
-    ?? (await getLatestCompiledPlan(taskId, workBlockId));
+    ?? (await getLatestCompiledPlan(taskId, workBlockId))
+    ?? (workBlockId ? (await getAcceptedCompiledPlan(taskId, null)) : null)
+    ?? (workBlockId ? (await getLatestCompiledPlan(taskId, null)) : null);
 
   if (!savedPlan) {
     return null;

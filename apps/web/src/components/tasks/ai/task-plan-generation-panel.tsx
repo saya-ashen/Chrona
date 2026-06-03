@@ -172,7 +172,9 @@ export function TaskPlanGenerationPanel({
     onPlanLoaded,
   });
 
-  const activeReadModel = result ?? savedPlan ?? null;
+  const activeReadModel = savedPlan?.status === "accepted"
+    ? savedPlan
+    : result ?? savedPlan ?? null;
   const compiledPlan = activeReadModel?.compiledPlan ?? null;
 
   const planGraph = useMemo(() => {

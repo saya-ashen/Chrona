@@ -16,9 +16,11 @@ export async function generateAndAcceptTaskPlan(input: { taskId: string; workBlo
 
       if (event.type === "result") {
         if (input.accept ?? true) {
-          const latest = await getLatestCompiledPlan(input.taskId, workBlockId);
-          const planId = latest?.compiledPlan.editablePlanId ?? event.result.id;
-          await taskPlanning.accept({ taskId: input.taskId, planId, workBlockId });
+          const planId = event.result.id;
+          const latest = await getLatestCompiledPlan(input.taskId, workBlockId)
+            ?? await getLatestCompiledPlan(input.taskId, null);
+          const effectiveWorkBlockId = latest?.workBlockId ?? null;
+          await taskPlanning.accept({ taskId: input.taskId, planId, workBlockId: effectiveWorkBlockId });
           acceptedPlanId = planId;
         }
 

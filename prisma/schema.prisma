@@ -687,6 +687,7 @@ model Event {
   eventVersion       Int                @default(1)
   workspaceId        String
   taskId             String?
+  workBlockId        String?
   runId              String?
   taskSessionId      String?
   executionSessionId String?
@@ -713,12 +714,13 @@ model Event {
   createdAt          DateTime           @default(now())
   workspace          Workspace          @relation(fields: [workspaceId], references: [id])
   task               Task?              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workBlock          WorkBlock?         @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   run                Run?               @relation(fields: [runId], references: [id], onDelete: Cascade)
   rawEvent           RawEventLog?       @relation(fields: [rawEventId], references: [id], onDelete: SetNull)
   timelineItems      TaskTimelineItem[]
 
-  @@index([taskId, ingestSequence])
-  @@index([taskId, nodeId, ingestSequence])
+  @@index([taskId, workBlockId, ingestSequence])
+  @@index([taskId, nodeId, workBlockId, ingestSequence])
   @@index([runId, ingestSequence])
   @@index([nodeAttemptId, ingestSequence])
   @@index([correlationId, ingestSequence])
@@ -836,6 +838,7 @@ model TaskTimelineItem {
   id                 String       @id @default(cuid())
   workspaceId        String
   taskId             String
+  workBlockId        String?
   runId              String?
   executionSessionId String?
   nodeId             String?
@@ -853,12 +856,13 @@ model TaskTimelineItem {
   createdAt          DateTime     @default(now())
   workspace          Workspace    @relation(fields: [workspaceId], references: [id])
   task               Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workBlock          WorkBlock?   @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   run                Run?         @relation(fields: [runId], references: [id], onDelete: Cascade)
   event              Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   rawEvent           RawEventLog? @relation(fields: [rawEventId], references: [id], onDelete: SetNull)
 
-  @@index([taskId, sortTime])
-  @@index([taskId, nodeId, sortTime])
+  @@index([taskId, workBlockId, sortTime])
+  @@index([taskId, nodeId, workBlockId, sortTime])
   @@index([runId, sortTime])
   @@index([eventId])
 }
@@ -1025,6 +1029,8 @@ model WorkBlock {
   taskPlanRuns      TaskPlanRun[]
   executionSessions ExecutionSession[]
   importedCalendarEvent ImportedCalendarEvent?
+  events            Event[]
+  timelineItems     TaskTimelineItem[]
 
   @@index([workspaceId, status])
   @@index([taskId, status])

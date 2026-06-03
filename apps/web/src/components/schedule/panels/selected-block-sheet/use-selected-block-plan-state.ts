@@ -66,11 +66,17 @@ export function useSelectedBlockPlanState({
     const next = snapshot.savedPlan;
     const nextKey = savedPlanKey(next);
     const nextStatus = snapshot.aiPlanGenerationStatus;
+    if (displayedSavedPlan?.status === "accepted" && next?.status !== "accepted") {
+      generationStatusRef.current = "accepted";
+      setGenerationStatus("accepted");
+      return;
+    }
+
     const currentPlanKey = lastDisplayedSavedPlanKeyRef.current;
     generationStatusRef.current = nextStatus;
     setGenerationStatus((current) => (current === nextStatus ? current : nextStatus));
 
-    if (currentPlanKey === nextKey) {
+    if (currentPlanKey === nextKey && (!hasFullPlan(next) || displayedSavedPlan?.id === next.id)) {
       return;
     }
 
@@ -92,7 +98,7 @@ export function useSelectedBlockPlanState({
         return accepted;
       });
     }
-  }, [generationSession.sessionStatus]);
+  }, [displayedSavedPlan?.id, displayedSavedPlan?.status, generationSession.sessionStatus]);
 
   useEffect(() => {
     generationStatusRef.current = item.aiPlanGenerationStatus ?? "idle";
@@ -146,7 +152,9 @@ export function useSelectedBlockPlanState({
   }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.savedPlan, item.taskId, item.workBlockId, item.aiPlanGenerationStatus]);
 
   useEffect(() => {
-    const nextSavedPlan = generationSession.result ?? displayedSavedPlan;
+    const nextSavedPlan = displayedSavedPlan?.status === "accepted"
+      ? displayedSavedPlan
+      : generationSession.result ?? displayedSavedPlan;
     const nextStatus = deriveGenerationStatus(nextSavedPlan, generationSession.sessionStatus);
 
     applyPlanStateSnapshot({

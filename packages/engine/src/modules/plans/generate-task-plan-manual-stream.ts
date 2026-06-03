@@ -57,9 +57,13 @@ async function readSavedPlanAfterToolCompletion(input: {
   userInstruction?: string | null;
   signal?: AbortSignal;
 }) {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     if (input.signal?.aborted) return null;
-    let savedPlan = await getLatestTaskPlanReadModel(input.taskId, input.workBlockId ?? null);
+
+    const savedPlan =
+      (input.workBlockId ? await getLatestTaskPlanReadModel(input.taskId, input.workBlockId) : null)
+      ?? await getLatestTaskPlanReadModel(input.taskId, null);
+
     if (savedPlan) {
       const userInstruction = input.userInstruction?.trim() || null;
       if (savedPlan.prompt !== userInstruction) {
@@ -68,11 +72,10 @@ async function readSavedPlanAfterToolCompletion(input: {
           workBlockId: input.workBlockId ?? null,
           prompt: userInstruction,
         });
-        savedPlan = await getLatestTaskPlanReadModel(input.taskId, input.workBlockId ?? null);
       }
       return savedPlan;
     }
-    if (attempt < 4) await wait(100);
+    if (attempt < 9) await wait(100);
   }
   return null;
 }
@@ -112,6 +115,7 @@ function summarizeGeneratePlanEvent(event: GeneratePlanSSEEvent) {
 async function recordPlanGenerationEvent(input: {
   type: "started" | "status" | "tool_called" | "draft_saved" | "completed" | "failed" | "cancelled";
   task: { id: string; workspaceId: string };
+  workBlockId?: string | null;
   generationId: string;
   payload?: Record<string, unknown>;
   dedupeSuffix?: string;
@@ -120,6 +124,7 @@ async function recordPlanGenerationEvent(input: {
     eventType: `plan_generation.${input.type}`,
     workspaceId: input.task.workspaceId,
     taskId: input.task.id,
+    workBlockId: input.workBlockId ?? null,
     actorType: "system",
     actorId: "plan-generator",
     source: "plan_generation",
@@ -138,6 +143,7 @@ async function recordPlanGenerationEvent(input: {
   publishTaskWorkspaceUpdatedEvent({
     taskId: input.task.id,
     workspaceId: input.task.workspaceId,
+    workBlockId: input.workBlockId,
     reason: `plan_generation.${input.type}`,
   });
 }
@@ -147,9 +153,10 @@ async function recordPlanGenerationStatus(input: {
   generationId: string;
   phase: string;
   message: string;
+  workBlockId?: string | null;
   sequence: number;
 }) {
-  await recordPlanGenerationEvent({
+  await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
     type: "status",
     task: input.task,
     generationId: input.generationId,
@@ -160,6 +167,48 @@ async function recordPlanGenerationStatus(input: {
     },
     dedupeSuffix: `${input.sequence}:${input.phase}`,
   });
+}
+
+type DebugDump = Awaited<ReturnType<typeof createDebugDump>>;
+
+async function* yieldPlanCompletion(
+  savedPlan: TaskPlanReadModel,
+  taskSessionKey: string,
+  dump: DebugDump,
+  task: { id: string; workspaceId: string },
+  generationId: string,
+  workBlockId: string | null,
+): AsyncGenerator<GeneratePlanSSEEvent> {
+  const completedEvent: GeneratePlanSSEEvent = {
+    type: "status",
+    phase: "completed",
+    message: "Plan generated.",
+  };
+  const resultEvent: GeneratePlanSSEEvent = {
+    type: "result",
+    result: savedPlan,
+    taskSessionKey,
+  };
+  const doneEvent: GeneratePlanSSEEvent = { type: "done" };
+  await recordPlanGenerationEvent({
+    workBlockId,
+    type: "completed",
+    task,
+    generationId,
+    payload: {
+      plan_id: savedPlan.id,
+      plan_title: savedPlan.summary,
+      status: savedPlan.status,
+    },
+  });
+  await dump?.write({ type: "saved_plan", result: previewDebugValue(savedPlan, 1200) });
+  await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(completedEvent) });
+  yield completedEvent;
+  await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(resultEvent) });
+  yield resultEvent;
+  await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(doneEvent) });
+  yield doneEvent;
+  await dump?.close();
 }
 
 /**
@@ -217,7 +266,7 @@ export async function* generateTaskPlanManualStream(input: {
   }
 
   const userInstruction = input.userInstruction?.trim() || null;
-  await recordPlanGenerationEvent({
+  await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
     type: "started",
     task,
     generationId,
@@ -232,7 +281,7 @@ export async function* generateTaskPlanManualStream(input: {
     phase: "loading_task",
     message: "Loading task context...",
   };
-  await recordPlanGenerationStatus({
+  await recordPlanGenerationStatus({ workBlockId: input.workBlockId,
     task,
     generationId,
     phase: loadingEvent.phase,
@@ -279,7 +328,7 @@ export async function* generateTaskPlanManualStream(input: {
     phase: "requesting_provider",
     message: "Requesting AI provider...",
   };
-  await recordPlanGenerationStatus({
+  await recordPlanGenerationStatus({ workBlockId: input.workBlockId,
     task,
     generationId,
     phase: requestingEvent.phase,
@@ -295,7 +344,7 @@ export async function* generateTaskPlanManualStream(input: {
 
   if (input.signal?.aborted) {
     const event: GeneratePlanSSEEvent = { type: "cancelled" };
-    await recordPlanGenerationEvent({ type: "cancelled", task, generationId, dedupeSuffix: "before_provider" });
+    await recordPlanGenerationEvent({ workBlockId: input.workBlockId, type: "cancelled", task, generationId, dedupeSuffix: "before_provider" });
     await dump?.write({ type: "yield", stage: "aborted_before_provider", event });
     yield event;
     await dump?.close();
@@ -317,7 +366,7 @@ export async function* generateTaskPlanManualStream(input: {
     });
     if (input.signal?.aborted) {
       const cancelledEvent: GeneratePlanSSEEvent = { type: "cancelled" };
-      await recordPlanGenerationEvent({ type: "cancelled", task, generationId, dedupeSuffix: "during_provider" });
+      await recordPlanGenerationEvent({ workBlockId: input.workBlockId, type: "cancelled", task, generationId, dedupeSuffix: "during_provider" });
       await dump?.write({ type: "yield", stage: "aborted_during_provider", event: cancelledEvent });
       yield cancelledEvent;
       await dump?.close();
@@ -332,7 +381,7 @@ export async function* generateTaskPlanManualStream(input: {
             phase: "streaming",
             message: event.message,
           };
-          await recordPlanGenerationStatus({
+          await recordPlanGenerationStatus({ workBlockId: input.workBlockId,
             task,
             generationId,
             phase: statusEvent.phase,
@@ -354,7 +403,7 @@ export async function* generateTaskPlanManualStream(input: {
           });
 
           if (isPlanBlueprint(event.input)) {
-            await recordPlanGenerationEvent({
+            await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
               type: "tool_called",
               task,
               generationId,
@@ -375,7 +424,7 @@ export async function* generateTaskPlanManualStream(input: {
               });
               materializedPlan = savedPlan;
               persistedPlanId = savedPlan.id;
-              await recordPlanGenerationEvent({
+              await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
                 type: "draft_saved",
                 task,
                 generationId,
@@ -405,7 +454,7 @@ export async function* generateTaskPlanManualStream(input: {
               phase: "streaming",
               message: `Using ${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
             };
-            await recordPlanGenerationStatus({
+            await recordPlanGenerationStatus({ workBlockId: input.workBlockId,
               task,
               generationId,
               phase: statusEvent.phase,
@@ -421,7 +470,7 @@ export async function* generateTaskPlanManualStream(input: {
             phase: "streaming",
             message: `Using ${getToolDisplayName(event.tool)}${getToolPreview(event.input)}...`,
           };
-          await recordPlanGenerationStatus({
+          await recordPlanGenerationStatus({ workBlockId: input.workBlockId,
             task,
             generationId,
             phase: statusEvent.phase,
@@ -441,7 +490,7 @@ export async function* generateTaskPlanManualStream(input: {
               code: "PROVIDER_ERROR",
               message: `${PLAN_GENERATE_TOOL_NAME} failed: ${event.result}`,
             };
-            await recordPlanGenerationEvent({
+            await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
               type: "failed",
               task,
               generationId,
@@ -459,7 +508,7 @@ export async function* generateTaskPlanManualStream(input: {
             phase: "saving",
             message: "Reading saved plan...",
           };
-          await recordPlanGenerationStatus({
+          await recordPlanGenerationStatus({ workBlockId: input.workBlockId,
             task,
             generationId,
             phase: savingEvent.phase,
@@ -481,7 +530,7 @@ export async function* generateTaskPlanManualStream(input: {
               code: "INTERNAL_ERROR",
               message: `${PLAN_GENERATE_TOOL_NAME} completed but no saved plan was found.`,
             };
-            await recordPlanGenerationEvent({
+            await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
               type: "failed",
               task,
               generationId,
@@ -494,35 +543,7 @@ export async function* generateTaskPlanManualStream(input: {
             return;
           }
 
-          const completedEvent: GeneratePlanSSEEvent = {
-            type: "status",
-            phase: "completed",
-            message: "Plan generated.",
-          };
-          const resultEvent: GeneratePlanSSEEvent = {
-            type: "result",
-            result: savedPlan,
-            taskSessionKey,
-          };
-          const doneEvent: GeneratePlanSSEEvent = { type: "done" };
-          await recordPlanGenerationEvent({
-            type: "completed",
-            task,
-            generationId,
-            payload: {
-              plan_id: savedPlan.id,
-              plan_title: savedPlan.summary,
-              status: savedPlan.status,
-            },
-          });
-          await dump?.write({ type: "saved_plan", result: previewDebugValue(savedPlan, 1200) });
-          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(completedEvent) });
-          yield completedEvent;
-          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(resultEvent) });
-          yield resultEvent;
-          await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(doneEvent) });
-          yield doneEvent;
-          await dump?.close();
+          yield* yieldPlanCompletion(savedPlan, taskSessionKey, dump, task, generationId, input.workBlockId ?? null);
           return;
         }
         {
@@ -531,7 +552,7 @@ export async function* generateTaskPlanManualStream(input: {
             phase: "streaming",
             message: `${getToolDisplayName(event.tool)} completed.`,
           };
-          await recordPlanGenerationStatus({
+          await recordPlanGenerationStatus({ workBlockId: input.workBlockId,
             task,
             generationId,
             phase: statusEvent.phase,
@@ -563,7 +584,7 @@ export async function* generateTaskPlanManualStream(input: {
           rawText: event.rawText,
           diagnostics: event.diagnostics,
         };
-        await recordPlanGenerationEvent({
+        await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
           type: "failed",
           task,
           generationId,
@@ -577,14 +598,25 @@ export async function* generateTaskPlanManualStream(input: {
       }
 
       case "done":
-        if (!hasPlanGenerateToolCall) {
+        {
+          const savedPlan =
+            materializedPlan
+            ?? (await getLatestTaskPlanReadModel(task.id, input.workBlockId ?? null))
+            ?? (input.workBlockId ? await getLatestTaskPlanReadModel(task.id, null) : null);
+          if (savedPlan) {
+            yield* yieldPlanCompletion(savedPlan, taskSessionKey, dump, task, generationId, input.workBlockId ?? null);
+            return;
+          }
+
+          const message = hasPlanGenerateToolCall
+            ? "Plan generation tool was called but no saved plan was found."
+            : `Provider completed without calling ${PLAN_GENERATE_TOOL_NAME}.`;
           const errorEvent: GeneratePlanSSEEvent = {
             type: "error",
-            code: "INVALID_TOOL_PAYLOAD",
-            message:
-              `Provider completed without calling ${PLAN_GENERATE_TOOL_NAME}.`,
+            code: hasPlanGenerateToolCall ? "INTERNAL_ERROR" : "INVALID_TOOL_PAYLOAD",
+            message,
           };
-          await recordPlanGenerationEvent({
+          await recordPlanGenerationEvent({ workBlockId: input.workBlockId,
             type: "failed",
             task,
             generationId,
@@ -596,16 +628,13 @@ export async function* generateTaskPlanManualStream(input: {
           await dump?.close();
           return;
         }
-        await dump?.write({ type: "provider_done", hasPlanGenerateToolCall });
-        break;
     }
 
-    if (event.type === "done") break;
   }
 
   if (input.signal?.aborted) {
     const event: GeneratePlanSSEEvent = { type: "cancelled" };
-    await recordPlanGenerationEvent({ type: "cancelled", task, generationId, dedupeSuffix: "after_provider" });
+    await recordPlanGenerationEvent({ workBlockId: input.workBlockId, type: "cancelled", task, generationId, dedupeSuffix: "after_provider" });
     await dump?.write({ type: "yield", stage: "aborted_after_provider", event });
     yield event;
     await dump?.close();

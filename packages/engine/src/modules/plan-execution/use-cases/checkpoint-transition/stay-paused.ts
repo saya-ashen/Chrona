@@ -23,6 +23,7 @@ export async function stayPausedTransition(
     taskId: input.taskId,
     planId: input.planId,
     sessionId: input.mainSession.id,
+    workBlockId: input.executionSession.workBlockId,
     eventType: "user_input_received",
     payload: {
       reason: `checkpoint:${input.action}`,

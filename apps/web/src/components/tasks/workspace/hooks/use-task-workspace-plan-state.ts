@@ -327,6 +327,8 @@ export function useTaskWorkspacePlanState(
 ) {
   const queryClient = useQueryClient();
   const selectedWorkBlockId = task.currentWorkBlock?.id ?? null;
+  const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
+  const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const lastWorkspaceEventSequenceRef = useRef(0);
   const planStateQuery = useQuery({
     queryKey: taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId),
@@ -355,7 +357,18 @@ export function useTaskWorkspacePlanState(
   const [isGraphPlanPending, setIsGraphPlanPending] = useState(false);
 
   useEffect(() => {
-    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
+    if (previousWorkBlockKeyRef.current === selectedWorkBlockKey) return;
+    previousWorkBlockKeyRef.current = selectedWorkBlockKey;
+    lastWorkspaceEventSequenceRef.current = 0;
+    setGenerationUserInstruction(null);
+    setIsGeneratingPlan(false);
+    setGenerationActivitySummary(null);
+    setRuntimeEvents([]);
+    setPlanFlow(createPlanFlowFromSnapshot(planStateQuery.data));
+  }, [planStateQuery.data, selectedWorkBlockKey]);
+
+  useEffect(() => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId), (current: TaskPlanState | undefined) => {
       const previous = current ?? {
         taskId: task.id,
         aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
@@ -402,6 +415,8 @@ export function useTaskWorkspacePlanState(
     );
 
     for (const event of nextEvents) {
+      if (event.workBlockId !== undefined && event.workBlockId !== null && event.workBlockId !== selectedWorkBlockId) continue;
+
       if (event.type === "command.accepted" && event.commandType === "plan.generate") {
         setIsGeneratingPlan(true);
         setGenerationActivitySummary("Generating plan");

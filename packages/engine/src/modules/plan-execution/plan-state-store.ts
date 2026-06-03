@@ -91,6 +91,7 @@ export async function appendMainSessionEvent(input: {
   taskId: string;
   planId: string;
   sessionId: string;
+  workBlockId?: string | null;
   eventType: MainSessionEventType;
   nodeId?: string | null;
   nodeTitle?: string | null;
@@ -135,6 +136,7 @@ export async function appendMainSessionEvent(input: {
     eventType: `plan_execution.${input.eventType}`,
     workspaceId: task.workspaceId,
     taskId: input.taskId,
+    workBlockId: input.workBlockId,
     taskSessionId: input.sessionId,
     planId: input.planId,
     runId: null,
@@ -198,6 +200,7 @@ export async function appendMainSessionEvent(input: {
   publishTaskWorkspaceUpdatedEvent({
     taskId: input.taskId,
     workspaceId: task.workspaceId,
+    workBlockId: input.workBlockId,
     reason: `plan_execution.${input.eventType}`,
   });
 }

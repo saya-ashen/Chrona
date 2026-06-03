@@ -86,15 +86,18 @@ export class TaskPlanning {
       await ensurePlanInWorkspace(input.planId, input.taskId, input.workspaceId);
     }
 
-    const latest = await getLatestCompiledPlan(input.taskId, input.workBlockId ?? null);
+    const latest = await getLatestCompiledPlan(input.taskId, input.workBlockId ?? null)
+      ?? await getLatestCompiledPlan(input.taskId, null);
     if (!latest || latest.compiledPlan.editablePlanId !== input.planId) {
       throw new EngineError(ENGINE_ERROR_CODES.PLAN_NOT_FOUND, "Plan not found");
     }
 
+    const effectiveWorkBlockId = latest.workBlockId ?? input.workBlockId ?? null;
+
     await saveCompiledPlan({
       workspaceId: latest.workspaceId,
       taskId: input.taskId,
-      workBlockId: input.workBlockId ?? latest.workBlockId,
+      workBlockId: effectiveWorkBlockId,
       compiledPlan: latest.compiledPlan,
       editablePlan: latest.editablePlan,
       status: "accepted",
@@ -103,7 +106,7 @@ export class TaskPlanning {
       generatedBy: latest.generatedBy,
     });
 
-    return { savedPlan: await getLatestTaskPlanReadModel(input.taskId, input.workBlockId ?? null) };
+    return { savedPlan: await getLatestTaskPlanReadModel(input.taskId, effectiveWorkBlockId) };
   }
 
   generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null }) {

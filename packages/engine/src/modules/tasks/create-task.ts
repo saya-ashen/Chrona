@@ -200,6 +200,7 @@ export async function createTask(input: CreateTaskInput) {
     eventType: "task.created",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: firstWorkBlockId,
     actorType: "user",
     actorId: "server-action",
     source: "ui",

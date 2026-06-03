@@ -230,6 +230,7 @@ async function withExecutionLease(input: {
       eventType: "execution.lease_ignored",
       workspaceId: input.workspaceId,
       taskId: input.taskId,
+      workBlockId: input.workBlockId,
       actorType: "runtime",
       actorId: input.scope,
       source: "execution-kernel",
@@ -307,6 +308,7 @@ export async function startPlanExecution(input: {
     taskId: input.taskId,
     planId: runtime.planId,
     sessionId: mainSession.id,
+    workBlockId: executionSession.workBlockId,
     eventType: "execution_started",
     payload: { trigger: input.trigger, prompt: input.prompt },
   });
@@ -350,8 +352,9 @@ export async function continuePlanExecution(input: {
   sessionId?: string;
   nodeId?: string;
   resumeReadyNode?: boolean;
+  workBlockId?: string | null;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
   if (!runtime) {
     return {
       taskId: input.taskId,
@@ -384,6 +387,7 @@ export async function continuePlanExecution(input: {
       taskId: input.taskId,
       planId: runtime.planId,
       sessionId: mainSession.id,
+      workBlockId: executionSession.workBlockId,
       eventType: "user_input_received",
       payload: { input: input.userInput, reason: input.reason },
     });
@@ -464,10 +468,11 @@ async function resumePlanExecutionWithApproval(input: {
   taskId: string;
   sessionId?: string;
   nodeId?: string;
+  workBlockId?: string | null;
   approved: boolean;
   feedback?: string;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
   if (!runtime) {
     return {
       taskId: input.taskId,
@@ -525,6 +530,7 @@ async function resumePlanExecutionWithApproval(input: {
     taskId: input.taskId,
     planId: runtime.planId,
     sessionId: mainSession.id,
+    workBlockId: executionSession.workBlockId,
     eventType: "user_input_received",
     payload: {
       reason: input.approved ? "approval:approve" : "approval:reject",
@@ -601,6 +607,7 @@ export async function dispatchExecutionAction(input: {
         inputFields: input.action.inputFields,
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -612,6 +619,7 @@ export async function dispatchExecutionAction(input: {
         nodeId: input.action.nodeId,
         approved: input.action.decision === "approve",
         feedback: input.action.feedback ?? input.action.editedContent,
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -623,6 +631,7 @@ export async function dispatchExecutionAction(input: {
         userInput: input.action.note,
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -810,8 +819,14 @@ export async function submitCheckpointAction(input: {
     status,
     effective,
     currentNodeId,
-    continuePlanExecution,
-    resumePlanExecutionWithApproval,
+    continuePlanExecution: (input) => continuePlanExecution({
+      ...input,
+      workBlockId: executionSession.workBlockId,
+    }),
+    resumePlanExecutionWithApproval: (input) => resumePlanExecutionWithApproval({
+      ...input,
+      workBlockId: executionSession.workBlockId,
+    }),
     dispatchExecutionAction,
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
