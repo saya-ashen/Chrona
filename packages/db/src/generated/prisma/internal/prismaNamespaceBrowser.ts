@@ -66,6 +66,7 @@ export const ModelName = {
   TaskPlanRun: 'TaskPlanRun',
   TaskPlanNodeAttempt: 'TaskPlanNodeAttempt',
   TaskPlanProviderRun: 'TaskPlanProviderRun',
+  TaskPlanProviderApproval: 'TaskPlanProviderApproval',
   TaskPlanLayer: 'TaskPlanLayer',
   Run: 'Run',
   Approval: 'Approval',
@@ -397,6 +398,48 @@ export const TaskPlanProviderRunScalarFieldEnum = {
 } as const
 
 export type TaskPlanProviderRunScalarFieldEnum = (typeof TaskPlanProviderRunScalarFieldEnum)[keyof typeof TaskPlanProviderRunScalarFieldEnum]
+
+
+export const TaskPlanProviderApprovalScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  workBlockId: 'workBlockId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  providerRunId: 'providerRunId',
+  nodeId: 'nodeId',
+  nodeTitle: 'nodeTitle',
+  provider: 'provider',
+  runtimeName: 'runtimeName',
+  nativeRunId: 'nativeRunId',
+  approvalRef: 'approvalRef',
+  kind: 'kind',
+  providerKind: 'providerKind',
+  title: 'title',
+  summary: 'summary',
+  description: 'description',
+  riskLevel: 'riskLevel',
+  subject: 'subject',
+  choices: 'choices',
+  scopePolicy: 'scopePolicy',
+  rawPayload: 'rawPayload',
+  status: 'status',
+  requestedAt: 'requestedAt',
+  resolvedAt: 'resolvedAt',
+  resolvedBy: 'resolvedBy',
+  choice: 'choice',
+  resolveAll: 'resolveAll',
+  resolutionRaw: 'resolutionRaw',
+  error: 'error',
+  rawEventId: 'rawEventId',
+  responseEventId: 'responseEventId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskPlanProviderApprovalScalarFieldEnum = (typeof TaskPlanProviderApprovalScalarFieldEnum)[keyof typeof TaskPlanProviderApprovalScalarFieldEnum]
 
 
 export const TaskPlanLayerScalarFieldEnum = {

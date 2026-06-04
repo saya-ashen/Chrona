@@ -61,6 +61,93 @@ export const providerStructuredOutputSchemaSchema = z
   })
   .strict();
 
+export const providerApprovalChoiceSchema = z.enum([
+  "approve_once",
+  "approve_session",
+  "approve_always",
+  "deny",
+]);
+
+export const providerApprovalRiskLevelSchema = z.enum([
+  "low",
+  "medium",
+  "high",
+  "critical",
+  "unknown",
+]);
+
+export const providerApprovalSubjectSchema = z
+  .object({
+    type: z.enum(["command", "tool", "url", "file", "provider_raw"]),
+    label: z.string().min(1),
+    preview: z.string().optional(),
+    language: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const providerApprovalScopePolicySchema = z
+  .object({
+    supportsOnce: z.boolean(),
+    supportsSession: z.boolean(),
+    supportsAlways: z.boolean(),
+    supportsResolveAll: z.boolean(),
+  })
+  .strict();
+
+export const providerApprovalCapabilitySchema = z
+  .object({
+    supported: z.boolean(),
+    choices: z.array(providerApprovalChoiceSchema),
+    scopes: z.array(z.enum(["once", "session", "always"])),
+    resolveAll: z.boolean(),
+  })
+  .strict();
+
+export const providerApprovalRequestSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    provider: z.string().min(1),
+    runId: z.string().min(1),
+    nativeRunId: z.string().min(1).optional(),
+    sessionId: z.string().min(1).optional(),
+    kind: z.string().min(1),
+    providerKind: z.string().min(1).optional(),
+    title: z.string().min(1),
+    summary: z.string().min(1),
+    description: z.string().min(1).optional(),
+    riskLevel: providerApprovalRiskLevelSchema,
+    subject: providerApprovalSubjectSchema.optional(),
+    choices: z.array(providerApprovalChoiceSchema).min(1),
+    defaultChoice: providerApprovalChoiceSchema.optional(),
+    recommendedChoice: providerApprovalChoiceSchema.optional(),
+    scopePolicy: providerApprovalScopePolicySchema.optional(),
+    raw: z.unknown().optional(),
+  })
+  .strict();
+
+export const resolveProviderApprovalInputSchema = z
+  .object({
+    runId: z.string().min(1),
+    nativeRunId: z.string().min(1).optional(),
+    approvalId: z.string().min(1).optional(),
+    choice: providerApprovalChoiceSchema,
+    resolveAll: z.boolean().optional(),
+    reason: z.string().optional(),
+    signal: z.custom<AbortSignal>().optional(),
+  })
+  .strict();
+
+export const providerApprovalResolutionSchema = z
+  .object({
+    provider: z.string().min(1),
+    runId: z.string().min(1),
+    nativeRunId: z.string().min(1).optional(),
+    choice: providerApprovalChoiceSchema,
+    resolved: z.number().int().nonnegative(),
+    status: z.enum(["resolved", "not_pending", "not_active"]),
+    raw: z.unknown().optional(),
+  })
+  .strict();
 export const providerCapabilitiesSchema = z
   .object({
     supportsSessions: z.boolean(),
@@ -70,6 +157,7 @@ export const providerCapabilitiesSchema = z
     supportsToolCalls: z.boolean(),
     supportsPreviousResponse: z.boolean(),
     reason: z.string().optional(),
+    approval: providerApprovalCapabilitySchema.optional(),
     details: z.unknown().optional(),
   })
   .strict();
@@ -270,7 +358,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
     .object({
       ...providerRunEventMetadataShape,
       type: z.literal("approval_required"),
-      approval: unknownRecordSchema,
+      approval: providerApprovalRequestSchema,
       raw: z.unknown().optional(),
     })
     .strict(),
@@ -362,6 +450,25 @@ export type ProviderUsage = z.infer<typeof providerUsageSchema>;
 export type ProviderStructuredOutputSchema = z.infer<
   typeof providerStructuredOutputSchemaSchema
 >;
+export type ProviderApprovalChoice = z.infer<typeof providerApprovalChoiceSchema>;
+export type ProviderApprovalRiskLevel = z.infer<
+  typeof providerApprovalRiskLevelSchema
+>;
+export type ProviderApprovalSubject = z.infer<typeof providerApprovalSubjectSchema>;
+export type ProviderApprovalScopePolicy = z.infer<
+  typeof providerApprovalScopePolicySchema
+>;
+export type ProviderApprovalCapability = z.infer<
+  typeof providerApprovalCapabilitySchema
+>;
+export type ProviderApprovalRequest = z.infer<typeof providerApprovalRequestSchema>;
+export type ResolveProviderApprovalInput = z.infer<
+  typeof resolveProviderApprovalInputSchema
+>;
+export type ProviderApprovalResolution = z.infer<
+  typeof providerApprovalResolutionSchema
+>;
+
 export type ProviderCapabilities = z.infer<typeof providerCapabilitiesSchema>;
 export type HealthCheckInput = z.infer<typeof healthCheckInputSchema>;
 export type ProviderHealth = z.infer<typeof providerHealthSchema>;
@@ -401,4 +508,8 @@ export interface AgentProviderClient {
   getRun(input: GetRunInput): Promise<ProviderRunSnapshot>;
 
   cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot>;
+
+  resolveApproval?(
+    input: ResolveProviderApprovalInput,
+  ): Promise<ProviderApprovalResolution>;
 }

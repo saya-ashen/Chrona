@@ -22,6 +22,87 @@ const nodeActionFormSchema = z.object({
   inputFields: z.array(nodeActionFormFieldSchema).min(1, "at least one input field is required"),
 }).strict();
 
+
+export const providerApprovalChoiceSchema = z.enum([
+  "approve_once",
+  "approve_session",
+  "approve_always",
+  "deny",
+]);
+
+export const providerApprovalRiskLevelSchema = z.enum([
+  "low",
+  "medium",
+  "high",
+  "critical",
+  "unknown",
+]);
+
+export const providerApprovalReadModelSchema = z
+  .object({
+    id: z.string().min(1),
+    taskId: taskIdParam,
+    workBlockId: z.string().min(1).nullable().optional(),
+    planId: z.string().min(1),
+    planRunId: z.string().min(1),
+    nodeId: z.string().min(1).nullable().optional(),
+    nodeTitle: z.string().min(1).nullable().optional(),
+    provider: z.string().min(1),
+    runtimeName: z.string().min(1).nullable().optional(),
+    nativeRunId: z.string().min(1).nullable().optional(),
+    kind: z.string().min(1),
+    providerKind: z.string().min(1).nullable().optional(),
+    title: z.string().min(1),
+    summary: z.string().min(1),
+    description: z.string().min(1).nullable().optional(),
+    riskLevel: providerApprovalRiskLevelSchema,
+    subject: z.unknown().optional(),
+    choices: z.array(providerApprovalChoiceSchema).min(1),
+    scopePolicy: z.unknown().optional(),
+    status: z.string().min(1),
+    requestedAt: z.string().min(1),
+    resolvedAt: z.string().min(1).nullable().optional(),
+    choice: providerApprovalChoiceSchema.nullable().optional(),
+    resolveAll: z.boolean().optional(),
+  })
+  .strict();
+
+export const providerApprovalListQuerySchema = z
+  .object({
+    status: z.enum(["pending", "approved", "denied", "expired", "superseded", "failed", "all"]).optional(),
+  })
+  .strict();
+
+export const providerApprovalListResponseSchema = z
+  .object({
+    approvals: z.array(providerApprovalReadModelSchema),
+  })
+  .strict();
+
+export const providerApprovalResolveParamSchema = z.object({
+  taskId: taskIdParam,
+  approvalId: z.string().min(1, "approvalId is required"),
+});
+
+export const providerApprovalResolveBodySchema = z
+  .object({
+    choice: providerApprovalChoiceSchema,
+    resolveAll: z.boolean().optional(),
+    note: z.string().optional(),
+    idempotencyKey: idempotencyKeySchema.optional(),
+  })
+  .strict();
+
+export const providerApprovalResolveResponseSchema = z
+  .object({
+    approval: providerApprovalReadModelSchema,
+    provider: z.string().min(1),
+    runId: z.string().min(1),
+    choice: providerApprovalChoiceSchema,
+    resolved: z.number().int().nonnegative(),
+    status: z.enum(["resolved", "not_pending", "not_active"]),
+  })
+  .strict();
 export const executionActionParamSchema = z.object({ taskId: taskIdParam });
 
 export const executionActionBodySchema = z.discriminatedUnion("action", [

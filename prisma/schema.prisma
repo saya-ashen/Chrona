@@ -182,6 +182,7 @@ model Workspace {
   taskPlanRuns         TaskPlanRun[]
   taskPlanNodeAttempts TaskPlanNodeAttempt[]
   taskPlanProviderRuns TaskPlanProviderRun[]
+  taskPlanProviderApprovals TaskPlanProviderApproval[]
   taskPlanLayers       TaskPlanLayer[]
   graphVersions        GraphVersion[]
   graphMutations       GraphMutationRecord[]
@@ -300,6 +301,7 @@ model Task {
   taskPlanRuns         TaskPlanRun[]
   taskPlanNodeAttempts TaskPlanNodeAttempt[]
   taskPlanProviderRuns TaskPlanProviderRun[]
+  taskPlanProviderApprovals TaskPlanProviderApproval[]
   taskPlanLayers       TaskPlanLayer[]
   graphVersions        GraphVersion[]
   graphMutations       GraphMutationRecord[]
@@ -484,6 +486,7 @@ model TaskPlanRun {
   plan                TaskPlan              @relation(fields: [planId], references: [planId], onDelete: Cascade)
   nodeAttempts        TaskPlanNodeAttempt[]
   providerRuns        TaskPlanProviderRun[]
+  providerApprovals TaskPlanProviderApproval[]
 
   @@unique([taskId, planId, workBlockId])
   @@index([taskId, planId, executionOwnerId])
@@ -524,6 +527,7 @@ model TaskPlanNodeAttempt {
   task                       Task                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   planRun                    TaskPlanRun           @relation(fields: [planRunId], references: [id], onDelete: Cascade)
   providerRuns               TaskPlanProviderRun[]
+  providerApprovals TaskPlanProviderApproval[]
 
   @@index([taskId, planId, nodeId, status])
   @@index([planRunId, nodeId, attemptNumber])
@@ -554,9 +558,59 @@ model TaskPlanProviderRun {
   task               Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
   planRun            TaskPlanRun         @relation(fields: [planRunId], references: [id], onDelete: Cascade)
   nodeAttempt        TaskPlanNodeAttempt @relation(fields: [nodeAttemptId], references: [id], onDelete: Cascade)
+  approvals          TaskPlanProviderApproval[]
 
   @@index([taskId, planId, status])
   @@index([nodeAttemptId, status])
+}
+
+model TaskPlanProviderApproval {
+  id              String              @id @default(cuid())
+  workspaceId     String
+  taskId          String
+  workBlockId     String?
+  planId          String
+  planRunId       String
+  nodeAttemptId   String?
+  providerRunId   String
+  nodeId          String?
+  nodeTitle       String?
+  provider        String
+  runtimeName     String?
+  nativeRunId     String?
+  approvalRef     String?
+  kind            String
+  providerKind    String?
+  title           String
+  summary         String
+  description     String?
+  riskLevel       String
+  subject         Json?
+  choices         Json
+  scopePolicy     Json?
+  rawPayload      Json?
+  status          String
+  requestedAt     DateTime
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  choice          String?
+  resolveAll      Boolean             @default(false)
+  resolutionRaw   Json?
+  error           Json?
+  rawEventId      String?
+  responseEventId String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id])
+  task            Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  planRun         TaskPlanRun         @relation(fields: [planRunId], references: [id], onDelete: Cascade)
+  nodeAttempt     TaskPlanNodeAttempt? @relation(fields: [nodeAttemptId], references: [id], onDelete: Cascade)
+  providerRun     TaskPlanProviderRun @relation(fields: [providerRunId], references: [id], onDelete: Cascade)
+
+  @@unique([providerRunId, approvalRef])
+  @@index([taskId, status, requestedAt])
+  @@index([providerRunId, status])
+  @@index([workspaceId, status, requestedAt])
 }
 
 model TaskPlanLayer {

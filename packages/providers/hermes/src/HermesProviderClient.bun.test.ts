@@ -337,6 +337,75 @@ describe("HermesProviderClient", () => {
     expect(seenHeaders?.get("Accept")).toBe("text/event-stream");
   });
 
+  it("normalizes Hermes approval requests", async () => {
+    globalThis.fetch = mockFetch(async () => new Response(
+      `data: ${JSON.stringify({
+        type: "approval.request",
+        run_id: "run-1",
+        pattern_key: "execute_code",
+        command: "execute_code <<'PY'\nprint('hi')\nPY",
+        description: "Code can mutate files.",
+        choices: ["once", "session", "always", "deny"],
+      })}\n\n`,
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    ));
+
+    const client = new HermesProviderClient();
+    const events = [];
+    for await (const event of client.streamRun({ runId: "run-1", sessionId: "session-1" })) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "approval_required",
+      approval: {
+        provider: "hermes",
+        runId: "run-1",
+        nativeRunId: "run-1",
+        sessionId: "session-1",
+        kind: "tool_execution",
+        providerKind: "execute_code",
+        title: "Approve code execution",
+        riskLevel: "high",
+        choices: ["approve_once", "approve_session", "approve_always", "deny"],
+        subject: {
+          type: "command",
+          label: "execute_code",
+          language: "python",
+        },
+      },
+    });
+  });
+
+  it("resolves Hermes approvals through provider contract", async () => {
+    let seenBody: unknown;
+    globalThis.fetch = mockFetch(async (url, init) => {
+      expect(String(url)).toBe("http://127.0.0.1:8642/v1/runs/run-native/approval");
+      expect(init?.method).toBe("POST");
+      seenBody = JSON.parse(String(init?.body));
+      return jsonResponse({ object: "hermes.run.approval_response", run_id: "run-native", choice: "session", resolved: 1 });
+    });
+
+    const client = new HermesProviderClient();
+    const result = await client.resolveApproval({
+      runId: "run-record",
+      nativeRunId: "run-native",
+      choice: "approve_session",
+      resolveAll: true,
+    });
+
+    expect(seenBody).toEqual({ choice: "session", resolve_all: true });
+    expect(result).toMatchObject({
+      provider: "hermes",
+      runId: "run-record",
+      nativeRunId: "run-native",
+      choice: "approve_session",
+      resolved: 1,
+      status: "resolved",
+    });
+  });
+
   it("uses stream input session when completed stream events omit session_id", async () => {
     globalThis.fetch = mockFetch(async () => new Response(
       'data: {"type":"run.completed","output":"done"}\n\n',

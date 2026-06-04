@@ -129,6 +129,7 @@ export class AiRuntimeInvoker {
           nodeAttemptId: input.nodeAttemptId,
           providerRunId: providerRun?.id,
           planId: input.nodeAttempt?.graphId,
+          planRunId: providerRun?.planRunId,
           nodeContext: input.nodeContext,
         },
         signal: input.signal,
@@ -353,7 +354,7 @@ async function ensureProviderRunRecord(input: {
       idempotencyKey: input.providerRunIdempotencyKey,
       status: "running",
     },
-    select: { id: true },
+    select: { id: true, planRunId: true, nodeAttemptId: true },
   });
 }
 
@@ -495,6 +496,7 @@ type RuntimeEventPersistenceContext = {
   runId: string;
   taskSessionId?: string | null;
   planId?: string | null;
+  planRunId?: string | null;
   nodeAttemptId?: string | null;
   providerRunId?: string | null;
   runtimeName: string;
@@ -587,9 +589,78 @@ async function persistProviderRuntimeEvent(input: {
       runtimeName: context.runtimeName,
       correlationId: context.providerRunId ?? context.runId,
     });
+    if (input.event.type === "approval_required") {
+      await persistProviderApproval({
+        context,
+        providerRunId: context.providerRunId,
+        rawEventId: rawEvent.id,
+        eventId: event.id,
+        event: input.event,
+        requestedAt: eventTime,
+      });
+    }
   } catch {
     // Runtime event persistence must not interrupt provider streaming.
   }
+}
+
+async function persistProviderApproval(input: {
+  context: RuntimeEventPersistenceContext;
+  providerRunId?: string | null;
+  rawEventId: string;
+  eventId: string;
+  event: Extract<ProviderRunEvent, { type: "approval_required" }>;
+  requestedAt: Date;
+}) {
+  if (!input.providerRunId || !input.context.planId || !input.context.planRunId) {
+    return;
+  }
+  const approval = input.event.approval;
+  const approvalRef = approval.id ?? `${input.event.sequence ?? 0}:${approval.providerKind ?? approval.kind}`;
+  await db.taskPlanProviderApproval.upsert({
+    where: {
+      providerRunId_approvalRef: {
+        providerRunId: input.providerRunId,
+        approvalRef,
+      },
+    },
+    update: {
+      rawEventId: input.rawEventId,
+      responseEventId: input.eventId,
+      rawPayload: toJsonInput(approval.raw),
+      requestedAt: input.requestedAt,
+      updatedAt: new Date(),
+    },
+    create: {
+      workspaceId: input.context.workspaceId,
+      taskId: input.context.taskId,
+      workBlockId: input.context.workBlockId ?? null,
+      planId: input.context.planId,
+      planRunId: input.context.planRunId,
+      nodeAttemptId: input.context.nodeAttemptId ?? null,
+      providerRunId: input.providerRunId,
+      nodeId: input.context.nodeContext?.nodeId ?? null,
+      nodeTitle: input.context.nodeContext?.nodeTitle ?? null,
+      provider: approval.provider,
+      runtimeName: input.context.runtimeName,
+      nativeRunId: approval.nativeRunId ?? approval.runId,
+      approvalRef,
+      kind: approval.kind,
+      providerKind: approval.providerKind,
+      title: approval.title,
+      summary: approval.summary,
+      description: approval.description,
+      riskLevel: approval.riskLevel,
+      subject: toJsonInput(approval.subject),
+      choices: toJsonInput(approval.choices) as Prisma.InputJsonValue,
+      scopePolicy: toJsonInput(approval.scopePolicy),
+      rawPayload: toJsonInput(approval.raw),
+      status: "pending",
+      requestedAt: input.requestedAt,
+      rawEventId: input.rawEventId,
+      responseEventId: input.eventId,
+    },
+  });
 }
 
 async function updateProviderRunAuditRefs(input: {
@@ -615,6 +686,7 @@ async function updateProviderRunAuditRefs(input: {
       lastRawEventId: input.rawEventId,
       completedByEventId: input.eventType === "run_completed" ? input.eventId : undefined,
       failedByEventId: input.eventType === "run_failed" ? input.eventId : undefined,
+      status: input.eventType === "approval_required" ? "waiting_for_approval" : undefined,
       correlationId: input.correlationId,
     },
   });

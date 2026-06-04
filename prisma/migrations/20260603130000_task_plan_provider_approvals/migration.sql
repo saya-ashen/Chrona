@@ -1,0 +1,48 @@
+CREATE TABLE "TaskPlanProviderApproval" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "workspaceId" TEXT NOT NULL,
+    "taskId" TEXT NOT NULL,
+    "workBlockId" TEXT,
+    "planId" TEXT NOT NULL,
+    "planRunId" TEXT NOT NULL,
+    "nodeAttemptId" TEXT,
+    "providerRunId" TEXT NOT NULL,
+    "nodeId" TEXT,
+    "nodeTitle" TEXT,
+    "provider" TEXT NOT NULL,
+    "runtimeName" TEXT,
+    "nativeRunId" TEXT,
+    "approvalRef" TEXT,
+    "kind" TEXT NOT NULL,
+    "providerKind" TEXT,
+    "title" TEXT NOT NULL,
+    "summary" TEXT NOT NULL,
+    "description" TEXT,
+    "riskLevel" TEXT NOT NULL,
+    "subject" JSONB,
+    "choices" JSONB NOT NULL,
+    "scopePolicy" JSONB,
+    "rawPayload" JSONB,
+    "status" TEXT NOT NULL,
+    "requestedAt" DATETIME NOT NULL,
+    "resolvedAt" DATETIME,
+    "resolvedBy" TEXT,
+    "choice" TEXT,
+    "resolveAll" BOOLEAN NOT NULL DEFAULT false,
+    "resolutionRaw" JSONB,
+    "error" JSONB,
+    "rawEventId" TEXT,
+    "responseEventId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "TaskPlanProviderApproval_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanProviderApproval_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanProviderApproval_planRunId_fkey" FOREIGN KEY ("planRunId") REFERENCES "TaskPlanRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanProviderApproval_nodeAttemptId_fkey" FOREIGN KEY ("nodeAttemptId") REFERENCES "TaskPlanNodeAttempt" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "TaskPlanProviderApproval_providerRunId_fkey" FOREIGN KEY ("providerRunId") REFERENCES "TaskPlanProviderRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX "TaskPlanProviderApproval_providerRunId_approvalRef_key" ON "TaskPlanProviderApproval"("providerRunId", "approvalRef");
+CREATE INDEX "TaskPlanProviderApproval_taskId_status_requestedAt_idx" ON "TaskPlanProviderApproval"("taskId", "status", "requestedAt");
+CREATE INDEX "TaskPlanProviderApproval_providerRunId_status_idx" ON "TaskPlanProviderApproval"("providerRunId", "status");
+CREATE INDEX "TaskPlanProviderApproval_workspaceId_status_requestedAt_idx" ON "TaskPlanProviderApproval"("workspaceId", "status", "requestedAt");

@@ -395,6 +395,7 @@ export type TaskWhereInput = {
   taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptListRelationFilter
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunListRelationFilter
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalListRelationFilter
   taskPlanLayers?: Prisma.TaskPlanLayerListRelationFilter
   graphVersions?: Prisma.GraphVersionListRelationFilter
   graphMutations?: Prisma.GraphMutationRecordListRelationFilter
@@ -455,6 +456,7 @@ export type TaskOrderByWithRelationInput = {
   taskPlanRuns?: Prisma.TaskPlanRunOrderByRelationAggregateInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptOrderByRelationAggregateInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunOrderByRelationAggregateInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalOrderByRelationAggregateInput
   taskPlanLayers?: Prisma.TaskPlanLayerOrderByRelationAggregateInput
   graphVersions?: Prisma.GraphVersionOrderByRelationAggregateInput
   graphMutations?: Prisma.GraphMutationRecordOrderByRelationAggregateInput
@@ -518,6 +520,7 @@ export type TaskWhereUniqueInput = Prisma.AtLeast<{
   taskPlanRuns?: Prisma.TaskPlanRunListRelationFilter
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptListRelationFilter
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunListRelationFilter
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalListRelationFilter
   taskPlanLayers?: Prisma.TaskPlanLayerListRelationFilter
   graphVersions?: Prisma.GraphVersionListRelationFilter
   graphMutations?: Prisma.GraphMutationRecordListRelationFilter
@@ -649,6 +652,7 @@ export type TaskCreateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -708,6 +712,7 @@ export type TaskUncheckedCreateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -767,6 +772,7 @@ export type TaskUpdateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -826,6 +832,7 @@ export type TaskUncheckedUpdateInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -1271,6 +1278,20 @@ export type TaskUpdateOneRequiredWithoutTaskPlanProviderRunsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutTaskPlanProviderRunsInput, Prisma.TaskUpdateWithoutTaskPlanProviderRunsInput>, Prisma.TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput>
 }
 
+export type TaskCreateNestedOneWithoutTaskPlanProviderApprovalsInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanProviderApprovalsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanProviderApprovalsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlanProviderApprovalsInput
+  connect?: Prisma.TaskWhereUniqueInput
+}
+
+export type TaskUpdateOneRequiredWithoutTaskPlanProviderApprovalsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanProviderApprovalsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanProviderApprovalsInput>
+  connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlanProviderApprovalsInput
+  upsert?: Prisma.TaskUpsertWithoutTaskPlanProviderApprovalsInput
+  connect?: Prisma.TaskWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskUpdateToOneWithWhereWithoutTaskPlanProviderApprovalsInput, Prisma.TaskUpdateWithoutTaskPlanProviderApprovalsInput>, Prisma.TaskUncheckedUpdateWithoutTaskPlanProviderApprovalsInput>
+}
+
 export type TaskCreateNestedOneWithoutTaskPlanLayersInput = {
   create?: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanLayersInput, Prisma.TaskUncheckedCreateWithoutTaskPlanLayersInput>
   connectOrCreate?: Prisma.TaskCreateOrConnectWithoutTaskPlanLayersInput
@@ -1525,6 +1546,7 @@ export type TaskCreateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -1583,6 +1605,7 @@ export type TaskUncheckedCreateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -1703,6 +1726,7 @@ export type TaskCreateWithoutImportedCalendarEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -1761,6 +1785,7 @@ export type TaskUncheckedCreateWithoutImportedCalendarEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -1835,6 +1860,7 @@ export type TaskUpdateWithoutImportedCalendarEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -1893,6 +1919,7 @@ export type TaskUncheckedUpdateWithoutImportedCalendarEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -1951,6 +1978,7 @@ export type TaskCreateWithoutGraphVersionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
@@ -2009,6 +2037,7 @@ export type TaskUncheckedCreateWithoutGraphVersionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
@@ -2083,6 +2112,7 @@ export type TaskUpdateWithoutGraphVersionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
@@ -2141,6 +2171,7 @@ export type TaskUncheckedUpdateWithoutGraphVersionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
@@ -2199,6 +2230,7 @@ export type TaskCreateWithoutGraphMutationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
@@ -2257,6 +2289,7 @@ export type TaskUncheckedCreateWithoutGraphMutationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
@@ -2331,6 +2364,7 @@ export type TaskUpdateWithoutGraphMutationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
@@ -2389,6 +2423,7 @@ export type TaskUncheckedUpdateWithoutGraphMutationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
@@ -2447,6 +2482,7 @@ export type TaskCreateWithoutReconciliationEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -2505,6 +2541,7 @@ export type TaskUncheckedCreateWithoutReconciliationEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -2579,6 +2616,7 @@ export type TaskUpdateWithoutReconciliationEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -2637,6 +2675,7 @@ export type TaskUncheckedUpdateWithoutReconciliationEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -2695,6 +2734,7 @@ export type TaskCreateWithoutSchedulerEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -2753,6 +2793,7 @@ export type TaskUncheckedCreateWithoutSchedulerEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -2827,6 +2868,7 @@ export type TaskUpdateWithoutSchedulerEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -2885,6 +2927,7 @@ export type TaskUncheckedUpdateWithoutSchedulerEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -2942,6 +2985,7 @@ export type TaskCreateWithoutSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -3000,6 +3044,7 @@ export type TaskUncheckedCreateWithoutSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -3074,6 +3119,7 @@ export type TaskUpdateWithoutSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -3132,6 +3178,7 @@ export type TaskUncheckedUpdateWithoutSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -3190,6 +3237,7 @@ export type TaskCreateWithoutDependenciesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -3248,6 +3296,7 @@ export type TaskUncheckedCreateWithoutDependenciesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -3311,6 +3360,7 @@ export type TaskCreateWithoutDependentTasksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -3369,6 +3419,7 @@ export type TaskUncheckedCreateWithoutDependentTasksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -3443,6 +3494,7 @@ export type TaskUpdateWithoutDependenciesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -3501,6 +3553,7 @@ export type TaskUncheckedUpdateWithoutDependenciesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -3570,6 +3623,7 @@ export type TaskUpdateWithoutDependentTasksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -3628,6 +3682,7 @@ export type TaskUncheckedUpdateWithoutDependentTasksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -3686,6 +3741,7 @@ export type TaskCreateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -3744,6 +3800,7 @@ export type TaskUncheckedCreateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -3818,6 +3875,7 @@ export type TaskUpdateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -3876,6 +3934,7 @@ export type TaskUncheckedUpdateWithoutTaskPlansInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -3934,6 +3993,7 @@ export type TaskCreateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -3992,6 +4052,7 @@ export type TaskUncheckedCreateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -4066,6 +4127,7 @@ export type TaskUpdateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -4124,6 +4186,7 @@ export type TaskUncheckedUpdateWithoutTaskPlanRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -4182,6 +4245,7 @@ export type TaskCreateWithoutTaskPlanNodeAttemptsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -4240,6 +4304,7 @@ export type TaskUncheckedCreateWithoutTaskPlanNodeAttemptsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -4314,6 +4379,7 @@ export type TaskUpdateWithoutTaskPlanNodeAttemptsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -4372,6 +4438,7 @@ export type TaskUncheckedUpdateWithoutTaskPlanNodeAttemptsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -4430,6 +4497,7 @@ export type TaskCreateWithoutTaskPlanProviderRunsInput = {
   taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -4488,6 +4556,7 @@ export type TaskUncheckedCreateWithoutTaskPlanProviderRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -4562,6 +4631,7 @@ export type TaskUpdateWithoutTaskPlanProviderRunsInput = {
   taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -4620,6 +4690,259 @@ export type TaskUncheckedUpdateWithoutTaskPlanProviderRunsInput = {
   taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedUpdateManyWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskCreateWithoutTaskPlanProviderApprovalsInput = {
+  id?: string
+  title: string
+  description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoPlanGeneration?: boolean
+  autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTasksInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventCreateNestedManyWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventCreateNestedManyWithoutTaskInput
+}
+
+export type TaskUncheckedCreateWithoutTaskPlanProviderApprovalsInput = {
+  id?: string
+  workspaceId: string
+  title: string
+  description?: string | null
+  kind?: $Enums.TaskKind
+  recurrenceRule?: string | null
+  seriesExternalUid?: string | null
+  recurrenceAnchorStartAt?: Date | string | null
+  recurrenceAnchorEndAt?: Date | string | null
+  recurrenceWindowUntil?: Date | string | null
+  executionRuntime: string
+  executionConfig: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status: $Enums.TaskStatus
+  priority: $Enums.TaskPriority
+  autoPlanGeneration?: boolean
+  autoExecute?: boolean
+  autoPlanGenerationTiming?: string
+  autoExecuteTiming?: string
+  parentTaskId?: string | null
+  dueAt?: Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: string | null
+  latestRunId?: string | null
+  latestEventId?: string | null
+  latestRawEventId?: string | null
+  blockedByEventId?: string | null
+  blockedByRawEventId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  completedAt?: Date | string | null
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskInput
+  sessions?: Prisma.TaskSessionUncheckedCreateNestedManyWithoutTaskInput
+  approvals?: Prisma.ApprovalUncheckedCreateNestedManyWithoutTaskInput
+  artifacts?: Prisma.ArtifactUncheckedCreateNestedManyWithoutTaskInput
+  memories?: Prisma.MemoryUncheckedCreateNestedManyWithoutTaskInput
+  events?: Prisma.EventUncheckedCreateNestedManyWithoutTaskInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedCreateNestedManyWithoutTaskInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedCreateNestedManyWithoutTaskInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedCreateNestedManyWithoutTaskInput
+  projection?: Prisma.TaskProjectionUncheckedCreateNestedOneWithoutTaskInput
+  dependencies?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutTaskInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedCreateNestedManyWithoutDependsOnTaskInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedCreateNestedManyWithoutTaskInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedCreateNestedManyWithoutTaskInput
+  workBlocks?: Prisma.WorkBlockUncheckedCreateNestedManyWithoutTaskInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedCreateNestedManyWithoutTaskInput
+  taskPlans?: Prisma.TaskPlanUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
+  graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
+  graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
+  reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
+  schedulerEvents?: Prisma.SchedulerEventUncheckedCreateNestedManyWithoutTaskInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUncheckedCreateNestedManyWithoutTaskInput
+}
+
+export type TaskCreateOrConnectWithoutTaskPlanProviderApprovalsInput = {
+  where: Prisma.TaskWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanProviderApprovalsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanProviderApprovalsInput>
+}
+
+export type TaskUpsertWithoutTaskPlanProviderApprovalsInput = {
+  update: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlanProviderApprovalsInput, Prisma.TaskUncheckedUpdateWithoutTaskPlanProviderApprovalsInput>
+  create: Prisma.XOR<Prisma.TaskCreateWithoutTaskPlanProviderApprovalsInput, Prisma.TaskUncheckedCreateWithoutTaskPlanProviderApprovalsInput>
+  where?: Prisma.TaskWhereInput
+}
+
+export type TaskUpdateToOneWithWhereWithoutTaskPlanProviderApprovalsInput = {
+  where?: Prisma.TaskWhereInput
+  data: Prisma.XOR<Prisma.TaskUpdateWithoutTaskPlanProviderApprovalsInput, Prisma.TaskUncheckedUpdateWithoutTaskPlanProviderApprovalsInput>
+}
+
+export type TaskUpdateWithoutTaskPlanProviderApprovalsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTasksNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
+  graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
+  graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
+  reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
+  schedulerEvents?: Prisma.SchedulerEventUpdateManyWithoutTaskNestedInput
+  importedCalendarEvents?: Prisma.ImportedCalendarEventUpdateManyWithoutTaskNestedInput
+}
+
+export type TaskUncheckedUpdateWithoutTaskPlanProviderApprovalsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.EnumTaskKindFieldUpdateOperationsInput | $Enums.TaskKind
+  recurrenceRule?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seriesExternalUid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  recurrenceAnchorStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceAnchorEndAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  recurrenceWindowUntil?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  executionRuntime?: Prisma.StringFieldUpdateOperationsInput | string
+  executionConfig?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumTaskStatusFieldUpdateOperationsInput | $Enums.TaskStatus
+  priority?: Prisma.EnumTaskPriorityFieldUpdateOperationsInput | $Enums.TaskPriority
+  autoPlanGeneration?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoExecute?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  autoPlanGenerationTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  autoExecuteTiming?: Prisma.StringFieldUpdateOperationsInput | string
+  parentTaskId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  blockReason?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  defaultSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  latestRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskNestedInput
+  sessions?: Prisma.TaskSessionUncheckedUpdateManyWithoutTaskNestedInput
+  approvals?: Prisma.ApprovalUncheckedUpdateManyWithoutTaskNestedInput
+  artifacts?: Prisma.ArtifactUncheckedUpdateManyWithoutTaskNestedInput
+  memories?: Prisma.MemoryUncheckedUpdateManyWithoutTaskNestedInput
+  events?: Prisma.EventUncheckedUpdateManyWithoutTaskNestedInput
+  rawEventLogs?: Prisma.RawEventLogUncheckedUpdateManyWithoutTaskNestedInput
+  toolInvocations?: Prisma.ToolInvocationUncheckedUpdateManyWithoutTaskNestedInput
+  timelineItems?: Prisma.TaskTimelineItemUncheckedUpdateManyWithoutTaskNestedInput
+  projection?: Prisma.TaskProjectionUncheckedUpdateOneWithoutTaskNestedInput
+  dependencies?: Prisma.TaskDependencyUncheckedUpdateManyWithoutTaskNestedInput
+  dependentTasks?: Prisma.TaskDependencyUncheckedUpdateManyWithoutDependsOnTaskNestedInput
+  scheduleProposals?: Prisma.ScheduleProposalUncheckedUpdateManyWithoutTaskNestedInput
+  assistantMessages?: Prisma.TaskAssistantMessageUncheckedUpdateManyWithoutTaskNestedInput
+  workBlocks?: Prisma.WorkBlockUncheckedUpdateManyWithoutTaskNestedInput
+  executionSessions?: Prisma.ExecutionSessionUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlans?: Prisma.TaskPlanUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -4679,6 +5002,7 @@ export type TaskCreateWithoutTaskPlanLayersInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventCreateNestedManyWithoutTaskInput
@@ -4737,6 +5061,7 @@ export type TaskUncheckedCreateWithoutTaskPlanLayersInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedCreateNestedManyWithoutTaskInput
@@ -4811,6 +5136,7 @@ export type TaskUpdateWithoutTaskPlanLayersInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUpdateManyWithoutTaskNestedInput
@@ -4869,6 +5195,7 @@ export type TaskUncheckedUpdateWithoutTaskPlanLayersInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
   reconciliationEvents?: Prisma.ReconciliationEventUncheckedUpdateManyWithoutTaskNestedInput
@@ -4926,6 +5253,7 @@ export type TaskCreateWithoutRunsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -4984,6 +5312,7 @@ export type TaskUncheckedCreateWithoutRunsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -5058,6 +5387,7 @@ export type TaskUpdateWithoutRunsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -5116,6 +5446,7 @@ export type TaskUncheckedUpdateWithoutRunsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -5174,6 +5505,7 @@ export type TaskCreateWithoutApprovalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -5232,6 +5564,7 @@ export type TaskUncheckedCreateWithoutApprovalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -5306,6 +5639,7 @@ export type TaskUpdateWithoutApprovalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -5364,6 +5698,7 @@ export type TaskUncheckedUpdateWithoutApprovalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -5422,6 +5757,7 @@ export type TaskCreateWithoutArtifactsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -5480,6 +5816,7 @@ export type TaskUncheckedCreateWithoutArtifactsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -5554,6 +5891,7 @@ export type TaskUpdateWithoutArtifactsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -5612,6 +5950,7 @@ export type TaskUncheckedUpdateWithoutArtifactsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -5670,6 +6009,7 @@ export type TaskCreateWithoutMemoriesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -5728,6 +6068,7 @@ export type TaskUncheckedCreateWithoutMemoriesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -5802,6 +6143,7 @@ export type TaskUpdateWithoutMemoriesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -5860,6 +6202,7 @@ export type TaskUncheckedUpdateWithoutMemoriesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -5918,6 +6261,7 @@ export type TaskCreateWithoutEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -5976,6 +6320,7 @@ export type TaskUncheckedCreateWithoutEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -6050,6 +6395,7 @@ export type TaskUpdateWithoutEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -6108,6 +6454,7 @@ export type TaskUncheckedUpdateWithoutEventsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -6166,6 +6513,7 @@ export type TaskCreateWithoutRawEventLogsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -6224,6 +6572,7 @@ export type TaskUncheckedCreateWithoutRawEventLogsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -6298,6 +6647,7 @@ export type TaskUpdateWithoutRawEventLogsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -6356,6 +6706,7 @@ export type TaskUncheckedUpdateWithoutRawEventLogsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -6414,6 +6765,7 @@ export type TaskCreateWithoutToolInvocationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -6472,6 +6824,7 @@ export type TaskUncheckedCreateWithoutToolInvocationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -6546,6 +6899,7 @@ export type TaskUpdateWithoutToolInvocationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -6604,6 +6958,7 @@ export type TaskUncheckedUpdateWithoutToolInvocationsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -6662,6 +7017,7 @@ export type TaskCreateWithoutTimelineItemsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -6720,6 +7076,7 @@ export type TaskUncheckedCreateWithoutTimelineItemsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -6794,6 +7151,7 @@ export type TaskUpdateWithoutTimelineItemsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -6852,6 +7210,7 @@ export type TaskUncheckedUpdateWithoutTimelineItemsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -6910,6 +7269,7 @@ export type TaskCreateWithoutProjectionInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -6968,6 +7328,7 @@ export type TaskUncheckedCreateWithoutProjectionInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -7042,6 +7403,7 @@ export type TaskUpdateWithoutProjectionInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -7100,6 +7462,7 @@ export type TaskUncheckedUpdateWithoutProjectionInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -7158,6 +7521,7 @@ export type TaskCreateWithoutScheduleProposalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -7216,6 +7580,7 @@ export type TaskUncheckedCreateWithoutScheduleProposalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -7290,6 +7655,7 @@ export type TaskUpdateWithoutScheduleProposalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -7348,6 +7714,7 @@ export type TaskUncheckedUpdateWithoutScheduleProposalsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -7406,6 +7773,7 @@ export type TaskCreateWithoutAssistantMessagesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -7464,6 +7832,7 @@ export type TaskUncheckedCreateWithoutAssistantMessagesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -7538,6 +7907,7 @@ export type TaskUpdateWithoutAssistantMessagesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -7596,6 +7966,7 @@ export type TaskUncheckedUpdateWithoutAssistantMessagesInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -7654,6 +8025,7 @@ export type TaskCreateWithoutWorkBlocksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -7712,6 +8084,7 @@ export type TaskUncheckedCreateWithoutWorkBlocksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -7786,6 +8159,7 @@ export type TaskUpdateWithoutWorkBlocksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -7844,6 +8218,7 @@ export type TaskUncheckedUpdateWithoutWorkBlocksInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -7902,6 +8277,7 @@ export type TaskCreateWithoutExecutionSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordCreateNestedManyWithoutTaskInput
@@ -7960,6 +8336,7 @@ export type TaskUncheckedCreateWithoutExecutionSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutTaskInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedCreateNestedManyWithoutTaskInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutTaskInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutTaskInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutTaskInput
   graphVersions?: Prisma.GraphVersionUncheckedCreateNestedManyWithoutTaskInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedCreateNestedManyWithoutTaskInput
@@ -8034,6 +8411,7 @@ export type TaskUpdateWithoutExecutionSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -8092,6 +8470,7 @@ export type TaskUncheckedUpdateWithoutExecutionSessionsInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -8182,6 +8561,7 @@ export type TaskUpdateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUpdateManyWithoutTaskNestedInput
@@ -8240,6 +8620,7 @@ export type TaskUncheckedUpdateWithoutWorkspaceInput = {
   taskPlanRuns?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanNodeAttempts?: Prisma.TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanProviderRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutTaskNestedInput
+  taskPlanProviderApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutTaskNestedInput
   taskPlanLayers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutTaskNestedInput
   graphVersions?: Prisma.GraphVersionUncheckedUpdateManyWithoutTaskNestedInput
   graphMutations?: Prisma.GraphMutationRecordUncheckedUpdateManyWithoutTaskNestedInput
@@ -8305,6 +8686,7 @@ export type TaskCountOutputType = {
   taskPlanRuns: number
   taskPlanNodeAttempts: number
   taskPlanProviderRuns: number
+  taskPlanProviderApprovals: number
   taskPlanLayers: number
   graphVersions: number
   graphMutations: number
@@ -8333,6 +8715,7 @@ export type TaskCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   taskPlanRuns?: boolean | TaskCountOutputTypeCountTaskPlanRunsArgs
   taskPlanNodeAttempts?: boolean | TaskCountOutputTypeCountTaskPlanNodeAttemptsArgs
   taskPlanProviderRuns?: boolean | TaskCountOutputTypeCountTaskPlanProviderRunsArgs
+  taskPlanProviderApprovals?: boolean | TaskCountOutputTypeCountTaskPlanProviderApprovalsArgs
   taskPlanLayers?: boolean | TaskCountOutputTypeCountTaskPlanLayersArgs
   graphVersions?: boolean | TaskCountOutputTypeCountGraphVersionsArgs
   graphMutations?: boolean | TaskCountOutputTypeCountGraphMutationsArgs
@@ -8487,6 +8870,13 @@ export type TaskCountOutputTypeCountTaskPlanProviderRunsArgs<ExtArgs extends run
 /**
  * TaskCountOutputType without action
  */
+export type TaskCountOutputTypeCountTaskPlanProviderApprovalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskPlanProviderApprovalWhereInput
+}
+
+/**
+ * TaskCountOutputType without action
+ */
 export type TaskCountOutputTypeCountTaskPlanLayersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TaskPlanLayerWhereInput
 }
@@ -8579,6 +8969,7 @@ export type TaskSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   taskPlanRuns?: boolean | Prisma.Task$taskPlanRunsArgs<ExtArgs>
   taskPlanNodeAttempts?: boolean | Prisma.Task$taskPlanNodeAttemptsArgs<ExtArgs>
   taskPlanProviderRuns?: boolean | Prisma.Task$taskPlanProviderRunsArgs<ExtArgs>
+  taskPlanProviderApprovals?: boolean | Prisma.Task$taskPlanProviderApprovalsArgs<ExtArgs>
   taskPlanLayers?: boolean | Prisma.Task$taskPlanLayersArgs<ExtArgs>
   graphVersions?: boolean | Prisma.Task$graphVersionsArgs<ExtArgs>
   graphMutations?: boolean | Prisma.Task$graphMutationsArgs<ExtArgs>
@@ -8712,6 +9103,7 @@ export type TaskInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   taskPlanRuns?: boolean | Prisma.Task$taskPlanRunsArgs<ExtArgs>
   taskPlanNodeAttempts?: boolean | Prisma.Task$taskPlanNodeAttemptsArgs<ExtArgs>
   taskPlanProviderRuns?: boolean | Prisma.Task$taskPlanProviderRunsArgs<ExtArgs>
+  taskPlanProviderApprovals?: boolean | Prisma.Task$taskPlanProviderApprovalsArgs<ExtArgs>
   taskPlanLayers?: boolean | Prisma.Task$taskPlanLayersArgs<ExtArgs>
   graphVersions?: boolean | Prisma.Task$graphVersionsArgs<ExtArgs>
   graphMutations?: boolean | Prisma.Task$graphMutationsArgs<ExtArgs>
@@ -8751,6 +9143,7 @@ export type $TaskPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     taskPlanRuns: Prisma.$TaskPlanRunPayload<ExtArgs>[]
     taskPlanNodeAttempts: Prisma.$TaskPlanNodeAttemptPayload<ExtArgs>[]
     taskPlanProviderRuns: Prisma.$TaskPlanProviderRunPayload<ExtArgs>[]
+    taskPlanProviderApprovals: Prisma.$TaskPlanProviderApprovalPayload<ExtArgs>[]
     taskPlanLayers: Prisma.$TaskPlanLayerPayload<ExtArgs>[]
     graphVersions: Prisma.$GraphVersionPayload<ExtArgs>[]
     graphMutations: Prisma.$GraphMutationRecordPayload<ExtArgs>[]
@@ -9204,6 +9597,7 @@ export interface Prisma__TaskClient<T, Null = never, ExtArgs extends runtime.Typ
   taskPlanRuns<T extends Prisma.Task$taskPlanRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   taskPlanNodeAttempts<T extends Prisma.Task$taskPlanNodeAttemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanNodeAttemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanNodeAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   taskPlanProviderRuns<T extends Prisma.Task$taskPlanProviderRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanProviderRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanProviderRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  taskPlanProviderApprovals<T extends Prisma.Task$taskPlanProviderApprovalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanProviderApprovalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanProviderApprovalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   taskPlanLayers<T extends Prisma.Task$taskPlanLayersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$taskPlanLayersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanLayerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   graphVersions<T extends Prisma.Task$graphVersionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$graphVersionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GraphVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   graphMutations<T extends Prisma.Task$graphMutationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Task$graphMutationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GraphMutationRecordPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -10140,6 +10534,30 @@ export type Task$taskPlanProviderRunsArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.TaskPlanProviderRunScalarFieldEnum | Prisma.TaskPlanProviderRunScalarFieldEnum[]
+}
+
+/**
+ * Task.taskPlanProviderApprovals
+ */
+export type Task$taskPlanProviderApprovalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskPlanProviderApproval
+   */
+  select?: Prisma.TaskPlanProviderApprovalSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskPlanProviderApproval
+   */
+  omit?: Prisma.TaskPlanProviderApprovalOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskPlanProviderApprovalInclude<ExtArgs> | null
+  where?: Prisma.TaskPlanProviderApprovalWhereInput
+  orderBy?: Prisma.TaskPlanProviderApprovalOrderByWithRelationInput | Prisma.TaskPlanProviderApprovalOrderByWithRelationInput[]
+  cursor?: Prisma.TaskPlanProviderApprovalWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskPlanProviderApprovalScalarFieldEnum | Prisma.TaskPlanProviderApprovalScalarFieldEnum[]
 }
 
 /**

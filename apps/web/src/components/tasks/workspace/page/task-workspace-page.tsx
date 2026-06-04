@@ -7,6 +7,7 @@ import { useAssistantSurface } from "@/components/assistant-surface/assistant-su
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "../sections/task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
+import { ProviderApprovalBanner } from "../execution/provider-approval-banner";
 import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { useTaskWorkspaceDeleteFlow } from "../hooks/use-task-workspace-delete-flow";
@@ -347,6 +348,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           }}
         />
       </div>
+      <ProviderApprovalBanner taskId={task.id} />
+
 
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}
