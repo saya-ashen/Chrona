@@ -636,6 +636,8 @@ export async function dispatchExecutionAction(input: {
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
+    case "submit_node_output":
+      throw new Error("submit_node_output must be handled through node result submission");
     case "complete_manual_node": {
       const action = input.action;
       return withTaskExecutionControl(input.taskId, (control) =>

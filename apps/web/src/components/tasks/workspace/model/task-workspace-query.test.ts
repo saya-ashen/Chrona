@@ -267,7 +267,7 @@ describe("task workspace execution console view model", () => {
         id: "done",
         status: "done",
         completionSummary: "Finished research",
-        resultOutputs: [{ kind: "text", content: "summary" }],
+        resultOutputs: [{ kind: "markdown", content: "summary" }],
       })]),
     });
 

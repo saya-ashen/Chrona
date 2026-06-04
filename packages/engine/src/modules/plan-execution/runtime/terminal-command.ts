@@ -13,6 +13,8 @@ export function summaryForTerminalCommand(input: {
 }): string {
   const summary = input.command.summary?.trim();
   if (summary) return summary;
+  const resultSummary = input.node.result?.outputSummary?.trim();
+  if (resultSummary) return resultSummary;
   if (input.command.terminalKind === "checkpoint") {
     return `Checkpoint ${input.command.decision ?? "completed"}: ${input.node.title}`;
   }
@@ -56,6 +58,14 @@ export function validateTerminalCommand(input: {
   if (!kind) return;
   if (input.node.type !== kind) {
     throw new Error(`chrona ${kind} terminal tool cannot complete current ${input.node.type} node`);
+  }
+  if (kind === "task") {
+    const expectedOutput = (input.node.config as { expectedOutput?: unknown }).expectedOutput;
+    const hasRequiredOutput = typeof expectedOutput === "string" && expectedOutput.trim().length > 0;
+    const outputs = input.node.result?.outputs;
+    if (hasRequiredOutput && (!outputs || outputs.length === 0)) {
+      throw new Error("chrona task node requires chrona_node_output before completion");
+    }
   }
   if (kind === "condition") {
     selectedBranchForTerminalCommand(input);

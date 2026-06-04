@@ -8,9 +8,11 @@ import type { CalendarFeedTransport } from "@chrona/integrations";
 import { createApiRouter } from "../../routes/api";
 import { json, resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
+const FIXTURE_NOW = new Date("2026-05-01T00:00:00.000Z");
+
 function app(transport = fixtureTransport) {
   const server = new Hono();
-  server.route("/api", createApiRouter(createChronaEngine(), { calendarSources: { transport } }));
+  server.route("/api", createApiRouter(createChronaEngine(), { calendarSources: { transport, now: () => FIXTURE_NOW } }));
   return server;
 }
 
@@ -126,7 +128,7 @@ describe("External calendar source management API", () => {
     expect(failed.syncStatus.latestErrorCode).toBe("malformed_calendar");
 
     const eventsRes = await app().request(`http://local/api/workspaces/${workspaceId}/calendar-events?from=2026-05-04T00:00:00.000Z&to=2026-05-05T00:00:00.000Z`);
-    expect((await json<{ events: unknown[] }>(eventsRes)).events).toHaveLength(0);
+    expect((await json<{ events: Array<{ title: string }> }>(eventsRes)).events.map((event) => event.title)).toEqual(["Partial refresh event"]);
     const importedEvents = await db.importedCalendarEvent.findMany({
       where: { workspaceId },
       include: { task: { include: { projection: true, workBlocks: true } } },

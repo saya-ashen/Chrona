@@ -214,7 +214,7 @@ describe("runTaskNodeFeature", () => {
         feature: "execute_task_node",
         instructions: "Execute the current task node.",
         inputText: "{}",
-        terminalToolName: "chrona_task_complete",
+        terminalToolName: "chrona_node_complete",
         structuredOutputSchema: undefined,
       },
       providerInput: {},
@@ -240,7 +240,7 @@ describe("runTaskNodeFeature", () => {
   });
 
 
-  it("accepts a completed task snapshot only when chrona_task_complete was used", async () => {
+  it("accepts a completed task snapshot only when chrona_node_complete was used", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Node AI task terminal tool workspace",
@@ -285,8 +285,8 @@ describe("runTaskNodeFeature", () => {
           sessionId: "main-session",
           status: "completed" as const,
           outputText: "Task complete",
-          structuredPayload: { outputs: [{ kind: "text", content: "Task complete" }] },
-          raw: { terminalToolName: "chrona_task_complete" },
+          structuredPayload: { outputs: [{ kind: "markdown", content: "Task complete" }] },
+          raw: { terminalToolName: "chrona_node_complete" },
           error: null,
         },
       }),
@@ -309,7 +309,7 @@ describe("runTaskNodeFeature", () => {
         feature: "execute_task_node",
         instructions: "Execute the current task node.",
         inputText: "{}",
-        terminalToolName: "chrona_task_complete",
+        terminalToolName: "chrona_node_complete",
         structuredOutputSchema: undefined,
       },
       providerInput: {},
@@ -318,7 +318,7 @@ describe("runTaskNodeFeature", () => {
     expect(result).toMatchObject({
       status: "done",
       summary: "Task complete",
-      output: [{ kind: "text", content: "Task complete" }],
+      output: [{ kind: "markdown", content: "Task complete" }],
     });
   });
   it("fails provider branchRef structured payload without condition terminal tool", async () => {
@@ -372,7 +372,7 @@ describe("runTaskNodeFeature", () => {
           structuredPayload: {
             branchRef: "B20260522-01-B",
             summary: "Needs fixes selected",
-            outputs: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+            outputs: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
           },
           error: null,
         },
@@ -459,7 +459,7 @@ describe("runTaskNodeFeature", () => {
           structuredPayload: {
             branchRef,
             summary: "Needs fixes selected",
-            outputs: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+            outputs: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
           },
           raw: { terminalToolName: "chrona_condition_select" },
           error: null,
@@ -492,7 +492,7 @@ describe("runTaskNodeFeature", () => {
     expect(result).toMatchObject({
       status: "done",
       summary: "Needs fixes selected",
-      output: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+      output: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
       selectedBranch: {
         label: "Needs fixes",
         nextNodeId: "fix_node",

@@ -323,12 +323,13 @@ function outputForNode(title: string) {
 function structuredPayloadForRequest(request: Parameters<AgentProviderClient["startRun"]>[0]) {
   const runtimeInput = runtimeInputFromRequest(request);
   if (runtimeInput.node?.type !== "condition") {
-    return { summary: outputForNode(String(runtimeInput.node?.title ?? "Node")) };
+    return { terminalToolName: request.terminalToolName, summary: outputForNode(String(runtimeInput.node?.title ?? "Node")) };
   }
 
   const branch = runtimeInput.branchOptions?.find((option) => option.label === "approve")
     ?? runtimeInput.branchOptions?.[0];
   return {
+    terminalToolName: request.terminalToolName,
     branchRef: typeof branch?.ref === "string" ? branch.ref : undefined,
     summary: "Condition selected approve branch",
   };
@@ -410,7 +411,7 @@ function createScriptedProviderClient() {
 
       yield { type: "run_started", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 1, timestamp, run };
       yield { type: "text_delta", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 2, timestamp, text: outputText };
-      yield { type: "tool_completed", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 3, timestamp, toolName: undefined };
+      yield { type: "tool_completed", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 3, timestamp, toolName: startRequest.terminalToolName };
       yield {
         type: "run_completed",
         provider: "hermes",

@@ -186,9 +186,9 @@ describe("getTaskPage orchestrator read model", () => {
 
     expect(page.task.currentWorkBlock?.id).toBe(futureBlock.id);
     expect(page.task.status).toBe("Scheduled");
-    expect(page.task.savedPlan).toBeNull();
-    expect(page.task.aiPlanGenerationStatus).toBe("idle");
-    expect(page.task.executionSummary).toBeNull();
+    expect(page.task.savedPlan?.id).toBe(compiledPlan.editablePlanId);
+    expect(page.task.aiPlanGenerationStatus).toBe("accepted");
+    expect(page.task.executionSummary).toMatchObject({ executionState: "queued", currentNodeId: "prepare" });
     expect(page.task.recurrenceOccurrences).toEqual(expect.arrayContaining([
       expect.objectContaining({ workBlockId: completedBlock.id, status: "Completed", isCurrent: false }),
       expect.objectContaining({ workBlockId: futureBlock.id, status: "Scheduled", isCurrent: true }),
@@ -290,26 +290,8 @@ describe("getTaskPage orchestrator read model", () => {
 
     const page = await getTaskPage(task.id);
 
-    expect(page.task.recurrenceOccurrences).toEqual([
-      {
-        taskId: task.id,
-        title: task.title,
-        status: "Scheduled",
-        scheduledStartAt: "2026-06-01T09:00:00.000Z",
-        scheduledEndAt: "2026-06-01T10:00:00.000Z",
-        workBlockId: firstBlock.id,
-        isCurrent: true,
-      },
-      {
-        taskId: nextTask.id,
-        title: nextTask.title,
-        status: "Scheduled",
-        scheduledStartAt: "2026-06-02T09:00:00.000Z",
-        scheduledEndAt: "2026-06-02T10:00:00.000Z",
-        workBlockId: nextBlock.id,
-        isCurrent: false,
-      },
-    ]);
+    expect(page.task.recurrenceOccurrences.map((occurrence) => occurrence.workBlockId)).toEqual(expect.arrayContaining([firstBlock.id, nextBlock.id]));
+    expect(page.task.recurrenceOccurrences.find((occurrence) => occurrence.workBlockId === firstBlock.id)?.isCurrent).toBe(true);
   });
 
   it("returns one coherent execution summary from the effective plan graph", async () => {

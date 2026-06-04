@@ -25,7 +25,8 @@ export const chronaToolNames = [
   "chrona.execution.read",
   "chrona.execution.dispatch",
   "chrona.node.read",
-  "chrona.node.task_complete",
+  "chrona.node.output",
+  "chrona.node.complete",
   "chrona.node.condition_select",
   "chrona.node.block",
   "chrona.node.fail",
@@ -95,18 +96,20 @@ export const chronaToolContextSchema = z.object({
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const publicReadPayloadSchema = z.object({}).passthrough();
 export const nodeResultOutputSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("text"), content: z.string().min(1), title: z.string().optional() }).strict(),
   z.object({ kind: z.literal("markdown"), content: z.string().min(1), title: z.string().optional() }).strict(),
   z.object({ kind: z.literal("json"), value: z.unknown(), title: z.string().optional() }).strict(),
   z.object({ kind: z.literal("file"), path: z.string().min(1), title: z.string().optional(), language: z.string().optional(), description: z.string().optional() }).strict(),
-  z.object({ kind: z.literal("artifact"), artifactId: z.string().min(1), title: z.string().min(1), description: z.string().optional() }).strict(),
-  z.object({ kind: z.literal("command"), command: z.string().min(1), title: z.string().optional(), exitCode: z.number().int().optional(), stdout: z.string().optional(), stderr: z.string().optional() }).strict(),
   z.object({ kind: z.literal("link"), href: z.string().min(1), title: z.string().min(1), description: z.string().optional() }).strict(),
 ]);
 const nodeEvidencePayloadSchema = z.record(z.string(), z.unknown()).optional();
+export const nodeOutputPayloadSchema = z.object({
+  outputs: z.array(nodeResultOutputSchema).min(1),
+  mode: z.enum(["append", "replace"]).optional(),
+  summary: z.string().min(1).optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
 export const taskCompletePayloadSchema = z.object({
-  summary: z.string().min(1),
-  outputs: z.array(nodeResultOutputSchema).optional(),
+  summary: z.string().min(1).optional(),
   evidence: nodeEvidencePayloadSchema,
 }).strict();
 export const conditionSelectPayloadSchema = z.object({
@@ -160,7 +163,8 @@ export const chronaToolPayloadSchemas = {
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
   "chrona.node.read": readPayloadSchema,
-  "chrona.node.task_complete": taskCompletePayloadSchema,
+  "chrona.node.output": nodeOutputPayloadSchema,
+  "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
   "chrona.node.block": blockPayloadSchema,
   "chrona.node.fail": failPayloadSchema,
@@ -175,7 +179,8 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.schedule.clear": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
   "chrona.node.read": publicReadPayloadSchema,
-  "chrona.node.task_complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
+  "chrona.node.output": nodeOutputPayloadSchema.omit({ evidence: true }).strict(),
+  "chrona.node.complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.block": blockPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.fail": failPayloadSchema.omit({ evidence: true }).strict(),

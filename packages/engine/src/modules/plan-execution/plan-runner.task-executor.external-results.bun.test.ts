@@ -140,7 +140,7 @@ describe("plan-runner task executor external results", () => {
             action: "complete_manual_node",
             sessionId: "provider-runtime-session",
             summary: "Runtime tool completed first task",
-            output: { source: "chrona_task_complete" },
+            output: { source: "chrona_node_output" },
           },
         });
         expect(submittedResult.status).toBe("running");

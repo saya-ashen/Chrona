@@ -700,7 +700,7 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(result.status).toBe("started");
     expect((result as { summary: string }).summary).toBe(outputContent);
     expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
-    expect(calls.startRun[0].instructions).toContain("Chrona result-submission actions");
+    expect(calls.startRun[0].instructions).toContain("terminal Chrona action");
     expectStreamedRunIds(calls.streamRun, ["hermes-run-1"]);
   });
 
@@ -733,7 +733,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
     expect(result.status).toBe("started");
     expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
-    expect(calls.startRun[0].instructions).toContain("Chrona result-submission actions");
+    expect(calls.startRun[0].instructions).toContain("terminal Chrona action");
     expect(calls.startRun[0].instructions).not.toContain("evaluate_condition_node_result");
     expectStreamedRunIds(calls.streamRun, ["hermes-run-1"]);
   });
@@ -767,7 +767,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
     expect(result.status).toBe("started");
     expect(calls.startRun[0].structuredOutputSchema).toBeUndefined();
-    expect(calls.startRun[0].instructions).toContain("Chrona result-submission actions");
+    expect(calls.startRun[0].instructions).toContain("terminal Chrona action");
     expect(calls.startRun[0].instructions).not.toContain("review_checkpoint_node_result");
     expectStreamedRunIds(calls.streamRun, ["hermes-run-1"]);
   });

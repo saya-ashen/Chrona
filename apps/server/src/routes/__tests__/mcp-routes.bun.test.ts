@@ -50,7 +50,7 @@ function app(
       registry: () => ({
         tools: [
           { name: "chrona.execution.read", mutates: false, description: "Read execution." },
-          { name: "chrona.node.task_complete", mutates: true, description: "Complete task node." },
+          { name: "chrona.node.complete", mutates: true, description: "Complete task node." },
         ],
       }),
       resolveInputContext: async (input: unknown) => ({
@@ -222,11 +222,12 @@ describe("MCP routes", () => {
       "chrona_condition_select",
       "chrona_execution_read",
       "chrona_node_block",
+      "chrona_node_complete",
       "chrona_node_fail",
+      "chrona_node_output",
       "chrona_node_read",
       "chrona_plan_generate",
       "chrona_plan_read",
-      "chrona_task_complete",
       "chrona_wait_complete",
     ]);
   });
@@ -252,7 +253,7 @@ describe("MCP routes", () => {
   it("returns slim accepted mutating tool results to the model", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona_task_complete",
+        name: "chrona_node_complete",
         arguments: { summary: "Done" },
         _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
@@ -288,7 +289,8 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona_node_read", "chrona.node.read", {}, {}],
-      ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
+      ["chrona_node_output", "chrona.node.output", { outputs: [{ kind: "markdown", content: "Result" }] }, { outputs: [{ kind: "markdown", content: "Result" }] }],
+      ["chrona_node_complete", "chrona.node.complete", { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
       ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
@@ -321,7 +323,7 @@ describe("MCP routes", () => {
   it("generates idempotency keys for mutating tools without exposing them to the model", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona_task_complete",
+        name: "chrona_node_complete",
         arguments: { summary: "Done" },
         _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
@@ -337,20 +339,20 @@ describe("MCP routes", () => {
   it("fails fast when mutating Chrona tools are called without sessionId", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona_task_complete",
+        name: "chrona_node_complete",
         arguments: { summary: "Done" },
       }),
     );
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(JSON.stringify(body)).toContain("chrona.node.task_complete requires sessionId for idempotency");
+    expect(JSON.stringify(body)).toContain("chrona.node.complete requires sessionId for idempotency");
   });
 
   it("fails fast when Chrona tool context uses unsupported session_id", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona_task_complete",
+        name: "chrona_node_complete",
         arguments: {
           summary: "Done",
           _meta: { session_id: "chrona:task:task-1:execute" },
@@ -409,7 +411,8 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona_node_read", "chrona.node.read", {}, {}],
-      ["chrona_task_complete", "chrona.node.task_complete", { summary: "Done" }, { summary: "Done" }],
+      ["chrona_node_output", "chrona.node.output", { outputs: [{ kind: "markdown", content: "Result" }] }, { outputs: [{ kind: "markdown", content: "Result" }] }],
+      ["chrona_node_complete", "chrona.node.complete", { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
       ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
@@ -528,23 +531,23 @@ describe("MCP routes", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     const taskComplete = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_task_complete",
+      (tool: { name: string }) => tool.name === "chrona_node_complete",
     );
     expect(taskComplete.inputSchema.properties.idempotencyKey).toBeUndefined();
     expect(taskComplete.inputSchema.properties.evidence).toBeUndefined();
     expect(taskComplete.inputSchema.properties.expectedRevision).toBeUndefined();
   });
 
-  it("exposes the same structured output contract used to validate task completion", async () => {
+  it("exposes the structured output contract on node output", async () => {
     const response = await postRpc(rpc("tools/list"));
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    const taskComplete = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_task_complete",
+    const nodeOutput = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_node_output",
     );
 
-    expect(taskComplete.inputSchema.properties.outputs).toMatchObject({
+    expect(nodeOutput.inputSchema.properties.outputs).toMatchObject({
       type: "array",
       items: {
         oneOf: expect.arrayContaining([
@@ -558,7 +561,7 @@ describe("MCP routes", () => {
           expect.objectContaining({
             required: expect.arrayContaining(["kind", "content"]),
             properties: expect.objectContaining({
-              kind: expect.objectContaining({ const: "text" }),
+              kind: expect.objectContaining({ const: "markdown" }),
               content: expect.objectContaining({ type: "string" }),
             }),
           }),
@@ -567,10 +570,10 @@ describe("MCP routes", () => {
     });
   });
 
-  it("rejects task completion outputs that pass the old loose public schema", async () => {
+  it("rejects node outputs that pass the old loose public schema", async () => {
     const response = await postRpc(
       rpc("tools/call", {
-        name: "chrona_task_complete",
+        name: "chrona_node_output",
         arguments: {
           summary: "Done",
           outputs: [{ type: "script_spec", value: { ok: true } }],

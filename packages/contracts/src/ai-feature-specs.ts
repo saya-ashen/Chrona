@@ -44,7 +44,7 @@ export const ANALYZE_SCHEDULE_CONFLICTS_TOOL_NAME =
 export const SUGGEST_TASK_TIMESLOTS_TOOL_NAME = "suggest_task_timeslots";
 export const DISPATCH_NEXT_TASK_ACTION_TOOL_NAME = "dispatch_next_task_action";
 export const GENERATE_PLAN_BLUEPRINT_TOOL_NAME = "chrona_plan_generate";
-export const EXECUTE_TASK_NODE_RESULT_TOOL_NAME = "chrona_task_complete";
+export const EXECUTE_TASK_NODE_RESULT_TOOL_NAME = "chrona_node_complete";
 export const CONDITION_NODE_SELECT_TOOL_NAME = "chrona_condition_select";
 export const EDIT_PLAN_PATCH_TOOL_NAME = "edit_plan_patch";
 
@@ -64,7 +64,7 @@ export const GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION =
   "Persist the complete Chrona plan graph through the Chrona MCP tool.";
 
 export const EXECUTE_TASK_NODE_RESULT_TOOL_DESCRIPTION =
-  "Report the current Chrona execution node result, then stop the current node run.";
+  "Mark the current Chrona execution node complete after outputs have been submitted.";
 
 export const EDIT_PLAN_PATCH_TOOL_DESCRIPTION =
   "Propose a PlanPatch to edit an existing plan graph. Returns patch operations only, NOT a full graph.";
@@ -103,13 +103,6 @@ export interface TaskNodeAiResult {
 const nodeResultOutputSchema = z.discriminatedUnion("kind", [
   z
     .object({
-      kind: z.literal("text"),
-      content: z.string().min(1),
-      title: z.string().optional(),
-    })
-    .strict(),
-  z
-    .object({
       kind: z.literal("markdown"),
       content: z.string().min(1),
       title: z.string().optional(),
@@ -129,24 +122,6 @@ const nodeResultOutputSchema = z.discriminatedUnion("kind", [
       title: z.string().optional(),
       language: z.string().optional(),
       description: z.string().optional(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("artifact"),
-      artifactId: z.string().min(1),
-      title: z.string().min(1),
-      description: z.string().optional(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("command"),
-      command: z.string().min(1),
-      title: z.string().optional(),
-      exitCode: z.number().int().optional(),
-      stdout: z.string().optional(),
-      stderr: z.string().optional(),
     })
     .strict(),
   z
@@ -279,11 +254,11 @@ Execute or assess only the task node described in the input.
 Treat the provided input as the current source of truth. Do not call chrona_node_read or chrona_execution_read by default.
 Call chrona_node_read only when current node details or result submission actions are missing, ambiguous, or suspected stale.
 Call chrona_execution_read only after a Chrona result submission action is rejected/errors, or when overall execution status/recovery actions are needed.
-The chrona_task_complete MCP action is the authoritative result submission action for successful task nodes.
-After a Chrona result submission action succeeds, stop immediately: do not call more actions, do not continue downstream nodes, and do not produce extra assistant work.
+When the current node has user-visible deliverables, chrona_node_output is authoritative for submitting those results. chrona_node_output may be called multiple times to append outputs, or with mode "replace" to replace prior outputs.
+After chrona_node_complete succeeds, stop immediately: do not call more actions, do not continue downstream nodes, and do not produce extra assistant work.
 
 Rules:
-1. Complete the current node only when the task objective is satisfied, by calling chrona_task_complete with concise result data. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_task_complete.
+1. Submit deliverables with chrona_node_output before completion. Complete the current node only when the task objective is satisfied, by calling chrona_node_complete. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_node_complete.
 2. Ask for user input only when a specific user answer is required.
 3. Block the node by calling chrona_node_block when progress depends on an external condition or unavailable capability.
 4. Fail the node by calling chrona_node_fail when the node cannot be completed because of an unrecoverable error.

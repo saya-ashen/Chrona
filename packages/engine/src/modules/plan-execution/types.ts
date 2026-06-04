@@ -105,6 +105,13 @@ export type AdvanceRuntimeCommand =
     }
   | { type: "resume_after_unblock"; nodeId?: string }
   | {
+      type: "submit_node_output";
+      nodeId?: string;
+      outputs: unknown;
+      mode?: "append" | "replace";
+      summary?: string;
+    }
+  | {
       type: "complete_manual_node";
       nodeId?: string;
       summary?: string;

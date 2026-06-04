@@ -654,6 +654,30 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     },
   });
 
+  const recurrenceSeriesTasks = task.seriesExternalUid
+    ? await db.task.findMany({
+        where: {
+          workspaceId: task.workspaceId,
+          seriesExternalUid: task.seriesExternalUid,
+          id: { not: task.id },
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          workBlocks: {
+            where: { status: { in: ["Scheduled", "Active", "Completed"] } },
+            orderBy: [
+              { status: "asc" },
+              { scheduledStartAt: "asc" },
+              { updatedAt: "desc" },
+            ],
+            take: 50,
+          },
+        },
+      })
+    : [];
+
   const latestRun = task.runs[0] ?? null;
   const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
   const importedEvent = task.importedCalendarEvents[0] ?? null;
@@ -667,7 +691,10 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
         immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
       }
     : null;
-  const recurrenceOccurrences = [{ id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks }];
+  const recurrenceOccurrences = [
+    { id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks },
+    ...recurrenceSeriesTasks,
+  ];
   const savedPlan = latestSavedPlan;
   const aiPlanGenerationStatus: TaskPlanGenerationStatus =
     isTaskPlanGenerationRunning({ taskId, workBlockId: selectedWorkBlockId })

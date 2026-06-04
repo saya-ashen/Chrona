@@ -509,14 +509,28 @@ describe("agent tool operations service", () => {
 
     await expect(
       agentTools.execute({
-        toolName: "chrona.node.task_complete",
+        toolName: "chrona.node.output",
         input: {
           workspaceId: "workspace-1",
           taskId: "task-1",
           sessionId: "session-1",
           actorType: "agent",
-          idempotencyKey: "node-task-complete-1",
-          payload: { summary: "Done", outputs: [{ kind: "json", value: { ok: true } }] },
+          idempotencyKey: "node-output-1",
+          payload: { outputs: [{ kind: "json", value: { ok: true } }] },
+        },
+      }),
+    ).resolves.toMatchObject({ status: "accepted" });
+
+    await expect(
+      agentTools.execute({
+        toolName: "chrona.node.complete",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          sessionId: "session-1",
+          actorType: "agent",
+          idempotencyKey: "node-complete-1",
+          payload: { summary: "Done" },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
@@ -572,10 +586,15 @@ describe("agent tool operations service", () => {
     expect(agentTools.calls.dispatchActions).toEqual([]);
     expect(agentTools.calls.submittedNodeResults).toEqual([
       {
+        action: "submit_node_output",
+        sessionId: "session-1",
+        outputs: [{ kind: "json", value: { ok: true } }],
+      },
+      {
         action: "complete_manual_node",
         sessionId: "session-1",
         summary: "Done",
-        output: [{ kind: "json", value: { ok: true } }],
+        output: undefined,
         terminalKind: "task",
       },
       {

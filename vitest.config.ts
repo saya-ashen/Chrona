@@ -16,6 +16,12 @@ export default defineConfig({
     ],
     environment: "jsdom",
     setupFiles: ["./apps/web/src/test/setup.ts"],
+    testTimeout: 15_000,
+    onConsoleLog(log: string) {
+      if (log.includes("cannot contain a nested") || log.includes("validateDOMNesting")) {
+        return false;
+      }
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

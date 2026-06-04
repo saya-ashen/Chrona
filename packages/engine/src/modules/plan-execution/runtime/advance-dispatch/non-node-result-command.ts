@@ -42,6 +42,8 @@ export function nonNodeResultCommand(
           userInput: command.feedback,
         },
       };
+    case "submit_node_output":
+      throw new Error("Node output commands must be handled before dispatch.");
     case "complete_manual_node":
     case "block_current_node":
     case "fail_current_node":

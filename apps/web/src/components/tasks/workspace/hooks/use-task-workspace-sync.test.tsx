@@ -312,28 +312,43 @@ beforeEach(() => {
     const url = input instanceof Request ? input.url : String(input);
     mocks.fetchCalls.push({ input: url, init });
 
+    if (url.includes("/api/tasks/") && !url.includes("/plan") && !url.includes("/execution")) {
+      mocks.pageFetchCount += 1;
+      return new Response(JSON.stringify(mocks.pageResponses.shift()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    if (url.endsWith("/plan")) {
+      return new Response(JSON.stringify(mocks.planResponses.shift()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     if (url.endsWith("/execution/current")) {
-      return {
-        ok: true,
-        json: async () => mocks.currentExecutionResponse,
-      };
+      return new Response(JSON.stringify(mocks.currentExecutionResponse), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
 
     if (url.endsWith("/commands")) {
-      return {
-        ok: true,
-        json: async () => mocks.commandResponses.shift() ?? {
-          commandId: "command-1",
-          taskId: "task-1",
-          acceptedAt: "2026-05-17T00:00:00.000Z",
-        },
-      };
+      return new Response(JSON.stringify(mocks.commandResponses.shift() ?? {
+        commandId: "command-1",
+        taskId: "task-1",
+        acceptedAt: "2026-05-17T00:00:00.000Z",
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }
 
-    return {
-      ok: false,
-      json: async () => ({ error: `Unhandled fetch ${url}` }),
-    };
+    return new Response(JSON.stringify({ error: `Unhandled fetch ${url}` }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
   }));
 });
 

@@ -80,7 +80,8 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.execution.read": "Read execution state summary.",
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
   "chrona.node.read": "Read current execution node state.",
-  "chrona.node.task_complete": "Complete the current task node.",
+  "chrona.node.output": "Append or replace user-visible outputs for the current execution node.",
+  "chrona.node.complete": "Complete the current task node.",
   "chrona.node.condition_select": "Select the current condition node branch.",
   "chrona.node.block": "Block the current execution node.",
   "chrona.node.fail": "Fail the current execution node.",
@@ -980,12 +981,29 @@ async function executeValidatedTool(
       });
     case "chrona.node.read":
       return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
-    case "chrona.node.task_complete":
+    case "chrona.node.output": {
+      const body = payload as {
+        outputs: unknown;
+        mode?: "append" | "replace";
+        summary?: string;
+      };
+      return deps.execution.submitNodeResult({
+        taskId: requireTaskId(input),
+        commandContext: toolCommandContext(operation, audit),
+        action: {
+          action: "submit_node_output" as const,
+          sessionId: input.sessionId,
+          outputs: body.outputs,
+          mode: body.mode,
+          summary: body.summary,
+        },
+      });
+    }
+    case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete": {
       const body = payload as {
         summary?: string;
-        outputs?: unknown;
         nodeId?: string;
         branchRef?: string;
         decision?: "approved" | "rejected" | "needs_input" | "completed";
@@ -1006,7 +1024,7 @@ async function executeValidatedTool(
           sessionId: input.sessionId,
           nodeId: body.nodeId,
           summary: body.summary,
-          output: body.outputs ?? body.input,
+          output: body.input,
           terminalKind,
           branchRef: body.branchRef,
           decision: body.decision,

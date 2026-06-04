@@ -8,9 +8,11 @@ import type { CalendarFeedTransport } from "@chrona/integrations";
 import { createApiRouter } from "../../routes/api";
 import { json, resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
+const FIXTURE_NOW = new Date("2026-05-01T00:00:00.000Z");
+
 function app(transport = fixtureTransport) {
   const server = new Hono();
-  server.route("/api", createApiRouter(createChronaEngine(), { calendarSources: { transport } }));
+  server.route("/api", createApiRouter(createChronaEngine(), { calendarSources: { transport, now: () => FIXTURE_NOW } }));
   return server;
 }
 

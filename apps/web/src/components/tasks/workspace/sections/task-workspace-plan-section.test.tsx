@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
@@ -91,6 +91,13 @@ beforeAll(async () => {
   }
 
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+});
+
+beforeEach(() => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ generationSession: null }), {
+    status: 404,
+    headers: { "content-type": "application/json" },
+  }));
 });
 
 afterEach(() => {

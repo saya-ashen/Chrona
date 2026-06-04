@@ -182,7 +182,7 @@ describe("TaskPlanGraph", () => {
               status: "done",
               type: "task",
               displayType: "task",
-              resultOutputs: [{ kind: "text", content: "artifact summary" }],
+              resultOutputs: [{ kind: "markdown", content: "artifact summary" }],
             },
             {
               id: "node-running",

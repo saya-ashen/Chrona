@@ -386,7 +386,7 @@ describe("graph-runtime execution", () => {
           outputSummary: "Provider returned final output but terminal tool submission failed",
           outputs: [
             {
-              kind: "text",
+              kind: "markdown",
               content: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
             },
           ],

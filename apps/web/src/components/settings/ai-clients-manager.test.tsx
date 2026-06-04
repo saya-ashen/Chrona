@@ -63,12 +63,12 @@ const providersResponse = {
   providers: [
     {
       key: "hermes",
-      label: "LLM (OpenAI Compatible)",
+      label: "Hermes",
       features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
     },
     {
-      key: "hermes",
-      label: "Hermes",
+      key: "llm",
+      label: "LLM (OpenAI Compatible)",
       features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
     },
     {

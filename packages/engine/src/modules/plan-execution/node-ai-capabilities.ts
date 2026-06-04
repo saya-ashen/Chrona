@@ -125,7 +125,7 @@ function terminalNodeResultFromSnapshot(input: {
         }),
         evidence: input.evidence,
       };
-    case "chrona_task_complete":
+    case "chrona_node_complete":
     case "chrona_wait_complete":
       return {
         status: "done",
@@ -381,6 +381,10 @@ function errorSummaryFromNodeResult(result: NodeExecutionResult): string | null 
   }
 }
 
+function defaultTerminalToolName(nodeType: EffectivePlanNode["type"]): string {
+  return nodeType === "task" ? "chrona_node_complete" : NODE_RUNTIME_TERMINAL_TOOLS[nodeType][0];
+}
+
 export async function executeTaskNodeCapability(
   input: NodeAiCapabilityInput,
 ): Promise<NodeExecutionResult> {
@@ -393,7 +397,7 @@ export async function executeTaskNodeCapability(
         : "execute_task_node",
     instructions: runtime.instructions,
     inputText: JSON.stringify(runtime.runtimeInput, null, 2),
-    terminalToolName: NODE_RUNTIME_TERMINAL_TOOLS[input.node.type][0],
+    terminalToolName: defaultTerminalToolName(input.node.type),
   };
 
   return runTaskNodeFeature({

@@ -111,7 +111,9 @@ function derivePlanRunFromRuntime(input: {
 }
 
 export async function ensureNativePlanRun(taskId: string, workBlockId?: string | null) {
-  const savedCompiled = await getAcceptedCompiledPlan(taskId, workBlockId);
+  const savedCompiled =
+    (await getAcceptedCompiledPlan(taskId, workBlockId))
+    ?? (workBlockId ? await getAcceptedCompiledPlan(taskId, null) : null);
   if (!savedCompiled) {
     return null;
   }

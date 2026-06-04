@@ -144,6 +144,15 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({
+    action: z.literal("submit_node_output"),
+    sessionId: sessionIdSchema.optional(),
+    nodeId: nodeIdSchema.optional(),
+    outputs: z.unknown(),
+    mode: z.enum(["append", "replace"]).optional(),
+    summary: z.string().optional(),
+    idempotencyKey: idempotencyKeySchema.optional(),
+  }),
+  z.object({
     action: z.literal("complete_manual_node"),
     sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),

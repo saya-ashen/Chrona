@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles, Terminal } from "lucide-react";
+import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
@@ -260,13 +260,6 @@ function outputTitle(output: NodeResultOutput, fallback: string) {
 
 export function ResultOutputCard({ output, graphCopy = DEFAULT_GRAPH_COPY, disableInternalScroll = false }: { output: NodeResultOutput; graphCopy?: GraphCopy; disableInternalScroll?: boolean }) {
   switch (output.kind) {
-    case "text":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <p className="text-xs font-semibold text-muted-foreground">{outputTitle(output, output.kind)}</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{output.content}</p>
-        </div>
-      );
     case "markdown":
       return (
         <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
@@ -311,36 +304,6 @@ export function ResultOutputCard({ output, graphCopy = DEFAULT_GRAPH_COPY, disab
               {output.language ? <p className="mt-1 text-[11px] font-medium text-muted-foreground">{output.language}</p> : null}
             </div>
           </div>
-        </div>
-      );
-    case "artifact":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <p className="text-sm font-semibold text-foreground">{output.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{graphCopy.runOutputArtifactPrefix}: {output.artifactId}</p>
-          {output.description ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{output.description}</p> : null}
-        </div>
-      );
-    case "command":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2 text-foreground">
-          <div className="flex items-center gap-2">
-            <Terminal className="size-4 text-muted-foreground" />
-            <p className="text-sm font-semibold">{output.title ?? graphCopy.runOutputCommandTitle}</p>
-            {typeof output.exitCode === "number" ? <span className="ml-auto text-xs text-muted-foreground">{graphCopy.runOutputExitPrefix} {output.exitCode}</span> : null}
-          </div>
-          <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-foreground",
-            !disableInternalScroll && "overflow-auto",
-          )}>{output.command}</pre>
-          {output.stdout ? <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words border-t border-border pt-2 text-xs text-foreground",
-            !disableInternalScroll && "max-h-40 overflow-auto",
-          )}>{output.stdout}</pre> : null}
-          {output.stderr ? <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words border-t border-border pt-2 text-xs text-destructive",
-            !disableInternalScroll && "max-h-40 overflow-auto",
-          )}>{output.stderr}</pre> : null}
         </div>
       );
     case "link":

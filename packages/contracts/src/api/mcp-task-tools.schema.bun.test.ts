@@ -162,7 +162,8 @@ describe("MCP task tool contracts", () => {
     });
 
     expect(parseChronaToolPayload("chrona.node.read", undefined)).toEqual({});
-    expect(parseChronaToolPayload("chrona.node.task_complete", { summary: "Done" })).toEqual({ summary: "Done" });
+    expect(parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "markdown", content: "Done" }] })).toEqual({ outputs: [{ kind: "markdown", content: "Done" }] });
+    expect(parseChronaToolPayload("chrona.node.complete", { summary: "Done" })).toEqual({ summary: "Done" });
     expect(parseChronaToolPayload("chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" })).toEqual({ nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" });
     expect(() => parseChronaToolPayload("chrona.node.block", { reason: "Waiting on API" })).toThrow();
     expect(parseChronaToolPayload("chrona.node.block", {
@@ -182,7 +183,7 @@ describe("MCP task tool contracts", () => {
     });
     expect(parseChronaToolPayload("chrona.node.fail", { error: "Command failed" })).toEqual({ error: "Command failed" });
     expect(parseChronaToolPayload("chrona.node.wait_complete", { summary: "Event observed" })).toEqual({ summary: "Event observed" });
-    expect(() => parseChronaToolPayload("chrona.node.task_complete", { nodeId: "node-1", summary: "Done" })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.node.complete", { nodeId: "node-1", summary: "Done" })).toThrow();
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { summary: "Missing ref" })).toThrow();
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Missing node" })).toThrow();
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No extra ids" })).toThrow();

@@ -19,6 +19,7 @@ export type ExecutionActionType =
   | "resume_with_input"
   | "resume_with_approval"
   | "resume_after_unblock"
+  | "submit_node_output"
   | "complete_manual_node"
   | "block_current_node"
   | "fail_current_node"
@@ -62,6 +63,15 @@ export type ExecutionActionInput =
       nodeId?: string;
       note?: string;
       workBlockId?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "submit_node_output";
+      sessionId?: string;
+      nodeId?: string;
+      outputs: unknown;
+      mode?: "append" | "replace";
+      summary?: string;
       idempotencyKey?: string;
     }
   | {

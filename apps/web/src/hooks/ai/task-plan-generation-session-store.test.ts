@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-mock.module("@microsoft/fetch-event-source", () => ({
+vi.mock("@microsoft/fetch-event-source", () => ({
   fetchEventSource: async (input: string, init: { onopen?: (response: Response) => Promise<void>; onmessage?: (message: { event: string; data: string }) => void }) => {
     await globalThis.fetch(input, init as RequestInit);
     await init.onopen?.(new Response(null, { status: 200, headers: { "Content-Type": "text/event-stream" } }));
@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe("task plan generation session store", () => {
   it("sends workBlockId when starting recurring occurrence generation", async () => {
-    const fetchMock = mock()
+    const fetchMock = vi.fn()
       .mockResolvedValueOnce(sse([{ event: "done", data: {} }]))
       .mockResolvedValueOnce(new Response(JSON.stringify({ generationSession: null }), { status: 404 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -46,7 +46,7 @@ describe("task plan generation session store", () => {
   });
 
   it("sends workBlockId query when stopping recurring occurrence generation", async () => {
-    const fetchMock = mock().mockResolvedValue(new Response(JSON.stringify({ stopped: true }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ stopped: true }), { status: 200 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     await stopTaskPlanGenerationSession("task_1", "block_1");

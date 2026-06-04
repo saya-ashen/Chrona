@@ -28,6 +28,10 @@ vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
   }),
 }));
 
+vi.mock("../execution/provider-approval-banner", () => ({
+  ProviderApprovalBanner: () => null,
+}));
+
 vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", () => ({
   useTaskWorkspaceEditorState: (task: TaskPageData["task"]) => {
     mocks.editorTask = mocks.editorTask ?? task;

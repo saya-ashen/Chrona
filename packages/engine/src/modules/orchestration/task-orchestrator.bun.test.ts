@@ -72,6 +72,7 @@ describe("default task orchestrator workers", () => {
       "restart-recovery",
       "due-scheduled-work",
       "due-auto-plan-generation",
+      "recurring-work-block-expansion",
       "graph-advancement",
     ]);
   });

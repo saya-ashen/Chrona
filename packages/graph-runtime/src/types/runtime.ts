@@ -120,7 +120,6 @@ export interface NodeResultSelectedBranch {
 }
 
 export type NodeResultOutput =
-  | { kind: "text"; content: string; title?: string }
   | { kind: "markdown"; content: string; title?: string }
   | { kind: "json"; value: unknown; title?: string }
   | {
@@ -129,15 +128,6 @@ export type NodeResultOutput =
       title?: string;
       language?: string;
       description?: string;
-    }
-  | { kind: "artifact"; artifactId: string; title: string; description?: string }
-  | {
-      kind: "command";
-      command: string;
-      title?: string;
-      exitCode?: number;
-      stdout?: string;
-      stderr?: string;
     }
   | { kind: "link"; href: string; title: string; description?: string };
 

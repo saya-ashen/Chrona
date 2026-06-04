@@ -38,7 +38,7 @@ function nodeResultCommand(input: {
             command: input.command,
             node: input.commandNode,
           }),
-          output: input.command.output,
+          output: input.command.output ?? input.commandNode.result?.outputs,
           selectedBranch: selectedBranchForTerminalCommand({
             plan: input.effective,
             node: input.commandNode,
