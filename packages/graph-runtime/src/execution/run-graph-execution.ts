@@ -223,14 +223,17 @@ export async function runGraphExecution<TContext = unknown>(
         state = submittedState;
         const submittedEffective = resolveEffectivePlanGraph(state);
         const status = mapTerminalReasonToGraphStatus(submittedEffective);
-        if (status === "running" && submittedEffective.readyNodeIds.length > 0) {
+        // When the nested command left execution running (e.g. it continued
+        // to the next node which started an async provider run), keep going
+        // in the outer loop so the outer executeNode sees the submitted result.
+        if (status === "running") {
           executedNodeIds.push(node.id);
           userInput = undefined;
           continue;
         }
         return {
           status,
-          currentNodeId: status === "running" ? null : node.id,
+          currentNodeId: node.id,
           executedNodeIds,
           effective: submittedEffective,
           state,

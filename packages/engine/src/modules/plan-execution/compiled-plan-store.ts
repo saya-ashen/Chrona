@@ -163,6 +163,29 @@ export async function getLatestCompiledPlan(
   return row ? toSavedCompiledPlan(row) : null;
 }
 
+export type PlanScope = { workBlockId: string | null; planId: string };
+
+/**
+ * The work block the task's most-recently-touched plan belongs to, regardless
+ * of scope. Used to recover a concrete work block when no live ExecutionSession
+ * exists (reads before/after a run). `accepted` is preferred over any draft so
+ * a stale in-flight draft never shadows the plan that actually ran.
+ */
+export async function getLatestPlanScope(
+  taskId: string,
+  options?: { acceptedOnly?: boolean },
+): Promise<PlanScope | null> {
+  const row = await db.taskPlan.findFirst({
+    where: {
+      taskId,
+      ...(options?.acceptedOnly ? { status: TaskPlanStatus.Accepted } : {}),
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: { workBlockId: true, planId: true },
+  });
+  return row ? { workBlockId: row.workBlockId, planId: row.planId } : null;
+}
+
 export async function updateLatestCompiledPlanPrompt(input: {
   taskId: string;
   prompt: string | null;

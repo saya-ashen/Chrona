@@ -18,12 +18,13 @@ export async function committedStateIfNodeAdvanced(input: {
   planId: string;
   nodeId: string | null;
   results: NodeResult[];
+  workBlockId?: string | null;
 }) {
   if (!input.nodeId || hasCurrentNodeResult({ results: input.results, nodeId: input.nodeId })) {
     return null;
   }
 
-  const committed = await getPlanRun(input.taskId, input.planId);
+  const committed = await getPlanRun(input.taskId, input.planId, input.workBlockId);
   if (!committed?.graph) return null;
   if (!hasCurrentNodeResult({ results: committed.results, nodeId: input.nodeId })) {
     return null;
@@ -37,8 +38,9 @@ export async function committedStateForSubmittedNode(input: {
   planId: string;
   nodeId: string;
   attemptId: string;
+  workBlockId?: string | null;
 }) {
-  const committed = await getPlanRun(input.taskId, input.planId);
+  const committed = await getPlanRun(input.taskId, input.planId, input.workBlockId);
   if (!committed?.graph) return null;
   const submittedResult = committed.results.find(
     (result) =>
@@ -57,6 +59,7 @@ export async function committedStateIfRunningNodeAdvanced(input: {
   taskId: string;
   planId: string;
   state: GraphExecutionState;
+  workBlockId?: string | null;
 }) {
   const runningNodeId = [...(input.state.attempts as unknown as NodeAttempt[])]
     .reverse()
@@ -67,5 +70,6 @@ export async function committedStateIfRunningNodeAdvanced(input: {
     planId: input.planId,
     nodeId: runningNodeId,
     results: input.state.results as unknown as NodeResult[],
+    workBlockId: input.workBlockId,
   });
 }

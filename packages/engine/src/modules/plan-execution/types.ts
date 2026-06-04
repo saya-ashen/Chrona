@@ -77,7 +77,7 @@ export type PlanGraphCommandCorrelation = {
   causationRawEventId?: string | null;
 };
 
-export type PlanGraphCommandEnvelope<TCommand = AdvanceRuntimeCommand> = {
+export type PlanGraphCommandEnvelope<TCommand = AdvanceRuntimeCommand | { type: string }> = {
   command: TCommand;
   actor: PlanGraphCommandActor;
   origin: PlanGraphCommandOrigin;

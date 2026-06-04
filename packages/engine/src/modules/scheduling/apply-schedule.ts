@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateScheduleWindow } from "@chrona/domain";
-import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 
 export async function applySchedule(input: {
   taskId: string;
@@ -42,7 +42,7 @@ export async function applySchedule(input: {
   });
 
   if (input.scheduledStartAt && input.scheduledEndAt) {
-    const acceptedPlan = await getAcceptedCompiledPlan(input.taskId);
+    const acceptedPlan = await getAcceptedCompiledPlanForTask(input.taskId);
     const planId = acceptedPlan?.compiledPlan.editablePlanId ?? null;
 
     const existingBlock = await db.workBlock.findFirst({

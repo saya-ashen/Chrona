@@ -2,7 +2,7 @@ import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { aiClientRegistry } from "@/modules/ai/runtime/client-registry";
 import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
-import { syncPlanRunRuntimeResult } from "./sync-plan-run-runtime-result";
+import { syncPlanRunRuntimeResult } from "../../kernel/sync-runtime-result";
 
 type ReconcileOutcome = "synced" | "left_running" | "skipped";
 

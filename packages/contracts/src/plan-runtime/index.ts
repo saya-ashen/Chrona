@@ -5,5 +5,6 @@ export * from "./attempts";
 export * from "./checkpoints";
 export * from "./execution-state";
 export * from "./commands";
+export * from "./execution-command";
 export * from "./events";
 export * from "./context";

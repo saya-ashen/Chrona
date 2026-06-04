@@ -7,7 +7,7 @@ export async function appendGraphRuntimeEvents(input: {
   planId: string;
   sessionId: string;
   events: GraphExecutionEvent[];
-  envelope: PlanGraphCommandEnvelope;
+  envelope?: PlanGraphCommandEnvelope;
 }) {
   for (const event of input.events) {
     switch (event.type) {

@@ -3,6 +3,7 @@ import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
 import type { CheckpointConfig, CompiledPlan, ConditionConfig, TaskConfig, WaitConfig } from "@chrona/contracts/ai";
+import { runTaskNodeFeature } from "./node-ai-capabilities";
 import type { NodeAiCapabilityInput } from "./node-ai-capabilities";
 import type { NodeExecutionResult } from "./node-executors/types";
 
@@ -16,6 +17,7 @@ mock.module("@/modules/plan-execution/node-ai-capabilities", () => ({
   executeTaskNodeCapability: executeTaskNodeCapabilityMock,
   reviewCheckpointNodeCapability: reviewCheckpointNodeCapabilityMock,
   evaluateConditionNodeCapability: evaluateConditionNodeCapabilityMock,
+  runTaskNodeFeature,
 }));
 
 export const { taskPlanExecution } = await import("@/modules/plan-execution");

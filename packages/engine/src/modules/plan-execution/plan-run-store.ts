@@ -194,6 +194,67 @@ export async function savePlanRun(input: {
   return persistedRecord.planRun;
 }
 
+/**
+ * Optimistic-concurrency write for the single-writer kernel. Persists the
+ * mutable runtime record only if the row's executionEpoch still matches the
+ * value read at the start of the command, then bumps the epoch. Returns
+ * committed=false on conflict (a concurrent writer advanced first) so the
+ * caller can reload and retry.
+ */
+export async function savePlanRunGuarded(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  workBlockId?: string | null;
+  expectedEpoch: number;
+  run?: PlanRun;
+  compiledPlan?: CompiledPlan;
+  graph: PlanGraph;
+  attempts: NodeAttempt[];
+  results: NodeResult[];
+  executionContextSnapshots: ExecutionContextSnapshot[];
+}): Promise<{ committed: boolean; planRun: PlanRun }> {
+  const existingRow = await db.taskPlanRun.findFirst({
+    where: {
+      taskId: input.taskId,
+      planId: input.planId,
+      workBlockId: input.workBlockId ?? null,
+    },
+  });
+  if (!existingRow) {
+    const planRun = await savePlanRun(input);
+    return { committed: true, planRun };
+  }
+
+  const compiledPlan =
+    input.compiledPlan ??
+    (await loadCompiledPlanForRun(input.taskId, input.planId, input.workBlockId));
+  const existingRecord =
+    (existingRow.planRun as unknown as PersistedPlanRunRecord | undefined) ?? null;
+  const persistedRecord = toPersistedPlanRunRecord({
+    existing: existingRecord,
+    compiledPlan,
+    taskId: input.taskId,
+    graph: input.graph,
+    attempts: input.attempts,
+    results: input.results,
+    executionContextSnapshots: input.executionContextSnapshots,
+    planRun: input.run,
+  });
+
+  const updated = await db.taskPlanRun.updateMany({
+    where: { id: existingRow.id, executionEpoch: input.expectedEpoch },
+    data: {
+      workspaceId: input.workspaceId,
+      workBlockId: input.workBlockId ?? null,
+      planRun: asJsonValue(persistedRecord),
+      executionEpoch: input.expectedEpoch + 1,
+    },
+  });
+
+  return { committed: updated.count > 0, planRun: persistedRecord.planRun };
+}
+
 export async function getPlanRun(
   taskId: string,
   planId: string,

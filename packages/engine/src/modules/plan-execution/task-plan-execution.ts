@@ -1,751 +1,237 @@
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import {
-  ensurePlanMainSession,
-  appendMainSessionEvent,
-} from "./plan-state-store";
-import {
-  resolveEffectivePlanGraph,
-  createGraphRuntime,
-} from "@chrona/graph-runtime";
-import {
-  executionStatusFromEffectiveGraph,
-} from "./execution-state-machine";
+import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
+import { executionStatusFromEffectiveGraph } from "./execution-state-machine";
 import { deriveExecutionCheckpoint } from "./execution-checkpoint";
-import {
-  resolveCheckpointAction,
-} from "./execution-actions";
+import { resolveCheckpointAction } from "./execution-actions";
 import type {
   EffectivePlanGraph,
-  NodeResult,
+  ExecutionCommand,
+  ExecutionCommandContext,
+  ExecutionTrigger,
   PlanExecutionResult,
   PlanExecutionStatus,
   SubmitCheckpointActionInput,
   SubmitCheckpointActionResult,
   WaitKind,
 } from "@chrona/contracts/ai";
-import {
-  type AdvanceRuntimeCommand,
-  type EngineRuntimeContext,
-  type ExecutionActionWithContinuation,
-  type ExecutionDispatchContext,
-  type OrchestratorTrigger,
-  type PlanGraphCommandEnvelope,
-  type PlanExecutionControl,
-  type PlanExecutionObserver,
+import type {
+  ExecutionActionWithContinuation,
+  ExecutionDispatchContext,
+  OrchestratorTrigger,
+  PlanExecutionObserver,
 } from "./types";
-import {
-  activateWorkBlock,
-} from "./persistence/work-block-store";
-import {
-  type ExecutionSessionRow,
-  ensureExecutionSession,
-} from "./persistence/execution-session-store";
-import {
-  acquireExecutionLease,
-  releaseExecutionLease,
-  type ExecutionLeaseScope,
-} from "./persistence/execution-lease-store";
-import { buildExecutionResponse } from "./projection/execution-response";
-import {
-  ensureNativePlanRun,
-} from "./persistence/plan-runtime-store";
-import {
-  currentNodeFromEffective,
-  currentNodeFromOutcome,
-  latestStartedNodeId,
-} from "./projection/execution-graph-selectors";
-import { getRuntimeName } from "./persistence/task-runtime-store";
-import { toGraphExecutionState } from "./runtime/graph-state";
-import {
-  committedStateForSubmittedNode,
-  committedStateIfNodeAdvanced,
-  committedStateIfRunningNodeAdvanced,
-} from "./runtime/committed-state";
-import { buildPlanGraphCommandEnvelope } from "./runtime/command-envelope";
-import { buildAdvanceDispatchCommand } from "./runtime/advance-dispatch/build-advance-dispatch-command";
-import { createExecutionGraphCallbacks } from "./runtime/graph-runtime-callbacks";
-import {
-  abortTaskExecution,
-  clearTaskExecutionControl,
-  createTaskExecutionControl,
-  requestTaskExecutionPause,
-} from "./runtime/execution-control-registry";
-import {
-  convergeExecutionToCommittedState,
-} from "./use-cases/execution-lifecycle";
-import { handleAdvanceOutcome } from "./use-cases/advance-outcome";
-import { dispatchRuntimeCommandAction } from "./use-cases/dispatch-runtime-command-action";
-import { getCurrentExecution } from "./use-cases/get-current-execution";
+import { ensureNativePlanRun } from "./persistence/plan-runtime-store";
+import { ensurePlanMainSession } from "./plan-state-store";
+import { currentNodeFromEffective } from "./projection/execution-graph-selectors";
+import { executeCommand } from "./kernel/execute-command";
 import { resolveCheckpointTransition } from "./use-cases/checkpoint-transition/resolve-checkpoint-transition";
-export { syncPlanRunRuntimeResult } from "./use-cases/sync-runtime-result/sync-plan-run-runtime-result";
-export { reconcileStaleRuntimeRuns } from "./use-cases/sync-runtime-result/reconcile-stale-runtime-runs";
+
 export { getCurrentExecution } from "./use-cases/get-current-execution";
 export { submitTerminalNodeResult } from "./use-cases/submit-terminal-node-result";
+export { syncPlanRunRuntimeResult } from "./kernel/sync-runtime-result";
+export { reconcileStaleRuntimeRuns } from "./use-cases/sync-runtime-result/reconcile-stale-runtime-runs";
 
-const DEFAULT_MAX_STEPS = 10;
-
-function mapTerminalReasonToStatus(
-  effective: EffectivePlanGraph,
-): PlanExecutionStatus {
+function mapTerminalReasonToStatus(effective: EffectivePlanGraph): PlanExecutionStatus {
   return executionStatusFromEffectiveGraph(effective);
 }
 
-function formatInputFields(inputFields: Record<string, string>) {
-  return Object.entries(inputFields)
-    .map(([key, value]) => `${key}: ${value}`)
-    .join("\n");
-}
+// ───────────────────────────────────────────────────────────────────────────
+// Public entry points. Each translates its legacy input shape into one
+// ExecutionCommand and dispatches it through the single-writer kernel. They
+// keep their original signatures so existing callers and the facade are
+// unaffected.
+// ───────────────────────────────────────────────────────────────────────────
 
-async function advancePlanExecution(input: {
-  taskId: string;
-  trigger: OrchestratorTrigger;
-  mainSession: { id: string; taskId: string; sessionKey: string };
-  executionSession: ExecutionSessionRow;
-  maxSteps?: number;
-  envelope: PlanGraphCommandEnvelope;
-  control?: PlanExecutionControl;
-} & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId, input.executionSession.workBlockId);
-  if (!runtime) {
-    return {
-      taskId: input.taskId,
-      planId: null,
-      mainSessionId: null,
-      status: "no_plan",
-      currentNodeId: null,
-      executedNodeIds: [],
-      waitingNodeIds: [],
-      blockedNodeIds: [],
-      checkpoint: null,
-      message: "No accepted plan. Create or accept a plan before execution.",
-    };
-  }
-
-  const runtimeName = await getRuntimeName(input.taskId);
-  const state = toGraphExecutionState(runtime.persisted);
-  const context: EngineRuntimeContext = {
+export async function startPlanExecution(
+  input: {
+    taskId: string;
+    trigger: OrchestratorTrigger;
+    prompt?: string;
+    workBlockId?: string | null;
+  } & PlanExecutionObserver,
+): Promise<PlanExecutionResult> {
+  return executeCommand({
     taskId: input.taskId,
-    planId: runtime.planId,
-    mainSession: input.mainSession,
-    control: input.control,
-  };
-  const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
-    taskId: input.taskId,
-    runtimeName,
-    policies: { maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS },
-    control: input.control,
-    callbacks: createExecutionGraphCallbacks({
-      taskId: input.taskId,
-      planId: runtime.planId,
-      workspaceId: runtime.workspaceId,
-      compiledPlan: runtime.compiledPlan,
-      persisted: runtime.persisted,
-      runtimeName,
-      trigger: input.trigger,
-      mainSession: input.mainSession,
-      executionSession: input.executionSession,
-      committedStateIfRunningNodeAdvanced,
-      committedStateForSubmittedNode,
-      onGraphEvent: input.onGraphEvent,
-      onRuntimeEvent: input.onRuntimeEvent,
-      onStateChange: input.onStateChange,
-    }),
-  });
-  const dispatchResolution = buildAdvanceDispatchCommand({
-    state,
-    trigger: input.trigger,
-    context,
-    executionSession: input.executionSession,
-    command: input.envelope.command,
-  });
-  if (dispatchResolution.type === "already_completed") {
-    return buildExecutionResponse({
-      taskId: input.taskId,
-      planId: runtime.planId,
-      mainSessionId: input.mainSession.id,
-      status: "completed",
-      effective: dispatchResolution.effective,
-      currentNodeId: null,
-      executedNodeIds: dispatchResolution.effective.completedNodeIds,
-      message: "Execution already completed; node result ignored.",
-    });
-  }
-  const outcome = await graphRuntime.dispatch(dispatchResolution.command);
-  const staleRunningNodeId =
-    outcome.status === "running"
-      ? currentNodeFromOutcome(outcome) ?? latestStartedNodeId(outcome.events)
-      : null;
-  const committed = outcome.status === "running"
-    ? await committedStateIfNodeAdvanced({
-        taskId: input.taskId,
-        planId: runtime.planId,
-        nodeId: staleRunningNodeId,
-        results: outcome.state.results as unknown as NodeResult[],
-      })
-    : null;
-
-  if (committed) {
-    return convergeExecutionToCommittedState({
-      taskId: input.taskId,
-      planId: runtime.planId,
-      mainSessionId: input.mainSession.id,
-      session: input.executionSession,
-      workspaceId: runtime.workspaceId,
-      compiledPlan: runtime.compiledPlan,
-      committed,
-      fallbackMessage: outcome.message,
-    });
-  }
-
-  return handleAdvanceOutcome({
-    taskId: input.taskId,
-    mainSessionId: input.mainSession.id,
-    runtime,
-    executionSession: input.executionSession,
-    outcome,
-    envelope: input.envelope,
+    command: { type: "start", trigger: input.trigger, prompt: input.prompt },
+    context: { trigger: input.trigger, workBlockId: input.workBlockId ?? null },
+    onGraphEvent: input.onGraphEvent,
+    onRuntimeEvent: input.onRuntimeEvent,
+    onStateChange: input.onStateChange,
   });
 }
 
-async function withExecutionLease(input: {
-  workspaceId: string;
-  taskId: string;
-  workBlockId?: string | null;
-  planId: string;
-  ownerId: string;
-  scope: ExecutionLeaseScope;
-  run: () => Promise<PlanExecutionResult>;
-}) {
-  const lease = await acquireExecutionLease({
+export async function continuePlanExecution(
+  input: {
+    taskId: string;
+    reason: string;
+    userInput?: string;
+    inputFields?: Record<string, string>;
+    sessionId?: string;
+    nodeId?: string;
+    resumeReadyNode?: boolean;
+    workBlockId?: string | null;
+  } & PlanExecutionObserver,
+): Promise<PlanExecutionResult> {
+  const command: ExecutionCommand =
+    input.inputFields && Object.keys(input.inputFields).length > 0
+      ? { type: "resume_with_input", nodeId: input.nodeId, inputFields: input.inputFields }
+      : { type: "resume_after_unblock", nodeId: input.nodeId, note: input.userInput };
+  return executeCommand({
     taskId: input.taskId,
-    workBlockId: input.workBlockId,
-    planId: input.planId,
-    ownerId: input.ownerId,
-    scope: input.scope,
-  });
-
-  if (!lease) {
-    await appendCanonicalEvent({
-      eventType: "execution.lease_ignored",
-      workspaceId: input.workspaceId,
-      taskId: input.taskId,
-      workBlockId: input.workBlockId,
-      actorType: "runtime",
-      actorId: input.scope,
-      source: "execution-kernel",
-      payload: {
-        planId: input.planId,
-        ownerId: input.ownerId,
-        scope: input.scope,
-        reason: "active_execution_owner",
-      },
-      dedupeKey: `execution.lease_ignored:${input.taskId}:${input.planId}:${input.ownerId}`,
-      occurredAt: new Date(),
-    });
-    return getCurrentExecution({ taskId: input.taskId });
-  }
-
-  try {
-    return await input.run();
-  } finally {
-    await releaseExecutionLease({
-      planRunId: lease.planRunId,
-      ownerId: lease.ownerId,
-      epoch: lease.epoch,
-    });
-  }
-}
-
-async function withTaskExecutionControl(
-  taskId: string,
-  run: (control: PlanExecutionControl) => Promise<PlanExecutionResult>,
-) {
-  const control = createTaskExecutionControl(taskId);
-  try {
-    return await run(control);
-  } finally {
-    clearTaskExecutionControl(taskId);
-  }
-}
-
-export async function startPlanExecution(input: {
-  taskId: string;
-  trigger: OrchestratorTrigger;
-  prompt?: string;
-  workBlockId?: string | null;
-} & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
-  if (!runtime) {
-    return {
-      taskId: input.taskId,
-      planId: null,
-      mainSessionId: null,
-      status: "no_plan",
-      currentNodeId: null,
-      executedNodeIds: [],
-      waitingNodeIds: [],
-      blockedNodeIds: [],
-      checkpoint: null,
-      message: "No accepted plan. Create or accept a plan before execution.",
-    };
-  }
-
-  const executionSession = await ensureExecutionSession({
-    workspaceId: runtime.workspaceId,
-    taskId: input.taskId,
-    planId: runtime.planId,
-    trigger: input.trigger,
-    workBlockId: input.workBlockId,
-  });
-  const mainSession = await ensurePlanMainSession({
-    taskId: input.taskId,
-    planId: runtime.planId,
-  });
-
-  await activateWorkBlock(input.taskId, executionSession.workBlockId);
-  await appendMainSessionEvent({
-    taskId: input.taskId,
-    planId: runtime.planId,
-    sessionId: mainSession.id,
-    workBlockId: executionSession.workBlockId,
-    eventType: "execution_started",
-    payload: { trigger: input.trigger, prompt: input.prompt },
-  });
-
-  return withExecutionLease({
-    workspaceId: runtime.workspaceId,
-    taskId: input.taskId,
-    workBlockId: runtime.workBlockId,
-    planId: runtime.planId,
-    ownerId: executionSession.id,
-    scope: input.trigger === "scheduler" ? "system" : "manual",
-    run: () =>
-      withTaskExecutionControl(input.taskId, (control) =>
-        advancePlanExecution({
-          taskId: input.taskId,
-          trigger: input.trigger,
-          mainSession,
-          executionSession,
-          envelope: buildPlanGraphCommandEnvelope({
-            taskId: input.taskId,
-            planId: runtime.planId,
-            mainSessionId: mainSession.id,
-            executionSessionId: executionSession.id,
-            command: { type: "start" },
-            trigger: input.trigger,
-          }),
-          control,
-          onGraphEvent: input.onGraphEvent,
-          onRuntimeEvent: input.onRuntimeEvent,
-          onStateChange: input.onStateChange,
-        }),
-      ),
+    command,
+    context: { sessionId: input.sessionId, workBlockId: input.workBlockId ?? null },
+    onGraphEvent: input.onGraphEvent,
+    onRuntimeEvent: input.onRuntimeEvent,
+    onStateChange: input.onStateChange,
   });
 }
 
-export async function continuePlanExecution(input: {
-  taskId: string;
-  reason: string;
-  userInput?: string;
-  inputFields?: Record<string, string>;
-  sessionId?: string;
-  nodeId?: string;
-  resumeReadyNode?: boolean;
-  workBlockId?: string | null;
-} & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
-  if (!runtime) {
-    return {
-      taskId: input.taskId,
-      planId: null,
-      mainSessionId: null,
-      status: "no_plan",
-      currentNodeId: null,
-      executedNodeIds: [],
-      waitingNodeIds: [],
-      blockedNodeIds: [],
-      checkpoint: null,
-      message: "No accepted plan. Create or accept a plan before execution.",
-    };
-  }
-
-  const executionSession = await ensureExecutionSession({
-    workspaceId: runtime.workspaceId,
+export async function resumePlanExecutionWithApproval(
+  input: {
+    taskId: string;
+    sessionId?: string;
+    nodeId?: string;
+    workBlockId?: string | null;
+    approved: boolean;
+    feedback?: string;
+  } & PlanExecutionObserver,
+): Promise<PlanExecutionResult> {
+  return executeCommand({
     taskId: input.taskId,
-    planId: runtime.planId,
-    trigger: "manual",
-    sessionId: input.sessionId,
-  });
-  const mainSession = await ensurePlanMainSession({
-    taskId: input.taskId,
-    planId: runtime.planId,
-  });
-
-  if (input.userInput) {
-    await appendMainSessionEvent({
-      taskId: input.taskId,
-      planId: runtime.planId,
-      sessionId: mainSession.id,
-      workBlockId: executionSession.workBlockId,
-      eventType: "user_input_received",
-      payload: { input: input.userInput, reason: input.reason },
-    });
-  }
-
-  const effective = resolveEffectivePlanGraph({
-    graph: runtime.persisted.graph!,
-    attempts: runtime.persisted.attempts,
-    results: runtime.persisted.results,
-  });
-  const waitingNode =
-    (input.nodeId
-      ? effective.nodes.find((node) => node.id === input.nodeId)
-      : null) ??
-    effective.nodes.find(
-      (node) => node.id === executionSession.currentNodeId,
-    ) ??
-    effective.nodes.find(
-      (node) =>
-        node.status === "waiting_for_user" ||
-        node.status === "waiting_for_approval" ||
-        node.status === "blocked",
-    ) ??
-    null;
-  const readyNode = input.resumeReadyNode
-    ? effective.nodes.find((node) => node.ready)
-    : null;
-
-  const resumeNodeId = input.resumeReadyNode
-    ? readyNode?.id ?? waitingNode?.id
-    : waitingNode?.id;
-
-  const command: AdvanceRuntimeCommand = input.userInput && waitingNode
-    ? {
-        type: "resume_with_input",
-        nodeId: waitingNode.id,
-        value: input.userInput,
-        fields: input.inputFields ?? {},
-        replaceStatus: "obsolete",
-      }
-    : {
-        type: "resume_after_unblock",
-        nodeId: resumeNodeId,
-      };
-
-  return withExecutionLease({
-    workspaceId: runtime.workspaceId,
-    taskId: input.taskId,
-    workBlockId: runtime.workBlockId,
-    planId: runtime.planId,
-    ownerId: executionSession.id,
-    scope: "manual",
-    run: () =>
-      withTaskExecutionControl(input.taskId, (control) =>
-        advancePlanExecution({
-          taskId: input.taskId,
-          trigger: "manual",
-          mainSession,
-          executionSession,
-          envelope: buildPlanGraphCommandEnvelope({
-            taskId: input.taskId,
-            planId: runtime.planId,
-            mainSessionId: mainSession.id,
-            executionSessionId: executionSession.id,
-            command,
-            trigger: "manual",
-          }),
-          control,
-          onGraphEvent: input.onGraphEvent,
-          onRuntimeEvent: input.onRuntimeEvent,
-          onStateChange: input.onStateChange,
-        }),
-      ),
-  });
-}
-
-async function resumePlanExecutionWithApproval(input: {
-  taskId: string;
-  sessionId?: string;
-  nodeId?: string;
-  workBlockId?: string | null;
-  approved: boolean;
-  feedback?: string;
-} & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
-  if (!runtime) {
-    return {
-      taskId: input.taskId,
-      planId: null,
-      mainSessionId: input.sessionId ?? null,
-      status: "no_plan",
-      currentNodeId: null,
-      executedNodeIds: [],
-      waitingNodeIds: [],
-      blockedNodeIds: [],
-      checkpoint: null,
-      message: "No accepted plan. Create or accept a plan before execution.",
-    };
-  }
-
-  const executionSession = await ensureExecutionSession({
-    workspaceId: runtime.workspaceId,
-    taskId: input.taskId,
-    planId: runtime.planId,
-    trigger: "manual",
-    sessionId: input.sessionId,
-  });
-  const mainSession = await ensurePlanMainSession({
-    taskId: input.taskId,
-    planId: runtime.planId,
-  });
-
-  const effective = resolveEffectivePlanGraph({
-    graph: runtime.persisted.graph!,
-    attempts: runtime.persisted.attempts,
-    results: runtime.persisted.results,
-  });
-  const waitingNode =
-    (input.nodeId
-      ? effective.nodes.find((node) => node.id === input.nodeId)
-      : null) ??
-    effective.nodes.find((node) => node.id === executionSession.currentNodeId) ??
-    effective.nodes.find((node) => node.status === "waiting_for_approval") ??
-    null;
-
-  if (!waitingNode) {
-    return buildExecutionResponse({
-      taskId: input.taskId,
-      planId: runtime.planId,
-      mainSessionId: mainSession.id,
-      status: mapTerminalReasonToStatus(effective),
-      effective,
-      currentNodeId: null,
-      executedNodeIds: [],
-      message: "No approval-waiting node found.",
-    });
-  }
-
-  await appendMainSessionEvent({
-    taskId: input.taskId,
-    planId: runtime.planId,
-    sessionId: mainSession.id,
-    workBlockId: executionSession.workBlockId,
-    eventType: "user_input_received",
-    payload: {
-      reason: input.approved ? "approval:approve" : "approval:reject",
+    command: {
+      type: "resume_with_approval",
+      nodeId: input.nodeId,
+      approved: input.approved,
       feedback: input.feedback,
-      nodeId: waitingNode.id,
     },
-  });
-
-  return withExecutionLease({
-    workspaceId: runtime.workspaceId,
-    taskId: input.taskId,
-    planId: runtime.planId,
-    ownerId: executionSession.id,
-    scope: "manual",
-    run: () =>
-      withTaskExecutionControl(input.taskId, (control) =>
-        advancePlanExecution({
-          taskId: input.taskId,
-          trigger: "manual",
-          mainSession,
-          executionSession,
-          envelope: buildPlanGraphCommandEnvelope({
-            taskId: input.taskId,
-            planId: runtime.planId,
-            mainSessionId: mainSession.id,
-            executionSessionId: executionSession.id,
-            trigger: "manual",
-            command: {
-            type: "resume_with_approval",
-            nodeId: waitingNode.id,
-            approved: input.approved,
-            feedback: input.feedback,
-            },
-          }),
-          control,
-          onGraphEvent: input.onGraphEvent,
-          onRuntimeEvent: input.onRuntimeEvent,
-          onStateChange: input.onStateChange,
-        }),
-      ),
+    context: { sessionId: input.sessionId, workBlockId: input.workBlockId ?? null },
+    onGraphEvent: input.onGraphEvent,
+    onRuntimeEvent: input.onRuntimeEvent,
+    onStateChange: input.onStateChange,
   });
 }
 
-export async function dispatchExecutionAction(input: {
-  taskId: string;
-  action: ExecutionActionWithContinuation;
-  commandContext?: ExecutionDispatchContext;
-} & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  switch (input.action.action) {
+function commandForExecutionAction(
+  action: ExecutionActionWithContinuation,
+): { command: ExecutionCommand; context: ExecutionCommandContext } {
+  const sessionId = "sessionId" in action ? action.sessionId : undefined;
+  const workBlockId = "workBlockId" in action ? action.workBlockId ?? null : null;
+  const context: ExecutionCommandContext = { sessionId, workBlockId };
+
+  switch (action.action) {
     case "start_manual":
-      return startPlanExecution({
-        taskId: input.taskId,
-        trigger: "manual",
-        prompt: input.action.prompt,
-        workBlockId: input.action.workBlockId ?? null,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      return {
+        command: { type: "start", trigger: "manual", prompt: action.prompt },
+        context: { ...context, trigger: "manual" },
+      };
     case "start_scheduled":
-      return startPlanExecution({
-        taskId: input.taskId,
-        trigger: "scheduler",
-        workBlockId: input.action.workBlockId ?? null,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      return {
+        command: { type: "start", trigger: "scheduler" },
+        context: { ...context, trigger: "scheduler" },
+      };
     case "resume_with_input":
-      return continuePlanExecution({
-        taskId: input.taskId,
-        reason: "user_input",
-        userInput: formatInputFields(input.action.inputFields),
-        inputFields: input.action.inputFields,
-        sessionId: input.action.sessionId,
-        nodeId: input.action.nodeId,
-        workBlockId: input.action.workBlockId ?? null,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      return {
+        command: { type: "resume_with_input", nodeId: action.nodeId, inputFields: action.inputFields },
+        context,
+      };
     case "resume_with_approval":
-      return resumePlanExecutionWithApproval({
-        taskId: input.taskId,
-        sessionId: input.action.sessionId,
-        nodeId: input.action.nodeId,
-        approved: input.action.decision === "approve",
-        feedback: input.action.feedback ?? input.action.editedContent,
-        workBlockId: input.action.workBlockId ?? null,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      return {
+        command: {
+          type: "resume_with_approval",
+          nodeId: action.nodeId,
+          approved: action.decision === "approve",
+          feedback: action.feedback ?? action.editedContent,
+        },
+        context,
+      };
     case "resume_after_unblock":
-      return continuePlanExecution({
-        taskId: input.taskId,
-        reason: "resume_after_unblock",
-        userInput: input.action.note,
-        sessionId: input.action.sessionId,
-        nodeId: input.action.nodeId,
-        workBlockId: input.action.workBlockId ?? null,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
+      return {
+        command: { type: "resume_after_unblock", nodeId: action.nodeId, note: action.note },
+        context,
+      };
     case "submit_node_output":
       throw new Error("submit_node_output must be handled through node result submission");
-    case "complete_manual_node": {
-      const action = input.action;
-      return withTaskExecutionControl(input.taskId, (control) =>
-        dispatchRuntimeCommandAction({
-          taskId: input.taskId,
-          action,
-          ...input.commandContext,
-          advance: advancePlanExecution,
-          withExecutionLease,
-          control,
-          onGraphEvent: input.onGraphEvent,
-          onRuntimeEvent: input.onRuntimeEvent,
-          onStateChange: input.onStateChange,
-        }),
-      );
-    }
-    case "block_current_node": {
-      const action = input.action;
-      return withTaskExecutionControl(input.taskId, (control) =>
-        dispatchRuntimeCommandAction({
-          taskId: input.taskId,
-          action,
-          ...input.commandContext,
-          advance: advancePlanExecution,
-          withExecutionLease,
-          control,
-          onGraphEvent: input.onGraphEvent,
-          onRuntimeEvent: input.onRuntimeEvent,
-          onStateChange: input.onStateChange,
-        }),
-      );
-    }
-    case "fail_current_node": {
-      const action = input.action;
-      return withTaskExecutionControl(input.taskId, (control) =>
-        dispatchRuntimeCommandAction({
-          taskId: input.taskId,
-          action,
-          ...input.commandContext,
-          advance: advancePlanExecution,
-          withExecutionLease,
-          control,
-          onGraphEvent: input.onGraphEvent,
-          onRuntimeEvent: input.onRuntimeEvent,
-          onStateChange: input.onStateChange,
-        }),
-      );
-    }
-    case "retry_node": {
-      const action = input.action;
-      return withTaskExecutionControl(input.taskId, (control) =>
-        dispatchRuntimeCommandAction({
-          taskId: input.taskId,
-          action,
-          ...input.commandContext,
-          advance: advancePlanExecution,
-          withExecutionLease,
-          control,
-          onGraphEvent: input.onGraphEvent,
-          onRuntimeEvent: input.onRuntimeEvent,
-          onStateChange: input.onStateChange,
-        }),
-      );
-    }
-    case "pause_session": {
-      if (requestTaskExecutionPause(input.taskId)) {
-        return getCurrentExecution({ taskId: input.taskId });
-      }
-      return dispatchRuntimeCommandAction({
-        taskId: input.taskId,
-        action: input.action,
-        ...input.commandContext,
-        advance: advancePlanExecution,
-        withExecutionLease,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
-    }
-    case "cancel_session": {
-      abortTaskExecution({
-        taskId: input.taskId,
-        reason: input.action.reason,
-      });
-      return dispatchRuntimeCommandAction({
-        taskId: input.taskId,
-        action: input.action,
-        ...input.commandContext,
-        advance: advancePlanExecution,
-        withExecutionLease,
-        onGraphEvent: input.onGraphEvent,
-        onRuntimeEvent: input.onRuntimeEvent,
-        onStateChange: input.onStateChange,
-      });
-    }
+    case "complete_manual_node":
+      return {
+        command: {
+          type: "submit_node_result",
+          nodeId: action.nodeId,
+          result: {
+            kind: "done",
+            summary: action.summary,
+            output: action.output,
+            evidence: action.sessionId ? { sessionId: action.sessionId } : undefined,
+            selectedBranch: action.selectedBranch,
+            branchRef: action.branchRef,
+          },
+          continueExecution: action.continueExecution ?? true,
+        },
+        context,
+      };
+    case "block_current_node":
+      return {
+        command: {
+          type: "block_node",
+          nodeId: action.nodeId,
+          reason: action.reason,
+          actionForm: action.actionForm,
+        },
+        context,
+      };
+    case "fail_current_node":
+      return {
+        command: { type: "fail_node", nodeId: action.nodeId, error: action.error },
+        context,
+      };
+    case "retry_node":
+      return {
+        command: {
+          type: "retry_node",
+          nodeId: action.nodeId,
+          reason: action.prompt ?? "Node retry requested",
+          userInput: action.prompt,
+        },
+        context,
+      };
+    case "pause_session":
+      return { command: { type: "pause", reason: action.reason }, context };
+    case "cancel_session":
+      return { command: { type: "cancel", reason: action.reason }, context };
     default: {
-      const exhaustiveCheck: never = input.action;
-      throw new Error(
-        `Unsupported execution action: ${JSON.stringify(exhaustiveCheck)}`,
-      );
+      const exhaustiveCheck: never = action;
+      throw new Error(`Unsupported execution action: ${JSON.stringify(exhaustiveCheck)}`);
     }
   }
 }
 
-export async function submitCheckpointAction(input: {
-  taskId: string;
-  action: SubmitCheckpointActionInput;
-} & PlanExecutionObserver): Promise<SubmitCheckpointActionResult> {
+export async function dispatchExecutionAction(
+  input: {
+    taskId: string;
+    action: ExecutionActionWithContinuation;
+    commandContext?: ExecutionDispatchContext;
+  } & PlanExecutionObserver,
+): Promise<PlanExecutionResult> {
+  const { command, context } = commandForExecutionAction(input.action);
+  return executeCommand({
+    taskId: input.taskId,
+    command,
+    context: {
+      ...context,
+      actor: input.commandContext?.actor,
+      origin: input.commandContext?.origin,
+    },
+    onGraphEvent: input.onGraphEvent,
+    onRuntimeEvent: input.onRuntimeEvent,
+    onStateChange: input.onStateChange,
+  });
+}
+
+export async function submitCheckpointAction(
+  input: {
+    taskId: string;
+    action: SubmitCheckpointActionInput;
+  } & PlanExecutionObserver,
+): Promise<SubmitCheckpointActionResult> {
   const runtime = await ensureNativePlanRun(input.taskId, input.action.workBlockId ?? null);
   if (!runtime) {
     return {
@@ -785,9 +271,10 @@ export async function submitCheckpointAction(input: {
     graph: runtime.persisted.graph!,
     attempts: runtime.persisted.attempts,
     results: runtime.persisted.results,
-  }) as unknown as EffectivePlanGraph;
+  });
   const status = mapTerminalReasonToStatus(effective);
-  const currentNodeId = currentNodeFromEffective(effective)?.id ?? executionSession.currentNodeId;
+  const currentNodeId =
+    currentNodeFromEffective(effective)?.id ?? executionSession.currentNodeId;
   const checkpoint = deriveExecutionCheckpoint({
     taskId: input.taskId,
     sessionId: executionSession.id,
@@ -821,17 +308,16 @@ export async function submitCheckpointAction(input: {
     status,
     effective,
     currentNodeId,
-    continuePlanExecution: (input) => continuePlanExecution({
-      ...input,
-      workBlockId: executionSession.workBlockId,
-    }),
-    resumePlanExecutionWithApproval: (input) => resumePlanExecutionWithApproval({
-      ...input,
-      workBlockId: executionSession.workBlockId,
-    }),
+    continuePlanExecution: (continueInput) =>
+      continuePlanExecution({ ...continueInput, workBlockId: executionSession.workBlockId }),
+    resumePlanExecutionWithApproval: (approvalInput) =>
+      resumePlanExecutionWithApproval({ ...approvalInput, workBlockId: executionSession.workBlockId }),
     dispatchExecutionAction,
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,
   });
 }
+
+// Re-exported for callers that referenced the trigger type via this module.
+export type { ExecutionTrigger };

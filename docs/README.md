@@ -2,7 +2,7 @@
 
 Chrona is an AI-native task control plane for turning work intent into scheduled tasks, executable plans, agent runs, and observable results.
 
-Use this directory as the stable product and developer documentation set. Time-point audits, refactor notes, and design-debt records live under `docs/internal/` so public navigation stays evergreen.
+Use this directory as the stable product and developer documentation set. Time-point audits, refactor notes, and design-debt records are removed once their lasting content is merged into stable docs.
 
 ## Start here
 
@@ -86,4 +86,4 @@ bun run dev:web
 - Keep API reference aligned with `apps/server/src/routes/**`.
 - Keep MCP tool docs aligned with `packages/contracts` and `apps/server/src/routes/mcp`.
 - Keep package boundary docs aligned with actual package directories.
-- Move dated audits, phase plans, and refactor-debt logs to `docs/internal/` instead of linking them as public guides.
+- Delete dated audits, phase plans, release-candidate notes, and refactor-debt logs once their lasting content is merged into stable docs.

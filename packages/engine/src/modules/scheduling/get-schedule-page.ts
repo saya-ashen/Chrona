@@ -10,7 +10,7 @@ import {
 } from "@/modules/task-execution/registry";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { deriveTaskRunnability } from "@chrona/shared";
-import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import {
   getLatestTaskPlanReadModel,
   resolveSavedPlanEffectiveGraph,
@@ -221,8 +221,8 @@ function getScheduledMinutes(item: {
   );
 }
 
-async function getReadyNodeIds(taskId: string) {
-  const acceptedPlan = await getAcceptedCompiledPlan(taskId);
+async function getReadyNodeIds(taskId: string, workBlockId?: string | null) {
+  const acceptedPlan = await getAcceptedCompiledPlanForTask(taskId, { workBlockId });
   if (!acceptedPlan) {
     return [] as string[];
   }

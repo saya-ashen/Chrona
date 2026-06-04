@@ -7,6 +7,7 @@ import {
   listExecutionRuntimes,
 } from "@/modules/task-execution/registry";
 import { deriveTaskRunnability } from "@chrona/shared";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 type TaskPlanGenerationStatus =
   | "idle"
@@ -604,7 +605,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
   const selectedWorkBlockId = typeof input === "string" ? null : input.workBlockId ?? null;
   const latestSavedPlan = await getLatestTaskPlanReadModel(taskId, selectedWorkBlockId);
 
-  const task = await db.task.findUniqueOrThrow({
+  const task = await db.task.findUnique({
     where: { id: taskId },
     include: {
       projection: true,
@@ -653,6 +654,9 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       },
     },
   });
+  if (!task) {
+    throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
+  }
 
   const recurrenceSeriesTasks = task.seriesExternalUid
     ? await db.task.findMany({
