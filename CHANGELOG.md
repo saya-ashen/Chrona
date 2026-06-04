@@ -7,7 +7,7 @@ Date: 2026-05-26
 ### Status
 - First reviewable MVP release candidate for local development, internal dogfood, and friendly-user review.
 - Not a stable public release; APIs, runtime contracts, packaging, and recovery flows may still change.
-- Full RC notes, verification summary, and known limitations: [docs/internal/release-candidate-0.1.4.md](./docs/internal/release-candidate-0.1.4.md).
+- RC verification notes were folded into this changelog; obsolete internal release notes were removed.
 
 ### Highlights
 - Repositioned top-level English and Chinese README copy around Chrona's schedule-first loop: task, plan, schedule, and auto execution.

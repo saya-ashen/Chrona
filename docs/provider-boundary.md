@@ -70,7 +70,7 @@ Chrona business execution state stays above the provider boundary:
 
 Chrona also owns execution context segmentation. Providers may preserve or compress their own native conversation history, but provider compression is not a correctness boundary. The engine decides which plan nodes share a provider session, when to switch sessions, and which structured summary is handed to the next segment.
 
-The default long-task policy should be segment-scoped provider sessions: related nodes share one provider session, then Chrona summarizes that segment and starts the next segment with compact explicit context. See `docs/internal/execution-context-segments.md`.
+The default long-task policy should be segment-scoped provider sessions: related nodes share one provider session, then Chrona summarizes that segment and starts the next segment with compact explicit context.
 
 ## Standard provider responsibilities
 

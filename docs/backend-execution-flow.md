@@ -125,7 +125,7 @@ This avoids two failure modes:
 - One provider session for the whole task makes Chrona depend on opaque provider-side context compression and risks context pollution across unrelated nodes.
 - One provider session per node loses useful short-term working context between tightly related nodes.
 
-`WorkBlock` should remain the scheduling/time container. A `WorkBlock` can contain one or more context segments. Segment policy belongs in `packages/engine`, while providers only create, resume, or virtualize native sessions. See `docs/internal/execution-context-segments.md`.
+`WorkBlock` should remain the scheduling/time container. A `WorkBlock` can contain one or more context segments. Segment policy belongs in `packages/engine`, while providers only create, resume, or virtualize native sessions.
 
 ## Checkpoint actions
 
