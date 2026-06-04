@@ -55,7 +55,19 @@ export function toHttpError(errorValue: unknown) {
   if (errorValue instanceof EngineError) {
     return new HttpError(engineErrorStatus(errorValue.code), errorValue.message);
   }
+  if (isPrismaNotFoundError(errorValue)) {
+    return new HttpError(404, "Record not found");
+  }
   return null;
+}
+
+function isPrismaNotFoundError(errorValue: unknown) {
+  return (
+    typeof errorValue === "object" &&
+    errorValue !== null &&
+    "code" in errorValue &&
+    errorValue.code === "P2025"
+  );
 }
 
 function engineErrorStatus(code: string) {

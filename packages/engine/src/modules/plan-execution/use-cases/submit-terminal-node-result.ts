@@ -1,5 +1,5 @@
 import type { ExecutionActionInput, NodeResult, NodeResultOutput, PlanExecutionResult } from "@chrona/contracts/ai";
-import { getAcceptedCompiledPlan } from "../compiled-plan-store";
+import { getAcceptedCompiledPlanForTask } from "../persistence/execution-scope";
 import { getCurrentExecution } from "./get-current-execution";
 import { getPlanRun, savePlanRun } from "../plan-run-store";
 import { appendMainSessionEvent, ensurePlanMainSession } from "../plan-state-store";
@@ -32,7 +32,9 @@ async function submitNodeOutput(input: {
   commandContext?: ExecutionDispatchContext;
   action: Extract<ExecutionActionInput, { action: "submit_node_output" }>;
 }): Promise<PlanExecutionResult> {
-  const accepted = await getAcceptedCompiledPlan(input.taskId);
+  const accepted = await getAcceptedCompiledPlanForTask(input.taskId, {
+    sessionId: input.action.sessionId,
+  });
   if (!accepted) throw new Error("No accepted plan. Create or accept a plan before submitting node output.");
   const persisted = await getPlanRun(input.taskId, accepted.compiledPlan.editablePlanId, accepted.workBlockId);
   if (!persisted?.graph) throw new Error("No runtime graph is available for output submission");

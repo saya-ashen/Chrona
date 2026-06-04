@@ -23,6 +23,7 @@ import {
   getLatestCompiledPlan,
   type SavedCompiledPlan,
 } from "@/modules/plan-execution/compiled-plan-store";
+import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import {
   createPlanGraphFromCompiledPlan,
   getPlanRun,
@@ -255,11 +256,12 @@ export async function getLatestTaskPlanReadModel(
   taskId: string,
   workBlockId?: string | null,
 ): Promise<TaskPlanReadModel | null> {
+  const scopedWorkBlockId = await resolveScopeWorkBlockId(taskId, { workBlockId });
   const savedPlan =
-    (await getAcceptedCompiledPlan(taskId, workBlockId))
-    ?? (await getLatestCompiledPlan(taskId, workBlockId))
-    ?? (workBlockId ? (await getAcceptedCompiledPlan(taskId, null)) : null)
-    ?? (workBlockId ? (await getLatestCompiledPlan(taskId, null)) : null);
+    (await getAcceptedCompiledPlan(taskId, scopedWorkBlockId))
+    ?? (await getLatestCompiledPlan(taskId, scopedWorkBlockId))
+    ?? (scopedWorkBlockId ? (await getAcceptedCompiledPlan(taskId, null)) : null)
+    ?? (scopedWorkBlockId ? (await getLatestCompiledPlan(taskId, null)) : null);
 
   if (!savedPlan) {
     return null;

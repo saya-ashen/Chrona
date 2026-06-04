@@ -5,7 +5,7 @@ import {
 } from "../plan-run-store";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { getAcceptedCompiledPlan } from "../compiled-plan-store";
+import { getAcceptedCompiledPlanForTask } from "./execution-scope";
 import { graphStatusForExecutionStatus, planRunStatusForExecutionStatus } from "../execution-state-machine";
 import type {
   CompiledPlan,
@@ -111,23 +111,24 @@ export function derivePlanRunFromRuntime(input: {
 }
 
 export async function ensureNativePlanRun(taskId: string, workBlockId?: string | null) {
-  const savedCompiled =
-    (await getAcceptedCompiledPlan(taskId, workBlockId))
-    ?? (workBlockId ? await getAcceptedCompiledPlan(taskId, null) : null);
+  const savedCompiled = await getAcceptedCompiledPlanForTask(taskId, { workBlockId });
   if (!savedCompiled) {
     return null;
   }
 
   const { compiledPlan, workspaceId } = savedCompiled;
   const planId = compiledPlan.editablePlanId;
-  let persisted = await getPlanRun(taskId, planId, workBlockId);
+  // The runtime row is keyed to the accepted plan's own work block, which is the
+  // authoritative scope that getAcceptedCompiledPlan just matched on.
+  const planWorkBlockId = savedCompiled.workBlockId;
+  let persisted = await getPlanRun(taskId, planId, planWorkBlockId);
 
   if (!persisted?.graph) {
     await savePlanRun({
       workspaceId,
       taskId,
       planId,
-      workBlockId,
+      workBlockId: planWorkBlockId,
       run: persisted?.planRun ?? createPlanRunFromCompiledPlan(compiledPlan),
       compiledPlan,
       graph: createPlanGraphFromCompiledPlan({
@@ -138,7 +139,7 @@ export async function ensureNativePlanRun(taskId: string, workBlockId?: string |
       results: persisted?.results ?? [],
       executionContextSnapshots: persisted?.executionContextSnapshots ?? [],
     });
-    persisted = await getPlanRun(taskId, planId, workBlockId);
+    persisted = await getPlanRun(taskId, planId, planWorkBlockId);
   }
 
   if (!persisted?.graph) {
@@ -146,7 +147,7 @@ export async function ensureNativePlanRun(taskId: string, workBlockId?: string |
   }
 
   return {
-    workBlockId: workBlockId ?? null,
+    workBlockId: planWorkBlockId,
     taskId,
     workspaceId,
     planId,

@@ -57,8 +57,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "bunx tsc --noEmit --pretty false 2>&1 | head -5",
-    "testCommand": "bun test packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts 2>&1 | grep -E \"(fail|Expected|Received|at .*test)\" | head -15",
+    "buildCommand": "cd /home/saya/workspace/Chrona; bunx tsc --noEmit --pretty false 2>&1 | grep -v \"node_modules\" | head -20; echo \"TSC_EXIT: $?\"; bun test packages/engine/src/modules/plan-execution/ 2>&1 | tail -8",
+    "testCommand": "cd /home/saya/workspace/Chrona; bun test packages/engine 2>&1 | tail -6; echo \"=== SERVER ===\"; bun test apps/server 2>&1 | tail -6",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -301,8 +301,8 @@
   "hotPaths": [
     {
       "path": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
-      "accessCount": 30,
-      "lastAccessed": 1780572310725,
+      "accessCount": 31,
+      "lastAccessed": 1780577518053,
       "type": "file"
     },
     {
@@ -312,9 +312,27 @@
       "type": "file"
     },
     {
+      "path": "packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "accessCount": 12,
+      "lastAccessed": 1780580473744,
+      "type": "file"
+    },
+    {
       "path": "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
       "accessCount": 11,
       "lastAccessed": 1780572315879,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "accessCount": 7,
+      "lastAccessed": 1780579837294,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/services/agent-tool-operations.service.ts",
+      "accessCount": 7,
+      "lastAccessed": 1780580315881,
       "type": "file"
     },
     {
@@ -324,15 +342,9 @@
       "type": "file"
     },
     {
-      "path": "packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "path": "packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts",
       "accessCount": 6,
-      "lastAccessed": 1780572244307,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
-      "accessCount": 5,
-      "lastAccessed": 1780569248530,
+      "lastAccessed": 1780580489175,
       "type": "file"
     },
     {
@@ -349,8 +361,20 @@
     },
     {
       "path": "packages/engine/src/modules/plan-execution/plan-run-store.ts",
+      "accessCount": 5,
+      "lastAccessed": 1780577392407,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/materialize-generated-task-plan.ts",
+      "accessCount": 5,
+      "lastAccessed": 1780577848103,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/task-plan-read-model.ts",
       "accessCount": 4,
-      "lastAccessed": 1780567825633,
+      "lastAccessed": 1780580079486,
       "type": "file"
     },
     {
@@ -369,6 +393,30 @@
       "path": "packages/engine/src/modules/plan-execution/runtime/committed-state.ts",
       "accessCount": 3,
       "lastAccessed": 1780570521315,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780579989684,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/compiled-plan-store.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780580001539,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/generate-task-plan-for-task.bun.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780580352038,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/materialize-generated-task-plan.bun.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780580364838,
       "type": "file"
     },
     {
@@ -420,6 +468,18 @@
       "type": "file"
     },
     {
+      "path": "packages/engine/src/modules/plans/task-planning.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780579837910,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/services/task-plan.service.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780580310037,
+      "type": "file"
+    },
+    {
       "path": "packages/contracts/src/plan-runtime/execution-state.ts",
       "accessCount": 1,
       "lastAccessed": 1780560645216,
@@ -450,21 +510,9 @@
       "type": "file"
     },
     {
-      "path": "packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780568325279,
-      "type": "file"
-    },
-    {
       "path": "packages/graph-runtime/src/commands/state-updates.ts",
       "accessCount": 1,
       "lastAccessed": 1780568400226,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780568763993,
       "type": "file"
     },
     {
@@ -513,6 +561,42 @@
       "path": "packages/graph-runtime/src/validation.ts",
       "accessCount": 1,
       "lastAccessed": 1780571939678,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/ai/features/generate-plan.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780577342638,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780577511234,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780577546795,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/errors.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780577578925,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780579017775,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/tasks/get-task-page.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780579163691,
       "type": "file"
     }
   ],

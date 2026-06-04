@@ -67,6 +67,38 @@ export async function getActiveExecutionWorkBlockId(taskId: string): Promise<str
   return session?.workBlockId ?? null;
 }
 
+export type ActiveExecutionSessionScope = {
+  executionSessionId: string;
+  workBlockId: string | null;
+  planId: string | null;
+};
+
+/**
+ * The authoritative "what is currently executing for this task" record. A live
+ * (Active/Paused) ExecutionSession is the single source of truth for the work
+ * block + plan an in-flight provider is operating on — callers that only hold a
+ * taskId (e.g. MCP tools resolved from a sessionId) recover the work block from
+ * here instead of guessing a null scope.
+ */
+export async function getActiveExecutionSessionScope(
+  taskId: string,
+): Promise<ActiveExecutionSessionScope | null> {
+  const session = await db.executionSession.findFirst({
+    where: {
+      taskId,
+      status: { in: ["Active", "Paused"] },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: { id: true, workBlockId: true, planId: true },
+  });
+  if (!session) return null;
+  return {
+    executionSessionId: session.id,
+    workBlockId: session.workBlockId,
+    planId: session.planId,
+  };
+}
+
 export async function setExecutionSessionState(input: {
   sessionId: string;
   status: "Active" | "Paused" | "Completed" | "Abandoned";

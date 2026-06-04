@@ -4,14 +4,60 @@ import { compilePlanBlueprint } from "@/modules/plans/plan-blueprint-compiler";
 import {
   saveCompiledPlan,
   getLatestCompiledPlan,
+  getAcceptedCompiledPlan,
 } from "@/modules/plan-execution/compiled-plan-store";
 import {
   createPlanGraphFromCompiledPlan,
   savePlanRun,
+  getPlanRun,
 } from "@/modules/plan-execution/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution";
 import { buildTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { upgradeBlueprintToEditable } from "@chrona/contracts";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+
+/**
+ * Plan-run statuses that mean the accepted plan is mid-flight. Materializing a
+ * fresh plan in these states would create a new "latest" draft that shadows the
+ * running plan in every read model (`getLatestTaskPlanReadModel`), so the UI
+ * would appear to swap the plan out from under an in-progress execution.
+ */
+const ACTIVE_PLAN_RUN_STATUSES = new Set(["running", "paused"]);
+
+/**
+ * Guard against regenerating a plan while the task's accepted plan is actively
+ * executing. Without this, an agent (or a stray `chrona.plan.generate` call)
+ * mid-run silently supersedes the running plan and the user sees their plan
+ * "refresh" into something else.
+ */
+async function assertNoActivePlanExecution(input: {
+  taskId: string;
+  workBlockId?: string | null;
+}): Promise<void> {
+  const accepted =
+    (await getAcceptedCompiledPlan(input.taskId, input.workBlockId ?? null)) ??
+    (input.workBlockId ? await getAcceptedCompiledPlan(input.taskId, null) : null);
+  if (!accepted) {
+    return;
+  }
+
+  const run = await getPlanRun(
+    input.taskId,
+    accepted.compiledPlan.editablePlanId,
+    accepted.workBlockId,
+  );
+  if (!run) {
+    return;
+  }
+
+  if (ACTIVE_PLAN_RUN_STATUSES.has(run.planRun.status)) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.CONFLICT,
+      `Cannot generate a new plan while the accepted plan is ${run.planRun.status}. ` +
+        "Stop or cancel the current execution before regenerating.",
+    );
+  }
+}
 
 /**
  * Materializes a generated task plan: compiles the AI blueprint, persists
@@ -26,6 +72,11 @@ export async function materializeGeneratedTaskPlan(input: {
   userInstruction?: string | null;
   generatedBy?: string | null;
 }): Promise<TaskPlanReadModel> {
+  await assertNoActivePlanExecution({
+    taskId: input.taskId,
+    workBlockId: input.workBlockId ?? null,
+  });
+
   const { compiledPlan, planId } = compilePlanBlueprint({
     taskId: input.taskId,
     blueprint: input.blueprint,

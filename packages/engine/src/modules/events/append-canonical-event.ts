@@ -73,11 +73,12 @@ export async function appendRawEventLog(input: AppendRawEventLogInput) {
     rawText: input.rawText ?? null,
     metadata: input.metadata ?? null,
   });
+  const contextRefs = await resolveRawEventContextRefs(input);
 
   const createData = {
       workspaceId: input.workspaceId,
-      taskId: input.taskId ?? null,
-      runId: input.runId ?? null,
+      taskId: contextRefs.taskId,
+      runId: contextRefs.runId,
       taskSessionId: input.taskSessionId ?? null,
       executionSessionId: input.executionSessionId ?? null,
       planId: input.planId ?? null,
@@ -115,6 +116,22 @@ export async function appendRawEventLog(input: AppendRawEventLogInput) {
   }
 
   return db.rawEventLog.create({ data: createData });
+}
+
+async function resolveRawEventContextRefs(input: AppendRawEventLogInput) {
+  const [task, run] = await Promise.all([
+    input.taskId
+      ? db.task.findUnique({ where: { id: input.taskId }, select: { id: true } })
+      : Promise.resolve(null),
+    input.runId
+      ? db.run.findUnique({ where: { id: input.runId }, select: { id: true } })
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    taskId: task?.id ?? null,
+    runId: run?.id ?? null,
+  };
 }
 
 export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {

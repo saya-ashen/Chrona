@@ -1,7 +1,7 @@
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
-import { getAcceptedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
@@ -111,7 +111,7 @@ export async function updateTask(
     workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
     executionConfig: nextExecutionConfig,
   });
-  const acceptedPlan = await getAcceptedCompiledPlan(currentTask.id);
+  const acceptedPlan = await getAcceptedCompiledPlanForTask(currentTask.id);
   const nextStatus = (() => {
     if (input.status) {
       return TaskStatus[input.status];

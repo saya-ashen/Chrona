@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { getAcceptedCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import { resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
 import { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";
 import type { WorkPageCopy } from "./types";
@@ -82,7 +83,10 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       },
     },
   });
-  const savedPlan = (await getAcceptedCompiledPlan(task.id)) ?? (await getLatestCompiledPlan(task.id));
+  const scopedWorkBlockId = await resolveScopeWorkBlockId(task.id);
+  const savedPlan =
+    (await getAcceptedCompiledPlan(task.id, scopedWorkBlockId))
+    ?? (await getLatestCompiledPlan(task.id, scopedWorkBlockId));
   const effectivePlanGraph = savedPlan && savedPlan.status === "accepted"
     ? await resolveSavedPlanEffectiveGraph(savedPlan)
     : null;

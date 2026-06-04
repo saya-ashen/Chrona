@@ -22,6 +22,7 @@ import type { createTaskScheduleService } from "./task-schedule.service";
 import type { createTasksService } from "./tasks.service";
 import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
 import { buildNodeRuntimeInput, buildSemanticRefHistory, refForNode } from "@/modules/plan-execution/node-runtime-refs";
+import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import {
   acceptedToolResult,
   duplicateOperationToolResult,
@@ -1102,9 +1103,14 @@ async function generatePlanForTool(
 ) {
   const taskId = requireTaskId(input);
   const workspaceId = requireWorkspaceId(input);
+  // Pin the generated plan to the same work block reads/execution resolve to, so
+  // an agent regenerating mid-session does not create a null-scoped draft that
+  // shadows the work-block-scoped accepted plan.
+  const workBlockId = await resolveScopeWorkBlockId(taskId, { sessionId: input.sessionId });
   const savedPlan = await deps.plan.materialize({
     taskId,
     workspaceId,
+    workBlockId,
     blueprint: payload as PlanBlueprint,
     generatedBy: input.actorId ?? "hermes",
   });
