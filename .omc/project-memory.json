@@ -57,8 +57,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd /home/saya/workspace/Chrona; bunx tsc --noEmit --pretty false 2>&1 | grep -v \"node_modules\" | head -20; echo \"TSC_EXIT: $?\"; bun test packages/engine/src/modules/plan-execution/ 2>&1 | tail -8",
-    "testCommand": "cd /home/saya/workspace/Chrona; bun test packages/engine 2>&1 | tail -6; echo \"=== SERVER ===\"; bun test apps/server 2>&1 | tail -6",
+    "buildCommand": "cd /home/saya/workspace/Chrona; bunx tsc --noEmit --pretty false 2>&1 | grep -v \"node_modules\" | head -20; echo \"TSC_EXIT: ${pipestatus[1]}\"",
+    "testCommand": "cd /home/saya/workspace/Chrona; bun test packages/engine/src/modules/plan-execution/ 2>&1 | tail -12",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -301,14 +301,20 @@
   "hotPaths": [
     {
       "path": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
-      "accessCount": 31,
-      "lastAccessed": 1780577518053,
+      "accessCount": 32,
+      "lastAccessed": 1780581384468,
       "type": "file"
     },
     {
       "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.external-results.bun.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1780572123952,
+      "accessCount": 17,
+      "lastAccessed": 1780581994341,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "accessCount": 13,
+      "lastAccessed": 1780581784827,
       "type": "file"
     },
     {
@@ -318,9 +324,9 @@
       "type": "file"
     },
     {
-      "path": "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
-      "accessCount": 11,
-      "lastAccessed": 1780572315879,
+      "path": "packages/engine/src/services/agent-tool-operations.service.ts",
+      "accessCount": 8,
+      "lastAccessed": 1780581949730,
       "type": "file"
     },
     {
@@ -330,9 +336,9 @@
       "type": "file"
     },
     {
-      "path": "packages/engine/src/services/agent-tool-operations.service.ts",
+      "path": "packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts",
       "accessCount": 7,
-      "lastAccessed": 1780580315881,
+      "lastAccessed": 1780581376675,
       "type": "file"
     },
     {
@@ -342,21 +348,21 @@
       "type": "file"
     },
     {
-      "path": "packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts",
+      "path": "packages/graph-runtime/src/execution/run-graph-execution.ts",
       "accessCount": 6,
-      "lastAccessed": 1780580489175,
+      "lastAccessed": 1780581756581,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/state-updates.ts",
+      "accessCount": 6,
+      "lastAccessed": 1780581872029,
       "type": "file"
     },
     {
       "path": "packages/contracts/src/plan-runtime/execution-command.ts",
       "accessCount": 5,
       "lastAccessed": 1780570674327,
-      "type": "file"
-    },
-    {
-      "path": "packages/graph-runtime/src/execution/run-graph-execution.ts",
-      "accessCount": 5,
-      "lastAccessed": 1780572395821,
       "type": "file"
     },
     {
@@ -378,6 +384,12 @@
       "type": "file"
     },
     {
+      "path": "packages/engine/src/modules/plan-execution/runtime/committed-state.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780581437659,
+      "type": "file"
+    },
+    {
       "path": "packages/engine/src/modules/plan-execution/node-ai-capabilities.ts",
       "accessCount": 3,
       "lastAccessed": 1780565254921,
@@ -387,12 +399,6 @@
       "path": "docs/refactor/plan-execution-kernel.md",
       "accessCount": 3,
       "lastAccessed": 1780567430639,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/modules/plan-execution/runtime/committed-state.ts",
-      "accessCount": 3,
-      "lastAccessed": 1780570521315,
       "type": "file"
     },
     {
@@ -507,12 +513,6 @@
       "path": "packages/graph-runtime/src/commands/submit-node-result.ts",
       "accessCount": 1,
       "lastAccessed": 1780568241560,
-      "type": "file"
-    },
-    {
-      "path": "packages/graph-runtime/src/commands/state-updates.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780568400226,
       "type": "file"
     },
     {

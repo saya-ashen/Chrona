@@ -47,19 +47,31 @@ export function appendExecutionResult(input: {
   const evidence = normalizeResultEvidence(input.result.evidence);
 
   switch (input.result.status) {
-    case "done":
+    case "done": {
+      // Outputs accumulate across the node's lifetime: partial outputs
+      // submitted via chrona_node_output land on the prior "current" result,
+      // and completion (chrona_node_complete) may carry additional outputs.
+      // Merge both so the completed node retains every submitted output rather
+      // than dropping the accumulated ones when the prior result is superseded.
+      const priorCurrent = input.state.results.findLast(
+        (result) => result.nodeId === input.node.id && result.status === "current",
+      );
+      const priorOutputs = priorCurrent?.outputs ?? [];
+      const completionOutputs = normalizeResultOutputs(input.result.output) ?? [];
+      const mergedOutputs = [...priorOutputs, ...completionOutputs];
       return appendCurrentResult({
         results: input.state.results,
         result: {
           ...base,
           status: "current",
-          outputSummary: input.result.summary,
-          outputs: normalizeResultOutputs(input.result.output),
+          outputSummary: input.result.summary ?? priorCurrent?.outputSummary,
+          outputs: mergedOutputs.length > 0 ? mergedOutputs : undefined,
           inputFields: input.result.inputFields,
           evidence,
           selectedBranch: input.result.selectedBranch,
         },
       });
+    }
     case "started":
       return input.state.results;
     case "waiting_for_user":

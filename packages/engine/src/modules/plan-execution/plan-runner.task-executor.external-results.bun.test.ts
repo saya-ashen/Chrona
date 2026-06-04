@@ -131,6 +131,72 @@ describe("plan-runner task executor external results", () => {
     expect(attemptCountAfterReplay).toBe(attemptCountBeforeReplay);
   });
 
+  it("accumulates chrona_node_output outputs into the completed node result", async () => {
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      const firstAppend = await taskPlanExecution.submitNodeResult({
+        taskId: input.taskId,
+        action: {
+          action: "submit_node_output",
+          sessionId: input.mainSession.id,
+          mode: "append",
+          outputs: [{ kind: "markdown", content: "Partial output one", title: "Step 1" }],
+        },
+      });
+      expect(firstAppend.status).toBe("running");
+
+      await taskPlanExecution.submitNodeResult({
+        taskId: input.taskId,
+        action: {
+          action: "submit_node_output",
+          sessionId: input.mainSession.id,
+          mode: "append",
+          outputs: [{ kind: "json", value: { score: 42 }, title: "Step 2" }],
+        },
+      });
+
+      // Completion carries no inline output — outputs were submitted separately
+      // via chrona_node_output and must survive into the completed result.
+      const submittedResult = await taskPlanExecution.dispatch({
+        taskId: input.taskId,
+        action: {
+          action: "complete_manual_node",
+          summary: "Task wrapped up",
+        },
+      });
+      expect(submittedResult.status).toBe("completed");
+
+      return {
+        status: "started",
+        summary: "Provider stream observed external completion after outputs",
+        evidence: { sessionId: input.mainSession.id },
+        output: { runtimeRunRef: "stale-after-outputs" },
+      } satisfies NodeExecutionResult;
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner accumulates node outputs");
+    const compiledPlan = makeSingleTaskPlan("graph_task_output_accumulation");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(result.status).toBe("completed");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    const completed = persisted?.results.find(
+      (entry) => entry.nodeId === "task_node" && entry.status === "current",
+    );
+    expect(completed).toMatchObject({
+      status: "current",
+      outputSummary: "Task wrapped up",
+    });
+    expect(completed?.outputs).toEqual([
+      { kind: "markdown", content: "Partial output one", title: "Step 1" },
+      { kind: "json", value: { score: 42 }, title: "Step 2" },
+    ]);
+  });
+
   it("continues to downstream work when a running task submits its own terminal result", async () => {
     executeTaskNodeCapabilityMock
       .mockImplementationOnce(async (input) => {
