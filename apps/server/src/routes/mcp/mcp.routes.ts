@@ -94,7 +94,7 @@ const externalTools = {
   chrona_node_block: {
     internalName: "chrona.node.block",
     title: "Chrona Node Block",
-    description: "Block the current node with a reason. Chrona resolves the active node from the session.",
+    description: "Block the current node when it needs user input or an unavailable capability. Provide a reason and an actionForm (instructions plus at least one input field) describing what the user must supply to unblock. Chrona resolves the active node from the session.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.block"]),
   },
   chrona_node_fail: {

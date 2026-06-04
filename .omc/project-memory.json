@@ -57,8 +57,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd /home/saya/workspace/Chrona; bunx tsc --noEmit --pretty false 2>&1 | grep -v \"node_modules\" | head -20; echo \"TSC_EXIT: ${pipestatus[1]}\"",
-    "testCommand": "cd /home/saya/workspace/Chrona; bun test packages/engine/src/modules/plan-execution/ 2>&1 | tail -12",
+    "buildCommand": "cd /home/saya/workspace/Chrona; bunx tsc --noEmit --pretty false > /tmp/tsc.out 2>&1; echo \"EXIT: $status\"; grep -v \"node_modules\" /tmp/tsc.out | grep -i \"error\" | head -30; echo \"---error count---\"; grep -c \"error TS\" /tmp/tsc.out",
+    "testCommand": "cd /home/saya/workspace/Chrona; bun test packages/engine/src/modules/plan-execution/ 2>&1 | tail -6",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -391,8 +391,8 @@
     },
     {
       "path": "packages/engine/src/modules/plan-execution/node-ai-capabilities.ts",
-      "accessCount": 3,
-      "lastAccessed": 1780565254921,
+      "accessCount": 4,
+      "lastAccessed": 1780582501478,
       "type": "file"
     },
     {
@@ -423,6 +423,12 @@
       "path": "packages/engine/src/modules/plans/materialize-generated-task-plan.bun.test.ts",
       "accessCount": 3,
       "lastAccessed": 1780580364838,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-runtime-refs.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780582500457,
       "type": "file"
     },
     {
@@ -468,12 +474,6 @@
       "type": "file"
     },
     {
-      "path": "packages/engine/src/modules/plan-execution/node-runtime-refs.ts",
-      "accessCount": 2,
-      "lastAccessed": 1780569891720,
-      "type": "file"
-    },
-    {
       "path": "packages/engine/src/modules/plans/task-planning.ts",
       "accessCount": 2,
       "lastAccessed": 1780579837910,
@@ -483,6 +483,18 @@
       "path": "packages/engine/src/services/task-plan.service.ts",
       "accessCount": 2,
       "lastAccessed": 1780580310037,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780582501354,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780582508355,
       "type": "file"
     },
     {
@@ -567,18 +579,6 @@
       "path": "packages/engine/src/modules/ai/features/generate-plan.ts",
       "accessCount": 1,
       "lastAccessed": 1780577342638,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780577511234,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780577546795,
       "type": "file"
     },
     {
