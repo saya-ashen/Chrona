@@ -64,7 +64,7 @@ function toLegacyNodeExecutionAttempt(attempt: NodeAttempt): NodeExecutionAttemp
   };
 }
 
-function derivePlanRunFromRuntime(input: {
+export function derivePlanRunFromRuntime(input: {
   existingRun?: PlanRun;
   compiledPlan: CompiledPlan;
   graph: PlanGraph;

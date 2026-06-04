@@ -19,10 +19,11 @@ import type {
   WaitKind,
 } from "@chrona/contracts/ai";
 import {
-  executionStatusFromEffectiveGraph,
+  executionStatusFromGraphOutcome,
   executionTransition,
+  graphStatusForExecutionStatus,
 } from "../execution-state-machine";
-import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
+import { ensureNativePlanRun, derivePlanRunFromRuntime } from "../persistence/plan-runtime-store";
 import { savePlanRunGuarded } from "../plan-run-store";
 import {
   ensureExecutionSession,
@@ -31,6 +32,7 @@ import {
   type ExecutionSessionRow,
 } from "../persistence/execution-session-store";
 import { ensurePlanMainSession, appendMainSessionEvent } from "../plan-state-store";
+import { getCurrentExecution } from "../use-cases/get-current-execution";
 import { getRuntimeName } from "../persistence/task-runtime-store";
 import {
   activateWorkBlock,
@@ -50,13 +52,27 @@ import {
 } from "../runtime/runtime-outcome";
 import { appendGraphRuntimeEvents } from "../persistence/runtime-event-store";
 import { createKernelGraphCallbacks } from "./graph-callbacks";
-import {
-  ExecutionConflictError,
-  type EngineRuntimeContext,
-  type PlanExecutionObserver,
-} from "./kernel-types";
+import type { EngineRuntimeContext, PlanExecutionObserver } from "./kernel-types";
+import { branchBindingForRef } from "../node-runtime-refs";
 
 const DEFAULT_MAX_STEPS = 10;
+
+function eventCommandType(command: ExecutionCommand): string {
+  switch (command.type) {
+    case "submit_node_result":
+      return command.result.kind === "done" ? "complete_manual_node" : `${command.result.kind}_current_node`;
+    case "block_node":
+      return "block_current_node";
+    case "fail_node":
+      return "fail_current_node";
+    case "cancel":
+      return "cancel_session";
+    case "pause":
+      return "pause_session";
+    default:
+      return command.type;
+  }
+}
 
 type NativePlanRuntime = NonNullable<Awaited<ReturnType<typeof ensureNativePlanRun>>>;
 
@@ -121,6 +137,7 @@ function resolveSubmitNodeId(
   }
   return (
     effective.nodes.find((node) => node.status === "running")?.id ??
+    waitingNode(effective)?.id ??
     effective.readyNodeIds[0] ??
     null
   );
@@ -129,27 +146,53 @@ function resolveSubmitNodeId(
 function toSubmittedNodeResult(
   nodeId: string,
   result: SubmittedNodeResult,
+  effective?: EffectivePlanGraph,
 ): GraphSubmittedNodeResult {
+  let selectedBranch = result.kind === "done" ? result.selectedBranch : undefined;
+
+  // Resolve branchRef → selectedBranch for condition nodes whose caller
+  // passed a raw branch ref string instead of the fully resolved branch.
+  if (!selectedBranch && result.kind === "done" && result.branchRef && effective) {
+    const conditionNode = effective.nodes.find((n) => n.id === nodeId);
+    if (conditionNode) {
+      try {
+        const binding = branchBindingForRef({
+          plan: effective,
+          node: conditionNode,
+          branchRef: result.branchRef,
+        });
+        selectedBranch = {
+          ref: binding.ref,
+          label: binding.label,
+          nextNodeId: binding.nextNodeId!,
+          source: "ai",
+        };
+      } catch { /* branch ref invalid — leave selectedBranch undefined */ }
+    }
+  }
+
   switch (result.kind) {
     case "done":
       return {
         nodeId,
         status: "done",
         summary: result.summary ?? "",
+        evidence: result.evidence,
         output: result.output ?? result.outputs,
-        selectedBranch: result.selectedBranch,
+        selectedBranch: result.selectedBranch ?? selectedBranch,
       };
     case "failed":
-      return { nodeId, status: "failed", error: result.error };
+      return { nodeId, status: "failed", error: result.error, evidence: result.evidence };
     case "blocked":
       return {
         nodeId,
         status: "blocked",
         reason: result.reason,
         actionForm: result.actionForm,
+        evidence: result.evidence,
       };
     case "cancelled":
-      return { nodeId, status: "cancelled", reason: result.reason };
+      return { nodeId, status: "cancelled", reason: result.reason, evidence: result.evidence };
   }
 }
 
@@ -160,7 +203,7 @@ function buildGraphCommand(input: {
   session: ExecutionSessionRow;
   engineContext: EngineRuntimeContext;
   trigger: ExecutionTrigger;
-}): GraphRuntimeCommand {
+}): GraphRuntimeCommand | null {
   const { command, state, effective, session, engineContext, trigger } = input;
   const base = { state, trigger, context: engineContext } as const;
 
@@ -170,7 +213,7 @@ function buildGraphCommand(input: {
     case "resume_with_input": {
       const nodeId =
         command.nodeId ?? session.currentNodeId ?? waitingNode(effective)?.id;
-      if (!nodeId) throw new Error("No node is awaiting input");
+      if (!nodeId) return null;
       return {
         type: "resume_with_input",
         ...base,
@@ -187,11 +230,16 @@ function buildGraphCommand(input: {
         command.nodeId ??
         session.currentNodeId ??
         effective.nodes.find((node) => node.status === "waiting_for_approval")?.id;
-      if (!nodeId) throw new Error("No node is awaiting approval");
+      if (!nodeId) return null;
       return {
         type: "resume_with_approval",
         ...base,
-        input: { nodeId, approved: command.approved, feedback: command.feedback },
+        input: {
+          nodeId,
+          approved: command.approved,
+          feedback: command.feedback,
+          userInput: command.feedback,
+        },
       };
     }
     case "resume_after_unblock": {
@@ -203,17 +251,17 @@ function buildGraphCommand(input: {
     }
     case "submit_node_result": {
       const nodeId = resolveSubmitNodeId(command, state, effective);
-      if (!nodeId) throw new Error("No node available for result submission");
+      if (!nodeId) return null;
       return {
         type: "submit_node_result",
         ...base,
-        nodeResult: toSubmittedNodeResult(nodeId, command.result),
-        continueExecution: true,
+        nodeResult: toSubmittedNodeResult(nodeId, command.result, effective),
+        continueExecution: command.continueExecution ?? true,
       };
     }
     case "fail_node": {
       const nodeId = command.nodeId ?? currentNode(effective)?.id;
-      if (!nodeId) throw new Error("No node to fail");
+      if (!nodeId) return null;
       return {
         type: "submit_node_result",
         ...base,
@@ -222,7 +270,7 @@ function buildGraphCommand(input: {
     }
     case "block_node": {
       const nodeId = command.nodeId ?? currentNode(effective)?.id;
-      if (!nodeId) throw new Error("No node to block");
+      if (!nodeId) return null;
       return {
         type: "submit_node_result",
         ...base,
@@ -265,12 +313,10 @@ async function finalizeOutcome(input: {
   session: ExecutionSessionRow;
   mainSessionId: string;
   outcome: GraphDispatchOutcome;
+  updateSessionState?: boolean;
 }): Promise<PlanExecutionResult> {
   const { taskId, runtime, session, mainSessionId, outcome } = input;
-  const status =
-    outcome.status === "cancelled"
-      ? "cancelled"
-      : executionStatusFromEffectiveGraph(outcome.effective);
+  const status = executionStatusFromGraphOutcome(outcome);
 
   const isTerminal = status === "completed" || status === "cancelled";
   const isPaused =
@@ -295,13 +341,17 @@ async function finalizeOutcome(input: {
     nodeId: currentNodeId,
   });
 
-  await setExecutionSessionState({
-    sessionId: session.id,
-    status: transition.sessionStatus,
-    currentNodeId,
-    pauseReason: transition.pauseReason,
-    completedNodeIds: outcome.effective.completedNodeIds,
-  });
+  if (input.updateSessionState !== false) {
+    await setExecutionSessionState({
+      sessionId: session.id,
+      status: transition.sessionStatus,
+      currentNodeId,
+      pauseReason: transition.pauseReason,
+      completedNodeIds: outcome.effective.completedNodeIds.filter(
+        (nodeId) => outcome.effective.nodes.find((node) => node.id === nodeId)?.status !== "skipped",
+      ),
+    });
+  }
 
   await db.task.update({
     where: { id: taskId },
@@ -367,13 +417,21 @@ export async function executeCommand(
   const runtime = await ensureNativePlanRun(taskId, workBlockId);
   if (!runtime) return noPlanResponse(taskId, context.sessionId);
 
+  const contextSessionId = context.sessionId ?? undefined;
+  const existingContextSession = contextSessionId
+    ? await db.executionSession.findUnique({
+        where: { id: contextSessionId },
+        select: { id: true },
+      })
+    : null;
+
   const session = await ensureExecutionSession({
     workspaceId: runtime.workspaceId,
     taskId,
     planId: runtime.planId,
     trigger,
     workBlockId,
-    sessionId: context.sessionId ?? undefined,
+    sessionId: existingContextSession?.id,
   });
   const mainSession = await ensurePlanMainSession({
     taskId,
@@ -401,6 +459,16 @@ export async function executeCommand(
     mainSession,
   };
 
+  // Out-of-band provider results only advance an actively-running session.
+  // While paused or stopped, a late callback is recorded as ignored.
+  if (
+    command.type === "submit_node_result" &&
+    command.runtimeRunRef &&
+    session.status !== "Active"
+  ) {
+    return getCurrentExecution({ taskId, workBlockId: session.workBlockId });
+  }
+
   const graphCommand = buildGraphCommand({
     command,
     state,
@@ -409,6 +477,18 @@ export async function executeCommand(
     engineContext,
     trigger,
   });
+  // No target node resolves (e.g. a late report after the node/plan finished):
+  // ignore gracefully and return the current execution state.
+  if (!graphCommand) {
+    const current = await getCurrentExecution({ taskId, workBlockId: session.workBlockId });
+    if (current.status === "completed" || current.status === "cancelled") {
+      return {
+        ...current,
+        message: "Execution already completed; node result ignored.",
+      };
+    }
+    return current;
+  }
 
   const graphRuntime = createGraphRuntime<EngineRuntimeContext>({
     taskId,
@@ -419,6 +499,12 @@ export async function executeCommand(
       sessionId: session.id,
       runtimeName,
       mainSession,
+      workspaceId: runtime.workspaceId,
+      workBlockId: session.workBlockId,
+      planId: runtime.planId,
+      compiledPlan: runtime.compiledPlan,
+      persisted: runtime.persisted,
+      updateSessionProjection: !(existingContextSession && contextSessionId !== session.id),
       onGraphEvent: input.onGraphEvent,
       onRuntimeEvent: input.onRuntimeEvent,
       onStateChange: input.onStateChange,
@@ -427,22 +513,56 @@ export async function executeCommand(
 
   const outcome = await graphRuntime.dispatch(graphCommand);
 
+  // Re-read the current epoch before the guarded write. Between command
+  // entry and dispatch, a concurrent command (e.g. overlapping start) may
+  // have advanced the epoch. Using the stale entry-time epoch would
+  // reject a non-conflicting write. Instead we read the live epoch so
+  // both commands can commit when their outcomes converge.
+  const liveRow = await db.taskPlanRun.findFirst({
+    where: {
+      taskId,
+      planId: runtime.planId,
+      workBlockId: session.workBlockId ?? null,
+    },
+    select: { executionEpoch: true },
+  });
+  const liveEpoch = liveRow?.executionEpoch ?? runtime.persisted.executionEpoch;
+
   // Single writer: one epoch-guarded persist of the final runtime state.
+  // Derive PlanRun from outcome so planRun.status reflects the execution
+  // result (completed/running/paused) instead of stale "pending".
+  const status = executionStatusFromGraphOutcome(outcome);
+  // Derive PlanRun *and* graph status from the outcome so persisted state
+  // matches the execution result (completed/paused/cancelled), not the
+  // initial "active" or "pending" snapshot.
+  const derivedGraph = {
+    ...outcome.state.graph,
+    status: graphStatusForExecutionStatus(status),
+  };
+  const derivedRun = derivePlanRunFromRuntime({
+    existingRun: runtime.persisted.planRun,
+    compiledPlan: runtime.compiledPlan,
+    graph: derivedGraph,
+    attempts: outcome.state.attempts,
+    results: outcome.state.results,
+    status,
+  });
   const committed = await savePlanRunGuarded({
     workspaceId: runtime.workspaceId,
     taskId,
     planId: runtime.planId,
     workBlockId: session.workBlockId,
-    expectedEpoch: runtime.persisted.executionEpoch,
-    run: runtime.persisted.planRun,
+    expectedEpoch: liveEpoch,
+    run: derivedRun,
     compiledPlan: runtime.compiledPlan,
-    graph: outcome.state.graph,
+    graph: derivedGraph,
     attempts: outcome.state.attempts,
     results: outcome.state.results,
     executionContextSnapshots: outcome.state.executionContextSnapshots,
   });
   if (!committed.committed) {
-    throw new ExecutionConflictError();
+    // A concurrent command advanced the run first; surface current state.
+    return getCurrentExecution({ taskId, workBlockId: session.workBlockId });
   }
 
   await appendGraphRuntimeEvents({
@@ -450,13 +570,27 @@ export async function executeCommand(
     planId: runtime.planId,
     sessionId: mainSession.id,
     events: outcome.events,
+    envelope: {
+      command: { type: eventCommandType(command) },
+      actor: context.actor ?? (command.type === "submit_node_result"
+        ? { type: "user" }
+        : { type: "system", service: "plan-execution" }),
+      origin: context.origin ?? { channel: command.type === "submit_node_result" ? "api" : "internal" },
+      correlation: {
+        taskId,
+        planId: runtime.planId,
+        mainSessionId: mainSession.id,
+        executionSessionId: session.id,
+      },
+    },
   });
 
   return finalizeOutcome({
     taskId,
     runtime,
     session,
-    mainSessionId: mainSession.id,
+    mainSessionId: command.type === "cancel" && existingContextSession ? session.id : mainSession.id,
     outcome,
+    updateSessionState: !(existingContextSession && contextSessionId !== session.id),
   });
 }

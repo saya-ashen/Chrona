@@ -2,12 +2,28 @@ import type { GraphExecutionEvent } from "@chrona/graph-runtime";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
 import type { EffectivePlanGraph } from "@chrona/contracts/ai";
 
+import type { CompiledPlan } from "@chrona/contracts/ai";
+import type { PersistedPlanRun } from "../persistence/plan-runtime-store";
+
 export type EngineRuntimeContext = {
   taskId: string;
   workBlockId?: string | null;
   planId: string;
   mainSession: { id: string; taskId: string; sessionKey: string };
   control?: { signal?: AbortSignal; shouldPause?: () => boolean };
+};
+
+export type KernelCallbacksInput = {
+  taskId: string;
+  sessionId: string;
+  runtimeName: string;
+  mainSession: EngineRuntimeContext["mainSession"];
+  workspaceId: string;
+  workBlockId: string | null;
+  planId: string;
+  compiledPlan: CompiledPlan;
+  persisted: PersistedPlanRun;
+  updateSessionProjection?: boolean;
 };
 
 export type PlanExecutionRuntimeEvent = {

@@ -2,6 +2,13 @@ import type { GraphMutationOperation } from "./graph";
 import type { NodeActionForm } from "./node";
 import type { NodeResultOutput } from "./node-result";
 
+type SubmittedNodeEvidence = {
+  sessionId?: string;
+  runId?: string;
+  runtimeRunRef?: string;
+  [key: string]: unknown;
+};
+
 /**
  * Single execution command vocabulary shared by API, engine kernel, and graph
  * runtime. Replaces the former triple of ExecutionActionInput (API),
@@ -41,6 +48,7 @@ export type SubmittedNodeResult =
       summary?: string;
       outputs?: NodeResultOutput[];
       output?: unknown;
+      evidence?: SubmittedNodeEvidence;
       mode?: "append" | "replace";
       selectedBranch?: {
         ref?: string;
@@ -49,10 +57,13 @@ export type SubmittedNodeResult =
         nextNodeId: string;
         source: "user" | "ai" | "system" | "default";
       };
+      /** Raw branch ref string (e.g. "B20260604-01-A") for condition nodes.
+       * Resolved to selectedBranch in the kernel. */
+      branchRef?: string;
     }
-  | { kind: "failed"; error: string }
-  | { kind: "blocked"; reason: string; actionForm?: NodeActionForm }
-  | { kind: "cancelled"; reason?: string };
+  | { kind: "failed"; error: string; evidence?: SubmittedNodeEvidence }
+  | { kind: "blocked"; reason: string; actionForm?: NodeActionForm; evidence?: SubmittedNodeEvidence }
+  | { kind: "cancelled"; reason?: string; evidence?: SubmittedNodeEvidence };
 
 export type ExecutionCommand =
   | { type: "start"; trigger: ExecutionTrigger; prompt?: string }
@@ -65,6 +76,9 @@ export type ExecutionCommand =
       result: SubmittedNodeResult;
       /** Set when the result arrives out-of-band from a provider run. */
       runtimeRunRef?: string;
+      /** Whether to continue execution after applying this result.
+       * Defaults to false — callers opt into automatic continuation. */
+      continueExecution?: boolean;
     }
   | { type: "block_node"; nodeId?: string; reason: string; actionForm?: NodeActionForm }
   | { type: "fail_node"; nodeId?: string; error: string }

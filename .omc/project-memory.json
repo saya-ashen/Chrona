@@ -1,0 +1,520 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1780559770810,
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "@playwright/test",
+        "version": "1.59.1",
+        "category": "testing"
+      },
+      {
+        "name": "playwright",
+        "version": "1.59.1",
+        "category": "testing"
+      },
+      {
+        "name": "react",
+        "version": "19.2.4",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.4",
+        "category": "frontend"
+      },
+      {
+        "name": "vite",
+        "version": "8.0.10",
+        "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "4.1.3",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "bunx tsc --noEmit --pretty false 2>&1 | head -5",
+    "testCommand": "bun test packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts 2>&1 | grep -E \"(fail|Expected|Received|at .*test)\" | head -15",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "chrona": "bun run scripts/chrona.ts",
+      "dev": "bun run scripts/dev.ts",
+      "build": "bun run chrona build",
+      "start": "bun run server:start",
+      "typecheck": "bunx tsc --noEmit --pretty false",
+      "server:start": "bun run apps/server/src/index.bun.ts",
+      "lint": "eslint .",
+      "deadcode": "knip --include unresolved,duplicates",
+      "check": "bun run chrona check",
+      "check:ui-foundation": "bun run scripts/check-ui-foundation.mjs",
+      "analyze": "bun run chrona check all",
+      "test": "bun run chrona test all",
+      "test:ci": "bun run chrona test ci",
+      "test:unit": "bun run chrona test unit",
+      "test:api": "bun run scripts/run-api-tests.ts",
+      "test:bun": "bun run scripts/run-bun-tests.ts",
+      "test:e2e": "playwright test",
+      "test:e2e:desktop": "playwright test --project=chromium",
+      "test:e2e:tablet": "playwright test --project=tablet",
+      "test:e2e:mobile": "playwright test --project=mobile",
+      "test:llm:replay": "bun run chrona test llm:replay",
+      "db:generate": "prisma generate",
+      "setup": "bun run db:generate && bun run db:seed",
+      "db:seed": "bun prisma/seed.ts",
+      "check:boundaries": "bun run chrona check boundaries"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [
+      "apps/*",
+      "packages/*",
+      "packages/*/*",
+      "packages/*/*/*"
+    ],
+    "mainDirectories": [
+      "assets",
+      "docs",
+      "scripts"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780559770796,
+      "keyFiles": [
+        "weather.cpython-313.pyc"
+      ]
+    },
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780559770797,
+      "keyFiles": []
+    },
+    "artifacts": {
+      "path": "artifacts",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1780559770805,
+      "keyFiles": [
+        "settings-after-desktop.png",
+        "settings-after-mobile.png",
+        "settings-after-tablet.png",
+        "settings-before-desktop.png",
+        "settings-before-mobile.png"
+      ]
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 3,
+      "lastAccessed": 1780559770807,
+      "keyFiles": [
+        "2026-04-27-12-09-14.png",
+        "2026-04-27-12-09-21.png",
+        "file.png"
+      ]
+    },
+    "coverage": {
+      "path": "coverage",
+      "purpose": null,
+      "fileCount": 8,
+      "lastAccessed": 1780559770807,
+      "keyFiles": [
+        "base.css",
+        "block-navigation.js",
+        "favicon.png",
+        "index.html",
+        "prettify.css"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 2,
+      "lastAccessed": 1780559770807,
+      "keyFiles": [
+        "bun-entry.js",
+        "cli.js"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 8,
+      "lastAccessed": 1780559770808,
+      "keyFiles": [
+        "README.md",
+        "api-reference.md",
+        "architecture.md",
+        "backend-execution-flow.md",
+        "data-model.md"
+      ]
+    },
+    "e2e": {
+      "path": "e2e",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780559770808,
+      "keyFiles": []
+    },
+    "external-plugins": {
+      "path": "external-plugins",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780559770808,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "file:": {
+      "path": "file:",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780559770808,
+      "keyFiles": []
+    },
+    "packages": {
+      "path": "packages",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780559770808,
+      "keyFiles": []
+    },
+    "prisma": {
+      "path": "prisma",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1780559770808,
+      "keyFiles": [
+        "dev.db",
+        "dev.db-shm",
+        "dev.db-wal",
+        "schema.prisma",
+        "seed.ts"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 14,
+      "lastAccessed": 1780559770808,
+      "keyFiles": [
+        "build-binaries.ts",
+        "check-ui-foundation.mjs",
+        "check-web-page-reachability.ts",
+        "chrona.bun.test.ts",
+        "chrona.ts"
+      ]
+    },
+    "specs": {
+      "path": "specs",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1780559770808,
+      "keyFiles": [
+        "auto-execute-create-dialog-default.png",
+        "auto-execute-settings-desktop.png",
+        "auto-execute-settings-mobile.png",
+        "auto-execute-settings-tablet.png",
+        "auto-execute-task-pre.png"
+      ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780559770809,
+      "keyFiles": []
+    },
+    "coverage/scripts": {
+      "path": "coverage/scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1780559770809,
+      "keyFiles": [
+        "check-ui-foundation.mjs.html",
+        "index.html"
+      ]
+    },
+    "docs/assets": {
+      "path": "docs/assets",
+      "purpose": "Static assets",
+      "fileCount": 4,
+      "lastAccessed": 1780559770810,
+      "keyFiles": [
+        "AIClients.png",
+        "CreateTask.png",
+        "NodeDetail.png"
+      ]
+    },
+    "prisma/migrations": {
+      "path": "prisma/migrations",
+      "purpose": "Database migrations",
+      "fileCount": 1,
+      "lastAccessed": 1780559770810,
+      "keyFiles": [
+        "migration_lock.toml"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "accessCount": 30,
+      "lastAccessed": 1780572310725,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.external-results.bun.test.ts",
+      "accessCount": 14,
+      "lastAccessed": 1780572123952,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "accessCount": 11,
+      "lastAccessed": 1780572315879,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "accessCount": 6,
+      "lastAccessed": 1780567471273,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "accessCount": 6,
+      "lastAccessed": 1780572244307,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "accessCount": 5,
+      "lastAccessed": 1780569248530,
+      "type": "file"
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/execution-command.ts",
+      "accessCount": 5,
+      "lastAccessed": 1780570674327,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "accessCount": 5,
+      "lastAccessed": 1780572395821,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-run-store.ts",
+      "accessCount": 4,
+      "lastAccessed": 1780567825633,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-ai-capabilities.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780565254921,
+      "type": "file"
+    },
+    {
+      "path": "docs/refactor/plan-execution-kernel.md",
+      "accessCount": 3,
+      "lastAccessed": 1780567430639,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/committed-state.ts",
+      "accessCount": 3,
+      "lastAccessed": 1780570521315,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/package.json",
+      "accessCount": 2,
+      "lastAccessed": 1780560735686,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/types/graph.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780560790325,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/types/execution.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780560811326,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/types/layers.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780560817150,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/types/runtime.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780560841465,
+      "type": "file"
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780561001625,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/graph-state.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780568325294,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-runtime-refs.ts",
+      "accessCount": 2,
+      "lastAccessed": 1780569891720,
+      "type": "file"
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780560645216,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.concurrency.bun.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780565856127,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.fixtures.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780567953547,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780568158029,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/submit-node-result.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780568241560,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780568325279,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/state-updates.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780568400226,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780568763993,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/resolve.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780569891690,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780569891750,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/facade/task-plan-execution.facade.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780569969834,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/status.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780570753261,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/work-block-store.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780570929686,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.bun.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780571916569,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/validate-command.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780571931853,
+      "type": "file"
+    },
+    {
+      "path": "packages/graph-runtime/src/validation.ts",
+      "accessCount": 1,
+      "lastAccessed": 1780571939678,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
