@@ -41,7 +41,7 @@ const MAX_IMPORTED_OCCURRENCES = 500;
 export type ExternalCalendarServiceOptions = {
   transport?: CalendarFeedTransport;
   now?: () => Date;
-  autoPlanTask?: (input: { taskId: string; accept?: boolean }) => void | Promise<void>;
+  autoPlanTask?: (input: { taskId: string; workBlockId?: string | null; accept?: boolean }) => void | Promise<void>;
 };
 
 type CalendarFetchOptions = {
@@ -221,6 +221,8 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
       return {
         events: events.map((event): ImportedCalendarEventSummary => ({
           id: event.id,
+          taskId: event.taskId,
+          workBlockId: event.workBlockId,
           calendarSourceId: event.calendarSourceId,
           sourceName: event.calendarSource.name,
           sourceColor: event.calendarSource.color,

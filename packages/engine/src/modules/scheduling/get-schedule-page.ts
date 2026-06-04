@@ -86,6 +86,84 @@ function mapProjectionItem(
   };
 }
 
+function mapWorkBlockItem(
+  block: Awaited<ReturnType<typeof db.workBlock.findMany>>[number] & {
+    task: {
+      id: string;
+      workspaceId: string;
+      parentTaskId: string | null;
+      title: string;
+      description: string | null;
+      status: string;
+      dueAt: Date | null;
+      workspace: { defaultRuntime: string };
+      priority: string;
+      executionRuntime: string;
+      executionConfig: unknown;
+      autoPlanGeneration: boolean;
+      autoExecute: boolean;
+      autoPlanGenerationTiming: string;
+      autoExecuteTiming: string;
+      kind: string;
+      recurrenceRule: string | null;
+      importedCalendarEvents: Array<{
+        id: string;
+        description: string | null;
+        calendarSource: { name: string; color: string };
+      }>;
+    };
+    importedCalendarEvent: {
+      id: string;
+      description: string | null;
+      calendarSource: { name: string; color: string };
+    } | null;
+  },
+) {
+  const importedEvent = block.importedCalendarEvent ?? block.task.importedCalendarEvents[0] ?? null;
+  const scheduleStatus = block.status === "Completed" ? "Completed" : "Scheduled";
+  return {
+    taskId: block.taskId,
+    workBlockId: block.id,
+    workspaceId: block.workspaceId,
+    parentTaskId: block.task.parentTaskId,
+    title: block.title,
+    description:
+      importedEvent && block.task.description === importedEvent.description
+        ? null
+        : block.task.description,
+    priority: block.task.priority,
+    persistedStatus: block.task.status,
+    displayState: block.status,
+    actionRequired: null,
+    approvalPendingCount: 0,
+    scheduleStatus,
+    scheduleSource: "system",
+    dueAt: block.task.dueAt,
+    scheduledStartAt: block.scheduledStartAt,
+    scheduledEndAt: block.scheduledEndAt,
+    latestRunStatus: null,
+    scheduleProposalCount: 0,
+    lastActivityAt: block.startedAt ?? block.task.dueAt,
+    autoPlanGeneration: block.task.autoPlanGeneration,
+    autoExecute: block.task.autoExecute,
+    autoPlanGenerationTiming: block.task.autoPlanGenerationTiming,
+    autoExecuteTiming: block.task.autoExecuteTiming,
+    kind: block.task.kind,
+    recurrenceRule: block.task.recurrenceRule,
+    sourceManaged: importedEvent
+      ? {
+          source: "external_calendar" as const,
+          eventId: importedEvent.id,
+          sourceName: importedEvent.calendarSource.name,
+          sourceColor: importedEvent.calendarSource.color,
+          description: importedEvent.description,
+          immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+        }
+      : null,
+    ...mapTaskRunnability(block.task),
+  };
+}
+
 function mapTaskRunnability(task: {
   workspace: { defaultRuntime: string };
   executionRuntime: string;
@@ -383,7 +461,7 @@ export async function getSchedulePage(workspaceId: string) {
       }
       planStatuses.set(
         item.taskId,
-        isTaskPlanGenerationRunning(item.taskId)
+        isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: null })
           ? "generating"
           : savedPlan?.status === "accepted"
             ? "accepted"
@@ -403,7 +481,7 @@ export async function getSchedulePage(workspaceId: string) {
   );
 
   const scheduled = topLevelItems
-    .filter((item) => item.kind !== "recurring" && item.scheduledStartAt && item.scheduledEndAt)
+    .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
     .map((item) => item);
 
   const unscheduled = topLevelItems
@@ -444,6 +522,11 @@ export async function getSchedulePage(workspaceId: string) {
     include: {
       task: {
         select: {
+          id: true,
+          workspaceId: true,
+          status: true,
+          dueAt: true,
+          workspace: { select: { defaultRuntime: true } },
           kind: true,
           title: true,
           description: true,
@@ -485,69 +568,32 @@ export async function getSchedulePage(workspaceId: string) {
     trigger: block.trigger,
   }));
 
-  const recurringWorkBlockItems: Array<
-    ReturnType<typeof mapProjectionItem> & { workBlockId: string }
-  > = [];
-  for (const block of workBlocks) {
-    if (block.task.kind !== "recurring") continue;
-    const task = block.task;
-    const importedEvent = block.importedCalendarEvent ?? null;
-    const executionRuntime = task.executionRuntime || workspace.defaultRuntime;
-    const runnability = deriveTaskRunnability({
-      executionRuntime,
-      executionConfig: task.executionConfig,
-    });
-
-    recurringWorkBlockItems.push({
-      taskId: block.taskId,
-      workBlockId: block.id,
-      workspaceId: block.workspaceId,
-      parentTaskId: task.parentTaskId,
-      title: task.title,
-      kind: "recurring" as const,
-      recurrenceRule: task.recurrenceRule,
-      description: importedEvent
-        ? ((task.description && task.description !== importedEvent.description) ? task.description : null)
-        : task.description,
-      priority: task.priority,
-      persistedStatus: "Scheduled",
-      displayState: null,
-      actionRequired: null,
-      approvalPendingCount: 0,
-      scheduleStatus: "Scheduled",
-      scheduleSource: block.trigger,
-      dueAt: null,
-      scheduledStartAt: block.scheduledStartAt,
-      scheduledEndAt: block.scheduledEndAt,
-      latestRunStatus: null,
-      scheduleProposalCount: 0,
-      lastActivityAt: null,
-      autoPlanGeneration: task.autoPlanGeneration,
-      autoExecute: task.autoExecute,
-      autoPlanGenerationTiming: task.autoPlanGenerationTiming,
-      autoExecuteTiming: task.autoExecuteTiming,
-      executionRuntime,
-      executionConfig: task.executionConfig,
-      isRunnable: runnability.isRunnable,
-      runnabilityState: runnability.state,
-      runnabilitySummary: runnability.summary,
-      sourceManaged: importedEvent
-        ? {
-            source: "external_calendar" as const,
-            eventId: importedEvent.id,
-            sourceName: importedEvent.calendarSource.name,
-            sourceColor: importedEvent.calendarSource.color,
-            description: importedEvent.description,
-            immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
-          }
-        : null,
-    });
-  }
-
-  const allScheduled = [
-    ...scheduled,
-    ...recurringWorkBlockItems,
-  ].sort((a, b) => (a.scheduledStartAt?.getTime() ?? 0) - (b.scheduledStartAt?.getTime() ?? 0));
+  const workBlockScheduledItemsBase = workBlocks
+    .map((block) => mapWorkBlockItem(block))
+    .filter((item) => item.parentTaskId === null && item.scheduledStartAt && item.scheduledEndAt);
+  const workBlockScheduledItems = await Promise.all(workBlockScheduledItemsBase.map(async (item) => {
+    const savedPlan = await getLatestTaskPlanReadModel(item.taskId, item.workBlockId ?? null);
+    const snapshot = savedPlan ? mapScheduleTaskPlanSnapshot(savedPlan) : null;
+    return {
+      ...item,
+      savedPlan: snapshot,
+      aiPlanGenerationStatus: isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: item.workBlockId ?? null })
+        ? "generating" as const
+        : savedPlan?.status === "accepted"
+          ? "accepted" as const
+          : savedPlan
+            ? "waiting_acceptance" as const
+            : "idle" as const,
+    };
+  }));
+  const workBlockScheduledKeys = new Set(
+    workBlockScheduledItems.map((item) => `${item.taskId}:${item.scheduledStartAt?.getTime() ?? ""}:${item.scheduledEndAt?.getTime() ?? ""}`),
+  );
+  const allScheduled = [...workBlockScheduledItems, ...scheduled.filter((item) => (
+    !workBlockScheduledKeys.has(`${item.taskId}:${item.scheduledStartAt?.getTime() ?? ""}:${item.scheduledEndAt?.getTime() ?? ""}`)
+  ))].sort(
+    (a, b) => (a.scheduledStartAt?.getTime() ?? 0) - (b.scheduledStartAt?.getTime() ?? 0),
+  );
 
   const planningSummary = buildPlanningSummary({
     scheduled: allScheduled,

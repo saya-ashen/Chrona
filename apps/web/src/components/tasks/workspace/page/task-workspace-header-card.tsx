@@ -13,6 +13,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { TaskData, TaskHeaderAction, TaskHeaderView } from "../model/task-workspace-types";
 
 function priorityTone(priority: string) {
@@ -60,6 +67,8 @@ function actionVariant(actionId: TaskHeaderAction["id"]) {
   return "secondary" as const;
 }
 
+type RecurrenceOccurrenceOption = NonNullable<TaskData["recurrenceOccurrences"]>[number];
+
 function formatOccurrenceWindow(start: string | null, end: string | null, locale: string) {
   if (!start) return null;
   const startDate = new Date(start);
@@ -73,6 +82,16 @@ function formatOccurrenceWindow(start: string | null, end: string | null, locale
 
   return endLabel ? `${dateLabel} ${startLabel}-${endLabel}` : `${dateLabel} ${startLabel}`;
 }
+
+function occurrenceValue(occurrence: RecurrenceOccurrenceOption) {
+  return occurrence.workBlockId ? `${occurrence.taskId}:${occurrence.workBlockId}` : occurrence.taskId;
+}
+
+function formatOccurrenceOption(occurrence: RecurrenceOccurrenceOption, locale: string) {
+  return formatOccurrenceWindow(occurrence.scheduledStartAt, occurrence.scheduledEndAt, locale)
+    ?? occurrence.title;
+}
+
 
 type TaskWorkspaceHeaderCardProps = {
   task: TaskData;
@@ -88,6 +107,7 @@ type TaskWorkspaceHeaderCardProps = {
     onClick: () => void;
   };
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
+  onSelectOccurrence: (occurrence: RecurrenceOccurrenceOption) => void;
   onEdit: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
@@ -104,6 +124,7 @@ export function TaskWorkspaceHeaderCard({
   workspaceStateGuidance,
   planAction,
   onAction,
+  onSelectOccurrence,
   onEdit,
   showDeleteConfirm,
   isDeleting,
@@ -118,6 +139,9 @@ export function TaskWorkspaceHeaderCard({
   const [pendingActionId, setPendingActionId] = useState<TaskHeaderAction["id"] | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const visibleActions = header.actions.filter((action) => action.id !== "more");
+  const recurrenceOccurrences = task.recurrenceOccurrences ?? [];
+  const currentOccurrence = recurrenceOccurrences.find((occurrence) => occurrence.isCurrent) ?? null;
+  const showOccurrenceSelector = recurrenceOccurrences.length > 1;
   const primaryStatusLabel = header.primaryStateLabel
     ?? (header.status === "approval-needed"
       ? copy.approvalNeeded
@@ -194,7 +218,32 @@ export function TaskWorkspaceHeaderCard({
             <Badge variant={priorityTone(task.priority)}>
               {task.priority}
             </Badge>
-            {occurrenceWindow ? (
+            {showOccurrenceSelector && currentOccurrence ? (
+              <Select
+                value={occurrenceValue(currentOccurrence)}
+                onValueChange={(value) => {
+                  const selected = recurrenceOccurrences.find((occurrence) => occurrenceValue(occurrence) === value);
+                  if (selected) onSelectOccurrence(selected);
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="h-6 min-w-[11rem] rounded-full border-border/70 bg-background/70 px-2 py-0 text-xs"
+                  aria-label={copy.occurrenceSelectorLabel ?? "Select occurrence"}
+                >
+                  <CalendarDays className="size-3 text-muted-foreground" />
+                  <span className="font-medium">{copy.occurrenceWindowLabel ?? "Occurrence"}</span>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="start">
+                  {recurrenceOccurrences.map((occurrence) => (
+                    <SelectItem key={occurrenceValue(occurrence)} value={occurrenceValue(occurrence)}>
+                      {formatOccurrenceOption(occurrence, locale)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : occurrenceWindow ? (
               <Badge
                 variant="outline"
                 className="gap-1"

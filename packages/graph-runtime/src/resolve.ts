@@ -307,11 +307,8 @@ function isFailedSubmissionNodeResult(result: NodeResult): boolean {
 
 function nodeResultOutputText(output: NonNullable<NodeResult["outputs"]>[number]): string | undefined {
   switch (output.kind) {
-    case "text":
     case "markdown":
       return output.content;
-    case "command":
-      return [output.stdout, output.stderr].filter(Boolean).join("\n");
     case "json":
       return stringifyJsonOutput(output.value);
     default:

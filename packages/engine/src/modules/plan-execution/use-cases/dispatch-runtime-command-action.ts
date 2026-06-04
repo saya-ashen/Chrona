@@ -11,7 +11,7 @@ import type {
 } from "../types";
 import type { ExecutionLeaseScope } from "../persistence/execution-lease-store";
 import { ensurePlanMainSession } from "../plan-state-store";
-import { ensureExecutionSession } from "../persistence/execution-session-store";
+import { ensureExecutionSession, getActiveExecutionWorkBlockId } from "../persistence/execution-session-store";
 import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
 import { buildPlanGraphCommandEnvelope } from "../runtime/command-envelope";
 
@@ -123,7 +123,8 @@ export async function dispatchRuntimeCommandAction(input: {
   withExecutionLease?: LeaseAdvance;
   control?: PlanExecutionControl;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const workBlockId = await getActiveExecutionWorkBlockId(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, workBlockId);
   if (!runtime) {
     return noPlanResponse({
       taskId: input.taskId,

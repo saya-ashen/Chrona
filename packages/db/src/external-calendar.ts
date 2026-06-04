@@ -47,6 +47,7 @@ type ImportedCalendarSyncOptions = {
 
 export type ImportedCalendarAutomationRequest = {
   taskId: string;
+  workBlockId: string | null;
   accept: boolean;
 };
 
@@ -127,13 +128,18 @@ export async function replaceImportedCalendarEvents(
       where: { calendarSourceId },
       orderBy: { updatedAt: "desc" },
     });
+    const previouslyLinkedTaskIds = new Set(
+      existingEvents.map((event) => event.taskId).filter((taskId): taskId is string => Boolean(taskId)),
+    );
     const existingByIdentity = new Map<string, ImportedCalendarEvent>();
+    const seriesTaskIds = new Map<string, string>();
     for (const event of existingEvents) {
       const identity = importedCalendarEventIdentity(event);
       if (!existingByIdentity.has(identity)) existingByIdentity.set(identity, event);
+      const seriesKey = importedCalendarSeriesKey(event);
+      if (seriesKey && event.taskId && !seriesTaskIds.has(seriesKey)) seriesTaskIds.set(seriesKey, event.taskId);
     }
 
-    const grouped = new Map<string, ImportedCalendarEvent[]>();
     const syncedEventIds = new Set<string>();
     for (const event of events) {
       const existingByStableIdentity = existingByIdentity.get(importedCalendarEventIdentity(event));
@@ -172,9 +178,14 @@ export async function replaceImportedCalendarEvents(
           },
         });
       syncedEventIds.add(importedEvent.id);
-      const group = grouped.get(importedEvent.externalUid) ?? [];
-      group.push(importedEvent);
-      grouped.set(importedEvent.externalUid, group);
+      const automationRequest = await syncImportedCalendarOccurrence(
+        tx,
+        importedEvent,
+        seriesTaskIds,
+        workspace.defaultRuntime,
+        syncOptions,
+      );
+      if (automationRequest) automationRequests.push(automationRequest);
       importedCount += 1;
     }
 
@@ -186,19 +197,24 @@ export async function replaceImportedCalendarEvents(
           where: { id: event.id },
           data: { status: "cancelled" },
         });
-      const group = grouped.get(cancelledEvent.externalUid) ?? [];
-      group.push(cancelledEvent);
-      grouped.set(cancelledEvent.externalUid, group);
-    }
-
-    for (const occurrences of grouped.values()) {
-      const automationRequest = await syncImportedCalendarSeries(
+      await syncImportedCalendarOccurrence(
         tx,
-        occurrences,
+        cancelledEvent,
+        seriesTaskIds,
         workspace.defaultRuntime,
         syncOptions,
       );
-      if (automationRequest) automationRequests.push(automationRequest);
+    }
+
+    const stillLinkedTaskIds = new Set(
+      (await tx.importedCalendarEvent.findMany({
+        where: { calendarSourceId, taskId: { not: null } },
+        select: { taskId: true },
+      })).map((event) => event.taskId).filter((taskId): taskId is string => Boolean(taskId)),
+    );
+    const orphanTaskIds = [...previouslyLinkedTaskIds].filter((taskId) => !stillLinkedTaskIds.has(taskId));
+    if (orphanTaskIds.length > 0) {
+      await deleteCalendarOrphanTasks(tx, orphanTaskIds);
     }
   });
   return { importedCount, automationRequests };
@@ -210,133 +226,184 @@ function importedCalendarEventIdentity(
   return [event.externalUid, event.recurrenceId ?? "single"].join(":");
 }
 
-async function syncImportedCalendarSeries(
+function importedCalendarSeriesKey(event: Pick<ImportedCalendarEvent, "externalUid" | "recurrenceRule">) {
+  return event.recurrenceRule ? event.externalUid : null;
+}
+
+async function deleteCalendarOrphanTasks(tx: TransactionClient, taskIds: string[]) {
+  await tx.rawEventLog.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.event.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.taskTimelineItem.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.taskPlanProviderRun.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.taskPlanRun.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.taskPlan.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.run.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.taskSession.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.executionSession.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.schedulerEvent.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.scheduleProposal.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.workBlock.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.taskProjection.deleteMany({ where: { taskId: { in: taskIds } } });
+  await tx.task.deleteMany({ where: { id: { in: taskIds } } });
+}
+
+async function syncImportedCalendarOccurrence(
   tx: TransactionClient,
-  occurrences: ImportedCalendarEvent[],
+  occurrence: ImportedCalendarEvent,
+  seriesTaskIds: Map<string, string>,
   defaultRuntime: string,
   options: ImportedCalendarSyncOptions,
 ): Promise<ImportedCalendarAutomationRequest | null> {
-  const sorted = [...occurrences].sort(
-    (a, b) => a.startsAt.getTime() - b.startsAt.getTime(),
-  );
-  const recurrenceRule = sorted.find((o) => o.recurrenceRule)?.recurrenceRule ?? null;
-  const isRecurring = recurrenceRule !== null || sorted.length > 1;
-  const externalUid = sorted[0].externalUid;
-  const workspaceId = sorted[0].workspaceId;
-
-  // The active occurrence (next upcoming, else most recent non-cancelled) drives
-  // the series task status and the single projection slot shown in lists.
-  const activeOccurrence =
-    sorted.find(
-      (o) => o.startsAt.getTime() >= options.now.getTime() && o.status !== "cancelled",
-    ) ??
-    [...sorted].reverse().find((o) => o.status !== "cancelled") ??
-    sorted[sorted.length - 1];
-  const activeStatus = getImportedCalendarTaskStatus(activeOccurrence, options);
-
-  let automationRequest: ImportedCalendarAutomationRequest | null = null;
-  const existingTaskId = sorted.find((o) => o.taskId)?.taskId ?? null;
-  let task = existingTaskId
-    ? await tx.task.findUnique({ where: { id: existingTaskId } })
+  const syncedStatus = getImportedCalendarTaskStatus(occurrence, options);
+  const workspaceId = occurrence.workspaceId;
+  const isRecurring = Boolean(occurrence.recurrenceRule || occurrence.recurrenceId);
+  const seriesKey = importedCalendarSeriesKey(occurrence);
+  const mappedSeriesTaskId = seriesKey ? seriesTaskIds.get(seriesKey) ?? null : null;
+  const seriesTaskId = isRecurring
+    ? mappedSeriesTaskId ?? (await tx.importedCalendarEvent.findFirst({
+      where: {
+        calendarSourceId: occurrence.calendarSourceId,
+        externalUid: occurrence.externalUid,
+        taskId: { not: null },
+      },
+      orderBy: { startsAt: "asc" },
+      select: { taskId: true },
+    }))?.taskId ?? null
     : null;
-
-  const seriesData = {
-    title: activeOccurrence.title,
-    status: activeStatus,
-    kind: isRecurring ? ("recurring" as const) : ("single" as const),
-    recurrenceRule,
-    seriesExternalUid: isRecurring ? externalUid : null,
-  };
+  let task = (seriesTaskId ?? occurrence.taskId)
+    ? await tx.task.findUnique({ where: { id: (seriesTaskId ?? occurrence.taskId) as string } })
+    : null;
+  let automationRequest: ImportedCalendarAutomationRequest | null = null;
 
   if (task) {
-    task = await tx.task.update({ where: { id: task.id }, data: seriesData });
+    task = await tx.task.update({
+      where: { id: task.id },
+      data: {
+        title: occurrence.title,
+        status: syncedStatus,
+        kind: isRecurring ? "recurring" : "single",
+        recurrenceRule: occurrence.recurrenceRule,
+        recurrenceWindowUntil: isRecurring ? occurrence.startsAt : null,
+        seriesExternalUid: null,
+      },
+    });
   } else {
-    const automation = getImportedCalendarTaskAutomation(activeOccurrence, activeStatus, options);
+    const automation = getImportedCalendarTaskAutomation(occurrence, syncedStatus, options);
     task = await tx.task.create({
       data: {
         workspaceId,
+        title: occurrence.title,
         description: null,
+        status: syncedStatus,
+        kind: isRecurring ? "recurring" : "single",
+        recurrenceRule: occurrence.recurrenceRule,
+        recurrenceAnchorStartAt: isRecurring ? occurrence.startsAt : null,
+        recurrenceAnchorEndAt: isRecurring ? occurrence.endsAt : null,
+        recurrenceWindowUntil: isRecurring ? occurrence.startsAt : null,
+        seriesExternalUid: null,
         executionRuntime: defaultRuntime,
         executionConfig: {},
         priority: "Medium",
         autoPlanGeneration: automation.autoPlanGeneration,
         autoExecute: automation.autoExecute,
-        ...seriesData,
+        autoPlanGenerationTiming: "at_start",
+        autoExecuteTiming: "at_start",
       },
     });
     if (automation.shouldStartPlan) {
-      automationRequest = { taskId: task.id, accept: automation.autoExecute };
+      automationRequest = { taskId: task.id, workBlockId: null, accept: automation.autoExecute };
     }
   }
 
-  // One work block per occurrence; each imported occurrence owns its work block.
-  for (const occurrence of sorted) {
-    const occStatus = getImportedCalendarTaskStatus(occurrence, options);
-    const workBlockStatus: WorkBlockStatus =
-      occStatus === "Cancelled"
-        ? "Cancelled"
-        : occStatus === "Completed"
-          ? "Completed"
-          : "Scheduled";
-    const completedAt = occStatus === "Completed" ? occurrence.endsAt : null;
-    const blockData = {
-      title: occurrence.title,
-      status: workBlockStatus,
-      scheduledStartAt: occurrence.startsAt,
-      scheduledEndAt: occurrence.endsAt,
-      completedAt,
-      trigger: "manual" as const,
-    };
+  if (seriesKey) seriesTaskIds.set(seriesKey, task.id);
+  if (isRecurring) {
+    await tx.workBlock.deleteMany({ where: { taskId: task.id, recurrenceKey: null } });
+  }
 
-    if (occurrence.workBlockId) {
+
+  const workBlockStatus: WorkBlockStatus =
+    syncedStatus === "Cancelled"
+      ? "Cancelled"
+      : syncedStatus === "Completed"
+        ? "Completed"
+        : "Scheduled";
+  const completedAt = syncedStatus === "Completed" ? occurrence.endsAt : null;
+  const blockData = {
+    recurrenceKey: isRecurring ? occurrence.startsAt.toISOString() : null,
+    title: occurrence.title,
+    status: workBlockStatus,
+    scheduledStartAt: occurrence.startsAt,
+    scheduledEndAt: occurrence.endsAt,
+    completedAt,
+    trigger: "manual" as const,
+  };
+
+  let workBlock: { id: string };
+  if (isRecurring) {
+    workBlock = await tx.workBlock.upsert({
+      where: {
+        taskId_recurrenceKey: {
+          taskId: task.id,
+          recurrenceKey: occurrence.startsAt.toISOString(),
+        },
+      },
+      create: { workspaceId, taskId: task.id, ...blockData },
+      update: { taskId: task.id, ...blockData },
+      select: { id: true },
+    });
+  } else if (occurrence.workBlockId) {
+    const existingBlock = await tx.workBlock.findUnique({
+      where: { id: occurrence.workBlockId },
+      select: { id: true },
+    });
+    workBlock = existingBlock ?? await tx.workBlock.create({
+      data: { workspaceId, taskId: task.id, ...blockData },
+      select: { id: true },
+    });
+    if (existingBlock) {
       await tx.workBlock.update({
-        where: { id: occurrence.workBlockId },
-        data: { ...blockData, taskId: task.id },
-      });
-      if (occurrence.taskId !== task.id) {
-        await tx.importedCalendarEvent.update({
-          where: { id: occurrence.id },
-          data: { taskId: task.id },
-        });
-      }
-    } else {
-      const workBlock = await tx.workBlock.create({
-        data: { workspaceId, taskId: task.id, ...blockData },
-      });
-      await tx.importedCalendarEvent.update({
-        where: { id: occurrence.id },
-        data: { taskId: task.id, workBlockId: workBlock.id },
+        where: { id: existingBlock.id },
+        data: { taskId: task.id, ...blockData },
       });
     }
-  }
-
-  // The projection tracks the active occurrence only.
-  if (activeStatus === "Cancelled") {
-    await upsertImportedCalendarTaskProjection(
-      tx,
-      task.id,
-      workspaceId,
-      activeStatus,
-      null,
-      null,
-      null,
-      null,
-    );
   } else {
-    await upsertImportedCalendarTaskProjection(
-      tx,
-      task.id,
-      workspaceId,
-      task.status,
-      activeOccurrence.startsAt,
-      activeOccurrence.endsAt,
-      activeStatus === "Completed" ? "Completed" : "Scheduled",
-      "system",
-    );
+    workBlock = await tx.workBlock.create({
+      data: { workspaceId, taskId: task.id, ...blockData },
+      select: { id: true },
+    });
   }
 
+  await tx.importedCalendarEvent.update({
+    where: { id: occurrence.id },
+    data: { taskId: task.id, workBlockId: workBlock.id },
+  });
+  await upsertImportedCalendarTaskProjectionForOccurrence(tx, task.id, workspaceId, syncedStatus, occurrence);
 
-  return automationRequest;
+  return automationRequest ? { ...automationRequest, workBlockId: workBlock.id } : null;
+}
+
+async function upsertImportedCalendarTaskProjectionForOccurrence(
+  tx: TransactionClient,
+  taskId: string,
+  workspaceId: string,
+  syncedStatus: TaskStatus,
+  occurrence: ImportedCalendarEvent,
+) {
+  if (syncedStatus === "Cancelled") {
+    await upsertImportedCalendarTaskProjection(tx, taskId, workspaceId, syncedStatus, null, null, null, null);
+    return;
+  }
+
+  await upsertImportedCalendarTaskProjection(
+    tx,
+    taskId,
+    workspaceId,
+    syncedStatus,
+    occurrence.startsAt,
+    occurrence.endsAt,
+    syncedStatus === "Completed" ? "Completed" : "Scheduled",
+    "system",
+  );
 }
 
 function getImportedCalendarTaskAutomation(
@@ -424,12 +491,10 @@ export function listImportedCalendarEventsInRange(
     where: {
       workspaceId,
       ...(sourceId ? { calendarSourceId: sourceId } : {}),
-      task: { kind: "recurring" },
       status: { not: "cancelled" },
       startsAt: { lt: to },
       endsAt: { gt: from },
       calendarSource: { lifecycleState: "active" },
-      workBlockId: null,
     },
     include: { calendarSource: true },
     orderBy: { startsAt: "asc" },

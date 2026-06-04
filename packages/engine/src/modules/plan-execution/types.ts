@@ -59,6 +59,7 @@ export type PlanExecutionControl = {
 
 export type EngineRuntimeContext = {
   taskId: string;
+  workBlockId?: string | null;
   planId: string;
   mainSession: { id: string; taskId: string; sessionKey: string };
   control?: PlanExecutionControl;
@@ -103,6 +104,13 @@ export type AdvanceRuntimeCommand =
       replaceStatus?: NonNullable<NodeResult["status"]>;
     }
   | { type: "resume_after_unblock"; nodeId?: string }
+  | {
+      type: "submit_node_output";
+      nodeId?: string;
+      outputs: unknown;
+      mode?: "append" | "replace";
+      summary?: string;
+    }
   | {
       type: "complete_manual_node";
       nodeId?: string;

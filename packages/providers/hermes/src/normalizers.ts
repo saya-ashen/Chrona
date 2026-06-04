@@ -1,4 +1,6 @@
 import type {
+  ProviderApprovalChoice,
+  ProviderApprovalRequest,
   ProviderCapabilities,
   ProviderRunEvent,
   ProviderRunSnapshot,
@@ -13,6 +15,12 @@ const defaultCapabilities: ProviderCapabilities = {
   supportsCancellation: true,
   supportsToolCalls: true,
   supportsPreviousResponse: false,
+  approval: {
+    supported: true,
+    choices: ["approve_once", "approve_session", "approve_always", "deny"],
+    scopes: ["once", "session", "always"],
+    resolveAll: true,
+  },
 };
 
 export function mapCapabilities(raw: unknown, fallbackReason?: string): ProviderCapabilities {
@@ -153,11 +161,7 @@ export function mapHermesEvent(
       return {
         ...metadata,
         type: "approval_required",
-        approval: {
-          runId: metadata.runId ?? runId,
-          choices: body.choices,
-          raw: event,
-        },
+        approval: normalizeHermesApproval(event, metadata.runId ?? runId, metadata.sessionId),
         raw,
       };
     case "run.completed": {
@@ -264,4 +268,133 @@ export function stringValue(value: unknown): string | undefined {
 
 function numberValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeHermesApproval(
+  event: unknown,
+  runId: string,
+  sessionId?: string,
+): ProviderApprovalRequest {
+  const body = asRecord(event);
+  const providerKind = stringValue(body.pattern_key) ?? "provider_action";
+  const command = stringValue(body.command);
+  const description = stringValue(body.description);
+  const choices = mapHermesApprovalChoices(body.choices);
+  const kind = hermesApprovalKind(providerKind);
+  const title = hermesApprovalTitle(providerKind);
+
+  return {
+    provider: "hermes",
+    runId,
+    nativeRunId: stringValue(body.run_id),
+    sessionId,
+    kind,
+    providerKind,
+    title,
+    summary: hermesApprovalSummary(providerKind, command),
+    description,
+    riskLevel: hermesApprovalRisk(providerKind),
+    subject: command
+      ? {
+          type: "command",
+          label: providerKind,
+          preview: command,
+          language: detectApprovalCommandLanguage(command),
+        }
+      : undefined,
+    choices,
+    defaultChoice: choices.includes("approve_once") ? "approve_once" : undefined,
+    recommendedChoice: choices.includes("approve_once") ? "approve_once" : undefined,
+    scopePolicy: {
+      supportsOnce: choices.includes("approve_once"),
+      supportsSession: choices.includes("approve_session"),
+      supportsAlways: choices.includes("approve_always"),
+      supportsResolveAll: true,
+    },
+    raw: event,
+  };
+}
+
+function mapHermesApprovalChoices(value: unknown): ProviderApprovalChoice[] {
+  const source = Array.isArray(value) ? value : ["once", "session", "always", "deny"];
+  const choices: ProviderApprovalChoice[] = [];
+  for (const item of source) {
+    switch (stringValue(item)) {
+      case "once":
+      case "approve":
+      case "approved":
+      case "allow":
+        choices.push("approve_once");
+        break;
+      case "session":
+        choices.push("approve_session");
+        break;
+      case "always":
+        choices.push("approve_always");
+        break;
+      case "deny":
+        choices.push("deny");
+        break;
+    }
+  }
+  return choices.length > 0 ? Array.from(new Set(choices)) : ["approve_once", "deny"];
+}
+
+function hermesApprovalKind(providerKind: string): string {
+  switch (providerKind) {
+    case "execute_code":
+      return "tool_execution";
+    case "shell_command":
+      return "command_execution";
+    case "network_access":
+      return "network_access";
+    case "file_write":
+      return "file_write";
+    default:
+      return "provider_action";
+  }
+}
+
+function hermesApprovalTitle(providerKind: string): string {
+  switch (providerKind) {
+    case "execute_code":
+      return "Approve code execution";
+    case "shell_command":
+      return "Approve shell command";
+    case "network_access":
+      return "Approve network access";
+    case "file_write":
+      return "Approve file write";
+    default:
+      return "Approve provider action";
+  }
+}
+
+function hermesApprovalSummary(providerKind: string, command?: string): string {
+  const title = hermesApprovalTitle(providerKind);
+  if (!command) {
+    return title;
+  }
+  const firstLine = command.split("\n", 1)[0]?.trim();
+  return firstLine ? `${title}: ${firstLine}` : title;
+}
+
+function hermesApprovalRisk(providerKind: string): ProviderApprovalRequest["riskLevel"] {
+  switch (providerKind) {
+    case "execute_code":
+    case "shell_command":
+      return "high";
+    case "network_access":
+    case "file_write":
+      return "medium";
+    default:
+      return "unknown";
+  }
+}
+
+function detectApprovalCommandLanguage(command: string): string | undefined {
+  if (command.startsWith("execute_code <<'PY'") || command.startsWith("execute_code <<\"PY\"")) {
+    return "python";
+  }
+  return undefined;
 }

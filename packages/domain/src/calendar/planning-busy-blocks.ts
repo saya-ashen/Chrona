@@ -31,7 +31,7 @@ export function projectPlanningBusyBlocks({
   scheduledBlocks?: ScheduledPlanningBlock[];
 }): PlanningBusyBlock[] {
   return events
-    .filter((event) => event.status !== "cancelled")
+    .filter((event) => event.status !== "cancelled" && !event.workBlockId && !event.taskId)
     .map((event) => {
       const startsAt = new Date(event.startsAt);
       const endsAt = new Date(event.endsAt);

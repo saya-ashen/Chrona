@@ -125,9 +125,41 @@ function terminalNodeResultFromSnapshot(input: {
         }),
         evidence: input.evidence,
       };
+    case "chrona_node_complete":
+    case "chrona_wait_complete":
+      return {
+        status: "done",
+        summary:
+          input.summary ||
+          `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
+        evidence: input.evidence,
+        output: outputFromStructuredPayload({ structured: input.structured, fallback: undefined }),
+      };
     default:
       return undefined;
   }
+}
+
+function missingTerminalToolResult(input: {
+  invocation: AiRuntimeInvocation;
+  node: EffectivePlanNode;
+  evidence: NodeExecutionEvidence;
+  summary?: string;
+}): NodeExecutionResult {
+  const message = `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed without a Chrona terminal result action for node ${input.node.id}`;
+  return {
+    status: "failed",
+    error: input.summary ? `${message}: ${input.summary}` : message,
+    evidence: input.evidence,
+    details: buildFailureDetails({
+      node: input.node,
+      runtimeName: input.evidence.runtimeName ?? "unknown",
+      runtimeRunRef: input.invocation.runtimeRunRef,
+      runId: input.invocation.runId,
+      runtimeSessionKey: input.invocation.runtimeSessionKey,
+      message,
+    }),
+  };
 }
 
 function conditionSelectionResultFromSnapshot(input: {
@@ -266,14 +298,12 @@ export async function runTaskNodeFeature(
         })
       : undefined;
     const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed"
-      ? {
-          status: "done",
-          summary:
-            summary ||
-            `Runtime run ${invocation.runtimeRunRef ?? invocation.runId} completed`,
+      ? missingTerminalToolResult({
+          invocation,
+          node: input.node,
           evidence,
-          output: outputFromStructuredPayload({ structured, fallback: output }),
-        }
+          summary,
+        })
       : {
           status: "started",
           summary:
@@ -351,6 +381,10 @@ function errorSummaryFromNodeResult(result: NodeExecutionResult): string | null 
   }
 }
 
+function defaultTerminalToolName(nodeType: EffectivePlanNode["type"]): string {
+  return nodeType === "task" ? "chrona_node_complete" : NODE_RUNTIME_TERMINAL_TOOLS[nodeType][0];
+}
+
 export async function executeTaskNodeCapability(
   input: NodeAiCapabilityInput,
 ): Promise<NodeExecutionResult> {
@@ -363,7 +397,7 @@ export async function executeTaskNodeCapability(
         : "execute_task_node",
     instructions: runtime.instructions,
     inputText: JSON.stringify(runtime.runtimeInput, null, 2),
-    terminalToolName: NODE_RUNTIME_TERMINAL_TOOLS[input.node.type][0],
+    terminalToolName: defaultTerminalToolName(input.node.type),
   };
 
   return runTaskNodeFeature({

@@ -55,6 +55,18 @@ export async function ensureExecutionSession(input: {
 
 export type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
 
+export async function getActiveExecutionWorkBlockId(taskId: string): Promise<string | null> {
+  const session = await db.executionSession.findFirst({
+    where: {
+      taskId,
+      status: { in: ["Active", "Paused"] },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: { workBlockId: true },
+  });
+  return session?.workBlockId ?? null;
+}
+
 export async function setExecutionSessionState(input: {
   sessionId: string;
   status: "Active" | "Paused" | "Completed" | "Abandoned";

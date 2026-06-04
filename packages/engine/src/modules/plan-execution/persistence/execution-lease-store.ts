@@ -12,6 +12,7 @@ export type ExecutionLease = {
 
 export async function acquireExecutionLease(input: {
   taskId: string;
+  workBlockId?: string | null;
   planId: string;
   ownerId: string;
   scope: ExecutionLeaseScope;
@@ -20,8 +21,8 @@ export async function acquireExecutionLease(input: {
 }): Promise<ExecutionLease | null> {
   const now = input.now ?? new Date();
   const leaseUntil = new Date(now.getTime() + (input.leaseMs ?? 30_000));
-  const existing = await db.taskPlanRun.findUnique({
-    where: { taskId_planId: { taskId: input.taskId, planId: input.planId } },
+  const existing = await db.taskPlanRun.findFirst({
+    where: { taskId: input.taskId, planId: input.planId, workBlockId: input.workBlockId ?? null },
     select: {
       id: true,
       executionOwnerId: true,

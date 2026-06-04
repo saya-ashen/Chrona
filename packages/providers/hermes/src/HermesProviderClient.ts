@@ -5,11 +5,14 @@ import type {
   ExistingRunStreamInput,
   GetRunInput,
   HealthCheckInput,
+  ProviderApprovalChoice,
+  ProviderApprovalResolution,
   ProviderCapabilities,
   ProviderHealth,
   ProviderRunEvent,
   ProviderRunRef,
   ProviderRunSnapshot,
+  ResolveProviderApprovalInput,
   StartRunInput,
   StreamRunInput,
 } from "@chrona/providers-foundation";
@@ -325,6 +328,35 @@ export class HermesProviderClient implements AgentProviderClient {
     return snapshot;
   }
 
+  async resolveApproval(
+    input: ResolveProviderApprovalInput,
+  ): Promise<ProviderApprovalResolution> {
+    const response = await this.http.request(
+      `/v1/runs/${encodeURIComponent(input.nativeRunId ?? input.runId)}/approval`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          choice: toHermesApprovalChoice(input.choice),
+          resolve_all: input.resolveAll === true,
+        }),
+        signal: input.signal,
+      },
+    );
+    const raw = asRecord(await ensureHermesOk(response, "resolve approval"));
+    const resolved = typeof raw.resolved === "number" && Number.isInteger(raw.resolved)
+      ? Math.max(0, raw.resolved)
+      : 0;
+    return {
+      provider: this.provider,
+      runId: input.runId,
+      nativeRunId: input.nativeRunId,
+      choice: input.choice,
+      resolved,
+      status: resolved > 0 ? "resolved" : "not_pending",
+      raw,
+    };
+  }
+
   async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
     const response = await this.http.request(
       `/v1/runs/${encodeURIComponent(input.runId)}/stop`,
@@ -341,6 +373,19 @@ export class HermesProviderClient implements AgentProviderClient {
     return this.replayDirectory
       ? replayPathForRun(this.replayDirectory, runId)
       : undefined;
+  }
+}
+
+function toHermesApprovalChoice(choice: ProviderApprovalChoice): string {
+  switch (choice) {
+    case "approve_once":
+      return "once";
+    case "approve_session":
+      return "session";
+    case "approve_always":
+      return "always";
+    case "deny":
+      return "deny";
   }
 }
 

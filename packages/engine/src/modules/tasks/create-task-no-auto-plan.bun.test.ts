@@ -8,6 +8,7 @@ mock.module("@/modules/plans/auto-generate-task-plan", () => ({
 }));
 
 import { createTask } from "@/modules/tasks/create-task";
+import { updateTask } from "@/modules/tasks/update-task";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -69,7 +70,7 @@ describe("createTask auto plan generation", () => {
       executionConfig: { prompt: "Do it" },
     });
 
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, accept: true });
+    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, workBlockId: null, accept: true });
   });
 
   it("starts draft plan generation when only auto-plan is enabled", async () => {
@@ -94,7 +95,7 @@ describe("createTask auto plan generation", () => {
     expect(result.autoExecute).toBe(false);
     expect(persisted.autoPlanGeneration).toBe(true);
     expect(persisted.autoExecute).toBe(false);
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, accept: false });
+    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, workBlockId: null, accept: false });
   });
 
   it("persists and returns the explicit task auto-execute choice", async () => {
@@ -133,6 +134,68 @@ describe("createTask auto plan generation", () => {
     expect(persistedById.get(disabled.taskId)?.autoPlanGeneration).toBe(false);
     expect(persistedById.get(disabled.taskId)?.autoExecute).toBe(false);
     expect(autoPlanGenerationMock).toHaveBeenCalledTimes(1);
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: enabled.taskId, accept: true });
+    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: enabled.taskId, workBlockId: null, accept: true });
+  });
+
+
+  it("keeps one task entry when workspace edit enables recurrence", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Workspace recurrence edit", status: "Active", defaultRuntime: "hermes" },
+    });
+    const result = await createTask({
+      workspaceId: workspace.id,
+      title: "Review metrics",
+      executionRuntime: "hermes",
+      executionConfig: { prompt: "Review" },
+    });
+
+    await updateTask({
+      taskId: result.taskId,
+      recurrenceRule: "FREQ=DAILY;COUNT=3",
+      recurrenceAnchorStartAt: "2026-06-01T09:00:00.000Z",
+      recurrenceAnchorEndAt: "2026-06-01T10:00:00.000Z",
+    });
+
+    const tasks = await db.task.findMany({
+      where: { workspaceId: workspace.id },
+      include: { workBlocks: { orderBy: { scheduledStartAt: "asc" } } },
+    });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.kind).toBe("recurring");
+    expect(tasks[0]?.seriesExternalUid).toBeNull();
+    expect(tasks[0]?.recurrenceRule).toBe("FREQ=DAILY;COUNT=3");
+    expect(tasks[0]?.workBlocks.map((block) => block.recurrenceKey)).toEqual([
+      "2026-06-01T09:00:00.000Z",
+      "2026-06-02T09:00:00.000Z",
+      "2026-06-03T09:00:00.000Z",
+    ]);
+  });
+
+  it("cancels open work blocks when a recurring task is cancelled", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Cancel recurring workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const result = await createTask({
+      workspaceId: workspace.id,
+      title: "Review trends",
+      recurrenceRule: "FREQ=DAILY;COUNT=3",
+      recurrenceAnchorStartAt: "2026-06-01T09:00:00.000Z",
+      recurrenceAnchorEndAt: "2026-06-01T10:00:00.000Z",
+      executionRuntime: "hermes",
+      executionConfig: { prompt: "Review" },
+    });
+
+    await updateTask({ taskId: result.taskId, status: "Cancelled" });
+
+    const rootBlocks = await db.workBlock.findMany({
+      where: { taskId: result.taskId },
+      select: { status: true, completedAt: true },
+    });
+    const taskCount = await db.task.count({ where: { workspaceId: workspace.id } });
+
+    expect(taskCount).toBe(1);
+    expect(rootBlocks).toHaveLength(3);
+    expect(rootBlocks.every((block) => block.status === "Cancelled")).toBe(true);
+    expect(rootBlocks.every((block) => block.completedAt instanceof Date)).toBe(true);
   });
 });

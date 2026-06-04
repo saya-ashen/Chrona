@@ -2,11 +2,15 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
+import { db } from "@chrona/db";
 import {
   checkpointActionBodySchema,
   checkpointActionParamSchema,
   executionActionBodySchema,
   executionActionParamSchema,
+  providerApprovalListQuerySchema,
+  providerApprovalResolveBodySchema,
+  providerApprovalResolveParamSchema,
 } from "@chrona/contracts/api";
 import type { PlanExecutionSSEEvent } from "@chrona/contracts";
 import type { EffectivePlanGraph } from "@chrona/contracts/ai";
@@ -61,7 +65,8 @@ export function createExecutionRoutes(engine: ChronaEngine) {
     async (c) => {
       try {
         const { taskId } = c.req.valid("param");
-        const result = await engine.tasks.execution.current({ taskId });
+        const workBlockId = c.req.query("workBlockId") || null;
+        const result = await engine.tasks.execution.current({ taskId, workBlockId });
         return c.json(result);
       } catch (cause) {
         const httpError = toHttpError(cause);
@@ -208,5 +213,135 @@ export function createExecutionRoutes(engine: ChronaEngine) {
         return error(c, cause instanceof Error ? cause.message : "Failed to submit checkpoint action", 500);
       }
     },
+  ).get(
+    "/tasks/:taskId/provider-approvals",
+    zValidator("param", executionActionParamSchema),
+    zValidator("query", providerApprovalListQuerySchema),
+    async (c) => {
+      try {
+        const { taskId } = c.req.valid("param");
+        const { status = "pending" } = c.req.valid("query");
+        const approvals = await db.taskPlanProviderApproval.findMany({
+          where: {
+            taskId,
+            ...(status === "all" ? {} : { status }),
+          },
+          orderBy: { requestedAt: "desc" },
+        });
+        return c.json({ approvals: approvals.map(toApprovalReadModel) });
+      } catch (cause) {
+        const httpError = toHttpError(cause);
+        if (httpError) {
+          return error(c, httpError.message, httpError.status);
+        }
+        return error(c, cause instanceof Error ? cause.message : "Failed to load provider approvals", 500);
+      }
+    },
+  ).post(
+    "/tasks/:taskId/provider-approvals/:approvalId/resolve",
+    zValidator("param", providerApprovalResolveParamSchema),
+    zValidator("json", providerApprovalResolveBodySchema),
+    async (c) => {
+      try {
+        const { taskId, approvalId } = c.req.valid("param");
+        const body = c.req.valid("json");
+        const approval = await db.taskPlanProviderApproval.findFirst({
+          where: { id: approvalId, taskId },
+          include: { providerRun: true },
+        });
+        if (!approval) {
+          return error(c, "Provider approval not found", 404);
+        }
+        if (approval.status !== "pending") {
+          return c.json({
+            approval: toApprovalReadModel(approval),
+            provider: approval.provider,
+            runId: approval.nativeRunId ?? approval.providerRun.providerRunRef ?? approval.providerRunId,
+            choice: body.choice,
+            resolved: 0,
+            status: "not_pending" as const,
+          });
+        }
+        const choices = Array.isArray(approval.choices) ? approval.choices : [];
+        if (!choices.includes(body.choice)) {
+          return error(c, "Approval choice is not allowed", 400);
+        }
+        const client = await engine.runtime.aiClients.get();
+        const providerClient = client?.providerClient;
+        if (!providerClient || providerClient.provider !== approval.provider || !providerClient.resolveApproval) {
+          return error(c, "Provider does not support approval resolution", 409);
+        }
+        const resolution = await providerClient.resolveApproval({
+          runId: approval.providerRun.providerRunRef ?? approval.nativeRunId ?? approval.providerRunId,
+          nativeRunId: approval.nativeRunId ?? approval.providerRun.nativeRunId ?? undefined,
+          approvalId: approval.approvalRef ?? undefined,
+          choice: body.choice,
+          resolveAll: body.resolveAll,
+          reason: body.note,
+        });
+        const status = resolution.status === "resolved"
+          ? body.choice === "deny" ? "denied" : "approved"
+          : resolution.status === "not_pending" ? "superseded" : "failed";
+        const updated = await db.taskPlanProviderApproval.update({
+          where: { id: approval.id },
+          data: {
+            status,
+            resolvedAt: new Date(),
+            choice: body.choice,
+            resolveAll: body.resolveAll === true,
+            resolutionRaw: resolution.raw === undefined || resolution.raw === null ? undefined : resolution.raw,
+          },
+        });
+        await db.taskPlanProviderRun.update({
+          where: { id: approval.providerRunId },
+          data: { status: resolution.status === "resolved" ? "running" : approval.providerRun.status },
+        }).catch(() => undefined);
+        return c.json({
+          approval: toApprovalReadModel(updated),
+          provider: resolution.provider,
+          runId: resolution.runId,
+          choice: resolution.choice,
+          resolved: resolution.resolved,
+          status: resolution.status,
+        });
+      } catch (cause) {
+        const httpError = toHttpError(cause);
+        if (httpError) {
+          return error(c, httpError.message, httpError.status);
+        }
+        return error(c, cause instanceof Error ? cause.message : "Failed to resolve provider approval", 500);
+      }
+    },
   );
+}
+
+type ProviderApprovalRecord = Awaited<ReturnType<typeof db.taskPlanProviderApproval.findFirst>> & {};
+
+function toApprovalReadModel(approval: NonNullable<ProviderApprovalRecord>) {
+  return {
+    id: approval.id,
+    taskId: approval.taskId,
+    workBlockId: approval.workBlockId,
+    planId: approval.planId,
+    planRunId: approval.planRunId,
+    nodeId: approval.nodeId,
+    nodeTitle: approval.nodeTitle,
+    provider: approval.provider,
+    runtimeName: approval.runtimeName,
+    nativeRunId: approval.nativeRunId,
+    kind: approval.kind,
+    providerKind: approval.providerKind,
+    title: approval.title,
+    summary: approval.summary,
+    description: approval.description,
+    riskLevel: approval.riskLevel,
+    subject: approval.subject,
+    choices: approval.choices,
+    scopePolicy: approval.scopePolicy,
+    status: approval.status,
+    requestedAt: approval.requestedAt.toISOString(),
+    resolvedAt: approval.resolvedAt?.toISOString() ?? null,
+    choice: approval.choice,
+    resolveAll: approval.resolveAll,
+  };
 }

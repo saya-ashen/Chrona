@@ -14,6 +14,16 @@ type TaskPlanGenerationStatus =
   | "waiting_acceptance"
   | "accepted";
 
+type RecurrenceOccurrenceReadModel = {
+  taskId: string;
+  title: string;
+  status: string;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+  workBlockId: string | null;
+  isCurrent: boolean;
+};
+
 type WorkspaceActivityTimelineItem = {
   id: string;
   kind: "assistant_message" | "reasoning" | "tool_started" | "tool_completed" | "provider_run" | "approval" | "node" | "task" | "artifact" | "schedule" | "raw";
@@ -592,15 +602,7 @@ function pickTaskPageWorkBlock(workBlocks: TaskPageWorkBlock[], selectedWorkBloc
 export async function getTaskPage(input: { taskId: string; workBlockId?: string | null } | string) {
   const taskId = typeof input === "string" ? input : input.taskId;
   const selectedWorkBlockId = typeof input === "string" ? null : input.workBlockId ?? null;
-  const savedPlan = await getLatestTaskPlanReadModel(taskId);
-  const aiPlanGenerationStatus: TaskPlanGenerationStatus =
-    isTaskPlanGenerationRunning(taskId)
-      ? "generating"
-      : savedPlan !== null && savedPlan.status === "accepted"
-        ? "accepted"
-        : savedPlan !== null
-          ? "waiting_acceptance"
-          : "idle";
+  const latestSavedPlan = await getLatestTaskPlanReadModel(taskId, selectedWorkBlockId);
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
@@ -610,10 +612,12 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
       timelineItems: {
+        where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
         orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
         take: 100,
       },
       events: {
+        where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
         orderBy: { ingestSequence: "desc" },
         take: 300,
       },
@@ -650,6 +654,30 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     },
   });
 
+  const recurrenceSeriesTasks = task.seriesExternalUid
+    ? await db.task.findMany({
+        where: {
+          workspaceId: task.workspaceId,
+          seriesExternalUid: task.seriesExternalUid,
+          id: { not: task.id },
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          workBlocks: {
+            where: { status: { in: ["Scheduled", "Active", "Completed"] } },
+            orderBy: [
+              { status: "asc" },
+              { scheduledStartAt: "asc" },
+              { updatedAt: "desc" },
+            ],
+            take: 50,
+          },
+        },
+      })
+    : [];
+
   const latestRun = task.runs[0] ?? null;
   const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
   const importedEvent = task.importedCalendarEvents[0] ?? null;
@@ -663,6 +691,19 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
         immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
       }
     : null;
+  const recurrenceOccurrences = [
+    { id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks },
+    ...recurrenceSeriesTasks,
+  ];
+  const savedPlan = latestSavedPlan;
+  const aiPlanGenerationStatus: TaskPlanGenerationStatus =
+    isTaskPlanGenerationRunning({ taskId, workBlockId: selectedWorkBlockId })
+      ? "generating"
+      : savedPlan !== null && savedPlan.status === "accepted"
+        ? "accepted"
+        : savedPlan !== null
+          ? "waiting_acceptance"
+          : "idle";
   const runnability = deriveTaskRunnability({
     executionRuntime: task.executionRuntime || task.workspace.defaultRuntime,
     executionConfig: task.executionConfig,
@@ -700,11 +741,42 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       autoExecute: task.autoExecute,
       autoPlanGenerationTiming: task.autoPlanGenerationTiming,
       autoExecuteTiming: task.autoExecuteTiming,
-      status: task.status,
+      recurrenceRule: task.recurrenceRule,
+      status: currentWorkBlock?.status ?? task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
       scheduledStartAt:
         currentWorkBlock?.scheduledStartAt.toISOString() ?? task.projection?.scheduledStartAt?.toISOString() ?? null,
+      recurrenceOccurrences: recurrenceOccurrences
+        .flatMap<RecurrenceOccurrenceReadModel>((occurrence) => {
+          if (occurrence.workBlocks.length === 0) {
+            return [{
+              taskId: occurrence.id,
+              title: occurrence.title,
+              status: occurrence.status,
+              scheduledStartAt: null,
+              scheduledEndAt: null,
+              workBlockId: null,
+              isCurrent: occurrence.id === task.id && !currentWorkBlock,
+            }];
+          }
+
+          return occurrence.workBlocks.map((workBlock) => ({
+            taskId: occurrence.id,
+            title: occurrence.title,
+            status: workBlock.status,
+            scheduledStartAt: workBlock.scheduledStartAt.toISOString(),
+            scheduledEndAt: workBlock.scheduledEndAt.toISOString(),
+            workBlockId: workBlock.id,
+            isCurrent: occurrence.id === task.id && currentWorkBlock?.id === workBlock.id,
+          }));
+        })
+        .sort((left, right) => {
+          if (left.scheduledStartAt && right.scheduledStartAt) return left.scheduledStartAt.localeCompare(right.scheduledStartAt);
+          if (left.scheduledStartAt) return -1;
+          if (right.scheduledStartAt) return 1;
+          return left.title.localeCompare(right.title);
+        }),
       scheduledEndAt: currentWorkBlock?.scheduledEndAt.toISOString() ?? task.projection?.scheduledEndAt?.toISOString() ?? null,
       scheduleStatus: currentWorkBlock?.status ?? task.projection?.scheduleStatus ?? "Unscheduled",
       scheduleSource: currentWorkBlock

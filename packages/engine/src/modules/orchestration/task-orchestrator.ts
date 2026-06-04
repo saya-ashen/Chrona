@@ -2,6 +2,7 @@ import { readTaskOrchestratorConfig, type TaskOrchestratorConfig } from "./orche
 import { runDueAutoPlanGenerationWorker } from "./due-auto-plan-generation-worker";
 import { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 import { runGraphAdvancementWorker } from "./graph-advancement-worker";
+import { runRecurringWorkBlockExpansionWorker } from "./recurring-work-block-expansion-worker";
 import { runRestartRecoveryWorker } from "./restart-recovery-worker";
 import {
   acquireSchedulerLease,
@@ -145,6 +146,12 @@ export function createDefaultTaskOrchestratorWorkers(): TaskOrchestratorWorker[]
       name: "due-auto-plan-generation",
       async run() {
         await runDueAutoPlanGenerationWorker();
+      },
+    },
+    {
+      name: "recurring-work-block-expansion",
+      async run() {
+        await runRecurringWorkBlockExpansionWorker();
       },
     },
     {

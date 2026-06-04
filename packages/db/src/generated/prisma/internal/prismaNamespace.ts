@@ -399,6 +399,7 @@ export const ModelName = {
   TaskPlanRun: 'TaskPlanRun',
   TaskPlanNodeAttempt: 'TaskPlanNodeAttempt',
   TaskPlanProviderRun: 'TaskPlanProviderRun',
+  TaskPlanProviderApproval: 'TaskPlanProviderApproval',
   TaskPlanLayer: 'TaskPlanLayer',
   Run: 'Run',
   Approval: 'Approval',
@@ -432,7 +433,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "workspace" | "calendarSource" | "importedCalendarEvent" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanNodeAttempt" | "taskPlanProviderRun" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "rawEventLog" | "conversationEntry" | "toolInvocation" | "taskTimelineItem" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
+    modelProps: "workspace" | "calendarSource" | "importedCalendarEvent" | "task" | "schedulerLease" | "graphVersion" | "graphMutationRecord" | "reconciliationEvent" | "schedulerEvent" | "taskSession" | "taskDependency" | "taskPlan" | "taskPlanRun" | "taskPlanNodeAttempt" | "taskPlanProviderRun" | "taskPlanProviderApproval" | "taskPlanLayer" | "run" | "approval" | "artifact" | "memory" | "event" | "rawEventLog" | "conversationEntry" | "toolInvocation" | "taskTimelineItem" | "taskProjection" | "scheduleProposal" | "runtimeCursor" | "aiClient" | "aiFeatureBinding" | "taskAssistantMessage" | "workBlock" | "executionSession"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1543,6 +1544,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.TaskPlanProviderRunCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.TaskPlanProviderRunCountAggregateOutputType> | number
+        }
+      }
+    }
+    TaskPlanProviderApproval: {
+      payload: Prisma.$TaskPlanProviderApprovalPayload<ExtArgs>
+      fields: Prisma.TaskPlanProviderApprovalFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TaskPlanProviderApprovalFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TaskPlanProviderApprovalFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>
+        }
+        findFirst: {
+          args: Prisma.TaskPlanProviderApprovalFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TaskPlanProviderApprovalFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>
+        }
+        findMany: {
+          args: Prisma.TaskPlanProviderApprovalFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>[]
+        }
+        create: {
+          args: Prisma.TaskPlanProviderApprovalCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>
+        }
+        createMany: {
+          args: Prisma.TaskPlanProviderApprovalCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TaskPlanProviderApprovalCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>[]
+        }
+        delete: {
+          args: Prisma.TaskPlanProviderApprovalDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>
+        }
+        update: {
+          args: Prisma.TaskPlanProviderApprovalUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>
+        }
+        deleteMany: {
+          args: Prisma.TaskPlanProviderApprovalDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TaskPlanProviderApprovalUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TaskPlanProviderApprovalUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>[]
+        }
+        upsert: {
+          args: Prisma.TaskPlanProviderApprovalUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TaskPlanProviderApprovalPayload>
+        }
+        aggregate: {
+          args: Prisma.TaskPlanProviderApprovalAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTaskPlanProviderApproval>
+        }
+        groupBy: {
+          args: Prisma.TaskPlanProviderApprovalGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskPlanProviderApprovalGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TaskPlanProviderApprovalCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TaskPlanProviderApprovalCountAggregateOutputType> | number
         }
       }
     }
@@ -2984,6 +3059,9 @@ export const TaskScalarFieldEnum = {
   kind: 'kind',
   recurrenceRule: 'recurrenceRule',
   seriesExternalUid: 'seriesExternalUid',
+  recurrenceAnchorStartAt: 'recurrenceAnchorStartAt',
+  recurrenceAnchorEndAt: 'recurrenceAnchorEndAt',
+  recurrenceWindowUntil: 'recurrenceWindowUntil',
   executionRuntime: 'executionRuntime',
   executionConfig: 'executionConfig',
   status: 'status',
@@ -3116,6 +3194,7 @@ export const TaskPlanScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   planId: 'planId',
   revision: 'revision',
   status: 'status',
@@ -3135,6 +3214,7 @@ export const TaskPlanRunScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   planId: 'planId',
   planRun: 'planRun',
   executionOwnerId: 'executionOwnerId',
@@ -3207,6 +3287,48 @@ export const TaskPlanProviderRunScalarFieldEnum = {
 } as const
 
 export type TaskPlanProviderRunScalarFieldEnum = (typeof TaskPlanProviderRunScalarFieldEnum)[keyof typeof TaskPlanProviderRunScalarFieldEnum]
+
+
+export const TaskPlanProviderApprovalScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  workBlockId: 'workBlockId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  providerRunId: 'providerRunId',
+  nodeId: 'nodeId',
+  nodeTitle: 'nodeTitle',
+  provider: 'provider',
+  runtimeName: 'runtimeName',
+  nativeRunId: 'nativeRunId',
+  approvalRef: 'approvalRef',
+  kind: 'kind',
+  providerKind: 'providerKind',
+  title: 'title',
+  summary: 'summary',
+  description: 'description',
+  riskLevel: 'riskLevel',
+  subject: 'subject',
+  choices: 'choices',
+  scopePolicy: 'scopePolicy',
+  rawPayload: 'rawPayload',
+  status: 'status',
+  requestedAt: 'requestedAt',
+  resolvedAt: 'resolvedAt',
+  resolvedBy: 'resolvedBy',
+  choice: 'choice',
+  resolveAll: 'resolveAll',
+  resolutionRaw: 'resolutionRaw',
+  error: 'error',
+  rawEventId: 'rawEventId',
+  responseEventId: 'responseEventId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskPlanProviderApprovalScalarFieldEnum = (typeof TaskPlanProviderApprovalScalarFieldEnum)[keyof typeof TaskPlanProviderApprovalScalarFieldEnum]
 
 
 export const TaskPlanLayerScalarFieldEnum = {
@@ -3313,6 +3435,7 @@ export const EventScalarFieldEnum = {
   eventVersion: 'eventVersion',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   runId: 'runId',
   taskSessionId: 'taskSessionId',
   executionSessionId: 'executionSessionId',
@@ -3436,6 +3559,7 @@ export const TaskTimelineItemScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   runId: 'runId',
   executionSessionId: 'executionSessionId',
   nodeId: 'nodeId',
@@ -3563,6 +3687,7 @@ export const WorkBlockScalarFieldEnum = {
   workspaceId: 'workspaceId',
   taskId: 'taskId',
   planId: 'planId',
+  recurrenceKey: 'recurrenceKey',
   title: 'title',
   status: 'status',
   scheduledStartAt: 'scheduledStartAt',
@@ -3990,6 +4115,7 @@ export type GlobalOmitConfig = {
   taskPlanRun?: Prisma.TaskPlanRunOmit
   taskPlanNodeAttempt?: Prisma.TaskPlanNodeAttemptOmit
   taskPlanProviderRun?: Prisma.TaskPlanProviderRunOmit
+  taskPlanProviderApproval?: Prisma.TaskPlanProviderApprovalOmit
   taskPlanLayer?: Prisma.TaskPlanLayerOmit
   run?: Prisma.RunOmit
   approval?: Prisma.ApprovalOmit

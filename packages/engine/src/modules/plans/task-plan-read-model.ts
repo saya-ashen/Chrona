@@ -213,6 +213,7 @@ export async function resolveSavedPlanEffectiveGraph(
   const persistedRun = await getPlanRun(
     savedPlan.taskId,
     savedPlan.compiledPlan.editablePlanId,
+    savedPlan.workBlockId,
   );
 
   if (persistedRun?.graph) {
@@ -252,10 +253,13 @@ async function buildSavedTaskPlanReadModel(
 
 export async function getLatestTaskPlanReadModel(
   taskId: string,
+  workBlockId?: string | null,
 ): Promise<TaskPlanReadModel | null> {
   const savedPlan =
-    (await getAcceptedCompiledPlan(taskId)) ??
-    (await getLatestCompiledPlan(taskId));
+    (await getAcceptedCompiledPlan(taskId, workBlockId))
+    ?? (await getLatestCompiledPlan(taskId, workBlockId))
+    ?? (workBlockId ? (await getAcceptedCompiledPlan(taskId, null)) : null)
+    ?? (workBlockId ? (await getLatestCompiledPlan(taskId, null)) : null);
 
   if (!savedPlan) {
     return null;

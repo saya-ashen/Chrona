@@ -63,6 +63,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
     if (command.type === "plan.generate") {
       const generation = engine.tasks.plan.generate({
         taskId,
+        workBlockId: command.workBlockId ?? null,
         forceRefresh: command.forceRefresh ?? true,
         userInstruction: command.userInstruction ?? undefined,
       });
@@ -81,7 +82,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
     }
 
     if (command.type === "plan.accept") {
-      const result = await engine.tasks.plan.accept({ taskId, planId: command.planId });
+      const result = await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
       publishWorkspaceTrigger({
         taskId,
         workspaceId,
@@ -140,6 +141,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         checkpointId: command.checkpointId,
         action: command.action,
         payload: command.payload,
+        workBlockId: command.workBlockId ?? null,
         idempotencyKey: command.idempotencyKey,
       } as SubmitCheckpointActionInput,
       onGraphEvent(event) {

@@ -112,6 +112,11 @@ export async function createTask(input: CreateTaskInput) {
       kind: recurrenceRule ? "recurring" : "single",
       recurrenceRule,
       seriesExternalUid: null,
+      recurrenceAnchorStartAt,
+      recurrenceAnchorEndAt,
+      recurrenceWindowUntil: recurrenceAnchorStartAt
+        ? new Date(recurrenceAnchorStartAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+        : null,
       executionRuntime: validatedRuntimeConfig.executionRuntime,
       executionConfig:
         validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject,
@@ -154,6 +159,7 @@ export async function createTask(input: CreateTaskInput) {
     defaultSessionId: task.defaultSessionId,
   });
 
+  let firstWorkBlockId: string | null = null;
   if (recurrenceRule && recurrenceAnchorStartAt && recurrenceAnchorEndAt) {
     const durationMs =
       recurrenceAnchorEndAt.getTime() - recurrenceAnchorStartAt.getTime();
@@ -172,18 +178,21 @@ export async function createTask(input: CreateTaskInput) {
       },
     );
 
-    if (occurrences.length > 0) {
-      await db.workBlock.createMany({
-        data: occurrences.map((occurrence) => ({
+    for (const occurrence of occurrences) {
+      const workBlock = await db.workBlock.create({
+        data: {
           workspaceId: task.workspaceId,
           taskId: task.id,
+          recurrenceKey: occurrence.startsAt.toISOString(),
           title: task.title,
-          status: "Scheduled" as const,
+          status: "Scheduled",
           scheduledStartAt: occurrence.startsAt,
           scheduledEndAt: occurrence.endsAt,
-          trigger: "manual" as const,
-        })),
+          trigger: "manual",
+        },
+        select: { id: true },
       });
+      firstWorkBlockId ??= workBlock.id;
     }
   }
 
@@ -191,6 +200,7 @@ export async function createTask(input: CreateTaskInput) {
     eventType: "task.created",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: firstWorkBlockId,
     actorType: "user",
     actorId: "server-action",
     source: "ui",
@@ -210,7 +220,7 @@ export async function createTask(input: CreateTaskInput) {
   await rebuildTaskProjection(task.id);
 
   if (task.autoPlanGeneration && autoPlanGenerationTiming === "immediate") {
-    startAutoPlanGenerationForTask({ taskId: task.id, accept: task.autoExecute });
+    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: firstWorkBlockId, accept: task.autoExecute });
   }
 
   return {

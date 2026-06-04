@@ -13,6 +13,7 @@
         "@hono/zod-validator": "^0.7.6",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@prisma/client": "7.8.0",
+        "headroom-ai": "^0.22.4",
         "hono": "^4.9.6",
         "ical.js": "^2.2.1",
         "prisma-adapter-bun-sqlite": "^0.7.1",
@@ -1343,6 +1344,8 @@
     "hast-util-whitespace": ["hast-util-whitespace@3.0.0", "", { "dependencies": { "@types/hast": "^3.0.0" } }, "sha512-88JUN06ipLwsnv+dVn+OIYOvAuvBMy/Qoi6O7mQHxdPXpjy+Cd6xRkWwux7DKO+4sYILtLBRIKgsdpS2gQc7qw=="],
 
     "headers-polyfill": ["headers-polyfill@5.0.1", "", { "dependencies": { "@types/set-cookie-parser": "^2.4.10", "set-cookie-parser": "^3.0.1" } }, "sha512-1TJ6Fih/b8h5TIcv+1+Hw0PDQWJTKDKzFZzcKOiW1wJza3XoAQlkCuXLbymPYB8+ZQyw8mHvdw560e8zVFIWyA=="],
+
+    "headroom-ai": ["headroom-ai@0.22.4", "", { "peerDependencies": { "@ai-sdk/provider": ">=1.0.0", "@anthropic-ai/sdk": ">=0.30.0", "ai": ">=6.0.0", "openai": ">=4.0.0" }, "optionalPeers": ["@ai-sdk/provider", "@anthropic-ai/sdk", "ai", "openai"] }, "sha512-9a0rgB/jsWe8gs/ggyUwe6E8DYwKAuBvlUml2ApwlUjb5EfJ611X6X+WG0SiXw3nO6sdyV1/+Ah5uw9P7ecnjw=="],
 
     "hono": ["hono@4.12.14", "", {}, "sha512-am5zfg3yu6sqn5yjKBNqhnTX7Cv+m00ox+7jbaKkrLMRJ4rAdldd1xPd/JzbBWspqaQv6RSTrgFN95EsfhC+7w=="],
 

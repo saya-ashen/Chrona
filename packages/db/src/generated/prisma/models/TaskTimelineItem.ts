@@ -28,6 +28,7 @@ export type TaskTimelineItemMinAggregateOutputType = {
   id: string | null
   workspaceId: string | null
   taskId: string | null
+  workBlockId: string | null
   runId: string | null
   executionSessionId: string | null
   nodeId: string | null
@@ -48,6 +49,7 @@ export type TaskTimelineItemMaxAggregateOutputType = {
   id: string | null
   workspaceId: string | null
   taskId: string | null
+  workBlockId: string | null
   runId: string | null
   executionSessionId: string | null
   nodeId: string | null
@@ -68,6 +70,7 @@ export type TaskTimelineItemCountAggregateOutputType = {
   id: number
   workspaceId: number
   taskId: number
+  workBlockId: number
   runId: number
   executionSessionId: number
   nodeId: number
@@ -91,6 +94,7 @@ export type TaskTimelineItemMinAggregateInputType = {
   id?: true
   workspaceId?: true
   taskId?: true
+  workBlockId?: true
   runId?: true
   executionSessionId?: true
   nodeId?: true
@@ -111,6 +115,7 @@ export type TaskTimelineItemMaxAggregateInputType = {
   id?: true
   workspaceId?: true
   taskId?: true
+  workBlockId?: true
   runId?: true
   executionSessionId?: true
   nodeId?: true
@@ -131,6 +136,7 @@ export type TaskTimelineItemCountAggregateInputType = {
   id?: true
   workspaceId?: true
   taskId?: true
+  workBlockId?: true
   runId?: true
   executionSessionId?: true
   nodeId?: true
@@ -225,6 +231,7 @@ export type TaskTimelineItemGroupByOutputType = {
   id: string
   workspaceId: string
   taskId: string
+  workBlockId: string | null
   runId: string | null
   executionSessionId: string | null
   nodeId: string | null
@@ -267,6 +274,7 @@ export type TaskTimelineItemWhereInput = {
   id?: Prisma.StringFilter<"TaskTimelineItem"> | string
   workspaceId?: Prisma.StringFilter<"TaskTimelineItem"> | string
   taskId?: Prisma.StringFilter<"TaskTimelineItem"> | string
+  workBlockId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   runId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   executionSessionId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   nodeId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
@@ -284,6 +292,7 @@ export type TaskTimelineItemWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"TaskTimelineItem"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
   run?: Prisma.XOR<Prisma.RunNullableScalarRelationFilter, Prisma.RunWhereInput> | null
   event?: Prisma.XOR<Prisma.EventNullableScalarRelationFilter, Prisma.EventWhereInput> | null
   rawEvent?: Prisma.XOR<Prisma.RawEventLogNullableScalarRelationFilter, Prisma.RawEventLogWhereInput> | null
@@ -293,6 +302,7 @@ export type TaskTimelineItemOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrderInput | Prisma.SortOrder
   runId?: Prisma.SortOrderInput | Prisma.SortOrder
   executionSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   nodeId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -310,6 +320,7 @@ export type TaskTimelineItemOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   workspace?: Prisma.WorkspaceOrderByWithRelationInput
   task?: Prisma.TaskOrderByWithRelationInput
+  workBlock?: Prisma.WorkBlockOrderByWithRelationInput
   run?: Prisma.RunOrderByWithRelationInput
   event?: Prisma.EventOrderByWithRelationInput
   rawEvent?: Prisma.RawEventLogOrderByWithRelationInput
@@ -322,6 +333,7 @@ export type TaskTimelineItemWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.TaskTimelineItemWhereInput | Prisma.TaskTimelineItemWhereInput[]
   workspaceId?: Prisma.StringFilter<"TaskTimelineItem"> | string
   taskId?: Prisma.StringFilter<"TaskTimelineItem"> | string
+  workBlockId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   runId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   executionSessionId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   nodeId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
@@ -339,6 +351,7 @@ export type TaskTimelineItemWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"TaskTimelineItem"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
   run?: Prisma.XOR<Prisma.RunNullableScalarRelationFilter, Prisma.RunWhereInput> | null
   event?: Prisma.XOR<Prisma.EventNullableScalarRelationFilter, Prisma.EventWhereInput> | null
   rawEvent?: Prisma.XOR<Prisma.RawEventLogNullableScalarRelationFilter, Prisma.RawEventLogWhereInput> | null
@@ -348,6 +361,7 @@ export type TaskTimelineItemOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrderInput | Prisma.SortOrder
   runId?: Prisma.SortOrderInput | Prisma.SortOrder
   executionSessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   nodeId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -375,6 +389,7 @@ export type TaskTimelineItemScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"TaskTimelineItem"> | string
   workspaceId?: Prisma.StringWithAggregatesFilter<"TaskTimelineItem"> | string
   taskId?: Prisma.StringWithAggregatesFilter<"TaskTimelineItem"> | string
+  workBlockId?: Prisma.StringNullableWithAggregatesFilter<"TaskTimelineItem"> | string | null
   runId?: Prisma.StringNullableWithAggregatesFilter<"TaskTimelineItem"> | string | null
   executionSessionId?: Prisma.StringNullableWithAggregatesFilter<"TaskTimelineItem"> | string | null
   nodeId?: Prisma.StringNullableWithAggregatesFilter<"TaskTimelineItem"> | string | null
@@ -408,6 +423,7 @@ export type TaskTimelineItemCreateInput = {
   createdAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskTimelineItemsInput
   task: Prisma.TaskCreateNestedOneWithoutTimelineItemsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTimelineItemsInput
   run?: Prisma.RunCreateNestedOneWithoutTimelineItemsInput
   event?: Prisma.EventCreateNestedOneWithoutTimelineItemsInput
   rawEvent?: Prisma.RawEventLogCreateNestedOneWithoutTimelineItemsInput
@@ -417,6 +433,7 @@ export type TaskTimelineItemUncheckedCreateInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -450,6 +467,7 @@ export type TaskTimelineItemUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskTimelineItemsNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTimelineItemsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTimelineItemsNestedInput
   run?: Prisma.RunUpdateOneWithoutTimelineItemsNestedInput
   event?: Prisma.EventUpdateOneWithoutTimelineItemsNestedInput
   rawEvent?: Prisma.RawEventLogUpdateOneWithoutTimelineItemsNestedInput
@@ -459,6 +477,7 @@ export type TaskTimelineItemUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -480,6 +499,7 @@ export type TaskTimelineItemCreateManyInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -517,6 +537,7 @@ export type TaskTimelineItemUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -548,6 +569,7 @@ export type TaskTimelineItemCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   runId?: Prisma.SortOrder
   executionSessionId?: Prisma.SortOrder
   nodeId?: Prisma.SortOrder
@@ -569,6 +591,7 @@ export type TaskTimelineItemMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   runId?: Prisma.SortOrder
   executionSessionId?: Prisma.SortOrder
   nodeId?: Prisma.SortOrder
@@ -589,6 +612,7 @@ export type TaskTimelineItemMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   runId?: Prisma.SortOrder
   executionSessionId?: Prisma.SortOrder
   nodeId?: Prisma.SortOrder
@@ -815,6 +839,48 @@ export type TaskTimelineItemUncheckedUpdateManyWithoutRawEventNestedInput = {
   deleteMany?: Prisma.TaskTimelineItemScalarWhereInput | Prisma.TaskTimelineItemScalarWhereInput[]
 }
 
+export type TaskTimelineItemCreateNestedManyWithoutWorkBlockInput = {
+  create?: Prisma.XOR<Prisma.TaskTimelineItemCreateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskTimelineItemCreateWithoutWorkBlockInput[] | Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput | Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskTimelineItemCreateManyWorkBlockInputEnvelope
+  connect?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+}
+
+export type TaskTimelineItemUncheckedCreateNestedManyWithoutWorkBlockInput = {
+  create?: Prisma.XOR<Prisma.TaskTimelineItemCreateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskTimelineItemCreateWithoutWorkBlockInput[] | Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput | Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskTimelineItemCreateManyWorkBlockInputEnvelope
+  connect?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+}
+
+export type TaskTimelineItemUpdateManyWithoutWorkBlockNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskTimelineItemCreateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskTimelineItemCreateWithoutWorkBlockInput[] | Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput | Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput[]
+  upsert?: Prisma.TaskTimelineItemUpsertWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskTimelineItemUpsertWithWhereUniqueWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskTimelineItemCreateManyWorkBlockInputEnvelope
+  set?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  disconnect?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  delete?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  connect?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  update?: Prisma.TaskTimelineItemUpdateWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskTimelineItemUpdateWithWhereUniqueWithoutWorkBlockInput[]
+  updateMany?: Prisma.TaskTimelineItemUpdateManyWithWhereWithoutWorkBlockInput | Prisma.TaskTimelineItemUpdateManyWithWhereWithoutWorkBlockInput[]
+  deleteMany?: Prisma.TaskTimelineItemScalarWhereInput | Prisma.TaskTimelineItemScalarWhereInput[]
+}
+
+export type TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskTimelineItemCreateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskTimelineItemCreateWithoutWorkBlockInput[] | Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput | Prisma.TaskTimelineItemCreateOrConnectWithoutWorkBlockInput[]
+  upsert?: Prisma.TaskTimelineItemUpsertWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskTimelineItemUpsertWithWhereUniqueWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskTimelineItemCreateManyWorkBlockInputEnvelope
+  set?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  disconnect?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  delete?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  connect?: Prisma.TaskTimelineItemWhereUniqueInput | Prisma.TaskTimelineItemWhereUniqueInput[]
+  update?: Prisma.TaskTimelineItemUpdateWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskTimelineItemUpdateWithWhereUniqueWithoutWorkBlockInput[]
+  updateMany?: Prisma.TaskTimelineItemUpdateManyWithWhereWithoutWorkBlockInput | Prisma.TaskTimelineItemUpdateManyWithWhereWithoutWorkBlockInput[]
+  deleteMany?: Prisma.TaskTimelineItemScalarWhereInput | Prisma.TaskTimelineItemScalarWhereInput[]
+}
+
 export type TaskTimelineItemCreateWithoutWorkspaceInput = {
   id?: string
   executionSessionId?: string | null
@@ -830,6 +896,7 @@ export type TaskTimelineItemCreateWithoutWorkspaceInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutTimelineItemsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTimelineItemsInput
   run?: Prisma.RunCreateNestedOneWithoutTimelineItemsInput
   event?: Prisma.EventCreateNestedOneWithoutTimelineItemsInput
   rawEvent?: Prisma.RawEventLogCreateNestedOneWithoutTimelineItemsInput
@@ -838,6 +905,7 @@ export type TaskTimelineItemCreateWithoutWorkspaceInput = {
 export type TaskTimelineItemUncheckedCreateWithoutWorkspaceInput = {
   id?: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -887,6 +955,7 @@ export type TaskTimelineItemScalarWhereInput = {
   id?: Prisma.StringFilter<"TaskTimelineItem"> | string
   workspaceId?: Prisma.StringFilter<"TaskTimelineItem"> | string
   taskId?: Prisma.StringFilter<"TaskTimelineItem"> | string
+  workBlockId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   runId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   executionSessionId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
   nodeId?: Prisma.StringNullableFilter<"TaskTimelineItem"> | string | null
@@ -919,6 +988,7 @@ export type TaskTimelineItemCreateWithoutTaskInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskTimelineItemsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTimelineItemsInput
   run?: Prisma.RunCreateNestedOneWithoutTimelineItemsInput
   event?: Prisma.EventCreateNestedOneWithoutTimelineItemsInput
   rawEvent?: Prisma.RawEventLogCreateNestedOneWithoutTimelineItemsInput
@@ -927,6 +997,7 @@ export type TaskTimelineItemCreateWithoutTaskInput = {
 export type TaskTimelineItemUncheckedCreateWithoutTaskInput = {
   id?: string
   workspaceId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -985,6 +1056,7 @@ export type TaskTimelineItemCreateWithoutRunInput = {
   createdAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskTimelineItemsInput
   task: Prisma.TaskCreateNestedOneWithoutTimelineItemsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTimelineItemsInput
   event?: Prisma.EventCreateNestedOneWithoutTimelineItemsInput
   rawEvent?: Prisma.RawEventLogCreateNestedOneWithoutTimelineItemsInput
 }
@@ -993,6 +1065,7 @@ export type TaskTimelineItemUncheckedCreateWithoutRunInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
   nodeAttemptId?: string | null
@@ -1050,6 +1123,7 @@ export type TaskTimelineItemCreateWithoutEventInput = {
   createdAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskTimelineItemsInput
   task: Prisma.TaskCreateNestedOneWithoutTimelineItemsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTimelineItemsInput
   run?: Prisma.RunCreateNestedOneWithoutTimelineItemsInput
   rawEvent?: Prisma.RawEventLogCreateNestedOneWithoutTimelineItemsInput
 }
@@ -1058,6 +1132,7 @@ export type TaskTimelineItemUncheckedCreateWithoutEventInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -1115,6 +1190,7 @@ export type TaskTimelineItemCreateWithoutRawEventInput = {
   createdAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskTimelineItemsInput
   task: Prisma.TaskCreateNestedOneWithoutTimelineItemsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTimelineItemsInput
   run?: Prisma.RunCreateNestedOneWithoutTimelineItemsInput
   event?: Prisma.EventCreateNestedOneWithoutTimelineItemsInput
 }
@@ -1123,6 +1199,7 @@ export type TaskTimelineItemUncheckedCreateWithoutRawEventInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -1164,9 +1241,77 @@ export type TaskTimelineItemUpdateManyWithWhereWithoutRawEventInput = {
   data: Prisma.XOR<Prisma.TaskTimelineItemUpdateManyMutationInput, Prisma.TaskTimelineItemUncheckedUpdateManyWithoutRawEventInput>
 }
 
+export type TaskTimelineItemCreateWithoutWorkBlockInput = {
+  id?: string
+  executionSessionId?: string | null
+  nodeId?: string | null
+  nodeAttemptId?: string | null
+  kind: string
+  title: string
+  body?: string | null
+  severity?: string | null
+  status?: string | null
+  toolInvocationId?: string | null
+  sortTime: Date | string
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskTimelineItemsInput
+  task: Prisma.TaskCreateNestedOneWithoutTimelineItemsInput
+  run?: Prisma.RunCreateNestedOneWithoutTimelineItemsInput
+  event?: Prisma.EventCreateNestedOneWithoutTimelineItemsInput
+  rawEvent?: Prisma.RawEventLogCreateNestedOneWithoutTimelineItemsInput
+}
+
+export type TaskTimelineItemUncheckedCreateWithoutWorkBlockInput = {
+  id?: string
+  workspaceId: string
+  taskId: string
+  runId?: string | null
+  executionSessionId?: string | null
+  nodeId?: string | null
+  nodeAttemptId?: string | null
+  kind: string
+  title: string
+  body?: string | null
+  severity?: string | null
+  status?: string | null
+  eventId?: string | null
+  rawEventId?: string | null
+  toolInvocationId?: string | null
+  sortTime: Date | string
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+}
+
+export type TaskTimelineItemCreateOrConnectWithoutWorkBlockInput = {
+  where: Prisma.TaskTimelineItemWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskTimelineItemCreateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput>
+}
+
+export type TaskTimelineItemCreateManyWorkBlockInputEnvelope = {
+  data: Prisma.TaskTimelineItemCreateManyWorkBlockInput | Prisma.TaskTimelineItemCreateManyWorkBlockInput[]
+}
+
+export type TaskTimelineItemUpsertWithWhereUniqueWithoutWorkBlockInput = {
+  where: Prisma.TaskTimelineItemWhereUniqueInput
+  update: Prisma.XOR<Prisma.TaskTimelineItemUpdateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedUpdateWithoutWorkBlockInput>
+  create: Prisma.XOR<Prisma.TaskTimelineItemCreateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedCreateWithoutWorkBlockInput>
+}
+
+export type TaskTimelineItemUpdateWithWhereUniqueWithoutWorkBlockInput = {
+  where: Prisma.TaskTimelineItemWhereUniqueInput
+  data: Prisma.XOR<Prisma.TaskTimelineItemUpdateWithoutWorkBlockInput, Prisma.TaskTimelineItemUncheckedUpdateWithoutWorkBlockInput>
+}
+
+export type TaskTimelineItemUpdateManyWithWhereWithoutWorkBlockInput = {
+  where: Prisma.TaskTimelineItemScalarWhereInput
+  data: Prisma.XOR<Prisma.TaskTimelineItemUpdateManyMutationInput, Prisma.TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockInput>
+}
+
 export type TaskTimelineItemCreateManyWorkspaceInput = {
   id?: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -1199,6 +1344,7 @@ export type TaskTimelineItemUpdateWithoutWorkspaceInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutTimelineItemsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTimelineItemsNestedInput
   run?: Prisma.RunUpdateOneWithoutTimelineItemsNestedInput
   event?: Prisma.EventUpdateOneWithoutTimelineItemsNestedInput
   rawEvent?: Prisma.RawEventLogUpdateOneWithoutTimelineItemsNestedInput
@@ -1207,6 +1353,7 @@ export type TaskTimelineItemUpdateWithoutWorkspaceInput = {
 export type TaskTimelineItemUncheckedUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1227,6 +1374,7 @@ export type TaskTimelineItemUncheckedUpdateWithoutWorkspaceInput = {
 export type TaskTimelineItemUncheckedUpdateManyWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1247,6 +1395,7 @@ export type TaskTimelineItemUncheckedUpdateManyWithoutWorkspaceInput = {
 export type TaskTimelineItemCreateManyTaskInput = {
   id?: string
   workspaceId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -1279,6 +1428,7 @@ export type TaskTimelineItemUpdateWithoutTaskInput = {
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskTimelineItemsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTimelineItemsNestedInput
   run?: Prisma.RunUpdateOneWithoutTimelineItemsNestedInput
   event?: Prisma.EventUpdateOneWithoutTimelineItemsNestedInput
   rawEvent?: Prisma.RawEventLogUpdateOneWithoutTimelineItemsNestedInput
@@ -1287,6 +1437,7 @@ export type TaskTimelineItemUpdateWithoutTaskInput = {
 export type TaskTimelineItemUncheckedUpdateWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1307,6 +1458,7 @@ export type TaskTimelineItemUncheckedUpdateWithoutTaskInput = {
 export type TaskTimelineItemUncheckedUpdateManyWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1328,6 +1480,7 @@ export type TaskTimelineItemCreateManyRunInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
   nodeAttemptId?: string | null
@@ -1360,6 +1513,7 @@ export type TaskTimelineItemUpdateWithoutRunInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskTimelineItemsNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTimelineItemsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTimelineItemsNestedInput
   event?: Prisma.EventUpdateOneWithoutTimelineItemsNestedInput
   rawEvent?: Prisma.RawEventLogUpdateOneWithoutTimelineItemsNestedInput
 }
@@ -1368,6 +1522,7 @@ export type TaskTimelineItemUncheckedUpdateWithoutRunInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1388,6 +1543,7 @@ export type TaskTimelineItemUncheckedUpdateManyWithoutRunInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1408,6 +1564,7 @@ export type TaskTimelineItemCreateManyEventInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -1440,6 +1597,7 @@ export type TaskTimelineItemUpdateWithoutEventInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskTimelineItemsNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTimelineItemsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTimelineItemsNestedInput
   run?: Prisma.RunUpdateOneWithoutTimelineItemsNestedInput
   rawEvent?: Prisma.RawEventLogUpdateOneWithoutTimelineItemsNestedInput
 }
@@ -1448,6 +1606,7 @@ export type TaskTimelineItemUncheckedUpdateWithoutEventInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1468,6 +1627,7 @@ export type TaskTimelineItemUncheckedUpdateManyWithoutEventInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1488,6 +1648,7 @@ export type TaskTimelineItemCreateManyRawEventInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   runId?: string | null
   executionSessionId?: string | null
   nodeId?: string | null
@@ -1520,6 +1681,7 @@ export type TaskTimelineItemUpdateWithoutRawEventInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskTimelineItemsNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTimelineItemsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTimelineItemsNestedInput
   run?: Prisma.RunUpdateOneWithoutTimelineItemsNestedInput
   event?: Prisma.EventUpdateOneWithoutTimelineItemsNestedInput
 }
@@ -1528,6 +1690,7 @@ export type TaskTimelineItemUncheckedUpdateWithoutRawEventInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1548,6 +1711,7 @@ export type TaskTimelineItemUncheckedUpdateManyWithoutRawEventInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1564,12 +1728,97 @@ export type TaskTimelineItemUncheckedUpdateManyWithoutRawEventInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+export type TaskTimelineItemCreateManyWorkBlockInput = {
+  id?: string
+  workspaceId: string
+  taskId: string
+  runId?: string | null
+  executionSessionId?: string | null
+  nodeId?: string | null
+  nodeAttemptId?: string | null
+  kind: string
+  title: string
+  body?: string | null
+  severity?: string | null
+  status?: string | null
+  eventId?: string | null
+  rawEventId?: string | null
+  toolInvocationId?: string | null
+  sortTime: Date | string
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+}
+
+export type TaskTimelineItemUpdateWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  body?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  severity?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  toolInvocationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sortTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskTimelineItemsNestedInput
+  task?: Prisma.TaskUpdateOneRequiredWithoutTimelineItemsNestedInput
+  run?: Prisma.RunUpdateOneWithoutTimelineItemsNestedInput
+  event?: Prisma.EventUpdateOneWithoutTimelineItemsNestedInput
+  rawEvent?: Prisma.RawEventLogUpdateOneWithoutTimelineItemsNestedInput
+}
+
+export type TaskTimelineItemUncheckedUpdateWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  body?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  severity?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  toolInvocationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sortTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type TaskTimelineItemUncheckedUpdateManyWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  executionSessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  nodeAttemptId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  body?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  severity?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  rawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  toolInvocationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sortTime?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 
 
 export type TaskTimelineItemSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   runId?: boolean
   executionSessionId?: boolean
   nodeId?: boolean
@@ -1587,6 +1836,7 @@ export type TaskTimelineItemSelect<ExtArgs extends runtime.Types.Extensions.Inte
   createdAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskTimelineItem$workBlockArgs<ExtArgs>
   run?: boolean | Prisma.TaskTimelineItem$runArgs<ExtArgs>
   event?: boolean | Prisma.TaskTimelineItem$eventArgs<ExtArgs>
   rawEvent?: boolean | Prisma.TaskTimelineItem$rawEventArgs<ExtArgs>
@@ -1596,6 +1846,7 @@ export type TaskTimelineItemSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   runId?: boolean
   executionSessionId?: boolean
   nodeId?: boolean
@@ -1613,6 +1864,7 @@ export type TaskTimelineItemSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   createdAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskTimelineItem$workBlockArgs<ExtArgs>
   run?: boolean | Prisma.TaskTimelineItem$runArgs<ExtArgs>
   event?: boolean | Prisma.TaskTimelineItem$eventArgs<ExtArgs>
   rawEvent?: boolean | Prisma.TaskTimelineItem$rawEventArgs<ExtArgs>
@@ -1622,6 +1874,7 @@ export type TaskTimelineItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   runId?: boolean
   executionSessionId?: boolean
   nodeId?: boolean
@@ -1639,6 +1892,7 @@ export type TaskTimelineItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   createdAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskTimelineItem$workBlockArgs<ExtArgs>
   run?: boolean | Prisma.TaskTimelineItem$runArgs<ExtArgs>
   event?: boolean | Prisma.TaskTimelineItem$eventArgs<ExtArgs>
   rawEvent?: boolean | Prisma.TaskTimelineItem$rawEventArgs<ExtArgs>
@@ -1648,6 +1902,7 @@ export type TaskTimelineItemSelectScalar = {
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   runId?: boolean
   executionSessionId?: boolean
   nodeId?: boolean
@@ -1665,10 +1920,11 @@ export type TaskTimelineItemSelectScalar = {
   createdAt?: boolean
 }
 
-export type TaskTimelineItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "runId" | "executionSessionId" | "nodeId" | "nodeAttemptId" | "kind" | "title" | "body" | "severity" | "status" | "eventId" | "rawEventId" | "toolInvocationId" | "sortTime" | "metadata" | "createdAt", ExtArgs["result"]["taskTimelineItem"]>
+export type TaskTimelineItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "workBlockId" | "runId" | "executionSessionId" | "nodeId" | "nodeAttemptId" | "kind" | "title" | "body" | "severity" | "status" | "eventId" | "rawEventId" | "toolInvocationId" | "sortTime" | "metadata" | "createdAt", ExtArgs["result"]["taskTimelineItem"]>
 export type TaskTimelineItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskTimelineItem$workBlockArgs<ExtArgs>
   run?: boolean | Prisma.TaskTimelineItem$runArgs<ExtArgs>
   event?: boolean | Prisma.TaskTimelineItem$eventArgs<ExtArgs>
   rawEvent?: boolean | Prisma.TaskTimelineItem$rawEventArgs<ExtArgs>
@@ -1676,6 +1932,7 @@ export type TaskTimelineItemInclude<ExtArgs extends runtime.Types.Extensions.Int
 export type TaskTimelineItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskTimelineItem$workBlockArgs<ExtArgs>
   run?: boolean | Prisma.TaskTimelineItem$runArgs<ExtArgs>
   event?: boolean | Prisma.TaskTimelineItem$eventArgs<ExtArgs>
   rawEvent?: boolean | Prisma.TaskTimelineItem$rawEventArgs<ExtArgs>
@@ -1683,6 +1940,7 @@ export type TaskTimelineItemIncludeCreateManyAndReturn<ExtArgs extends runtime.T
 export type TaskTimelineItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskTimelineItem$workBlockArgs<ExtArgs>
   run?: boolean | Prisma.TaskTimelineItem$runArgs<ExtArgs>
   event?: boolean | Prisma.TaskTimelineItem$eventArgs<ExtArgs>
   rawEvent?: boolean | Prisma.TaskTimelineItem$rawEventArgs<ExtArgs>
@@ -1693,6 +1951,7 @@ export type $TaskTimelineItemPayload<ExtArgs extends runtime.Types.Extensions.In
   objects: {
     workspace: Prisma.$WorkspacePayload<ExtArgs>
     task: Prisma.$TaskPayload<ExtArgs>
+    workBlock: Prisma.$WorkBlockPayload<ExtArgs> | null
     run: Prisma.$RunPayload<ExtArgs> | null
     event: Prisma.$EventPayload<ExtArgs> | null
     rawEvent: Prisma.$RawEventLogPayload<ExtArgs> | null
@@ -1701,6 +1960,7 @@ export type $TaskTimelineItemPayload<ExtArgs extends runtime.Types.Extensions.In
     id: string
     workspaceId: string
     taskId: string
+    workBlockId: string | null
     runId: string | null
     executionSessionId: string | null
     nodeId: string | null
@@ -2112,6 +2372,7 @@ export interface Prisma__TaskTimelineItemClient<T, Null = never, ExtArgs extends
   readonly [Symbol.toStringTag]: "PrismaPromise"
   workspace<T extends Prisma.WorkspaceDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkspaceDefaultArgs<ExtArgs>>): Prisma.Prisma__WorkspaceClient<runtime.Types.Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   task<T extends Prisma.TaskDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskDefaultArgs<ExtArgs>>): Prisma.Prisma__TaskClient<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  workBlock<T extends Prisma.TaskTimelineItem$workBlockArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskTimelineItem$workBlockArgs<ExtArgs>>): Prisma.Prisma__WorkBlockClient<runtime.Types.Result.GetResult<Prisma.$WorkBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   run<T extends Prisma.TaskTimelineItem$runArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskTimelineItem$runArgs<ExtArgs>>): Prisma.Prisma__RunClient<runtime.Types.Result.GetResult<Prisma.$RunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   event<T extends Prisma.TaskTimelineItem$eventArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskTimelineItem$eventArgs<ExtArgs>>): Prisma.Prisma__EventClient<runtime.Types.Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   rawEvent<T extends Prisma.TaskTimelineItem$rawEventArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskTimelineItem$rawEventArgs<ExtArgs>>): Prisma.Prisma__RawEventLogClient<runtime.Types.Result.GetResult<Prisma.$RawEventLogPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
@@ -2147,6 +2408,7 @@ export interface TaskTimelineItemFieldRefs {
   readonly id: Prisma.FieldRef<"TaskTimelineItem", 'String'>
   readonly workspaceId: Prisma.FieldRef<"TaskTimelineItem", 'String'>
   readonly taskId: Prisma.FieldRef<"TaskTimelineItem", 'String'>
+  readonly workBlockId: Prisma.FieldRef<"TaskTimelineItem", 'String'>
   readonly runId: Prisma.FieldRef<"TaskTimelineItem", 'String'>
   readonly executionSessionId: Prisma.FieldRef<"TaskTimelineItem", 'String'>
   readonly nodeId: Prisma.FieldRef<"TaskTimelineItem", 'String'>
@@ -2558,6 +2820,25 @@ export type TaskTimelineItemDeleteManyArgs<ExtArgs extends runtime.Types.Extensi
    * Limit how many TaskTimelineItems to delete.
    */
   limit?: number
+}
+
+/**
+ * TaskTimelineItem.workBlock
+ */
+export type TaskTimelineItem$workBlockArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkBlock
+   */
+  select?: Prisma.WorkBlockSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WorkBlock
+   */
+  omit?: Prisma.WorkBlockOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WorkBlockInclude<ExtArgs> | null
+  where?: Prisma.WorkBlockWhereInput
 }
 
 /**

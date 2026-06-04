@@ -19,6 +19,7 @@ export type ContinuePlanExecution = (input: {
   inputFields?: Record<string, string>;
   sessionId?: string;
   nodeId?: string;
+  workBlockId?: string | null;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
 
 export type ResumeWithApproval = (input: {
@@ -27,6 +28,7 @@ export type ResumeWithApproval = (input: {
   nodeId?: string;
   approved: boolean;
   feedback?: string;
+  workBlockId?: string | null;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
 
 export type DispatchExecutionAction = (input: {

@@ -32,6 +32,7 @@ export async function proposeSchedule(input: {
     eventType: "task.schedule_proposed",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     actorType: input.source === "ai" ? "agent" : "user",
     actorId: input.proposedBy,
     source: input.source === "ai" ? "planner" : "ui",

@@ -35,6 +35,7 @@ export async function markTaskDone(input: { taskId: string }) {
     eventType: "task.done",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     runId: latestRun.id,
     actorType: "user",
     actorId: "server-action",

@@ -1,4 +1,5 @@
 import { api } from "@/lib/rpc-client";
+import { apiJson } from "@/api";
 import { appendTaskPrimaryNodeAction, graphNodeIdForTaskAction } from "@/components/tasks/plan/task-action-node-action";
 import { stringifyResultOutput } from "@/components/tasks/plan/task-plan-graph/result-output-format";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -146,9 +147,9 @@ function fillTemplate(template: string, values: Record<string, string | number>)
 
 export const taskWorkspaceQueryKeys = {
   all: ["task-workspace"] as const,
-  page: (taskId: string) => [...taskWorkspaceQueryKeys.all, "page", taskId] as const,
-  planState: (taskId: string) => [...taskWorkspaceQueryKeys.all, "plan-state", taskId] as const,
-  currentExecution: (taskId: string) => [...taskWorkspaceQueryKeys.all, "current-execution", taskId] as const,
+  page: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "page", taskId, workBlockId ?? null] as const,
+  planState: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "plan-state", taskId, workBlockId ?? null] as const,
+  currentExecution: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "current-execution", taskId, workBlockId ?? null] as const,
 };
 
 function isDoneStatus(status: PlanNodeDataModel["status"]) {
@@ -169,9 +170,12 @@ function isCheckpointStatus(status: PlanNodeDataModel["status"]) {
 }
 
 function deriveTaskStatusFromGraph(
-  taskStatus: string,
+  task: TaskData,
   graphPlan: TaskPlanGraphPlan | null,
 ) {
+  const taskStatus = task.currentWorkBlock?.status && task.currentWorkBlock.status !== "Completed"
+    ? task.currentWorkBlock.status
+    : task.status;
   const nodes = graphPlan?.nodes ?? [];
   if (nodes.length === 0) return taskStatus;
 
@@ -187,7 +191,7 @@ function deriveTaskStatusFromGraph(
     return "Blocked";
   }
 
-  if (nodes.every((node) => isDoneStatus(node.status))) {
+  if (taskStatus === task.status && nodes.every((node) => isDoneStatus(node.status))) {
     return "Completed";
   }
 
@@ -573,7 +577,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   const graphPlan = appendTaskPrimaryNodeAction(input.pageData, input.graphPlan);
   const task = {
     ...input.pageData.task,
-    status: deriveTaskStatusFromGraph(input.pageData.task.status, graphPlan),
+    status: deriveTaskStatusFromGraph(input.pageData.task, graphPlan),
   } satisfies TaskData;
   const pageData = { ...input.pageData, task } satisfies TaskPageData;
   const selectedNode = input.selectedNode
@@ -634,23 +638,14 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   };
 }
 
-export async function fetchTaskWorkspacePage(taskId: string): Promise<TaskPageData> {
-  const response = await api.tasks[":taskId"].$get({
-    param: { taskId },
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Failed to load task workspace" }));
-    throw new Error((err as { error?: string }).error ?? "Failed to load task workspace");
-  }
-
-  return await response.json() as unknown as TaskPageData;
+export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: string | null): Promise<TaskPageData> {
+  const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
+  return apiJson<TaskPageData>(`/api/tasks/${encodeURIComponent(taskId)}${query}`);
 }
 
-export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState> {
-  const response = await api.tasks[":taskId"].plan.$get({
-    param: { taskId },
-  });
+export async function fetchTaskPlanState(taskId: string, workBlockId?: string | null): Promise<TaskPlanState> {
+  const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
+  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/plan${query}`);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: "Failed to load task plan state" }));
@@ -672,10 +667,9 @@ export async function fetchTaskPlanState(taskId: string): Promise<TaskPlanState>
   };
 }
 
-export async function fetchCurrentTaskExecution(taskId: string): Promise<PlanExecutionResult> {
-  const response = await api.tasks[":taskId"].execution.current.$get({
-    param: { taskId },
-  });
+export async function fetchCurrentTaskExecution(taskId: string, workBlockId?: string | null): Promise<PlanExecutionResult> {
+  const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
+  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/execution/current${query}`);
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: "Failed to load current execution state" }));
@@ -688,10 +682,12 @@ export async function fetchCurrentTaskExecution(taskId: string): Promise<PlanExe
 export async function dispatchTaskExecutionAction(
   taskId: string,
   action: ExecutionActionInput,
+  workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
+  const scopedAction = workBlockId ? { ...action, workBlockId } : action;
   const response = await api.work[":taskId"].commands.$post({
     param: { taskId },
-    json: { type: "execution.action", ...action },
+    json: { type: "execution.action", ...scopedAction },
   });
 
   if (!response.ok) {
@@ -706,15 +702,18 @@ export async function dispatchTaskExecutionAction(
 export async function submitTaskCheckpointAction(
   taskId: string,
   action: SubmitCheckpointActionInput,
+  workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
+  const scopedAction = workBlockId ? { ...action, workBlockId } : action;
   const response = await api.work[":taskId"].commands.$post({
     param: { taskId },
     json: {
       type: "checkpoint.action",
-      checkpointId: action.checkpointId,
-      action: action.action,
-      payload: action.payload as Record<string, unknown> | undefined,
-      idempotencyKey: action.idempotencyKey,
+      checkpointId: scopedAction.checkpointId,
+      action: scopedAction.action,
+      payload: scopedAction.payload as Record<string, unknown> | undefined,
+      workBlockId: scopedAction.workBlockId ?? undefined,
+      idempotencyKey: scopedAction.idempotencyKey,
     },
   });
 

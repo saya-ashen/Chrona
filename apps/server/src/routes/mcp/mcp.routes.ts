@@ -73,11 +73,17 @@ const externalTools = {
     description: "Read current execution node state through AI-visible refs.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.read"]),
   },
-  chrona_task_complete: {
-    internalName: "chrona.node.task_complete",
-    title: "Chrona Task Complete",
-    description: "Complete the current task node. Chrona resolves the active node from the session.",
-    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.task_complete"]),
+  chrona_node_output: {
+    internalName: "chrona.node.output",
+    title: "Chrona Node Output",
+    description: "Append or replace user-visible outputs for the current execution node. May be called multiple times before completion.",
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.output"]),
+  },
+  chrona_node_complete: {
+    internalName: "chrona.node.complete",
+    title: "Chrona Node Complete",
+    description: "Complete the current task node after required outputs have been submitted.",
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.complete"]),
   },
   chrona_condition_select: {
     internalName: "chrona.node.condition_select",
@@ -184,9 +190,9 @@ function idempotencyKeyFrom(input: Record<string, unknown>, toolName: ChronaTool
 
 function aiVisibleToolResult(toolName: ChronaToolName, result: ChronaToolResult): Record<string, unknown> {
   if (result.status === "accepted") {
-    return toolName.endsWith(".read")
-      ? { status: result.status, message: result.message, state: result.state }
-      : { status: result.status, message: result.message, next: "stop" };
+    if (toolName.endsWith(".read")) return { status: result.status, message: result.message, state: result.state };
+    if (toolName === "chrona.node.output") return { status: result.status, message: result.message, next: "continue_or_complete" };
+    return { status: result.status, message: result.message, next: "stop" };
   }
 
   return {

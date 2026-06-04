@@ -161,6 +161,9 @@ export const updateTaskBodySchema = z.object({
   status: taskStatusEnum.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
+  recurrenceRule: z.string().trim().min(1).nullable().optional(),
+  recurrenceAnchorStartAt: z.string().datetime().nullable().optional(),
+  recurrenceAnchorEndAt: z.string().datetime().nullable().optional(),
 });
 
 // ── GET /tasks/:taskId ──

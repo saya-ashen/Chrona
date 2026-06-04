@@ -86,7 +86,7 @@ describe("external calendar repository", () => {
       status: "confirmed",
     }]);
 
-    expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(0);
+    expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(1);
     const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
       where: { workspaceId: workspace.id },
       include: { task: { include: { projection: true, workBlocks: true } } },
@@ -100,6 +100,69 @@ describe("external calendar repository", () => {
     expect(await listImportedCalendarEventsInRange(workspace.id, new Date("2026-05-30T00:00:00.000Z"), new Date("2026-05-31T00:00:00.000Z"))).toHaveLength(0);
     await markCalendarSourceRemoved(workspace.id, source.id);
     expect(await listCalendarSources(workspace.id)).toHaveLength(0);
+  });
+
+  it("collapses existing expanded recurring calendar tasks into one task entry", async () => {
+    const { workspace, source } = await createWorkspaceAndCalendarSource("Calendar collapse DB");
+    const events = [0, 1, 2].map((index) => ({
+      workspaceId: workspace.id,
+      calendarSourceId: source.id,
+      externalUid: "recurring-event-1",
+      recurrenceId: `2026060${index + 1}T090000Z`,
+      recurrenceRule: "FREQ=DAILY;COUNT=3",
+      dedupeKey: `recurring-event-1:2026060${index + 1}T090000Z:2026-06-0${index + 1}T09:00:00.000Z`,
+      title: "Daily standup",
+      startsAt: new Date(`2026-06-0${index + 1}T09:00:00.000Z`),
+      endsAt: new Date(`2026-06-0${index + 1}T09:30:00.000Z`),
+      isAllDay: false,
+      status: "confirmed" as const,
+    }));
+
+    await replaceImportedCalendarEvents(source.id, events, { now: new Date("2026-05-30T10:00:00.000Z") });
+    const expandedEvents = await db.importedCalendarEvent.findMany({ where: { calendarSourceId: source.id } });
+    await db.importedCalendarEvent.updateMany({ where: { calendarSourceId: source.id }, data: { taskId: null, workBlockId: null } });
+    await db.workBlock.deleteMany({ where: { workspaceId: workspace.id } });
+    await db.taskProjection.deleteMany({ where: { workspaceId: workspace.id } });
+    await db.task.deleteMany({ where: { workspaceId: workspace.id } });
+    for (const event of expandedEvents) {
+      await db.task.create({
+        data: {
+          workspaceId: workspace.id,
+          title: `legacy ${event.recurrenceId}`,
+          status: "Ready",
+          priority: "Medium",
+          executionRuntime: "debug",
+          executionConfig: {},
+          kind: "single",
+          recurrenceRule: event.recurrenceRule,
+          importedCalendarEvents: { connect: { id: event.id } },
+          workBlocks: {
+            create: {
+              workspaceId: workspace.id,
+              title: event.title,
+              status: "Scheduled",
+              scheduledStartAt: event.startsAt,
+              scheduledEndAt: event.endsAt,
+              trigger: "manual",
+            },
+          },
+        },
+      });
+    }
+    expect(await db.task.count({ where: { workspaceId: workspace.id } })).toBe(3);
+
+    await replaceImportedCalendarEvents(source.id, events, { now: new Date("2026-05-30T10:00:00.000Z") });
+
+    const tasks = await db.task.findMany({
+      where: { workspaceId: workspace.id },
+      include: { workBlocks: { orderBy: { scheduledStartAt: "asc" } } },
+    });
+    const imported = await db.importedCalendarEvent.findMany({ where: { calendarSourceId: source.id } });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.kind).toBe("recurring");
+    expect(tasks[0]?.workBlocks).toHaveLength(3);
+    expect(new Set(imported.map((event) => event.taskId)).size).toBe(1);
+    expect(imported.every((event) => event.taskId === tasks[0]?.id)).toBe(true);
   });
 
   it("applies source sync policy to complete past imported tasks", async () => {
@@ -172,13 +235,14 @@ describe("external calendar repository", () => {
 
     const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
       where: { workspaceId: workspace.id },
-      include: { task: true },
+      include: { task: true, workBlock: true },
     });
     expect(importedEvent.task?.autoPlanGeneration).toBe(true);
     expect(importedEvent.task?.autoExecute).toBe(true);
     const taskId = importedEvent.task?.id;
-    if (!taskId) throw new Error("Expected imported task");
-    expect(result.automationRequests).toEqual([{ taskId, accept: true }]);
+    const workBlockId = importedEvent.workBlock?.id;
+    if (!taskId || !workBlockId) throw new Error("Expected imported task and work block");
+    expect(result.automationRequests).toEqual([{ taskId, workBlockId, accept: true }]);
   });
 
   it("can import calendar tasks without automation", async () => {
@@ -303,5 +367,31 @@ describe("external calendar repository", () => {
     expect(importedEvent.task?.title).toBe("Recreated Google event");
     expect(importedEvent.task?.projection?.scheduledStartAt?.toISOString()).toBe("2026-05-30T10:00:00.000Z");
     expect(importedEvent.task?.workBlocks[0]?.scheduledEndAt.toISOString()).toBe("2026-05-30T11:00:00.000Z");
+  });
+
+  it("recreates imported event work blocks when a stale workBlockId is left behind", async () => {
+    const { workspace, source } = await createWorkspaceAndCalendarSource("Calendar stale work block DB");
+    await syncMovedEventFixture(source.id, workspace.id, 10, "Original meeting", "Original calendar description");
+    const firstImportedEvent = await db.importedCalendarEvent.findFirstOrThrow({
+      where: { workspaceId: workspace.id },
+      include: { workBlock: true },
+    });
+    const staleWorkBlockId = firstImportedEvent.workBlockId;
+    expect(staleWorkBlockId).toBeTruthy();
+
+    await db.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
+    await db.$executeRawUnsafe(`DELETE FROM WorkBlock WHERE id = '${staleWorkBlockId}'`);
+    await db.$executeRawUnsafe("PRAGMA foreign_keys = ON");
+
+    await syncMovedEventFixture(source.id, workspace.id, 12, "Recovered meeting", "Recovered calendar description");
+
+    const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
+      where: { workspaceId: workspace.id },
+      include: { task: { include: { workBlocks: true } }, workBlock: true },
+    });
+    expect(importedEvent.workBlockId).not.toBe(staleWorkBlockId);
+    expect(importedEvent.workBlock?.scheduledStartAt.toISOString()).toBe("2026-05-30T12:00:00.000Z");
+    expect(importedEvent.workBlock?.scheduledEndAt.toISOString()).toBe("2026-05-30T13:30:00.000Z");
+    expect(importedEvent.task?.workBlocks).toHaveLength(1);
   });
 });

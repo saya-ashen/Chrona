@@ -92,6 +92,7 @@ export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixtu
       autoExecute: false,
       autoPlanGenerationTiming: "at_start",
       autoExecuteTiming: "at_start",
+      recurrenceRule: null,
       status: "Ready",
       priority: "High",
       dueAt: null,
@@ -181,7 +182,7 @@ export const taskWorkspaceStateFixtures = {
       artifacts: [{ id: "artifact-1", title: "Report", type: "markdown", uri: "file://report.md" }],
     }),
     graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "done", status: "done", resultOutputs: [{ kind: "text", content: "summary" }] }),
+      createTaskWorkspaceFixtureNode({ id: "done", status: "done", resultOutputs: [{ kind: "markdown", content: "summary" }] }),
     ], "done"),
   },
   staleError: {

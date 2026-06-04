@@ -66,6 +66,7 @@ export const ModelName = {
   TaskPlanRun: 'TaskPlanRun',
   TaskPlanNodeAttempt: 'TaskPlanNodeAttempt',
   TaskPlanProviderRun: 'TaskPlanProviderRun',
+  TaskPlanProviderApproval: 'TaskPlanProviderApproval',
   TaskPlanLayer: 'TaskPlanLayer',
   Run: 'Run',
   Approval: 'Approval',
@@ -169,6 +170,9 @@ export const TaskScalarFieldEnum = {
   kind: 'kind',
   recurrenceRule: 'recurrenceRule',
   seriesExternalUid: 'seriesExternalUid',
+  recurrenceAnchorStartAt: 'recurrenceAnchorStartAt',
+  recurrenceAnchorEndAt: 'recurrenceAnchorEndAt',
+  recurrenceWindowUntil: 'recurrenceWindowUntil',
   executionRuntime: 'executionRuntime',
   executionConfig: 'executionConfig',
   status: 'status',
@@ -301,6 +305,7 @@ export const TaskPlanScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   planId: 'planId',
   revision: 'revision',
   status: 'status',
@@ -320,6 +325,7 @@ export const TaskPlanRunScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   planId: 'planId',
   planRun: 'planRun',
   executionOwnerId: 'executionOwnerId',
@@ -392,6 +398,48 @@ export const TaskPlanProviderRunScalarFieldEnum = {
 } as const
 
 export type TaskPlanProviderRunScalarFieldEnum = (typeof TaskPlanProviderRunScalarFieldEnum)[keyof typeof TaskPlanProviderRunScalarFieldEnum]
+
+
+export const TaskPlanProviderApprovalScalarFieldEnum = {
+  id: 'id',
+  workspaceId: 'workspaceId',
+  taskId: 'taskId',
+  workBlockId: 'workBlockId',
+  planId: 'planId',
+  planRunId: 'planRunId',
+  nodeAttemptId: 'nodeAttemptId',
+  providerRunId: 'providerRunId',
+  nodeId: 'nodeId',
+  nodeTitle: 'nodeTitle',
+  provider: 'provider',
+  runtimeName: 'runtimeName',
+  nativeRunId: 'nativeRunId',
+  approvalRef: 'approvalRef',
+  kind: 'kind',
+  providerKind: 'providerKind',
+  title: 'title',
+  summary: 'summary',
+  description: 'description',
+  riskLevel: 'riskLevel',
+  subject: 'subject',
+  choices: 'choices',
+  scopePolicy: 'scopePolicy',
+  rawPayload: 'rawPayload',
+  status: 'status',
+  requestedAt: 'requestedAt',
+  resolvedAt: 'resolvedAt',
+  resolvedBy: 'resolvedBy',
+  choice: 'choice',
+  resolveAll: 'resolveAll',
+  resolutionRaw: 'resolutionRaw',
+  error: 'error',
+  rawEventId: 'rawEventId',
+  responseEventId: 'responseEventId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskPlanProviderApprovalScalarFieldEnum = (typeof TaskPlanProviderApprovalScalarFieldEnum)[keyof typeof TaskPlanProviderApprovalScalarFieldEnum]
 
 
 export const TaskPlanLayerScalarFieldEnum = {
@@ -498,6 +546,7 @@ export const EventScalarFieldEnum = {
   eventVersion: 'eventVersion',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   runId: 'runId',
   taskSessionId: 'taskSessionId',
   executionSessionId: 'executionSessionId',
@@ -621,6 +670,7 @@ export const TaskTimelineItemScalarFieldEnum = {
   id: 'id',
   workspaceId: 'workspaceId',
   taskId: 'taskId',
+  workBlockId: 'workBlockId',
   runId: 'runId',
   executionSessionId: 'executionSessionId',
   nodeId: 'nodeId',
@@ -748,6 +798,7 @@ export const WorkBlockScalarFieldEnum = {
   workspaceId: 'workspaceId',
   taskId: 'taskId',
   planId: 'planId',
+  recurrenceKey: 'recurrenceKey',
   title: 'title',
   status: 'status',
   scheduledStartAt: 'scheduledStartAt',

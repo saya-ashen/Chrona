@@ -93,4 +93,7 @@ export type UpdateTaskInput = {
   autoPlanGenerationTiming?: AutomationTimingPreset;
   autoExecuteTiming?: AutomationTimingPreset;
   status?: TaskStatus;
+  recurrenceRule?: string | null;
+  recurrenceAnchorStartAt?: string | null;
+  recurrenceAnchorEndAt?: string | null;
 } & Partial<TaskRuntimeFields>;

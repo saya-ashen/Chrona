@@ -36,6 +36,7 @@ export async function reopenTask(input: { taskId: string }) {
     eventType: "task.reopened",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     actorType: "user",
     actorId: "server-action",
     source: "ui",

@@ -392,6 +392,7 @@ export type TaskPlanNodeAttemptWhereInput = {
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   planRun?: Prisma.XOR<Prisma.TaskPlanRunScalarRelationFilter, Prisma.TaskPlanRunWhereInput>
   providerRuns?: Prisma.TaskPlanProviderRunListRelationFilter
+  providerApprovals?: Prisma.TaskPlanProviderApprovalListRelationFilter
 }
 
 export type TaskPlanNodeAttemptOrderByWithRelationInput = {
@@ -426,6 +427,7 @@ export type TaskPlanNodeAttemptOrderByWithRelationInput = {
   task?: Prisma.TaskOrderByWithRelationInput
   planRun?: Prisma.TaskPlanRunOrderByWithRelationInput
   providerRuns?: Prisma.TaskPlanProviderRunOrderByRelationAggregateInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalOrderByRelationAggregateInput
 }
 
 export type TaskPlanNodeAttemptWhereUniqueInput = Prisma.AtLeast<{
@@ -463,6 +465,7 @@ export type TaskPlanNodeAttemptWhereUniqueInput = Prisma.AtLeast<{
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   planRun?: Prisma.XOR<Prisma.TaskPlanRunScalarRelationFilter, Prisma.TaskPlanRunWhereInput>
   providerRuns?: Prisma.TaskPlanProviderRunListRelationFilter
+  providerApprovals?: Prisma.TaskPlanProviderApprovalListRelationFilter
 }, "id" | "idempotencyKey">
 
 export type TaskPlanNodeAttemptOrderByWithAggregationInput = {
@@ -562,6 +565,7 @@ export type TaskPlanNodeAttemptCreateInput = {
   task: Prisma.TaskCreateNestedOneWithoutTaskPlanNodeAttemptsInput
   planRun: Prisma.TaskPlanRunCreateNestedOneWithoutNodeAttemptsInput
   providerRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptUncheckedCreateInput = {
@@ -593,6 +597,7 @@ export type TaskPlanNodeAttemptUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptUpdateInput = {
@@ -624,6 +629,7 @@ export type TaskPlanNodeAttemptUpdateInput = {
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
   planRun?: Prisma.TaskPlanRunUpdateOneRequiredWithoutNodeAttemptsNestedInput
   providerRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateInput = {
@@ -655,6 +661,7 @@ export type TaskPlanNodeAttemptUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptCreateManyInput = {
@@ -855,6 +862,11 @@ export type TaskPlanNodeAttemptScalarRelationFilter = {
   isNot?: Prisma.TaskPlanNodeAttemptWhereInput
 }
 
+export type TaskPlanNodeAttemptNullableScalarRelationFilter = {
+  is?: Prisma.TaskPlanNodeAttemptWhereInput | null
+  isNot?: Prisma.TaskPlanNodeAttemptWhereInput | null
+}
+
 export type TaskPlanNodeAttemptCreateNestedManyWithoutWorkspaceInput = {
   create?: Prisma.XOR<Prisma.TaskPlanNodeAttemptCreateWithoutWorkspaceInput, Prisma.TaskPlanNodeAttemptUncheckedCreateWithoutWorkspaceInput> | Prisma.TaskPlanNodeAttemptCreateWithoutWorkspaceInput[] | Prisma.TaskPlanNodeAttemptUncheckedCreateWithoutWorkspaceInput[]
   connectOrCreate?: Prisma.TaskPlanNodeAttemptCreateOrConnectWithoutWorkspaceInput | Prisma.TaskPlanNodeAttemptCreateOrConnectWithoutWorkspaceInput[]
@@ -995,6 +1007,22 @@ export type TaskPlanNodeAttemptUpdateOneRequiredWithoutProviderRunsNestedInput =
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskPlanNodeAttemptUpdateToOneWithWhereWithoutProviderRunsInput, Prisma.TaskPlanNodeAttemptUpdateWithoutProviderRunsInput>, Prisma.TaskPlanNodeAttemptUncheckedUpdateWithoutProviderRunsInput>
 }
 
+export type TaskPlanNodeAttemptCreateNestedOneWithoutProviderApprovalsInput = {
+  create?: Prisma.XOR<Prisma.TaskPlanNodeAttemptCreateWithoutProviderApprovalsInput, Prisma.TaskPlanNodeAttemptUncheckedCreateWithoutProviderApprovalsInput>
+  connectOrCreate?: Prisma.TaskPlanNodeAttemptCreateOrConnectWithoutProviderApprovalsInput
+  connect?: Prisma.TaskPlanNodeAttemptWhereUniqueInput
+}
+
+export type TaskPlanNodeAttemptUpdateOneWithoutProviderApprovalsNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskPlanNodeAttemptCreateWithoutProviderApprovalsInput, Prisma.TaskPlanNodeAttemptUncheckedCreateWithoutProviderApprovalsInput>
+  connectOrCreate?: Prisma.TaskPlanNodeAttemptCreateOrConnectWithoutProviderApprovalsInput
+  upsert?: Prisma.TaskPlanNodeAttemptUpsertWithoutProviderApprovalsInput
+  disconnect?: Prisma.TaskPlanNodeAttemptWhereInput | boolean
+  delete?: Prisma.TaskPlanNodeAttemptWhereInput | boolean
+  connect?: Prisma.TaskPlanNodeAttemptWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskPlanNodeAttemptUpdateToOneWithWhereWithoutProviderApprovalsInput, Prisma.TaskPlanNodeAttemptUpdateWithoutProviderApprovalsInput>, Prisma.TaskPlanNodeAttemptUncheckedUpdateWithoutProviderApprovalsInput>
+}
+
 export type TaskPlanNodeAttemptCreateWithoutWorkspaceInput = {
   id?: string
   planId: string
@@ -1023,6 +1051,7 @@ export type TaskPlanNodeAttemptCreateWithoutWorkspaceInput = {
   task: Prisma.TaskCreateNestedOneWithoutTaskPlanNodeAttemptsInput
   planRun: Prisma.TaskPlanRunCreateNestedOneWithoutNodeAttemptsInput
   providerRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptUncheckedCreateWithoutWorkspaceInput = {
@@ -1053,6 +1082,7 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutWorkspaceInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptCreateOrConnectWithoutWorkspaceInput = {
@@ -1141,6 +1171,7 @@ export type TaskPlanNodeAttemptCreateWithoutTaskInput = {
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
   planRun: Prisma.TaskPlanRunCreateNestedOneWithoutNodeAttemptsInput
   providerRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptUncheckedCreateWithoutTaskInput = {
@@ -1171,6 +1202,7 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutTaskInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptCreateOrConnectWithoutTaskInput = {
@@ -1226,6 +1258,7 @@ export type TaskPlanNodeAttemptCreateWithoutPlanRunInput = {
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
   task: Prisma.TaskCreateNestedOneWithoutTaskPlanNodeAttemptsInput
   providerRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptUncheckedCreateWithoutPlanRunInput = {
@@ -1256,6 +1289,7 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutPlanRunInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptCreateOrConnectWithoutPlanRunInput = {
@@ -1311,6 +1345,7 @@ export type TaskPlanNodeAttemptCreateWithoutProviderRunsInput = {
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
   task: Prisma.TaskCreateNestedOneWithoutTaskPlanNodeAttemptsInput
   planRun: Prisma.TaskPlanRunCreateNestedOneWithoutNodeAttemptsInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptUncheckedCreateWithoutProviderRunsInput = {
@@ -1341,6 +1376,7 @@ export type TaskPlanNodeAttemptUncheckedCreateWithoutProviderRunsInput = {
   selectedNextNodeId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedCreateNestedManyWithoutNodeAttemptInput
 }
 
 export type TaskPlanNodeAttemptCreateOrConnectWithoutProviderRunsInput = {
@@ -1387,6 +1423,7 @@ export type TaskPlanNodeAttemptUpdateWithoutProviderRunsInput = {
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
   planRun?: Prisma.TaskPlanRunUpdateOneRequiredWithoutNodeAttemptsNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateWithoutProviderRunsInput = {
@@ -1417,6 +1454,147 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutProviderRunsInput = {
   selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutNodeAttemptNestedInput
+}
+
+export type TaskPlanNodeAttemptCreateWithoutProviderApprovalsInput = {
+  id?: string
+  planId: string
+  nodeId: string
+  nodeLayerId: string
+  executionContextSnapshotId?: string | null
+  idempotencyKey: string
+  attemptNumber: number
+  status: string
+  executionEpoch: number
+  startedAt?: Date | string
+  finishedAt?: Date | string | null
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlanNodeAttemptsInput
+  task: Prisma.TaskCreateNestedOneWithoutTaskPlanNodeAttemptsInput
+  planRun: Prisma.TaskPlanRunCreateNestedOneWithoutNodeAttemptsInput
+  providerRuns?: Prisma.TaskPlanProviderRunCreateNestedManyWithoutNodeAttemptInput
+}
+
+export type TaskPlanNodeAttemptUncheckedCreateWithoutProviderApprovalsInput = {
+  id?: string
+  workspaceId: string
+  taskId: string
+  planId: string
+  planRunId: string
+  nodeId: string
+  nodeLayerId: string
+  executionContextSnapshotId?: string | null
+  idempotencyKey: string
+  attemptNumber: number
+  status: string
+  executionEpoch: number
+  startedAt?: Date | string
+  finishedAt?: Date | string | null
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: string | null
+  completedByEventId?: string | null
+  failedByEventId?: string | null
+  blockedByEventId?: string | null
+  inputRawEventId?: string | null
+  outputRawEventId?: string | null
+  errorRawEventId?: string | null
+  selectedBranchRef?: string | null
+  selectedNextNodeId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  providerRuns?: Prisma.TaskPlanProviderRunUncheckedCreateNestedManyWithoutNodeAttemptInput
+}
+
+export type TaskPlanNodeAttemptCreateOrConnectWithoutProviderApprovalsInput = {
+  where: Prisma.TaskPlanNodeAttemptWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskPlanNodeAttemptCreateWithoutProviderApprovalsInput, Prisma.TaskPlanNodeAttemptUncheckedCreateWithoutProviderApprovalsInput>
+}
+
+export type TaskPlanNodeAttemptUpsertWithoutProviderApprovalsInput = {
+  update: Prisma.XOR<Prisma.TaskPlanNodeAttemptUpdateWithoutProviderApprovalsInput, Prisma.TaskPlanNodeAttemptUncheckedUpdateWithoutProviderApprovalsInput>
+  create: Prisma.XOR<Prisma.TaskPlanNodeAttemptCreateWithoutProviderApprovalsInput, Prisma.TaskPlanNodeAttemptUncheckedCreateWithoutProviderApprovalsInput>
+  where?: Prisma.TaskPlanNodeAttemptWhereInput
+}
+
+export type TaskPlanNodeAttemptUpdateToOneWithWhereWithoutProviderApprovalsInput = {
+  where?: Prisma.TaskPlanNodeAttemptWhereInput
+  data: Prisma.XOR<Prisma.TaskPlanNodeAttemptUpdateWithoutProviderApprovalsInput, Prisma.TaskPlanNodeAttemptUncheckedUpdateWithoutProviderApprovalsInput>
+}
+
+export type TaskPlanNodeAttemptUpdateWithoutProviderApprovalsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeLayerId?: Prisma.StringFieldUpdateOperationsInput | string
+  executionContextSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  executionEpoch?: Prisma.IntFieldUpdateOperationsInput | number
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
+  task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
+  planRun?: Prisma.TaskPlanRunUpdateOneRequiredWithoutNodeAttemptsNestedInput
+  providerRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutNodeAttemptNestedInput
+}
+
+export type TaskPlanNodeAttemptUncheckedUpdateWithoutProviderApprovalsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.StringFieldUpdateOperationsInput | string
+  planRunId?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeId?: Prisma.StringFieldUpdateOperationsInput | string
+  nodeLayerId?: Prisma.StringFieldUpdateOperationsInput | string
+  executionContextSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  attemptNumber?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  executionEpoch?: Prisma.IntFieldUpdateOperationsInput | number
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  runtimeSnapshot?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  completedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  failedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockedByEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outputRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  errorRawEventId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedBranchRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  selectedNextNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptCreateManyWorkspaceInput = {
@@ -1476,6 +1654,7 @@ export type TaskPlanNodeAttemptUpdateWithoutWorkspaceInput = {
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
   planRun?: Prisma.TaskPlanRunUpdateOneRequiredWithoutNodeAttemptsNestedInput
   providerRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateWithoutWorkspaceInput = {
@@ -1506,6 +1685,7 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutWorkspaceInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateManyWithoutWorkspaceInput = {
@@ -1594,6 +1774,7 @@ export type TaskPlanNodeAttemptUpdateWithoutTaskInput = {
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
   planRun?: Prisma.TaskPlanRunUpdateOneRequiredWithoutNodeAttemptsNestedInput
   providerRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateWithoutTaskInput = {
@@ -1624,6 +1805,7 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutTaskInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateManyWithoutTaskInput = {
@@ -1712,6 +1894,7 @@ export type TaskPlanNodeAttemptUpdateWithoutPlanRunInput = {
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlanNodeAttemptsNestedInput
   providerRuns?: Prisma.TaskPlanProviderRunUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateWithoutPlanRunInput = {
@@ -1742,6 +1925,7 @@ export type TaskPlanNodeAttemptUncheckedUpdateWithoutPlanRunInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   providerRuns?: Prisma.TaskPlanProviderRunUncheckedUpdateManyWithoutNodeAttemptNestedInput
+  providerApprovals?: Prisma.TaskPlanProviderApprovalUncheckedUpdateManyWithoutNodeAttemptNestedInput
 }
 
 export type TaskPlanNodeAttemptUncheckedUpdateManyWithoutPlanRunInput = {
@@ -1780,10 +1964,12 @@ export type TaskPlanNodeAttemptUncheckedUpdateManyWithoutPlanRunInput = {
 
 export type TaskPlanNodeAttemptCountOutputType = {
   providerRuns: number
+  providerApprovals: number
 }
 
 export type TaskPlanNodeAttemptCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   providerRuns?: boolean | TaskPlanNodeAttemptCountOutputTypeCountProviderRunsArgs
+  providerApprovals?: boolean | TaskPlanNodeAttemptCountOutputTypeCountProviderApprovalsArgs
 }
 
 /**
@@ -1801,6 +1987,13 @@ export type TaskPlanNodeAttemptCountOutputTypeDefaultArgs<ExtArgs extends runtim
  */
 export type TaskPlanNodeAttemptCountOutputTypeCountProviderRunsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TaskPlanProviderRunWhereInput
+}
+
+/**
+ * TaskPlanNodeAttemptCountOutputType without action
+ */
+export type TaskPlanNodeAttemptCountOutputTypeCountProviderApprovalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskPlanProviderApprovalWhereInput
 }
 
 
@@ -1836,6 +2029,7 @@ export type TaskPlanNodeAttemptSelect<ExtArgs extends runtime.Types.Extensions.I
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   planRun?: boolean | Prisma.TaskPlanRunDefaultArgs<ExtArgs>
   providerRuns?: boolean | Prisma.TaskPlanNodeAttempt$providerRunsArgs<ExtArgs>
+  providerApprovals?: boolean | Prisma.TaskPlanNodeAttempt$providerApprovalsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskPlanNodeAttemptCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["taskPlanNodeAttempt"]>
 
@@ -1941,6 +2135,7 @@ export type TaskPlanNodeAttemptInclude<ExtArgs extends runtime.Types.Extensions.
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   planRun?: boolean | Prisma.TaskPlanRunDefaultArgs<ExtArgs>
   providerRuns?: boolean | Prisma.TaskPlanNodeAttempt$providerRunsArgs<ExtArgs>
+  providerApprovals?: boolean | Prisma.TaskPlanNodeAttempt$providerApprovalsArgs<ExtArgs>
   _count?: boolean | Prisma.TaskPlanNodeAttemptCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TaskPlanNodeAttemptIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1961,6 +2156,7 @@ export type $TaskPlanNodeAttemptPayload<ExtArgs extends runtime.Types.Extensions
     task: Prisma.$TaskPayload<ExtArgs>
     planRun: Prisma.$TaskPlanRunPayload<ExtArgs>
     providerRuns: Prisma.$TaskPlanProviderRunPayload<ExtArgs>[]
+    providerApprovals: Prisma.$TaskPlanProviderApprovalPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2388,6 +2584,7 @@ export interface Prisma__TaskPlanNodeAttemptClient<T, Null = never, ExtArgs exte
   task<T extends Prisma.TaskDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskDefaultArgs<ExtArgs>>): Prisma.Prisma__TaskClient<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   planRun<T extends Prisma.TaskPlanRunDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskPlanRunDefaultArgs<ExtArgs>>): Prisma.Prisma__TaskPlanRunClient<runtime.Types.Result.GetResult<Prisma.$TaskPlanRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   providerRuns<T extends Prisma.TaskPlanNodeAttempt$providerRunsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskPlanNodeAttempt$providerRunsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanProviderRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  providerApprovals<T extends Prisma.TaskPlanNodeAttempt$providerApprovalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskPlanNodeAttempt$providerApprovalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanProviderApprovalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2864,6 +3061,30 @@ export type TaskPlanNodeAttempt$providerRunsArgs<ExtArgs extends runtime.Types.E
   take?: number
   skip?: number
   distinct?: Prisma.TaskPlanProviderRunScalarFieldEnum | Prisma.TaskPlanProviderRunScalarFieldEnum[]
+}
+
+/**
+ * TaskPlanNodeAttempt.providerApprovals
+ */
+export type TaskPlanNodeAttempt$providerApprovalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TaskPlanProviderApproval
+   */
+  select?: Prisma.TaskPlanProviderApprovalSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TaskPlanProviderApproval
+   */
+  omit?: Prisma.TaskPlanProviderApprovalOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskPlanProviderApprovalInclude<ExtArgs> | null
+  where?: Prisma.TaskPlanProviderApprovalWhereInput
+  orderBy?: Prisma.TaskPlanProviderApprovalOrderByWithRelationInput | Prisma.TaskPlanProviderApprovalOrderByWithRelationInput[]
+  cursor?: Prisma.TaskPlanProviderApprovalWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskPlanProviderApprovalScalarFieldEnum | Prisma.TaskPlanProviderApprovalScalarFieldEnum[]
 }
 
 /**

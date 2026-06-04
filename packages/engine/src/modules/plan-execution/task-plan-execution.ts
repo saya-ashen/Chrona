@@ -106,7 +106,7 @@ async function advancePlanExecution(input: {
   envelope: PlanGraphCommandEnvelope;
   control?: PlanExecutionControl;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, input.executionSession.workBlockId);
   if (!runtime) {
     return {
       taskId: input.taskId,
@@ -211,6 +211,7 @@ async function advancePlanExecution(input: {
 async function withExecutionLease(input: {
   workspaceId: string;
   taskId: string;
+  workBlockId?: string | null;
   planId: string;
   ownerId: string;
   scope: ExecutionLeaseScope;
@@ -218,6 +219,7 @@ async function withExecutionLease(input: {
 }) {
   const lease = await acquireExecutionLease({
     taskId: input.taskId,
+    workBlockId: input.workBlockId,
     planId: input.planId,
     ownerId: input.ownerId,
     scope: input.scope,
@@ -228,6 +230,7 @@ async function withExecutionLease(input: {
       eventType: "execution.lease_ignored",
       workspaceId: input.workspaceId,
       taskId: input.taskId,
+      workBlockId: input.workBlockId,
       actorType: "runtime",
       actorId: input.scope,
       source: "execution-kernel",
@@ -272,7 +275,7 @@ export async function startPlanExecution(input: {
   prompt?: string;
   workBlockId?: string | null;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
   if (!runtime) {
     return {
       taskId: input.taskId,
@@ -305,6 +308,7 @@ export async function startPlanExecution(input: {
     taskId: input.taskId,
     planId: runtime.planId,
     sessionId: mainSession.id,
+    workBlockId: executionSession.workBlockId,
     eventType: "execution_started",
     payload: { trigger: input.trigger, prompt: input.prompt },
   });
@@ -312,6 +316,7 @@ export async function startPlanExecution(input: {
   return withExecutionLease({
     workspaceId: runtime.workspaceId,
     taskId: input.taskId,
+    workBlockId: runtime.workBlockId,
     planId: runtime.planId,
     ownerId: executionSession.id,
     scope: input.trigger === "scheduler" ? "system" : "manual",
@@ -347,8 +352,9 @@ export async function continuePlanExecution(input: {
   sessionId?: string;
   nodeId?: string;
   resumeReadyNode?: boolean;
+  workBlockId?: string | null;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
   if (!runtime) {
     return {
       taskId: input.taskId,
@@ -381,6 +387,7 @@ export async function continuePlanExecution(input: {
       taskId: input.taskId,
       planId: runtime.planId,
       sessionId: mainSession.id,
+      workBlockId: executionSession.workBlockId,
       eventType: "user_input_received",
       payload: { input: input.userInput, reason: input.reason },
     });
@@ -429,6 +436,7 @@ export async function continuePlanExecution(input: {
   return withExecutionLease({
     workspaceId: runtime.workspaceId,
     taskId: input.taskId,
+    workBlockId: runtime.workBlockId,
     planId: runtime.planId,
     ownerId: executionSession.id,
     scope: "manual",
@@ -460,10 +468,11 @@ async function resumePlanExecutionWithApproval(input: {
   taskId: string;
   sessionId?: string;
   nodeId?: string;
+  workBlockId?: string | null;
   approved: boolean;
   feedback?: string;
 } & PlanExecutionObserver): Promise<PlanExecutionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId);
   if (!runtime) {
     return {
       taskId: input.taskId,
@@ -521,6 +530,7 @@ async function resumePlanExecutionWithApproval(input: {
     taskId: input.taskId,
     planId: runtime.planId,
     sessionId: mainSession.id,
+    workBlockId: executionSession.workBlockId,
     eventType: "user_input_received",
     payload: {
       reason: input.approved ? "approval:approve" : "approval:reject",
@@ -575,6 +585,7 @@ export async function dispatchExecutionAction(input: {
         taskId: input.taskId,
         trigger: "manual",
         prompt: input.action.prompt,
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -583,6 +594,7 @@ export async function dispatchExecutionAction(input: {
       return startPlanExecution({
         taskId: input.taskId,
         trigger: "scheduler",
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -595,6 +607,7 @@ export async function dispatchExecutionAction(input: {
         inputFields: input.action.inputFields,
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -606,6 +619,7 @@ export async function dispatchExecutionAction(input: {
         nodeId: input.action.nodeId,
         approved: input.action.decision === "approve",
         feedback: input.action.feedback ?? input.action.editedContent,
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
@@ -617,10 +631,13 @@ export async function dispatchExecutionAction(input: {
         userInput: input.action.note,
         sessionId: input.action.sessionId,
         nodeId: input.action.nodeId,
+        workBlockId: input.action.workBlockId ?? null,
         onGraphEvent: input.onGraphEvent,
         onRuntimeEvent: input.onRuntimeEvent,
         onStateChange: input.onStateChange,
       });
+    case "submit_node_output":
+      throw new Error("submit_node_output must be handled through node result submission");
     case "complete_manual_node": {
       const action = input.action;
       return withTaskExecutionControl(input.taskId, (control) =>
@@ -729,7 +746,7 @@ export async function submitCheckpointAction(input: {
   taskId: string;
   action: SubmitCheckpointActionInput;
 } & PlanExecutionObserver): Promise<SubmitCheckpointActionResult> {
-  const runtime = await ensureNativePlanRun(input.taskId);
+  const runtime = await ensureNativePlanRun(input.taskId, input.action.workBlockId ?? null);
   if (!runtime) {
     return {
       transition: { type: "stay_paused", reason: "No accepted plan." },
@@ -804,8 +821,14 @@ export async function submitCheckpointAction(input: {
     status,
     effective,
     currentNodeId,
-    continuePlanExecution,
-    resumePlanExecutionWithApproval,
+    continuePlanExecution: (input) => continuePlanExecution({
+      ...input,
+      workBlockId: executionSession.workBlockId,
+    }),
+    resumePlanExecutionWithApproval: (input) => resumePlanExecutionWithApproval({
+      ...input,
+      workBlockId: executionSession.workBlockId,
+    }),
     dispatchExecutionAction,
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,

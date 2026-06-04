@@ -12,7 +12,7 @@ export function jsonOutputText(value: unknown) {
 }
 
 export function stringifyResultOutput(output: NodeResultOutput) {
-  if (output.kind === "text" || output.kind === "markdown") return output.content;
+  if (output.kind === "markdown") return output.content;
   if (output.kind === "json") return jsonOutputText(output.value) ?? JSON.stringify(output.value, null, 2);
   if (output.kind === "file") return [output.title, output.path, output.description].filter(Boolean).join("\n");
   return "";

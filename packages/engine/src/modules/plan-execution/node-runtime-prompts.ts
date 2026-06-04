@@ -6,7 +6,7 @@ import type {
 import { buildNodeRuntimeInput } from "./node-runtime-refs";
 
 export const NODE_RUNTIME_TERMINAL_TOOLS = {
-  task: ["chrona_task_complete", "chrona_node_block", "chrona_node_fail"],
+  task: ["chrona_node_output", "chrona_node_complete", "chrona_node_block", "chrona_node_fail"],
   condition: [
     "chrona_condition_select",
     "chrona_node_block",
@@ -24,13 +24,13 @@ You must never invent or emit backend IDs.
 Do not call chrona_node_read or chrona_execution_read by default.
 Call chrona_node_read only when the current node details, result submission actions, or branch refs are missing, ambiguous, or suspected stale.
 Call chrona_execution_read only after a Chrona result submission action is rejected/errors, or when overall execution status/recovery actions are needed.
-After a Chrona result submission action succeeds, stop immediately. Do not continue downstream nodes.
+After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
 `.trim();
 
 function nodeTypeInstructions(node: EffectivePlanNode): string {
   switch (node.type) {
     case "task":
-      return `Call chrona_task_complete only when the current task-node objective is fully satisfied. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_task_complete. Call chrona_node_fail for unrecoverable errors.`;
+      return `When the current task-node has user-visible deliverables, call chrona_node_output with those outputs before completion. chrona_node_output may be called multiple times to append outputs, or with mode "replace" to replace prior outputs. Call chrona_node_complete only when the current task-node objective is fully satisfied and required outputs have already been submitted. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_node_complete. Call chrona_node_fail for unrecoverable errors.`;
     case "condition":
       return `Evaluate exactly one listed branch and call chrona_condition_select with branchRef. Do not use labels, nextNodeId, default branches, natural-language conclusions, or incomplete JSON as routing authority. If no explicit branchRef is safe, call chrona_node_block.`;
     case "checkpoint":
@@ -58,7 +58,7 @@ export function buildNodeRuntimePrompt(input: {
   const instructions = [
     NODE_RUNTIME_PROTOCOL,
     nodeTypeInstructions(input.node),
-    `When the node work is finished, report the result with one of these Chrona result-submission actions: ${currentNodeResultActionNames.join(", ")}. These actions only report the final outcome of this Chrona node back to Chrona.`,
+    `When task-node work produces deliverables, submit them with chrona_node_output first. Finish with one terminal Chrona action: ${currentNodeResultActionNames.filter((name) => name !== "chrona_node_output").join(", ")}. These actions report this Chrona node outcome back to Chrona.`,
     "Current Node Context JSON:",
     runtimeJson(runtimeInput),
   ].join("\n\n");

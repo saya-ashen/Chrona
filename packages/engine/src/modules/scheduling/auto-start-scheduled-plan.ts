@@ -93,6 +93,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           eventType: "task.auto_start.skipped",
           workspaceId: task.workspaceId,
           taskId: task.id,
+          workBlockId: block.id,
           actorType: "system",
           actorId: "auto-start-scheduler",
           source: "scheduler",
@@ -107,6 +108,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
         publishTaskWorkspaceUpdatedEvent({
           taskId: task.id,
           workspaceId: task.workspaceId,
+          workBlockId: block.id,
           reason: "task.auto_start.skipped",
         });
         continue;

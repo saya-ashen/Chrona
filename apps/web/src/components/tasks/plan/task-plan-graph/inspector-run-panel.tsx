@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles, Terminal } from "lucide-react";
+import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
@@ -77,11 +77,16 @@ function defaultActionForNode(node: PlanNodeDataModel) {
     ?? null;
 }
 
-function ActionButton({ action, isActive, onClick }: { action: PlanNodeAction; isActive: boolean; onClick: () => void }) {
+function isNodeExecutionRunning(node: PlanNodeDataModel) {
+  return node.active === true || node.status === "active" || node.status === "in_progress";
+}
+
+function ActionButton({ action, isActive, disabled, onClick }: { action: PlanNodeAction; isActive: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <Button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       variant={isActive ? "default" : "outline"}
       size="sm"
       className="rounded-xl"
@@ -255,13 +260,6 @@ function outputTitle(output: NodeResultOutput, fallback: string) {
 
 export function ResultOutputCard({ output, graphCopy = DEFAULT_GRAPH_COPY, disableInternalScroll = false }: { output: NodeResultOutput; graphCopy?: GraphCopy; disableInternalScroll?: boolean }) {
   switch (output.kind) {
-    case "text":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <p className="text-xs font-semibold text-muted-foreground">{outputTitle(output, output.kind)}</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">{output.content}</p>
-        </div>
-      );
     case "markdown":
       return (
         <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
@@ -306,36 +304,6 @@ export function ResultOutputCard({ output, graphCopy = DEFAULT_GRAPH_COPY, disab
               {output.language ? <p className="mt-1 text-[11px] font-medium text-muted-foreground">{output.language}</p> : null}
             </div>
           </div>
-        </div>
-      );
-    case "artifact":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <p className="text-sm font-semibold text-foreground">{output.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{graphCopy.runOutputArtifactPrefix}: {output.artifactId}</p>
-          {output.description ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{output.description}</p> : null}
-        </div>
-      );
-    case "command":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2 text-foreground">
-          <div className="flex items-center gap-2">
-            <Terminal className="size-4 text-muted-foreground" />
-            <p className="text-sm font-semibold">{output.title ?? graphCopy.runOutputCommandTitle}</p>
-            {typeof output.exitCode === "number" ? <span className="ml-auto text-xs text-muted-foreground">{graphCopy.runOutputExitPrefix} {output.exitCode}</span> : null}
-          </div>
-          <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-foreground",
-            !disableInternalScroll && "overflow-auto",
-          )}>{output.command}</pre>
-          {output.stdout ? <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words border-t border-border pt-2 text-xs text-foreground",
-            !disableInternalScroll && "max-h-40 overflow-auto",
-          )}>{output.stdout}</pre> : null}
-          {output.stderr ? <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words border-t border-border pt-2 text-xs text-destructive",
-            !disableInternalScroll && "max-h-40 overflow-auto",
-          )}>{output.stderr}</pre> : null}
         </div>
       );
     case "link":
@@ -412,11 +380,15 @@ export function TaskPlanGraphInspectorRunPanel({
   const fieldValues = (useWatch({ control: form.control }) as Record<string, string> | undefined) ?? buildDefaultFieldValues(node.interactiveFields ?? []);
   const [runLog, setRunLog] = useState<Array<{ id: string; title: string; detail: string }>>([]);
   const [isDispatching, setIsDispatching] = useState(false);
+  const previousNodeIdRef = useRef(node.id);
 
   useEffect(() => {
     setSelectedActionId(defaultActionForNode(node));
     form.reset(buildDefaultFieldValues(node.interactiveFields ?? []));
-    setRunLog([]);
+    if (previousNodeIdRef.current !== node.id) {
+      previousNodeIdRef.current = node.id;
+      setRunLog([]);
+    }
   }, [form, node]);
 
   const selectedAction = useMemo(() => node.availableActions?.find((action) => action.id === selectedActionId) ?? null, [node.availableActions, selectedActionId]);
@@ -431,11 +403,40 @@ export function TaskPlanGraphInspectorRunPanel({
   const runPanelHints = useMemo(() => getRunPanelHints(resolvedRunPanelMode, graphCopy), [graphCopy, resolvedRunPanelMode]);
   const availableActions = node.availableActions ?? [];
   const hasExecutionAction = availableActions.some((action) => action.executionAction);
-  const showRunControls = hasExecutionAction || node.status === "ready" || node.status === "active" || node.status === "waiting" || node.status === "blocked";
+  const isExecutionRunning = isNodeExecutionRunning(node);
+  const showRunControls = hasExecutionAction || node.status === "ready" || isExecutionRunning || node.status === "waiting" || node.status === "blocked";
   const SubmitIcon = runPanelCopy.submitIcon;
   const primarySubmitLabel = resolvePrimarySubmitLabel(node, resolvedRunPanelMode, runPanelCopy.submitLabel, graphCopy);
   const interactiveFields = node.interactiveFields ?? [];
   const canSubmitRunAction = interactiveFields.every((field) => !field.required || Boolean(fieldValues[field.key]?.trim()));
+
+  async function dispatchExecutionActionFromPanel(action: PlanNodeAction, label: string) {
+    if (!action.executionAction) return false;
+    if (!onDispatchExecutionAction) {
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: graphCopy.runActionBackendMissing }, ...current].slice(0, 4));
+      return true;
+    }
+
+    setIsDispatching(true);
+    try {
+      const result = await onDispatchExecutionAction(action.executionAction);
+      setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : graphCopy.runActionDispatchFailed;
+      setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} ${graphCopy.runActionStillRunningSuffix}` : `${label} ${graphCopy.runActionFailedSuffix}`, detail: message }, ...current].slice(0, 4));
+    } finally {
+      setIsDispatching(false);
+    }
+    return true;
+  }
+
+  function handleActionButtonClick(action: PlanNodeAction) {
+    if (action.kind === "trigger" && action.executionAction && interactiveFields.length === 0) {
+      void dispatchExecutionActionFromPanel(action, primarySubmitLabel);
+      return;
+    }
+    setSelectedActionId(action.id);
+  }
 
   async function handleRunAction(values: Record<string, string>) {
     const payload = summarizeFieldValues(interactiveFields, values);
@@ -443,24 +444,7 @@ export function TaskPlanGraphInspectorRunPanel({
       ? primarySubmitLabel
       : selectedAction?.label ?? node.nextAction ?? graphCopy.runActionDefaultLabel;
 
-    if (selectedAction?.executionAction) {
-      if (!onDispatchExecutionAction) {
-        setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: graphCopy.runActionBackendMissing }, ...current].slice(0, 4));
-        return;
-      }
-
-      setIsDispatching(true);
-      try {
-        const result = await onDispatchExecutionAction(selectedAction.executionAction);
-        setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: result.message }, ...current].slice(0, 4));
-      } catch (cause) {
-        const message = cause instanceof Error ? cause.message : graphCopy.runActionDispatchFailed;
-        setRunLog((current) => [{ id: `${Date.now()}`, title: message.includes("still running") ? `${label} ${graphCopy.runActionStillRunningSuffix}` : `${label} ${graphCopy.runActionFailedSuffix}`, detail: message }, ...current].slice(0, 4));
-      } finally {
-        setIsDispatching(false);
-      }
-      return;
-    }
+    if (selectedAction && await dispatchExecutionActionFromPanel(selectedAction, label)) return;
 
     if (!onSubmitCheckpointAction) {
       setRunLog((current) => [{ id: `${Date.now()}`, title: label, detail: payload || graphCopy.runActionBackendMissing }, ...current].slice(0, 4));
@@ -532,7 +516,7 @@ export function TaskPlanGraphInspectorRunPanel({
             {availableActions.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {availableActions.map((action) => (
-                  <ActionButton key={action.id} action={action} isActive={selectedActionId === action.id} onClick={() => setSelectedActionId(action.id)} />
+                  <ActionButton key={action.id} action={action} isActive={selectedActionId === action.id} disabled={isDispatching || (isExecutionRunning && Boolean(action.executionAction))} onClick={() => handleActionButtonClick(action)} />
                 ))}
               </div>
             ) : null}
@@ -578,7 +562,7 @@ export function TaskPlanGraphInspectorRunPanel({
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="submit"
-                disabled={isDispatching || (!selectedAction && interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(resolvedRunPanelMode) : !canSubmitRunAction)}
+                disabled={isDispatching || isExecutionRunning || (!selectedAction && interactiveFields.length === 0 ? !["observe", "execute", "wait"].includes(resolvedRunPanelMode) : !canSubmitRunAction)}
                 variant="default" size="sm" className="rounded-xl"
               >
                 {isDispatching

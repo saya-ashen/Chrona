@@ -110,21 +110,24 @@ function derivePlanRunFromRuntime(input: {
   };
 }
 
-export async function ensureNativePlanRun(taskId: string) {
-  const savedCompiled = await getAcceptedCompiledPlan(taskId);
+export async function ensureNativePlanRun(taskId: string, workBlockId?: string | null) {
+  const savedCompiled =
+    (await getAcceptedCompiledPlan(taskId, workBlockId))
+    ?? (workBlockId ? await getAcceptedCompiledPlan(taskId, null) : null);
   if (!savedCompiled) {
     return null;
   }
 
   const { compiledPlan, workspaceId } = savedCompiled;
   const planId = compiledPlan.editablePlanId;
-  let persisted = await getPlanRun(taskId, planId);
+  let persisted = await getPlanRun(taskId, planId, workBlockId);
 
   if (!persisted?.graph) {
     await savePlanRun({
       workspaceId,
       taskId,
       planId,
+      workBlockId,
       run: persisted?.planRun ?? createPlanRunFromCompiledPlan(compiledPlan),
       compiledPlan,
       graph: createPlanGraphFromCompiledPlan({
@@ -135,7 +138,7 @@ export async function ensureNativePlanRun(taskId: string) {
       results: persisted?.results ?? [],
       executionContextSnapshots: persisted?.executionContextSnapshots ?? [],
     });
-    persisted = await getPlanRun(taskId, planId);
+    persisted = await getPlanRun(taskId, planId, workBlockId);
   }
 
   if (!persisted?.graph) {
@@ -143,6 +146,7 @@ export async function ensureNativePlanRun(taskId: string) {
   }
 
   return {
+    workBlockId: workBlockId ?? null,
     taskId,
     workspaceId,
     planId,
@@ -154,6 +158,7 @@ export async function ensureNativePlanRun(taskId: string) {
 export async function persistRuntimeState(input: {
   workspaceId: string;
   taskId: string;
+  workBlockId?: string | null;
   planId: string;
   compiledPlan: CompiledPlan;
   graph: PlanGraph;
@@ -165,6 +170,7 @@ export async function persistRuntimeState(input: {
   await savePlanRun({
     workspaceId: input.workspaceId,
     taskId: input.taskId,
+    workBlockId: input.workBlockId,
     planId: input.planId,
     run: derivePlanRunFromRuntime(input),
     compiledPlan: input.compiledPlan,
@@ -185,6 +191,7 @@ export async function persistRuntimeState(input: {
 export async function persistTerminalRuntimeState(input: {
   workspaceId: string;
   taskId: string;
+  workBlockId?: string | null;
   planId: string;
   compiledPlan: CompiledPlan;
   persisted: PersistedPlanRun;
@@ -203,6 +210,7 @@ export async function persistTerminalRuntimeState(input: {
   await savePlanRun({
     workspaceId: input.workspaceId,
     taskId: input.taskId,
+    workBlockId: input.workBlockId,
     planId: input.planId,
     run: derivePlanRunFromRuntime({
       existingRun: input.persisted.planRun,
@@ -235,8 +243,8 @@ async function syncNormalizedRuntimeState(input: {
   results: NodeResult[];
 }) {
   if (input.attempts.length === 0) return;
-  const planRun = await db.taskPlanRun.findUnique({
-    where: { taskId_planId: { taskId: input.taskId, planId: input.planId } },
+  const planRun = await db.taskPlanRun.findFirst({
+    where: { taskId: input.taskId, planId: input.planId },
     select: { id: true, executionEpoch: true },
   });
   if (!planRun) return;

@@ -6,10 +6,11 @@ function fixtureUrl(eventTitle: string, key: string) {
 
 test.describe("external calendar events on schedule", () => {
   test("shows imported calendar tasks on desktop, tablet, and mobile", async ({ page }, testInfo) => {
-    const sourceName = `Planning calendar ${testInfo.project.name}`;
+    const sourceName = `Planning calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
     const eventTitle = `External standup ${testInfo.project.name}`;
     await page.goto("/en/schedule?day=2026-05-04");
     await page.getByRole("tab", { name: /calendar/i }).click();
+    await page.getByRole("button", { name: /connect calendar/i }).click();
 
     await page.getByLabel(/display name/i).first().fill(sourceName);
     await page.getByLabel(/calendar url/i).fill(fixtureUrl(eventTitle, sourceName));

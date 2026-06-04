@@ -23,6 +23,7 @@ export async function acceptTaskResult(input: { taskId: string }) {
     eventType: "task.result_accepted",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     runId: latestRun.id,
     actorType: "user",
     actorId: "server-action",

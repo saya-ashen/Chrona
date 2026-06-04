@@ -61,12 +61,11 @@ export async function rebuildTaskProjection(taskId: string) {
   const currentWorkBlock = pickProjectionWorkBlock(task.workBlocks, now);
   const latestEvent = task.events[0] ?? null;
   const currentNode = activeSession?.currentNodeId && activeSession.planId
-    ? await db.taskPlanRun.findUnique({
+    ? await db.taskPlanRun.findFirst({
         where: {
-          taskId_planId: {
-            taskId: task.id,
-            planId: activeSession.planId,
-          },
+          taskId: task.id,
+          planId: activeSession.planId,
+          workBlockId: activeSession.workBlockId ?? null,
         },
         select: { planRun: true },
       })

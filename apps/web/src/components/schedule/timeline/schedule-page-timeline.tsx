@@ -231,7 +231,7 @@ export function DayTimeline({
       startEditable: !isPending,
       classNames: [
         "chrona-calendar-event",
-        selectedTaskId === item.taskId ? "chrona-calendar-event-selected" : "",
+        selectedTaskId === (item.workBlockId ?? item.taskId) || selectedTaskId === item.taskId ? "chrona-calendar-event-selected" : "",
         isCurrent ? "chrona-calendar-event-current" : "",
         isPast ? "chrona-calendar-event-past" : "",
         hasConflict ? "chrona-calendar-event-conflict" : "",
@@ -669,12 +669,12 @@ export function DayTimeline({
           ) : null}
           <div className="sr-only">
             {items.map((item) => (
-              <div key={item.taskId}>
+              <div key={item.workBlockId ?? item.taskId}>
                 <a
-                  href={buildScheduleHref(selectedDay, item.taskId)}
+                  href={buildScheduleHref(selectedDay, item.taskId, item.workBlockId)}
                   onClick={(event) => {
                     event.preventDefault();
-                    onSelectTask(item.taskId);
+                    onSelectTask(item.workBlockId ?? item.taskId);
                   }}
                   onKeyDown={(event) => {
                     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
@@ -737,7 +737,7 @@ export function DayTimeline({
             eventClick={(info) => {
               info.jsEvent.preventDefault();
               const clicked = selectedItemById.get(info.event.id);
-              onSelectTask(clicked?.taskId ?? info.event.id);
+              onSelectTask(clicked ? clicked.workBlockId ?? clicked.taskId : info.event.id);
             }}
             eventDragStart={(info) => setHiddenTaskId(info.event.id)}
             eventDragStop={() => {

@@ -14,6 +14,11 @@ const mocks = vi.hoisted(() => ({
   planGenerationStatus: "idle" as TaskPlanGenerationStatus,
   canAcceptPlan: false,
   setPageContext: vi.fn(),
+  navigate: vi.fn(),
+}));
+
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mocks.navigate,
 }));
 
 vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
@@ -21,6 +26,10 @@ vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
     registerHandlers: vi.fn(() => vi.fn()),
     setPageContext: mocks.setPageContext,
   }),
+}));
+
+vi.mock("../execution/provider-approval-banner", () => ({
+  ProviderApprovalBanner: () => null,
 }));
 
 vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", () => ({
@@ -100,7 +109,7 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () 
 }));
 
 vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
-  TaskWorkspaceHeaderCard: ({ task, header, workspaceStateGuidance, planAction }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; workspaceStateGuidance?: string; planAction?: { label: string; disabled?: boolean; isLoading?: boolean } }) => (
+  TaskWorkspaceHeaderCard: ({ task, header, workspaceStateGuidance, planAction, onSelectOccurrence }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; workspaceStateGuidance?: string; planAction?: { label: string; disabled?: boolean; isLoading?: boolean }; onSelectOccurrence?: (occurrence: NonNullable<TaskPageData["task"]["recurrenceOccurrences"]>[number]) => void }) => (
     <header>
       <h1>{task.title}</h1>
       <section aria-label="Workspace state">
@@ -108,6 +117,14 @@ vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
         <p>{header.status === "running" ? "Running" : header.status}</p>
       </section>
       <p>header-status:{task.status}</p>
+      {task.recurrenceOccurrences?.find((occurrence) => !occurrence.isCurrent) ? (
+        <button
+          type="button"
+          onClick={() => onSelectOccurrence?.(task.recurrenceOccurrences!.find((occurrence) => !occurrence.isCurrent)!)}
+        >
+          Switch occurrence
+        </button>
+      ) : null}
       <p>workspace-status:{header.status}</p>
       <p>{workspaceStateGuidance}</p>
       <p>primary-action:{header.actions.find((action) => action.id !== "more")?.label ?? "none"}</p>
@@ -175,6 +192,7 @@ afterEach(() => {
   mocks.planGenerationStatus = "idle";
   mocks.canAcceptPlan = false;
   mocks.setPageContext.mockClear();
+  mocks.navigate.mockClear();
 });
 
 function taskData(): TaskPageData {
@@ -263,7 +281,40 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("plan:none")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+
   });
+  it("navigates to the selected recurrence occurrence", () => {
+    const data = taskData();
+    data.task.recurrenceOccurrences = [
+      {
+        taskId: data.task.id,
+        title: data.task.title,
+        status: data.task.status,
+        scheduledStartAt: "2026-06-04T14:00:00.000Z",
+        scheduledEndAt: "2026-06-04T15:00:00.000Z",
+        workBlockId: "block-current",
+        isCurrent: true,
+      },
+      {
+        taskId: data.task.id,
+        title: data.task.title,
+        status: data.task.status,
+        scheduledStartAt: "2026-06-05T14:00:00.000Z",
+        scheduledEndAt: "2026-06-05T15:00:00.000Z",
+        workBlockId: "block-next",
+        isCurrent: false,
+      },
+    ];
+
+    render(<TaskWorkspacePage data={data} />);
+    fireEvent.click(screen.getByRole("button", { name: "Switch occurrence" }));
+
+    expect(mocks.navigate).toHaveBeenCalledWith({
+      pathname: "/en/tasks/task-1",
+      search: "?workBlockId=block-next",
+    });
+  });
+
 
   it("passes generating-plan state through the console regions", () => {
     mocks.planGenerationStatus = "generating";

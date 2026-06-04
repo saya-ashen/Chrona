@@ -30,6 +30,7 @@ export async function clearSchedule(input: { taskId: string }) {
     eventType: "task.unscheduled",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     actorType: "user",
     actorId: "server-action",
     source: "ui",

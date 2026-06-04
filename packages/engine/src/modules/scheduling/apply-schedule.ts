@@ -90,6 +90,7 @@ export async function applySchedule(input: {
     eventType: "task.schedule_changed",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     actorType: "user",
     actorId: "server-action",
     source: "ui",

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useI18n } from "@chrona/i18n/react";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "../sections/task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
-import type { TaskPageData } from "../model/task-workspace-types";
+import { ProviderApprovalBanner } from "../execution/provider-approval-banner";
+import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { useTaskWorkspaceDeleteFlow } from "../hooks/use-task-workspace-delete-flow";
 import { useTaskWorkspaceEditorState } from "../hooks/use-task-workspace-editor-state";
@@ -33,6 +35,7 @@ type TaskWorkspaceHeaderEditorProps = {
   backToScheduleLabel: string;
   planAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["planAction"];
   onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
+  onSelectOccurrence: (occurrence: NonNullable<TaskData["recurrenceOccurrences"]>[number]) => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
@@ -88,6 +91,7 @@ function TaskWorkspaceHeaderEditor({
   backToScheduleLabel,
   planAction,
   onAction,
+  onSelectOccurrence,
   showDeleteConfirm,
   isDeleting,
   onStartDeleteConfirm,
@@ -107,6 +111,7 @@ function TaskWorkspaceHeaderEditor({
         workspaceStateGuidance={workspaceStateGuidance}
         planAction={planAction}
         onAction={onAction}
+        onSelectOccurrence={onSelectOccurrence}
         onEdit={() => setIsEditExpanded((current) => !current)}
         showDeleteConfirm={showDeleteConfirm}
         isDeleting={isDeleting}
@@ -186,11 +191,17 @@ function createHeaderPlanAction({
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
-  const { messages } = useI18n();
+  const { locale, messages } = useI18n();
   const executionConsoleCopy = messages.components?.taskWorkspace ?? {};
   const { registerHandlers, setPageContext } = useAssistantSurface();
   const { pageData, setTask, refreshWorkspace, workspaceEvents } = useTaskWorkspacePageState(data);
   const task = pageData.task;
+  const navigate = useNavigate();
+  const handleSelectOccurrence = (occurrence: NonNullable<typeof task.recurrenceOccurrences>[number]) => {
+    if (occurrence.isCurrent) return;
+    const search = occurrence.workBlockId ? `?workBlockId=${encodeURIComponent(occurrence.workBlockId)}` : "";
+    void navigate({ pathname: `/${locale}/tasks/${occurrence.taskId}`, search });
+  };
 
   const {
     hasUnsavedConfigChanges,
@@ -301,6 +312,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           workspaceStateLabel={consoleView.states.treatment.label ?? undefined}
           workspaceStateGuidance={`${copy.nextAction}: ${consoleView.states.treatment.guidance}`}
           planAction={planAction}
+          onSelectOccurrence={handleSelectOccurrence}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });
@@ -336,6 +348,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           }}
         />
       </div>
+      <ProviderApprovalBanner taskId={task.id} />
+
 
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}

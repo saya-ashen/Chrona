@@ -530,6 +530,67 @@ describe("SelectedBlockSheet – layout order", () => {
     expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "waiting_acceptance");
   });
 
+  it("keeps the generated plan visible after accepting it", async () => {
+    const generatedPlan = makeStubTaskPlanReadModel({
+      id: "plan-generated",
+      status: "draft",
+      revision: 3,
+      summary: "generated plan",
+      updatedAt: "2026-04-25T12:00:00.000Z",
+    });
+    const acceptedPlan = { ...generatedPlan, status: "accepted" as const };
+    const onMutatedAction = vi.fn().mockResolvedValue(undefined);
+    mockFetch.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes("/api/tasks/") && url.includes("/plan/accept")) {
+        return Promise.resolve(createJsonResponse({ savedPlan: acceptedPlan }));
+      }
+
+      return Promise.resolve(createJsonResponse([]));
+    });
+
+    const { rerender } = render(<SelectedBlockSheet {...defaultSheetProps} onMutatedAction={onMutatedAction} />);
+
+    const loadedPanelProps = taskDecompositionPanelProps.mock.calls.at(-1)?.[0] as {
+      onPlanLoaded?: (savedPlan: unknown) => void;
+    };
+    await act(async () => {
+      loadedPanelProps.onPlanLoaded?.(generatedPlan);
+    });
+
+    const applyPanelProps = taskDecompositionPanelProps.mock.calls.at(-1)?.[0] as {
+      onApply?: (savedPlan: unknown) => Promise<void> | void;
+    };
+    await act(async () => {
+      await applyPanelProps.onApply?.(generatedPlan);
+    });
+
+    expect(onMutatedAction).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-generated");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-active-accepted-plan-id", "plan-generated");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "accepted");
+
+    rerender(<SelectedBlockSheet {...defaultSheetProps} onMutatedAction={onMutatedAction} item={{
+      ...mockItem,
+      aiPlanGenerationStatus: "waiting_acceptance",
+      savedPlan: makeSchedulePlanSnapshot({
+        id: "plan-generated",
+        status: "draft",
+        revision: 3,
+        updatedAt: "2026-04-25T12:00:00.000Z",
+      }),
+    }} />);
+
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-saved-plan-id", "plan-generated");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-active-accepted-plan-id", "plan-generated");
+    expect(screen.getByTestId("task-decomposition-panel")).toHaveAttribute("data-generation-status", "accepted");
+  });
+
 
   it("syncs the sidebar status and plan when the selected task prop changes", async () => {
     const { rerender } = render(<SelectedBlockSheet {...defaultSheetProps} />);

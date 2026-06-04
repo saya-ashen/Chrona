@@ -161,12 +161,13 @@ export function buildTodayFocusItems(
   return Array.from(focus.values()).slice(0, 5);
 }
 
-export function buildScheduleHref(day: string, taskId?: string) {
+export function buildScheduleHref(day: string, taskId?: string, workBlockId?: string) {
   const params = new URLSearchParams();
   params.set("day", day);
 
-  if (taskId) {
-    params.set("task", taskId);
+  const selectedId = workBlockId ?? taskId;
+  if (selectedId) {
+    params.set("task", selectedId);
   }
 
   return `/schedule?${params.toString()}`;

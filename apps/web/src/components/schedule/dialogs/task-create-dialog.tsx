@@ -34,17 +34,9 @@ import {
   TaskConfigField,
 } from "@/components/schedule/forms/task-config-form";
 
-/* ------------------------------------------------------------------ */
-/*  Recurrence presets                                                */
-/* ------------------------------------------------------------------ */
-const RECURRENCE_PRESETS = ["daily", "weekly", "monthly", "custom"] as const;
-type RecurrencePreset = (typeof RECURRENCE_PRESETS)[number];
+import { RECURRENCE_PRESETS, recurrenceRuleFromState, type RecurrencePreset } from "@/lib/recurrence-presets";
 
-const RECURRENCE_PRESET_RRULE: Record<Exclude<RecurrencePreset, "custom">, string> = {
-  daily: "FREQ=DAILY",
-  weekly: "FREQ=WEEKLY",
-  monthly: "FREQ=MONTHLY",
-};
+const RECURRENCE_UI_PRESETS = RECURRENCE_PRESETS.filter((p) => p !== "none");
 
 /* ------------------------------------------------------------------ */
 /*  Priority badge color map                                          */
@@ -242,11 +234,7 @@ export function TaskCreateDialog({
     const scheduledEndAt = new Date(startDate);
     scheduledEndAt.setHours(endHours, endMinutes, 0, 0);
 
-    const recurrenceRule = !repeatEnabled
-      ? null
-      : recurrenceMode === "custom"
-        ? customRRULE.trim() || null
-        : RECURRENCE_PRESET_RRULE[recurrenceMode] ?? null;
+    const recurrenceRule = !repeatEnabled ? null : recurrenceRuleFromState(recurrenceMode, customRRULE);
 
     await onSubmit({
       title: title.trim(),
@@ -538,7 +526,7 @@ export function TaskCreateDialog({
                 {repeatEnabled && (
                   <div className="mt-3 space-y-3 border-t border-border/30 pt-3">
                     <div className="flex gap-2">
-                      {RECURRENCE_PRESETS.map((preset) => (
+                      {RECURRENCE_UI_PRESETS.map((preset) => (
                         <Button
                           key={preset}
                           type="button"

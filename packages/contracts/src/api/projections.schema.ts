@@ -30,11 +30,13 @@ export const workCommandBodySchema = z.union([
   workspaceCommandBaseSchema.extend({
     type: z.literal("plan.generate"),
     forceRefresh: z.boolean().optional(),
+    workBlockId: z.string().min(1).nullable().optional(),
     userInstruction: z.string().optional().nullable(),
   }),
   workspaceCommandBaseSchema.extend({
     type: z.literal("plan.accept"),
     planId: z.string().min(1),
+    workBlockId: z.string().min(1).nullable().optional(),
   }),
   executionActionBodySchema.and(workspaceCommandBaseSchema.extend({
     type: z.literal("execution.action"),
@@ -44,6 +46,7 @@ export const workCommandBodySchema = z.union([
     checkpointId: z.string().min(1),
     action: checkpointActionKindSchema,
     payload: z.record(z.string(), z.unknown()).optional(),
+    workBlockId: z.string().min(1).nullable().optional(),
   }),
 ]);
 

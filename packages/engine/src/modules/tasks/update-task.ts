@@ -8,7 +8,11 @@ import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config"
 import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
 import { deriveTaskStaticState } from "@chrona/domain";
 import { normalizeAutomationTiming } from "@chrona/contracts";
+import { expandRecurrenceRule } from "@chrona/integrations";
 import type { UpdateTaskInput } from "@chrona/contracts";
+
+const SELF_SERIES_WINDOW_DAYS = 180;
+const SELF_SERIES_MAX_OCCURRENCES = 365;
 
 function normalizeRequiredUpdateTextField(
   value: string | undefined,
@@ -146,6 +150,37 @@ export async function updateTask(
       ? normalizeAutomationTiming(input.autoExecuteTiming)
       : normalizeAutomationTiming(currentTask.autoExecuteTiming);
 
+  const nextRecurrenceRule = input.recurrenceRule === undefined
+    ? currentTask.recurrenceRule
+    : input.recurrenceRule?.trim() || null;
+  const recurrenceChanged = input.recurrenceRule !== undefined;
+  const shouldMaterializeRecurrence = Boolean(
+    recurrenceChanged &&
+    nextRecurrenceRule &&
+    input.recurrenceAnchorStartAt &&
+    input.recurrenceAnchorEndAt,
+  );
+  const recurrenceAnchorStartAt = input.recurrenceAnchorStartAt
+    ? new Date(input.recurrenceAnchorStartAt)
+    : null;
+  const recurrenceAnchorEndAt = input.recurrenceAnchorEndAt
+    ? new Date(input.recurrenceAnchorEndAt)
+    : null;
+
+  if (input.recurrenceRule && (!recurrenceAnchorStartAt || !recurrenceAnchorEndAt)) {
+    throw new Error("recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set");
+  }
+  if (
+    input.recurrenceRule &&
+    recurrenceAnchorStartAt &&
+    recurrenceAnchorEndAt &&
+    recurrenceAnchorEndAt.getTime() <= recurrenceAnchorStartAt.getTime()
+  ) {
+    throw new Error("recurrenceAnchorEndAt must be after recurrenceAnchorStartAt");
+  }
+  const shouldCancelOpenWorkBlocks = nextStatus === TaskStatus.Cancelled &&
+    currentTask.status !== TaskStatus.Cancelled;
+
   const changedFields = [
     input.title !== undefined ? "title" : null,
     input.description !== undefined ? "description" : null,
@@ -158,6 +193,7 @@ export async function updateTask(
     input.executionRuntime !== undefined ? "executionRuntime" : null,
     input.executionConfig !== undefined ? "executionConfig" : null,
     input.sessionStrategy !== undefined ? "executionConfig" : null,
+    input.recurrenceRule !== undefined ? "recurrenceRule" : null,
   ].filter((field): field is string => field !== null);
 
   const task = await db.task.update({
@@ -184,13 +220,104 @@ export async function updateTask(
         ? (validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject)
         : executionConfig,
       status: nextStatus,
+      recurrenceRule: input.recurrenceRule !== undefined ? nextRecurrenceRule : undefined,
+      kind: input.recurrenceRule !== undefined ? (nextRecurrenceRule ? "recurring" : "single") : undefined,
+      recurrenceAnchorStartAt: input.recurrenceRule !== undefined ? recurrenceAnchorStartAt : undefined,
+      recurrenceAnchorEndAt: input.recurrenceRule !== undefined ? recurrenceAnchorEndAt : undefined,
+      recurrenceWindowUntil: input.recurrenceRule !== undefined && recurrenceAnchorStartAt
+        ? new Date(recurrenceAnchorStartAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+        : input.recurrenceRule !== undefined
+          ? null
+          : undefined,
+      seriesExternalUid: input.recurrenceRule !== undefined ? null : undefined,
     },
   });
 
+  if (shouldCancelOpenWorkBlocks) {
+    await db.workBlock.updateMany({
+      where: {
+        taskId: task.id,
+        status: { in: ["Scheduled", "Active"] },
+      },
+      data: {
+        status: "Cancelled",
+        completedAt: new Date(),
+      },
+    });
+  }
+
+  if (!shouldCancelOpenWorkBlocks && recurrenceChanged && !nextRecurrenceRule) {
+    await db.workBlock.updateMany({
+      where: {
+        taskId: task.id,
+        status: "Scheduled",
+        recurrenceKey: { not: null },
+      },
+      data: {
+        status: "Cancelled",
+        completedAt: new Date(),
+      },
+    });
+  }
+
+  if (!shouldCancelOpenWorkBlocks && shouldMaterializeRecurrence && recurrenceAnchorStartAt && recurrenceAnchorEndAt && nextRecurrenceRule) {
+    const durationMs = recurrenceAnchorEndAt.getTime() - recurrenceAnchorStartAt.getTime();
+    const windowTo = new Date(
+      recurrenceAnchorStartAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const occurrences = expandRecurrenceRule(nextRecurrenceRule, recurrenceAnchorStartAt, durationMs, {
+      from: recurrenceAnchorStartAt,
+      to: windowTo,
+      maxOccurrences: SELF_SERIES_MAX_OCCURRENCES,
+    });
+    const nextKeys = new Set(occurrences.map((occurrence) => occurrence.startsAt.toISOString()));
+
+    await db.workBlock.updateMany({
+      where: {
+        taskId: task.id,
+        status: "Scheduled",
+        recurrenceKey: { not: null },
+        NOT: { recurrenceKey: { in: [...nextKeys] } },
+      },
+      data: {
+        status: "Cancelled",
+        completedAt: new Date(),
+      },
+    });
+
+    for (const occurrence of occurrences) {
+      const recurrenceKey = occurrence.startsAt.toISOString();
+      await db.workBlock.upsert({
+        where: {
+          taskId_recurrenceKey: {
+            taskId: task.id,
+            recurrenceKey,
+          },
+        },
+        create: {
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          recurrenceKey,
+          title: task.title,
+          status: "Scheduled",
+          scheduledStartAt: occurrence.startsAt,
+          scheduledEndAt: occurrence.endsAt,
+          trigger: "manual",
+        },
+        update: {
+          title: task.title,
+          scheduledStartAt: occurrence.startsAt,
+          scheduledEndAt: occurrence.endsAt,
+          trigger: "manual",
+        },
+      });
+    }
+  }
   await appendCanonicalEvent({
     eventType: "task.updated",
     workspaceId: task.workspaceId,
     taskId: task.id,
+    workBlockId: null,
     actorType: "user",
     actorId: "server-action",
     source: "ui",

@@ -3,6 +3,38 @@ import type { ExecutionActionType } from "./commands";
 import type { EffectivePlanGraph } from "./graph";
 import type { PlanExecutionResult, TaskPlanReadModel } from "./execution-state";
 
+export type ProviderApprovalChoice = "approve_once" | "approve_session" | "approve_always" | "deny";
+
+export type ProviderApprovalReadModel = {
+  id?: string;
+  provider: string;
+  runId: string;
+  nativeRunId?: string;
+  sessionId?: string;
+  kind: string;
+  providerKind?: string;
+  title: string;
+  summary: string;
+  description?: string;
+  riskLevel: "low" | "medium" | "high" | "critical" | "unknown";
+  subject?: {
+    type: "command" | "tool" | "url" | "file" | "provider_raw";
+    label: string;
+    preview?: string;
+    language?: string;
+  };
+  choices: ProviderApprovalChoice[];
+  defaultChoice?: ProviderApprovalChoice;
+  recommendedChoice?: ProviderApprovalChoice;
+  scopePolicy?: {
+    supportsOnce: boolean;
+    supportsSession: boolean;
+    supportsAlways: boolean;
+    supportsResolveAll: boolean;
+  };
+  raw?: unknown;
+};
+
 export type PlanExecutionRuntimeDisplayEvent =
   | {
       type: "assistant_text_delta";
@@ -28,7 +60,7 @@ export type PlanExecutionRuntimeDisplayEvent =
     }
   | {
       type: "approval_required";
-      approval: Record<string, unknown>;
+      approval: ProviderApprovalReadModel;
     }
   | {
       type: "run_status";

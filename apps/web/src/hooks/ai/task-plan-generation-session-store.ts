@@ -47,6 +47,14 @@ type SessionEntry = {
   hydratePromise: Promise<void> | null;
 };
 
+function sessionKey(taskId: string, workBlockId?: string | null) {
+  return workBlockId ? `${taskId}:${workBlockId}` : taskId;
+}
+
+function workBlockQuery(workBlockId?: string | null) {
+  return workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
+}
+
 function createIdleState(taskId: string): TaskPlanSessionState {
   return {
     taskId,
@@ -70,17 +78,17 @@ function createIdleState(taskId: string): TaskPlanSessionState {
 
 const sessions = new Map<string, SessionEntry>();
 
-function getEntry(taskId: string) {
-  let entry = sessions.get(taskId);
+function getEntry(key: string) {
+  let entry = sessions.get(key);
   if (!entry) {
     entry = {
-      state: createIdleState(taskId),
+      state: createIdleState(key),
       listeners: new Set(),
       streamController: null,
       activeSubscriptionController: null,
       hydratePromise: null,
     };
-    sessions.set(taskId, entry);
+    sessions.set(key, entry);
   }
   return entry;
 }
@@ -91,14 +99,14 @@ function emit(entry: SessionEntry) {
   }
 }
 
-function patchState(taskId: string, updater: (state: TaskPlanSessionState) => TaskPlanSessionState) {
-  const entry = getEntry(taskId);
+function patchState(key: string, updater: (state: TaskPlanSessionState) => TaskPlanSessionState) {
+  const entry = getEntry(key);
   entry.state = updater(entry.state);
   emit(entry);
 }
 
-function applySessionSnapshot(taskId: string, snapshot: TaskPlanGenerationSessionReadModel | null) {
-  patchState(taskId, (state) => {
+function applySessionSnapshot(key: string, snapshot: TaskPlanGenerationSessionReadModel | null) {
+  patchState(key, (state) => {
     if (!snapshot) {
       return {
         ...state,
@@ -106,18 +114,8 @@ function applySessionSnapshot(taskId: string, snapshot: TaskPlanGenerationSessio
         hydrated: true,
         connected: false,
         isLoading: false,
-        sessionStatus:
-          state.sessionStatus === "failed"
-            ? "failed"
-            : state.result
-              ? "completed"
-              : "idle",
-        phase:
-          state.sessionStatus === "failed"
-            ? "error"
-            : state.result
-              ? "done"
-              : "idle",
+        sessionStatus: state.sessionStatus === "failed" ? "failed" : state.result ? "completed" : "idle",
+        phase: state.sessionStatus === "failed" ? "error" : state.result ? "done" : "idle",
       };
     }
 
@@ -129,12 +127,7 @@ function applySessionSnapshot(taskId: string, snapshot: TaskPlanGenerationSessio
       isLoading: snapshot.status === "running",
       error: snapshot.error?.message ?? null,
       errorCode: snapshot.error?.code ?? null,
-      phase:
-        snapshot.status === "failed"
-          ? "error"
-          : snapshot.status === "completed"
-            ? "done"
-            : snapshot.phase ?? "connecting",
+      phase: snapshot.status === "failed" ? "error" : snapshot.status === "completed" ? "done" : snapshot.phase ?? "connecting",
       statusMessage: snapshot.statusMessage,
       partialText: snapshot.partialText,
       startedAt: snapshot.startedAt,
@@ -145,8 +138,8 @@ function applySessionSnapshot(taskId: string, snapshot: TaskPlanGenerationSessio
   });
 }
 
-function applyStreamEvent(taskId: string, event: string, data: Record<string, unknown>) {
-  patchState(taskId, (state) => {
+function applyStreamEvent(key: string, event: string, data: Record<string, unknown>) {
+  patchState(key, (state) => {
     switch (event) {
       case "session": {
         const generationId = typeof data.generationId === "string" ? data.generationId : state.generationId;
@@ -160,12 +153,7 @@ function applyStreamEvent(taskId: string, event: string, data: Record<string, un
             isLoading: snapshot.status === "running",
             error: snapshot.error?.message ?? null,
             errorCode: snapshot.error?.code ?? null,
-            phase:
-              snapshot.status === "failed"
-                ? "error"
-                : snapshot.status === "completed"
-                  ? "done"
-                  : snapshot.phase ?? "connecting",
+            phase: snapshot.status === "failed" ? "error" : snapshot.status === "completed" ? "done" : snapshot.phase ?? "connecting",
             statusMessage: snapshot.statusMessage,
             partialText: snapshot.partialText,
             startedAt: snapshot.startedAt,
@@ -189,10 +177,7 @@ function applyStreamEvent(taskId: string, event: string, data: Record<string, un
           ...state,
           sessionStatus: "running",
           isLoading: true,
-          phase:
-            typeof data.phase === "string"
-              ? (data.phase as TaskPlanSessionState["phase"])
-              : "connecting",
+          phase: typeof data.phase === "string" ? (data.phase as TaskPlanSessionState["phase"]) : "connecting",
           statusMessage: typeof data.message === "string" ? data.message : null,
           connected: true,
           hydrated: true,
@@ -279,14 +264,15 @@ function applyStreamEvent(taskId: string, event: string, data: Record<string, un
   });
 }
 
-async function fetchActiveSnapshot(taskId: string) {
-  const response = await fetch(`/api/tasks/${taskId}/plan/generations/active`, {
+async function fetchActiveSnapshot(taskId: string, workBlockId?: string | null) {
+  const key = sessionKey(taskId, workBlockId);
+  const response = await fetch(`/api/tasks/${taskId}/plan/generations/active${workBlockQuery(workBlockId)}`, {
     headers: buildAccessKeyHeaders(),
   });
   handleUnauthorizedResponse(response);
   if (!response.ok) {
     if (response.status === 404) {
-      applySessionSnapshot(taskId, null);
+      applySessionSnapshot(key, null);
       return;
     }
     throw new Error(`Failed to load active task plan generation (${response.status})`);
@@ -295,25 +281,27 @@ async function fetchActiveSnapshot(taskId: string) {
   const payload = await response.json() as {
     generationSession?: TaskPlanGenerationSessionReadModel | null;
   };
-  applySessionSnapshot(taskId, payload.generationSession ?? null);
+  applySessionSnapshot(key, payload.generationSession ?? null);
 }
 
-async function ensureHydrated(taskId: string) {
-  const entry = getEntry(taskId);
+async function ensureHydrated(taskId: string, workBlockId?: string | null) {
+  const key = sessionKey(taskId, workBlockId);
+  const entry = getEntry(key);
   if (entry.state.hydrated) {
     return;
   }
   if (entry.hydratePromise) {
     return entry.hydratePromise;
   }
-  entry.hydratePromise = fetchActiveSnapshot(taskId).finally(() => {
+  entry.hydratePromise = fetchActiveSnapshot(taskId, workBlockId).finally(() => {
     entry.hydratePromise = null;
   });
   return entry.hydratePromise;
 }
 
-function ensureActiveSubscription(taskId: string) {
-  const entry = getEntry(taskId);
+function ensureActiveSubscription(taskId: string, workBlockId?: string | null) {
+  const key = sessionKey(taskId, workBlockId);
+  const entry = getEntry(key);
   if (entry.activeSubscriptionController || entry.streamController || entry.state.sessionStatus !== "running") {
     return;
   }
@@ -321,18 +309,18 @@ function ensureActiveSubscription(taskId: string) {
   const controller = new AbortController();
   entry.activeSubscriptionController = controller;
 
-  void fetchJsonEventSource(`/api/tasks/${taskId}/plan/generations/active/events`, {
+  void fetchJsonEventSource(`/api/tasks/${taskId}/plan/generations/active/events${workBlockQuery(workBlockId)}`, {
     method: "GET",
     headers: { Accept: "text/event-stream" },
     signal: controller.signal,
     onEvent({ event, data }) {
-      applyStreamEvent(taskId, event, data);
+      applyStreamEvent(key, event, data);
     },
   }).catch((error) => {
     if (error instanceof DOMException && error.name === "AbortError") {
       return;
     }
-    patchState(taskId, (state) => ({
+    patchState(key, (state) => ({
       ...state,
       connected: false,
       error: error instanceof Error ? error.message : "Failed to subscribe to active plan generation",
@@ -340,26 +328,28 @@ function ensureActiveSubscription(taskId: string) {
       hydrated: true,
     }));
   }).finally(() => {
-    const current = getEntry(taskId);
+    const current = getEntry(key);
     if (current.activeSubscriptionController === controller) {
       current.activeSubscriptionController = null;
     }
   });
 }
 
-export async function hydrateTaskPlanGenerationSession(taskId: string) {
-  await ensureHydrated(taskId);
-  ensureActiveSubscription(taskId);
+export async function hydrateTaskPlanGenerationSession(taskId: string, workBlockId?: string | null) {
+  await ensureHydrated(taskId, workBlockId);
+  ensureActiveSubscription(taskId, workBlockId);
 }
 
 export async function startTaskPlanGenerationSession(input: {
   taskId: string;
+  workBlockId?: string | null;
   forceRefresh?: boolean;
   userInstruction?: string | null;
 }) {
-  const { taskId, forceRefresh = true } = input;
+  const { taskId, workBlockId = null, forceRefresh = true } = input;
+  const key = sessionKey(taskId, workBlockId);
   const userInstruction = input.userInstruction?.trim() || null;
-  const entry = getEntry(taskId);
+  const entry = getEntry(key);
   entry.streamController?.abort();
   entry.activeSubscriptionController?.abort();
 
@@ -367,8 +357,8 @@ export async function startTaskPlanGenerationSession(input: {
   entry.streamController = controller;
   let sawTerminalError = false;
 
-  patchState(taskId, (state) => ({
-    ...createIdleState(taskId),
+  patchState(key, (state) => ({
+    ...createIdleState(key),
     generationId: state.generationId,
     sessionStatus: "running",
     isLoading: true,
@@ -385,19 +375,19 @@ export async function startTaskPlanGenerationSession(input: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify({ forceRefresh, userInstruction }),
+      body: JSON.stringify({ forceRefresh, userInstruction, workBlockId }),
       signal: controller.signal,
       onEvent({ event, data }) {
         if (event === "error") {
           sawTerminalError = true;
         }
-        applyStreamEvent(taskId, event, data);
+        applyStreamEvent(key, event, data);
       },
     });
   } catch (error) {
     if (!(error instanceof DOMException && error.name === "AbortError")) {
       sawTerminalError = true;
-      patchState(taskId, (state) => ({
+      patchState(key, (state) => ({
         ...state,
         sessionStatus: "failed",
         isLoading: false,
@@ -407,37 +397,38 @@ export async function startTaskPlanGenerationSession(input: {
       }));
     }
   } finally {
-    const current = getEntry(taskId);
+    const current = getEntry(key);
     if (current.streamController === controller) {
       current.streamController = null;
     }
 
     if (!sawTerminalError) {
       try {
-        await fetchActiveSnapshot(taskId);
+        await fetchActiveSnapshot(taskId, workBlockId);
       } catch {
         // Leave current state in place when reconciliation fetch fails.
       }
     }
 
-    ensureActiveSubscription(taskId);
+    ensureActiveSubscription(taskId, workBlockId);
   }
 }
 
-export async function stopTaskPlanGenerationSession(taskId: string) {
-  const entry = getEntry(taskId);
+export async function stopTaskPlanGenerationSession(taskId: string, workBlockId?: string | null) {
+  const key = sessionKey(taskId, workBlockId);
+  const entry = getEntry(key);
   entry.streamController?.abort();
   entry.activeSubscriptionController?.abort();
   entry.streamController = null;
   entry.activeSubscriptionController = null;
 
-  patchState(taskId, (state) => ({
+  patchState(key, (state) => ({
     ...state,
     isLoading: false,
     connected: false,
   }));
 
-  const response = await fetch(`/api/tasks/${taskId}/plan/generations/stop`, {
+  const response = await fetch(`/api/tasks/${taskId}/plan/generations/stop${workBlockQuery(workBlockId)}`, {
     method: "POST",
     headers: buildAccessKeyHeaders(),
   });
@@ -448,19 +439,22 @@ export async function stopTaskPlanGenerationSession(taskId: string) {
   }
 }
 
-export function useTaskPlanGenerationSession(taskId?: string, options?: { hydrate?: boolean }) {
+export function useTaskPlanGenerationSession(taskId?: string, workBlockIdOrOptions?: string | null | { hydrate?: boolean }, maybeOptions?: { hydrate?: boolean }) {
+  const workBlockId = typeof workBlockIdOrOptions === "string" ? workBlockIdOrOptions : null;
+  const options = typeof workBlockIdOrOptions === "object" ? workBlockIdOrOptions : maybeOptions;
+  const key = taskId ? sessionKey(taskId, workBlockId) : null;
   const subscribe = (onStoreChange: () => void) => {
-    if (!taskId) {
+    if (!key) {
       return () => undefined;
     }
-    const entry = getEntry(taskId);
+    const entry = getEntry(key);
     entry.listeners.add(onStoreChange);
     return () => {
       entry.listeners.delete(onStoreChange);
     };
   };
 
-  const getSnapshot = () => taskId ? getEntry(taskId).state : createIdleState("");
+  const getSnapshot = () => key ? getEntry(key).state : createIdleState("");
 
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
@@ -468,8 +462,8 @@ export function useTaskPlanGenerationSession(taskId?: string, options?: { hydrat
     if (!taskId || options?.hydrate === false) {
       return;
     }
-    void hydrateTaskPlanGenerationSession(taskId);
-  }, [options?.hydrate, taskId]);
+    void hydrateTaskPlanGenerationSession(taskId, workBlockId);
+  }, [options?.hydrate, taskId, workBlockId]);
 
   return state;
 }

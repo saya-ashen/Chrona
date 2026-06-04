@@ -182,7 +182,7 @@ describe("TaskPlanGraph", () => {
               status: "done",
               type: "task",
               displayType: "task",
-              resultOutputs: [{ kind: "text", content: "artifact summary" }],
+              resultOutputs: [{ kind: "markdown", content: "artifact summary" }],
             },
             {
               id: "node-running",
@@ -333,6 +333,59 @@ describe("TaskPlanGraph", () => {
       nodeId: "node-failed",
     }));
     expect(await screen.findByText("Retry queued")).toBeInTheDocument();
+  });
+
+  it("dispatches the visible start button and preserves activity while node is running", async () => {
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Started Node1" });
+    const startAction = {
+      id: "task-primary:start_manual:node-1",
+      label: "Start",
+      kind: "trigger" as const,
+      executionAction: { action: "start_manual" as const },
+    };
+
+    const { rerender } = render(
+      <TaskPlanGraphInspector
+        graphCopy={DEFAULT_GRAPH_COPY}
+        node={{
+          id: "node-1",
+          title: "Node1",
+          objective: "Run today's occurrence.",
+          phase: "execution",
+          status: "ready",
+          type: "task",
+          interactionType: "execute",
+          availableActions: [startAction],
+        }}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" }));
+    await screen.findByText("Started Node1");
+
+    rerender(
+      <TaskPlanGraphInspector
+        graphCopy={DEFAULT_GRAPH_COPY}
+        node={{
+          id: "node-1",
+          title: "Node1",
+          objective: "Run today's occurrence.",
+          phase: "execution",
+          status: "active",
+          active: true,
+          type: "task",
+          interactionType: "execute",
+          availableActions: [startAction],
+        }}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+
+    expect(screen.getByText("Started Node1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
   it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", async () => {

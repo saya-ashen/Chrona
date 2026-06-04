@@ -46,7 +46,7 @@ describe("External calendar service sync policies", () => {
 
   it("starts plan generation for new future confirmed imports", async () => {
     const { workspaceId } = await seedWorkspace("Google automation");
-    const startedPlans: Array<{ taskId: string; accept?: boolean }> = [];
+    const startedPlans: Array<{ taskId: string; workBlockId?: string | null; accept?: boolean }> = [];
     const futureFeed = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Chrona//Future Policy Fixture//EN
@@ -76,12 +76,13 @@ END:VCALENDAR`;
     expect("source" in result ? result.source.automationPolicy : null).toBe("auto_execute");
     const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
       where: { workspaceId },
-      include: { task: true },
+      include: { task: true, workBlock: true },
     });
     expect(importedEvent.task?.autoPlanGeneration).toBe(true);
     expect(importedEvent.task?.autoExecute).toBe(true);
     const taskId = importedEvent.task?.id;
-    if (!taskId) throw new Error("Expected imported task");
-    expect(startedPlans).toEqual([{ taskId, accept: true }]);
+    const workBlockId = importedEvent.workBlock?.id;
+    if (!taskId || !workBlockId) throw new Error("Expected imported task and work block");
+    expect(startedPlans).toEqual([{ taskId, workBlockId, accept: true }]);
   });
 });

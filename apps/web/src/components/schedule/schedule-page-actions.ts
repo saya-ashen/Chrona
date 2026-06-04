@@ -494,6 +494,9 @@ export async function handleTaskConfigSaveAction({
       autoExecute: input.autoExecute,
       autoPlanGenerationTiming: input.autoPlanGenerationTiming,
       autoExecuteTiming: input.autoExecuteTiming,
+      recurrenceRule: input.recurrenceRule,
+      recurrenceAnchorStartAt: input.recurrenceAnchorStartAt?.toISOString() ?? null,
+      recurrenceAnchorEndAt: input.recurrenceAnchorEndAt?.toISOString() ?? null,
     });
 
     if (input.scheduledStartAt && input.scheduledEndAt) {

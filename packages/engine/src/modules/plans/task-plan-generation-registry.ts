@@ -14,6 +14,10 @@ export class TaskPlanGenerationInFlightError extends Error {
 }
 
 type Subscriber = (event: GeneratePlanSSEEvent) => void;
+function generationKey(taskId: string, workBlockId?: string | null) {
+  return workBlockId ? `${taskId}:${workBlockId}` : taskId;
+}
+
 
 type SessionStatus = "running" | "completed" | "failed" | "cancelled";
 
@@ -22,6 +26,8 @@ type SessionSnapshot = TaskPlanGenerationSessionReadModel;
 type SessionRecord = {
   generationId: string;
   taskId: string;
+  key: string;
+  workBlockId: string | null;
   controller: AbortController;
   subscribers: Set<Subscriber>;
   done: boolean;
@@ -29,14 +35,14 @@ type SessionRecord = {
   cleanupTimer: ReturnType<typeof setTimeout> | null;
 };
 
-const sessionsByTaskId = new Map<string, SessionRecord>();
+const sessionsByKey = new Map<string, SessionRecord>();
 const sessionsByGenerationId = new Map<string, SessionRecord>();
 
 function finishSession(session: SessionRecord, status: SessionStatus) {
   session.done = true;
   session.snapshot.status = status;
   session.snapshot.finishedAt = new Date().toISOString();
-  sessionsByTaskId.delete(session.taskId);
+  sessionsByKey.delete(session.key);
   session.subscribers.clear();
   if (!session.cleanupTimer) {
     session.cleanupTimer = setTimeout(() => {
@@ -98,23 +104,26 @@ function cloneSnapshot(snapshot: SessionSnapshot): SessionSnapshot {
   };
 }
 
-export function startTaskPlanGeneration(taskId: string) {
-  const existing = sessionsByTaskId.get(taskId);
+export function startTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }) {
+  const key = generationKey(input.taskId, input.workBlockId ?? null);
+  const existing = sessionsByKey.get(key);
   if (existing && !existing.controller.signal.aborted && !existing.done) {
-    throw new TaskPlanGenerationInFlightError(taskId);
+    throw new TaskPlanGenerationInFlightError(input.taskId);
   }
 
   const generationId = randomUUID();
   const session: SessionRecord = {
     generationId,
-    taskId,
+    taskId: input.taskId,
+    key,
+    workBlockId: input.workBlockId ?? null,
     controller: new AbortController(),
     subscribers: new Set(),
     done: false,
     cleanupTimer: null,
     snapshot: {
       generationId,
-      taskId,
+      taskId: input.taskId,
       status: "running",
       phase: "starting",
       statusMessage: null,
@@ -126,7 +135,7 @@ export function startTaskPlanGeneration(taskId: string) {
     },
   };
 
-  sessionsByTaskId.set(taskId, session);
+  sessionsByKey.set(key, session);
   sessionsByGenerationId.set(generationId, session);
 
   return {
@@ -143,8 +152,8 @@ export function startTaskPlanGeneration(taskId: string) {
   };
 }
 
-export function subscribeTaskPlanGeneration(taskId: string, subscriber: Subscriber) {
-  const session = sessionsByTaskId.get(taskId);
+export function subscribeTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }, subscriber: Subscriber) {
+  const session = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null));
   if (!session) {
     return null;
   }
@@ -173,8 +182,8 @@ export function subscribeTaskPlanGenerationById(generationId: string, subscriber
   };
 }
 
-export function stopTaskPlanGeneration(taskId: string) {
-  const session = sessionsByTaskId.get(taskId);
+export function stopTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }) {
+  const session = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null));
   if (!session) {
     return false;
   }
@@ -186,13 +195,13 @@ export function stopTaskPlanGeneration(taskId: string) {
   return true;
 }
 
-export function isTaskPlanGenerationRunning(taskId: string) {
-  const session = sessionsByTaskId.get(taskId);
+export function isTaskPlanGenerationRunning(input: { taskId: string; workBlockId?: string | null }) {
+  const session = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null));
   return Boolean(session && !session.controller.signal.aborted && !session.done);
 }
 
-export function getTaskPlanGenerationSession(taskId: string) {
-  const snapshot = sessionsByTaskId.get(taskId)?.snapshot;
+export function getTaskPlanGenerationSession(input: { taskId: string; workBlockId?: string | null }) {
+  const snapshot = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null))?.snapshot;
   return snapshot ? cloneSnapshot(snapshot) : null;
 }
 

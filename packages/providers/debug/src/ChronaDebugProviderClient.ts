@@ -32,7 +32,8 @@ export type ChronaDebugProviderConfig = {
 };
 
 const PLAN_TOOL = "chrona_plan_generate";
-const TASK_COMPLETE_TOOL = "chrona_task_complete";
+const NODE_OUTPUT_TOOL = "chrona_node_output";
+const NODE_COMPLETE_TOOL = "chrona_node_complete";
 const DEFAULT_DEBUG_PROVIDER_PROFILE: DebugProviderProfile = "deterministic";
 
 type DebugRun = {
@@ -415,7 +416,8 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       };
     } else {
       const title = currentNodeTitle(streamInput);
-      const callId = `chrona-debug-complete-${sequence}`;
+      const outputCallId = `chrona-debug-output-${sequence}`;
+      const completeCallId = `chrona-debug-complete-${sequence}`;
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "reasoning_delta",
@@ -431,10 +433,10 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "tool_call",
-        tool: TASK_COMPLETE_TOOL,
-        callId,
+        tool: NODE_OUTPUT_TOOL,
+        callId: outputCallId,
         input: {
-          summary: `Debug provider completed ${title}.`,
+          summary: `Debug provider produced output for ${title}.`,
           outputs: [
             {
               kind: "json",
@@ -448,8 +450,27 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "tool_result",
-        tool: TASK_COMPLETE_TOOL,
-        callId,
+        tool: NODE_OUTPUT_TOOL,
+        callId: outputCallId,
+        result: { ok: true, message: `Debug provider submitted output for ${title}.` },
+      };
+      await pause(signal);
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_call",
+        tool: NODE_COMPLETE_TOOL,
+        callId: completeCallId,
+        input: {
+          summary: `Debug provider completed ${title}.`,
+        },
+        status: "completed",
+      };
+      await pause(signal);
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_result",
+        tool: NODE_COMPLETE_TOOL,
+        callId: completeCallId,
         result: { ok: true, message: `Debug provider completed ${title}.` },
       };
       if (this.profile !== "deterministic") {
@@ -457,7 +478,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         yield {
           ...eventBase(this.provider, run, sequence++),
           type: "tool_completed",
-          toolName: TASK_COMPLETE_TOOL,
+          toolName: NODE_COMPLETE_TOOL,
           raw: { debugProvider: true, profile: this.profile },
         };
       }

@@ -326,10 +326,13 @@ export function useTaskWorkspacePlanState(
   workspaceEvents: TaskWorkspaceSseEvent[] = [],
 ) {
   const queryClient = useQueryClient();
+  const selectedWorkBlockId = task.currentWorkBlock?.id ?? null;
+  const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
+  const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const lastWorkspaceEventSequenceRef = useRef(0);
   const planStateQuery = useQuery({
-    queryKey: taskWorkspaceQueryKeys.planState(task.id),
-    queryFn: () => fetchTaskPlanState(task.id),
+    queryKey: taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId),
+    queryFn: () => fetchTaskPlanState(task.id, selectedWorkBlockId),
     initialData: {
       taskId: task.id,
       aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
@@ -338,8 +341,8 @@ export function useTaskWorkspacePlanState(
     } satisfies TaskPlanState,
   });
   const currentExecutionQuery = useQuery({
-    queryKey: taskWorkspaceQueryKeys.currentExecution(task.id),
-    queryFn: () => fetchCurrentTaskExecution(task.id),
+    queryKey: taskWorkspaceQueryKeys.currentExecution(task.id, selectedWorkBlockId),
+    queryFn: () => fetchCurrentTaskExecution(task.id, selectedWorkBlockId),
   });
   const planState = planStateQuery.data;
   const [generationUserInstruction, setGenerationUserInstruction] = useState<string | null>(null);
@@ -354,7 +357,18 @@ export function useTaskWorkspacePlanState(
   const [isGraphPlanPending, setIsGraphPlanPending] = useState(false);
 
   useEffect(() => {
-    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
+    if (previousWorkBlockKeyRef.current === selectedWorkBlockKey) return;
+    previousWorkBlockKeyRef.current = selectedWorkBlockKey;
+    lastWorkspaceEventSequenceRef.current = 0;
+    setGenerationUserInstruction(null);
+    setIsGeneratingPlan(false);
+    setGenerationActivitySummary(null);
+    setRuntimeEvents([]);
+    setPlanFlow(createPlanFlowFromSnapshot(planStateQuery.data));
+  }, [planStateQuery.data, selectedWorkBlockKey]);
+
+  useEffect(() => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId), (current: TaskPlanState | undefined) => {
       const previous = current ?? {
         taskId: task.id,
         aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
@@ -401,6 +415,8 @@ export function useTaskWorkspacePlanState(
     );
 
     for (const event of nextEvents) {
+      if (event.workBlockId !== undefined && event.workBlockId !== null && event.workBlockId !== selectedWorkBlockId) continue;
+
       if (event.type === "command.accepted" && event.commandType === "plan.generate") {
         setIsGeneratingPlan(true);
         setGenerationActivitySummary("Generating plan");
@@ -478,7 +494,7 @@ export function useTaskWorkspacePlanState(
   }, [currentExecution, latestCheckpoint, plan]);
 
   const setPlan = useCallback((value: SetStateAction<TaskData["savedPlan"] | null>) => {
-    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id), (current: TaskPlanState | undefined) => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId), (current: TaskPlanState | undefined) => {
       const previous = current ?? {
         taskId: task.id,
         aiPlanGenerationStatus: task.aiPlanGenerationStatus ?? "idle",
@@ -494,7 +510,7 @@ export function useTaskWorkspacePlanState(
         aiPlanGenerationStatus: derivePlanStatus(nextPlan, previous.generationSession?.status === "running"),
       } satisfies TaskPlanState;
     });
-  }, [queryClient, task.aiPlanGenerationStatus, task.id, task.savedPlan]);
+  }, [queryClient, selectedWorkBlockId, task.aiPlanGenerationStatus, task.id, task.savedPlan]);
 
   const fetchPlan = useCallback(async () => {
     await planStateQuery.refetch();
@@ -514,13 +530,13 @@ export function useTaskWorkspacePlanState(
   const acceptPlanById = useCallback(async (planId: string) => {
     setPlanFlow((current) => startPlanAccept(clearPlanFlowError(current), planId));
     try {
-      await dispatchWorkspaceCommand(task.id, { type: "plan.accept", planId });
+      await dispatchWorkspaceCommand(task.id, { type: "plan.accept", planId, workBlockId: selectedWorkBlockId });
       setPlanFlow(completePlanAccept(plan));
       void refreshExecutionQueries();
     } catch (cause) {
       setPlanFlow((current) => failPlanAccept(current, planId, cause instanceof Error ? cause.message : "Failed to accept plan"));
     }
-  }, [plan, refreshExecutionQueries, task.id]);
+  }, [plan, refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
   const handleAcceptPlan = useCallback(async () => {
     if (!plan?.id) return;
@@ -532,25 +548,25 @@ export function useTaskWorkspacePlanState(
     setGenerationUserInstruction(userInstruction);
     setIsGeneratingPlan(true);
     setGenerationActivitySummary("Generating plan");
-    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, userInstruction }).catch((cause) => {
+    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction }).catch((cause) => {
       setIsGeneratingPlan(false);
       setGenerationActivitySummary(cause instanceof Error ? cause.message : "Failed to generate plan");
     });
-  }, [task.id]);
+  }, [selectedWorkBlockId, task.id]);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);
-    const result = await dispatchTaskExecutionAction(task.id, action);
+    const result = await dispatchTaskExecutionAction(task.id, action, selectedWorkBlockId);
     void refreshExecutionQueries();
     return result;
-  }, [refreshExecutionQueries, task.id]);
+  }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
   const submitCheckpointAction = useCallback(async (action: SubmitCheckpointActionInput) => {
     setRuntimeEvents([]);
-    const result = await submitTaskCheckpointAction(task.id, action);
+    const result = await submitTaskCheckpointAction(task.id, action, selectedWorkBlockId);
     void refreshExecutionQueries();
     return result;
-  }, [refreshExecutionQueries, task.id]);
+  }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
   const assistantBuildCurrentPlan = useCallback(() => {
     if (!plan?.compiledPlan) return null;

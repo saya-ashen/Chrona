@@ -38,6 +38,7 @@ export type TaskPlanMinAggregateOutputType = {
   id: string | null
   workspaceId: string | null
   taskId: string | null
+  workBlockId: string | null
   planId: string | null
   revision: number | null
   status: $Enums.TaskPlanStatus | null
@@ -52,6 +53,7 @@ export type TaskPlanMaxAggregateOutputType = {
   id: string | null
   workspaceId: string | null
   taskId: string | null
+  workBlockId: string | null
   planId: string | null
   revision: number | null
   status: $Enums.TaskPlanStatus | null
@@ -66,6 +68,7 @@ export type TaskPlanCountAggregateOutputType = {
   id: number
   workspaceId: number
   taskId: number
+  workBlockId: number
   planId: number
   revision: number
   status: number
@@ -92,6 +95,7 @@ export type TaskPlanMinAggregateInputType = {
   id?: true
   workspaceId?: true
   taskId?: true
+  workBlockId?: true
   planId?: true
   revision?: true
   status?: true
@@ -106,6 +110,7 @@ export type TaskPlanMaxAggregateInputType = {
   id?: true
   workspaceId?: true
   taskId?: true
+  workBlockId?: true
   planId?: true
   revision?: true
   status?: true
@@ -120,6 +125,7 @@ export type TaskPlanCountAggregateInputType = {
   id?: true
   workspaceId?: true
   taskId?: true
+  workBlockId?: true
   planId?: true
   revision?: true
   status?: true
@@ -223,6 +229,7 @@ export type TaskPlanGroupByOutputType = {
   id: string
   workspaceId: string
   taskId: string
+  workBlockId: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -262,6 +269,7 @@ export type TaskPlanWhereInput = {
   id?: Prisma.StringFilter<"TaskPlan"> | string
   workspaceId?: Prisma.StringFilter<"TaskPlan"> | string
   taskId?: Prisma.StringFilter<"TaskPlan"> | string
+  workBlockId?: Prisma.StringNullableFilter<"TaskPlan"> | string | null
   planId?: Prisma.StringFilter<"TaskPlan"> | string
   revision?: Prisma.IntFilter<"TaskPlan"> | number
   status?: Prisma.EnumTaskPlanStatusFilter<"TaskPlan"> | $Enums.TaskPlanStatus
@@ -274,6 +282,7 @@ export type TaskPlanWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"TaskPlan"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
   runs?: Prisma.TaskPlanRunListRelationFilter
   layers?: Prisma.TaskPlanLayerListRelationFilter
 }
@@ -282,6 +291,7 @@ export type TaskPlanOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrderInput | Prisma.SortOrder
   planId?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -294,6 +304,7 @@ export type TaskPlanOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   workspace?: Prisma.WorkspaceOrderByWithRelationInput
   task?: Prisma.TaskOrderByWithRelationInput
+  workBlock?: Prisma.WorkBlockOrderByWithRelationInput
   runs?: Prisma.TaskPlanRunOrderByRelationAggregateInput
   layers?: Prisma.TaskPlanLayerOrderByRelationAggregateInput
 }
@@ -306,6 +317,7 @@ export type TaskPlanWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.TaskPlanWhereInput | Prisma.TaskPlanWhereInput[]
   workspaceId?: Prisma.StringFilter<"TaskPlan"> | string
   taskId?: Prisma.StringFilter<"TaskPlan"> | string
+  workBlockId?: Prisma.StringNullableFilter<"TaskPlan"> | string | null
   revision?: Prisma.IntFilter<"TaskPlan"> | number
   status?: Prisma.EnumTaskPlanStatusFilter<"TaskPlan"> | $Enums.TaskPlanStatus
   prompt?: Prisma.StringNullableFilter<"TaskPlan"> | string | null
@@ -317,6 +329,7 @@ export type TaskPlanWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"TaskPlan"> | Date | string
   workspace?: Prisma.XOR<Prisma.WorkspaceScalarRelationFilter, Prisma.WorkspaceWhereInput>
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
   runs?: Prisma.TaskPlanRunListRelationFilter
   layers?: Prisma.TaskPlanLayerListRelationFilter
 }, "id" | "planId">
@@ -325,6 +338,7 @@ export type TaskPlanOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrderInput | Prisma.SortOrder
   planId?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -349,6 +363,7 @@ export type TaskPlanScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"TaskPlan"> | string
   workspaceId?: Prisma.StringWithAggregatesFilter<"TaskPlan"> | string
   taskId?: Prisma.StringWithAggregatesFilter<"TaskPlan"> | string
+  workBlockId?: Prisma.StringNullableWithAggregatesFilter<"TaskPlan"> | string | null
   planId?: Prisma.StringWithAggregatesFilter<"TaskPlan"> | string
   revision?: Prisma.IntWithAggregatesFilter<"TaskPlan"> | number
   status?: Prisma.EnumTaskPlanStatusWithAggregatesFilter<"TaskPlan"> | $Enums.TaskPlanStatus
@@ -375,6 +390,7 @@ export type TaskPlanCreateInput = {
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlansInput
   task: Prisma.TaskCreateNestedOneWithoutTaskPlansInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTaskPlansInput
   runs?: Prisma.TaskPlanRunCreateNestedManyWithoutPlanInput
   layers?: Prisma.TaskPlanLayerCreateNestedManyWithoutPlanInput
 }
@@ -383,6 +399,7 @@ export type TaskPlanUncheckedCreateInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -411,6 +428,7 @@ export type TaskPlanUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlansNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlansNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTaskPlansNestedInput
   runs?: Prisma.TaskPlanRunUpdateManyWithoutPlanNestedInput
   layers?: Prisma.TaskPlanLayerUpdateManyWithoutPlanNestedInput
 }
@@ -419,6 +437,7 @@ export type TaskPlanUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -437,6 +456,7 @@ export type TaskPlanCreateManyInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -467,6 +487,7 @@ export type TaskPlanUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -493,6 +514,7 @@ export type TaskPlanCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   planId?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -513,6 +535,7 @@ export type TaskPlanMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   planId?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -527,6 +550,7 @@ export type TaskPlanMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   workspaceId?: Prisma.SortOrder
   taskId?: Prisma.SortOrder
+  workBlockId?: Prisma.SortOrder
   planId?: Prisma.SortOrder
   revision?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -662,6 +686,48 @@ export type TaskPlanUpdateOneRequiredWithoutLayersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskPlanUpdateToOneWithWhereWithoutLayersInput, Prisma.TaskPlanUpdateWithoutLayersInput>, Prisma.TaskPlanUncheckedUpdateWithoutLayersInput>
 }
 
+export type TaskPlanCreateNestedManyWithoutWorkBlockInput = {
+  create?: Prisma.XOR<Prisma.TaskPlanCreateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskPlanCreateWithoutWorkBlockInput[] | Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput | Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskPlanCreateManyWorkBlockInputEnvelope
+  connect?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+}
+
+export type TaskPlanUncheckedCreateNestedManyWithoutWorkBlockInput = {
+  create?: Prisma.XOR<Prisma.TaskPlanCreateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskPlanCreateWithoutWorkBlockInput[] | Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput | Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskPlanCreateManyWorkBlockInputEnvelope
+  connect?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+}
+
+export type TaskPlanUpdateManyWithoutWorkBlockNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskPlanCreateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskPlanCreateWithoutWorkBlockInput[] | Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput | Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput[]
+  upsert?: Prisma.TaskPlanUpsertWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskPlanUpsertWithWhereUniqueWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskPlanCreateManyWorkBlockInputEnvelope
+  set?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  disconnect?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  delete?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  connect?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  update?: Prisma.TaskPlanUpdateWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskPlanUpdateWithWhereUniqueWithoutWorkBlockInput[]
+  updateMany?: Prisma.TaskPlanUpdateManyWithWhereWithoutWorkBlockInput | Prisma.TaskPlanUpdateManyWithWhereWithoutWorkBlockInput[]
+  deleteMany?: Prisma.TaskPlanScalarWhereInput | Prisma.TaskPlanScalarWhereInput[]
+}
+
+export type TaskPlanUncheckedUpdateManyWithoutWorkBlockNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskPlanCreateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput> | Prisma.TaskPlanCreateWithoutWorkBlockInput[] | Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput[]
+  connectOrCreate?: Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput | Prisma.TaskPlanCreateOrConnectWithoutWorkBlockInput[]
+  upsert?: Prisma.TaskPlanUpsertWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskPlanUpsertWithWhereUniqueWithoutWorkBlockInput[]
+  createMany?: Prisma.TaskPlanCreateManyWorkBlockInputEnvelope
+  set?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  disconnect?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  delete?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  connect?: Prisma.TaskPlanWhereUniqueInput | Prisma.TaskPlanWhereUniqueInput[]
+  update?: Prisma.TaskPlanUpdateWithWhereUniqueWithoutWorkBlockInput | Prisma.TaskPlanUpdateWithWhereUniqueWithoutWorkBlockInput[]
+  updateMany?: Prisma.TaskPlanUpdateManyWithWhereWithoutWorkBlockInput | Prisma.TaskPlanUpdateManyWithWhereWithoutWorkBlockInput[]
+  deleteMany?: Prisma.TaskPlanScalarWhereInput | Prisma.TaskPlanScalarWhereInput[]
+}
+
 export type TaskPlanCreateWithoutWorkspaceInput = {
   id?: string
   planId: string
@@ -675,6 +741,7 @@ export type TaskPlanCreateWithoutWorkspaceInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutTaskPlansInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTaskPlansInput
   runs?: Prisma.TaskPlanRunCreateNestedManyWithoutPlanInput
   layers?: Prisma.TaskPlanLayerCreateNestedManyWithoutPlanInput
 }
@@ -682,6 +749,7 @@ export type TaskPlanCreateWithoutWorkspaceInput = {
 export type TaskPlanUncheckedCreateWithoutWorkspaceInput = {
   id?: string
   taskId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -728,6 +796,7 @@ export type TaskPlanScalarWhereInput = {
   id?: Prisma.StringFilter<"TaskPlan"> | string
   workspaceId?: Prisma.StringFilter<"TaskPlan"> | string
   taskId?: Prisma.StringFilter<"TaskPlan"> | string
+  workBlockId?: Prisma.StringNullableFilter<"TaskPlan"> | string | null
   planId?: Prisma.StringFilter<"TaskPlan"> | string
   revision?: Prisma.IntFilter<"TaskPlan"> | number
   status?: Prisma.EnumTaskPlanStatusFilter<"TaskPlan"> | $Enums.TaskPlanStatus
@@ -753,6 +822,7 @@ export type TaskPlanCreateWithoutTaskInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlansInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTaskPlansInput
   runs?: Prisma.TaskPlanRunCreateNestedManyWithoutPlanInput
   layers?: Prisma.TaskPlanLayerCreateNestedManyWithoutPlanInput
 }
@@ -760,6 +830,7 @@ export type TaskPlanCreateWithoutTaskInput = {
 export type TaskPlanUncheckedCreateWithoutTaskInput = {
   id?: string
   workspaceId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -813,6 +884,7 @@ export type TaskPlanCreateWithoutRunsInput = {
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlansInput
   task: Prisma.TaskCreateNestedOneWithoutTaskPlansInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTaskPlansInput
   layers?: Prisma.TaskPlanLayerCreateNestedManyWithoutPlanInput
 }
 
@@ -820,6 +892,7 @@ export type TaskPlanUncheckedCreateWithoutRunsInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -863,6 +936,7 @@ export type TaskPlanUpdateWithoutRunsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlansNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlansNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTaskPlansNestedInput
   layers?: Prisma.TaskPlanLayerUpdateManyWithoutPlanNestedInput
 }
 
@@ -870,6 +944,7 @@ export type TaskPlanUncheckedUpdateWithoutRunsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -897,6 +972,7 @@ export type TaskPlanCreateWithoutLayersInput = {
   updatedAt?: Date | string
   workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlansInput
   task: Prisma.TaskCreateNestedOneWithoutTaskPlansInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutTaskPlansInput
   runs?: Prisma.TaskPlanRunCreateNestedManyWithoutPlanInput
 }
 
@@ -904,6 +980,7 @@ export type TaskPlanUncheckedCreateWithoutLayersInput = {
   id?: string
   workspaceId: string
   taskId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -947,6 +1024,7 @@ export type TaskPlanUpdateWithoutLayersInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlansNestedInput
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlansNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTaskPlansNestedInput
   runs?: Prisma.TaskPlanRunUpdateManyWithoutPlanNestedInput
 }
 
@@ -954,6 +1032,7 @@ export type TaskPlanUncheckedUpdateWithoutLayersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -967,9 +1046,71 @@ export type TaskPlanUncheckedUpdateWithoutLayersInput = {
   runs?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutPlanNestedInput
 }
 
+export type TaskPlanCreateWithoutWorkBlockInput = {
+  id?: string
+  planId: string
+  revision: number
+  status: $Enums.TaskPlanStatus
+  prompt?: string | null
+  summary?: string | null
+  generatedBy?: string | null
+  compiledPlan: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  editablePlan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  workspace: Prisma.WorkspaceCreateNestedOneWithoutTaskPlansInput
+  task: Prisma.TaskCreateNestedOneWithoutTaskPlansInput
+  runs?: Prisma.TaskPlanRunCreateNestedManyWithoutPlanInput
+  layers?: Prisma.TaskPlanLayerCreateNestedManyWithoutPlanInput
+}
+
+export type TaskPlanUncheckedCreateWithoutWorkBlockInput = {
+  id?: string
+  workspaceId: string
+  taskId: string
+  planId: string
+  revision: number
+  status: $Enums.TaskPlanStatus
+  prompt?: string | null
+  summary?: string | null
+  generatedBy?: string | null
+  compiledPlan: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  editablePlan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  runs?: Prisma.TaskPlanRunUncheckedCreateNestedManyWithoutPlanInput
+  layers?: Prisma.TaskPlanLayerUncheckedCreateNestedManyWithoutPlanInput
+}
+
+export type TaskPlanCreateOrConnectWithoutWorkBlockInput = {
+  where: Prisma.TaskPlanWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskPlanCreateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput>
+}
+
+export type TaskPlanCreateManyWorkBlockInputEnvelope = {
+  data: Prisma.TaskPlanCreateManyWorkBlockInput | Prisma.TaskPlanCreateManyWorkBlockInput[]
+}
+
+export type TaskPlanUpsertWithWhereUniqueWithoutWorkBlockInput = {
+  where: Prisma.TaskPlanWhereUniqueInput
+  update: Prisma.XOR<Prisma.TaskPlanUpdateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedUpdateWithoutWorkBlockInput>
+  create: Prisma.XOR<Prisma.TaskPlanCreateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedCreateWithoutWorkBlockInput>
+}
+
+export type TaskPlanUpdateWithWhereUniqueWithoutWorkBlockInput = {
+  where: Prisma.TaskPlanWhereUniqueInput
+  data: Prisma.XOR<Prisma.TaskPlanUpdateWithoutWorkBlockInput, Prisma.TaskPlanUncheckedUpdateWithoutWorkBlockInput>
+}
+
+export type TaskPlanUpdateManyWithWhereWithoutWorkBlockInput = {
+  where: Prisma.TaskPlanScalarWhereInput
+  data: Prisma.XOR<Prisma.TaskPlanUpdateManyMutationInput, Prisma.TaskPlanUncheckedUpdateManyWithoutWorkBlockInput>
+}
+
 export type TaskPlanCreateManyWorkspaceInput = {
   id?: string
   taskId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -995,6 +1136,7 @@ export type TaskPlanUpdateWithoutWorkspaceInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlansNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTaskPlansNestedInput
   runs?: Prisma.TaskPlanRunUpdateManyWithoutPlanNestedInput
   layers?: Prisma.TaskPlanLayerUpdateManyWithoutPlanNestedInput
 }
@@ -1002,6 +1144,7 @@ export type TaskPlanUpdateWithoutWorkspaceInput = {
 export type TaskPlanUncheckedUpdateWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -1019,6 +1162,7 @@ export type TaskPlanUncheckedUpdateWithoutWorkspaceInput = {
 export type TaskPlanUncheckedUpdateManyWithoutWorkspaceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -1034,6 +1178,7 @@ export type TaskPlanUncheckedUpdateManyWithoutWorkspaceInput = {
 export type TaskPlanCreateManyTaskInput = {
   id?: string
   workspaceId: string
+  workBlockId?: string | null
   planId: string
   revision: number
   status: $Enums.TaskPlanStatus
@@ -1059,6 +1204,7 @@ export type TaskPlanUpdateWithoutTaskInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlansNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutTaskPlansNestedInput
   runs?: Prisma.TaskPlanRunUpdateManyWithoutPlanNestedInput
   layers?: Prisma.TaskPlanLayerUpdateManyWithoutPlanNestedInput
 }
@@ -1066,6 +1212,7 @@ export type TaskPlanUpdateWithoutTaskInput = {
 export type TaskPlanUncheckedUpdateWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -1083,6 +1230,75 @@ export type TaskPlanUncheckedUpdateWithoutTaskInput = {
 export type TaskPlanUncheckedUpdateManyWithoutTaskInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  workBlockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planId?: Prisma.StringFieldUpdateOperationsInput | string
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  summary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  generatedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  compiledPlan?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  editablePlan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type TaskPlanCreateManyWorkBlockInput = {
+  id?: string
+  workspaceId: string
+  taskId: string
+  planId: string
+  revision: number
+  status: $Enums.TaskPlanStatus
+  prompt?: string | null
+  summary?: string | null
+  generatedBy?: string | null
+  compiledPlan: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  editablePlan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type TaskPlanUpdateWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.StringFieldUpdateOperationsInput | string
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  summary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  generatedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  compiledPlan?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  editablePlan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  workspace?: Prisma.WorkspaceUpdateOneRequiredWithoutTaskPlansNestedInput
+  task?: Prisma.TaskUpdateOneRequiredWithoutTaskPlansNestedInput
+  runs?: Prisma.TaskPlanRunUpdateManyWithoutPlanNestedInput
+  layers?: Prisma.TaskPlanLayerUpdateManyWithoutPlanNestedInput
+}
+
+export type TaskPlanUncheckedUpdateWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  planId?: Prisma.StringFieldUpdateOperationsInput | string
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
+  prompt?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  summary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  generatedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  compiledPlan?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  editablePlan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  runs?: Prisma.TaskPlanRunUncheckedUpdateManyWithoutPlanNestedInput
+  layers?: Prisma.TaskPlanLayerUncheckedUpdateManyWithoutPlanNestedInput
+}
+
+export type TaskPlanUncheckedUpdateManyWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  workspaceId?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
   planId?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumTaskPlanStatusFieldUpdateOperationsInput | $Enums.TaskPlanStatus
@@ -1139,6 +1355,7 @@ export type TaskPlanSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   planId?: boolean
   revision?: boolean
   status?: boolean
@@ -1151,6 +1368,7 @@ export type TaskPlanSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskPlan$workBlockArgs<ExtArgs>
   runs?: boolean | Prisma.TaskPlan$runsArgs<ExtArgs>
   layers?: boolean | Prisma.TaskPlan$layersArgs<ExtArgs>
   _count?: boolean | Prisma.TaskPlanCountOutputTypeDefaultArgs<ExtArgs>
@@ -1160,6 +1378,7 @@ export type TaskPlanSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   planId?: boolean
   revision?: boolean
   status?: boolean
@@ -1172,12 +1391,14 @@ export type TaskPlanSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskPlan$workBlockArgs<ExtArgs>
 }, ExtArgs["result"]["taskPlan"]>
 
 export type TaskPlanSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   planId?: boolean
   revision?: boolean
   status?: boolean
@@ -1190,12 +1411,14 @@ export type TaskPlanSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
   updatedAt?: boolean
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskPlan$workBlockArgs<ExtArgs>
 }, ExtArgs["result"]["taskPlan"]>
 
 export type TaskPlanSelectScalar = {
   id?: boolean
   workspaceId?: boolean
   taskId?: boolean
+  workBlockId?: boolean
   planId?: boolean
   revision?: boolean
   status?: boolean
@@ -1208,10 +1431,11 @@ export type TaskPlanSelectScalar = {
   updatedAt?: boolean
 }
 
-export type TaskPlanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "planId" | "revision" | "status" | "prompt" | "summary" | "generatedBy" | "compiledPlan" | "editablePlan" | "createdAt" | "updatedAt", ExtArgs["result"]["taskPlan"]>
+export type TaskPlanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workspaceId" | "taskId" | "workBlockId" | "planId" | "revision" | "status" | "prompt" | "summary" | "generatedBy" | "compiledPlan" | "editablePlan" | "createdAt" | "updatedAt", ExtArgs["result"]["taskPlan"]>
 export type TaskPlanInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskPlan$workBlockArgs<ExtArgs>
   runs?: boolean | Prisma.TaskPlan$runsArgs<ExtArgs>
   layers?: boolean | Prisma.TaskPlan$layersArgs<ExtArgs>
   _count?: boolean | Prisma.TaskPlanCountOutputTypeDefaultArgs<ExtArgs>
@@ -1219,10 +1443,12 @@ export type TaskPlanInclude<ExtArgs extends runtime.Types.Extensions.InternalArg
 export type TaskPlanIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskPlan$workBlockArgs<ExtArgs>
 }
 export type TaskPlanIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskPlan$workBlockArgs<ExtArgs>
 }
 
 export type $TaskPlanPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1230,6 +1456,7 @@ export type $TaskPlanPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   objects: {
     workspace: Prisma.$WorkspacePayload<ExtArgs>
     task: Prisma.$TaskPayload<ExtArgs>
+    workBlock: Prisma.$WorkBlockPayload<ExtArgs> | null
     runs: Prisma.$TaskPlanRunPayload<ExtArgs>[]
     layers: Prisma.$TaskPlanLayerPayload<ExtArgs>[]
   }
@@ -1237,6 +1464,7 @@ export type $TaskPlanPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     id: string
     workspaceId: string
     taskId: string
+    workBlockId: string | null
     planId: string
     revision: number
     status: $Enums.TaskPlanStatus
@@ -1643,6 +1871,7 @@ export interface Prisma__TaskPlanClient<T, Null = never, ExtArgs extends runtime
   readonly [Symbol.toStringTag]: "PrismaPromise"
   workspace<T extends Prisma.WorkspaceDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorkspaceDefaultArgs<ExtArgs>>): Prisma.Prisma__WorkspaceClient<runtime.Types.Result.GetResult<Prisma.$WorkspacePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   task<T extends Prisma.TaskDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskDefaultArgs<ExtArgs>>): Prisma.Prisma__TaskClient<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  workBlock<T extends Prisma.TaskPlan$workBlockArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskPlan$workBlockArgs<ExtArgs>>): Prisma.Prisma__WorkBlockClient<runtime.Types.Result.GetResult<Prisma.$WorkBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   runs<T extends Prisma.TaskPlan$runsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskPlan$runsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   layers<T extends Prisma.TaskPlan$layersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskPlan$layersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPlanLayerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -1677,6 +1906,7 @@ export interface TaskPlanFieldRefs {
   readonly id: Prisma.FieldRef<"TaskPlan", 'String'>
   readonly workspaceId: Prisma.FieldRef<"TaskPlan", 'String'>
   readonly taskId: Prisma.FieldRef<"TaskPlan", 'String'>
+  readonly workBlockId: Prisma.FieldRef<"TaskPlan", 'String'>
   readonly planId: Prisma.FieldRef<"TaskPlan", 'String'>
   readonly revision: Prisma.FieldRef<"TaskPlan", 'Int'>
   readonly status: Prisma.FieldRef<"TaskPlan", 'TaskPlanStatus'>
@@ -2083,6 +2313,25 @@ export type TaskPlanDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Limit how many TaskPlans to delete.
    */
   limit?: number
+}
+
+/**
+ * TaskPlan.workBlock
+ */
+export type TaskPlan$workBlockArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkBlock
+   */
+  select?: Prisma.WorkBlockSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WorkBlock
+   */
+  omit?: Prisma.WorkBlockOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WorkBlockInclude<ExtArgs> | null
+  where?: Prisma.WorkBlockWhereInput
 }
 
 /**

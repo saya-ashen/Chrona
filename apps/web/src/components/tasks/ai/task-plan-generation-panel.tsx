@@ -18,6 +18,7 @@ import { useTaskPlanGeneration } from "@/hooks/ai/use-task-plan-generation";
 
 interface TaskPlanGenerationPanelProps {
   taskId?: string;
+  workBlockId?: string | null;
   title: string;
   description?: string | null;
   priority: string;
@@ -114,6 +115,7 @@ function getProgressCopy(messages: Record<string, unknown>) {
 
 export function TaskPlanGenerationPanel({
   taskId,
+  workBlockId = null,
   title: _title,
   description: _description,
   priority: _priority,
@@ -164,12 +166,15 @@ export function TaskPlanGenerationPanel({
     stopGeneration,
   } = useTaskPlanGeneration({
     taskId,
+    workBlockId,
     autoRequest,
     forceRefresh: Boolean(forceRefresh),
     onPlanLoaded,
   });
 
-  const activeReadModel = result ?? savedPlan ?? null;
+  const activeReadModel = savedPlan?.status === "accepted"
+    ? savedPlan
+    : result ?? savedPlan ?? null;
   const compiledPlan = activeReadModel?.compiledPlan ?? null;
 
   const planGraph = useMemo(() => {

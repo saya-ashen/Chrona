@@ -6,11 +6,12 @@ function fixtureUrl(eventTitle: string, key: string) {
 
 test.describe("external calendar source management", () => {
   test("disables, re-enables, refreshes, renames, and removes a source", async ({ page }, testInfo) => {
-    const sourceName = `Managed calendar ${testInfo.project.name}`;
-    const renamedSourceName = `Renamed calendar ${testInfo.project.name}`;
+    const sourceName = `Managed calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
+    const renamedSourceName = `Renamed calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
     const eventTitle = `Managed standup ${testInfo.project.name}`;
     await page.goto("/en/schedule?day=2026-05-04");
     await page.getByRole("tab", { name: /calendar/i }).click();
+    await page.getByRole("button", { name: /connect calendar/i }).click();
 
     await page.getByLabel(/display name/i).first().fill(sourceName);
     await page.getByLabel(/calendar url/i).fill(fixtureUrl(eventTitle, sourceName));

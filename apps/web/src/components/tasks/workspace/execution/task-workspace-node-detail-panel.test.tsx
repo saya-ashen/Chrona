@@ -82,7 +82,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       availableActions: [{ id: "approve_result", label: "Accept", kind: "approve", emphasis: "primary", checkpointId: checkpoint.id, checkpointAction: "approve_result" }],
       interactiveFields: [{ key: "checkpoint:decision", label: "Decision", value: "", control: "approval", required: true }],
       completionSummary: "Generated patch touches task workspace only.",
-      resultOutputs: [{ kind: "text", content: "Patch summary" }],
+      resultOutputs: [{ kind: "markdown", content: "Patch summary" }],
       resultEvidence: { runtimeName: "hermes", runId: "run-1", artifactIds: ["artifact-1"] },
       metadata: { dependencies: [{ id: "research", title: "Research current task workspace" }] },
     });
@@ -317,7 +317,7 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       phase: "Done",
       status: "done",
       completionSummary: "Finished research",
-      resultOutputs: [{ kind: "text", content: "Patch summary" }],
+      resultOutputs: [{ kind: "markdown", content: "Patch summary" }],
     });
 
     render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} onSubmitCheckpointAction={vi.fn()} />);

@@ -533,7 +533,7 @@ async function seedFixture(fixture: Fixture, workspaceId: string) {
     });
 
     await tx.taskPlanRun.upsert({
-      where: { taskId_planId: { taskId, planId: compiledPlan.editablePlanId } },
+      where: { id: `task-plan-run-${fixture.slug}` },
       create: {
         id: `task-plan-run-${fixture.slug}`,
         workspaceId,

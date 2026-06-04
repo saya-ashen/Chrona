@@ -98,6 +98,30 @@ describe("task workspace execution console view model", () => {
     expect(mapTaskWorkspaceStatus("ready")).toBe("waiting");
   });
 
+  it("does not reuse completed plan state for a future recurring occurrence", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Cancelled",
+          currentWorkBlock: {
+            id: "future-block",
+            status: "Scheduled",
+            scheduledStartAt: "2026-06-08T10:00:00.000Z",
+            scheduledEndAt: "2026-06-08T10:30:00.000Z",
+          },
+          scheduledStartAt: "2026-06-08T10:00:00.000Z",
+          scheduledEndAt: "2026-06-08T10:30:00.000Z",
+          scheduleStatus: "Scheduled",
+        },
+      }),
+      graphPlan: graph([node({ id: "previous-cycle", status: "done" })]),
+    });
+
+    expect(view.task.status).toBe("Scheduled");
+    expect(view.header.status).toBe("waiting");
+  });
+
   it("returns an empty progress summary when no graph exists", () => {
     expect(buildProgressSummary(null)).toEqual({
       completedSteps: 0,
@@ -243,7 +267,7 @@ describe("task workspace execution console view model", () => {
         id: "done",
         status: "done",
         completionSummary: "Finished research",
-        resultOutputs: [{ kind: "text", content: "summary" }],
+        resultOutputs: [{ kind: "markdown", content: "summary" }],
       })]),
     });
 

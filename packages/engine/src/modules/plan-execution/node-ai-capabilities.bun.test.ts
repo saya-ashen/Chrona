@@ -147,7 +147,7 @@ describe("runTaskNodeFeature", () => {
     await db.workspace.deleteMany();
   });
 
-  it("treats a completed provider snapshot with final text as a done node result", async () => {
+  it("fails a completed provider snapshot that did not use a Chrona terminal tool", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Node AI capabilities workspace",
@@ -214,15 +214,15 @@ describe("runTaskNodeFeature", () => {
         feature: "execute_task_node",
         instructions: "Execute the current task node.",
         inputText: "{}",
-        terminalToolName: "chrona_task_complete",
+        terminalToolName: "chrona_node_complete",
         structuredOutputSchema: undefined,
       },
       providerInput: {},
     });
 
     expect(result).toMatchObject({
-      status: "done",
-      summary: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+      status: "failed",
+      error: "Runtime run runtime-first-entry completed without a Chrona terminal result action for node first_entry: Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
       evidence: {
         sessionId: "main-session",
         runId: "local-run-1",
@@ -230,16 +230,98 @@ describe("runTaskNodeFeature", () => {
         runtimeRunRef: "runtime-first-entry",
         conversationEntryIds: ["conversation-entry-1"],
       },
-      output: {
-        runtimeRunRef: "runtime-first-entry",
-        runtimeName: "hermes",
-        provider: "hermes",
-        outputText: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
-      },
+    });
+
+    const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-1" } });
+    expect(run).toMatchObject({
+      status: "Failed",
+      errorSummary: "Runtime run runtime-first-entry completed without a Chrona terminal result action for node first_entry: Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
     });
   });
 
-  it("does not use provider branchRef structured payload as condition routing authority", async () => {
+
+  it("accepts a completed task snapshot only when chrona_node_complete was used", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Node AI task terminal tool workspace",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-terminal-tool",
+        workspaceId: workspace.id,
+        title: "Node AI task terminal tool task",
+        status: TaskStatus.Running,
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "local-run-task-terminal-tool",
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date(),
+        syncStatus: "healthy",
+      },
+    });
+
+    const node = makeTaskNode();
+    const aiRuntimeInvoker = {
+      invoke: async () => ({
+        runId: "local-run-task-terminal-tool",
+        runtimeRunRef: "runtime-task-terminal-tool",
+        runtimeSessionKey: "main-session",
+        conversationEntryIds: ["conversation-entry-task-terminal-tool"],
+        response: {
+          provider: "hermes",
+          runId: "runtime-task-terminal-tool",
+          nativeRunId: "runtime-task-terminal-tool",
+          sessionId: "main-session",
+          status: "completed" as const,
+          outputText: "Task complete",
+          structuredPayload: { outputs: [{ kind: "markdown", content: "Task complete" }] },
+          raw: { terminalToolName: "chrona_node_complete" },
+          error: null,
+        },
+      }),
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+
+    const plan = makePlan(node);
+    const result = await runTaskNodeFeature({
+      taskId: task.id,
+      mainSession: {
+        id: "main-session",
+        taskId: task.id,
+        sessionKey: "chrona:task:task-terminal-tool:plan-1",
+      },
+      node,
+      plan,
+      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+      featureSpec: {
+        feature: "execute_task_node",
+        instructions: "Execute the current task node.",
+        inputText: "{}",
+        terminalToolName: "chrona_node_complete",
+        structuredOutputSchema: undefined,
+      },
+      providerInput: {},
+    });
+
+    expect(result).toMatchObject({
+      status: "done",
+      summary: "Task complete",
+      output: [{ kind: "markdown", content: "Task complete" }],
+    });
+  });
+  it("fails provider branchRef structured payload without condition terminal tool", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Node AI condition workspace",
@@ -290,7 +372,7 @@ describe("runTaskNodeFeature", () => {
           structuredPayload: {
             branchRef: "B20260522-01-B",
             summary: "Needs fixes selected",
-            outputs: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+            outputs: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
           },
           error: null,
         },
@@ -320,11 +402,9 @@ describe("runTaskNodeFeature", () => {
     });
 
     expect(result).toMatchObject({
-      status: "done",
-      summary: "Needs fixes selected",
-      output: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+      status: "failed",
+      error: "Runtime run runtime-condition completed without a Chrona terminal result action for node condition_node: Needs fixes selected",
     });
-    expect(result.status === "done" ? result.selectedBranch : undefined).toBeUndefined();
   });
 
   it("uses chrona_condition_select terminal tool evidence as condition routing authority", async () => {
@@ -379,7 +459,7 @@ describe("runTaskNodeFeature", () => {
           structuredPayload: {
             branchRef,
             summary: "Needs fixes selected",
-            outputs: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+            outputs: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
           },
           raw: { terminalToolName: "chrona_condition_select" },
           error: null,
@@ -412,7 +492,7 @@ describe("runTaskNodeFeature", () => {
     expect(result).toMatchObject({
       status: "done",
       summary: "Needs fixes selected",
-      output: [{ kind: "text", content: "Fix JSONDecodeError ordering." }],
+      output: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
       selectedBranch: {
         label: "Needs fixes",
         nextNodeId: "fix_node",

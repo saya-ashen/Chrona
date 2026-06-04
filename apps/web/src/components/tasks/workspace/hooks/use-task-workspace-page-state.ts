@@ -166,38 +166,47 @@ function useTaskWorkspaceEventStream(
 export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const queryClient = useQueryClient();
   const taskId = initialData.task.id;
+  const selectedWorkBlockId = initialData.task.currentWorkBlock?.id ?? null;
+  const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
+  const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
   const pageQuery = useQuery({
-    queryKey: taskWorkspaceQueryKeys.page(taskId),
-    queryFn: () => fetchTaskWorkspacePage(taskId),
+    queryKey: taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId),
+    queryFn: () => fetchTaskWorkspacePage(taskId, selectedWorkBlockId),
     initialData,
   });
   const pageData = pageQuery.data;
 
   const refreshWorkspace = useCallback(async (_options: RefreshOptions = {}) => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId) }),
-      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.planState(taskId) }),
-      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId) }),
+      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId) }),
+      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.planState(taskId, selectedWorkBlockId) }),
+      queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId, selectedWorkBlockId) }),
     ]);
-  }, [queryClient, taskId]);
+  }, [queryClient, selectedWorkBlockId, taskId]);
   const refreshWorkspacePage = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId) });
-  }, [queryClient, taskId]);
+    await queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId) });
+  }, [queryClient, selectedWorkBlockId, taskId]);
 
   const setTask = useCallback((value: React.SetStateAction<TaskData>) => {
-    queryClient.setQueryData(taskWorkspaceQueryKeys.page(taskId), (current: TaskPageData | undefined) => {
+    queryClient.setQueryData(taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId), (current: TaskPageData | undefined) => {
       const previous = current ?? initialData;
       const nextTask = typeof value === "function"
         ? (value as (prevState: TaskData) => TaskData)(previous.task)
         : value;
       return { ...previous, task: nextTask } satisfies TaskPageData;
     });
-  }, [initialData, queryClient, taskId]);
+  }, [initialData, queryClient, selectedWorkBlockId, taskId]);
   const handleWorkspaceEvent = useCallback((event: TaskWorkspaceSseEvent) => {
     setWorkspaceEvents((current) => [...current.slice(-199), event]);
   }, []);
   useTaskWorkspaceEventStream(taskId, refreshWorkspacePage, handleWorkspaceEvent);
+
+  useEffect(() => {
+    if (previousWorkBlockKeyRef.current === selectedWorkBlockKey) return;
+    previousWorkBlockKeyRef.current = selectedWorkBlockKey;
+    setWorkspaceEvents([]);
+  }, [selectedWorkBlockKey]);
 
   useEffect(() => {
     if (!isWorkspaceActive(pageData)) {

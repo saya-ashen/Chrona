@@ -117,6 +117,11 @@ export type TaskPlanNodeAttempt = Prisma.TaskPlanNodeAttemptModel
  */
 export type TaskPlanProviderRun = Prisma.TaskPlanProviderRunModel
 /**
+ * Model TaskPlanProviderApproval
+ * 
+ */
+export type TaskPlanProviderApproval = Prisma.TaskPlanProviderApprovalModel
+/**
  * Model TaskPlanLayer
  * 
  */

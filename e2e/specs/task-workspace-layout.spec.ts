@@ -34,7 +34,7 @@ test.describe("Task workspace layout", () => {
       await page.goto(`/en/tasks/${taskId}`);
 
       await expect(page.getByText(`E2E Layout ${viewport}`).first()).toBeVisible();
-      await expect(page.getByText("Plan").first()).toBeVisible();
+      await expect(page.getByRole("region", { name: /execution flow/i }).getByText("Plan", { exact: true })).toBeVisible();
 
       const overflow = await page.evaluate(() => ({
         bodyOverflow: document.body.scrollWidth > window.innerWidth,

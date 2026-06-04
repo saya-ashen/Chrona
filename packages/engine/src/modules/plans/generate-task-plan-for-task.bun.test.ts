@@ -43,8 +43,31 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
   edges: [],
 }));
 
-async function* aiGeneratePlanStreamMock(request: { title: string; description?: string }) {
+let streamStyle: "full" | "hermes" = "full";
+
+import { materializeGeneratedTaskPlan } from "./materialize-generated-task-plan";
+
+async function* aiGeneratePlanStreamMock(request: { title: string; description?: string; taskId: string }) {
   const blueprint = await aiGeneratePlanMock(request);
+
+  if (streamStyle === "hermes") {
+    yield { type: "tool_call" as const, tool: "chrona_plan_generate", input: { preview: "generating plan..." } };
+    // Simulate what real Chrona-owned tool does: persist plan via DB.
+    // In production the Hermes provider runs the tool internally and calls
+    // chrona.plan.generate, which persists to DB behind the scenes.
+    const task = await db.task.findUnique({ where: { id: request.taskId } });
+    if (task) {
+      await materializeGeneratedTaskPlan({
+        taskId: task.id,
+        workspaceId: task.workspaceId,
+        blueprint,
+        generatedBy: "hermes",
+      });
+    }
+    yield { type: "done" as const, text: "done" };
+    return;
+  }
+
   yield { type: "tool_call" as const, tool: "chrona_plan_generate", input: blueprint };
 
   if (blueprint.nodes.length === 0) {
@@ -70,6 +93,9 @@ async function resetDb() {
   await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();
+  await db.taskPlanNodeAttempt.deleteMany();
+  await db.taskPlanRun.deleteMany();
+  await db.taskPlan.deleteMany();
   await db.event.deleteMany();
   await db.approval.deleteMany();
   await db.artifact.deleteMany();
@@ -78,6 +104,7 @@ async function resetDb() {
   await db.taskSession.deleteMany();
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
+  await db.workBlock.deleteMany();
   await db.task.deleteMany();
   await db.workspace.deleteMany();
 }
@@ -85,6 +112,7 @@ async function resetDb() {
 describe("generateTaskPlanForTask", () => {
   beforeEach(async () => {
     await resetDb();
+    streamStyle = "full";
     aiGeneratePlanMock.mockClear();
   });
 
@@ -361,5 +389,140 @@ describe("generateTaskPlanForTask", () => {
     expect(manualNode?.executor).toBe("user");
     expect(manualNode?.mode).toBe("manual");
     expect(manualNode?.dependencies).toContain(approvalNode!.id);
+  });
+
+  it("emits result event when tool_call is followed by done (Hermes Chrona-owned tool)", async () => {
+    streamStyle = "hermes";
+
+    const workspace = await db.workspace.create({
+      data: { name: "Hermes Tool Only", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Hermes plan test",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
+    const events: Array<{ type: string }> = [];
+    const { generateTaskPlanManualStream } = await import("@/modules/plans/generate-task-plan-manual-stream");
+    for await (const event of generateTaskPlanManualStream({ taskId: task.id, forceRefresh: true })) {
+      events.push({ type: event.type });
+    }
+
+    expect(events.map((e) => e.type)).toContain("result");
+
+    const savedPlan = await getLatestTaskPlanReadModel(task.id);
+    expect(savedPlan).not.toBeNull();
+    expect(savedPlan?.status).toBe("draft");
+  });
+
+  it("finds plan when Hermes tool saves with NULL workBlockId but caller passes concrete one", async () => {
+    streamStyle = "hermes";
+
+    const workspace = await db.workspace.create({
+      data: { name: "Hermes workBlock mismatch", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Hermes mismatch",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    const workBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-01T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-01T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+
+    const events: Array<{ type: string }> = [];
+    const { generateTaskPlanManualStream } = await import("@/modules/plans/generate-task-plan-manual-stream");
+    for await (const event of generateTaskPlanManualStream({
+      taskId: task.id,
+      workBlockId: workBlock.id,
+      forceRefresh: true,
+    })) {
+      events.push({ type: event.type });
+    }
+
+    expect(events.map((e) => e.type)).toContain("result");
+
+    const savedPlan = await getLatestTaskPlanReadModel(task.id, workBlock.id);
+    expect(savedPlan).not.toBeNull();
+    expect(savedPlan?.status).toBe("draft");
+  });
+
+  it("generates and accepts plans when Hermes stream has no tool_result", async () => {
+    streamStyle = "hermes";
+
+    const workspace = await db.workspace.create({
+      data: { name: "Hermes Accept Plan", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Hermes auto accept",
+        status: "Draft",
+        priority: "High",
+        autoExecute: true,
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
+    await generateAndAcceptTaskPlanForTask({ taskId: task.id });
+
+    const savedPlan = await getLatestTaskPlanReadModel(task.id);
+    expect(savedPlan?.status).toBe("accepted");
+  });
+
+  it("accepts plan when Hermes saves with NULL workBlockId but caller passes concrete one", async () => {
+    streamStyle = "hermes";
+
+    const workspace = await db.workspace.create({
+      data: { name: "Hermes Accept wb mismatch", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Hermes accept mismatch",
+        status: "Draft",
+        priority: "High",
+        autoExecute: true,
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    const workBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-01T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-01T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+
+    const { generateAndAcceptTaskPlan } = await import("@/modules/plans/auto-generate-task-plan");
+    await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: workBlock.id });
+
+    const savedPlan = await getLatestTaskPlanReadModel(task.id);
+    expect(savedPlan?.status).toBe("accepted");
   });
 });

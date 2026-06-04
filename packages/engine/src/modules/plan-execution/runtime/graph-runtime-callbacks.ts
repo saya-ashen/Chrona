@@ -78,6 +78,7 @@ export function createExecutionGraphCallbacks(input: {
       await persistRuntimeState({
         workspaceId: input.workspaceId,
         taskId: input.taskId,
+        workBlockId: input.executionSession.workBlockId,
         planId: input.planId,
         compiledPlan: input.compiledPlan as never,
         graph: state.graph as unknown as PlanGraph,

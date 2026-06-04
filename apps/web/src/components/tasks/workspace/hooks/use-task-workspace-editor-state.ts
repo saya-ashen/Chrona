@@ -29,6 +29,7 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
     task.executionConfig,
     task.autoPlanGeneration,
     task.autoExecute,
+    task.recurrenceRule,
   ]);
   const originalEditableTask = useMemo(() => taskToEditableTask(task), [task]);
   const draftEditableTask = useMemo(
@@ -80,8 +81,10 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
         executionConfig: input.executionConfig,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
+        recurrenceRule: input.recurrenceRule,
+        recurrenceAnchorStartAt: input.recurrenceAnchorStartAt?.toISOString() ?? null,
+        recurrenceAnchorEndAt: input.recurrenceAnchorEndAt?.toISOString() ?? null,
       };
-
       const response = await api.tasks[":taskId"].$patch({
         param: { taskId: task.id },
         json: taskBody,
@@ -136,6 +139,7 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
         executionConfig: input.executionConfig,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
+        recurrenceRule: input.recurrenceRule,
       }));
       setTaskConfigDraft(input);
       setHasUnsavedConfigChanges(false);

@@ -469,6 +469,86 @@ describe("getSchedulePage", () => {
     expect(JSON.stringify(item?.savedPlan)).not.toContain("effectivePlan");
   });
 
+  it("includes occurrence-scoped saved plans on work block scheduled items", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Occurrence plan workspace", defaultRuntime: "debug", status: "Active" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Recurring planning",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "debug",
+        executionConfig: {},
+        kind: "recurring",
+        recurrenceRule: "FREQ=DAILY;COUNT=2",
+      },
+    });
+    const workBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        recurrenceKey: "2026-06-04T14:00:00.000Z",
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-04T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-04T15:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    await db.taskProjection.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        persistedStatus: "Ready",
+        displayState: "Ready",
+        scheduleStatus: "Scheduled",
+        scheduleSource: "human",
+        scheduledStartAt: new Date("2026-06-04T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-04T15:00:00.000Z"),
+      },
+    });
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      workBlockId: workBlock.id,
+      status: "accepted",
+      prompt: "plan this occurrence",
+      summary: "Occurrence plan summary",
+      generatedBy: "generate-task-plan",
+      compiledPlan: {
+        id: "compiled-occurrence-plan-1",
+        editablePlanId: "occurrence-plan-1",
+        sourceVersion: 1,
+        title: "Occurrence plan title",
+        goal: "Occurrence plan goal",
+        assumptions: [],
+        nodes: [],
+        edges: [],
+        entryNodeIds: [],
+        terminalNodeIds: [],
+        topologicalOrder: [],
+        completionPolicy: { type: "all_tasks_completed" },
+        validationWarnings: [],
+      },
+    });
+
+    const page = await getSchedulePage(workspace.id);
+    const item = page.scheduled.find((entry) => (entry as { workBlockId?: string | null }).workBlockId === workBlock.id);
+
+    expect(item?.taskId).toBe(task.id);
+    expect(item?.savedPlan).toEqual({
+      id: "occurrence-plan-1",
+      status: "accepted",
+      revision: 1,
+      summary: "Occurrence plan summary",
+      updatedAt: expect.any(String),
+      generatedBy: "generate-task-plan",
+    });
+    expect(item?.aiPlanGenerationStatus).toBe("accepted");
+  });
+
   it("keeps a completed scheduled task in the timeline after projection rebuild", async () => {
     const workspace = await db.workspace.create({
       data: {
@@ -532,5 +612,54 @@ describe("getSchedulePage", () => {
       scheduledStartAt,
       scheduledEndAt,
     });
+  });
+
+  it("includes scheduled work blocks even when task projection has no scheduled window", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Recurring Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Recurring imported task",
+        status: "Cancelled",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+        recurrenceRule: "FREQ=DAILY",
+        seriesExternalUid: "series-1",
+      },
+    });
+    await db.taskProjection.create({
+      data: {
+        taskId: task.id,
+        workspaceId: workspace.id,
+        persistedStatus: "Cancelled",
+        scheduleProposalCount: 0,
+      },
+    });
+    const workBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-04T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-04T15:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+
+    const page = await getSchedulePage(workspace.id);
+
+    expect(page.scheduled).toEqual([
+      expect.objectContaining({
+        taskId: task.id,
+        workBlockId: workBlock.id,
+        title: task.title,
+        scheduledStartAt: new Date("2026-06-04T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-04T15:00:00.000Z"),
+      }),
+    ]);
   });
 });

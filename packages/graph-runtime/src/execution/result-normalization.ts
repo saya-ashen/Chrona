@@ -135,17 +135,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isNodeResultOutput(value: unknown): value is NodeResultOutput {
   if (!isRecord(value) || typeof value.kind !== "string") return false;
   switch (value.kind) {
-    case "text":
     case "markdown":
       return typeof value.content === "string";
     case "json":
       return "value" in value;
     case "file":
       return typeof value.path === "string";
-    case "artifact":
-      return typeof value.artifactId === "string" && typeof value.title === "string";
-    case "command":
-      return typeof value.command === "string";
     case "link":
       return typeof value.href === "string" && typeof value.title === "string";
     default:
@@ -160,7 +155,7 @@ export function normalizeResultOutputs(output: unknown): NodeResultOutput[] | un
     return output.outputs;
   }
   if (isNodeResultOutput(output)) return [output];
-  if (typeof output === "string") return [{ kind: "text", content: output }];
+  if (typeof output === "string") return [{ kind: "markdown", content: output }];
   return [{ kind: "json", value: output }];
 }
 

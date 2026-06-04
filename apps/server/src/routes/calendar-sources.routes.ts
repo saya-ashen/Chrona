@@ -17,6 +17,7 @@ import { createExternalCalendarService } from "../services/external-calendar-ser
 
 export type CalendarSourceRouteOptions = {
   transport?: CalendarFeedTransport;
+  now?: () => Date;
 };
 
 const workspaceParamSchema = z.object({ workspaceId: z.string().min(1) });
@@ -56,6 +57,7 @@ function defaultRouteTransport() {
 export function createCalendarSourceRoutes(options: CalendarSourceRouteOptions = {}) {
   const service = createExternalCalendarService({
     transport: options.transport ?? defaultRouteTransport(),
+    now: options.now,
     autoPlanTask: startAutoPlanGenerationForTask,
   });
 
