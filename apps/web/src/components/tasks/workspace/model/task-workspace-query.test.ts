@@ -87,6 +87,21 @@ function pageData(overrides: Partial<TaskPageData> = {}): TaskPageData {
   };
 }
 
+function savedPlan(status: NonNullable<TaskPageData["task"]["savedPlan"]>["status"]): NonNullable<TaskPageData["task"]["savedPlan"]> {
+  return {
+    id: `plan-${status}`,
+    status,
+    revision: 1,
+    prompt: `${status} plan`,
+    summary: null,
+    updatedAt: "2026-05-12T10:00:00.000Z",
+    generatedBy: "assistant",
+    blueprint: {} as never,
+    compiledPlan: {} as never,
+    effectivePlan: { graphId: `graph-${status}`, basePlanId: `plan-${status}`, nodes: [], edges: [] } as never,
+  };
+}
+
 describe("task workspace execution console view model", () => {
   it("maps internal statuses to user-facing workspace states", () => {
     expect(mapTaskWorkspaceStatus("done")).toBe("completed");
@@ -692,5 +707,113 @@ describe("task workspace execution console view model", () => {
     expect(review.states.treatment).toMatchObject({ label: "Review required", tone: "warning", guidance: "Approve output" });
     expect(completed.states.treatment).toMatchObject({ label: "Completed", tone: "success" });
     expect(idle.states.treatment).toMatchObject({ label: "Idle", tone: "neutral" });
+  });
+  it("keeps node detail empty and start disabled when no plan exists", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: null,
+    });
+
+    expect(view.states.isEmpty).toBe(true);
+    expect(view.nodeDetail).toMatchObject({
+      selectedNode: null,
+      currentNode: null,
+      title: "No plan node selected",
+      status: null,
+      stepPosition: "0/0",
+      autoRefreshEnabled: false,
+      isEmpty: true,
+    });
+    expect(view.header.actions.find((action) => action.id === "start")).toMatchObject({
+      disabled: true,
+      disabledReason: "Generate and accept a plan before starting execution.",
+    });
+    expect(view.readiness).toMatchObject({
+      id: "execution-ready-empty",
+      description: "No accepted plan is ready to run yet.",
+      statusLabel: "Unscheduled",
+      tone: "neutral",
+    });
+  });
+
+  it("treats a draft saved plan as not startable until accepted", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          savedPlan: savedPlan("draft"),
+        },
+      }),
+      graphPlan: graph([node({ id: "ready", status: "ready" })]),
+    });
+
+    expect(view.header.actions.find((action) => action.id === "start")).toMatchObject({
+      disabled: true,
+      disabledReason: "Accept the generated plan before starting execution.",
+    });
+    expect(view.readiness).toMatchObject({
+      id: "current-node-ready",
+      title: "Current work",
+      actionNodeId: "ready",
+    });
+  });
+
+  it("leaves accepted unstarted plans ready to start at the first ready node", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          savedPlan: savedPlan("accepted"),
+        },
+      }),
+      graphPlan: graph([node({ id: "ready", status: "ready", summary: "Run first step" })]),
+    });
+
+    expect(view.header.actions.find((action) => action.id === "start")).toMatchObject({
+      disabled: false,
+      disabledReason: undefined,
+    });
+    expect(view.nodeDetail).toMatchObject({ currentNode: expect.objectContaining({ id: "ready" }), autoRefreshEnabled: false });
+    expect(view.readiness).toMatchObject({ description: "Run first step", actionLabel: "Open run controls", actionNodeId: "ready" });
+  });
+
+  it("keeps latest completed node available when result only has a renderable spec", () => {
+    const specOnly = node({
+      id: "spec-output",
+      status: "done",
+      resultOutputs: [{
+        root: "root",
+        elements: {
+          root: { type: "Text", props: { children: "Rendered result" } },
+        },
+      }],
+    });
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([specOnly]),
+    });
+
+    expect(view.latestCompletedNode?.id).toBe("spec-output");
+    expect(view.latestResult).toMatchObject({
+      id: "latest-result-empty",
+      description: "No execution result yet.",
+    });
+  });
+
+  it("does not disable node actions when field-only checkpoint input is available", () => {
+    const fieldOnly = node({
+      id: "field-only",
+      status: "waiting_for_user",
+      interactiveFields: [{ key: "answer", label: "Answer", value: "", control: "textarea" }],
+      availableActions: [],
+    });
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData(),
+      graphPlan: graph([fieldOnly]),
+      selectedNode: fieldOnly,
+    });
+
+    expect(view.nodeDetail.disabledActionReason).toBeUndefined();
+    expect(view.nodeDetail.autoRefreshEnabled).toBe(true);
   });
 });

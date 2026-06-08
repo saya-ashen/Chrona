@@ -208,6 +208,8 @@ function featureOf(f: string): { pkg: string; module: string } {
     const pkg = g[2] ? `${g[1]}/${g[2]}` : (g[1] as string);
     return { pkg, module: g[3] ?? g[4] ?? "(root)" };
   }
+  if ((m = f.match(/^apps\/web\/src\/components\/tasks\/(workspace|plan)\//)))
+    return { pkg: "web/components", module: `tasks/${m[1]}` };
   if ((m = f.match(/^apps\/web\/src\/components\/([^/]+)/)))
     return { pkg: "web/components", module: m[1] };
   if ((m = f.match(/^apps\/web\/src\/([^/]+)/))) return { pkg: "web", module: m[1] };

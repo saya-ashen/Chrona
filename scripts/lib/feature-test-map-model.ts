@@ -50,6 +50,13 @@ export interface MapModel {
 // product workflows from docs/README.md, mapped to feature buckets that serve them.
 export const WORKFLOWS: Array<{ id: string; title: string; match: (pkg: string, mod: string) => boolean }> = [
   {
+    id: "task-workspace-plan-execution",
+    title: "Task workspace plan execution (workspace UI / graph / runner controls)",
+    match: (p, m) =>
+      (p === "web/components" && ["tasks/workspace", "tasks/plan"].includes(m)) ||
+      (p === "engine" && ["plan-execution", "orchestration"].includes(m)),
+  },
+  {
     id: "task-management",
     title: "Task management (create/edit/complete/relate)",
     match: (p, m) =>

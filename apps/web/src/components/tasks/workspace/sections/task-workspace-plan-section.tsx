@@ -17,11 +17,15 @@ import {
 } from "../execution/task-workspace-execution-overview";
 import { useActionSpecRenderConfig } from "../execution/action-tab";
 import type { UiDocument } from "@chrona/ui-protocol";
+import { TaskWorkspaceNodeDetailPanel, type NodeDrawerFrame } from "../execution/task-workspace-node-detail-panel";
 import {
-  TaskWorkspaceNodeDetailPanel,
-  type NodeDrawerFrame,
-  type NodeDrawerSize,
-} from "../execution/task-workspace-node-detail-panel";
+  applyNodeDrawerSelection,
+  createNodeDrawerMachineState,
+  expandNodeDrawer,
+  recordNodeDrawerGraphClick,
+  recordNodeDrawerOutsideClick,
+  setNodeDrawerSize as resolveNodeDrawerSize,
+} from "../model/task-workspace-node-drawer-machine";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import {
   createTaskWorkspaceExecutionConsoleView,
@@ -144,10 +148,10 @@ export function TaskWorkspacePlanSection({
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"result" | null>(null);
-  const [nodeDrawerSize, setNodeDrawerSize] = useState<NodeDrawerSize>("collapsed");
+  const [nodeDrawerState, setNodeDrawerState] = useState(createNodeDrawerMachineState);
+  const nodeDrawerSize = nodeDrawerState.size;
   const [nodeDrawerFrame, setNodeDrawerFrame] = useState<NodeDrawerFrame | null>(null);
   const nodeDrawerFrameRef = useRef<HTMLDivElement | null>(null);
-  const shouldAutoOpenDrawerRef = useRef(false);
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
   const { messages } = useI18n();
@@ -302,20 +306,15 @@ export function TaskWorkspacePlanSection({
     nodes: PlanNodeDataModel[],
   ) => {
     handleSelectedPlanNodeChange(node, nodes);
-    if (!node) {
-      setNodeDrawerSize("collapsed");
-    } else if (shouldAutoOpenDrawerRef.current && nodeDrawerSize === "collapsed") {
-      setNodeDrawerSize("expanded");
-    }
-    shouldAutoOpenDrawerRef.current = false;
-  }, [handleSelectedPlanNodeChange, nodeDrawerSize]);
+    setNodeDrawerState((current) => applyNodeDrawerSelection(current, { hasNode: Boolean(node) }));
+  }, [handleSelectedPlanNodeChange]);
   const focusNodeActions = (nodeId?: string) => {
     if (nodeId && graphPlan) {
       const node =
         graphPlan.nodes.find((candidate) => candidate.id === nodeId) ?? null;
       if (node) {
         handleSelectedPlanNodeChange(node, [node]);
-        if (nodeDrawerSize === "collapsed") setNodeDrawerSize("expanded");
+        setNodeDrawerState((current) => current.size === "collapsed" ? expandNodeDrawer(current) : current);
       }
     }
     setPreferredNodeDetailTab("result");
@@ -329,12 +328,11 @@ export function TaskWorkspacePlanSection({
     const handleDocumentClick = (event: MouseEvent) => {
       if (isNodeDetailDrawerTarget(event.target)) return;
       if (isPlanGraphTarget(event.target)) {
-        shouldAutoOpenDrawerRef.current = true;
+        setNodeDrawerState(recordNodeDrawerGraphClick);
         return;
       }
 
-      shouldAutoOpenDrawerRef.current = false;
-      setNodeDrawerSize((currentSize) => currentSize === "collapsed" ? currentSize : "collapsed");
+      setNodeDrawerState(recordNodeDrawerOutsideClick);
     };
 
     document.addEventListener("click", handleDocumentClick, { capture: true });
@@ -481,7 +479,7 @@ export function TaskWorkspacePlanSection({
                 variant="drawer"
                 drawerSize={nodeDrawerSize}
                 drawerFrame={nodeDrawerFrame}
-                onDrawerSizeChange={setNodeDrawerSize}
+                onDrawerSizeChange={(size) => setNodeDrawerState((current) => resolveNodeDrawerSize(current, size))}
                 preferredTab={preferredNodeDetailTab}
                 onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
               />
