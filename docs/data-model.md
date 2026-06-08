@@ -45,8 +45,9 @@ erDiagram
   TaskPlanLayer ||--o{ GraphVersion : versions
   TaskPlanLayer ||--o{ GraphMutationRecord : mutations
 
-  TaskPlanRun ||--o{ Run : provider_runs
-  TaskPlanRun ||--o{ ExecutionSession : sessions
+  WorkBlock ||--o{ TaskPlanRun : occurrence_runs
+  WorkBlock ||--o{ ExecutionSession : occurrence_sessions
+  WorkBlock ||--o{ Run : occurrence_provider_runs
   Run ||--o{ Approval : approvals
   Run ||--o{ Artifact : artifacts
 
@@ -118,6 +119,15 @@ Important enums:
 - `ArtifactType`
 
 Execution records distinguish Chrona plan-run state from external runtime/provider runs. `ExecutionSession` is the server-side scope for AI-visible refs. `RuntimeCursor` tracks provider stream/progress cursoring. Approvals and artifacts store intervention and output records.
+
+Execution is occurrence-scoped. A recurring `Task` shares one row across many
+`WorkBlock` occurrences, so `TaskPlanRun`, `ExecutionSession`, and `Run` each
+carry a `workBlockId` that pins them to a single occurrence. `Run` also stores
+`errorSummary`, the authoritative provider failure cause surfaced to the read
+model. The projection committer (`rebuildTaskProjection`) scopes its
+runs/sessions/approvals to the occurrence that most recently executed, so a
+failed or cancelled occurrence never contaminates a sibling occurrence. See
+`docs/backend-execution-flow.md` → "Task state authority".
 
 ## Schedule state
 

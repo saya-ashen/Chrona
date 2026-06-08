@@ -13,7 +13,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { extractJSON, llmCall } from "@/modules/ai/providers";
-import { createPlanGraphFromCompiledPlan } from "@/modules/plan-execution/plan-run-store";
+import { createPlanGraphFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-run-store";
 import type {
   PlanBlueprintNode,
   PlanBlueprintEdge,
@@ -24,7 +24,7 @@ import type {
   NodeResult,
 } from "@chrona/contracts/ai";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
-import { getReadyAutoRunnableNodes } from "@/modules/plan-execution/compat";
+import { getReadyAutoRunnableNodes } from "@/modules/plans/task-plan-graph";
 
 // -- Config --
 

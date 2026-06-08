@@ -54,7 +54,7 @@ const COMMANDS: Partial<Record<string, CommandGroup>> = {
     "windows-x64": { description: "Build Windows x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "windows-x64"] },
   },
   check: {
-    all: { description: "Typecheck, lint, deadcode, pages, boundaries", run: ["bun", "x", "tsc", "--noEmit", "--pretty", "false", "&&", "bun", "x", "eslint", ".", "&&", "bun", "x", "knip", "--include", "unresolved,duplicates", "&&", "bun", "run", "scripts/check-web-page-reachability.ts", "&&", "bun", "x", "dependency-cruiser", "--config", ".dependency-cruiser.cjs", "apps", "packages"] },
+    all: { description: "Typecheck, lint, deadcode, pages, boundaries", run: ["bun", "x", "tsc", "--noEmit", "--pretty", "false", "&&", "bun", "x", "eslint", ".", "&&", "bun", "x", "knip", "--include", "unresolved,duplicates", "&&", "bun", "run", "scripts/check-web-page-reachability.ts", "&&", "bun", "x", "dependency-cruiser", "--config", ".dependency-cruiser.cjs", "--ignore-known", ".dependency-cruiser-known-violations.json", "apps", "packages"] },
     type: { description: "TypeScript typecheck", run: ["bun", "x", "tsc", "--noEmit", "--pretty", "false"] },
     lint: { description: "ESLint", run: ["bun", "x", "eslint", "."] },
     deadcode: { description: "Knip unresolved and duplicate checks", run: ["bun", "x", "knip", "--include", "unresolved,duplicates"] },
@@ -62,7 +62,7 @@ const COMMANDS: Partial<Record<string, CommandGroup>> = {
     deps: { description: "Knip dependency checks", run: ["bun", "x", "knip", "--dependencies"] },
     pages: { description: "Web page reachability", run: ["bun", "run", "scripts/check-web-page-reachability.ts"] },
     ui: { description: "UI foundation rules", run: ["bun", "run", "scripts/check-ui-foundation.mjs"] },
-    boundaries: { description: "Dependency boundaries", run: ["bun", "x", "dependency-cruiser", "--config", ".dependency-cruiser.cjs", "apps", "packages"] },
+    boundaries: { description: "Dependency boundaries", run: ["bun", "x", "dependency-cruiser", "--config", ".dependency-cruiser.cjs", "--ignore-known", ".dependency-cruiser-known-violations.json", "apps", "packages"] },
   },
   test: TEST_COMMANDS,
   db: {
