@@ -304,7 +304,7 @@ export function TaskWorkspacePlanSection({
     handleSelectedPlanNodeChange(node, nodes);
     if (!node) {
       setNodeDrawerSize("collapsed");
-    } else if (nodeDrawerSize === "collapsed") {
+    } else if (shouldAutoOpenDrawerRef.current && nodeDrawerSize === "collapsed") {
       setNodeDrawerSize("expanded");
     }
     shouldAutoOpenDrawerRef.current = false;

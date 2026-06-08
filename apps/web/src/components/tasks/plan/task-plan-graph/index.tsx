@@ -282,7 +282,8 @@ export function TaskPlanGraph({
 
   const handleSelectNode = useCallback((nodeId: string) => {
     setSelectedNodeId(nodeId);
-  }, []);
+    onSelectedNodeChange?.(plan.nodes.find((node) => node.id === nodeId) ?? null, plan.nodes);
+  }, [onSelectedNodeChange, plan.nodes]);
 
   const handleDismissOverlay = useCallback(() => {
     setSelectedNodeId(null);
