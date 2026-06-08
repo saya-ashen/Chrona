@@ -31,6 +31,34 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task");
       }
     },
+    async getBootstrap(input: Parameters<typeof tasks.getBootstrap>[0]) {
+      try {
+        return await tasks.getBootstrap(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task bootstrap");
+      }
+    },
+    async getRuntimeContext(input: Parameters<typeof tasks.getRuntimeContext>[0]) {
+      try {
+        return await tasks.getRuntimeContext(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task runtime context");
+      }
+    },
+    async getReviewContext(input: Parameters<typeof tasks.getReviewContext>[0]) {
+      try {
+        return await tasks.getReviewContext(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task review context");
+      }
+    },
+    async getCommandCenter(input: Parameters<typeof tasks.getCommandCenter>[0]) {
+      try {
+        return await tasks.getCommandCenter(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task command center");
+      }
+    },
     async getActivityPage(input: Parameters<typeof tasks.getActivityPage>[0]) {
       try {
         return await tasks.getActivityPage(input);
