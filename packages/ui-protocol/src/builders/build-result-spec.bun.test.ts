@@ -21,12 +21,12 @@ describe("buildResultSpec", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("renders a danger Alert when errorMessage is set and outputs is empty", () => {
+  it("renders an error Alert when errorMessage is set and outputs is empty", () => {
     const doc = buildResultSpec([], { errorMessage: "Run failed: timeout" });
     expect(doc.elements["empty-state"].type).toBe("Alert");
     const props = doc.elements["empty-state"].props as Record<string, unknown>;
     expect(props.title).toBe("Run failed: timeout");
-    expect(props.type).toBe("danger");
+    expect(props.type).toBe("error");
     expect(doc.elements.root.children).toEqual(["empty-state"]);
     const result = validateChronaSpec(doc);
     expect(result.ok).toBe(true);

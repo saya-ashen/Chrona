@@ -31,7 +31,7 @@ export interface BuildResultSpecOptions {
  * - `"file"` → `FileRef` (path + language + description)
  * - `"link"` → `Link` (href + label=title)
  *
- * Empty outputs with `options.errorMessage` → danger `Alert`.
+ * Empty outputs with `options.errorMessage` → error `Alert`.
  * Empty outputs with `options.emptyMessage` → `Text` placeholder.
  * Empty outputs with neither → minimal `Stack` with no children.
  */
@@ -45,7 +45,7 @@ export function buildResultSpec(outputs: ResultOutputItemInput[], options?: Buil
     if (options?.errorMessage) {
       elements["empty-state"] = {
         type: "Alert",
-        props: { title: options.errorMessage, type: "danger" },
+        props: { title: options.errorMessage, type: "error" },
       };
       rootChildren.push("empty-state");
     } else if (options?.emptyMessage) {
