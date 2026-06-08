@@ -45,6 +45,10 @@ function actionFormForCheckpoint(input: {
   return undefined;
 }
 
+function jsonViewOutput(value: Record<string, unknown>) {
+  return { root: "root", elements: { root: { type: "JsonView", props: { value } } } };
+}
+
 export class CheckpointNodeExecutor implements NodeExecutor {
   readonly nodeType = "checkpoint" as const;
 
@@ -70,7 +74,7 @@ export class CheckpointNodeExecutor implements NodeExecutor {
       return {
         status: "done",
         summary: `Checkpoint ${action}: ${input.node.title}`,
-        output: { inputFields: input.inputFields },
+        output: jsonViewOutput({ inputFields: input.inputFields }),
         inputFields: input.inputFields,
         evidence: { sessionId: input.mainSession.id },
       };
@@ -80,7 +84,7 @@ export class CheckpointNodeExecutor implements NodeExecutor {
       return {
         status: "done",
         summary: `Checkpoint approved: ${input.node.title}`,
-        output: { feedback: input.userInput },
+        output: jsonViewOutput({ feedback: input.userInput }),
         evidence: { sessionId: input.mainSession.id },
       };
     }

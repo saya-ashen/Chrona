@@ -85,6 +85,7 @@ async function* aiGeneratePlanStreamMock(request: { title: string; description?:
 }
 
 mock.module("@/modules/ai/runtime/ai-service", () => ({
+  aiChat: mock(() => Promise.resolve(null)),
   aiGeneratePlanStream: aiGeneratePlanStreamMock,
 }));
 

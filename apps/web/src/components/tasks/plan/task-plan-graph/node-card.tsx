@@ -22,7 +22,7 @@ function resolveExecutionStatus(node: FlowGraphNode["data"]["node"]) {
 }
 
 function hasNodeArtifacts(node: FlowGraphNode["data"]["node"]) {
-  return Boolean(node.result || node.resultOutputs?.length || node.resultEvidence);
+  return Boolean(node.result || node.resultEvidence || node.resultOutputs);
 }
 
 function formatEstimatedMinutes(value: number | null) {

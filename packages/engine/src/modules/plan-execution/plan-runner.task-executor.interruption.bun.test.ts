@@ -11,6 +11,10 @@ import {
   taskPlanExecution,
 } from "./plan-runner.task-executor.fixtures";
 
+function jsonViewOutput(value: Record<string, unknown>) {
+  return { root: "root", elements: { root: { type: "JsonView", props: { value } } } };
+}
+
 describe("plan-runner task executor interruption", () => {
   setupPlanRunnerTaskExecutorTest();
 
@@ -40,7 +44,7 @@ describe("plan-runner task executor interruption", () => {
       runtimeRunRef: "runtime-first-task",
       status: "Completed",
       summary: "Late first task complete",
-      output: { requirements: "ready" },
+      output: jsonViewOutput({ requirements: "ready" }),
     });
 
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
@@ -74,7 +78,7 @@ describe("plan-runner task executor interruption", () => {
       runtimeRunRef: "runtime-first-task",
       status: "Completed",
       summary: "Late first task complete",
-      output: { requirements: "ready" },
+      output: jsonViewOutput({ requirements: "ready" }),
     });
 
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
@@ -90,7 +94,7 @@ describe("plan-runner task executor interruption", () => {
         status: "done",
         summary: "First task complete",
         evidence: { sessionId: "main-session", runId: "run_first_task" },
-        output: { runtimeRunRef: "runtime-first-task" },
+        output: jsonViewOutput({ runtimeRunRef: "runtime-first-task" }),
       })
       .mockResolvedValueOnce({
         status: "started",
@@ -128,7 +132,7 @@ describe("plan-runner task executor interruption", () => {
         status: "done",
         summary: "First task complete",
         evidence: { sessionId: "main-session", runId: "run_first_task" },
-        output: { runtimeRunRef: "runtime-first-task" },
+        output: jsonViewOutput({ runtimeRunRef: "runtime-first-task" }),
       })
       .mockResolvedValueOnce({
         status: "started",
@@ -170,13 +174,13 @@ describe("plan-runner task executor interruption", () => {
         status: "done",
         summary: "First task complete",
         evidence: { sessionId: "main-session", runId: "run_first_task" },
-        output: { runtimeRunRef: "runtime-first-task" },
+        output: jsonViewOutput({ runtimeRunRef: "runtime-first-task" }),
       })
       .mockResolvedValueOnce({
         status: "done",
         summary: "First task retried successfully",
         evidence: { sessionId: "main-session", runId: "run_first_task_retry" },
-        output: { runtimeRunRef: "runtime-first-task-retry" },
+        output: jsonViewOutput({ runtimeRunRef: "runtime-first-task-retry" }),
       });
 
     const { workspace, task } = await seedWorkspaceAndTask("Runner explicit retry replacement");

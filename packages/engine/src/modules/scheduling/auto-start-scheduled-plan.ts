@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
+import { taskPlanExecution } from "@/modules/plan-execution";
 import { TaskPlanStatus } from "@/generated/prisma/client";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 import { appendCanonicalEvent } from "@/modules/events";
