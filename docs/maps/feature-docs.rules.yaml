@@ -175,4 +175,17 @@ selection:
       reason: "task-orchestration-runtime-loop"
       symbols:
         - "createTaskOrchestrator"
+    - path: "packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts"
+      reason: "task-workspace-current-execution-status-projection"
+      symbols:
+        - "getCurrentExecution"
+        - "currentExecutionStatusFromEffectiveGraph"
+    - path: "apps/server/src/routes/tasks/crud.routes.ts"
+      reason: "task-workspace-command-center-api-route"
+      symbols:
+        - "createTasksRoutes"
+    - path: "packages/engine/src/modules/tasks/get-task-command-center.ts"
+      reason: "task-workspace-command-center-json-render-documents"
+      symbols:
+        - "getTaskCommandCenter"
 describe_threshold: 5

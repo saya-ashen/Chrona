@@ -37,6 +37,22 @@ export interface CommandCenterCheckpointInput {
 }
 
 type MutableElements = UiDocument["elements"];
+function appendDocument(
+  target: MutableElements,
+  children: string[],
+  keyPrefix: string,
+  document: UiDocument | null | undefined,
+) {
+  if (!document?.root || !document.elements[document.root]) return;
+  for (const [key, element] of Object.entries(document.elements)) {
+    target[`${keyPrefix}:${key}`] = {
+      ...element,
+      children: element.children?.map((child) => `${keyPrefix}:${child}`),
+    };
+  }
+  children.push(`${keyPrefix}:${document.root}`);
+}
+
 
 function actionVariant(style: CommandCenterCheckpointActionInput["style"]) {
   if (style === "danger") return "danger";
@@ -48,6 +64,35 @@ function checkpointTone(severity: CommandCenterCheckpointInput["severity"]) {
   if (severity === "error") return "error";
   if (severity === "warning") return "warning";
   return "info";
+}
+
+export function buildCommandCenterNowSpec(input: {
+  title: string;
+  description?: string | null;
+  statusLabel?: string | null;
+  tone?: "neutral" | "info" | "success" | "warning" | "danger";
+  currentOperationSpec?: UiDocument | null;
+  copy?: {
+    currentOperation?: string;
+  };
+}): UiDocument {
+  const elements: MutableElements = {
+    root: { type: "Stack", props: { gap: "sm" }, children: ["status-card"] },
+    "status-card": {
+      type: "WorkspaceSummaryCard",
+      props: {
+        eyebrow: input.copy?.currentOperation ?? "Current operation",
+        title: input.title,
+        description: input.description ?? undefined,
+        statusLabel: input.statusLabel ?? undefined,
+        tone: input.tone ?? "info",
+        icon: input.tone === "warning" || input.tone === "danger" ? "warning" : "sparkles",
+      },
+    },
+  };
+  const children = elements.root.children ?? [];
+  appendDocument(elements, children, "current-operation", input.currentOperationSpec);
+  return { root: "root", elements, state: input.currentOperationSpec?.state };
 }
 
 export function buildCommandCenterCheckpointSpec(input: {
@@ -67,6 +112,8 @@ export function buildCommandCenterCheckpointSpec(input: {
     },
   };
   const children = elements.root.children ?? [];
+  const inlineActionChildren: string[] = [];
+  const formActionChildren: string[] = [];
 
   for (const action of checkpoint.availableActions) {
     const actionChildren: string[] = [];
@@ -98,6 +145,7 @@ export function buildCommandCenterCheckpointSpec(input: {
         press: {
           action: UI_ACTION.submitCheckpoint,
           params: {
+            checkpointId: checkpoint.id,
             actionId: action.id,
             values: action.requiresPayload ? { [stateKey]: { $state: `/${stateKey}` } } : undefined,
           },
@@ -106,8 +154,35 @@ export function buildCommandCenterCheckpointSpec(input: {
     };
     actionChildren.push(submitKey);
 
-    elements[actionKey] = { type: "Stack", props: { gap: "xs" }, children: actionChildren };
-    children.push(actionKey);
+    if (action.requiresPayload) {
+      elements[actionKey] = {
+        type: "WorkspaceActionCard",
+        props: { title: action.label, tone: action.style === "danger" ? "danger" : "neutral" },
+        children: actionChildren,
+      };
+      formActionChildren.push(actionKey);
+    } else {
+      elements[actionKey] = { type: "Stack", props: { gap: "xs" }, children: actionChildren };
+      inlineActionChildren.push(actionKey);
+    }
+  }
+
+  if (inlineActionChildren.length > 0) {
+    elements["quick-actions"] = {
+      type: "WorkspaceActionGroup",
+      props: { label: "Quick actions", layout: "inline" },
+      children: inlineActionChildren,
+    };
+    children.push("quick-actions");
+  }
+
+  if (formActionChildren.length > 0) {
+    elements["form-actions"] = {
+      type: "WorkspaceActionGroup",
+      props: { label: "Actions requiring context", layout: "stack" },
+      children: formActionChildren,
+    };
+    children.push("form-actions");
   }
 
   return { root: "root", elements, state: {} };

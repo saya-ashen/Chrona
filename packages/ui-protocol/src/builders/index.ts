@@ -19,6 +19,7 @@ export {
 export {
   buildCommandCenterArtifactsSpec,
   buildCommandCenterCheckpointSpec,
+  buildCommandCenterNowSpec,
   buildCommandCenterTrailSpec,
   type CommandCenterArtifactInput,
   type CommandCenterCheckpointActionInput,

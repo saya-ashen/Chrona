@@ -15,35 +15,6 @@ symbols:
     source_name: "markTaskDone"
     kind: "function"
     describe: true
-    reason: "ai-selected:pilot-task-management-lifecycle-use-case"
-    status: "needs-ai-fill"
-tests:
-  direct:
-    - "apps/server/src/routes/__tests__/task-execution-closure.bun.test.ts"
-  transitive:
-    - "apps/server/src/__tests__/api/ai-client-crud.bun.test.ts"
-    - "apps/server/src/__tests__/api/ai-feature-binding.bun.test.ts"
-    - "apps/server/src/__tests__/api/external-calendar-events.bun.test.ts"
-    - "apps/server/src/__tests__/api/external-calendar-source-management.bun.test.ts"
-    - "apps/server/src/__tests__/api/external-calendar-sources.bun.test.ts"
-    - "apps/server/src/__tests__/api/external-task-edit-roundtrip.bun.test.ts"
-    - "apps/server/src/__tests__/api/plan-execution-module.bun.test.ts"
-    - "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts"
-    - "apps/server/src/__tests__/api/real-router-smoke.bun.test.ts"
-    - "apps/server/src/__tests__/api/task-assistant-message.bun.test.ts"
-    - "apps/server/src/__tests__/api/task-validation-workflow.bun.test.ts"
-    - "apps/server/src/__tests__/api/task-workflow.bun.test.ts"
-    - "apps/server/src/__tests__/api/task-workspace-activity.bun.test.ts"
-    - "apps/server/src/__tests__/api/task-workspace-chat.bun.test.ts"
-    - "apps/server/src/__tests__/bootstrap-runtime.bun.test.ts"
-    - "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts"
-    - "apps/server/src/routes/__tests__/plan-operations.bun.test.ts"
-    - "apps/server/src/routes/__tests__/task-execution-closure.bun.test.ts"
-    - "apps/server/src/routes/tasks/runtime-event-summary.test.ts"
-    - "packages/engine/src/modules/agent-tools/operations.bun.test.ts"
-coverage:
-  status: "unknown"
-  confidence: "low"
 ---
 # mark-task-done
 

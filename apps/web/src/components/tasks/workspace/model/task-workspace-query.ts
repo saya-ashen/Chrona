@@ -588,7 +588,9 @@ export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: strin
     ...bootstrap,
     ...runtimeContext,
     ...reviewContext,
-    ...commandCenter,
+    artifacts: [],
+    activityTimeline: [],
+    commandCenter,
   };
 }
 

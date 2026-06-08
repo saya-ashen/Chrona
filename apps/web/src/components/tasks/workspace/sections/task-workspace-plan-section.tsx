@@ -252,6 +252,26 @@ export function TaskWorkspacePlanSection({
       onGeneratePlan({ userInstruction: instruction });
     },
   }), [onApplyPlan, onGeneratePlan, plan, regenerationInstruction]);
+  const commandCenterActionHandlers = useMemo(() => ({
+    "submit-checkpoint": async (params: Record<string, unknown>) => {
+      if (!onSubmitCheckpointAction) throw new Error("Checkpoint actions are not available for this view.");
+      const checkpointId = typeof params.checkpointId === "string"
+        ? params.checkpointId
+        : currentExecution?.checkpoint?.id;
+      const actionId = typeof params.actionId === "string" ? params.actionId : null;
+      if (!checkpointId || !actionId) throw new Error("Checkpoint action payload is incomplete.");
+      const rawValues = (params.values ?? {}) as Record<string, unknown>;
+      const values = Object.fromEntries(
+        Object.entries(rawValues).filter(([, value]) => typeof value === "string" && value.trim()),
+      ) as Record<string, string>;
+      const payloadValue = Object.values(values)[0];
+      return onSubmitCheckpointAction({
+        checkpointId,
+        action: actionId as SubmitCheckpointActionInput["action"],
+        ...(payloadValue ? { payload: payloadValue } : {}),
+      });
+    },
+  }), [currentExecution?.checkpoint?.id, onSubmitCheckpointAction]);
   const handleAcceptOrRegenerateStateChange = useCallback((changes: Array<{ path: string; value: unknown }>) => {
     const instructionChange = changes.find((change) => change.path === "/instruction");
     if (instructionChange) {
@@ -439,7 +459,8 @@ export function TaskWorkspacePlanSection({
               latestCompletedNode={consoleView.latestCompletedNode}
               artifacts={consoleView.artifacts}
               activity={consoleView.activity}
-              commandCenterUi={pageData.ui?.commandCenter ?? null}
+              commandCenterActionHandlers={commandCenterActionHandlers}
+              commandCenter={pageData.commandCenter ?? null}
               runtimeEvents={runtimeEvents}
               primaryAction={primaryAction}
               copy={commandCenterCopy}

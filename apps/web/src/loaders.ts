@@ -143,7 +143,9 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
       ...bootstrap,
       ...runtimeContext,
       ...reviewContext,
-      ...commandCenter,
+      artifacts: [],
+      activityTimeline: [],
+      commandCenter,
     } as TaskPageRouteData["task"],
   };
 }

@@ -103,6 +103,24 @@ function WorkspaceArtifactList({
     </div>
   );
 }
+function WorkspaceActionGroup({ label, layout = "inline", children }: { label?: string; layout?: "inline" | "stack"; children?: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-border/60 bg-background/70 p-2.5 shadow-sm">
+      {label ? <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p> : null}
+      <div className={cn(layout === "inline" ? "flex flex-wrap gap-2" : "space-y-2")}>{children}</div>
+    </section>
+  );
+}
+
+function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?: Tone; children?: ReactNode }) {
+  return (
+    <div className={cn("min-w-0 rounded-lg border bg-card/80 p-2.5 shadow-xs", panelToneClassName(tone))}>
+      {title ? <p className="mb-2 text-xs font-semibold text-foreground">{title}</p> : null}
+      <div className="space-y-2 [&_button]:h-8 [&_button]:rounded-lg [&_button]:px-3 [&_textarea]:min-h-20 [&_textarea]:text-sm">{children}</div>
+    </div>
+  );
+}
+
 
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt
@@ -133,6 +151,8 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Tabs: shadcnComponents.Tabs,
     Table: shadcnComponents.Table,
 
+    WorkspaceActionGroup: ({ props, children }) => <WorkspaceActionGroup label={props.label} layout={props.layout}>{children}</WorkspaceActionGroup>,
+    WorkspaceActionCard: ({ props, children }) => <WorkspaceActionCard title={props.title} tone={props.tone as Tone}>{children}</WorkspaceActionCard>,
     // domain components (Chrona)
     Markdown: ({ props }) => (
       <article className="rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm leading-6 text-foreground shadow-sm">

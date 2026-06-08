@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
 
+import type { TaskPageData } from "@/components/tasks/workspace/model/task-workspace-types";
 export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 
 export type AppBootData = {
@@ -40,7 +41,7 @@ export type MemoryRouteData = {
 export type TaskPageRouteData = {
   locale: Locale;
   dictionary: Dictionary;
-  task: Awaited<ReturnType<typeof import("@chrona/engine/modules/tasks/get-task-page").getTaskPage>>;
+  task: TaskPageData;
 };
 
 export type TaskListRouteData = {

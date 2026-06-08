@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { ApprovalStatus, ArtifactType, RunStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
+import { Hono } from "hono";
+import { createChronaEngine } from "@chrona/engine";
+import { createApiRouter } from "../../routes/api";
 import { getTaskPage } from "@chrona/engine/modules/tasks/get-task-page";
-import { resetTestDb, seedScheduleProposal, seedTask, seedWorkspace } from "../bun-test-helpers";
+import { json, resetTestDb, seedScheduleProposal, seedTask, seedWorkspace } from "../bun-test-helpers";
+
+function app() {
+  const server = new Hono();
+  server.route("/api", createApiRouter(createChronaEngine()));
+  return server;
+}
 
 describe("task workspace console read data", () => {
   beforeEach(async () => {
@@ -109,6 +118,47 @@ describe("task workspace console read data", () => {
       type: "patch",
       uri: "file://patch.diff",
     }));
+  });
+
+  it("returns command center json-render documents only", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Command Center API");
+    const { taskId } = await seedTask(workspaceId, { title: "Render command center" });
+    const run = await db.run.create({
+      data: {
+        taskId,
+        runtimeName: "hermes",
+        runtimeRunRef: "run-command-center-documents",
+        status: RunStatus.Completed,
+        triggeredBy: "agent",
+        startedAt: new Date("2026-05-12T11:00:00.000Z"),
+      },
+    });
+
+
+    await db.artifact.create({
+      data: {
+        workspaceId,
+        taskId,
+        runId: run.id,
+        type: ArtifactType.summary,
+        title: "Generated summary",
+        uri: "file://summary.md",
+      },
+    });
+
+    const response = await app().request(`/api/tasks/${taskId}/command-center`);
+    expect(response.status).toBe(200);
+
+    const body = await json<Record<string, unknown>>(response);
+    expect(Object.keys(body).sort()).toEqual(["documents"]);
+    expect(body).not.toHaveProperty("artifacts");
+    expect(body).not.toHaveProperty("activityTimeline");
+    expect(body).not.toHaveProperty("ui");
+    expect(body.documents).toMatchObject({
+      now: { root: "root", elements: expect.any(Object) },
+      output: { root: "root", elements: expect.any(Object) },
+      trail: { root: "root", elements: expect.any(Object) },
+    });
   });
 
   it("returns persisted provider runtime activity for the workspace activity timeline", async () => {

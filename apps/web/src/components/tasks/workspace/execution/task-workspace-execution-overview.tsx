@@ -14,7 +14,7 @@ import type {
   WorkspaceArtifactItem,
 } from "../model/task-workspace-types";
 import { SpecRenderer } from "../catalog/spec-renderer";
-import { buildCommandCenterNowTabSpec, buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
+import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
 
 type OverviewAction = (nodeId?: string) => void;
 type CommandCenterTab = "now" | "output" | "trail";
@@ -81,7 +81,8 @@ export function TaskWorkspaceExecutionOverview({
   runtimeEvents = [],
   primaryAction,
   copy: copyProp,
-  commandCenterUi,
+  commandCenter,
+  commandCenterActionHandlers,
   onAction,
 }: {
   progress: ProgressSummary;
@@ -96,10 +97,14 @@ export function TaskWorkspaceExecutionOverview({
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   onAction?: OverviewAction;
-  commandCenterUi?: {
-    artifactsSpec?: UiDocument | null;
-    trailSpec?: UiDocument | null;
+  commandCenter?: {
+    documents: {
+      now: UiDocument;
+      output: UiDocument;
+      trail: UiDocument;
+    };
   } | null;
+  commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
 }) {
   const [activeTab, setActiveTab] = useState<CommandCenterTab>("now");
   const { messages } = useI18n();
@@ -129,6 +134,7 @@ export function TaskWorkspaceExecutionOverview({
     ?? null;
 
   const nowHandlers = {
+    ...(commandCenterActionHandlers ?? {}),
     ...(primaryAction?.actionHandlers ?? {}),
     "command-center-primary": (params: Record<string, unknown>) => {
       const actionId = typeof params.actionId === "string" ? params.actionId : null;
@@ -215,23 +221,22 @@ export function TaskWorkspaceExecutionOverview({
 
           <TabsContent value="now" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
             <SpecRenderer
-              key={primaryAction?.kind ?? "now"}
-              spec={buildCommandCenterNowTabSpec({ primaryAction, readiness, attention, runtimeEvents, copy: ws })}
+              key="now"
+              spec={commandCenter?.documents.now ?? null}
               handlers={nowHandlers}
-              onStateChange={primaryAction?.onActionStateChange}
             />
           </TabsContent>
 
           <TabsContent value="output" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
             <SpecRenderer
-              spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenterUi?.artifactsSpec ?? null })}
+              spec={commandCenter?.documents.output ?? buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws })}
               handlers={locateHandlers}
             />
           </TabsContent>
 
           <TabsContent value="trail" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
             <SpecRenderer
-              spec={commandCenterUi?.trailSpec ?? buildCommandCenterTrailTabSpec({
+              spec={commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
                 activity,
                 runtimeEvents,
                 copy: {

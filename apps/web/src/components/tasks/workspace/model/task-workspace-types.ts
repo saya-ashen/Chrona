@@ -108,23 +108,24 @@ export type TaskPageData = {
     uri?: string;
   }>;
   activityTimeline?: WorkspaceActivityItem[];
-  ui?: {
-    commandCenter?: {
-      artifactsSpec?: UiDocument | null;
-      trailSpec?: UiDocument | null;
+  commandCenter?: {
+    documents: {
+      now: UiDocument;
+      output: UiDocument;
+      trail: UiDocument;
     };
   };
 };
 
 export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
-  "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "ui"
+  "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "commandCenter"
 >;
 
 export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes">;
 
 export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "scheduleProposals" | "approvals">;
 
-export type TaskWorkspaceCommandCenterData = Pick<TaskPageData, "artifacts" | "activityTimeline" | "ui">;
+export type TaskWorkspaceCommandCenterData = NonNullable<TaskPageData["commandCenter"]>;
 
 export type EditableTask = {
   title: string;

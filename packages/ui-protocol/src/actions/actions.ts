@@ -36,6 +36,7 @@ export const locateWorkspaceNodePayloadSchema = z.object({
 });
 
 export const submitCheckpointPayloadSchema = z.object({
+  checkpointId: z.string().optional(),
   actionId: z.string().optional(),
   values: z.record(z.string(), z.string()).optional(),
 });

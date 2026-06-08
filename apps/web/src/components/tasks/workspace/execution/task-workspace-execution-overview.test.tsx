@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { UiDocument } from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "./task-workspace-execution-overview";
@@ -23,6 +24,27 @@ function renderOverview(
   );
 }
 
+function nowDocument(title = "Current operation"): UiDocument {
+  return {
+    root: "root",
+    elements: {
+      root: { type: "Stack", props: { gap: "sm" }, children: ["status-card"] },
+      "status-card": {
+        type: "WorkspaceSummaryCard",
+        props: {
+          eyebrow: "Current operation",
+          title,
+          description: "Backend-rendered now tab.",
+          statusLabel: "started",
+          tone: "info",
+          icon: "sparkles",
+        },
+      },
+    },
+  };
+}
+
+
 describe("TaskWorkspaceExecutionOverview", () => {
   afterEach(() => {
     cleanup();
@@ -31,21 +53,19 @@ describe("TaskWorkspaceExecutionOverview", () => {
   it("renders the now, output, and trail tabs", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
     const onAction = vi.fn();
-
-    renderOverview(view, { onAction });
+    renderOverview(view, { commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: nowDocument("Trail") } }, onAction });
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
     expect(screen.getByRole("tab", { name: "Now" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Output" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Trail" })).toBeInTheDocument();
-    // Now tab shows the current operation status card from attention/readiness.
-    expect(screen.getByText("Current operation")).toBeInTheDocument();
+    expect(screen.getByText("Backend-rendered now tab.")).toBeInTheDocument();
   });
 
   it("renders live runtime events in the now tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
-
     renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
       runtimeEvents: [{
         type: "runtime_event",
         action: "start_manual",
@@ -57,48 +77,11 @@ describe("TaskWorkspaceExecutionOverview", () => {
         sequence: 1,
         timestamp: "2026-05-12T10:01:00.000Z",
         event: { type: "tool_started", toolName: "chrona_plan_read", label: "正在读取计划" },
-      }, {
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 2,
-        timestamp: "2026-05-12T10:01:01.000Z",
-        event: { type: "assistant_text_delta", text: "Runtime " },
-      }, {
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 3,
-        timestamp: "2026-05-12T10:01:01.500Z",
-        event: { type: "assistant_text_delta", text: "answer" },
-      }, {
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 4,
-        timestamp: "2026-05-12T10:01:02.000Z",
-        event: { type: "reasoning_delta", text: "Runtime reasoning" },
       }],
     });
 
-    // Live event content surfaces directly in the Now tab. Raw (unmerged)
-    // events are rendered individually with a kind label prefix.
-    expect(screen.getByText("Tool: 正在读取计划")).toBeInTheDocument();
-    expect(screen.getByText("Assistant: Runtime")).toBeInTheDocument();
-    expect(screen.getByText("Assistant: answer")).toBeInTheDocument();
-    expect(screen.getByText("Reasoning: Runtime reasoning")).toBeInTheDocument();
+    expect(screen.getByText("Execution running")).toBeInTheDocument();
+    expect(screen.queryByText("Tool: 正在读取计划")).not.toBeInTheDocument();
   });
 
   it("renders the latest completed node result and artifacts in the output tab", () => {
@@ -119,8 +102,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
   it("renders a command center primary action in the now tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
     const onClick = vi.fn();
-
     renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
       primaryAction: {
         kind: "generate",
         label: "Generate plan",
@@ -131,9 +114,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
       },
     });
 
-    expect(screen.getByText("Current operation")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Generate plan" }));
-    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Execution running")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it("renders an empty output state when no node has completed", () => {
@@ -191,5 +174,41 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByRole("tab", { name: "Trail" })).toHaveAttribute("aria-selected", "true");
     fireEvent.click(screen.getByRole("tab", { name: "Output" }));
     expect(screen.getByRole("tab", { name: "Output" })).toHaveAttribute("aria-selected", "true");
+  });
+  it("renders API-provided now documents without frontend augmentation", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+    const apiNowSpec: UiDocument = {
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "sm" }, children: ["status-card"] },
+        "status-card": {
+          type: "WorkspaceSummaryCard",
+          props: {
+            eyebrow: "Current operation",
+            title: "Execution running",
+            description: "No active execution session.",
+            statusLabel: "started",
+            tone: "info",
+            icon: "sparkles",
+          },
+        },
+      },
+    };
+
+    renderOverview(view, {
+      commandCenter: { documents: { now: apiNowSpec, output: apiNowSpec, trail: apiNowSpec } },
+      primaryAction: {
+        kind: "task-primary-action",
+        label: "Retry Sync",
+        description: "Retry sync or repair this node before continuing execution.",
+        statusLabel: "Degraded",
+        tone: "critical",
+        onClick: vi.fn(),
+      },
+    });
+
+    expect(screen.getByText("Execution running")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry Sync" })).not.toBeInTheDocument();
+    expect(apiNowSpec.elements.root.children).toEqual(["status-card"]);
   });
 });

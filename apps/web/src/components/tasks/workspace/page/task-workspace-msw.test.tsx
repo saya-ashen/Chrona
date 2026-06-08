@@ -5,11 +5,21 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import type { PropsWithChildren } from "react";
 
+import { buildResultSpec } from "@chrona/ui-protocol";
+
 import { createTestQueryClient } from "@/test/fixtures";
 import { server } from "@/test/msw/server";
 import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-state";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import type { TaskPageData } from "../model/task-workspace-types";
+
+const emptyCommandCenterDocuments = {
+  documents: {
+    now: buildResultSpec([], { emptyMessage: "No current operation." }),
+    output: buildResultSpec([], { emptyMessage: "No output yet." }),
+    trail: buildResultSpec([], { emptyMessage: "No activity yet." }),
+  },
+};
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -34,11 +44,9 @@ function splitWorkspaceHandlers(data: TaskPageData, onPageRequest?: () => void) 
       scheduleProposals: data.scheduleProposals,
       approvals: data.approvals,
     })),
-    http.get("/api/tasks/:taskId/command-center", () => HttpResponse.json({
-      artifacts: data.artifacts,
-      activityTimeline: data.activityTimeline,
-      ui: data.ui,
-    })),
+    http.get("/api/tasks/:taskId/command-center", () => HttpResponse.json(
+      data.commandCenter ?? emptyCommandCenterDocuments,
+    )),
   ];
 }
 

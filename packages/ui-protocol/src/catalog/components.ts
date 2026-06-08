@@ -127,6 +127,22 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       }),
       description: "One workspace artifact row with an optional locate action.",
     },
+    WorkspaceActionGroup: {
+      props: z.object({
+        label: z.string().optional(),
+        layout: z.enum(["inline", "stack"]).optional(),
+      }),
+      slots: ["default"],
+      description: "Compact action group used by command center checkpoint controls.",
+    },
+    WorkspaceActionCard: {
+      props: z.object({
+        title: z.string().optional(),
+        tone: toneSchema,
+      }),
+      slots: ["default"],
+      description: "Contained command center action with optional input field.",
+    },
     WorkspaceDiffPreview: {
       props: z.object({
         summary: z.string(),
