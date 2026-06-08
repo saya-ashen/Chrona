@@ -230,6 +230,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     generationUserInstruction,
     runtimeEvents,
     latestActivitySummary,
+    currentExecution,
     acceptPlanById,
     dispatchExecutionAction,
     submitCheckpointAction,
@@ -369,6 +370,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         unsavedConfigDraft={planningTaskDraft}
         generationUserInstruction={generationUserInstruction}
         runtimeEvents={runtimeEvents}
+        currentExecution={currentExecution}
         onGeneratePlan={handleGeneratePlanFromHeader}
         onPlanLoaded={setPlan}
         onApplyPlan={async (result) => {

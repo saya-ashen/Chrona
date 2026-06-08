@@ -12,6 +12,12 @@ import type {
   TaskPageRouteData,
   WorkPageRouteData,
 } from "./pages";
+import type {
+  TaskWorkspaceBootstrapData,
+  TaskWorkspaceCommandCenterData,
+  TaskWorkspaceReviewContextData,
+  TaskWorkspaceRuntimeContextData,
+} from "./components/tasks/workspace/model/task-workspace-types";
 
 async function resolveRouteLocale(params: Params<string>): Promise<Locale> {
   return resolveLocale(params.lang);
@@ -122,10 +128,23 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
   if (workBlockId) query.set("workBlockId", workBlockId);
   const suffix = query.size ? `?${query.toString()}` : "";
 
+  const taskPath = `${origin}/api/tasks/${params.taskId}`;
+  const [bootstrap, runtimeContext, reviewContext, commandCenter] = await Promise.all([
+    apiJson<TaskWorkspaceBootstrapData>(`${taskPath}${suffix}`),
+    apiJson<TaskWorkspaceRuntimeContextData>(`${taskPath}/runtime-context${suffix}`),
+    apiJson<TaskWorkspaceReviewContextData>(`${taskPath}/review-context${suffix}`),
+    apiJson<TaskWorkspaceCommandCenterData>(`${taskPath}/command-center${suffix}`),
+  ]);
+
   return {
     locale,
     dictionary,
-    task: await apiJson<TaskPageRouteData["task"]>(`${origin}/api/tasks/${params.taskId}${suffix}`),
+    task: {
+      ...bootstrap,
+      ...runtimeContext,
+      ...reviewContext,
+      ...commandCenter,
+    } as TaskPageRouteData["task"],
   };
 }
 

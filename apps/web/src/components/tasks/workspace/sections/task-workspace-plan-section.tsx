@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
@@ -111,6 +111,7 @@ type TaskWorkspacePlanSectionProps = {
   hasUnsavedConfigChanges: boolean;
   unsavedConfigDraft: TaskConfigFormDraft | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
+  currentExecution?: PlanExecutionResult | null;
   generationUserInstruction?: string | null;
   onGeneratePlan: (request?: PlanGenerationRequest) => void;
   onPlanLoaded: (savedPlan: TaskPlanReadModel | null) => void;
@@ -139,6 +140,7 @@ export function TaskWorkspacePlanSection({
   unsavedConfigDraft,
   generationUserInstruction,
   runtimeEvents,
+  currentExecution,
   onGeneratePlan,
   onPlanLoaded,
   onApplyPlan,
@@ -229,6 +231,7 @@ export function TaskWorkspacePlanSection({
     onDispatchExecutionAction,
     onSubmitCheckpointAction,
   });
+  const apiCurrentOperationSpec = currentExecution?.ui?.currentOperationSpec ?? null;
   const acceptOrRegenerateSpec = useMemo<UiDocument | null>(() => {
     if (!plan) return null;
     return buildAcceptOrRegenerateSpec({
@@ -295,7 +298,7 @@ export function TaskWorkspacePlanSection({
       : {}),
     ...(primaryActionDescriptor.kind === "current-operation" && currentOperationNode
       ? {
-          actionSpec: currentOperationAction.spec,
+          actionSpec: apiCurrentOperationSpec ?? currentOperationAction.spec,
           actionHandlers: currentOperationAction.handlers,
           onActionStateChange: currentOperationAction.onStateChange,
         }
@@ -436,6 +439,7 @@ export function TaskWorkspacePlanSection({
               latestCompletedNode={consoleView.latestCompletedNode}
               artifacts={consoleView.artifacts}
               activity={consoleView.activity}
+              commandCenterUi={pageData.ui?.commandCenter ?? null}
               runtimeEvents={runtimeEvents}
               primaryAction={primaryAction}
               copy={commandCenterCopy}

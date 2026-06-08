@@ -1,3 +1,4 @@
+import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanBlueprint } from "../ai-plan-blueprint";
 import type { CheckpointResponse, ExecutionCheckpoint } from "./checkpoints";
 import type { CompiledPlan, EffectivePlanGraph, PlanGraphStatus } from "./graph";
@@ -275,6 +276,9 @@ export type PlanExecutionResult = {
   blockedNodeIds: string[];
   message: string;
   checkpoint: ExecutionCheckpoint | null;
+  ui?: {
+    currentOperationSpec?: UiDocument | null;
+  };
   errorDetails?: unknown;
 };
 

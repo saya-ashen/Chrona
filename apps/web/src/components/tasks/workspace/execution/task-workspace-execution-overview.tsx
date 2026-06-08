@@ -3,8 +3,8 @@ import { Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { buildResultSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
@@ -14,8 +14,7 @@ import type {
   WorkspaceArtifactItem,
 } from "../model/task-workspace-types";
 import { SpecRenderer } from "../catalog/spec-renderer";
-import { buildArtifactsSpec, buildNowTabSpec } from "./build-execution-overview-spec";
-import { WorkspaceActivityFeed } from "./workspace-activity-feed";
+import { buildCommandCenterNowTabSpec, buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
 
 type OverviewAction = (nodeId?: string) => void;
 type CommandCenterTab = "now" | "output" | "trail";
@@ -57,23 +56,19 @@ function isActionablePrimary(primaryAction?: CommandCenterPrimaryAction | null) 
   );
 }
 
-function NodeResultContent({ node, emptyMessage }: { node: PlanNodeDataModel | null; emptyMessage: string }) {
+function buildNodeResultContentSpec(node: PlanNodeDataModel | null, emptyMessage: string) {
   const specOutput = node?.resultOutputs?.[0] ?? null;
   if (specOutput) {
     const result = validateChronaSpec(specOutput);
     if (!result.ok) {
       const detail = result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
-      return (
-        <SpecRenderer
-          spec={buildResultSpec([], {
-            errorMessage: `Unable to render this node's result (${detail}).`,
-          })}
-        />
-      );
+      return buildResultSpec([], {
+        errorMessage: `Unable to render this node's result (${detail}).`,
+      });
     }
-    return <SpecRenderer spec={specOutput} />;
+    return specOutput;
   }
-  return <SpecRenderer spec={buildResultSpec([], { emptyMessage })} />;
+  return buildResultSpec([], { emptyMessage });
 }
 
 export function TaskWorkspaceExecutionOverview({
@@ -86,6 +81,7 @@ export function TaskWorkspaceExecutionOverview({
   runtimeEvents = [],
   primaryAction,
   copy: copyProp,
+  commandCenterUi,
   onAction,
 }: {
   progress: ProgressSummary;
@@ -100,6 +96,10 @@ export function TaskWorkspaceExecutionOverview({
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   onAction?: OverviewAction;
+  commandCenterUi?: {
+    artifactsSpec?: UiDocument | null;
+    trailSpec?: UiDocument | null;
+  } | null;
 }) {
   const [activeTab, setActiveTab] = useState<CommandCenterTab>("now");
   const { messages } = useI18n();
@@ -127,6 +127,21 @@ export function TaskWorkspaceExecutionOverview({
     ?? attention?.statusLabel
     ?? readiness.statusLabel
     ?? null;
+
+  const nowHandlers = {
+    ...(primaryAction?.actionHandlers ?? {}),
+    "command-center-primary": (params: Record<string, unknown>) => {
+      const actionId = typeof params.actionId === "string" ? params.actionId : null;
+      if (actionId === (primaryAction?.kind ?? primaryAction?.label)) primaryAction?.onClick?.();
+    },
+  };
+  const locateHandlers = {
+    "locate-workspace-node": (params: Record<string, unknown>) => {
+      const nodeId = typeof params.nodeId === "string" ? params.nodeId : undefined;
+      if (nodeId) onAction?.(nodeId);
+    },
+  };
+  const resultSpec = buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet ?? "No output yet.");
 
   return (
     <aside
@@ -199,66 +214,33 @@ export function TaskWorkspaceExecutionOverview({
           </TabsList>
 
           <TabsContent value="now" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            <SpecRenderer spec={buildNowTabSpec({ primaryAction, readiness, attention, runtimeEvents, copy: ws })} />
-            {primaryAction?.actionSpec ? (
-              <div className="px-3">
-                <SpecRenderer
-                  spec={primaryAction.actionSpec}
-                  handlers={primaryAction.actionHandlers}
-                  onStateChange={primaryAction.onActionStateChange}
-                />
-              </div>
-            ) : null}
-            {primaryAction?.onClick ? (
-              <div className="px-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs shadow-sm"
-                  disabled={primaryAction.disabled || primaryAction.isLoading}
-                  onClick={primaryAction.onClick}
-                >
-                  {primaryAction.isLoading ? (ws.generating ?? "Generating...") : primaryAction.label}
-                </Button>
-              </div>
-            ) : null}
+            <SpecRenderer
+              key={primaryAction?.kind ?? "now"}
+              spec={buildCommandCenterNowTabSpec({ primaryAction, readiness, attention, runtimeEvents, copy: ws })}
+              handlers={nowHandlers}
+              onStateChange={primaryAction?.onActionStateChange}
+            />
           </TabsContent>
 
           <TabsContent value="output" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            {latestCompletedNode ? (
-              <div className="flex items-center justify-between gap-2 px-1 pb-1">
-                <span className="truncate text-xs text-muted-foreground">
-                  {ws.from ?? "from"}: {latestCompletedNode.title}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 shrink-0 rounded-full px-2 text-xs"
-                  onClick={() => onAction?.(latestCompletedNode.id)}
-                >
-                  {ws.locateSourceNode ?? "Locate source node"}
-                </Button>
-              </div>
-            ) : null}
-            <NodeResultContent node={latestCompletedNode} emptyMessage={ws.noResultYet ?? "No output yet."} />
-            {artifacts.length > 0 ? (
-              <SpecRenderer
-                spec={buildArtifactsSpec({ artifacts, copy: ws, onLocate: true })}
-                handlers={{
-                  "locate-workspace-node": (params) => {
-                    const nodeId = typeof params.nodeId === "string" ? params.nodeId : undefined;
-                    if (nodeId) onAction?.(nodeId);
-                  },
-                }}
-              />
-            ) : null}
+            <SpecRenderer
+              spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenterUi?.artifactsSpec ?? null })}
+              handlers={locateHandlers}
+            />
           </TabsContent>
 
           <TabsContent value="trail" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            <WorkspaceActivityFeed
-              activity={activity}
-              runtimeEvents={runtimeEvents}
+            <SpecRenderer
+              spec={commandCenterUi?.trailSpec ?? buildCommandCenterTrailTabSpec({
+                activity,
+                runtimeEvents,
+                copy: {
+                  ...ws,
+                  activityTitle: taskWorkspaceActivityMessages.taskTitle,
+                  activityEmpty: taskWorkspaceActivityMessages.taskEmpty,
+                },
+                toolLabels: taskWorkspaceActivityMessages.toolLabels,
+              })}
             />
           </TabsContent>
         </Tabs>

@@ -14,12 +14,18 @@ export { CATALOG_VERSION, isCatalogCompatible } from "./catalog/catalog-version"
 export {
   UI_ACTION,
   UI_ACTION_PAYLOAD,
+  commandCenterPrimaryPayloadSchema,
+  acceptPlanPayloadSchema,
   dispatchExecutionPayloadSchema,
   locateWorkspaceNodePayloadSchema,
   submitCheckpointPayloadSchema,
+  regeneratePlanPayloadSchema,
   type UiActionName,
+  type CommandCenterPrimaryPayload,
+  type AcceptPlanPayload,
   type DispatchExecutionPayload,
   type LocateWorkspaceNodePayload,
+  type RegeneratePlanPayload,
   type SubmitCheckpointPayload,
 } from "./actions/actions";
 export {
@@ -39,3 +45,12 @@ export {
   type ActionItemInput,
   type ActionSpecInput,
 } from "./builders/build-action-spec";
+export {
+  buildCommandCenterArtifactsSpec,
+  buildCommandCenterCheckpointSpec,
+  buildCommandCenterTrailSpec,
+  type CommandCenterArtifactInput,
+  type CommandCenterCheckpointActionInput,
+  type CommandCenterCheckpointInput,
+  type CommandCenterCopyInput,
+} from "./builders/build-command-center-spec";

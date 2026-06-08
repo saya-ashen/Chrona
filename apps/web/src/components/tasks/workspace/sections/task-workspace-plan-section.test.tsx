@@ -232,7 +232,7 @@ describe("TaskWorkspacePlanSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Generated plan node" })).not.toBeInTheDocument());
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
-    expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
+    await waitFor(() => expect(onApplyPlan).toHaveBeenCalledWith(draftPlan));
 
     view.rerender(
       <TaskWorkspacePlanSection

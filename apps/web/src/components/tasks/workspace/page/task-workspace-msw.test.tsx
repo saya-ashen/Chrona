@@ -19,6 +19,29 @@ function wrapper({ children }: PropsWithChildren) {
   return <QueryClientProvider client={createTestQueryClient()}>{children}</QueryClientProvider>;
 }
 
+function splitWorkspaceHandlers(data: TaskPageData, onPageRequest?: () => void) {
+  return [
+    http.get("/api/tasks/:taskId", () => {
+      onPageRequest?.();
+      return HttpResponse.json({ task: data.task, reconciliation: data.reconciliation });
+    }),
+    http.get("/api/tasks/:taskId/runtime-context", () => HttpResponse.json({
+      defaultExecutionRuntime: data.defaultExecutionRuntime,
+      executionRuntimes: data.executionRuntimes,
+    })),
+    http.get("/api/tasks/:taskId/review-context", () => HttpResponse.json({
+      latestRunSummary: data.latestRunSummary,
+      scheduleProposals: data.scheduleProposals,
+      approvals: data.approvals,
+    })),
+    http.get("/api/tasks/:taskId/command-center", () => HttpResponse.json({
+      artifacts: data.artifacts,
+      activityTimeline: data.activityTimeline,
+      ui: data.ui,
+    })),
+  ];
+}
+
 describe("Task workspace MSW integration", () => {
   it("refreshes task workspace data after workspace update events", async () => {
     const initialData = taskWorkspaceStateFixtures.running.pageData;
@@ -54,9 +77,8 @@ describe("Task workspace MSW integration", () => {
       ].join("\n"), {
         headers: { "Content-Type": "text/event-stream" },
       })),
-      http.get("/api/tasks/:taskId", () => {
+      ...splitWorkspaceHandlers(refreshedData, () => {
         pageRequests += 1;
-        return HttpResponse.json(refreshedData);
       }),
     );
 
@@ -83,6 +105,9 @@ describe("Task workspace MSW integration", () => {
         pageRequests += 1;
         return HttpResponse.json({ error: "Workspace temporarily unavailable" }, { status: 503 });
       }),
+      http.get("/api/tasks/:taskId/runtime-context", () => HttpResponse.json({})),
+      http.get("/api/tasks/:taskId/review-context", () => HttpResponse.json({})),
+      http.get("/api/tasks/:taskId/command-center", () => HttpResponse.json({})),
     );
 
     const { result } = renderHook(() => useTaskWorkspacePageState(initialData), { wrapper });

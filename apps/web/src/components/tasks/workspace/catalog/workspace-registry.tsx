@@ -329,6 +329,15 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     ),
   },
   actions: {
+    "command-center-primary": async () => {
+      throw new Error('[ui-protocol] action "command-center-primary" requires a host handler.');
+    },
+    "accept-plan": async () => {
+      throw new Error('[ui-protocol] action "accept-plan" requires a host handler.');
+    },
+    "regenerate-plan": async () => {
+      throw new Error('[ui-protocol] action "regenerate-plan" requires a host handler.');
+    },
     "dispatch-execution": async () => {
       throw new Error('[ui-protocol] action "dispatch-execution" is wired in Phase 3 (Node action).');
     },

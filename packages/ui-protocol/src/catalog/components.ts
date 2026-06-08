@@ -4,8 +4,11 @@ import { shadcnComponentDefinitions as shadcn } from "@json-render/shadcn/catalo
 import { chronaSchema } from "../schema";
 import {
   UI_ACTION,
+  commandCenterPrimaryPayloadSchema,
+  acceptPlanPayloadSchema,
   dispatchExecutionPayloadSchema,
   locateWorkspaceNodePayloadSchema,
+  regeneratePlanPayloadSchema,
   submitCheckpointPayloadSchema,
 } from "../actions/actions";
 
@@ -147,6 +150,18 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     },
   },
   actions: {
+    [UI_ACTION.commandCenterPrimary]: {
+      params: commandCenterPrimaryPayloadSchema,
+      description: "Run a host-owned primary command center action.",
+    },
+    [UI_ACTION.acceptPlan]: {
+      params: acceptPlanPayloadSchema,
+      description: "Accept the current generated plan.",
+    },
+    [UI_ACTION.regeneratePlan]: {
+      params: regeneratePlanPayloadSchema,
+      description: "Regenerate the current generated plan with optional user instruction.",
+    },
     [UI_ACTION.dispatchExecution]: {
       params: dispatchExecutionPayloadSchema,
       description: "Dispatch a pre-defined execution action for the current node.",

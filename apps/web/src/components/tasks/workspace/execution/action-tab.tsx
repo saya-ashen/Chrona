@@ -119,12 +119,13 @@ export function useActionSpecRenderConfig({
     "submit-checkpoint": async (params: Record<string, unknown>) => {
       if (!node) throw new Error("Checkpoint action node not found.");
       const checkpointAction = params.checkpointAction as string | undefined;
+      const actionId = params.actionId as string | undefined;
       const rawValues = (params.values ?? {}) as Record<string, unknown>;
       // Strip non-string entries (e.g. $bindState refs that were not resolved) for defense-in-depth.
       const values = Object.fromEntries(
         Object.entries(rawValues).filter(([, v]) => typeof v === "string"),
       ) as Record<string, string>;
-      const selectedAction = node.availableActions?.find((a) => a.checkpointAction === checkpointAction) ?? null;
+      const selectedAction = node.availableActions?.find((a) => a.checkpointAction === checkpointAction || a.id === actionId) ?? null;
       if (!onSubmitCheckpointAction) throw new Error("Checkpoint actions are not available for this view.");
       const result = await onSubmitCheckpointAction(
         buildWorkspaceCheckpointActionInput({ node, selectedAction, fields, values }),

@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Context, Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
@@ -15,6 +15,60 @@ import {
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
+type TaskPagePayload = Awaited<ReturnType<ChronaEngine["tasks"]["getPage"]>>;
+
+function runtimeContext(page: TaskPagePayload) {
+  return {
+    defaultExecutionRuntime: page.defaultExecutionRuntime,
+    executionRuntimes: page.executionRuntimes,
+  };
+}
+
+function reviewContext(page: TaskPagePayload) {
+  return {
+    latestRunSummary: page.latestRunSummary,
+    scheduleProposals: page.scheduleProposals,
+    approvals: page.approvals,
+  };
+}
+
+function commandCenterContext(page: TaskPagePayload) {
+  return {
+    artifacts: page.artifacts,
+    activityTimeline: page.activityTimeline,
+    ui: page.ui,
+  };
+}
+
+function bootstrapContext(page: TaskPagePayload) {
+  return {
+    task: page.task,
+    reconciliation: page.reconciliation,
+  };
+}
+
+async function taskPageForRequest(engine: ChronaEngine, taskId: string, workBlockId: string | null) {
+  return engine.tasks.getPage({ taskId, workBlockId });
+}
+
+async function taskContextResponse(
+  c: Context,
+  engine: ChronaEngine,
+  contextName: string,
+  taskId: string,
+  workBlockId: string | null,
+  select: (page: TaskPagePayload) => unknown,
+) {
+  try {
+    return json(c, select(await taskPageForRequest(engine, taskId, workBlockId)));
+  } catch (cause) {
+    const httpError = toHttpError(cause);
+    if (httpError) {
+      return error(c, httpError.message, httpError.status);
+    }
+    return internalServerError(c, contextName, cause, "Failed to get task context");
+  }
+}
 export function createTasksRoutes(engine: ChronaEngine) {
   const supportedExecutionRuntimes = engine.runtime.listExecutionRuntimes();
   const supportedCreateTaskBodySchema = createTaskBodySchemaForSupportedRuntimes(
@@ -148,13 +202,28 @@ export function createTasksRoutes(engine: ChronaEngine) {
       },
     )
     .get(
+      "/tasks/:taskId/runtime-context",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(c, engine, "GET /api/tasks/:taskId/runtime-context", c.req.valid("param").taskId, c.req.query("workBlockId") ?? null, runtimeContext),
+    )
+    .get(
+      "/tasks/:taskId/review-context",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(c, engine, "GET /api/tasks/:taskId/review-context", c.req.valid("param").taskId, c.req.query("workBlockId") ?? null, reviewContext),
+    )
+    .get(
+      "/tasks/:taskId/command-center",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(c, engine, "GET /api/tasks/:taskId/command-center", c.req.valid("param").taskId, c.req.query("workBlockId") ?? null, commandCenterContext),
+    )
+    .get(
       "/tasks/:taskId",
       zValidator("param", taskDetailParamSchema),
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
           const workBlockId = c.req.query("workBlockId") ?? null;
-          return json(c, await engine.tasks.getPage({ taskId, workBlockId }));
+          return json(c, bootstrapContext(await engine.tasks.getPage({ taskId, workBlockId })));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {

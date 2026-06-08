@@ -578,7 +578,7 @@ async function expectConversationHistory(taskId: string, expectedAssistantTexts:
 async function getCurrentExecution(server: Hono, taskId: string) {
   const response = await server.request(`http://local/api/tasks/${taskId}/execution/current`);
   expect(response.status).toBe(200);
-  return json<{ status: string; currentNodeId: string | null; checkpoint: unknown | null; executionSessionId?: string | null; message?: string }>(response);
+  return json<{ status: string; currentNodeId: string | null; checkpoint: unknown | null; executionSessionId?: string | null; message?: string; ui?: { currentOperationSpec?: unknown | null } }>(response);
 }
 
 async function setupModuleExecutionTest(compiledPlan: CompiledPlan, title: string) {
@@ -730,6 +730,7 @@ describe("task execution module API integration", () => {
       kind: "user_input",
       nodeId: "requirements_checkpoint",
     });
+    expect(currentBeforeInput.ui?.currentOperationSpec).toMatchObject({ root: "root", elements: expect.any(Object) });
 
     const checkpointEvents = await postCheckpointAction(server, taskId, checkpointId!, {
       action: "submit_input",

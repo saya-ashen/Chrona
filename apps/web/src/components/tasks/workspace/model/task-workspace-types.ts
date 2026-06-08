@@ -2,6 +2,7 @@ import type { TaskConfigExecutionRuntime } from "@/components/schedule/forms/tas
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 import type { GraphNodeState, ReconciliationResult, TaskExecutionSummary } from "@chrona/contracts";
+import type { UiDocument } from "@chrona/ui-protocol";
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
@@ -107,7 +108,23 @@ export type TaskPageData = {
     uri?: string;
   }>;
   activityTimeline?: WorkspaceActivityItem[];
+  ui?: {
+    commandCenter?: {
+      artifactsSpec?: UiDocument | null;
+      trailSpec?: UiDocument | null;
+    };
+  };
 };
+
+export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
+  "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "ui"
+>;
+
+export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes">;
+
+export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "scheduleProposals" | "approvals">;
+
+export type TaskWorkspaceCommandCenterData = Pick<TaskPageData, "artifacts" | "activityTimeline" | "ui">;
 
 export type EditableTask = {
   title: string;

@@ -10,6 +10,10 @@ import type {
   TaskData,
   TaskHeaderView,
   TaskPageData,
+  TaskWorkspaceBootstrapData,
+  TaskWorkspaceCommandCenterData,
+  TaskWorkspaceReviewContextData,
+  TaskWorkspaceRuntimeContextData,
   TaskPlanGenerationStatus,
   TaskWorkspaceUserStatus,
   TaskWorkspaceExecutionConsoleView,
@@ -566,9 +570,26 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   };
 }
 
+function taskScopedQuery(workBlockId?: string | null) {
+  return workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
+}
+
 export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: string | null): Promise<TaskPageData> {
-  const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
-  return apiJson<TaskPageData>(`/api/tasks/${encodeURIComponent(taskId)}${query}`);
+  const taskPath = `/api/tasks/${encodeURIComponent(taskId)}`;
+  const query = taskScopedQuery(workBlockId);
+  const [bootstrap, runtimeContext, reviewContext, commandCenter] = await Promise.all([
+    apiJson<TaskWorkspaceBootstrapData>(`${taskPath}${query}`),
+    apiJson<TaskWorkspaceRuntimeContextData>(`${taskPath}/runtime-context${query}`),
+    apiJson<TaskWorkspaceReviewContextData>(`${taskPath}/review-context${query}`),
+    apiJson<TaskWorkspaceCommandCenterData>(`${taskPath}/command-center${query}`),
+  ]);
+
+  return {
+    ...bootstrap,
+    ...runtimeContext,
+    ...reviewContext,
+    ...commandCenter,
+  };
 }
 
 export async function fetchTaskPlanState(taskId: string, workBlockId?: string | null): Promise<TaskPlanState> {
