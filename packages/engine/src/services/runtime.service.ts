@@ -1,5 +1,5 @@
 import { startTaskOrchestrator } from "../modules/orchestration";
-import { listExecutionRuntimes } from "../modules/task-execution/registry";
+import { listExecutionRuntimes } from "../modules/execution-runtime";
 
 export function createRuntimeService() {
   return {

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateScheduleWindow } from "@chrona/domain";
 

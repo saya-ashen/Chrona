@@ -1,6 +1,7 @@
 import { createTask } from "./create-task";
 import { deleteTask } from "./delete-task";
-import { getTaskActivityPage, getTaskPage } from "./get-task-page";
+import { getTaskPage } from "./get-task-page";
+import { getTaskActivityPage } from "./task-activity";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
 import { markTaskDone } from "./mark-task-done";

@@ -1,19 +1,12 @@
 import type { PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import { compilePlanBlueprint } from "@/modules/plans/plan-blueprint-compiler";
-import {
-  saveCompiledPlan,
-  getLatestCompiledPlan,
-  getAcceptedCompiledPlan,
-} from "@/modules/plan-execution/compiled-plan-store";
-import {
-  createPlanGraphFromCompiledPlan,
-  savePlanRun,
-  getPlanRun,
-} from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution";
+import { saveCompiledPlan, getLatestCompiledPlan, getAcceptedCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { createPlanGraphFromCompiledPlan, savePlanRun, getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-runtime-store";
 import { buildTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { upgradeBlueprintToEditable } from "@chrona/contracts";
+import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 /**
@@ -119,6 +112,11 @@ export async function materializeGeneratedTaskPlan(input: {
       compiledPlan,
     }),
   });
+
+  // Plan persistence changes the task's read state (it becomes runnable / gains
+  // a current node). Rebuild the projection so Schedule/Work surfaces reflect
+  // the new plan immediately instead of waiting for the next execution action.
+  await rebuildTaskProjection(input.taskId);
 
   // Fetch the just-saved record for accurate timestamps
   const saved = await getLatestCompiledPlan(input.taskId, input.workBlockId ?? null);

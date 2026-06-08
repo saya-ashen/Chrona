@@ -156,6 +156,7 @@ function GraphShell({
           />
         ) : null}
         handleNodeClick={handleNodeClick}
+        handlePaneClick={onDismissOverlay}
         handleNodeDragStart={stopIfNodeButton}
         handleNodeDrag={stopIfNodeButton}
         handleNodeDragStop={stopIfNodeButton}
@@ -280,7 +281,7 @@ export function TaskPlanGraph({
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   const handleSelectNode = useCallback((nodeId: string) => {
-    setSelectedNodeId((current) => (current === nodeId ? null : nodeId));
+    setSelectedNodeId(nodeId);
   }, []);
 
   const handleDismissOverlay = useCallback(() => {

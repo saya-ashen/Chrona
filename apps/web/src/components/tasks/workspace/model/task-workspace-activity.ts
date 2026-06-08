@@ -1,5 +1,5 @@
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
-import type { ExecutionOverviewTone, WorkspaceActivityItem, WorkspaceActivityTone } from "./task-workspace-types";
+import type { WorkspaceActivityItem } from "./task-workspace-types";
 
 const DEFAULT_LIMIT = 30;
 const PREVIEW_LIMIT = 240;
@@ -18,9 +18,6 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
-export function activityToneFromOverviewTone(tone: ExecutionOverviewTone): WorkspaceActivityTone {
-  return tone === "critical" ? "danger" : tone;
-}
 
 export function getWorkspaceActivityIdentity(item: WorkspaceActivityItem) {
   return [

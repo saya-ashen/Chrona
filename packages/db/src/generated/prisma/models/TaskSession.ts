@@ -240,6 +240,7 @@ export type TaskSessionWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"TaskSession"> | Date | string
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   runs?: Prisma.RunListRelationFilter
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
 }
 
 export type TaskSessionOrderByWithRelationInput = {
@@ -257,6 +258,7 @@ export type TaskSessionOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   task?: Prisma.TaskOrderByWithRelationInput
   runs?: Prisma.RunOrderByRelationAggregateInput
+  workBlock?: Prisma.WorkBlockOrderByWithRelationInput
 }
 
 export type TaskSessionWhereUniqueInput = Prisma.AtLeast<{
@@ -277,6 +279,7 @@ export type TaskSessionWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"TaskSession"> | Date | string
   task?: Prisma.XOR<Prisma.TaskScalarRelationFilter, Prisma.TaskWhereInput>
   runs?: Prisma.RunListRelationFilter
+  workBlock?: Prisma.XOR<Prisma.WorkBlockNullableScalarRelationFilter, Prisma.WorkBlockWhereInput> | null
 }, "id" | "sessionKey">
 
 export type TaskSessionOrderByWithAggregationInput = {
@@ -329,6 +332,7 @@ export type TaskSessionCreateInput = {
   updatedAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutSessionsInput
   runs?: Prisma.RunCreateNestedManyWithoutTaskSessionInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutSessionInput
 }
 
 export type TaskSessionUncheckedCreateInput = {
@@ -345,6 +349,7 @@ export type TaskSessionUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskSessionInput
+  workBlock?: Prisma.WorkBlockUncheckedCreateNestedOneWithoutSessionInput
 }
 
 export type TaskSessionUpdateInput = {
@@ -361,6 +366,7 @@ export type TaskSessionUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutSessionsNestedInput
   runs?: Prisma.RunUpdateManyWithoutTaskSessionNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutSessionNestedInput
 }
 
 export type TaskSessionUncheckedUpdateInput = {
@@ -377,6 +383,7 @@ export type TaskSessionUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   runs?: Prisma.RunUncheckedUpdateManyWithoutTaskSessionNestedInput
+  workBlock?: Prisma.WorkBlockUncheckedUpdateOneWithoutSessionNestedInput
 }
 
 export type TaskSessionCreateManyInput = {
@@ -541,6 +548,22 @@ export type TaskSessionUpdateOneWithoutRunsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TaskSessionUpdateToOneWithWhereWithoutRunsInput, Prisma.TaskSessionUpdateWithoutRunsInput>, Prisma.TaskSessionUncheckedUpdateWithoutRunsInput>
 }
 
+export type TaskSessionCreateNestedOneWithoutWorkBlockInput = {
+  create?: Prisma.XOR<Prisma.TaskSessionCreateWithoutWorkBlockInput, Prisma.TaskSessionUncheckedCreateWithoutWorkBlockInput>
+  connectOrCreate?: Prisma.TaskSessionCreateOrConnectWithoutWorkBlockInput
+  connect?: Prisma.TaskSessionWhereUniqueInput
+}
+
+export type TaskSessionUpdateOneWithoutWorkBlockNestedInput = {
+  create?: Prisma.XOR<Prisma.TaskSessionCreateWithoutWorkBlockInput, Prisma.TaskSessionUncheckedCreateWithoutWorkBlockInput>
+  connectOrCreate?: Prisma.TaskSessionCreateOrConnectWithoutWorkBlockInput
+  upsert?: Prisma.TaskSessionUpsertWithoutWorkBlockInput
+  disconnect?: Prisma.TaskSessionWhereInput | boolean
+  delete?: Prisma.TaskSessionWhereInput | boolean
+  connect?: Prisma.TaskSessionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TaskSessionUpdateToOneWithWhereWithoutWorkBlockInput, Prisma.TaskSessionUpdateWithoutWorkBlockInput>, Prisma.TaskSessionUncheckedUpdateWithoutWorkBlockInput>
+}
+
 export type TaskSessionCreateWithoutTaskInput = {
   id?: string
   runtimeName: string
@@ -554,6 +577,7 @@ export type TaskSessionCreateWithoutTaskInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   runs?: Prisma.RunCreateNestedManyWithoutTaskSessionInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutSessionInput
 }
 
 export type TaskSessionUncheckedCreateWithoutTaskInput = {
@@ -569,6 +593,7 @@ export type TaskSessionUncheckedCreateWithoutTaskInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskSessionInput
+  workBlock?: Prisma.WorkBlockUncheckedCreateNestedOneWithoutSessionInput
 }
 
 export type TaskSessionCreateOrConnectWithoutTaskInput = {
@@ -627,6 +652,7 @@ export type TaskSessionCreateWithoutRunsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   task: Prisma.TaskCreateNestedOneWithoutSessionsInput
+  workBlock?: Prisma.WorkBlockCreateNestedOneWithoutSessionInput
 }
 
 export type TaskSessionUncheckedCreateWithoutRunsInput = {
@@ -642,6 +668,7 @@ export type TaskSessionUncheckedCreateWithoutRunsInput = {
   createdByFramework?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  workBlock?: Prisma.WorkBlockUncheckedCreateNestedOneWithoutSessionInput
 }
 
 export type TaskSessionCreateOrConnectWithoutRunsInput = {
@@ -673,6 +700,7 @@ export type TaskSessionUpdateWithoutRunsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   task?: Prisma.TaskUpdateOneRequiredWithoutSessionsNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutSessionNestedInput
 }
 
 export type TaskSessionUncheckedUpdateWithoutRunsInput = {
@@ -688,6 +716,87 @@ export type TaskSessionUncheckedUpdateWithoutRunsInput = {
   createdByFramework?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  workBlock?: Prisma.WorkBlockUncheckedUpdateOneWithoutSessionNestedInput
+}
+
+export type TaskSessionCreateWithoutWorkBlockInput = {
+  id?: string
+  runtimeName: string
+  sessionKey: string
+  label?: string | null
+  status?: string
+  lastRunStatus?: string | null
+  activeRunId?: string | null
+  lastRunRef?: string | null
+  createdByFramework?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  task: Prisma.TaskCreateNestedOneWithoutSessionsInput
+  runs?: Prisma.RunCreateNestedManyWithoutTaskSessionInput
+}
+
+export type TaskSessionUncheckedCreateWithoutWorkBlockInput = {
+  id?: string
+  taskId: string
+  runtimeName: string
+  sessionKey: string
+  label?: string | null
+  status?: string
+  lastRunStatus?: string | null
+  activeRunId?: string | null
+  lastRunRef?: string | null
+  createdByFramework?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  runs?: Prisma.RunUncheckedCreateNestedManyWithoutTaskSessionInput
+}
+
+export type TaskSessionCreateOrConnectWithoutWorkBlockInput = {
+  where: Prisma.TaskSessionWhereUniqueInput
+  create: Prisma.XOR<Prisma.TaskSessionCreateWithoutWorkBlockInput, Prisma.TaskSessionUncheckedCreateWithoutWorkBlockInput>
+}
+
+export type TaskSessionUpsertWithoutWorkBlockInput = {
+  update: Prisma.XOR<Prisma.TaskSessionUpdateWithoutWorkBlockInput, Prisma.TaskSessionUncheckedUpdateWithoutWorkBlockInput>
+  create: Prisma.XOR<Prisma.TaskSessionCreateWithoutWorkBlockInput, Prisma.TaskSessionUncheckedCreateWithoutWorkBlockInput>
+  where?: Prisma.TaskSessionWhereInput
+}
+
+export type TaskSessionUpdateToOneWithWhereWithoutWorkBlockInput = {
+  where?: Prisma.TaskSessionWhereInput
+  data: Prisma.XOR<Prisma.TaskSessionUpdateWithoutWorkBlockInput, Prisma.TaskSessionUncheckedUpdateWithoutWorkBlockInput>
+}
+
+export type TaskSessionUpdateWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionKey?: Prisma.StringFieldUpdateOperationsInput | string
+  label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  lastRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdByFramework?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  task?: Prisma.TaskUpdateOneRequiredWithoutSessionsNestedInput
+  runs?: Prisma.RunUpdateManyWithoutTaskSessionNestedInput
+}
+
+export type TaskSessionUncheckedUpdateWithoutWorkBlockInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  taskId?: Prisma.StringFieldUpdateOperationsInput | string
+  runtimeName?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionKey?: Prisma.StringFieldUpdateOperationsInput | string
+  label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  lastRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastRunRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdByFramework?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  runs?: Prisma.RunUncheckedUpdateManyWithoutTaskSessionNestedInput
 }
 
 export type TaskSessionCreateManyTaskInput = {
@@ -717,6 +826,7 @@ export type TaskSessionUpdateWithoutTaskInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   runs?: Prisma.RunUpdateManyWithoutTaskSessionNestedInput
+  workBlock?: Prisma.WorkBlockUpdateOneWithoutSessionNestedInput
 }
 
 export type TaskSessionUncheckedUpdateWithoutTaskInput = {
@@ -732,6 +842,7 @@ export type TaskSessionUncheckedUpdateWithoutTaskInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   runs?: Prisma.RunUncheckedUpdateManyWithoutTaskSessionNestedInput
+  workBlock?: Prisma.WorkBlockUncheckedUpdateOneWithoutSessionNestedInput
 }
 
 export type TaskSessionUncheckedUpdateManyWithoutTaskInput = {
@@ -794,6 +905,7 @@ export type TaskSessionSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   updatedAt?: boolean
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.TaskSession$runsArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskSession$workBlockArgs<ExtArgs>
   _count?: boolean | Prisma.TaskSessionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["taskSession"]>
 
@@ -848,6 +960,7 @@ export type TaskSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArg
 export type TaskSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
   runs?: boolean | Prisma.TaskSession$runsArgs<ExtArgs>
+  workBlock?: boolean | Prisma.TaskSession$workBlockArgs<ExtArgs>
   _count?: boolean | Prisma.TaskSessionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type TaskSessionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -862,6 +975,7 @@ export type $TaskSessionPayload<ExtArgs extends runtime.Types.Extensions.Interna
   objects: {
     task: Prisma.$TaskPayload<ExtArgs>
     runs: Prisma.$RunPayload<ExtArgs>[]
+    workBlock: Prisma.$WorkBlockPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1272,6 +1386,7 @@ export interface Prisma__TaskSessionClient<T, Null = never, ExtArgs extends runt
   readonly [Symbol.toStringTag]: "PrismaPromise"
   task<T extends Prisma.TaskDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskDefaultArgs<ExtArgs>>): Prisma.Prisma__TaskClient<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   runs<T extends Prisma.TaskSession$runsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskSession$runsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  workBlock<T extends Prisma.TaskSession$workBlockArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TaskSession$workBlockArgs<ExtArgs>>): Prisma.Prisma__WorkBlockClient<runtime.Types.Result.GetResult<Prisma.$WorkBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1733,6 +1848,25 @@ export type TaskSession$runsArgs<ExtArgs extends runtime.Types.Extensions.Intern
   take?: number
   skip?: number
   distinct?: Prisma.RunScalarFieldEnum | Prisma.RunScalarFieldEnum[]
+}
+
+/**
+ * TaskSession.workBlock
+ */
+export type TaskSession$workBlockArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WorkBlock
+   */
+  select?: Prisma.WorkBlockSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WorkBlock
+   */
+  omit?: Prisma.WorkBlockOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WorkBlockInclude<ExtArgs> | null
+  where?: Prisma.WorkBlockWhereInput
 }
 
 /**

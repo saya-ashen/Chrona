@@ -197,8 +197,6 @@ export function TaskWorkspaceHeaderCard({
   return (
     <Card
       className="relative z-30 min-w-0 overflow-visible rounded-[0.9rem] border-border/70 bg-card/90 p-1 shadow-sm backdrop-blur"
-     
-     
     >
       <CardHeader className="flex flex-col gap-1.5 px-2.5 py-1.5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-1">

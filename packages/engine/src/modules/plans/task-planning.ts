@@ -4,7 +4,7 @@ import type {
   TaskPlanReadModel,
 } from "@chrona/contracts";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
-import { getLatestCompiledPlan, saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getLatestCompiledPlan, saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { ensureTaskInWorkspace } from "@/modules/tasks/task-by-id";
 import { applyPlanMutationCommand, applyPlanPatchCommand } from "./apply-plan-patch-command";
 import { generateTaskPlanManualStream } from "./generate-task-plan-manual-stream";
@@ -18,6 +18,7 @@ import {
   subscribeTaskPlanGenerationById,
 } from "./task-plan-generation-registry";
 import { getLatestTaskPlanReadModel } from "./task-plan-read-model";
+import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 
 export class TaskPlanning {
   async getState(input: { taskId: string; workBlockId?: string | null }): Promise<{
@@ -105,6 +106,10 @@ export class TaskPlanning {
       summary: latest.summary,
       generatedBy: latest.generatedBy,
     });
+
+    // Acceptance flips the plan to executable; rebuild so the task's read state
+    // (runnable, primary action) reflects it without a separate execution tick.
+    await rebuildTaskProjection(input.taskId);
 
     return { savedPlan: await getLatestTaskPlanReadModel(input.taskId, effectiveWorkBlockId) };
   }

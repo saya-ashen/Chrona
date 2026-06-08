@@ -1,15 +1,33 @@
 import type { ExecutionActionInput, NodeResult, NodeResultOutput, PlanExecutionResult } from "@chrona/contracts/ai";
 import { getAcceptedCompiledPlanForTask } from "../persistence/execution-scope";
 import { getCurrentExecution } from "./get-current-execution";
-import { getPlanRun, savePlanRun } from "../plan-run-store";
-import { appendMainSessionEvent, ensurePlanMainSession } from "../plan-state-store";
+import { getPlanRun, savePlanRun } from "../persistence/plan-run-store";
+import { appendMainSessionEvent, ensurePlanMainSession } from "../persistence/plan-state-store";
 import { toEffectivePlanGraph } from "../projection/execution-graph-selectors";
 import type { ExecutionDispatchContext } from "../types";
 import type { ExecutionActionWithContinuation } from "../types";
 import { dispatchExecutionAction } from "../task-plan-execution";
+import { validateChronaSpec } from "@chrona/ui-protocol";
 
 function asOutputs(value: unknown): NodeResultOutput[] {
   return Array.isArray(value) ? value as NodeResultOutput[] : [];
+}
+
+function sanitizeNodeOutputs(outputs: NodeResultOutput[]): NodeResultOutput[] {
+  if (outputs.length === 0) return [];
+
+  const validSpecs: NodeResultOutput[] = [];
+  for (const spec of outputs) {
+    const result = validateChronaSpec(spec);
+    if (!result.ok) {
+      throw new Error(`Invalid chrona_node_output json-render Spec: ${result.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`);
+    }
+    validSpecs.push(spec);
+  }
+
+  // Keep the last valid Spec so that append-mode calls update the output rather
+  // than silently retaining the prior Spec (prior outputs are prepended, new at end).
+  return [validSpecs[validSpecs.length - 1]!];
 }
 
 function outputNodeFromEffective(input: {
@@ -56,7 +74,7 @@ async function submitNodeOutput(input: {
     attemptId: prior?.attemptId,
     status: "current",
     outputSummary: input.action.summary ?? prior?.outputSummary,
-    outputs: [...priorOutputs, ...asOutputs(input.action.outputs)],
+    outputs: sanitizeNodeOutputs([...priorOutputs, ...asOutputs(input.action.outputs)]),
     evidence: {
       ...prior?.evidence,
       sessionId: input.action.sessionId ?? prior?.evidence?.sessionId,

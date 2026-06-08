@@ -1,18 +1,27 @@
-import { useState, type ReactNode } from "react";
-import { Archive, FileText, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
+import { buildResultSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
+import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
-import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../model/task-workspace-types";
+import type {
+  ExecutionOverviewCard,
+  ProgressSummary,
+  WorkspaceActivityItem,
+  WorkspaceArtifactItem,
+} from "../model/task-workspace-types";
+import { SpecRenderer } from "../catalog/spec-renderer";
+import { buildArtifactsSpec, buildNowTabSpec } from "./build-execution-overview-spec";
 import { WorkspaceActivityFeed } from "./workspace-activity-feed";
 
 type OverviewAction = (nodeId?: string) => void;
-type CommandCenterTab = "actions" | "result" | "artifacts" | "activity";
-type TaskWorkspaceCopy = Record<string, string | undefined>;
+type CommandCenterTab = "now" | "output" | "trail";
 
 export type CommandCenterPrimaryAction = {
+  kind?: string;
   label: string;
   description: string;
   statusLabel?: string;
@@ -20,26 +29,58 @@ export type CommandCenterPrimaryAction = {
   disabled?: boolean;
   isLoading?: boolean;
   onClick?: () => void;
-  actionControls?: ReactNode;
+  actionSpec?: UiDocument | null;
+  actionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
+  onActionStateChange?: (changes: Array<{ path: string; value: unknown }>) => void;
   suppressAttentionCard?: boolean;
 };
 
 export type CommandCenterCopy = {
-  actionsTab: string;
-  resultTab: string;
-  artifactsTab: string;
-  activityTab: string;
+  nowTab: string;
+  outputTab: string;
+  trailTab: string;
 };
 
 const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
-  actionsTab: "Actions",
-  resultTab: "Result",
-  artifactsTab: "Artifacts",
-  activityTab: "Activity",
+  nowTab: "Now",
+  outputTab: "Output",
+  trailTab: "Trail",
 };
 
+function isActionablePrimary(primaryAction?: CommandCenterPrimaryAction | null) {
+  const kind = primaryAction?.kind;
+  return (
+    kind === "current-operation" ||
+    kind === "start-plan" ||
+    kind === "accept-or-regenerate" ||
+    kind === "generate"
+  );
+}
+
+function NodeResultContent({ node, emptyMessage }: { node: PlanNodeDataModel | null; emptyMessage: string }) {
+  const specOutput = node?.resultOutputs?.[0] ?? null;
+  if (specOutput) {
+    const result = validateChronaSpec(specOutput);
+    if (!result.ok) {
+      const detail = result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
+      return (
+        <SpecRenderer
+          spec={buildResultSpec([], {
+            errorMessage: `Unable to render this node's result (${detail}).`,
+          })}
+        />
+      );
+    }
+    return <SpecRenderer spec={specOutput} />;
+  }
+  return <SpecRenderer spec={buildResultSpec([], { emptyMessage })} />;
+}
+
 export function TaskWorkspaceExecutionOverview({
-  latestResult,
+  progress,
+  readiness,
+  attention,
+  latestCompletedNode,
   artifacts,
   activity,
   runtimeEvents = [],
@@ -47,201 +88,181 @@ export function TaskWorkspaceExecutionOverview({
   copy: copyProp,
   onAction,
 }: {
+  progress: ProgressSummary;
   readiness: ExecutionOverviewCard;
-  latestResult: ExecutionOverviewCard;
+  /** Retained for callers; the Now tab derives its status card from readiness/attention. */
+  latestResult?: ExecutionOverviewCard;
   attention: ExecutionOverviewCard | null;
+  latestCompletedNode: PlanNodeDataModel | null;
   artifacts: WorkspaceArtifactItem[];
   activity: WorkspaceActivityItem[];
   runtimeEvents?: WorkspaceRuntimeEvent[];
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
-  progressLabel?: string;
-  taskStatus?: string;
-  nextAction?: string;
   onAction?: OverviewAction;
 }) {
-  const [activeTab, setActiveTab] = useState<CommandCenterTab>("actions");
+  const [activeTab, setActiveTab] = useState<CommandCenterTab>("now");
   const { messages } = useI18n();
   const ws = messages.components?.taskWorkspace ?? {};
   const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
-  const tabs: Array<{ id: CommandCenterTab; label: string }> = [
-    { id: "actions", label: copy.actionsTab },
-    { id: "result", label: copy.resultTab },
-    { id: "artifacts", label: copy.artifactsTab },
-    { id: "activity", label: copy.activityTab },
+  const hasAttention = attention !== null;
+  const needsNow = hasAttention || primaryAction?.kind === "current-operation";
+  const showNowBadge = needsNow || isActionablePrimary(primaryAction);
+
+  const prevNeedsNowRef = useRef(needsNow);
+  useEffect(() => {
+    if (needsNow && !prevNeedsNowRef.current) {
+      setActiveTab("now");
+    }
+    prevNeedsNowRef.current = needsNow;
+  }, [needsNow]);
+
+  const tabs: Array<{ id: CommandCenterTab; label: string; badge?: boolean }> = [
+    { id: "now", label: copy.nowTab, badge: showNowBadge },
+    { id: "output", label: copy.outputTab },
+    { id: "trail", label: copy.trailTab },
   ];
 
+  const statusLabel = primaryAction?.statusLabel
+    ?? attention?.statusLabel
+    ?? readiness.statusLabel
+    ?? null;
+
   return (
-    <aside aria-label={ws.executionOverviewAria ?? "Execution overview"} className="min-h-0 min-w-0 rounded-[1.15rem] bg-background/75 p-3">
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
+    <aside
+      aria-label={ws.executionOverviewAria ?? "Execution overview"}
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.15rem] border border-border/65 bg-card/95 p-3.5 shadow-[0_10px_35px_rgba(15,23,42,0.07)]"
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-              <Sparkles className="size-3.5" />
+            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-4 ring-primary/10">
+              <Sparkles className="size-4" />
             </span>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{ws.taskEyebrow ?? "Task"}</p>
-              <h2 className="text-sm font-semibold text-foreground">{ws.commandCenter ?? "Command Center"}</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                {ws.taskEyebrow ?? "Task"}
+              </p>
+              <h2 className="font-heading text-base font-semibold leading-tight text-foreground">
+                {ws.commandCenter ?? "Command Center"}
+              </h2>
             </div>
           </div>
         </div>
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CommandCenterTab)} className="gap-2">
-          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 rounded-[0.9rem] bg-muted/70 p-1">
+
+        <div className="mb-3 shrink-0 space-y-1.5 rounded-xl border border-border/60 bg-muted/35 px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            {statusLabel ? (
+              <span className="truncate text-xs font-medium text-muted-foreground">{statusLabel}</span>
+            ) : <span />}
+            {progress.totalSteps > 0 ? (
+              <span className="shrink-0 text-xs font-semibold text-foreground">
+                {progress.completedSteps}/{progress.totalSteps}
+              </span>
+            ) : null}
+          </div>
+          {progress.totalSteps > 0 ? (
+            <div className="h-2 w-full overflow-hidden rounded-full bg-background shadow-inner">
+              <div
+                className="h-full rounded-full bg-primary shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_55%,transparent)] transition-[width]"
+                style={{ width: `${progress.percentComplete}%` }}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as CommandCenterTab)}
+          className="min-h-0 flex-1 gap-3 overflow-hidden"
+        >
+          <TabsList className="grid h-auto w-full shrink-0 grid-cols-3 gap-1 rounded-[1rem] border border-border/60 bg-muted/70 p-1 shadow-inner">
             {tabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id} onClick={() => setActiveTab(tab.id)} className="rounded-[0.7rem] px-2 py-1.5 text-xs font-semibold data-active:bg-primary data-active:text-primary-foreground data-active:shadow-sm">
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="relative rounded-[0.78rem] px-2.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+              >
                 {tab.label}
+                {tab.badge ? (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute right-1 top-1 size-1.5 rounded-full",
+                      attention ? "bg-warning" : "bg-primary",
+                    )}
+                  />
+                ) : null}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <TabsContent value="actions" className="space-y-2">
-            <>
-              {primaryAction ? <PrimaryActionCard action={primaryAction} copy={ws} /> : null}
-            </>
+          <TabsContent value="now" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
+            <SpecRenderer spec={buildNowTabSpec({ primaryAction, readiness, attention, runtimeEvents, copy: ws })} />
+            {primaryAction?.actionSpec ? (
+              <div className="px-3">
+                <SpecRenderer
+                  spec={primaryAction.actionSpec}
+                  handlers={primaryAction.actionHandlers}
+                  onStateChange={primaryAction.onActionStateChange}
+                />
+              </div>
+            ) : null}
+            {primaryAction?.onClick ? (
+              <div className="px-3">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-full px-3 text-xs shadow-sm"
+                  disabled={primaryAction.disabled || primaryAction.isLoading}
+                  onClick={primaryAction.onClick}
+                >
+                  {primaryAction.isLoading ? (ws.generating ?? "Generating...") : primaryAction.label}
+                </Button>
+              </div>
+            ) : null}
           </TabsContent>
-          <TabsContent value="result" className="space-y-2">
-            <LatestResultCard card={latestResult} onAction={onAction} copy={ws} />
+
+          <TabsContent value="output" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
+            {latestCompletedNode ? (
+              <div className="flex items-center justify-between gap-2 px-1 pb-1">
+                <span className="truncate text-xs text-muted-foreground">
+                  {ws.from ?? "from"}: {latestCompletedNode.title}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 rounded-full px-2 text-xs"
+                  onClick={() => onAction?.(latestCompletedNode.id)}
+                >
+                  {ws.locateSourceNode ?? "Locate source node"}
+                </Button>
+              </div>
+            ) : null}
+            <NodeResultContent node={latestCompletedNode} emptyMessage={ws.noResultYet ?? "No output yet."} />
+            {artifacts.length > 0 ? (
+              <SpecRenderer
+                spec={buildArtifactsSpec({ artifacts, copy: ws, onLocate: true })}
+                handlers={{
+                  "locate-workspace-node": (params) => {
+                    const nodeId = typeof params.nodeId === "string" ? params.nodeId : undefined;
+                    if (nodeId) onAction?.(nodeId);
+                  },
+                }}
+              />
+            ) : null}
           </TabsContent>
-          <TabsContent value="artifacts" className="space-y-2">
-            <ArtifactsCard artifacts={artifacts} onAction={onAction} copy={ws} />
-          </TabsContent>
-          <TabsContent value="activity" className="space-y-2">
-            <WorkspaceActivityFeed activity={activity} runtimeEvents={runtimeEvents} />
+
+          <TabsContent value="trail" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
+            <WorkspaceActivityFeed
+              activity={activity}
+              runtimeEvents={runtimeEvents}
+            />
           </TabsContent>
         </Tabs>
       </div>
     </aside>
-  );
-}
-
-function PrimaryActionCard({ action, copy }: { action: CommandCenterPrimaryAction; copy: TaskWorkspaceCopy }) {
-  return (
-    <section className={cn("rounded-[1rem] border p-3", cardToneClass(action.tone ?? "info"))}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{copy.currentOperation ?? "Current operation"}</p>
-          <p className="mt-0.5 break-words text-sm font-semibold text-foreground">{action.label}</p>
-        </div>
-        {action.statusLabel ? <span className="shrink-0 rounded-full bg-background/85 px-2 py-0.5 text-xs font-medium text-muted-foreground">{action.statusLabel}</span> : null}
-      </div>
-      <p className="mt-2 break-words text-[13px] leading-[1.4] text-foreground/80">{action.description}</p>
-      {action.actionControls ? <div className="mt-3">{action.actionControls}</div> : null}
-      {action.onClick ? (
-        <Button
-          type="button"
-          size="sm"
-          className="mt-3 h-8 rounded-full px-3 text-xs shadow-sm"
-          disabled={action.disabled || action.isLoading}
-          onClick={action.onClick}
-        >
-          {action.isLoading ? (copy.generating ?? "Generating...") : action.label}
-        </Button>
-      ) : null}
-    </section>
-  );
-}
-
-function cardToneClass(tone: ExecutionOverviewCard["tone"]) {
-  if (tone === "critical") return "border-destructive/30 bg-destructive/10";
-  if (tone === "warning") return "border-warning/40 bg-warning/10";
-  if (tone === "success") return "border-success/30 bg-success/10";
-  if (tone === "info") return "border-info/30 bg-info/10";
-  return "border-border bg-muted/45";
-}
-
-function LatestResultCard({ card, onAction, copy }: { card: ExecutionOverviewCard; onAction?: OverviewAction; copy: TaskWorkspaceCopy }) {
-  const resultText = card.content?.trim() || card.description;
-
-  return (
-    <section className="rounded-[1rem] bg-transparent p-1">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Sparkles className="size-3.5" />
-          </span>
-          <p className="text-sm font-semibold text-foreground">{card.title}</p>
-        </div>
-        {card.statusLabel ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{card.statusLabel}</span> : null}
-      </div>
-      <div className="mt-2 max-h-[420px] overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-muted/50 px-2.5 py-2 text-[13px] leading-[1.45] text-foreground/80">
-        {resultText === (copy.noResultYet ?? "No execution result yet.")
-          ? (copy.resultPlaceholder ?? "Result summary will appear here after the current node finishes.")
-          : resultText}
-      </div>
-      {card.actionLabel && onAction ? (
-        <button type="button" className="mt-2 text-xs font-semibold text-primary hover:text-primary/80" onClick={() => onAction(card.actionNodeId)}>
-          {copy.locateResultNode ?? "Locate result node"}
-        </button>
-      ) : null}
-    </section>
-  );
-}
-
-function ArtifactsCard({ artifacts, onAction, copy }: { artifacts: WorkspaceArtifactItem[]; onAction?: OverviewAction; copy: TaskWorkspaceCopy }) {
-  const [expandedArtifactId, setExpandedArtifactId] = useState<string | null>(artifacts[0]?.id ?? null);
-  const [showAll, setShowAll] = useState(false);
-  const COLLAPSED_LIMIT = 4;
-  const hasOverflow = artifacts.length > COLLAPSED_LIMIT;
-  const visibleArtifacts = showAll ? artifacts : artifacts.slice(0, COLLAPSED_LIMIT);
-
-  return (
-    <section className="rounded-[1rem] bg-transparent p-1">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Archive className="size-4 text-primary" />
-          <p className="text-sm font-semibold text-foreground">{copy.artifactsLabel ?? "Artifacts"} ({artifacts.length})</p>
-        </div>
-      </div>
-      {artifacts.length === 0 ? (
-        <p className="mt-1.5 text-[13px] text-muted-foreground">{copy.noArtifacts ?? "No artifacts yet."}</p>
-      ) : (
-        <div className="mt-2 space-y-1.5">
-          {visibleArtifacts.map((artifact) => (
-            <div key={artifact.id} className="rounded-xl bg-muted/45 px-2 py-1.5">
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 text-left"
-                onClick={() => setExpandedArtifactId((current) => current === artifact.id ? null : artifact.id)}
-                aria-expanded={expandedArtifactId === artifact.id}
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                  <FileText className="size-3.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block break-words text-sm font-medium text-foreground">{artifact.title}</span>
-                  <span className="block break-words text-xs text-muted-foreground">{artifact.type}</span>
-                </span>
-              </button>
-              {expandedArtifactId === artifact.id ? (
-                <div className="mt-2 rounded-lg bg-background/80 p-2">
-                  {artifact.content ? (
-                    <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{artifact.content}</pre>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">{copy.noInlinePreview ?? "No inline preview is available for this artifact."}</p>
-                  )}
-                  {artifact.sourceNodeId && onAction ? (
-                    <button type="button" className="mt-2 text-xs font-semibold text-primary" onClick={() => onAction(artifact.sourceNodeId)}>
-                      {copy.locateSourceNode ?? "Locate source node"}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ))}
-          {hasOverflow ? (
-            <button
-              type="button"
-              className="mt-1 text-xs font-semibold text-primary hover:text-primary/80"
-              onClick={() => setShowAll((current) => !current)}
-              aria-expanded={showAll}
-            >
-              {showAll
-                ? (copy.showFewerArtifacts ?? "Show fewer")
-                : `${copy.showAllArtifacts ?? "Show all"} (${artifacts.length})`}
-            </button>
-          ) : null}
-        </div>
-      )}
-    </section>
   );
 }

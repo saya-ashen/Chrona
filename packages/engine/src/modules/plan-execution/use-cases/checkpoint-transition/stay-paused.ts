@@ -1,5 +1,5 @@
 import type { SubmitCheckpointActionResult, WaitKind } from "@chrona/contracts/ai";
-import { appendMainSessionEvent } from "../../plan-state-store";
+import { appendMainSessionEvent } from "../../persistence/plan-state-store";
 import { buildExecutionResponse } from "../../projection/execution-response";
 import { observerCallbacks } from "./observer";
 import type { CheckpointTransitionInput } from "./types";

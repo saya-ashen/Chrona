@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { taskPlanExecution } from "@/modules/plan-execution";
+import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
 import { recordOrchestratorEvent } from "./scheduler-events";
 
 type RecoveryTaskRef = { workspaceId: string } | null;

@@ -137,6 +137,19 @@ function selectAcceptedPlan(
   return undefined;
 }
 
+/**
+ * Reconciles the "true" saved plan from two async sources that can disagree:
+ * the page query (`task.savedPlan`) and the plan-state query (`planFlow.savedPlan`).
+ * Precedence:
+ *   1. If only one side has a plan, use it.
+ *   2. Different plan ids → trust the plan-state query (the plan-scoped endpoint
+ *      is authoritative for which plan is current).
+ *   3. Same id → newer `updatedAt` wins.
+ *   4. updatedAt tie → prefer whichever side is `accepted`; otherwise honor
+ *      `preferPagePlanOnTie` (page query wins) else the plan-state query.
+ * Keep this aligned with the work-block scope resolution: both queries are keyed
+ * by the same `selectedWorkBlockId`, so this never mixes plans across work blocks.
+ */
 function selectWorkspacePlan(
   pagePlan: TaskData["savedPlan"] | null | undefined,
   planStatePlan: TaskData["savedPlan"] | null | undefined,

@@ -196,10 +196,16 @@ export function mapHermesEvent(
         raw,
       };
     default: {
+      // When the caller opts into raw capture, surface unknown events as
+      // raw_event so the Trail never silently loses provider activity. Only
+      // abort on unknown types when raw capture was not requested.
+      if (options.includeRaw) {
+        return { ...metadata, type: "raw_event", raw: event };
+      }
       if (options.strictUnknown) {
         throw new Error(`Unknown Hermes stream event type: ${type ?? "<missing>"}`);
       }
-      return options.includeRaw ? { ...metadata, type: "raw_event", raw: event } : undefined;
+      return undefined;
     }
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
+import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import {
   executeTaskNodeCapabilityMock,
   makeTwoTaskPlan,
@@ -70,7 +70,12 @@ describe("kernel executeCommand (single-writer)", () => {
         status: "done",
         summary: "First task finished",
         evidence: { sessionId: "main-session", runId: "run-first" },
-        output: { runtimeRunRef: "runtime-first", outputText: "first output" },
+        output: {
+          root: "root",
+          elements: {
+            root: { type: "Markdown", props: { content: "first output" } },
+          },
+        },
       })
       .mockResolvedValueOnce({
         status: "started",

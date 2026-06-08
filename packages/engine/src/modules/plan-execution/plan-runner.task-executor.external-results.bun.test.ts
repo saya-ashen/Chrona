@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
+import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import type { CompiledPlan, ConditionConfig, TaskConfig } from "@chrona/contracts/ai";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type { NodeExecutionResult } from "./node-executors/types";
-import { buildSemanticRefHistory } from "./node-runtime-refs";
+import { buildSemanticRefHistory } from "./runtime/node-runtime-refs";
 import {
   executeTaskNodeCapabilityMock,
   evaluateConditionNodeCapabilityMock,
@@ -34,7 +34,12 @@ describe("plan-runner task executor external results", () => {
         action: {
           action: "complete_manual_node",
           summary: "Hermes completed externally",
-          output: { source: "hermes" },
+          output: {
+            root: "root",
+            elements: {
+              root: { type: "JsonView", props: { value: { source: "hermes" } } },
+            },
+          },
         },
       });
       expect(submittedResult.status).toBe("completed");
@@ -133,13 +138,36 @@ describe("plan-runner task executor external results", () => {
 
   it("accumulates chrona_node_output outputs into the completed node result", async () => {
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      const partialSpec = {
+        root: "root",
+        elements: {
+          root: {
+            type: "Stack",
+            props: { gap: "sm" },
+            children: ["partial"],
+          },
+          partial: { type: "Markdown", props: { content: "Partial output" } },
+        },
+      };
+      const resultSpec = {
+        root: "root",
+        elements: {
+          root: {
+            type: "Stack",
+            props: { gap: "sm" },
+            children: ["summary"],
+          },
+          summary: { type: "Markdown", props: { content: "Final UI output" } },
+        },
+      };
+
       const firstAppend = await taskPlanExecution.submitNodeResult({
         taskId: input.taskId,
         action: {
           action: "submit_node_output",
           sessionId: input.mainSession.id,
           mode: "append",
-          outputs: [{ kind: "markdown", content: "Partial output one", title: "Step 1" }],
+          outputs: [partialSpec],
         },
       });
       expect(firstAppend.status).toBe("running");
@@ -150,12 +178,13 @@ describe("plan-runner task executor external results", () => {
           action: "submit_node_output",
           sessionId: input.mainSession.id,
           mode: "append",
-          outputs: [{ kind: "json", value: { score: 42 }, title: "Step 2" }],
+          outputs: [resultSpec],
         },
       });
 
-      // Completion carries no inline output — outputs were submitted separately
-      // via chrona_node_output and must survive into the completed result.
+      // Completion carries no inline output. The latest json-render Spec submitted
+      // via chrona_node_output (append mode keeps the last Spec) survives into the
+      // completed result. Legacy typed outputs are rejected at submission time.
       const submittedResult = await taskPlanExecution.dispatch({
         taskId: input.taskId,
         action: {
@@ -192,8 +221,17 @@ describe("plan-runner task executor external results", () => {
       outputSummary: "Task wrapped up",
     });
     expect(completed?.outputs).toEqual([
-      { kind: "markdown", content: "Partial output one", title: "Step 1" },
-      { kind: "json", value: { score: 42 }, title: "Step 2" },
+      {
+        root: "root",
+        elements: {
+          root: {
+            type: "Stack",
+            props: { gap: "sm" },
+            children: ["summary"],
+          },
+          summary: { type: "Markdown", props: { content: "Final UI output" } },
+        },
+      },
     ]);
   });
 
@@ -206,7 +244,12 @@ describe("plan-runner task executor external results", () => {
             action: "complete_manual_node",
             sessionId: "provider-runtime-session",
             summary: "Runtime tool completed first task",
-            output: { source: "chrona_node_output" },
+            output: {
+              root: "root",
+              elements: {
+                root: { type: "JsonView", props: { value: { source: "chrona_node_output" } } },
+              },
+            },
           },
         });
         expect(submittedResult.status).toBe("running");

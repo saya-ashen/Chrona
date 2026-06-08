@@ -8,7 +8,7 @@ export {
   executeTaskNodeCapability,
   evaluateConditionNodeCapability,
   reviewCheckpointNodeCapability,
-} from "./node-ai-capabilities";
+} from "./runtime/node-ai-capabilities";
 
 export {
   createPlanRunFromCompiledPlan,

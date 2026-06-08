@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AiFeature } from "@chrona/contracts";
 import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
-import type { ProviderFeatureRequest } from "../modules/ai/providers";
+import type { ProviderFeatureRequest } from "../modules/ai";
 
 const DEFAULT_CASSETTE_DIR = "packages/engine/src/test/llm-fixtures";
 

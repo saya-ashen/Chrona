@@ -1,9 +1,10 @@
 import type { ScheduleSource } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateScheduleWindow } from "@chrona/domain";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
+import { ensureWorkBlockTaskSession } from "@/modules/execution-runtime";
 
 export async function applySchedule(input: {
   taskId: string;
@@ -17,22 +18,10 @@ export async function applySchedule(input: {
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { id: true, workspaceId: true, title: true, updatedAt: true },
+    select: { id: true, workspaceId: true, title: true, executionRuntime: true, updatedAt: true },
   });
-  const importedCalendarEvent = await db.importedCalendarEvent.findFirst({
-    where: { taskId: input.taskId },
-    select: { startsAt: true, endsAt: true },
-  });
-  if (importedCalendarEvent) {
-    const nextStart = input.scheduledStartAt?.getTime() ?? null;
-    const nextEnd = input.scheduledEndAt?.getTime() ?? null;
-    if (
-      nextStart !== importedCalendarEvent.startsAt.getTime() ||
-      nextEnd !== importedCalendarEvent.endsAt.getTime()
-    ) {
-      throw new Error("External calendar task schedule is managed by the calendar source");
-    }
-  }
+  const isExternallyManaged =
+    (await db.importedCalendarEvent.count({ where: { taskId: input.taskId } })) > 0;
 
   await db.task.update({
     where: { id: input.taskId },
@@ -40,6 +29,21 @@ export async function applySchedule(input: {
       dueAt: input.dueAt,
     },
   });
+
+  if (isExternallyManaged) {
+    // External calendar tasks own their scheduled window and their
+    // per-occurrence work blocks through calendar sync. A task-level schedule
+    // apply (manual or AI) must NOT create or move them — it only persists the
+    // editable Chrona fields (dueAt above). Skipping the window path also
+    // avoids spurious "managed by the calendar source" drift caused by the
+    // UI's minute-precision datetime round-trips, and leaves the projection to
+    // reflect the authoritative per-occurrence work blocks.
+    await rebuildTaskProjection(task.id);
+    return {
+      taskId: task.id,
+      workspaceId: task.workspaceId,
+    };
+  }
 
   if (input.scheduledStartAt && input.scheduledEndAt) {
     const acceptedPlan = await getAcceptedCompiledPlanForTask(input.taskId);
@@ -61,7 +65,7 @@ export async function applySchedule(input: {
     }
 
     if (existingBlock) {
-      await db.workBlock.update({
+      const workBlock = await db.workBlock.update({
         where: { id: existingBlock.id },
         data: {
           planId,
@@ -70,9 +74,18 @@ export async function applySchedule(input: {
           scheduledEndAt: input.scheduledEndAt,
           trigger: input.scheduleSource === "ai" ? "scheduled" : "manual",
         },
+        select: { id: true, sessionId: true },
+      });
+      await ensureWorkBlockTaskSession({
+        taskId: task.id,
+        taskTitle: task.title,
+        runtimeName: task.executionRuntime,
+        workBlockId: workBlock.id,
+        sessionId: workBlock.sessionId,
+        label: `${task.title} · Work block session`,
       });
     } else {
-      await db.workBlock.create({
+      const workBlock = await db.workBlock.create({
         data: {
           workspaceId: task.workspaceId,
           taskId: task.id,
@@ -82,6 +95,14 @@ export async function applySchedule(input: {
           scheduledEndAt: input.scheduledEndAt,
           trigger: input.scheduleSource === "ai" ? "scheduled" : "manual",
         },
+        select: { id: true },
+      });
+      await ensureWorkBlockTaskSession({
+        taskId: task.id,
+        taskTitle: task.title,
+        runtimeName: task.executionRuntime,
+        workBlockId: workBlock.id,
+        label: `${task.title} · Work block session`,
       });
     }
   }

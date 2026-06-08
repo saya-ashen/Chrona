@@ -182,7 +182,17 @@ export const taskWorkspaceStateFixtures = {
       artifacts: [{ id: "artifact-1", title: "Report", type: "markdown", uri: "file://report.md" }],
     }),
     graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "done", status: "done", resultOutputs: [{ kind: "markdown", content: "summary" }] }),
+      createTaskWorkspaceFixtureNode({
+        id: "done",
+        status: "done",
+        resultOutputs: [{
+          root: "root",
+          elements: {
+            root: { type: "Stack", props: { gap: "sm" }, children: ["content"] },
+            content: { type: "Markdown", props: { content: "summary" } },
+          },
+        }],
+      }),
     ], "done"),
   },
   staleError: {

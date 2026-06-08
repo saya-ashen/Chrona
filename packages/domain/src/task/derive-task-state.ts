@@ -1,6 +1,6 @@
 type DeriveTaskStateInput = {
   task: { status: string; latestRunId?: string | null };
-  runs: Array<{ id: string; status: string; updatedAt: Date }>;
+  runs: Array<{ id: string; status: string; updatedAt: Date; errorSummary?: string | null }>;
   approvals: Array<{ status: string; requestedAt: Date }>;
   sync: { stale: boolean };
   executionSession?: {
@@ -15,6 +15,8 @@ type BlockReason = {
   scope: string;
   actionRequired: string;
   nodeId?: string;
+  /** Human-readable cause of the block (e.g. provider error). Surfaced in the UI. */
+  detail?: string;
 };
 
 type DeriveTaskStateResult = {
@@ -43,6 +45,17 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
+  // An abandoned execution session is the durable record of a cancelled run.
+  // Reproduced here so the projection committer is the only writer of task
+  // status while still reflecting cancellation.
+  if (input.executionSession?.status === "Abandoned") {
+    return {
+      persistedStatus: "Cancelled",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    };
+  }
   const activeRun =
     input.runs.find((run) => run.id === input.task.latestRunId) ??
     [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0] ??
@@ -101,7 +114,7 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
-  if (activeRun?.status === "Failed") {
+  if (activeRun?.status === "Failed" && input.executionSession?.status !== "Active") {
     return {
       persistedStatus: "Blocked",
       displayState: "Attention Needed",
@@ -109,6 +122,8 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
         blockType: "run_failed",
         scope: "run",
         actionRequired: "Retry Run",
+        nodeId: input.executionSession?.currentNodeId ?? undefined,
+        detail: activeRun.errorSummary ?? undefined,
       },
       blockSince: activeRun.updatedAt,
     };
@@ -202,7 +217,11 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
-  if (activeRun?.status === "Completed") {
+  // A completed execution session is the authoritative record of a finished
+  // run; a completed run is the same signal from the provider side. Either
+  // means the task is done. (The run may be absent — e.g. occurrence-scoped or
+  // not yet persisted — so the session alone must be able to drive this.)
+  if (input.executionSession?.status === "Completed" || activeRun?.status === "Completed") {
     const reopenedStatus = new Set(["Draft", "Ready"]);
 
     return {

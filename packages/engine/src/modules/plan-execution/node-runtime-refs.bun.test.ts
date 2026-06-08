@@ -7,8 +7,8 @@ import {
   branchBindingForRef,
   buildNodeRuntimeInput,
   buildSemanticRefHistory,
-} from "./node-runtime-refs";
-import { buildNodeRuntimePrompt } from "./node-runtime-prompts";
+} from "./runtime/node-runtime-refs";
+import { buildNodeRuntimePrompt } from "./runtime/node-runtime-prompts";
 
 function node(
   input: Partial<EffectivePlanNode> &
@@ -111,7 +111,7 @@ describe("node runtime refs", () => {
         nodeId: "dependency-real-123",
         status: "completed",
         outputSummary: "Weather script requirements confirmed.",
-        outputs: [{ kind: "json", value: { location: "Beijing" } }],
+        outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { location: "Beijing" } } } } }],
       } as unknown as EffectivePlanNode["result"],
     });
     const unrelated = node({
@@ -152,7 +152,7 @@ describe("node runtime refs", () => {
         nodeRef: "N20260516-01",
         title: "Confirm requirements",
         summary: "Weather script requirements confirmed.",
-        outputs: [{ kind: "json", value: { location: "Beijing" } }],
+        outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { location: "Beijing" } } } } }],
       },
     ]);
     expect(input.context.globalSummary).toBe(

@@ -8,6 +8,12 @@ export interface GenerateTaskPlanRequest {
   dueAt?: Date | string | null;
   estimatedMinutes?: number;
   userInstruction?: string | null;
+  /**
+   * Read-only context owned by an external source (e.g. an imported calendar
+   * event's description). Distinct from `description`, which is the editable
+   * Chrona note. Both are surfaced to the planner as separate sections.
+   */
+  sourceContext?: string | null;
   sessionKey?: string;
   signal?: AbortSignal;
 }

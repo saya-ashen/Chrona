@@ -24,14 +24,14 @@ import {
   graphStatusForExecutionStatus,
 } from "../execution-state-machine";
 import { ensureNativePlanRun, derivePlanRunFromRuntime } from "../persistence/plan-runtime-store";
-import { savePlanRunGuarded } from "../plan-run-store";
+import { savePlanRunGuarded } from "../persistence/plan-run-store";
 import {
   ensureExecutionSession,
   getActiveExecutionWorkBlockId,
   setExecutionSessionState,
   type ExecutionSessionRow,
 } from "../persistence/execution-session-store";
-import { ensurePlanMainSession, appendMainSessionEvent } from "../plan-state-store";
+import { ensurePlanMainSession, appendMainSessionEvent } from "../persistence/plan-state-store";
 import { getCurrentExecution } from "../use-cases/get-current-execution";
 import { getRuntimeName } from "../persistence/task-runtime-store";
 import {
@@ -53,7 +53,7 @@ import {
 import { appendGraphRuntimeEvents } from "../persistence/runtime-event-store";
 import { createKernelGraphCallbacks } from "./graph-callbacks";
 import type { EngineRuntimeContext, PlanExecutionObserver } from "./kernel-types";
-import { branchBindingForRef } from "../node-runtime-refs";
+import { branchBindingForRef } from "../runtime/node-runtime-refs";
 
 const DEFAULT_MAX_STEPS = 10;
 
@@ -334,12 +334,10 @@ async function finalizeOutcome(input: {
       ? runningNodeId
       : runningNodeId ?? session.currentNodeId ?? null;
 
-  const transition = executionTransition({
-    status,
-    pauseReason: waitKind,
-    message: outcome.message,
-    nodeId: currentNodeId,
-  });
+  // Persist the session as the authoritative execution fact. Task status and
+  // blockReason are NOT written here — rebuildTaskProjection is the single
+  // authority that derives them from session/run/approval facts.
+  const transition = executionTransition({ status, pauseReason: waitKind });
 
   if (input.updateSessionState !== false) {
     await setExecutionSessionState({
@@ -353,16 +351,11 @@ async function finalizeOutcome(input: {
     });
   }
 
-  await db.task.update({
-    where: { id: taskId },
-    data: {
-      status: transition.taskStatus,
-      blockReason: transition.blockReason,
-      completedAt: status === "completed" ? new Date() : undefined,
-    },
-  });
-
   if (status === "completed") {
+    await db.task.update({
+      where: { id: taskId },
+      data: { completedAt: new Date() },
+    });
     await completeActiveRunsForTask(taskId);
     await completeWorkBlock(taskId, session.workBlockId);
     await appendMainSessionEvent({

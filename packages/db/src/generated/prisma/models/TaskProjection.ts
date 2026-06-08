@@ -45,6 +45,8 @@ export type TaskProjectionMinAggregateOutputType = {
   blockScope: string | null
   blockSince: Date | null
   actionRequired: string | null
+  blockDetail: string | null
+  blockNodeId: string | null
   latestRunStatus: string | null
   approvalPendingCount: number | null
   dueAt: Date | null
@@ -73,6 +75,8 @@ export type TaskProjectionMaxAggregateOutputType = {
   blockScope: string | null
   blockSince: Date | null
   actionRequired: string | null
+  blockDetail: string | null
+  blockNodeId: string | null
   latestRunStatus: string | null
   approvalPendingCount: number | null
   dueAt: Date | null
@@ -101,6 +105,8 @@ export type TaskProjectionCountAggregateOutputType = {
   blockScope: number
   blockSince: number
   actionRequired: number
+  blockDetail: number
+  blockNodeId: number
   latestRunStatus: number
   approvalPendingCount: number
   dueAt: number
@@ -141,6 +147,8 @@ export type TaskProjectionMinAggregateInputType = {
   blockScope?: true
   blockSince?: true
   actionRequired?: true
+  blockDetail?: true
+  blockNodeId?: true
   latestRunStatus?: true
   approvalPendingCount?: true
   dueAt?: true
@@ -169,6 +177,8 @@ export type TaskProjectionMaxAggregateInputType = {
   blockScope?: true
   blockSince?: true
   actionRequired?: true
+  blockDetail?: true
+  blockNodeId?: true
   latestRunStatus?: true
   approvalPendingCount?: true
   dueAt?: true
@@ -197,6 +207,8 @@ export type TaskProjectionCountAggregateInputType = {
   blockScope?: true
   blockSince?: true
   actionRequired?: true
+  blockDetail?: true
+  blockNodeId?: true
   latestRunStatus?: true
   approvalPendingCount?: true
   dueAt?: true
@@ -312,6 +324,8 @@ export type TaskProjectionGroupByOutputType = {
   blockScope: string | null
   blockSince: Date | null
   actionRequired: string | null
+  blockDetail: string | null
+  blockNodeId: string | null
   latestRunStatus: string | null
   approvalPendingCount: number
   dueAt: Date | null
@@ -363,6 +377,8 @@ export type TaskProjectionWhereInput = {
   blockScope?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   blockSince?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   actionRequired?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockDetail?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockNodeId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   latestRunStatus?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   approvalPendingCount?: Prisma.IntFilter<"TaskProjection"> | number
   dueAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
@@ -393,6 +409,8 @@ export type TaskProjectionOrderByWithRelationInput = {
   blockScope?: Prisma.SortOrderInput | Prisma.SortOrder
   blockSince?: Prisma.SortOrderInput | Prisma.SortOrder
   actionRequired?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockDetail?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   approvalPendingCount?: Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -426,6 +444,8 @@ export type TaskProjectionWhereUniqueInput = Prisma.AtLeast<{
   blockScope?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   blockSince?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   actionRequired?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockDetail?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockNodeId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   latestRunStatus?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   approvalPendingCount?: Prisma.IntFilter<"TaskProjection"> | number
   dueAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
@@ -456,6 +476,8 @@ export type TaskProjectionOrderByWithAggregationInput = {
   blockScope?: Prisma.SortOrderInput | Prisma.SortOrder
   blockSince?: Prisma.SortOrderInput | Prisma.SortOrder
   actionRequired?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockDetail?: Prisma.SortOrderInput | Prisma.SortOrder
+  blockNodeId?: Prisma.SortOrderInput | Prisma.SortOrder
   latestRunStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   approvalPendingCount?: Prisma.SortOrder
   dueAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -492,6 +514,8 @@ export type TaskProjectionScalarWhereWithAggregatesInput = {
   blockScope?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
   blockSince?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskProjection"> | Date | string | null
   actionRequired?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  blockDetail?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
+  blockNodeId?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
   latestRunStatus?: Prisma.StringNullableWithAggregatesFilter<"TaskProjection"> | string | null
   approvalPendingCount?: Prisma.IntWithAggregatesFilter<"TaskProjection"> | number
   dueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"TaskProjection"> | Date | string | null
@@ -518,6 +542,8 @@ export type TaskProjectionCreateInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -548,6 +574,8 @@ export type TaskProjectionUncheckedCreateInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -574,6 +602,8 @@ export type TaskProjectionUpdateInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -604,6 +634,8 @@ export type TaskProjectionUncheckedUpdateInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -632,6 +664,8 @@ export type TaskProjectionCreateManyInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -658,6 +692,8 @@ export type TaskProjectionUpdateManyMutationInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -686,6 +722,8 @@ export type TaskProjectionUncheckedUpdateManyInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -729,6 +767,8 @@ export type TaskProjectionCountOrderByAggregateInput = {
   blockScope?: Prisma.SortOrder
   blockSince?: Prisma.SortOrder
   actionRequired?: Prisma.SortOrder
+  blockDetail?: Prisma.SortOrder
+  blockNodeId?: Prisma.SortOrder
   latestRunStatus?: Prisma.SortOrder
   approvalPendingCount?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
@@ -762,6 +802,8 @@ export type TaskProjectionMaxOrderByAggregateInput = {
   blockScope?: Prisma.SortOrder
   blockSince?: Prisma.SortOrder
   actionRequired?: Prisma.SortOrder
+  blockDetail?: Prisma.SortOrder
+  blockNodeId?: Prisma.SortOrder
   latestRunStatus?: Prisma.SortOrder
   approvalPendingCount?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
@@ -790,6 +832,8 @@ export type TaskProjectionMinOrderByAggregateInput = {
   blockScope?: Prisma.SortOrder
   blockSince?: Prisma.SortOrder
   actionRequired?: Prisma.SortOrder
+  blockDetail?: Prisma.SortOrder
+  blockNodeId?: Prisma.SortOrder
   latestRunStatus?: Prisma.SortOrder
   approvalPendingCount?: Prisma.SortOrder
   dueAt?: Prisma.SortOrder
@@ -895,6 +939,8 @@ export type TaskProjectionCreateWithoutWorkspaceInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -923,6 +969,8 @@ export type TaskProjectionUncheckedCreateWithoutWorkspaceInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -979,6 +1027,8 @@ export type TaskProjectionScalarWhereInput = {
   blockScope?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   blockSince?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
   actionRequired?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockDetail?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
+  blockNodeId?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   latestRunStatus?: Prisma.StringNullableFilter<"TaskProjection"> | string | null
   approvalPendingCount?: Prisma.IntFilter<"TaskProjection"> | number
   dueAt?: Prisma.DateTimeNullableFilter<"TaskProjection"> | Date | string | null
@@ -1005,6 +1055,8 @@ export type TaskProjectionCreateWithoutTaskInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -1033,6 +1085,8 @@ export type TaskProjectionUncheckedCreateWithoutTaskInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -1075,6 +1129,8 @@ export type TaskProjectionUpdateWithoutTaskInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1103,6 +1159,8 @@ export type TaskProjectionUncheckedUpdateWithoutTaskInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1130,6 +1188,8 @@ export type TaskProjectionCreateManyWorkspaceInput = {
   blockScope?: string | null
   blockSince?: Date | string | null
   actionRequired?: string | null
+  blockDetail?: string | null
+  blockNodeId?: string | null
   latestRunStatus?: string | null
   approvalPendingCount?: number
   dueAt?: Date | string | null
@@ -1156,6 +1216,8 @@ export type TaskProjectionUpdateWithoutWorkspaceInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1184,6 +1246,8 @@ export type TaskProjectionUncheckedUpdateWithoutWorkspaceInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1211,6 +1275,8 @@ export type TaskProjectionUncheckedUpdateManyWithoutWorkspaceInput = {
   blockScope?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   blockSince?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   actionRequired?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  blockNodeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestRunStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvalPendingCount?: Prisma.IntFieldUpdateOperationsInput | number
   dueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1241,6 +1307,8 @@ export type TaskProjectionSelect<ExtArgs extends runtime.Types.Extensions.Intern
   blockScope?: boolean
   blockSince?: boolean
   actionRequired?: boolean
+  blockDetail?: boolean
+  blockNodeId?: boolean
   latestRunStatus?: boolean
   approvalPendingCount?: boolean
   dueAt?: boolean
@@ -1271,6 +1339,8 @@ export type TaskProjectionSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   blockScope?: boolean
   blockSince?: boolean
   actionRequired?: boolean
+  blockDetail?: boolean
+  blockNodeId?: boolean
   latestRunStatus?: boolean
   approvalPendingCount?: boolean
   dueAt?: boolean
@@ -1301,6 +1371,8 @@ export type TaskProjectionSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   blockScope?: boolean
   blockSince?: boolean
   actionRequired?: boolean
+  blockDetail?: boolean
+  blockNodeId?: boolean
   latestRunStatus?: boolean
   approvalPendingCount?: boolean
   dueAt?: boolean
@@ -1331,6 +1403,8 @@ export type TaskProjectionSelectScalar = {
   blockScope?: boolean
   blockSince?: boolean
   actionRequired?: boolean
+  blockDetail?: boolean
+  blockNodeId?: boolean
   latestRunStatus?: boolean
   approvalPendingCount?: boolean
   dueAt?: boolean
@@ -1350,7 +1424,7 @@ export type TaskProjectionSelectScalar = {
   updatedAt?: boolean
 }
 
-export type TaskProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"taskId" | "workspaceId" | "persistedStatus" | "displayState" | "blockType" | "blockScope" | "blockSince" | "actionRequired" | "latestRunStatus" | "approvalPendingCount" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "scheduleProposalCount" | "latestArtifactTitle" | "lastActivityAt" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "currentNodeId" | "currentNodeTitle" | "updatedAt", ExtArgs["result"]["taskProjection"]>
+export type TaskProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"taskId" | "workspaceId" | "persistedStatus" | "displayState" | "blockType" | "blockScope" | "blockSince" | "actionRequired" | "blockDetail" | "blockNodeId" | "latestRunStatus" | "approvalPendingCount" | "dueAt" | "scheduledStartAt" | "scheduledEndAt" | "scheduleStatus" | "scheduleSource" | "scheduleProposalCount" | "latestArtifactTitle" | "lastActivityAt" | "latestEventId" | "latestRawEventId" | "blockedByEventId" | "blockedByRawEventId" | "currentNodeId" | "currentNodeTitle" | "updatedAt", ExtArgs["result"]["taskProjection"]>
 export type TaskProjectionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workspace?: boolean | Prisma.WorkspaceDefaultArgs<ExtArgs>
   task?: boolean | Prisma.TaskDefaultArgs<ExtArgs>
@@ -1379,6 +1453,8 @@ export type $TaskProjectionPayload<ExtArgs extends runtime.Types.Extensions.Inte
     blockScope: string | null
     blockSince: Date | null
     actionRequired: string | null
+    blockDetail: string | null
+    blockNodeId: string | null
     latestRunStatus: string | null
     approvalPendingCount: number
     dueAt: Date | null
@@ -1829,6 +1905,8 @@ export interface TaskProjectionFieldRefs {
   readonly blockScope: Prisma.FieldRef<"TaskProjection", 'String'>
   readonly blockSince: Prisma.FieldRef<"TaskProjection", 'DateTime'>
   readonly actionRequired: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly blockDetail: Prisma.FieldRef<"TaskProjection", 'String'>
+  readonly blockNodeId: Prisma.FieldRef<"TaskProjection", 'String'>
   readonly latestRunStatus: Prisma.FieldRef<"TaskProjection", 'String'>
   readonly approvalPendingCount: Prisma.FieldRef<"TaskProjection", 'Int'>
   readonly dueAt: Prisma.FieldRef<"TaskProjection", 'DateTime'>

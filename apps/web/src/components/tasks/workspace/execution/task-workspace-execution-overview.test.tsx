@@ -5,233 +5,191 @@ import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "./task-workspace-execution-overview";
 
+function renderOverview(
+  view: ReturnType<typeof createTaskWorkspaceExecutionConsoleView>,
+  extra: Partial<React.ComponentProps<typeof TaskWorkspaceExecutionOverview>> = {},
+) {
+  return render(
+    <TaskWorkspaceExecutionOverview
+      progress={view.progress}
+      readiness={view.readiness}
+      latestResult={view.latestResult}
+      attention={view.attention}
+      latestCompletedNode={view.latestCompletedNode}
+      artifacts={view.artifacts}
+      activity={view.activity}
+      {...extra}
+    />,
+  );
+}
+
 describe("TaskWorkspaceExecutionOverview", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("renders latest result, attention, artifacts, and activity from the workspace view", () => {
+  it("renders the now, output, and trail tabs", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
     const onAction = vi.fn();
 
-    render(
-      <TaskWorkspaceExecutionOverview
-        readiness={view.readiness}
-        latestResult={view.latestResult}
-        attention={view.attention}
-        artifacts={view.artifacts}
-        activity={view.activity}
-        onAction={onAction}
-      />,
-    );
+    renderOverview(view, { onAction });
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Needs handling")).not.toBeInTheDocument();
-    expect(screen.queryByText("Approve result")).not.toBeInTheDocument();
-    expect(screen.queryByText("Current operation")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Result" }));
-    expect(screen.getByText("Latest result")).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("tab", { name: "Artifacts" })[0]);
-    expect(screen.getByText("Artifacts (0)")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
-    expect(screen.getByText("Execution activity", { selector: "p" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "Actions" }));
-    expect(screen.queryByRole("button", { name: "Resolve in node panel" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Now" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Output" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Trail" })).toBeInTheDocument();
+    // Now tab shows the current operation status card from attention/readiness.
+    expect(screen.getByText("Current operation")).toBeInTheDocument();
   });
 
-  it("renders live provider runtime events in the activity tab", () => {
+  it("renders live runtime events in the now tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
 
-    render(
-      <TaskWorkspaceExecutionOverview
-        readiness={view.readiness}
-        latestResult={view.latestResult}
-        attention={view.attention}
-        artifacts={view.artifacts}
-        activity={view.activity}
-        runtimeEvents={[{
-          type: "runtime_event",
-          action: "start_manual",
-          nodeId: "execute",
-          nodeTitle: "execute",
-          runtimeName: "hermes",
-          provider: "hermes",
-          runId: "run-1",
-          sequence: 1,
-          timestamp: "2026-05-12T10:01:00.000Z",
-          event: { type: "tool_started", toolName: "chrona_plan_read", label: "正在读取计划" },
-        }, {
-          type: "runtime_event",
-          action: "start_manual",
-          nodeId: "execute",
-          nodeTitle: "execute",
-          runtimeName: "hermes",
-          provider: "hermes",
-          runId: "run-1",
-          sequence: 2,
-          timestamp: "2026-05-12T10:01:01.000Z",
-          event: { type: "assistant_text_delta", text: "Runtime " },
-        }, {
-          type: "runtime_event",
-          action: "start_manual",
-          nodeId: "execute",
-          nodeTitle: "execute",
-          runtimeName: "hermes",
-          provider: "hermes",
-          runId: "run-1",
-          sequence: 3,
-          timestamp: "2026-05-12T10:01:01.500Z",
-          event: { type: "assistant_text_delta", text: "answer" },
-        }, {
-          type: "runtime_event",
-          action: "start_manual",
-          nodeId: "execute",
-          nodeTitle: "execute",
-          runtimeName: "hermes",
-          provider: "hermes",
-          runId: "run-1",
-          sequence: 4,
-          timestamp: "2026-05-12T10:01:02.000Z",
-          event: { type: "reasoning_delta", text: "Runtime reasoning" },
-        }]}
-      />,
-    );
+    renderOverview(view, {
+      runtimeEvents: [{
+        type: "runtime_event",
+        action: "start_manual",
+        nodeId: "execute",
+        nodeTitle: "execute",
+        runtimeName: "hermes",
+        provider: "hermes",
+        runId: "run-1",
+        sequence: 1,
+        timestamp: "2026-05-12T10:01:00.000Z",
+        event: { type: "tool_started", toolName: "chrona_plan_read", label: "正在读取计划" },
+      }, {
+        type: "runtime_event",
+        action: "start_manual",
+        nodeId: "execute",
+        nodeTitle: "execute",
+        runtimeName: "hermes",
+        provider: "hermes",
+        runId: "run-1",
+        sequence: 2,
+        timestamp: "2026-05-12T10:01:01.000Z",
+        event: { type: "assistant_text_delta", text: "Runtime " },
+      }, {
+        type: "runtime_event",
+        action: "start_manual",
+        nodeId: "execute",
+        nodeTitle: "execute",
+        runtimeName: "hermes",
+        provider: "hermes",
+        runId: "run-1",
+        sequence: 3,
+        timestamp: "2026-05-12T10:01:01.500Z",
+        event: { type: "assistant_text_delta", text: "answer" },
+      }, {
+        type: "runtime_event",
+        action: "start_manual",
+        nodeId: "execute",
+        nodeTitle: "execute",
+        runtimeName: "hermes",
+        provider: "hermes",
+        runId: "run-1",
+        sequence: 4,
+        timestamp: "2026-05-12T10:01:02.000Z",
+        event: { type: "reasoning_delta", text: "Runtime reasoning" },
+      }],
+    });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
-    expect(screen.getByText("正在读取计划")).toBeInTheDocument();
-    expect(screen.getByText("Runtime answer")).toBeInTheDocument();
-    expect(screen.queryByText("Runtime ")).not.toBeInTheDocument();
-    expect(screen.getByText("Reasoning")).toBeInTheDocument();
-    expect(screen.getByText("Runtime reasoning")).toBeInTheDocument();
+    // Live event content surfaces directly in the Now tab. Raw (unmerged)
+    // events are rendered individually with a kind label prefix.
+    expect(screen.getByText("Tool: 正在读取计划")).toBeInTheDocument();
+    expect(screen.getByText("Assistant: Runtime")).toBeInTheDocument();
+    expect(screen.getByText("Assistant: answer")).toBeInTheDocument();
+    expect(screen.getByText("Reasoning: Runtime reasoning")).toBeInTheDocument();
   });
 
-  it("renders full latest result and expandable artifact content", () => {
+  it("renders the latest completed node result and artifacts in the output tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
     const onAction = vi.fn();
 
-    render(
-      <TaskWorkspaceExecutionOverview
-        readiness={view.readiness}
-        latestResult={view.latestResult}
-        attention={view.attention}
-        artifacts={view.artifacts}
-        activity={view.activity}
-        onAction={onAction}
-      />,
-    );
+    renderOverview(view, { onAction });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Result" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Output" }));
     expect(screen.getByText("summary")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "View full result ->" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Locate result node" }));
-    expect(onAction).toHaveBeenCalledWith("done");
-
-    fireEvent.click(screen.getAllByRole("tab", { name: "Artifacts" })[0]);
-    expect(screen.getByText("done output 1", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("summary")).toBeInTheDocument();
-
+    expect(screen.queryByText(/runtimeRunRef/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Locate source node" }));
     expect(onAction).toHaveBeenCalledWith("done");
+    expect(screen.getByText("Report")).toBeInTheDocument();
+    expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
 
-  it("renders a command center primary action", () => {
+  it("renders a command center primary action in the now tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
     const onClick = vi.fn();
 
-    render(
-      <TaskWorkspaceExecutionOverview
-        readiness={view.readiness}
-        latestResult={view.latestResult}
-        attention={view.attention}
-        artifacts={view.artifacts}
-        activity={view.activity}
-        primaryAction={{
-          label: "Generate plan",
-          description: "Create an execution plan before starting task work.",
-          statusLabel: "idle",
-          tone: "info",
-          onClick,
-        }}
-      />,
-    );
+    renderOverview(view, {
+      primaryAction: {
+        kind: "generate",
+        label: "Generate plan",
+        description: "Create an execution plan before starting task work.",
+        statusLabel: "idle",
+        tone: "info",
+        onClick,
+      },
+    });
 
     expect(screen.getByText("Current operation")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate plan" }));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("renders empty and stale workspace overview states", () => {
-    const emptyView = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
-    const staleView = createTaskWorkspaceExecutionConsoleView({
-      ...taskWorkspaceStateFixtures.staleError,
-      pageData: {
-        ...taskWorkspaceStateFixtures.staleError.pageData,
-        latestRunSummary: { id: "run-1", status: "Running", startedAt: null, syncStatus: "stale" },
-      },
-    });
+  it("renders an empty output state when no node has completed", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+
+    renderOverview(view);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Output" }));
+    expect(screen.getByText("No execution result yet.")).toBeInTheDocument();
+  });
+
+  it("auto-switches to the now tab when attention first appears", () => {
+    const calm = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const attentive = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
 
     const { rerender } = render(
       <TaskWorkspaceExecutionOverview
-        readiness={emptyView.readiness}
-        latestResult={emptyView.latestResult}
-        attention={emptyView.attention}
-        artifacts={emptyView.artifacts}
-        activity={emptyView.activity}
+        progress={calm.progress}
+        readiness={calm.readiness}
+        latestResult={calm.latestResult}
+        attention={null}
+        latestCompletedNode={calm.latestCompletedNode}
+        artifacts={calm.artifacts}
+        activity={calm.activity}
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Result" }));
-    expect(screen.getAllByText("Result summary will appear here after the current node finishes.").length).toBeGreaterThan(0);
-    expect(screen.queryByText("No approval, input, or blocker needs attention.")).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole("tab", { name: "Artifacts" })[0]);
-    expect(screen.getAllByText("No artifacts yet.").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
-    expect(screen.getByText("Activity will appear after planning or execution starts.")).toBeInTheDocument();
+    // User moves to the Trail tab while nothing needs attention.
+    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
+    expect(screen.getByRole("tab", { name: "Trail" })).toHaveAttribute("aria-selected", "true");
 
+    // Attention appears: the console pulls focus back to Now exactly once.
     rerender(
       <TaskWorkspaceExecutionOverview
-        readiness={staleView.readiness}
-        latestResult={staleView.latestResult}
-        attention={staleView.attention}
-        artifacts={staleView.artifacts}
-        activity={staleView.activity}
+        progress={attentive.progress}
+        readiness={attentive.readiness}
+        latestResult={attentive.latestResult}
+        attention={attentive.attention}
+        latestCompletedNode={attentive.latestCompletedNode}
+        artifacts={attentive.artifacts}
+        activity={attentive.activity}
       />,
     );
-
-    expect(screen.queryByRole("button", { name: "Refresh" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Actions" }));
-    expect(screen.queryByText("Run is Running")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Now" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("exposes blocked status, retry progress, and accessible action names", () => {
-    const view = createTaskWorkspaceExecutionConsoleView({
-      ...taskWorkspaceStateFixtures.staleError,
-      pageData: {
-        ...taskWorkspaceStateFixtures.staleError.pageData,
-        task: {
-          ...taskWorkspaceStateFixtures.staleError.pageData.task,
-          isRunnable: true,
-        },
-      },
-    });
-    const onAction = vi.fn();
+  it("lets the user leave the now tab while attention persists", () => {
+    // Regression: a blocked/attention state must not trap the user on Now.
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
 
-    render(
-      <TaskWorkspaceExecutionOverview
-        readiness={view.readiness}
-        latestResult={view.latestResult}
-        attention={view.attention}
-        artifacts={view.artifacts}
-        activity={view.activity}
-        onAction={onAction}
-      />,
-    );
+    renderOverview(view);
 
-    expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Retry refresh")).not.toBeInTheDocument();
-    expect(screen.queryByText("Open action controls")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open action controls" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Now" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
+    expect(screen.getByRole("tab", { name: "Trail" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Output" }));
+    expect(screen.getByRole("tab", { name: "Output" })).toHaveAttribute("aria-selected", "true");
   });
 });

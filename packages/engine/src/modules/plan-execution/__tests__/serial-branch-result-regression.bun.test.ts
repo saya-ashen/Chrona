@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
+import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import {
   executeTaskNodeCapabilityMock,
   makeTwoEntryTaskPlan,
@@ -18,7 +18,12 @@ describe("serial branch result regressions", () => {
         status: "done",
         summary: "First branch finished before runtime sync",
         evidence: { sessionId: "main-session", runId: "run-first-entry" },
-        output: { runtimeRunRef: "runtime-first-entry", outputText: "first branch output" },
+        output: {
+          root: "root",
+          elements: {
+            root: { type: "Markdown", props: { content: "first branch output" } },
+          },
+        },
       })
       .mockResolvedValueOnce({
         status: "started",

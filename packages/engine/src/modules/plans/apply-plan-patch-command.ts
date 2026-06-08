@@ -1,11 +1,7 @@
 import { db } from "@/lib/db";
-import { getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import {
-  createPlanGraphFromCompiledPlan,
-  getPlanRun,
-  savePlanRun,
-} from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution";
+import { getLatestCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { createPlanGraphFromCompiledPlan, getPlanRun, savePlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-runtime-store";
 import {
   analyzeStructuralChangeImpact,
   applyDownstreamInvalidation,

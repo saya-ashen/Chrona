@@ -2,7 +2,7 @@ import {
   createPlanGraphFromCompiledPlan,
   getPlanRun,
   savePlanRun,
-} from "../plan-run-store";
+} from "./plan-run-store";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getAcceptedCompiledPlanForTask } from "./execution-scope";

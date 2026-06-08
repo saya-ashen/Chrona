@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { HermesProviderClient, HermesProviderError } from "./index";
+import type { ProviderRunEvent } from "@chrona/providers-foundation";
 
 const realFetch = globalThis.fetch;
 const realStrictUnknownEvents = process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS;
@@ -337,6 +338,48 @@ describe("HermesProviderClient", () => {
     expect(seenHeaders?.get("Accept")).toBe("text/event-stream");
   });
 
+  it("raises a retryable error when the SSE body is interrupted before a terminal event", async () => {
+    globalThis.fetch = mockFetch(async () => {
+      let pulls = 0;
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pulls += 1;
+          if (pulls === 1) {
+            controller.enqueue(
+              new TextEncoder().encode(
+                'data: {"type":"message.delta","delta":"partial"}\n\n',
+              ),
+            );
+            return;
+          }
+          controller.error(new Error("socket hang up"));
+        },
+      });
+      return new Response(stream, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    });
+
+    const client = new HermesProviderClient();
+    const seen: string[] = [];
+    let captured: unknown;
+    try {
+      for await (const event of client.streamRun({ runId: "run-1" })) {
+        seen.push(event.type);
+      }
+    } catch (error) {
+      captured = error;
+    }
+
+    expect(seen).toEqual(["text_delta"]);
+    expect(captured).toMatchObject({
+      name: "HermesProviderError",
+      code: "network_error",
+      retryable: true,
+    } satisfies Partial<HermesProviderError>);
+  });
+
   it("normalizes Hermes approval requests", async () => {
     globalThis.fetch = mockFetch(async () => new Response(
       `data: ${JSON.stringify({
@@ -510,6 +553,26 @@ describe("HermesProviderClient", () => {
     }
 
     expect(events).toEqual(["raw_event"]);
+  });
+
+  it("captures unknown stream events as raw_event even when strict handling is enabled", async () => {
+    delete process.env.CHRONA_HERMES_STRICT_UNKNOWN_EVENTS;
+    globalThis.fetch = mockFetch(async () => new Response(
+      'data: {"type":"run.mystery","value":1}\n\n',
+      { status: 200, headers: { "Content-Type": "text/event-stream" } },
+    ));
+
+    const client = new HermesProviderClient();
+    const events = [] as ProviderRunEvent[];
+    for await (const event of client.streamRun({ runId: "run-1", include: { rawEvents: true } })) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    const [event] = events;
+    expect(event.type).toBe("raw_event");
+    expect(event.type === "raw_event" ? event.raw : undefined).toEqual({ type: "run.mystery", value: 1 });
+    expect(event.rawEventType).toBe("run.mystery");
   });
 
   it("maps completed run output and usage", async () => {

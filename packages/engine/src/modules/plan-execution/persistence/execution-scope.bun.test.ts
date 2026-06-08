@@ -7,7 +7,7 @@ import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-genera
 import {
   getAcceptedCompiledPlan,
   saveCompiledPlan,
-} from "@/modules/plan-execution/compiled-plan-store";
+} from "@/modules/plan-execution/persistence/compiled-plan-store";
 import {
   resolveExecutionScope,
   getAcceptedCompiledPlanForTask,
@@ -31,8 +31,8 @@ async function resetDb() {
   await db.taskPlan.deleteMany();
   await db.event.deleteMany();
   await db.taskProjection.deleteMany();
-  await db.taskSession.deleteMany();
   await db.workBlock.deleteMany();
+  await db.taskSession.deleteMany();
   await db.task.deleteMany();
   await db.workspace.deleteMany();
 }

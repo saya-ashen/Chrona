@@ -9,17 +9,18 @@ import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generat
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { buildAcceptOrRegenerateSpec } from "../execution/build-execution-overview-spec";
 import {
   TaskWorkspaceExecutionOverview,
   type CommandCenterCopy,
   type CommandCenterPrimaryAction,
 } from "../execution/task-workspace-execution-overview";
+import { useActionSpecRenderConfig } from "../execution/action-tab";
+import type { UiDocument } from "@chrona/ui-protocol";
 import {
   TaskWorkspaceNodeDetailPanel,
   type NodeDrawerFrame,
   type NodeDrawerSize,
-  WorkspaceNodeActionControls,
 } from "../execution/task-workspace-node-detail-panel";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import {
@@ -142,7 +143,7 @@ export function TaskWorkspacePlanSection({
   onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
-  const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"action" | null>(null);
+  const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"result" | null>(null);
   const [nodeDrawerSize, setNodeDrawerSize] = useState<NodeDrawerSize>("collapsed");
   const [nodeDrawerFrame, setNodeDrawerFrame] = useState<NodeDrawerFrame | null>(null);
   const nodeDrawerFrameRef = useRef<HTMLDivElement | null>(null);
@@ -183,16 +184,6 @@ export function TaskWorkspacePlanSection({
   const recoveryActions = pageData.reconciliation?.repairActions ?? [];
   const recoveryIssue = pageData.reconciliation?.issues.find((issue) => issue.severity === "error") ?? null;
   const recoveryCurrentNodeId = pageData.reconciliation?.currentNodeId ?? undefined;
-  const graphNodes = graphPlan?.nodes ?? [];
-  const completedNodeCount = graphNodes.filter((node) =>
-    isCompletedGraphNode(node.status),
-  ).length;
-  const totalNodeCount = graphNodes.length;
-  const progressLabel =
-    totalNodeCount > 0
-      ? `${completedNodeCount}/${totalNodeCount}`
-      : consoleView.progress.label;
-  const completionLabel = totalNodeCount > 0 ? `${progressLabel} steps` : consoleView.progress.label;
   const isGeneratingPlan = planGenerationStatus === "generating";
   const isPlanAccepted = plan?.status === "accepted";
   const isPlanAwaitingAcceptance = Boolean(plan && !isPlanAccepted);
@@ -228,9 +219,38 @@ export function TaskWorkspacePlanSection({
   const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
   const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
-  const handleRegeneratePlan = () => {
-    onGeneratePlan({ userInstruction: regenerationInstruction });
-  };
+  const currentOperationAction = useActionSpecRenderConfig({
+    node: currentOperationNode,
+    disabledActionReason: operationConsoleView.nodeDetail.disabledActionReason,
+    onDispatchExecutionAction,
+    onSubmitCheckpointAction,
+  });
+  const acceptOrRegenerateSpec = useMemo<UiDocument | null>(() => {
+    if (!plan) return null;
+    return buildAcceptOrRegenerateSpec({
+      copy,
+      canAcceptPlan,
+      isGeneratingPlan,
+      visibleGenerationInstruction,
+      acceptPlanError,
+      regenerationInstruction,
+    });
+  }, [acceptPlanError, canAcceptPlan, copy, isGeneratingPlan, plan, regenerationInstruction, visibleGenerationInstruction]);
+  const acceptOrRegenerateHandlers = useMemo(() => ({
+    "accept-plan": async () => {
+      if (plan) await onApplyPlan(plan);
+    },
+    "regenerate-plan": (params: Record<string, unknown>) => {
+      const instruction = typeof params.instruction === "string" ? params.instruction : regenerationInstruction;
+      onGeneratePlan({ userInstruction: instruction });
+    },
+  }), [onApplyPlan, onGeneratePlan, plan, regenerationInstruction]);
+  const handleAcceptOrRegenerateStateChange = useCallback((changes: Array<{ path: string; value: unknown }>) => {
+    const instructionChange = changes.find((change) => change.path === "/instruction");
+    if (instructionChange) {
+      setRegenerationInstruction(typeof instructionChange.value === "string" ? instructionChange.value : "");
+    }
+  }, []);
   const primaryActionDescriptor = resolveCommandCenterPrimaryAction({
     hasPlan: Boolean(plan),
     planStatus: plan?.status ?? null,
@@ -264,58 +284,16 @@ export function TaskWorkspacePlanSection({
       : {}),
     ...(primaryActionDescriptor.kind === "accept-or-regenerate" && plan
       ? {
-          actionControls: (
-            <div className="space-y-3">
-              {visibleGenerationInstruction ? (
-                <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-foreground">
-                  <div className="font-semibold">{copy.instructionLabel ?? "User instruction for this plan revision"}</div>
-                  <p className="mt-1 whitespace-pre-wrap leading-relaxed">{visibleGenerationInstruction}</p>
-                </div>
-              ) : null}
-              <Textarea
-                value={regenerationInstruction}
-                onChange={(event) => setRegenerationInstruction(event.target.value)}
-                placeholder={copy.instructionPlaceholder ?? "Tell Chrona what to change in the regenerated plan..."}
-                className="min-h-24 resize-y rounded-xl bg-background text-sm"
-                aria-label={copy.instructionAria ?? "Plan regeneration instruction"}
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs shadow-sm"
-                  disabled={!canAcceptPlan}
-                  onClick={() => void onApplyPlan(plan)}
-                >
-                  {copy.accept ?? "Accept plan"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 rounded-full px-3 text-xs"
-                  disabled={isGeneratingPlan}
-                  onClick={handleRegeneratePlan}
-                >
-                  {isGeneratingPlan ? (copy.generating ?? "Generating...") : (copy.regenerateWithInstruction ?? "Regenerate with instruction")}
-                </Button>
-              </div>
-              {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
-            </div>
-          ),
+          actionSpec: acceptOrRegenerateSpec,
+          actionHandlers: acceptOrRegenerateHandlers,
+          onActionStateChange: handleAcceptOrRegenerateStateChange,
         }
       : {}),
     ...(primaryActionDescriptor.kind === "current-operation" && currentOperationNode
       ? {
-          actionControls: (
-            <WorkspaceNodeActionControls
-              node={currentOperationNode}
-              disabledActionReason={operationConsoleView.nodeDetail.disabledActionReason}
-              onDispatchExecutionAction={onDispatchExecutionAction}
-              onSubmitCheckpointAction={onSubmitCheckpointAction}
-              className="border-0 bg-transparent p-0 shadow-none"
-            />
-          ),
+          actionSpec: currentOperationAction.spec,
+          actionHandlers: currentOperationAction.handlers,
+          onActionStateChange: currentOperationAction.onStateChange,
         }
       : {}),
   };
@@ -324,7 +302,9 @@ export function TaskWorkspacePlanSection({
     nodes: PlanNodeDataModel[],
   ) => {
     handleSelectedPlanNodeChange(node, nodes);
-    if (node && nodeDrawerSize === "collapsed" && shouldAutoOpenDrawerRef.current) {
+    if (!node) {
+      setNodeDrawerSize("collapsed");
+    } else if (nodeDrawerSize === "collapsed") {
       setNodeDrawerSize("expanded");
     }
     shouldAutoOpenDrawerRef.current = false;
@@ -338,7 +318,7 @@ export function TaskWorkspacePlanSection({
         if (nodeDrawerSize === "collapsed") setNodeDrawerSize("expanded");
       }
     }
-    setPreferredNodeDetailTab("action");
+    setPreferredNodeDetailTab("result");
 
     const actionsPanel = document.getElementById("task-workspace-node-actions");
     if (typeof actionsPanel?.scrollIntoView === "function") {
@@ -389,7 +369,7 @@ export function TaskWorkspacePlanSection({
   return (
     <section
       aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
-      className="relative flex flex-col overflow-visible rounded-[1.5rem] border border-border bg-canvas p-2 pb-0 xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+      className="relative flex flex-col overflow-visible rounded-[1.75rem] border border-border/80 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--canvas)_88%,var(--background)),var(--canvas))] p-2.5 pb-0 shadow-[0_18px_60px_rgba(15,23,42,0.08)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
       {stateMessage ? (
         <div
@@ -427,11 +407,11 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : null}
 
-      <div className="relative flex min-h-[700px] flex-1 flex-col gap-2 xl:min-h-0">
-        <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
+      <div className="relative flex min-h-[760px] flex-1 flex-col gap-2.5 xl:min-h-0">
+        <div className="grid min-h-0 flex-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
           <section
             aria-label={copy.executionFlow ?? "Execution flow"}
-            className="min-h-0 min-w-0"
+            className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/55 shadow-sm"
             data-plan-graph-surface
           >
             <TaskWorkspacePlanContent
@@ -441,27 +421,26 @@ export function TaskWorkspacePlanSection({
               plan={plan}
               acceptPlanError={acceptPlanError}
               planGenerationStatus={planGenerationStatus}
-                onGeneratePlan={onGeneratePlan}
+              onGeneratePlan={onGeneratePlan}
               onSelectedNodeChange={handlePlanNodeChange}
             />
           </section>
 
           <aside
-            className="min-h-0 space-y-2 overflow-y-auto p-1"
+            className="min-h-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/45 p-1 shadow-sm"
             aria-label={copy.commandCenterAria ?? "Task command center"}
           >
             <TaskWorkspaceExecutionOverview
+              progress={consoleView.progress}
               readiness={consoleView.readiness}
               latestResult={consoleView.latestResult}
               attention={consoleView.attention}
+              latestCompletedNode={consoleView.latestCompletedNode}
               artifacts={consoleView.artifacts}
               activity={consoleView.activity}
               runtimeEvents={runtimeEvents}
               primaryAction={primaryAction}
               copy={commandCenterCopy}
-              progressLabel={completionLabel}
-              taskStatus={consoleView.header.primaryStateLabel ?? pageData.task.status}
-              nextAction={consoleView.latestResult.description}
               onAction={focusNodeActions}
             />
             {shouldShowPlanGenerationPanel ? (
@@ -490,7 +469,7 @@ export function TaskWorkspacePlanSection({
           </aside>
         </div>
 
-        <div className="pointer-events-none relative z-20 grid h-[60px] shrink-0 gap-2 xl:grid-cols-[minmax(0,1fr)_352px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
+        <div className="pointer-events-none relative z-20 grid h-[72px] shrink-0 gap-2.5 xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
           <div ref={nodeDrawerFrameRef} className="relative min-w-0">
             <div className="absolute inset-x-0 bottom-2">
               <TaskWorkspaceNodeDetailPanel
@@ -505,8 +484,6 @@ export function TaskWorkspacePlanSection({
                 onDrawerSizeChange={setNodeDrawerSize}
                 preferredTab={preferredNodeDetailTab}
                 onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
-                onDispatchExecutionAction={onDispatchExecutionAction}
-                onSubmitCheckpointAction={onSubmitCheckpointAction}
               />
             </div>
           </div>

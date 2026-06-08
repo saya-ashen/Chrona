@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
+import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import {
   executeTaskNodeCapabilityMock,
   makeInputCheckpointThenTaskPlan,
@@ -19,9 +19,10 @@ describe("plan-runner task executor continuation", () => {
 
   it("continues to the downstream task run after submitting checkpoint input", async () => {
     executeTaskNodeCapabilityMock.mockResolvedValueOnce({
-      status: "done",
-      summary: "Specification task complete",
-      evidence: { sessionId: "main-session", runId: "run_spec" },
+        status: "done",
+        summary: "Specification task complete",
+        evidence: { sessionId: "main-session", runId: "run_spec" },
+        output: { root: "root", elements: { root: { type: "Markdown", props: { content: "Specification task complete" } } } },
     });
 
     const { workspace, task } = await seedWorkspaceAndTask("Runner checkpoint input handoff");
@@ -140,7 +141,7 @@ describe("plan-runner task executor continuation", () => {
       runtimeRunRef: "runtime-first",
       status: "Completed",
       summary: "First task complete",
-      output: { requirements: "ready" },
+      output: { root: "root", elements: { root: { type: "JsonView", props: { value: { requirements: "ready" } } } } },
     });
 
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
@@ -193,7 +194,7 @@ describe("plan-runner task executor continuation", () => {
       runtimeRunRef: "runtime-first-entry",
       status: "Completed",
       summary: "First entry complete",
-      output: { architectureFacts: "ready" },
+      output: { root: "root", elements: { root: { type: "JsonView", props: { value: { architectureFacts: "ready" } } } } },
     });
 
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
@@ -219,7 +220,7 @@ describe("plan-runner task executor continuation", () => {
         status: "done",
         summary: "First task complete",
         evidence: { sessionId: "main-session", runId: "run_first_task" },
-        output: { runtimeRunRef: "runtime-first-task" },
+        output: { root: "root", elements: { root: { type: "JsonView", props: { value: { runtimeRunRef: "runtime-first-task" } } } } },
       })
       .mockResolvedValueOnce({
         status: "started",

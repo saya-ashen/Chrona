@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { createTask } from "@/modules/tasks/create-task";
 import { reopenTask } from "@/modules/tasks/reopen-task";
 import { updateTask } from "@/modules/tasks/update-task";

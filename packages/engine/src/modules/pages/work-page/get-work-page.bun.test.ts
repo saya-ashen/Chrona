@@ -8,9 +8,9 @@ import {
 } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getWorkPage, WorkPageTaskNotFoundError } from "@/modules/pages/work-page";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/plan-run-store";
-import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution";
+import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-runtime-store";
 import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 
 async function resetDb() {

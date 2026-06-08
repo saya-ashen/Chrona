@@ -1,10 +1,10 @@
 import { afterAll, beforeEach, mock } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import type { CheckpointConfig, CompiledPlan, ConditionConfig, TaskConfig, WaitConfig } from "@chrona/contracts/ai";
-import { runTaskNodeFeature } from "./node-ai-capabilities";
-import type { NodeAiCapabilityInput } from "./node-ai-capabilities";
+import { runTaskNodeFeature } from "./runtime/node-ai-capabilities";
+import type { NodeAiCapabilityInput } from "./runtime/node-ai-capabilities";
 import type { NodeExecutionResult } from "./node-executors/types";
 
 type NodeCapabilityMock = (input: NodeAiCapabilityInput) => Promise<NodeExecutionResult>;
@@ -13,7 +13,7 @@ export const executeTaskNodeCapabilityMock = mock<NodeCapabilityMock>();
 export const reviewCheckpointNodeCapabilityMock = mock<NodeCapabilityMock>();
 export const evaluateConditionNodeCapabilityMock = mock<NodeCapabilityMock>();
 
-mock.module("@/modules/plan-execution/node-ai-capabilities", () => ({
+mock.module("@/modules/plan-execution/runtime/node-ai-capabilities", () => ({
   executeTaskNodeCapability: executeTaskNodeCapabilityMock,
   reviewCheckpointNodeCapability: reviewCheckpointNodeCapabilityMock,
   evaluateConditionNodeCapability: evaluateConditionNodeCapabilityMock,

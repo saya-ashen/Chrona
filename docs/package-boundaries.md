@@ -101,6 +101,37 @@ Do not put here:
 - raw provider wire parsing
 - canonical cross-layer schema definitions
 
+### Internal module structure
+
+`packages/engine` is the largest package (~21k LOC) because it is the
+application's orchestration core. Internally it is split into
+`src/modules/<name>/`, and those modules fall into two kinds with different
+import rules:
+
+- **Capability ("sink") modules** — `events`, `ai`, `task-execution`,
+  `workspaces`. These have *zero* outbound dependencies on other engine
+  modules. Each exposes a public `index.ts` barrel, and everything outside the
+  module MUST import through that barrel, never its internal files. Because a
+  sink has no cross-module dependencies, routing through its barrel can never
+  create an import cycle, and its internal files stay free to move. This is
+  enforced by the `engine-sink-modules-via-barrel` dependency-cruiser rule
+  (type-only imports are exempt, mirroring the package-level policy).
+- **Co-recursive core modules** — `plan-execution`, `plans`, `tasks`,
+  `scheduling`, `orchestration`, `projections`. These are mutually recursive by
+  domain necessity: creating a task starts plan generation, planning validates
+  the task, plan execution writes projections, projection rebuild reads
+  plan-execution scope, scheduling starts plans, and so on. They reference each
+  other with **direct (deep) imports on purpose**. Forcing them through fat
+  barrels collapses file-level resolution to the module level and manufactures
+  real runtime import cycles (verified: doing so created four cross-module
+  cycles that deep imports avoid). The core is therefore intentionally *not*
+  barrel-enforced; its files stay acyclic at the file-graph level instead.
+
+The package's single public entry to the outside world remains
+`@chrona/engine` (`src/index.ts` + `createChronaEngine`); the module barrels
+above govern only engine-internal imports. When a sink module needs to expose a
+new symbol, add it to that module's `index.ts` rather than deep-importing.
+
 ## `packages/contracts`
 
 Put here:
@@ -228,3 +259,46 @@ Ask these questions before adding a file:
 7. Is it graph mechanics independent of Chrona product policy? `packages/graph-runtime`.
 8. Is it external provider protocol behavior? `packages/providers/*`.
 9. Is it a terminal client feature? `packages/cli`.
+
+## Enforcement
+
+These boundaries are enforced, not just documented. Two gates run in
+`bun run chrona check` (and the standalone `bun run check:boundaries`):
+
+- **ESLint** keeps `packages/domain` pure (`no-restricted-imports` bans react,
+  Prisma, `@/lib/db`, and provider imports there).
+- **dependency-cruiser** (`.dependency-cruiser.cjs`) enforces the cross-package
+  rules above against the resolved import graph. `error`-level rules fail the
+  build; a new violation of any of them is a regression.
+
+### Rules (severity)
+
+| Rule | Severity | What it forbids |
+| --- | --- | --- |
+| `domain-stays-pure` | error | `packages/domain` importing db/engine/providers/integrations/apps/react/prisma |
+| `contracts-stay-schema-only` | error | `packages/contracts` importing engine/db/providers/integrations/apps |
+| `providers-own-no-business` | error | `packages/providers/*` importing engine/domain/db/apps |
+| `graph-runtime-owns-no-product` | error | `packages/graph-runtime` importing engine/db/providers/integrations/apps |
+| `packages-never-import-apps` | error | any package importing an app (except the CLI launcher entry) |
+| `no-deep-import-engine-internals` | error | runtime (value) imports of `packages/engine/src/modules/*` from outside engine — use the `@chrona/engine` barrel. Type-only imports are allowed as an end-to-end type contract |
+| `no-cross-package-prisma-generated` | error | importing `packages/db/src/generated/*` from another package — use the `@chrona/db` barrel |
+| `engine-sink-modules-via-barrel` | error | runtime (value) imports into an engine *capability* module's internals (`events`/`ai`/`task-execution`/`workspaces`) — use its `modules/<name>/index.ts` barrel. Type-only imports exempt. The co-recursive core modules are deliberately not covered (see [Internal module structure](#internal-module-structure)) |
+| `no-deep-import-engine-internals-tests` | warn | test files reaching into engine internals (debt; prefer the barrel) |
+| `engine-sink-modules-via-barrel-tests` | warn | test files reaching into capability-module internals (debt; prefer the barrel) |
+| `no-circular` | warn | circular dependencies (remaining ones are intra-package type-only debt) |
+
+### Known violations (debt)
+
+`.dependency-cruiser-known-violations.json` freezes the pre-existing
+`error`-level violations so the gate can run green while still catching new
+ones. It currently holds a single entry:
+
+- `packages/engine/src/modules/scheduling/get-schedule-page.ts` imports
+  `buildPlanningSummary` / `formatDateKey` / `startOfDay` from
+  `apps/web/src/components/schedule/`. These are pure aggregation/date helpers
+  that belong in a shared layer (`packages/domain` or `packages/shared`);
+  migrating them (and flipping the ~16 web consumers) clears the entry. Do not
+  add new entries to work around the rule — fix the import instead.
+
+Regenerate the baseline only when intentionally clearing or re-snapshotting
+debt: `bunx dependency-cruiser --config .dependency-cruiser.cjs --output-type baseline apps packages`, then keep only the `error`-severity entries.

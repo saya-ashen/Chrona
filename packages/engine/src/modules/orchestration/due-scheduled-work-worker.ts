@@ -1,8 +1,5 @@
 import { db } from "@/lib/db";
-import {
-  autoStartScheduledPlanTasks,
-  type AutoStartScheduledPlanResult,
-} from "@/modules/scheduling/auto-start-scheduled-plan";
+import { autoStartScheduledPlanTasks, type AutoStartScheduledPlanResult } from "@/modules/scheduling/auto-start-scheduled-plan";
 import { recordOrchestratorEvent } from "./scheduler-events";
 
 type DueScheduledWorkWorkerDeps = {

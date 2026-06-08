@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { isTaskPlanGenerationRunning } from "@chrona/engine/modules/plans/task-plan-generation-registry";
-import { getLatestCompiledPlan, saveCompiledPlan } from "@chrona/engine/modules/plan-execution/compiled-plan-store";
+import { getLatestCompiledPlan, saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
 import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/plans/task-plan-read-model";
 import type { CompiledPlan } from "@chrona/contracts/ai";
 import { resetTestDb, seedWorkspace, seedTask } from "../bun-test-helpers";

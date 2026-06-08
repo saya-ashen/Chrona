@@ -1,5 +1,5 @@
 import type { GraphExecutionEvent } from "@chrona/graph-runtime";
-import { appendMainSessionEvent } from "../plan-state-store";
+import { appendMainSessionEvent } from "./plan-state-store";
 import type { PlanGraphCommandEnvelope } from "../types";
 
 export async function appendGraphRuntimeEvents(input: {

@@ -183,6 +183,9 @@ export type ExecutionOverviewCard = {
   tone: ExecutionOverviewTone;
   actionLabel?: string;
   actionNodeId?: string;
+  sourceNodeTitle?: string;
+  summary?: string;
+  ctaLabel?: string;
 };
 
 export type WorkspaceArtifactItem = {
@@ -265,7 +268,7 @@ export type NodeDetailPanelState = {
   status: TaskWorkspaceUserStatus | null;
   stepPosition: string;
   autoRefreshEnabled: boolean;
-  tabs: Array<"result" | "activity" | "action" | "configuration">;
+  tabs: Array<"result" | "activity" | "configuration">;
   disabledActionReason?: string;
   isEmpty: boolean;
 };
@@ -279,6 +282,7 @@ export type TaskWorkspaceExecutionConsoleView = {
   readiness: ExecutionOverviewCard;
   latestResult: ExecutionOverviewCard;
   attention: ExecutionOverviewCard | null;
+  latestCompletedNode: PlanNodeDataModel | null;
   artifacts: WorkspaceArtifactItem[];
   activity: WorkspaceActivityItem[];
   states: {

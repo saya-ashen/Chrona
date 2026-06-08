@@ -1,4 +1,4 @@
-import { Prisma, RunStatus, TaskStatus } from "@/generated/prisma/client";
+import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 
@@ -35,16 +35,10 @@ export async function markExecutionNodeActive(input: {
         },
       })
     : { count: 0 };
-  const taskUpdate = await db.task.updateMany({
-    where: {
-      id: input.taskId,
-      completedAt: null,
-      status: { notIn: [TaskStatus.Completed, TaskStatus.Done, TaskStatus.Cancelled] },
-    },
-    data: { status: TaskStatus.Running, blockReason: Prisma.DbNull },
-  });
-
-  if (taskUpdate.count > 0 || sessionUpdate.count > 0) {
+  // The session transition to Active is the authoritative execution fact.
+  // rebuildTaskProjection is the single authority that derives Running and
+  // clears the block from it — we never write Task.status/blockReason here.
+  if (sessionUpdate.count > 0) {
     await rebuildTaskProjection(input.taskId);
   }
 }

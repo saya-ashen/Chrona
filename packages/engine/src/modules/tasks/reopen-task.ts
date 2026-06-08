@@ -1,9 +1,9 @@
 import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
+import { getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
 import { deriveTaskStaticState } from "@chrona/domain";
 
 export async function reopenTask(input: { taskId: string }) {

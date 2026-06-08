@@ -1,121 +1,71 @@
-import { useState } from "react";
-import { CalendarClock, ChevronDown, ChevronUp, Wrench } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { CalendarClock, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
-import { cn } from "@/lib/utils";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type { WorkspaceActivityItem } from "../model/task-workspace-types";
+import { ActivityTimeline } from "./activity-timeline";
 
-const ACTIVITY_TEXT_COLLAPSE_THRESHOLD = 360;
-const ACTIVITY_TEXT_PREVIEW_LENGTH = 280;
-
-function dotClassName(tone: WorkspaceActivityItem["tone"]) {
-  if (tone === "success") return "bg-success";
-  if (tone === "warning") return "bg-warning";
-  if (tone === "danger") return "bg-destructive";
-  if (tone === "info") return "bg-info";
-  return "bg-muted-foreground/40";
-}
-
-function toneBadgeVariant(tone: WorkspaceActivityItem["tone"]) {
-  if (tone === "danger") return "destructive" as const;
-  if (tone === "success" || tone === "info") return "secondary" as const;
-  return "outline" as const;
-}
-
-function timeLabel(timestamp: string | null | undefined) {
-  return timestamp ? timestamp.slice(11, 16) : null;
-}
-
-function CollapsibleActivityText({
-  text,
-  className,
+function ActivityFeedHeader({
+  title,
+  shownCount,
+  liveCount,
+  savedCount,
+  provider,
 }: {
-  text: string;
-  className?: string;
+  title: string;
+  shownCount: number;
+  liveCount: number;
+  savedCount: number;
+  provider?: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const shouldCollapse = text.length > ACTIVITY_TEXT_COLLAPSE_THRESHOLD;
-  const visibleText = shouldCollapse && !expanded ? `${text.slice(0, ACTIVITY_TEXT_PREVIEW_LENGTH).trimEnd()}...` : text;
-
   return (
-    <div className={className}>
-      <p className="whitespace-pre-wrap break-words">{visibleText}</p>
-      {shouldCollapse ? (
-        <Button type="button" variant="ghost" size="sm" className="mt-1 h-6 rounded-full px-2 text-[11px]" onClick={() => setExpanded((value) => !value)}>
-          {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-          {expanded ? taskWorkspaceActivityMessages.hideFullContent : taskWorkspaceActivityMessages.showFullContent}
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-function ToolDetails({ item }: { item: WorkspaceActivityItem }) {
-  const [expanded, setExpanded] = useState(false);
-  const tool = item.tool;
-  if (!tool) return null;
-
-  const detailRows = [
-    [taskWorkspaceActivityMessages.toolLabels.tool, tool.label ?? tool.name],
-    [taskWorkspaceActivityMessages.toolLabels.input, tool.inputSummary],
-    [taskWorkspaceActivityMessages.toolLabels.preview, tool.preview],
-    [taskWorkspaceActivityMessages.toolLabels.duration, tool.durationMs !== undefined ? `${Math.round(tool.durationMs)}ms` : undefined],
-    [taskWorkspaceActivityMessages.toolLabels.error, tool.error],
-  ].filter((row): row is [string, string] => Boolean(row[1]));
-
-  if (detailRows.length === 0) return null;
-
-  return (
-    <div className="mt-1.5 rounded-xl bg-muted/45 p-2">
-      <Button type="button" variant="ghost" size="sm" className="h-7 rounded-full px-2 text-xs" onClick={() => setExpanded((value) => !value)}>
-        {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-        {expanded ? taskWorkspaceActivityMessages.hideToolDetails : taskWorkspaceActivityMessages.showToolDetails}
-      </Button>
-      {expanded ? (
-        <dl className="mt-2 space-y-1.5 text-xs">
-          {detailRows.map(([label, value]) => (
-            <div key={label} className="grid gap-1 sm:grid-cols-[72px_minmax(0,1fr)]">
-              <dt className="font-semibold text-muted-foreground">{label}</dt>
-              <dd className="min-w-0 text-foreground/80">
-                <CollapsibleActivityText text={value} />
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
-    </div>
-  );
-}
-
-function ActivityRow({ item }: { item: WorkspaceActivityItem }) {
-  const label = timeLabel(item.timestamp);
-  const isReasoning = item.kind === "reasoning";
-  const text = item.assistant?.text ?? item.summary;
-
-  return (
-    <div className="flex gap-2 rounded-xl border border-transparent px-1.5 py-1.5 hover:border-border/70 hover:bg-muted/50">
-      <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", dotClassName(item.tone))} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          {label ? <span className="text-xs text-muted-foreground">{label}</span> : null}
-          <p className="break-words text-sm font-medium text-foreground">{item.title}</p>
-          {item.sourceNodeTitle ? <Badge variant="outline" className="max-w-full truncate text-[10px]">{item.sourceNodeTitle}</Badge> : null}
-          {item.tool ? <Badge variant={toneBadgeVariant(item.tone)} className="gap-1 text-[10px]"><Wrench className="size-3" />{item.tool.state}</Badge> : null}
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+            <CalendarClock className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            <p className="text-xs text-muted-foreground">{taskWorkspaceActivityMessages.feedStats({ shown: shownCount, live: liveCount, saved: savedCount })}</p>
+          </div>
         </div>
-        {isReasoning ? (
-          <details className="mt-1 rounded-lg bg-muted/45 px-2 py-1.5 text-xs text-muted-foreground">
-            <summary className="cursor-pointer font-medium text-foreground/80">{taskWorkspaceActivityMessages.reasoningDetails}</summary>
-            <CollapsibleActivityText text={text} className="mt-1 leading-5" />
-          </details>
-        ) : (
-          <CollapsibleActivityText text={text} className="mt-0.5 text-xs leading-[1.35] text-muted-foreground" />
-        )}
-        <ToolDetails item={item} />
       </div>
+      {provider ? (
+        <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary-soft px-2.5 py-1 text-[11px] font-semibold text-primary">
+          <Radio className="size-3" />
+          {provider}
+        </span>
+      ) : null}
     </div>
+  );
+}
+
+function ActivityEmptyState({ message }: { message: string }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-dashed border-border/70 bg-background/70 px-3 py-4 text-center">
+      <p className="text-sm font-medium text-foreground">{message}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{taskWorkspaceActivityMessages.emptyHint}</p>
+    </div>
+  );
+}
+
+function LoadOlderActivityButton({
+  visible,
+  loading,
+  onClick,
+}: {
+  visible: boolean;
+  loading: boolean;
+  onClick?: () => void;
+}) {
+  if (!visible || !onClick) return null;
+
+  return (
+    <Button type="button" variant="outline" size="sm" className="mt-3 w-full rounded-full text-xs" disabled={loading} onClick={onClick}>
+      {loading ? taskWorkspaceActivityMessages.loadingOlder : taskWorkspaceActivityMessages.loadOlder}
+    </Button>
   );
 }
 
@@ -128,6 +78,7 @@ export function WorkspaceActivityFeed({
   hasOlderActivity = false,
   isLoadingOlder = false,
   onLoadOlder,
+  density = "detailed",
 }: {
   activity: WorkspaceActivityItem[];
   runtimeEvents?: WorkspaceRuntimeEvent[];
@@ -137,34 +88,24 @@ export function WorkspaceActivityFeed({
   hasOlderActivity?: boolean;
   isLoadingOlder?: boolean;
   onLoadOlder?: () => void;
+  density?: "compact" | "detailed";
 }) {
   const items = mergeWorkspaceActivity([...runtimeEventsToWorkspaceActivity(runtimeEvents, limit), ...activity], limit);
+  const latestProvider = runtimeEvents.at(-1)?.provider;
+  const liveCount = runtimeEvents.length;
+  const persistedCount = activity.length;
 
   return (
-    <section className="rounded-[1rem] bg-transparent p-1">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarClock className="size-4 text-primary" />
-          <p className="text-sm font-semibold text-foreground">{title}</p>
-        </div>
-        {runtimeEvents.length > 0 ? (
-          <span className="rounded-full border border-primary/30 bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">
-            {runtimeEvents.at(-1)?.provider ?? "runtime"}
-          </span>
-        ) : null}
-      </div>
+    <section>
+      <ActivityFeedHeader title={title} shownCount={items.length} liveCount={liveCount} savedCount={persistedCount} provider={latestProvider} />
       {items.length === 0 ? (
-        <p className="mt-1.5 text-[13px] text-muted-foreground">{emptyMessage}</p>
+        <ActivityEmptyState message={emptyMessage} />
       ) : (
-        <div className="mt-2 space-y-1">
-          {items.map((item) => <ActivityRow key={item.id} item={item} />)}
+        <div className="mt-4 pl-1">
+          <ActivityTimeline items={items} density={density} />
         </div>
       )}
-      {hasOlderActivity && onLoadOlder ? (
-        <Button type="button" variant="outline" size="sm" className="mt-3 w-full rounded-full text-xs" disabled={isLoadingOlder} onClick={onLoadOlder}>
-          {isLoadingOlder ? taskWorkspaceActivityMessages.loadingOlder : taskWorkspaceActivityMessages.loadOlder}
-        </Button>
-      ) : null}
+      <LoadOlderActivityButton visible={hasOlderActivity} loading={isLoadingOlder} onClick={onLoadOlder} />
     </section>
   );
 }

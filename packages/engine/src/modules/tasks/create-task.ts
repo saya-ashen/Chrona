@@ -1,11 +1,9 @@
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
-import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
-import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
+import { ensureDefaultTaskSession, ensureWorkBlockTaskSession, validateTaskRuntimeConfig, getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
 import { deriveTaskStaticState } from "@chrona/domain";
 import { normalizeAutomationTiming } from "@chrona/contracts";
 import type { CreateTaskInput } from "@chrona/contracts";
@@ -191,6 +189,13 @@ export async function createTask(input: CreateTaskInput) {
           trigger: "manual",
         },
         select: { id: true },
+      });
+      await ensureWorkBlockTaskSession({
+        taskId: task.id,
+        taskTitle: task.title,
+        runtimeName: validatedRuntimeConfig.executionRuntime,
+        workBlockId: workBlock.id,
+        label: `${task.title} · Work block session`,
       });
       firstWorkBlockId ??= workBlock.id;
     }

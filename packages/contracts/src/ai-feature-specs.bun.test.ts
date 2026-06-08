@@ -29,6 +29,32 @@ describe("generate_plan feature spec", () => {
     expect(spec.inputText).toContain("Estimated duration: 60 minutes");
   });
 
+  it("includes both the editable Chrona note and the read-only calendar source context as distinct sections", () => {
+    const spec = buildGeneratePlanFeatureSpec({
+      taskId: "task-cal",
+      title: "获取今天的github trendings",
+      description: "我的本地笔记",
+      sourceContext: "读取今天最新的github trendings，并总结成一份markdown报告",
+    });
+
+    expect(spec.inputText).toContain("Description: 我的本地笔记");
+    expect(spec.inputText).toContain(
+      "Calendar event details (read-only, from the external calendar source):",
+    );
+    expect(spec.inputText).toContain(
+      "读取今天最新的github trendings，并总结成一份markdown报告",
+    );
+  });
+
+  it("omits the calendar source context section when no source context is present", () => {
+    const spec = buildGeneratePlanFeatureSpec({
+      title: "Plain task",
+      description: "Just a note",
+    });
+
+    expect(spec.inputText).not.toContain("Calendar event details");
+  });
+
   it("validates generate_plan tool payloads through the shared contract", () => {
     const spec = buildGeneratePlanFeatureSpec({
       title: "制作一个汉堡",

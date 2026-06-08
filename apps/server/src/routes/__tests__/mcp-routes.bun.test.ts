@@ -39,6 +39,15 @@ const blockPayload = {
     inputFields: [{ name: "apiDetails", label: "API details" }],
   },
 };
+const nodeOutputSpec = {
+  root: "root",
+  elements: {
+    root: {
+      type: "Markdown",
+      props: { content: "Result" },
+    },
+  },
+};
 
 function app(
   rejected = false,
@@ -289,7 +298,7 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona_node_read", "chrona.node.read", {}, {}],
-      ["chrona_node_output", "chrona.node.output", { outputs: [{ kind: "markdown", content: "Result" }] }, { outputs: [{ kind: "markdown", content: "Result" }] }],
+      ["chrona_node_output", "chrona.node.output", { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
       ["chrona_node_complete", "chrona.node.complete", { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
@@ -411,7 +420,7 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona_node_read", "chrona.node.read", {}, {}],
-      ["chrona_node_output", "chrona.node.output", { outputs: [{ kind: "markdown", content: "Result" }] }, { outputs: [{ kind: "markdown", content: "Result" }] }],
+      ["chrona_node_output", "chrona.node.output", { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
       ["chrona_node_complete", "chrona.node.complete", { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
@@ -549,23 +558,14 @@ describe("MCP routes", () => {
 
     expect(nodeOutput.inputSchema.properties.outputs).toMatchObject({
       type: "array",
+      minItems: 1,
       items: {
-        oneOf: expect.arrayContaining([
-          expect.objectContaining({
-            required: expect.arrayContaining(["kind", "value"]),
-            properties: expect.objectContaining({
-              kind: expect.objectContaining({ const: "json" }),
-              value: expect.any(Object),
-            }),
-          }),
-          expect.objectContaining({
-            required: expect.arrayContaining(["kind", "content"]),
-            properties: expect.objectContaining({
-              kind: expect.objectContaining({ const: "markdown" }),
-              content: expect.objectContaining({ type: "string" }),
-            }),
-          }),
-        ]),
+        type: "object",
+        required: expect.arrayContaining(["root", "elements"]),
+        properties: expect.objectContaining({
+          root: expect.objectContaining({ type: "string" }),
+          elements: expect.objectContaining({ type: "object" }),
+        }),
       },
     });
   });
@@ -584,8 +584,9 @@ describe("MCP routes", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(JSON.stringify(body)).toContain("kind");
-    expect(JSON.stringify(body)).toContain("Invalid discriminator value");
+    expect(JSON.stringify(body)).toContain("root");
+    expect(JSON.stringify(body)).toContain("elements");
+    expect(JSON.stringify(body)).toContain("Unrecognized keys");
   });
 
   it("rejects branch target IDs in public condition terminal schema", async () => {

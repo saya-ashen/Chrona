@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
 import type { PlanBlueprint } from "@chrona/contracts";
 
-import { getLatestTaskPlanGraph } from "@/modules/plan-execution/compat";
+import { getLatestTaskPlanGraph } from "@/modules/plans/task-plan-graph";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 
 async function generateTaskPlanForTask(input: {
@@ -85,6 +85,7 @@ async function* aiGeneratePlanStreamMock(request: { title: string; description?:
 }
 
 mock.module("@/modules/ai/runtime/ai-service", () => ({
+  aiChat: mock(() => Promise.resolve(null)),
   aiGeneratePlanStream: aiGeneratePlanStreamMock,
 }));
 
@@ -101,10 +102,10 @@ async function resetDb() {
   await db.artifact.deleteMany();
   await db.taskProjection.deleteMany();
   await db.run.deleteMany();
-  await db.taskSession.deleteMany();
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.workBlock.deleteMany();
+  await db.taskSession.deleteMany();
   await db.task.deleteMany();
   await db.workspace.deleteMany();
 }
@@ -136,7 +137,7 @@ describe("generateTaskPlanForTask", () => {
         executionConfig: {},
       },
     });
-    await db.workBlock.create({
+    const workBlock = await db.workBlock.create({
       data: {
         workspaceId: workspace.id,
         taskId: task.id,
@@ -156,7 +157,7 @@ describe("generateTaskPlanForTask", () => {
       title: "Updated task title",
       description: "Updated description from DB",
       estimatedMinutes: 90,
-      sessionKey: `chrona:task:${task.id}:plan-graph`,
+      sessionKey: `chrona:task:${task.id}:work-block:${workBlock.id}`,
     }));
 
     const saved = await getLatestTaskPlanGraph(task.id);
@@ -173,7 +174,7 @@ describe("generateTaskPlanForTask", () => {
     expect(saved?.plan.completionPolicy).toEqual({ type: "all_tasks_completed" });
     expect(refreshedTask?.defaultSessionId).toBeNull();
     expect(sessions.map((session) => session.sessionKey)).toContain(
-      `chrona:task:${task.id}:plan-graph`,
+      `chrona:task:${task.id}:work-block:${workBlock.id}`,
     );
     expect(activityEvents.map((event) => event.eventType)).toEqual([
       "plan_generation.started",
@@ -524,5 +525,57 @@ describe("generateTaskPlanForTask", () => {
 
     const savedPlan = await getLatestTaskPlanReadModel(task.id);
     expect(savedPlan?.status).toBe("accepted");
+  });
+
+  it("passes the imported calendar event description to the planner as source context", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Calendar plan context", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "获取今天的github trendings",
+        description: "我的本地笔记",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    const source = await db.calendarSource.create({
+      data: {
+        workspaceId: workspace.id,
+        name: "Team Calendar",
+        sourceUrl: `file:///tmp/${crypto.randomUUID()}.ics`,
+        redactedUrlLabel: "local fixture",
+        color: "#2563eb",
+        lifecycleState: "active",
+      },
+    });
+    const calendarDescription = "读取今天最新的github trendings，并总结成一份markdown报告";
+    await db.importedCalendarEvent.create({
+      data: {
+        workspaceId: workspace.id,
+        calendarSourceId: source.id,
+        taskId: task.id,
+        externalUid: crypto.randomUUID(),
+        dedupeKey: crypto.randomUUID(),
+        title: task.title,
+        startsAt: new Date("2026-06-06T14:00:00.000Z"),
+        endsAt: new Date("2026-06-06T15:00:00.000Z"),
+        isAllDay: false,
+        status: "confirmed",
+        description: calendarDescription,
+      },
+    });
+
+    aiGeneratePlanMock.mockClear();
+    await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
+
+    const request = aiGeneratePlanMock.mock.calls.at(-1)?.[0];
+    // The editable Chrona note and the read-only calendar description are
+    // surfaced to the planner as distinct fields, not merged or dropped.
+    expect(request?.description).toBe("我的本地笔记");
+    expect((request as { sourceContext?: string } | undefined)?.sourceContext).toBe(calendarDescription);
   });
 });

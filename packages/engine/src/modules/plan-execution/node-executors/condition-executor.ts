@@ -1,6 +1,6 @@
 import type { ConditionConfig, EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
-import { evaluateConditionNodeCapability } from "../node-ai-capabilities";
+import { evaluateConditionNodeCapability } from "../runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 
 function normalizeBranchToken(value: string) {

@@ -43,4 +43,26 @@ describe("summarizeRuntimeEvent", () => {
       },
     });
   });
+
+  it("backfills the receipt time when the provider omits a timestamp", () => {
+    const before = Date.now();
+    const event = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      nodeTitle: "Node A",
+      runtimeName: "hermes",
+      event: {
+        type: "text_delta",
+        provider: "anthropic",
+        runId: "run-1",
+        text: "partial output",
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+    const after = Date.now();
+
+    expect(event.timestamp).toBeDefined();
+    const stamped = Date.parse(event.timestamp as string);
+    expect(Number.isNaN(stamped)).toBe(false);
+    expect(stamped).toBeGreaterThanOrEqual(before);
+    expect(stamped).toBeLessThanOrEqual(after);
+  });
 });

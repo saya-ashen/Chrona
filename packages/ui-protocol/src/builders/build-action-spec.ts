@@ -1,0 +1,194 @@
+import type { UiDocument } from "../document/document";
+
+export interface ActionFieldInput {
+  key: string;
+  label: string;
+  value: string;
+  control?: "text" | "textarea" | "select" | "approval";
+  required?: boolean;
+  options?: string[];
+}
+
+export interface ActionItemInput {
+  id: string;
+  label: string;
+  kind: string;
+  emphasis?: "default" | "primary" | "warning" | "danger";
+  checkpointId?: string;
+  checkpointAction?: string;
+  executionAction?: Record<string, unknown>;
+}
+
+export interface ActionSpecInput {
+  fields: ActionFieldInput[];
+  actions: ActionItemInput[];
+  /** Values already submitted (shown read-only). */
+  submittedValues?: Record<string, string>;
+  /** When true, renders submitted state: disabled inputs + Alert, no submit button. */
+  isReadOnly?: boolean;
+  /** Guidance text shown above the form (e.g. node.nextAction). */
+  nodeNextAction?: string | null;
+  /** When set, shows a warning Alert and disables the submit button. Mirrors legacy disabledActionReason. */
+  disabledReason?: string | null;
+  /** When true, disables the submit button only (no Alert). Used for required-field emptiness gate. */
+  disabledButton?: boolean;
+}
+
+const DEFAULT_APPROVAL_OPTIONS = ["Approve", "Reject", "Needs changes"];
+
+function primaryAction(actions: ActionItemInput[]): ActionItemInput | undefined {
+  return actions.find((a) => a.emphasis === "primary") ?? actions[0];
+}
+
+/**
+ * Deterministically build a Node-action {@link UiDocument} from typed
+ * plan-node fields and available actions (plan §5.2). Mirrors the layout of
+ * `WorkspaceNodeActionControls`:
+ *   - shadcn `Input` / `Textarea` / `Select` per interactive field, bound to
+ *     form state via `$bindState`
+ *   - action-selector `Select` when multiple checkpoint actions are present
+ *   - submit `Button` binding `dispatch-execution` (execution actions) or
+ *     `submit-checkpoint` (checkpoint actions), passing form state via `$state`
+ *
+ * Readonly state (submitted input): disabled inputs + `Alert` (type "info"),
+ * no submit button. Pure and cheap — safe to rebuild on every node update.
+ *
+ * Note: `$bindState` references in field `value` props are resolved by
+ * json-render's `StateProvider` at render time. These props intentionally do
+ * not conform to the catalog Zod string schema, so backend action specs skip
+ * `validateChronaSpec` (plan §7, D3).
+ */
+export function buildActionSpec(input: ActionSpecInput): UiDocument {
+  const { fields, actions, submittedValues, isReadOnly = false, nodeNextAction, disabledReason, disabledButton } = input;
+  const elements: UiDocument["elements"] = {};
+  const state: Record<string, unknown> = {};
+  const rootChildren: string[] = [];
+
+  elements.root = { type: "Stack", props: { gap: "sm" }, children: rootChildren };
+
+  if (nodeNextAction) {
+    elements.guidance = { type: "Text", props: { text: nodeNextAction } };
+    rootChildren.push("guidance");
+  }
+
+  if (isReadOnly) {
+    elements["submitted-alert"] = {
+      type: "Alert",
+      props: { title: "Submitted", type: "info" },
+    };
+    rootChildren.push("submitted-alert");
+  }
+
+  if (disabledReason) {
+    elements["disabled-alert"] = {
+      type: "Alert",
+      props: { title: disabledReason, type: "warning" },
+    };
+    rootChildren.push("disabled-alert");
+  }
+
+  for (const field of fields) {
+    const elemKey = `field:${field.key}`;
+    const stateKey = `/${field.key}`;
+    const fieldValue = isReadOnly
+      ? (submittedValues?.[field.key] ?? field.value ?? "")
+      : (field.value ?? "");
+
+    // Readonly fields still use $bindState + state seed because shadcn
+    // Input/Select initialize localValue="" and ignore props.value when
+    // isBound=false (no binding path). Seeding state + $bindState + disabled
+    // ensures the submitted value renders.
+    state[field.key] = fieldValue;
+    const boundValue = { $bindState: stateKey };
+    const checks = !isReadOnly && field.required ? [{ type: "required" }] : undefined;
+
+    const baseProps: Record<string, unknown> = {
+      label: field.label,
+      name: field.key,
+      value: boundValue,
+      ...(isReadOnly && { disabled: true }),
+      ...(checks && { checks, validateOn: "blur" }),
+    };
+
+    if (field.control === "approval") {
+      elements[elemKey] = {
+        type: "Select",
+        props: { ...baseProps, options: field.options ?? DEFAULT_APPROVAL_OPTIONS },
+      };
+    } else if (field.control === "select") {
+      elements[elemKey] = {
+        type: "Select",
+        props: { ...baseProps, options: field.options ?? [] },
+      };
+    } else if (field.control === "textarea") {
+      elements[elemKey] = { type: "Textarea", props: baseProps };
+    } else {
+      elements[elemKey] = { type: "Input", props: baseProps };
+    }
+
+    rootChildren.push(elemKey);
+  }
+
+  // Multi-checkpoint action selector
+  const checkpointActions = actions.filter((a) => !a.executionAction);
+  const hasMultipleCheckpoints = checkpointActions.length > 1;
+
+  if (!isReadOnly && hasMultipleCheckpoints) {
+    const primary = primaryAction(checkpointActions);
+    state["__checkpointAction"] = primary?.checkpointAction ?? "";
+    elements["action-select"] = {
+      type: "Select",
+      props: {
+        label: "Action",
+        name: "__checkpointAction",
+        options: checkpointActions
+          .map((a) => a.checkpointAction ?? a.id)
+          .filter(Boolean) as string[],
+        value: { $bindState: "/__checkpointAction" },
+      },
+    };
+    rootChildren.push("action-select");
+  }
+
+  // Submit button
+  if (!isReadOnly && actions.length > 0) {
+    const primary = primaryAction(actions);
+    if (primary) {
+      const actionBinding: Record<string, unknown> = primary.executionAction
+        ? { action: "dispatch-execution", params: { actionId: primary.id } }
+        : hasMultipleCheckpoints
+          ? {
+              action: "submit-checkpoint",
+              params: {
+                checkpointAction: { $state: "/__checkpointAction" },
+                values: { $state: "/" },
+              },
+            }
+          : {
+              action: "submit-checkpoint",
+              params: {
+                checkpointAction: primary.checkpointAction ?? null,
+                values: { $state: "/" },
+              },
+            };
+
+      elements.submit = {
+        type: "Button",
+        props: {
+          label: `Send ${primary.label}`,
+          variant: primary.emphasis === "danger" ? "danger" : "primary",
+          ...((disabledReason || disabledButton) && { disabled: true }),
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        on: { press: actionBinding as any },
+      };
+      rootChildren.push("submit");
+    }
+  }
+
+  return {
+    root: "root",
+    elements,
+    ...(Object.keys(state).length > 0 && { state }),
+  };
+}

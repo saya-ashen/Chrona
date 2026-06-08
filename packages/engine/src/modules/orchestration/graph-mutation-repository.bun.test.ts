@@ -1,12 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import {
-  assertCurrentGraphVersion,
-  createGraphMutation,
-  createGraphVersion,
-  listPendingGraphMutations,
-  updateGraphMutationStatus,
-} from "@/modules/orchestration";
+import { assertCurrentGraphVersion, createGraphVersion } from "@/modules/orchestration/graph-version-repository";
+import { createGraphMutation, listPendingGraphMutations, updateGraphMutationStatus } from "@/modules/orchestration/graph-mutation-repository";
 
 async function resetDb() {
   try {

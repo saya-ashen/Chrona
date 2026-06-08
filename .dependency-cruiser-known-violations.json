@@ -1,0 +1,19 @@
+[
+  {
+    "type": "dependency",
+    "from": "packages/engine/src/modules/scheduling/get-schedule-page.ts",
+    "to": "apps/web/src/components/schedule/schedule-page-utils.ts",
+    "unresolvedTo": "@/components/schedule/schedule-page-utils",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "packages-never-import-apps"
+    }
+  }
+]

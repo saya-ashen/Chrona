@@ -162,7 +162,26 @@ describe("MCP task tool contracts", () => {
     });
 
     expect(parseChronaToolPayload("chrona.node.read", undefined)).toEqual({});
-    expect(parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "markdown", content: "Done" }] })).toEqual({ outputs: [{ kind: "markdown", content: "Done" }] });
+    expect(() => parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "markdown", content: "Done" }] })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "json", value: { foo: "bar" } }] })).toThrow();
+    expect(parseChronaToolPayload("chrona.node.output", {
+      mode: "replace",
+      outputs: [
+        {
+          root: "root",
+          elements: {
+            root: { type: "Card", props: { title: "Done" }, children: [] },
+          },
+          state: { status: "done" },
+        },
+      ],
+    })).toMatchObject({
+      mode: "replace",
+      outputs: [{ root: "root" }],
+    });
+    expect(() => parseChronaToolPayload("chrona.node.output", {
+      outputs: [{ kind: "json", title: "Wrong wrapper", value: { root: "root", elements: {} } }],
+    })).toThrow();
     expect(parseChronaToolPayload("chrona.node.complete", { summary: "Done" })).toEqual({ summary: "Done" });
     expect(parseChronaToolPayload("chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" })).toEqual({ nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" });
     expect(() => parseChronaToolPayload("chrona.node.block", { reason: "Waiting on API" })).toThrow();

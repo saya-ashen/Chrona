@@ -397,4 +397,104 @@ describe("applySchedule", () => {
     expect(storedTask.projection?.scheduleStatus).toBe("Overdue");
     expect(storedTask.projection?.scheduleProposalCount).toBe(0);
   });
+
+  it("persists editable fields for an external task without creating or moving its calendar-owned work blocks", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "External Schedule Source",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Imported standup",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+        kind: "recurring",
+        recurrenceRule: "FREQ=DAILY",
+      },
+    });
+
+    const source = await db.calendarSource.create({
+      data: {
+        workspaceId: workspace.id,
+        name: "Team Calendar",
+        sourceUrl: `file:///tmp/${crypto.randomUUID()}.ics`,
+        redactedUrlLabel: "local fixture",
+        color: "#2563eb",
+        lifecycleState: "active",
+      },
+    });
+
+    // Two occurrences with their own authoritative windows, each backed by a
+    // calendar-owned work block — the shape that previously got corrupted.
+    const day1Start = new Date("2026-04-20T09:00:37.500Z");
+    const day1End = new Date("2026-04-20T10:00:37.500Z");
+    const day2Start = new Date("2026-04-21T09:00:37.500Z");
+    const day2End = new Date("2026-04-21T10:00:37.500Z");
+    for (const [start, end] of [
+      [day1Start, day1End],
+      [day2Start, day2End],
+    ] as const) {
+      await db.importedCalendarEvent.create({
+        data: {
+          workspaceId: workspace.id,
+          calendarSourceId: source.id,
+          taskId: task.id,
+          externalUid: crypto.randomUUID(),
+          dedupeKey: crypto.randomUUID(),
+          title: "Imported standup",
+          startsAt: start,
+          endsAt: end,
+          isAllDay: false,
+          status: "confirmed",
+          recurrenceRule: "FREQ=DAILY",
+        },
+      });
+      await db.workBlock.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          recurrenceKey: start.toISOString(),
+          title: "Imported standup",
+          status: "Scheduled",
+          scheduledStartAt: start,
+          scheduledEndAt: end,
+          trigger: "manual",
+        },
+      });
+    }
+
+    const editableDue = new Date("2026-04-20T18:00:00.000Z");
+    // The UI locks the window but still round-trips it through minute-precision
+    // datetime inputs, so the client returns a truncated (drifted) window.
+    await applySchedule({
+      taskId: task.id,
+      dueAt: editableDue,
+      scheduledStartAt: new Date("2026-04-20T09:00:00.000Z"),
+      scheduledEndAt: new Date("2026-04-20T10:00:00.000Z"),
+      scheduleSource: "human",
+    });
+
+    const storedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    const workBlocks = await db.workBlock.findMany({
+      where: { taskId: task.id },
+      orderBy: { scheduledStartAt: "asc" },
+    });
+
+    // Editable field persists.
+    expect(storedTask.dueAt?.toISOString()).toBe(editableDue.toISOString());
+    // No extra work block was created, and each occurrence keeps its own
+    // authoritative window untouched (no cross-occurrence corruption).
+    expect(workBlocks).toHaveLength(2);
+    expect(workBlocks[0]?.scheduledStartAt.toISOString()).toBe(day1Start.toISOString());
+    expect(workBlocks[0]?.scheduledEndAt.toISOString()).toBe(day1End.toISOString());
+    expect(workBlocks[1]?.scheduledStartAt.toISOString()).toBe(day2Start.toISOString());
+    expect(workBlocks[1]?.scheduledEndAt.toISOString()).toBe(day2End.toISOString());
+  });
 });

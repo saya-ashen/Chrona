@@ -106,15 +106,22 @@ Source anchors:
 
 ## Node outcomes
 
-| Outcome | Backend effect |
+Node outcomes never write `Task.status`/`blockReason` directly. The runner
+persists *facts* — the node result/attempt, the `ExecutionSession` state, and
+(for provider work) the `Run` status + `errorSummary` — then calls the single
+state committer (see [Task state authority](#task-state-authority)). The table
+below describes the facts each outcome persists and the task state they derive
+to.
+
+| Outcome | Persisted fact → derived task state |
 | --- | --- |
-| `done` | Persist node result, mark attempt complete, append graph event, continue to next ready node |
-| `waiting_for_user` | Pause as `WaitingForInput`; expose input action |
-| `waiting_for_approval` | Pause as `WaitingForApproval`; expose approval action |
-| `child_running` | Pause while child run/session continues |
-| `blocked` | Pause as `Blocked` with recovery form/reason |
-| `failed` | Mark task/session failed unless retry action is later submitted |
-| `replan_required` | Pause for plan review or approval |
+| `done` | Node result + attempt complete; session stays `Active` or transitions `Completed` → `Running`/`Completed` |
+| `waiting_for_user` | Session `Paused`, `pauseReason=user_input` → `WaitingForInput` + input action |
+| `waiting_for_approval` | Session `Paused`, `pauseReason=approval` → `WaitingForApproval` + approval action |
+| `child_running` | Session `Active` while child run/session continues → `Running` |
+| `blocked` | Session `Paused`, pause reason carries node id/reason → `Blocked` with recovery form |
+| `failed` | `Run.status=Failed` + `errorSummary`; session `Paused` → `Blocked` (`run_failed`) carrying the real error + node id |
+| `replan_required` | Session `Paused`, `pauseReason=replan_required` → `WaitingForApproval` (replan) |
 
 ## Context segments
 
@@ -151,4 +158,50 @@ Important rule: agents must not invent backend IDs. They should call read tools 
 
 ## Completion
 
-When no ready nodes remain, the runner completes or pauses the execution session, updates the task status, completes the WorkBlock when applicable, appends execution events, and rebuilds projections. Work, Schedule, and Inbox then reflect the updated state.
+When no ready nodes remain, the runner transitions the `ExecutionSession` to
+`Completed`, records `Task.completedAt`, completes the active `Run`s and the
+`WorkBlock`, appends execution events, then rebuilds the projection. The
+committer derives the `Completed` task status from the completed session/run —
+the runner never writes the status itself. Work, Schedule, and Inbox then
+reflect the updated state.
+
+## Task state authority
+
+`Task.status`, `Task.blockReason`, and the read-optimized `TaskProjection` have
+a **single writer**: `rebuildTaskProjection`
+(`packages/engine/src/modules/projections/rebuild-task-projection.ts`). Every
+other code path — execution finalize, node-active marking, plan
+generation/acceptance, scheduling, lifecycle — persists only durable *facts*
+(run status, `errorSummary`, session state, plan rows, work blocks) and then
+calls the committer. No other path writes task status or block reason.
+
+The committer derives state through one pure reducer, `deriveTaskState`
+(`packages/domain/src/task/derive-task-state.ts`). The reducer maps facts to a
+task status + a block reason that carries the real cause:
+
+- A failed `Run` surfaces its `errorSummary` as `blockReason.detail` and the
+  paused node as `blockReason.nodeId` — never a hard-coded "Retry Run" with no
+  cause.
+- A `Completed`/`Abandoned` `ExecutionSession` is the authoritative record of a
+  finished/cancelled run and derives `Completed`/`Cancelled` even when no `Run`
+  row exists.
+
+### Occurrence scoping
+
+A recurring task shares one `Task` row across many `WorkBlock` occurrences, so
+execution facts are occurrence-scoped: `Run`, `ExecutionSession`, `TaskPlan`,
+and `TaskPlanRun` all carry a `workBlockId`. The committer scopes its
+runs/sessions/approvals to the occurrence that most recently executed (the
+latest `ExecutionSession` in any state, falling back to the latest plan's work
+block before any run exists). A failed or cancelled occurrence therefore never
+bleeds its state onto a sibling occurrence — a fresh occurrence with a
+just-generated plan is unaffected by an earlier occurrence's provider failure.
+
+### Projection refresh invariant
+
+Any write that changes execution or plan reality MUST end by rebuilding the
+projection so Work/Schedule/Inbox reflect it without waiting for the next
+execution tick. This includes plan draft persistence
+(`materializeGeneratedTaskPlan`) and plan acceptance (`TaskPlanning.accept`),
+not only execution actions. `publishTaskWorkspaceUpdatedEvent` only notifies
+SSE listeners; it is never a substitute for `rebuildTaskProjection`.

@@ -1,6 +1,6 @@
 import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 
 export async function markTaskDone(input: { taskId: string }) {

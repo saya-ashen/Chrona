@@ -18,6 +18,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | Place code in the right package | [Package Boundaries](./package-boundaries.md) |
 | Extend AI/runtime providers | [Provider Boundary](./provider-boundary.md) |
 | Run tests | [中文测试指南](./zh/testing.md) |
+| See feature/test coverage map | [Feature + Test Map](./maps/feature-test-map.md) (regenerate: `bun run map:build`) |
 
 ## Current product areas
 

@@ -42,6 +42,8 @@
       "@chrona/domain/*": ["./packages/domain/src/*"],
       "@chrona/contracts": ["./packages/contracts/src/index.ts"],
       "@chrona/contracts/*": ["./packages/contracts/src/*"],
+      "@chrona/ui-protocol": ["./packages/ui-protocol/src/index.ts"],
+      "@chrona/ui-protocol/*": ["./packages/ui-protocol/src/*"],
       "@chrona/db": ["./packages/db/src/index.ts"],
       "@chrona/db/*": ["./packages/db/src/*"],
       "@chrona/shared": ["./packages/shared/src/index.ts"],

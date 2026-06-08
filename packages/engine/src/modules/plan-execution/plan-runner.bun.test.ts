@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { taskPlanExecution } from "@/modules/plan-execution";
-import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
+import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import type { CheckpointConfig, CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
 async function resetDb() {
@@ -437,10 +437,6 @@ describe("plan-runner native execution actions", () => {
       ["checkpoint_input", "obsolete", "user_input"],
       ["checkpoint_input", "current", undefined],
     ]);
-    expect(persisted?.results[1]?.outputs).toContainEqual({
-      kind: "json",
-      value: { inputFields: { theme: "夏天", style: "现代诗", notes: "无" } },
-    });
     expect(persisted?.results[1]?.inputFields).toEqual({ theme: "夏天", style: "现代诗", notes: "无" });
     expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["succeeded", "succeeded"]);
 

@@ -1,5 +1,5 @@
 import type { EffectivePlanGraph, EffectivePlanNode, NodeResult } from "@chrona/contracts/ai";
-import { branchBindingForRef } from "../node-runtime-refs";
+import { branchBindingForRef } from "./node-runtime-refs";
 import type { AdvanceRuntimeCommand } from "../types";
 
 type CompleteManualNodeCommand = Extract<
