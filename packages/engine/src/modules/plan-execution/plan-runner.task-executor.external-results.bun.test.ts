@@ -36,7 +36,9 @@ describe("plan-runner task executor external results", () => {
           summary: "Hermes completed externally",
           output: {
             root: "root",
-            elements: { root: { type: "JsonView", props: { value: { source: "hermes" } } } },
+            elements: {
+              root: { type: "JsonView", props: { value: { source: "hermes" } } },
+            },
           },
         },
       });
@@ -245,10 +247,7 @@ describe("plan-runner task executor external results", () => {
             output: {
               root: "root",
               elements: {
-                root: {
-                  type: "JsonView",
-                  props: { value: { source: "chrona_node_output" } },
-                },
+                root: { type: "JsonView", props: { value: { source: "chrona_node_output" } } },
               },
             },
           },

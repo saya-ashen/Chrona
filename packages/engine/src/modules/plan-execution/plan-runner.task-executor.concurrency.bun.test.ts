@@ -169,8 +169,13 @@ describe("plan-runner task executor concurrency", () => {
         summary: "Provider returned final output but terminal tool submission failed",
         evidence: { sessionId: "main-session", runId: "run_first_entry" },
         output: {
-          runtimeRunRef: "runtime-first-entry",
-          outputText: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+          root: "root",
+          elements: {
+            root: {
+              type: "Markdown",
+              props: { content: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。" },
+            },
+          },
         },
       })
       .mockResolvedValueOnce({

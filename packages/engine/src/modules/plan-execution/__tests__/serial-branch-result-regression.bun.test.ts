@@ -18,7 +18,12 @@ describe("serial branch result regressions", () => {
         status: "done",
         summary: "First branch finished before runtime sync",
         evidence: { sessionId: "main-session", runId: "run-first-entry" },
-        output: { runtimeRunRef: "runtime-first-entry", outputText: "first branch output" },
+        output: {
+          root: "root",
+          elements: {
+            root: { type: "Markdown", props: { content: "first branch output" } },
+          },
+        },
       })
       .mockResolvedValueOnce({
         status: "started",

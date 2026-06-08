@@ -70,7 +70,12 @@ describe("kernel executeCommand (single-writer)", () => {
         status: "done",
         summary: "First task finished",
         evidence: { sessionId: "main-session", runId: "run-first" },
-        output: { runtimeRunRef: "runtime-first", outputText: "first output" },
+        output: {
+          root: "root",
+          elements: {
+            root: { type: "Markdown", props: { content: "first output" } },
+          },
+        },
       })
       .mockResolvedValueOnce({
         status: "started",
