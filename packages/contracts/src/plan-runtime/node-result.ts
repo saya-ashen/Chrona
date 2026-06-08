@@ -1,17 +1,8 @@
 import type { CheckpointResponse } from "./checkpoints";
 import type { NodeActionForm, WaitKind } from "./node";
+import type { Spec } from "@chrona/ui-protocol";
 
-export type NodeResultOutput =
-  | { kind: "markdown"; content: string; title?: string }
-  | { kind: "json"; value: unknown; title?: string }
-  | {
-      kind: "file";
-      path: string;
-      title?: string;
-      language?: string;
-      description?: string;
-    }
-  | { kind: "link"; href: string; title: string; description?: string };
+export type NodeResultOutput = Spec;
 
 export interface NodeResultEvidence {
   sessionId?: string;

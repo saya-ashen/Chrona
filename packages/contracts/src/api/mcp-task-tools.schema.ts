@@ -95,12 +95,17 @@ export const chronaToolContextSchema = z.object({
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const publicReadPayloadSchema = z.object({}).passthrough();
-export const nodeResultOutputSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("markdown"), content: z.string().min(1), title: z.string().optional() }).strict(),
-  z.object({ kind: z.literal("json"), value: z.unknown(), title: z.string().optional() }).strict(),
-  z.object({ kind: z.literal("file"), path: z.string().min(1), title: z.string().optional(), language: z.string().optional(), description: z.string().optional() }).strict(),
-  z.object({ kind: z.literal("link"), href: z.string().min(1), title: z.string().min(1), description: z.string().optional() }).strict(),
-]);
+const jsonRenderElementSchema = z.object({
+  type: z.string().min(1),
+  props: z.record(z.string(), z.unknown()).optional(),
+  children: z.array(z.string().min(1)).optional(),
+}).passthrough();
+const jsonRenderSpecSchema = z.object({
+  root: z.string().min(1),
+  elements: z.record(z.string().min(1), jsonRenderElementSchema),
+  state: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+export const nodeResultOutputSchema = jsonRenderSpecSchema;
 const nodeEvidencePayloadSchema = z.record(z.string(), z.unknown()).optional();
 export const nodeOutputPayloadSchema = z.object({
   outputs: z.array(nodeResultOutputSchema).min(1),

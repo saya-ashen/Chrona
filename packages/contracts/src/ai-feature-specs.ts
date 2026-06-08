@@ -180,6 +180,13 @@ export function buildGeneratePlanFeatureInputText(
   if (input.description?.trim()) {
     parts.push(`Description: ${input.description.trim()}`);
   }
+  if (input.sourceContext?.trim()) {
+    parts.push(
+      "",
+      "Calendar event details (read-only, from the external calendar source):",
+      input.sourceContext.trim(),
+    );
+  }
   if (typeof input.estimatedMinutes === "number") {
     parts.push(`Estimated duration: ${input.estimatedMinutes} minutes`);
   }
