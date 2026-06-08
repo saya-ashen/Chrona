@@ -75,7 +75,6 @@ function GraphShell({
   edgeLegend,
   nodeLegend,
   handleNodeClick,
-  handlePaneClick,
   stopIfNodeButton,
   onDismissOverlay,
   onCenterCurrentNode,
@@ -101,7 +100,6 @@ function GraphShell({
   edgeLegend: ReturnType<typeof useGraphLegend>["edgeLegend"];
   nodeLegend: ReturnType<typeof useGraphLegend>["nodeLegend"];
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
-  handlePaneClick: () => void;
   stopIfNodeButton: (event: MouseEvent<Element>) => void;
   onDismissOverlay: () => void;
   onCenterCurrentNode: () => void;
@@ -532,7 +530,6 @@ export function TaskPlanGraph({
               edgeLegend={edgeLegend}
               nodeLegend={nodeLegend}
               handleNodeClick={handleNodeClick}
-              handlePaneClick={handleDismissOverlay}
               stopIfNodeButton={stopIfNodeButton}
               onDismissOverlay={handleDismissOverlay}
               onCenterCurrentNode={handleCenterCurrentNode}
@@ -650,7 +647,6 @@ export function TaskPlanGraph({
           edgeLegend={edgeLegend}
           nodeLegend={nodeLegend}
           handleNodeClick={handleNodeClick}
-          handlePaneClick={handleDismissOverlay}
           stopIfNodeButton={stopIfNodeButton}
           onDismissOverlay={handleDismissOverlay}
           onCenterCurrentNode={handleCenterCurrentNode}
