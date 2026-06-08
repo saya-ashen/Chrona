@@ -1,11 +1,10 @@
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { validateTaskRuntimeConfig } from "@/modules/task-execution/task-config";
-import { getRuntimeTaskConfigSpec } from "@/modules/task-execution/registry";
+import { validateTaskRuntimeConfig, ensureWorkBlockTaskSession, getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
 import { deriveTaskStaticState } from "@chrona/domain";
 import { normalizeAutomationTiming } from "@chrona/contracts";
 import { expandRecurrenceRule } from "@chrona/integrations";
@@ -287,7 +286,7 @@ export async function updateTask(
 
     for (const occurrence of occurrences) {
       const recurrenceKey = occurrence.startsAt.toISOString();
-      await db.workBlock.upsert({
+      const workBlock = await db.workBlock.upsert({
         where: {
           taskId_recurrenceKey: {
             taskId: task.id,
@@ -310,6 +309,15 @@ export async function updateTask(
           scheduledEndAt: occurrence.endsAt,
           trigger: "manual",
         },
+        select: { id: true, sessionId: true },
+      });
+      await ensureWorkBlockTaskSession({
+        taskId: task.id,
+        taskTitle: task.title,
+        runtimeName: validatedRuntimeConfig.executionRuntime,
+        workBlockId: workBlock.id,
+        sessionId: workBlock.sessionId,
+        label: `${task.title} · Work block session`,
       });
     }
   }

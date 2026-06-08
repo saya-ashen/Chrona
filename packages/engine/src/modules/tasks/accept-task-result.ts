@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 
 export async function acceptTaskResult(input: { taskId: string }) {

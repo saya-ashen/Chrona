@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
-import type { ScheduleSource } from "@chrona/db/generated/prisma/client";
+import type { ScheduleSource } from "@chrona/db";
 import {
   clearScheduleParamSchema,
   scheduleBodySchema,

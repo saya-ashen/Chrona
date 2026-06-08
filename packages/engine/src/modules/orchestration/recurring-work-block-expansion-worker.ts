@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ensureWorkBlockTaskSession } from "@/modules/execution-runtime";
 import { expandRecurrenceRule } from "@chrona/integrations";
 
 const EXPANSION_LOOKAHEAD_DAYS = 90;
@@ -23,6 +24,7 @@ export async function runRecurringWorkBlockExpansionWorker(input: Deps = {}) {
       id: true,
       workspaceId: true,
       title: true,
+      executionRuntime: true,
       recurrenceRule: true,
       recurrenceAnchorStartAt: true,
       recurrenceAnchorEndAt: true,
@@ -75,7 +77,7 @@ export async function runRecurringWorkBlockExpansionWorker(input: Deps = {}) {
       const recurrenceKey = occurrence.startsAt.toISOString();
       if (existingKeys.has(recurrenceKey)) continue;
 
-      await db.workBlock.upsert({
+      const workBlock = await db.workBlock.upsert({
         where: {
           taskId_recurrenceKey: { taskId: task.id, recurrenceKey },
         },
@@ -94,6 +96,15 @@ export async function runRecurringWorkBlockExpansionWorker(input: Deps = {}) {
           scheduledStartAt: occurrence.startsAt,
           scheduledEndAt: occurrence.endsAt,
         },
+        select: { id: true, sessionId: true },
+      });
+      await ensureWorkBlockTaskSession({
+        taskId: task.id,
+        taskTitle: task.title,
+        runtimeName: task.executionRuntime,
+        workBlockId: workBlock.id,
+        sessionId: workBlock.sessionId,
+        label: `${task.title} · Work block session`,
       });
       created++;
     }

@@ -1,10 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
-import {
-  createDefaultTaskOrchestratorWorkers,
-  createTaskOrchestrator,
-  type TaskOrchestratorConfig,
-  type TaskOrchestratorOptions,
-} from "@/modules/orchestration";
+import { createDefaultTaskOrchestratorWorkers, createTaskOrchestrator, type TaskOrchestratorOptions } from "@/modules/orchestration/task-orchestrator";
+import { type TaskOrchestratorConfig } from "@/modules/orchestration/orchestrator-config";
 
 const config: TaskOrchestratorConfig = {
   enabled: true,

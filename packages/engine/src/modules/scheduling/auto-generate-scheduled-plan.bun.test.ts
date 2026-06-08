@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 
 const startAutoPlanMock = mock();
 mock.module("@/modules/plans/auto-generate-task-plan", () => ({

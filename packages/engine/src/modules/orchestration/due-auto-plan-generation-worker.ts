@@ -1,8 +1,5 @@
 import { db } from "@/lib/db";
-import {
-  autoGenerateScheduledPlanTasks,
-  type AutoGenerateScheduledPlanResult,
-} from "@/modules/scheduling/auto-generate-scheduled-plan";
+import { autoGenerateScheduledPlanTasks, type AutoGenerateScheduledPlanResult } from "@/modules/scheduling/auto-generate-scheduled-plan";
 import { recordOrchestratorEvent } from "./scheduler-events";
 
 type DueAutoPlanGenerationWorkerDeps = {

@@ -418,6 +418,7 @@ model TaskSession {
   updatedAt          DateTime @updatedAt
   task               Task     @relation("TaskSessions", fields: [taskId], references: [id], onDelete: Cascade)
   runs               Run[]
+  workBlock          WorkBlock? @relation("WorkBlockSession")
 
   @@index([taskId, createdAt])
   @@index([taskId, status])
@@ -634,6 +635,7 @@ model TaskPlanLayer {
 model Run {
   id                    String              @id @default(cuid())
   taskId                String
+  workBlockId           String?
   taskSessionId         String?
   runtimeName           String
   runtimeConfigSnapshot Json?
@@ -656,6 +658,7 @@ model Run {
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
   task                  Task                @relation(fields: [taskId], references: [id])
+  workBlock             WorkBlock?          @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   taskSession           TaskSession?        @relation(fields: [taskSessionId], references: [id], onDelete: SetNull)
   approvals             Approval[]
   artifacts             Artifact[]
@@ -667,6 +670,7 @@ model Run {
   runtimeCursor         RuntimeCursor?
 
   @@index([taskId, status])
+  @@index([taskId, workBlockId, status])
   @@index([taskSessionId, status])
   @@index([runtimeName, status])
 }
@@ -930,6 +934,8 @@ model TaskProjection {
   blockScope            String?
   blockSince            DateTime?
   actionRequired        String?
+  blockDetail           String?
+  blockNodeId           String?
   latestRunStatus       String?
   approvalPendingCount  Int       @default(0)
   dueAt                 DateTime?
@@ -1066,6 +1072,7 @@ model WorkBlock {
   id                String             @id @default(cuid())
   workspaceId       String
   taskId            String
+  sessionId         String?            @unique
   planId            String?
   recurrenceKey     String?
   title             String
@@ -1079,15 +1086,18 @@ model WorkBlock {
   updatedAt         DateTime           @updatedAt
   workspace         Workspace          @relation(fields: [workspaceId], references: [id])
   task              Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  session           TaskSession?       @relation("WorkBlockSession", fields: [sessionId], references: [id], onDelete: SetNull)
   taskPlans         TaskPlan[]
   taskPlanRuns      TaskPlanRun[]
   executionSessions ExecutionSession[]
+  runs              Run[]
   importedCalendarEvent ImportedCalendarEvent?
   events            Event[]
   timelineItems     TaskTimelineItem[]
 
   @@index([workspaceId, status])
   @@index([taskId, status])
+  @@index([sessionId])
   @@unique([taskId, recurrenceKey])
   @@index([workspaceId, scheduledStartAt])
 }

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import { getTaskActivityPage, getTaskPage } from "@/modules/tasks/get-task-page";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/plan-run-store";
+import { getTaskPage } from "@/modules/tasks/get-task-page";
+import { getTaskActivityPage } from "@/modules/tasks/task-activity";
+import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 
@@ -474,6 +475,43 @@ describe("getTaskPage orchestrator read model", () => {
     expect(page.reconciliation).toMatchObject({
       executionState: "completed",
     });
+  });
+
+  it("does not fabricate a block reason from a projection with no block fields", async () => {
+    const { workspace, task } = await seedTask("Completed occurrence without blocker");
+    const compiledPlan = makeCompiledPlan();
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      compiledPlan,
+      status: "accepted",
+      prompt: compiledPlan.title,
+      summary: compiledPlan.goal,
+      generatedBy: "orchestrator-test",
+    });
+    const graph = createPlanGraphFromCompiledPlan({ taskId: task.id, compiledPlan });
+    const results: NodeResult[] = graph.nodes.map((node) => ({
+      nodeId: node.id,
+      nodeLayerId: definitionLayerId(graph, node.id),
+      status: "current",
+      outputSummary: `${node.id} done`,
+    }));
+    await savePlanRun({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: compiledPlan.editablePlanId,
+      compiledPlan,
+      graph,
+      results,
+    });
+    // Projection is rebuilt with a currentNodeId but no block fields; the task is
+    // not Completed, so the stale-completed guard does not apply.
+    await rebuildTaskProjection(task.id);
+
+    const page = await getTaskPage(task.id);
+
+    expect(page.task.status).not.toBe("Completed");
+    expect(page.task.blockReason).toBeNull();
   });
 
   it("maps persisted provider events into structured activity items", async () => {

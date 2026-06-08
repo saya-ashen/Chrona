@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
-import { taskPlanExecution } from "@/modules/plan-execution";
+import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
 import { TaskPlanStatus } from "@/generated/prisma/client";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { appendCanonicalEvent } from "@/modules/events";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 import { AUTOMATION_TIMING_PRESETS, automationTimingOffsetMs } from "@chrona/contracts";
 

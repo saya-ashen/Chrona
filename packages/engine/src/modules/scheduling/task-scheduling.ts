@@ -3,7 +3,6 @@ import { autoStartScheduledPlanTasks } from "./auto-start-scheduled-plan";
 import { startAutoStartScheduler } from "./auto-start-runner";
 import { clearSchedule } from "./clear-schedule";
 import { decideScheduleProposal } from "./decide-schedule-proposal";
-import { getSchedulePage } from "./get-schedule-page";
 import { moveWorkBlock } from "./move-work-block";
 import { proposeSchedule } from "./propose-schedule";
 
@@ -27,11 +26,6 @@ export class TaskScheduling {
   decideProposal(input: Parameters<typeof decideScheduleProposal>[0]) {
     return decideScheduleProposal(input);
   }
-
-  getPage(input: { workspaceId: string }) {
-    return getSchedulePage(input.workspaceId);
-  }
-
   autoStartScheduledPlans() {
     return autoStartScheduledPlanTasks();
   }

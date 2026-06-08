@@ -2,6 +2,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { SYNC_STALE_MS } from "../../constants";
 import { deriveScheduleState, deriveTaskState } from "@chrona/domain";
+import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import { appendTaskWorkspaceEvent } from "./task-projection-events";
 
 
@@ -27,16 +28,37 @@ function pickProjectionWorkBlock(workBlocks: ProjectionWorkBlock[], now: Date) {
   return workBlocks.find((block) => block.status === "Completed") ?? null;
 }
 export async function rebuildTaskProjection(taskId: string) {
+  // The canonical occurrence this projection is about. Recurring tasks share a
+  // single Task row across many work-block occurrences; runs/sessions/approvals
+  // are scoped to this work block so a failed (or cancelled) occurrence never
+  // bleeds its state onto a sibling occurrence.
+  //
+  // The occurrence is whichever one most recently executed (its ExecutionSession
+  // in any state — Active/Paused/Completed/Abandoned — is the authoritative
+  // record of what ran). Before any run exists we fall back to the plan scope so
+  // a freshly-generated/accepted plan still projects against its work block.
+  const latestSession = await db.executionSession.findFirst({
+    where: { taskId },
+    orderBy: [{ updatedAt: "desc" }, { startedAt: "desc" }],
+    select: { workBlockId: true },
+  });
+  const scopeWorkBlockId = latestSession
+    ? latestSession.workBlockId
+    : await resolveScopeWorkBlockId(taskId);
+
   const task = await db.task.findUniqueOrThrow({
     where: { id: taskId },
     include: {
-      runs: { orderBy: { updatedAt: "desc" } },
-      approvals: { where: { status: "Pending" }, orderBy: { requestedAt: "desc" } },
+      runs: { where: { workBlockId: scopeWorkBlockId }, orderBy: { updatedAt: "desc" } },
+      approvals: {
+        where: { status: "Pending", run: { workBlockId: scopeWorkBlockId } },
+        orderBy: { requestedAt: "desc" },
+      },
       artifacts: { orderBy: { createdAt: "desc" }, take: 1 },
       scheduleProposals: { where: { status: "Pending" } },
       executionSessions: {
-        where: { status: { in: ["Active", "Paused"] } },
-        orderBy: { startedAt: "desc" },
+        where: { workBlockId: scopeWorkBlockId },
+        orderBy: [{ updatedAt: "desc" }, { startedAt: "desc" }],
         take: 1,
       },
       events: { orderBy: { ingestSequence: "desc" }, take: 1 },
@@ -57,22 +79,22 @@ export async function rebuildTaskProjection(taskId: string) {
   );
 
   const now = new Date();
-  const activeSession = task.executionSessions[0] ?? null;
+  const session = task.executionSessions[0] ?? null;
   const currentWorkBlock = pickProjectionWorkBlock(task.workBlocks, now);
   const latestEvent = task.events[0] ?? null;
-  const currentNode = activeSession?.currentNodeId && activeSession.planId
+  const currentNode = session?.currentNodeId && session.planId
     ? await db.taskPlanRun.findFirst({
         where: {
           taskId: task.id,
-          planId: activeSession.planId,
-          workBlockId: activeSession.workBlockId ?? null,
+          planId: session.planId,
+          workBlockId: session.workBlockId ?? null,
         },
         select: { planRun: true },
       })
     : null;
   const currentNodeTitle = currentNodeTitleFromPlanRun(
     currentNode?.planRun,
-    activeSession?.currentNodeId,
+    session?.currentNodeId,
   );
 
   const derived = deriveTaskState({
@@ -80,11 +102,11 @@ export async function rebuildTaskProjection(taskId: string) {
     runs: task.runs,
     approvals: task.approvals,
     sync: { stale: syncStale },
-    executionSession: activeSession
+    executionSession: session
       ? {
-          status: activeSession.status,
-          currentNodeId: activeSession.currentNodeId,
-          pauseReason: activeSession.pauseReason,
+          status: session.status,
+          currentNodeId: session.currentNodeId,
+          pauseReason: session.pauseReason,
         }
       : null,
   });
@@ -145,6 +167,8 @@ export async function rebuildTaskProjection(taskId: string) {
       blockScope: derived.blockReason?.scope ?? null,
       blockSince: derived.blockSince,
       actionRequired: derived.blockReason?.actionRequired ?? null,
+      blockDetail: derived.blockReason?.detail ?? null,
+      blockNodeId: derived.blockReason?.nodeId ?? null,
       latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
@@ -164,7 +188,7 @@ export async function rebuildTaskProjection(taskId: string) {
       latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
       blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
       blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
-      currentNodeId: activeSession?.currentNodeId ?? null,
+      currentNodeId: session?.currentNodeId ?? null,
       currentNodeTitle,
     },
     create: {
@@ -176,6 +200,8 @@ export async function rebuildTaskProjection(taskId: string) {
       blockScope: derived.blockReason?.scope ?? null,
       blockSince: derived.blockSince,
       actionRequired: derived.blockReason?.actionRequired ?? null,
+      blockDetail: derived.blockReason?.detail ?? null,
+      blockNodeId: derived.blockReason?.nodeId ?? null,
       latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
@@ -195,7 +221,7 @@ export async function rebuildTaskProjection(taskId: string) {
       latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
       blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
       blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
-      currentNodeId: activeSession?.currentNodeId ?? null,
+      currentNodeId: session?.currentNodeId ?? null,
       currentNodeTitle,
     },
   });

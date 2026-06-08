@@ -68,6 +68,86 @@ describe("deriveTaskState", () => {
     });
   });
 
+  it("clears a failed-run block once the retry session is actively executing", () => {
+    const result = deriveTaskState({
+      task: { status: "Blocked", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Failed", updatedAt }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: {
+        status: "Active",
+        currentNodeId: "cn_retry_1",
+        pauseReason: null,
+      },
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Running",
+      displayState: "ExecutionActive",
+      blockReason: null,
+      blockSince: null,
+    });
+  });
+
+  it("still reports a failed run as blocked when no session is active", () => {
+    const result = deriveTaskState({
+      task: { status: "Running", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Failed", updatedAt }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: null,
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Blocked",
+      blockReason: { blockType: "run_failed", scope: "run", actionRequired: "Retry Run" },
+    });
+  });
+
+  it("surfaces the real provider error and paused node in a failed-run block", () => {
+    const result = deriveTaskState({
+      task: { status: "Running", latestRunId: "run_1" },
+      runs: [
+        {
+          id: "run_1",
+          status: "Failed",
+          updatedAt,
+          errorSummary: "HTTP 502: provider connect timeout",
+        },
+      ],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: { status: "Paused", currentNodeId: "cn_answer", pauseReason: "manual_action" },
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Blocked",
+      blockReason: {
+        blockType: "run_failed",
+        scope: "run",
+        actionRequired: "Retry Run",
+        nodeId: "cn_answer",
+        detail: "HTTP 502: provider connect timeout",
+      },
+    });
+  });
+
+  it("reports an abandoned execution session as cancelled without a block", () => {
+    const result = deriveTaskState({
+      task: { status: "Running", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Failed", updatedAt, errorSummary: "irrelevant once cancelled" }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: { status: "Abandoned", currentNodeId: null, pauseReason: null },
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Cancelled",
+      blockReason: null,
+      blockSince: null,
+    });
+  });
+
   it("does not let stale running runs reopen a completed task", () => {
     expect(
       deriveTaskState({
