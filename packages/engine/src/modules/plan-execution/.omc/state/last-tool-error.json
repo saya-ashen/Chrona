@@ -1,7 +1,0 @@
-{
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/home/saya/workspace/Chrona/packages/engine/src/modules/plan-execution/packages/engine/src/modules/plan-execution/index.ts\"}",
-  "error": "File does not exist. Note: your current working directory is /home/saya/workspace/Chrona/packages/engine/src/modules/plan-execution.",
-  "timestamp": "2026-06-04T07:57:27.741Z",
-  "retry_count": 1
-}

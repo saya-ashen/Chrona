@@ -1,0 +1,175 @@
+---
+feature_doc_version: 1
+scope: "file"
+source: "task-activity.ts"
+owner_feature: "Task Management"
+owner_capability: "Task Activity"
+layer: "engine"
+status: "active"
+sync:
+  mode: "scaffold-and-check"
+  source_hash: "5f1150a133cffb92"
+  last_scanned_commit: ""
+symbols:
+  - id: "buildActivityTimeline"
+    source_name: "buildActivityTimeline"
+    kind: "function"
+    describe: true
+    reason: "ai-selected:pilot-task-management-activity-events"
+    status: "needs-ai-fill"
+  - id: "getTaskActivityPage"
+    source_name: "getTaskActivityPage"
+    kind: "function"
+    describe: true
+    reason: "ai-selected:pilot-task-management-activity-events"
+    status: "needs-ai-fill"
+tests:
+  direct:
+    - "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts"
+  transitive:
+    - "apps/server/src/__tests__/api/ai-client-crud.bun.test.ts"
+    - "apps/server/src/__tests__/api/ai-feature-binding.bun.test.ts"
+    - "apps/server/src/__tests__/api/external-calendar-events.bun.test.ts"
+    - "apps/server/src/__tests__/api/external-calendar-source-management.bun.test.ts"
+    - "apps/server/src/__tests__/api/external-calendar-sources.bun.test.ts"
+    - "apps/server/src/__tests__/api/external-task-edit-roundtrip.bun.test.ts"
+    - "apps/server/src/__tests__/api/plan-execution-module.bun.test.ts"
+    - "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts"
+    - "apps/server/src/__tests__/api/real-router-smoke.bun.test.ts"
+    - "apps/server/src/__tests__/api/task-assistant-message.bun.test.ts"
+    - "apps/server/src/__tests__/api/task-validation-workflow.bun.test.ts"
+    - "apps/server/src/__tests__/api/task-workflow.bun.test.ts"
+    - "apps/server/src/__tests__/api/task-workspace-activity.bun.test.ts"
+    - "apps/server/src/__tests__/api/task-workspace-chat.bun.test.ts"
+    - "apps/server/src/__tests__/api/task-workspace-console.bun.test.ts"
+    - "apps/server/src/__tests__/bootstrap-runtime.bun.test.ts"
+    - "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts"
+    - "apps/server/src/routes/__tests__/plan-operations.bun.test.ts"
+    - "apps/server/src/routes/tasks/runtime-event-summary.test.ts"
+    - "apps/web/src/__tests__/localized-child-loader-regression.test.tsx"
+    - "apps/web/src/__tests__/localized-root-index-route.test.tsx"
+    - "packages/engine/src/modules/agent-tools/operations.bun.test.ts"
+    - "packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts"
+    - "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts"
+coverage:
+  status: "unknown"
+  confidence: "low"
+---
+# task-activity
+
+## Purpose
+
+<!-- ai:purpose:start -->
+TODO: AI fill.
+<!-- ai:purpose:end -->
+
+## Generated symbol inventory
+
+<!-- generated:symbols:start -->
+| Symbol | Kind | Score | Reason | Signature |
+|---|---:|---:|---|---|
+| `buildActivityTimeline` | function | 5 | ai-selected:pilot-task-management-activity-events | `export function buildActivityTimeline(events: TaskActivityEvent[])` |
+| `getTaskActivityPage` | function | 6 | ai-selected:pilot-task-management-activity-events | `export async function getTaskActivityPage(input: TaskActivityPageInput)` |
+<!-- generated:symbols:end -->
+
+## Function docs
+
+<!-- symbol:buildActivityTimeline:start -->
+
+### `buildActivityTimeline`
+
+#### Role
+
+<!-- ai:role:start buildActivityTimeline -->
+TODO: AI fill.
+<!-- ai:role:end buildActivityTimeline -->
+
+#### Behavior
+
+<!-- ai:behavior:start buildActivityTimeline -->
+TODO: AI fill.
+<!-- ai:behavior:end buildActivityTimeline -->
+
+#### Inputs and outputs
+
+<!-- ai:io:start buildActivityTimeline -->
+TODO: AI fill.
+<!-- ai:io:end buildActivityTimeline -->
+
+#### Invariants
+
+<!-- ai:invariants:start buildActivityTimeline -->
+TODO: AI fill.
+<!-- ai:invariants:end buildActivityTimeline -->
+
+#### Test coverage
+
+<!-- generated:tests:start buildActivityTimeline -->
+Direct tests:
+- None found
+
+Transitive tests:
+- None found
+<!-- generated:tests:end buildActivityTimeline -->
+
+<!-- ai:test-assessment:start buildActivityTimeline -->
+Coverage status: Unknown
+
+Covered:
+- TODO
+
+Missing or weak:
+- TODO
+<!-- ai:test-assessment:end buildActivityTimeline -->
+
+<!-- symbol:buildActivityTimeline:end -->
+
+<!-- symbol:getTaskActivityPage:start -->
+
+### `getTaskActivityPage`
+
+#### Role
+
+<!-- ai:role:start getTaskActivityPage -->
+TODO: AI fill.
+<!-- ai:role:end getTaskActivityPage -->
+
+#### Behavior
+
+<!-- ai:behavior:start getTaskActivityPage -->
+TODO: AI fill.
+<!-- ai:behavior:end getTaskActivityPage -->
+
+#### Inputs and outputs
+
+<!-- ai:io:start getTaskActivityPage -->
+TODO: AI fill.
+<!-- ai:io:end getTaskActivityPage -->
+
+#### Invariants
+
+<!-- ai:invariants:start getTaskActivityPage -->
+TODO: AI fill.
+<!-- ai:invariants:end getTaskActivityPage -->
+
+#### Test coverage
+
+<!-- generated:tests:start getTaskActivityPage -->
+Direct tests:
+- packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts
+
+Transitive tests:
+- None found
+<!-- generated:tests:end getTaskActivityPage -->
+
+<!-- ai:test-assessment:start getTaskActivityPage -->
+Coverage status: Unknown
+
+Covered:
+- TODO
+
+Missing or weak:
+- TODO
+<!-- ai:test-assessment:end getTaskActivityPage -->
+
+<!-- symbol:getTaskActivityPage:end -->

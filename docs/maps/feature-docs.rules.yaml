@@ -1,0 +1,178 @@
+version: 1
+
+document:
+  file_suffix: ".feature.md"
+  module_file_name: "MODULE.feature.md"
+  front_matter_required: true
+
+source:
+  include_globs:
+    - "apps/**/*.ts"
+    - "apps/**/*.tsx"
+    - "packages/**/*.ts"
+    - "packages/**/*.tsx"
+    - "external-plugins/**/*.ts"
+  exclude_globs:
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.bun.test.ts"
+    - "**/*.spec.ts"
+    - "**/dist/**"
+    - "**/generated/**"
+    - "**/node_modules/**"
+
+exclude:
+  path_globs:
+    - "**/index.ts"
+    - "**/index.tsx"
+  symbol_kinds:
+    - "type"
+    - "interface"
+  symbol_name_patterns:
+    - "^_"
+    - "Props$"
+    - "State$"
+
+score:
+  exported: 3
+  route_handler: 3
+  engine_use_case: 3
+  writes_database: 3
+  emits_event: 2
+  rebuilds_projection: 2
+  provider_boundary: 2
+  graph_transition: 2
+  public_component: 2
+  has_direct_tests: 1
+  internal_helper: -2
+  type_only: -4
+  barrel_export: -4
+
+# AI-owned allowlist. Default mode is explicit: no source file is documented
+# until an AI/human reviews a scoped area and writes chosen files/symbols here.
+# Use `bun run feature-docs:select --path <area>` to print candidate YAML,
+# then keep only entries worth documenting.
+selection:
+  mode: "explicit"
+  files:
+    - path: "packages/engine/src/modules/tasks/accept-task-result.ts"
+      reason: "pilot-task-management-result-flow"
+      symbols:
+        - "acceptTaskResult"
+    - path: "packages/engine/src/modules/tasks/create-task.ts"
+      reason: "pilot-task-management-create-use-case"
+      symbols:
+        - "createTask"
+    - path: "packages/engine/src/modules/tasks/delete-task.ts"
+      reason: "pilot-task-management-delete-use-case"
+      symbols:
+        - "deleteTask"
+    - path: "packages/engine/src/modules/tasks/get-task-page.ts"
+      reason: "pilot-task-management-page-read-model"
+      symbols:
+        - "getTaskPage"
+    - path: "packages/engine/src/modules/tasks/list-tasks.ts"
+      reason: "pilot-task-management-list-use-case"
+      symbols:
+        - "listTasksByWorkspace"
+    - path: "packages/engine/src/modules/tasks/mark-task-done.ts"
+      reason: "pilot-task-management-lifecycle-use-case"
+      symbols:
+        - "markTaskDone"
+    - path: "packages/engine/src/modules/tasks/reopen-task.ts"
+      reason: "pilot-task-management-lifecycle-use-case"
+      symbols:
+        - "reopenTask"
+    - path: "packages/engine/src/modules/tasks/task-activity.ts"
+      reason: "pilot-task-management-activity-events"
+      symbols:
+        - "buildActivityTimeline"
+        - "getTaskActivityPage"
+    - path: "packages/engine/src/modules/tasks/update-task.ts"
+      reason: "pilot-task-management-update-use-case"
+      symbols:
+        - "updateTask"
+
+    - path: "apps/server/src/routes/calendar-sources.routes.ts"
+      reason: "external-calendar-api-route"
+      symbols:
+        - "createCalendarSourceRoutes"
+    - path: "apps/server/src/services/external-calendar-service.ts"
+      reason: "external-calendar-refresh-service"
+      symbols:
+        - "createExternalCalendarService"
+    - path: "apps/web/src/components/schedule/calendar-source-actions.tsx"
+      reason: "external-calendar-source-management-ui"
+      symbols:
+        - "CalendarSourceActions"
+    - path: "apps/web/src/components/schedule/calendar-source-list.tsx"
+      reason: "external-calendar-source-management-ui"
+      symbols:
+        - "CalendarSourceList"
+    - path: "apps/web/src/components/schedule/calendar-source-setup.tsx"
+      reason: "external-calendar-source-setup-ui"
+      symbols:
+        - "CalendarSourceSetup"
+    - path: "apps/web/src/components/schedule/external-calendar-event-block.tsx"
+      reason: "external-calendar-schedule-visibility-ui"
+      symbols:
+        - "ExternalCalendarEventBlock"
+    - path: "packages/contracts/src/external-calendar.ts"
+      reason: "external-calendar-public-contracts"
+      symbols:
+        - "calendarSourceSummarySchema"
+        - "calendarSyncStatusSchema"
+        - "importedCalendarEventSummarySchema"
+        - "validateCalendarSourceResponseSchema"
+        - "createCalendarSourceRequestSchema"
+        - "updateCalendarSourceRequestSchema"
+    - path: "packages/db/src/external-calendar.ts"
+      reason: "external-calendar-persistence-boundary"
+      symbols:
+        - "createCalendarSource"
+        - "listImportedCalendarEventsInRange"
+        - "markCalendarSourceRemoved"
+        - "replaceImportedCalendarEvents"
+        - "updateCalendarSource"
+        - "updateCalendarSourceSyncStatus"
+    - path: "packages/domain/src/calendar/normalize-imported-events.ts"
+      reason: "external-calendar-event-normalization"
+      symbols:
+        - "normalizeImportedEvents"
+    - path: "packages/domain/src/calendar/planning-busy-blocks.ts"
+      reason: "external-calendar-planning-busy-blocks"
+      symbols:
+        - "projectPlanningBusyBlocks"
+    - path: "packages/integrations/src/calendar/normalizer.ts"
+      reason: "external-calendar-feed-parser"
+      symbols:
+        - "parseICalendarFeed"
+    - path: "packages/integrations/src/calendar/recurrence.ts"
+      reason: "external-calendar-recurrence-expansion"
+      symbols:
+        - "expandRecurrenceRule"
+    - path: "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts"
+      reason: "plan-execution-provider-runtime-boundary"
+      symbols:
+        - "AiRuntimeInvoker"
+        - "runProviderRequest"
+    - path: "packages/engine/src/modules/plan-execution/execution-state-machine.ts"
+      reason: "plan-execution-state-transitions"
+      symbols:
+        - "executionStatusFromEffectiveGraph"
+        - "executionStatusFromGraphOutcome"
+        - "executionTransition"
+        - "graphStatusForExecutionStatus"
+    - path: "packages/engine/src/modules/plan-execution/kernel/execute-command.ts"
+      reason: "plan-execution-command-kernel"
+      symbols:
+        - "executeCommand"
+    - path: "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts"
+      reason: "plan-execution-graph-mutation-callbacks"
+      symbols:
+        - "createKernelGraphCallbacks"
+    - path: "packages/engine/src/modules/orchestration/task-orchestrator.ts"
+      reason: "task-orchestration-runtime-loop"
+      symbols:
+        - "createTaskOrchestrator"
+describe_threshold: 5
