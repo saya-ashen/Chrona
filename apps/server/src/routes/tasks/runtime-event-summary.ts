@@ -1,7 +1,7 @@
 import type { PlanExecutionSSEEvent } from "@chrona/contracts";
 import type { ExecutionActionType } from "@chrona/contracts/ai";
 import type { CheckpointActionKind } from "@chrona/contracts/ai";
-import type { PlanExecutionRuntimeEvent } from "@chrona/engine/modules/plan-execution";
+import type { PlanExecutionRuntimeEvent } from "@chrona/engine";
 
 type RuntimeSummaryBase = Omit<Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>, "event">;
 
@@ -36,7 +36,7 @@ export function summarizeRuntimeEvent(
     runId: providerEvent.runId,
     nativeRunId: providerEvent.nativeRunId,
     sequence: providerEvent.sequence,
-    timestamp: providerEvent.timestamp,
+    timestamp: providerEvent.timestamp ?? new Date().toISOString(),
     rawEventType: providerEvent.rawEventType,
   };
 

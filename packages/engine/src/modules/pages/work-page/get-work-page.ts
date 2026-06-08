@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getAcceptedCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import { getAcceptedCompiledPlan, getLatestCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import { resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
 import { WorkPageTaskNotFoundError, DEFAULT_COPY } from "./types";

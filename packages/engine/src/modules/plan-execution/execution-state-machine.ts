@@ -1,4 +1,3 @@
-import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import type { GraphDispatchOutcome } from "@chrona/graph-runtime";
 import type {
   EffectivePlanGraph,
@@ -12,12 +11,10 @@ export type ExecutionPauseReason = WaitKind;
 
 export type ExecutionTransition = {
   status: PlanExecutionStatus;
-  taskStatus: TaskStatus;
   sessionStatus: "Active" | "Paused" | "Completed" | "Abandoned";
   planRunStatus: PlanRun["status"];
   graphStatus: PlanGraph["status"];
   pauseReason: ExecutionPauseReason | null;
-  blockReason: Prisma.InputJsonValue | typeof Prisma.DbNull;
 };
 
 export function executionStatusFromEffectiveGraph(
@@ -49,7 +46,6 @@ export function executionStatusFromEffectiveGraph(
 
   return "blocked";
 }
-
 export function executionStatusFromWaitKind(waitKind: WaitKind | undefined): PlanExecutionStatus {
   switch (waitKind) {
     case undefined:
@@ -104,27 +100,6 @@ export function pauseReasonFromExecutionStatus(
   }
 }
 
-export function taskStatusForExecutionStatus(status: PlanExecutionStatus): TaskStatus {
-  switch (status) {
-    case "started":
-    case "no_plan":
-    case "running":
-      return TaskStatus.Running;
-    case "waiting_for_user":
-      return TaskStatus.WaitingForInput;
-    case "waiting_for_approval":
-      return TaskStatus.WaitingForApproval;
-    case "blocked":
-      return TaskStatus.Blocked;
-    case "failed":
-      return TaskStatus.Failed;
-    case "completed":
-      return TaskStatus.Completed;
-    case "cancelled":
-      return TaskStatus.Cancelled;
-  }
-}
-
 export function planRunStatusForExecutionStatus(status: PlanExecutionStatus): PlanRun["status"] {
   switch (status) {
     case "started":
@@ -166,23 +141,14 @@ export function graphStatusForExecutionStatus(status: PlanExecutionStatus): Plan
 export function executionTransition(input: {
   status: PlanExecutionStatus;
   pauseReason?: WaitKind | null;
-  message?: string;
-  nodeId?: string | null;
 }): ExecutionTransition {
   const pauseReason = pauseReasonFromExecutionStatus(input.status, input.pauseReason ?? undefined);
   return {
     status: input.status,
-    taskStatus: taskStatusForExecutionStatus(input.status),
     sessionStatus: sessionStatusForExecutionStatus(input.status),
     planRunStatus: planRunStatusForExecutionStatus(input.status),
     graphStatus: graphStatusForExecutionStatus(input.status),
     pauseReason,
-    blockReason: blockReasonForExecutionStatus({
-      status: input.status,
-      pauseReason,
-      message: input.message,
-      nodeId: input.nodeId,
-    }),
   };
 }
 
@@ -203,65 +169,5 @@ function sessionStatusForExecutionStatus(
     case "blocked":
     case "failed":
       return "Paused";
-  }
-}
-
-function blockReasonForExecutionStatus(input: {
-  status: PlanExecutionStatus;
-  pauseReason: ExecutionPauseReason | null;
-  message?: string;
-  nodeId?: string | null;
-}): ExecutionTransition["blockReason"] {
-  switch (input.status) {
-    case "waiting_for_user":
-      return planNodeBlockReason("human_input_required", input, "Provide input");
-    case "waiting_for_approval":
-      return planNodeBlockReason(approvalBlockType(input.pauseReason), input, "Review step output");
-    case "blocked":
-      return planNodeBlockReason(blockedBlockType(input.pauseReason), input, "Resolve blocked node");
-    case "failed":
-      return planNodeBlockReason("node_failed", input, "Retry or replan failed node");
-    case "running":
-    case "completed":
-    case "cancelled":
-    case "started":
-    case "no_plan":
-      return Prisma.DbNull;
-  }
-}
-
-function planNodeBlockReason(
-  blockType: string,
-  input: {
-    message?: string;
-    nodeId?: string | null;
-  },
-  fallbackAction: string,
-) {
-  return {
-    blockType,
-    scope: "plan_node",
-    actionRequired: input.message ?? fallbackAction,
-    nodeId: input.nodeId ?? undefined,
-  };
-}
-
-function approvalBlockType(pauseReason: ExecutionPauseReason | null) {
-  return pauseReason === "replan_required" ? "replan_required" : "approval_required";
-}
-
-function blockedBlockType(pauseReason: ExecutionPauseReason | null) {
-  switch (pauseReason) {
-    case "capability_unavailable":
-      return "capability_unavailable";
-    case "external_dependency":
-      return "external_dependency";
-    case "manual_action":
-    case null:
-    case "user_input":
-    case "approval":
-    case "review":
-    case "replan_required":
-      return "node_blocked";
   }
 }

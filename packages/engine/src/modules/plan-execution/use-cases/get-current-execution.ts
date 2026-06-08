@@ -6,7 +6,7 @@ import type {
   WaitKind,
 } from "@chrona/contracts/ai";
 import { executionStatusFromEffectiveGraph } from "../execution-state-machine";
-import { ensurePlanMainSession } from "../plan-state-store";
+import { ensurePlanMainSession } from "../persistence/plan-state-store";
 import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
 import { currentNodeFromEffective } from "../projection/execution-graph-selectors";
 import { buildExecutionResponse } from "../projection/execution-response";

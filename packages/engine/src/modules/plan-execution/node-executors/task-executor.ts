@@ -1,7 +1,7 @@
 import type { EffectivePlanNode } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
-import { executeTaskNodeCapability } from "../node-ai-capabilities";
+import { executeTaskNodeCapability } from "../runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 
 export class TaskNodeExecutor implements NodeExecutor {

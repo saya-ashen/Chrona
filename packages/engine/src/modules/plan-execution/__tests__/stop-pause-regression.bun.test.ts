@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import { getPlanRun } from "@/modules/plan-execution/plan-run-store";
+import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import {
   executeTaskNodeCapabilityMock,
   makeTwoTaskPlan,

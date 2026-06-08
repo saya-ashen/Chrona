@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
-import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/compiled-plan-store";
+import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
 import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
 import { createApiRouter } from "../../routes/api";

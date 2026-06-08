@@ -2,7 +2,8 @@ import {
   getAcceptedCompiledPlan,
   getLatestPlanScope,
   type SavedCompiledPlan,
-} from "../compiled-plan-store";
+} from "./compiled-plan-store";
+import { db } from "@/lib/db";
 import { getActiveExecutionSessionScope } from "./execution-session-store";
 
 /**
@@ -45,6 +46,25 @@ export async function resolveExecutionScope(
 ): Promise<ExecutionScope> {
   if (typeof hint?.workBlockId === "string" && hint.workBlockId.length > 0) {
     return { workBlockId: hint.workBlockId, planId: null, executionSessionId: null };
+  }
+
+  if (typeof hint?.sessionId === "string" && hint.sessionId.length > 0) {
+    const session = await db.taskSession.findFirst({
+      where: {
+        taskId,
+        OR: [{ id: hint.sessionId }, { sessionKey: hint.sessionId }],
+      },
+      select: { id: true },
+    });
+    const workBlock = session
+      ? await db.workBlock.findFirst({
+          where: { taskId, sessionId: session.id },
+          select: { id: true, planId: true },
+        })
+      : null;
+    if (workBlock) {
+      return { workBlockId: workBlock.id, planId: workBlock.planId, executionSessionId: null };
+    }
   }
 
   const active = await getActiveExecutionSessionScope(taskId);

@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { EffectivePlanGraph, EffectivePlanNode, NodeAttempt } from "@chrona/contracts/ai";
-import { runTaskNodeFeature } from "./node-ai-capabilities";
+import { runTaskNodeFeature } from "./runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "./ai-runtime-invoker";
 
 function makeTaskNode(): EffectivePlanNode {
@@ -285,7 +285,7 @@ describe("runTaskNodeFeature", () => {
           sessionId: "main-session",
           status: "completed" as const,
           outputText: "Task complete",
-          structuredPayload: { outputs: [{ kind: "markdown", content: "Task complete" }] },
+          structuredPayload: { outputs: [{ root: "root", elements: { root: { type: "Markdown", props: { content: "Task complete" } } } }] },
           raw: { terminalToolName: "chrona_node_complete" },
           error: null,
         },
@@ -318,7 +318,7 @@ describe("runTaskNodeFeature", () => {
     expect(result).toMatchObject({
       status: "done",
       summary: "Task complete",
-      output: [{ kind: "markdown", content: "Task complete" }],
+      output: [{ root: "root", elements: { root: { type: "Markdown", props: { content: "Task complete" } } } }],
     });
   });
   it("fails provider branchRef structured payload without condition terminal tool", async () => {
@@ -372,7 +372,7 @@ describe("runTaskNodeFeature", () => {
           structuredPayload: {
             branchRef: "B20260522-01-B",
             summary: "Needs fixes selected",
-            outputs: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
+            outputs: [{ root: "root", elements: { root: { type: "Markdown", props: { content: "Fix JSONDecodeError ordering." } } } }],
           },
           error: null,
         },
@@ -459,7 +459,7 @@ describe("runTaskNodeFeature", () => {
           structuredPayload: {
             branchRef,
             summary: "Needs fixes selected",
-            outputs: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
+            outputs: [{ root: "root", elements: { root: { type: "Markdown", props: { content: "Fix JSONDecodeError ordering." } } } }],
           },
           raw: { terminalToolName: "chrona_condition_select" },
           error: null,
@@ -492,7 +492,7 @@ describe("runTaskNodeFeature", () => {
     expect(result).toMatchObject({
       status: "done",
       summary: "Needs fixes selected",
-      output: [{ kind: "markdown", content: "Fix JSONDecodeError ordering." }],
+      output: [{ root: "root", elements: { root: { type: "Markdown", props: { content: "Fix JSONDecodeError ordering." } } } }],
       selectedBranch: {
         label: "Needs fixes",
         nextNodeId: "fix_node",

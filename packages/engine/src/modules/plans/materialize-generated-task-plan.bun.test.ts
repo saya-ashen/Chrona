@@ -5,8 +5,8 @@ import type { PlanBlueprint } from "@chrona/contracts";
 import { isEngineError } from "../../errors";
 
 import { materializeGeneratedTaskPlan } from "./materialize-generated-task-plan";
-import { saveCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
-import { getPlanRun, savePlanRun } from "@/modules/plan-execution/plan-run-store";
+import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { getPlanRun, savePlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 
 function blueprint(title: string): PlanBlueprint {
@@ -31,8 +31,8 @@ async function resetDb() {
   await db.taskPlan.deleteMany();
   await db.event.deleteMany();
   await db.taskProjection.deleteMany();
-  await db.taskSession.deleteMany();
   await db.workBlock.deleteMany();
+  await db.taskSession.deleteMany();
   await db.task.deleteMany();
   await db.workspace.deleteMany();
 }

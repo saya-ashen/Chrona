@@ -18,16 +18,9 @@ import type {
   WaitTimeoutAction,
 } from "@chrona/contracts";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
-import {
-  getAcceptedCompiledPlan,
-  getLatestCompiledPlan,
-  type SavedCompiledPlan,
-} from "@/modules/plan-execution/compiled-plan-store";
+import { getAcceptedCompiledPlan, getLatestCompiledPlan, type SavedCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
-import {
-  createPlanGraphFromCompiledPlan,
-  getPlanRun,
-} from "@/modules/plan-execution/plan-run-store";
+import { createPlanGraphFromCompiledPlan, getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 
 /**
  * Builds the canonical frontend-facing read model from persisted plan data.

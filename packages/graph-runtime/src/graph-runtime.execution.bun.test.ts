@@ -188,7 +188,7 @@ describe("graph-runtime execution", () => {
         status: "done",
         summary: "External run completed",
         evidence: { runId: "run_1" },
-        output: [{ kind: "json", value: { selected: "yes" } }],
+        output: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { selected: "yes" } } } } }],
         selectedBranch: { label: "yes", nextNodeId: "done", source: "system" },
       },
     });
@@ -202,7 +202,7 @@ describe("graph-runtime execution", () => {
     ]);
     expect(second.state.results[1]).toMatchObject({
       evidence: { runId: "run_1" },
-      outputs: [{ kind: "json", value: { selected: "yes" } }],
+      outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { selected: "yes" } } } } }],
     });
     expect(second.events.map((event) => event.type)).toEqual([
       "command_received",
@@ -384,12 +384,7 @@ describe("graph-runtime execution", () => {
           attemptId: "attempt_left_1",
           status: "current",
           outputSummary: "Provider returned final output but terminal tool submission failed",
-          outputs: [
-            {
-              kind: "markdown",
-              content: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
-            },
-          ],
+          outputs: undefined,
         },
       ],
     });

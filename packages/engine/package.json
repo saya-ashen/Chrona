@@ -13,7 +13,8 @@
     "@chrona/providers-debug": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
     "@chrona/shared": "workspace:*",
-    "@chrona/runtime-core": "workspace:*"
+    "@chrona/runtime-core": "workspace:*",
+    "@chrona/ui-protocol": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts"

@@ -4,7 +4,7 @@ import type { Context } from "hono";
 
 import { db } from "@chrona/db";
 import type { TaskPlan } from "@chrona/db/generated/prisma/client";
-import { getLatestCompiledPlan, saveCompiledPlan } from "@chrona/engine/modules/plan-execution/compiled-plan-store";
+import { getLatestCompiledPlan, saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
 import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/plans/task-plan-read-model";
 import type { CompiledPlan } from "@chrona/contracts/ai";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";

@@ -17,7 +17,7 @@ import type { EffectivePlanGraph } from "@chrona/contracts/ai";
 import type {
   GraphExecutionEvent,
   PlanExecutionRuntimeEvent,
-} from "@chrona/engine/modules/plan-execution";
+} from "@chrona/engine";
 
 import { error, toHttpError } from "../../lib/http";
 import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "./runtime-event-summary";

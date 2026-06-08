@@ -1,11 +1,11 @@
-import { taskScheduling } from "@/modules/scheduling";
+import { getSchedulePage } from "./get-schedule-page";
 import { getInbox } from "./get-inbox";
 import { getMemoryConsole } from "./get-memory-console";
 import { getWorkPage } from "./work-page";
 
 export class PageQuery {
   getSchedule(input: { workspaceId: string }) {
-    return taskScheduling.getPage(input);
+    return getSchedulePage(input.workspaceId);
   }
 
   getInbox(input: { workspaceId: string }) {

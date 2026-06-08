@@ -1,6 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { aiClientRegistry } from "@/modules/ai/runtime/client-registry";
+import { aiClientRegistry } from "@/modules/ai";
 import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { syncPlanRunRuntimeResult } from "../../kernel/sync-runtime-result";
 

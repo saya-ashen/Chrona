@@ -1,11 +1,10 @@
 import { db } from "@/lib/db";
-import { aiGeneratePlanStream } from "@/modules/ai/runtime/ai-service";
-import { appendCanonicalEvent } from "@/modules/events/append-canonical-event";
+import { aiGeneratePlanStream } from "@/modules/ai";
+import { appendCanonicalEvent } from "@/modules/events";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
-import { ensureDefaultTaskSession } from "@/modules/task-execution/task-sessions";
-import { resolveExecutionRuntime } from "@/modules/task-execution/registry";
+import { ensureDefaultTaskSession, ensureWorkBlockTaskSession, resolveExecutionRuntime } from "@/modules/execution-runtime";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
-import { updateLatestCompiledPlanPrompt } from "@/modules/plan-execution/compiled-plan-store";
+import { updateLatestCompiledPlanPrompt } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
 import type { GeneratePlanSSEEvent, PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts";
 import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
@@ -132,6 +131,7 @@ async function recordPlanGenerationEvent(input: {
       generation_id: input.generationId,
       ...(input.payload ?? {}),
     },
+    occurredAt: new Date(),
     dedupeKey: [
       "plan_generation",
       input.task.id,
@@ -246,9 +246,16 @@ export async function* generateTaskPlanManualStream(input: {
     where: { id: input.taskId },
     include: {
       workBlocks: {
-        where: { status: { in: ["Scheduled", "Active"] } },
+        where: input.workBlockId
+          ? { id: input.workBlockId }
+          : { status: { in: ["Scheduled", "Active"] } },
         orderBy: { scheduledStartAt: "asc" },
         take: 1,
+      },
+      importedCalendarEvents: {
+        orderBy: { startsAt: "asc" },
+        take: 1,
+        select: { description: true },
       },
     },
   });
@@ -291,20 +298,27 @@ export async function* generateTaskPlanManualStream(input: {
   await dump?.write({ type: "yield", event: summarizeGeneratePlanEvent(loadingEvent) });
   yield loadingEvent;
 
-  const taskSessionKey = (
-    await ensureDefaultTaskSession({
-      taskId: task.id,
-      taskTitle: task.title,
-      runtimeName: resolveExecutionRuntime({
-        executionRuntime: task.executionRuntime,
-      }),
-      defaultSessionId: task.defaultSessionId,
-      suffix: "plan-graph",
-      label: `${task.title} · Plan graph generation session`,
-    })
-  ).sessionKey;
-
   const currentWorkBlock = task.workBlocks[0] ?? null;
+  const runtimeName = resolveExecutionRuntime({
+    executionRuntime: task.executionRuntime,
+  });
+  const taskSessionKey = currentWorkBlock
+    ? (await ensureWorkBlockTaskSession({
+        taskId: task.id,
+        taskTitle: task.title,
+        runtimeName,
+        workBlockId: currentWorkBlock.id,
+        sessionId: currentWorkBlock.sessionId,
+        label: `${task.title} · Work block plan generation session`,
+      })).sessionKey
+    : (await ensureDefaultTaskSession({
+        taskId: task.id,
+        taskTitle: task.title,
+        runtimeName,
+        defaultSessionId: task.defaultSessionId,
+        suffix: "plan-graph",
+        label: `${task.title} · Plan graph generation session`,
+      })).sessionKey;
   const estimatedMinutes =
     currentWorkBlock?.scheduledStartAt && currentWorkBlock.scheduledEndAt
       ? Math.round(
@@ -355,6 +369,7 @@ export async function* generateTaskPlanManualStream(input: {
     taskId: task.id,
     title: task.title,
     description: task.description ?? undefined,
+    sourceContext: task.importedCalendarEvents[0]?.description ?? undefined,
     estimatedMinutes,
     userInstruction,
     sessionKey: taskSessionKey,

@@ -145,30 +145,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isNodeResultOutput(value: unknown): value is NodeResultOutput {
-  if (!isRecord(value) || typeof value.kind !== "string") return false;
-  switch (value.kind) {
-    case "markdown":
-      return typeof value.content === "string";
-    case "json":
-      return "value" in value;
-    case "file":
-      return typeof value.path === "string";
-    case "link":
-      return typeof value.href === "string" && typeof value.title === "string";
-    default:
-      return false;
-  }
+  if (!isRecord(value)) return false;
+  if (typeof value.root === "string" && isRecord(value.elements)) return true;
+  return false;
 }
 
-export function normalizeResultOutputs(output: unknown): NodeResultOutput[] | undefined {
+function assertResultOutputs(output: unknown): NodeResultOutput[] | undefined {
   if (output === undefined || output === null) return undefined;
   if (Array.isArray(output) && output.every(isNodeResultOutput)) return output;
   if (isRecord(output) && Array.isArray(output.outputs) && output.outputs.every(isNodeResultOutput)) {
     return output.outputs;
   }
   if (isNodeResultOutput(output)) return [output];
-  if (typeof output === "string") return [{ kind: "markdown", content: output }];
-  return [{ kind: "json", value: output }];
+  throw new Error("Node result output must be a json-render Spec ({ root, elements }). Legacy kind-based outputs are not supported.");
+}
+
+export function normalizeResultOutputs(output: unknown): NodeResultOutput[] | undefined {
+  return assertResultOutputs(output);
 }
 
 export function getPauseKind(result: GraphNodeExecutionResult): WaitKind | null {

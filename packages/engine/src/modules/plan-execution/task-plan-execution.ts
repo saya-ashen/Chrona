@@ -21,7 +21,7 @@ import type {
   PlanExecutionObserver,
 } from "./types";
 import { ensureNativePlanRun } from "./persistence/plan-runtime-store";
-import { ensurePlanMainSession } from "./plan-state-store";
+import { ensurePlanMainSession } from "./persistence/plan-state-store";
 import { currentNodeFromEffective } from "./projection/execution-graph-selectors";
 import { executeCommand } from "./kernel/execute-command";
 import { resolveCheckpointTransition } from "./use-cases/checkpoint-transition/resolve-checkpoint-transition";

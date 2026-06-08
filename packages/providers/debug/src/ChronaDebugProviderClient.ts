@@ -439,8 +439,13 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
           summary: `Debug provider produced output for ${title}.`,
           outputs: [
             {
-              kind: "json",
-              value: { provider: this.provider, nodeTitle: title },
+              root: "root",
+              elements: {
+                root: {
+                  type: "JsonView",
+                  props: { value: { provider: this.provider, nodeTitle: title } },
+                },
+              },
             },
           ],
         },

@@ -1,6 +1,6 @@
 import type { GraphExecutionState } from "@chrona/graph-runtime";
 import type { NodeAttempt, NodeResult } from "@chrona/contracts/ai";
-import { getPlanRun } from "../plan-run-store";
+import { getPlanRun } from "../persistence/plan-run-store";
 
 function hasCurrentNodeResult(input: {
   results: NodeResult[];

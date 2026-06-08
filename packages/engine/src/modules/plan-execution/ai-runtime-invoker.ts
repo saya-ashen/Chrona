@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import {
   appendCanonicalEvent,
   appendRawEventLog,
-} from "@/modules/events/append-canonical-event";
+} from "@/modules/events";
 import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
 import type { NodeAttempt } from "@chrona/contracts/ai";
 import type {
@@ -14,7 +14,7 @@ import type {
   ProviderRunRef,
   StartRunInput,
 } from "@chrona/providers-foundation";
-import { requireAiClient } from "../ai/runtime/client-resolution";
+import { requireAiClient } from "@/modules/ai";
 
 type ProviderChatHistory = {
   messages: Array<{ role: string; content: string }>;
@@ -66,9 +66,26 @@ const TRANSIENT_PROVIDER_ERROR_CODES = new Set([
   "network_error",
   "provider_error",
   "rate_limited",
+  "incomplete_stream",
 ]);
 
 const PROVIDER_RETRY_BACKOFF_MS = 1_000;
+
+/**
+ * Raised when a provider event stream ends (cleanly or via an interrupted
+ * socket) without emitting a terminal run event. Marked retryable so the
+ * caller reconnects and, failing that, reconciles the authoritative run state
+ * via getRun instead of falsely recording the run as failed.
+ */
+class IncompleteRunStreamError extends Error {
+  readonly code = "incomplete_stream";
+  readonly retryable = true;
+
+  constructor() {
+    super("Provider run stream ended without a terminal event");
+    this.name = "IncompleteRunStreamError";
+  }
+}
 
 export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
@@ -79,6 +96,7 @@ export class AiRuntimeInvoker {
     const run = await db.run.create({
       data: {
         taskId: input.taskId,
+        workBlockId: input.workBlockId ?? null,
         taskSessionId: input.taskSessionId,
         runtimeName: input.runtimeName,
         runtimeSessionRef: input.runtimeSessionKey,
@@ -205,7 +223,7 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
   };
 }
 
-async function runProviderRequest(
+export async function runProviderRequest(
   providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
   request: ExecutionProviderRequest,
   options: {
@@ -222,7 +240,7 @@ async function runProviderRequest(
   const idempotencyKey = options.idempotencyKey ?? (options.runId
     ? `chrona-runtime:${options.runId}`
     : undefined);
-  let run = await providerClient.startRun({
+  const run = await providerClient.startRun({
     ...startInput,
     signal: options.signal,
     idempotencyKey,
@@ -241,6 +259,7 @@ async function runProviderRequest(
         runId: run.runId,
         sessionId: run.sessionId,
         signal: options.signal,
+        include: { rawEvents: true },
       }),
       run.sessionId,
       run,
@@ -257,6 +276,7 @@ async function runProviderRequest(
           runId: run.runId,
           sessionId: run.sessionId,
           signal: options.signal,
+          include: { rawEvents: true },
         }),
         run.sessionId,
         run,
@@ -266,28 +286,37 @@ async function runProviderRequest(
       if (!isTransientProviderError(resumeError)) throw resumeError;
     }
 
-    run = await providerClient.startRun({
-      ...startInput,
-      signal: options.signal,
-      idempotencyKey,
-    } as StartRunInput & { idempotencyKey?: string });
-    await persistRuntimeRunRef(options.runId, run);
-    await updateProviderRunRecord(options.providerRunRecordId, {
-      providerRunRef: run.nativeRunId ?? run.runId,
-      nativeRunId: run.nativeRunId ?? null,
-      status: run.status ?? "running",
+    // Reconnect failed. Rather than assume the run failed, poll the
+    // authoritative run state. The run may still be executing on the provider
+    // (keep it Running for the recovery worker) or may have already finished
+    // while our stream was severed (finalize from the snapshot).
+    return reconcileInterruptedRun(providerClient, run, options.signal);
+  }
+}
+
+async function reconcileInterruptedRun(
+  providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
+  run: ProviderRunRef,
+  signal?: AbortSignal,
+): Promise<ProviderRunSnapshot> {
+  try {
+    return await providerClient.getRun({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      signal,
     });
-    return collectProviderRunSnapshot(
-      providerClient.provider,
-      providerClient.streamRun({
-        runId: run.runId,
-        sessionId: run.sessionId,
-        signal: options.signal,
-      }),
-      run.sessionId,
-      run,
-      options,
-    );
+  } catch {
+    // getRun is unavailable (network error, transient 404 before the run is
+    // queryable). Keep the run in a non-terminal state so the restart-recovery
+    // worker reconciles it later instead of recording a false failure here.
+    return {
+      provider: providerClient.provider,
+      runId: run.runId,
+      nativeRunId: run.nativeRunId,
+      sessionId: run.sessionId,
+      status: "running",
+      error: null,
+    };
   }
 }
 
@@ -484,7 +513,7 @@ async function collectProviderRunSnapshot(
     }
   }
   if (!snapshot) {
-    throw new Error("Provider run finished without a snapshot");
+    throw new IncompleteRunStreamError();
   }
   return snapshot;
 }

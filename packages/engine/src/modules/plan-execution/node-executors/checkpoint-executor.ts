@@ -1,7 +1,7 @@
 import type { CheckpointConfig, EffectivePlanNode, NodeActionForm, NodeActionFormField } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
-import { reviewCheckpointNodeCapability } from "../node-ai-capabilities";
+import { reviewCheckpointNodeCapability } from "../runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 
 function normalizeInputFieldType(type: string | undefined): NodeActionFormField["type"] {

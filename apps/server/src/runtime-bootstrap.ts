@@ -1,4 +1,4 @@
-import type { TaskOrchestrator } from "@chrona/engine/modules/orchestration/task-orchestrator";
+import type { TaskOrchestrator } from "@chrona/engine";
 
 type RuntimeBootstrapPort = {
   startTaskOrchestrator: () => TaskOrchestrator | void;

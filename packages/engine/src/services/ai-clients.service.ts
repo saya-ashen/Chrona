@@ -1,5 +1,5 @@
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
-import { aiClientManagement } from "../modules/ai/management";
+import { aiClientManagement } from "../modules/ai";
 
 type AiClientListItem = Awaited<ReturnType<typeof aiClientManagement.list>>[number];
 

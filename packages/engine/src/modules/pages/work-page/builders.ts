@@ -1,5 +1,5 @@
 import { SYNC_STALE_MS } from "../../../constants";
-import type { SavedCompiledPlan } from "@/modules/plan-execution/compiled-plan-store";
+import type { SavedCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import type { EvidenceItem, TaskPlanProjection, TaskPlanProjectionStep, TaskPlanStepStatus, WorkPageCopy } from "./types";
 import { makeEvidence, toIsoString } from "./helpers";
 
@@ -49,7 +49,7 @@ export function readBlockReason(
     since?: string;
     nodeId?: string | null;
   } | null;
-  const projectedBlockReason = task.projection
+  const projectedBlockReason = task.projection && (task.projection.blockType || task.projection.actionRequired)
     ? {
         actionRequired: task.projection.actionRequired ?? undefined,
         blockType: task.projection.blockType ?? undefined,

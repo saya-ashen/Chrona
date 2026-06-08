@@ -271,33 +271,60 @@ export class HermesProviderClient implements AgentProviderClient {
     const strictUnknown = shouldThrowOnUnknownStreamEvent();
     const replayPath = this.replayPath(runId);
     let sequence = 0;
-    for await (const rawEvent of parseSseData(response.body)) {
-      const event = mapHermesEvent(rawEvent, runId, {
-        includeRaw,
-        strictUnknown,
-        sessionId: "sessionId" in input ? input.sessionId : undefined,
-        sequence: sequence++,
-      });
-
-      if (!event) {
-        continue;
-      }
-      if (replayPath) {
-        await appendProviderReplayRecord(replayPath, {
-          kind: "event",
-          provider: this.provider,
-          recordedAt: new Date().toISOString(),
-          event,
+    const iterator = parseSseData(response.body)[Symbol.asyncIterator]();
+    try {
+      while (true) {
+        let result: IteratorResult<unknown>;
+        try {
+          result = await iterator.next();
+        } catch (error) {
+          if (error instanceof HermesProviderError) {
+            throw error;
+          }
+          // The SSE body was interrupted before a terminal event arrived.
+          // Surface a retryable error so the caller can reconnect (Hermes
+          // replays events on reconnect) or reconcile the run state via
+          // getRun, rather than assuming the run failed.
+          throw new HermesProviderError({
+            message:
+              error instanceof Error ? error.message : "Hermes stream interrupted",
+            code: "network_error",
+            retryable: true,
+            raw: error,
+          });
+        }
+        if (result.done) {
+          break;
+        }
+        const event = mapHermesEvent(result.value, runId, {
+          includeRaw,
+          strictUnknown,
+          sessionId: "sessionId" in input ? input.sessionId : undefined,
+          sequence: sequence++,
         });
+
+        if (!event) {
+          continue;
+        }
+        if (replayPath) {
+          await appendProviderReplayRecord(replayPath, {
+            kind: "event",
+            provider: this.provider,
+            recordedAt: new Date().toISOString(),
+            event,
+          });
+        }
+        yield event;
+        if (
+          event.type === "run_completed" ||
+          event.type === "run_failed" ||
+          event.type === "run_cancelled"
+        ) {
+          return;
+        }
       }
-      yield event;
-      if (
-        event.type === "run_completed" ||
-        event.type === "run_failed" ||
-        event.type === "run_cancelled"
-      ) {
-        return;
-      }
+    } finally {
+      await iterator.return?.();
     }
   }
 

@@ -305,25 +305,10 @@ function isFailedSubmissionNodeResult(result: NodeResult): boolean {
   return FAILED_SUBMISSION_RESULT_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-function nodeResultOutputText(output: NonNullable<NodeResult["outputs"]>[number]): string | undefined {
-  switch (output.kind) {
-    case "markdown":
-      return output.content;
-    case "json":
-      return stringifyJsonOutput(output.value);
-    default:
-      return undefined;
-  }
+function nodeResultOutputText(_output: NonNullable<NodeResult["outputs"]>[number]): string | undefined {
+  return undefined;
 }
 
-function stringifyJsonOutput(value: unknown): string | undefined {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return undefined;
-  }
-}
 
 function compareAttemptsForEffectiveState(a: NodeAttempt, b: NodeAttempt): number {
   const statusDelta = attemptStatusPriority(b.status) - attemptStatusPriority(a.status);
