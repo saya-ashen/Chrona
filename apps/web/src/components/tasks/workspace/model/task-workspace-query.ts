@@ -1,7 +1,6 @@
 import { api } from "@/lib/rpc-client";
 import { apiJson } from "@/api";
 import { appendTaskPrimaryNodeAction, graphNodeIdForTaskAction } from "@/components/tasks/plan/task-action-node-action";
-import { stringifyResultOutput } from "@/components/tasks/plan/task-plan-graph/result-output-format";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput, TaskPlanGenerationSessionReadModel } from "@chrona/contracts/ai";
 import type {
@@ -18,7 +17,6 @@ import type {
   WorkspaceArtifactItem,
 } from "./task-workspace-types";
 import {
-  activityToneFromOverviewTone,
   mergeWorkspaceActivity,
 } from "./task-workspace-activity";
 import {
@@ -254,24 +252,17 @@ export function pickWorkspaceCurrentNode(
 function nodeResultSummary(node: PlanNodeDataModel) {
   return node.completionSummary
     ?? node.result?.outputSummary
-    ?? (node.resultOutputs ?? []).map(stringifyResultOutput).find((value) => value.trim())
     ?? null;
 }
 
-function nodeResultContent(node: PlanNodeDataModel) {
-  const parts = [
-    node.result?.outputSummary,
-    node.completionSummary,
-    ...(node.resultOutputs ?? []).map(stringifyResultOutput),
-  ].filter((value): value is string => Boolean(value?.trim()));
-
-  return Array.from(new Set(parts)).join("\n\n");
+function hasSpecResultOutput(node: PlanNodeDataModel): boolean {
+  return Boolean(node.resultOutputs?.length);
 }
 
 function pickLatestResultNode(graphPlan: TaskPlanGraphPlan | null) {
   return [...(graphPlan?.steps ?? graphPlan?.nodes ?? [])]
     .reverse()
-    .find((node) => nodeResultSummary(node))
+    .find((node) => nodeResultSummary(node) || hasSpecResultOutput(node))
     ?? null;
 }
 
@@ -288,11 +279,13 @@ function buildLatestResultCard(
       id: `node-result-${latestResultNode?.id ?? "current"}`,
       title: copy.latestResult,
       description: nodeSummary,
-      content: latestResultNode ? nodeResultContent(latestResultNode) : undefined,
+      summary: nodeSummary,
       statusLabel: latestResultNode?.statusLabel ?? latestResultNode?.status,
       tone: overviewToneForNode(latestResultNode),
       actionLabel: copy.reviewResultActions,
+      ctaLabel: copy.reviewResultActions,
       actionNodeId: latestResultNode?.id,
+      sourceNodeTitle: latestResultNode?.title,
     };
   }
 
@@ -351,10 +344,15 @@ function buildAttentionCard(
       pageData,
       null,
     ) ?? currentNode?.id;
+    // Prefer the agent-supplied actionForm.instructions over the generic outcome message.
+    const blockInstructions =
+      currentNode?.status === "blocked"
+        ? (currentNode.result?.actionForm?.instructions ?? null)
+        : null;
     return {
       id: "task-block-reason",
       title: copy.blocked,
-      description: pageData.task.blockReason.actionRequired ?? pageData.task.runnabilitySummary,
+      description: blockInstructions ?? pageData.task.blockReason.actionRequired ?? pageData.task.runnabilitySummary,
       statusLabel: pageData.task.blockReason.blockType,
       tone: "critical",
       actionLabel: actionNodeId ? copy.openActionControls : undefined,
@@ -426,89 +424,17 @@ function buildReadinessCard(
   };
 }
 
-function buildArtifactItems(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null): WorkspaceArtifactItem[] {
-  const nodeArtifacts = (graphPlan?.nodes ?? []).flatMap((node) => (node.resultOutputs ?? []).map((output, index) => ({
-    id: `${node.id}-output-${index}`,
-    title: `${node.title} output ${index + 1}`,
-    type: output.kind,
-    sourceNodeId: node.id,
-    content: stringifyResultOutput(output),
-  })));
-
-  return [
-    ...nodeArtifacts,
-    ...pageData.artifacts.map((artifact) => ({
-      id: artifact.id,
-      title: artifact.title,
-      type: artifact.type,
-      uri: artifact.uri,
-    })),
-  ];
+function buildArtifactItems(pageData: TaskPageData, _graphPlan: TaskPlanGraphPlan | null): WorkspaceArtifactItem[] {
+  return pageData.artifacts.map((artifact) => ({
+    id: artifact.id,
+    title: artifact.title,
+    type: artifact.type,
+    uri: artifact.uri,
+  }));
 }
 
-function buildActivity(pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null): WorkspaceActivityItem[] {
-  const providerActivity = pageData.activityTimeline ?? [];
-  const approvalActivity = pageData.approvals.slice(0, 3).map((approval) => ({
-    id: `approval-${approval.id}`,
-    kind: "approval" as const,
-    title: approval.title,
-    summary: `Approval ${approval.status}`,
-    description: `Approval ${approval.status}`,
-    tone: approval.status === "Approved" || approval.status === "EditedAndApproved" ? "success" as const : "warning" as const,
-    timestamp: approval.requestedAt,
-  }));
-
-  const artifactActivity = pageData.artifacts.slice(0, 3).map((artifact) => ({
-    id: `artifact-${artifact.id}`,
-    kind: "artifact" as const,
-    title: artifact.title,
-    summary: `Artifact ${artifact.type}`,
-    description: `Artifact ${artifact.type}`,
-    tone: "info" as const,
-  }));
-
-  const proposalActivity = pageData.scheduleProposals
-    .filter((proposal) => proposal.status === "Pending")
-    .slice(0, 2)
-    .map((proposal) => ({
-      id: `schedule-proposal-${proposal.id}`,
-      kind: "schedule" as const,
-      title: "Schedule proposal",
-      summary: proposal.summary,
-      description: proposal.summary,
-      tone: "warning" as const,
-      timestamp: proposal.scheduledStartAt,
-    }));
-
-  const nodeActivity = (graphPlan?.nodes ?? [])
-    .filter((node) => node.status !== "idle" && node.status !== "pending")
-    .slice(0, 5)
-    .map((node) => ({
-      id: `node-${node.id}`,
-      kind: "node" as const,
-      title: node.title,
-      summary: node.statusLabel ?? node.status,
-      description: node.statusLabel ?? node.status,
-      tone: activityToneFromOverviewTone(overviewToneForNode(node)),
-      sourceNodeId: node.id,
-      sourceNodeTitle: node.title,
-    }));
-
-  const fallbackActivity = [...approvalActivity, ...artifactActivity, ...proposalActivity, ...nodeActivity] satisfies WorkspaceActivityItem[];
-
-  if (pageData.latestRunSummary) {
-    return mergeWorkspaceActivity([...providerActivity, {
-      id: `run-${pageData.latestRunSummary.id}`,
-      kind: "provider_run" as const,
-      title: "Latest run",
-      summary: pageData.latestRunSummary.status,
-      description: pageData.latestRunSummary.status,
-      tone: pageData.latestRunSummary.status === "Completed" ? "success" as const : "info" as const,
-      timestamp: pageData.latestRunSummary.startedAt,
-    }, ...fallbackActivity]);
-  }
-
-  return mergeWorkspaceActivity([...providerActivity, ...fallbackActivity]);
+function buildActivity(pageData: TaskPageData): WorkspaceActivityItem[] {
+  return mergeWorkspaceActivity(pageData.activityTimeline ?? []);
 }
 
 function buildTaskHeaderView(
@@ -586,10 +512,11 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   const currentNode = pickWorkspaceCurrentNode(graphPlan, selectedNode);
   const progress = buildProgressSummary(graphPlan, copy);
   const attention = buildAttentionCard(pageData, currentNode, copy);
+  const latestCompletedNode = pickLatestResultNode(graphPlan);
   const isPermissionLimited = !pageData.task.isRunnable && !pageData.task.blockReason;
   const isStale = pageData.latestRunSummary?.syncStatus === "stale";
   const errorMessage = graphPlan?.state === "empty" && pageData.task.status === "Failed" ? pageData.task.runnabilitySummary : null;
-  const activity = buildActivity(pageData, graphPlan);
+  const activity = buildActivity(pageData);
 
   return {
     task,
@@ -604,7 +531,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
       status: currentNode ? mapTaskWorkspaceStatus(currentNode.status) : null,
       stepPosition: currentNode ? `${(graphPlan?.nodes ?? []).findIndex((node) => node.id === currentNode.id) + 1}/${graphPlan?.nodes.length ?? 0}` : "0/0",
       autoRefreshEnabled: currentNode ? ["running", "approval-needed"].includes(mapTaskWorkspaceStatus(currentNode.status)) : false,
-      tabs: ["result", "activity", "action", "configuration"],
+      tabs: ["result", "activity", "configuration"],
       disabledActionReason:
         Boolean(currentNode) &&
         (currentNode.availableActions?.length ?? 0) === 0 &&
@@ -616,6 +543,7 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
     readiness: buildReadinessCard(pageData, currentNode, copy),
     latestResult: buildLatestResultCard(pageData, graphPlan, copy),
     attention,
+    latestCompletedNode,
     artifacts: buildArtifactItems(pageData, graphPlan),
     activity,
     states: {

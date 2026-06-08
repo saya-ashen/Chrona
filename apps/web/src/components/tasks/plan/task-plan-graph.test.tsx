@@ -182,7 +182,7 @@ describe("TaskPlanGraph", () => {
               status: "done",
               type: "task",
               displayType: "task",
-              resultOutputs: [{ kind: "markdown", content: "artifact summary" }],
+              resultOutputs: [],
             },
             {
               id: "node-running",
@@ -637,6 +637,11 @@ describe("TaskPlanGraph", () => {
 
     const canvas = within(graph).getByTestId("task-plan-graph-canvas");
     expect(canvas.style.height).toBe("100%");
+
+    const pane = graph.querySelector(".react-flow__pane") as HTMLElement | null;
+    expect(pane).not.toBeNull();
+    fireEvent.click(pane as HTMLElement);
+    expect(deliverableNode.getAttribute("data-node-selected")).toBe("false");
   });
 
   it("maps semantic node types to flowchart-like shapes", async () => {

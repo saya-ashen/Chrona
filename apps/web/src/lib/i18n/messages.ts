@@ -10,6 +10,8 @@ export const taskWorkspaceActivityMessages = {
   hideFullContent: "Hide full content",
   loadOlder: "Load older activity",
   loadingOlder: "Loading older activity...",
+  feedStats: ({ shown, live, saved }: { shown: number; live: number; saved: number }) => `${shown} shown · ${live} live · ${saved} saved`,
+  emptyHint: "Runtime events and saved history will appear here.",
   toolLabels: {
     tool: "Tool",
     input: "Input",

@@ -151,7 +151,7 @@ describe("task-plan-view-model", () => {
             reachable: true,
             result: {
               outputSummary: "选择了是",
-              outputs: [{ kind: "json", value: { selectedBranch: "是" } }],
+              outputs: [],
               evidence: { runId: "run-1", runtimeRunRef: "runtime-ref-1" },
               selectedBranch: { label: "是", nextNodeId: "task-yes", source: "user" },
             },
@@ -209,9 +209,7 @@ describe("task-plan-view-model", () => {
 
     expect(graphPlan?.currentStepId).toBe("task-yes");
     expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.status).toBe("done");
-    expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.resultOutputs).toEqual([
-      { kind: "json", value: { selectedBranch: "是" } },
-    ]);
+    expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.resultOutputs).toEqual([]);
     expect(graphPlan?.steps.find((step) => step.id === "condition-1")?.resultEvidence).toMatchObject({
       runId: "run-1",
       runtimeRunRef: "runtime-ref-1",
@@ -494,7 +492,7 @@ describe("task-plan-view-model", () => {
             result: {
               outputSummary: "默认城市: 北京",
               inputFields: { city: "北京" },
-              outputs: [{ kind: "json", value: { inputFields: { city: "北京" } } }],
+              outputs: [],
             },
             requiredInfo: ["默认城市"],
           } as TaskPlanReadModel["effectivePlan"]["nodes"][number] & { requiredInfo: string[] },

@@ -31,6 +31,7 @@ export function TaskPlanGraphFrame({
   nodeLegend,
   overview,
   handleNodeClick,
+  handlePaneClick,
   handleNodeDragStart,
   handleNodeDrag,
   handleNodeDragStop,
@@ -56,6 +57,7 @@ export function TaskPlanGraphFrame({
   nodeLegend: NodeLegendItem[];
   overview?: ReactNode;
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
+  handlePaneClick: () => void;
   handleNodeDragStart: (event: MouseEvent<Element>) => void;
   handleNodeDrag: (event: MouseEvent<Element>) => void;
   handleNodeDragStop: (event: MouseEvent<Element>) => void;
@@ -253,6 +255,7 @@ export function TaskPlanGraphFrame({
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               onNodeClick={handleNodeClick}
+              onPaneClick={handlePaneClick}
               onNodeDragStart={handleNodeDragStart}
               onNodeDrag={handleNodeDrag}
               onNodeDragStop={handleNodeDragStop}

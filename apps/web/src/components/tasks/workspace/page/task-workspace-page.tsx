@@ -77,10 +77,9 @@ const DEFAULT_COPY = {
   workspaceState: "Workspace state",
   currentState: "Current state",
   nextAction: "Next action",
-  commandCenterActionsTab: "Actions",
-  commandCenterResultTab: "Result",
-  commandCenterArtifactsTab: "Artifacts",
-  commandCenterActivityTab: "Activity",
+  commandCenterNowTab: "Now",
+  commandCenterOutputTab: "Output",
+  commandCenterTrailTab: "Trail",
 };
 
 function TaskWorkspaceHeaderEditor({
@@ -354,14 +353,13 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}
         commandCenterCopy={{
-          actionsTab: copy.commandCenterActionsTab,
-          resultTab: copy.commandCenterResultTab,
-          artifactsTab: copy.commandCenterArtifactsTab,
-          activityTab: copy.commandCenterActivityTab,
+          nowTab: copy.commandCenterNowTab,
+          outputTab: copy.commandCenterOutputTab,
+          trailTab: copy.commandCenterTrailTab,
         }}
         graphPlan={graphPlan}
         isGraphPlanPending={isGraphPlanPending}
-        pageData={{ ...pageData, task: consoleView.task }}
+        pageData={pageData}
         plan={plan}
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}

@@ -2,10 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Check, ExternalLink, FileText, LinkIcon, Play, RotateCcw, Send, Sparkles } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import type { ExecutionActionInput, NodeResultEvidence, NodeResultOutput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import { Check, Play, RotateCcw, Send, Sparkles } from "lucide-react";
+import type { ExecutionActionInput, NodeResultEvidence, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -14,9 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { TaskExecutionDispatchResult } from "@/components/tasks/task-workspace-query";
 import { buildWorkspaceCheckpointActionInput } from "@/components/tasks/workspace/model/task-workspace-actions";
-import { DEFAULT_GRAPH_COPY } from "./constants";
 import { interactionLabel } from "./logic";
-import { jsonOutputText } from "./result-output-format";
 import type { GraphCopy, PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./types";
 
 type RunPanelMode = PlanNodeDataModel["interactionType"];
@@ -210,116 +206,7 @@ export function extractRunResult(node: PlanNodeDataModel) {
   return candidates[0] ?? null;
 }
 
-function formatJson(value: unknown) {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
 
-function MarkdownContent({ content, disableInternalScroll = false }: { content: string; disableInternalScroll?: boolean }) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer" className="font-medium text-sky-700 underline underline-offset-2 dark:text-sky-300">{children}</a>,
-        code: ({ children }) => <code className="rounded bg-muted px-1 py-0.5 text-[0.85em] text-foreground">{children}</code>,
-        h1: ({ children }) => <h3 className="text-base font-semibold text-foreground">{children}</h3>,
-        h2: ({ children }) => <h4 className="text-sm font-semibold text-foreground">{children}</h4>,
-        h3: ({ children }) => <h5 className="text-sm font-semibold text-foreground">{children}</h5>,
-        li: ({ children }) => <li className="pl-1 marker:text-muted-foreground">{children}</li>,
-        ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-foreground">{children}</ol>,
-        p: ({ children }) => <p className="text-sm leading-6 text-foreground">{children}</p>,
-        pre: ({ children }) => (
-          <pre className={cn(
-            "my-2 whitespace-pre-wrap break-words rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-50",
-            !disableInternalScroll && "max-h-72 overflow-auto",
-          )}>{children}</pre>
-        ),
-        strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-        table: ({ children }) => (
-          <div className={cn("my-2 rounded-xl border border-border/60", !disableInternalScroll && "overflow-auto")}>
-            <table className="w-full border-collapse text-sm">{children}</table>
-          </div>
-        ),
-        td: ({ children }) => <td className="border-t border-border/60 px-2 py-1.5 align-top text-foreground">{children}</td>,
-        th: ({ children }) => <th className="bg-muted/60 px-2 py-1.5 text-left font-semibold text-foreground">{children}</th>,
-        ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5 text-sm leading-6 text-foreground">{children}</ul>,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  );
-}
-
-function outputTitle(output: NodeResultOutput, fallback: string) {
-  if ("title" in output && output.title) return output.title;
-  return fallback;
-}
-
-export function ResultOutputCard({ output, graphCopy = DEFAULT_GRAPH_COPY, disableInternalScroll = false }: { output: NodeResultOutput; graphCopy?: GraphCopy; disableInternalScroll?: boolean }) {
-  switch (output.kind) {
-    case "markdown":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <p className="text-xs font-semibold text-muted-foreground">{outputTitle(output, "markdown")}</p>
-          <div className="mt-2">
-            <MarkdownContent content={output.content} disableInternalScroll={disableInternalScroll} />
-          </div>
-        </div>
-      );
-    case "json":
-      {
-        const text = jsonOutputText(output.value);
-        if (text) {
-          return (
-            <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-              <p className="text-xs font-semibold text-muted-foreground">{output.title ?? graphCopy.runResultTitle}</p>
-              <div className="mt-2">
-                <MarkdownContent content={text} disableInternalScroll={disableInternalScroll} />
-              </div>
-            </div>
-          );
-        }
-      }
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2 text-foreground">
-          <p className="text-xs font-semibold text-muted-foreground">{output.title ?? graphCopy.runOutputJsonTitle}</p>
-          <pre className={cn(
-            "mt-2 whitespace-pre-wrap break-words text-xs leading-5",
-            !disableInternalScroll && "max-h-64 overflow-auto",
-          )}>{formatJson(output.value)}</pre>
-        </div>
-      );
-    case "file":
-      return (
-        <div className="rounded-xl border border-border/60 bg-background/75 px-3 py-2">
-          <div className="flex items-start gap-2">
-            <FileText className="mt-0.5 size-4 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground">{output.title ?? graphCopy.runOutputFileTitle}</p>
-              <code className="mt-1 block break-all rounded-lg bg-background/80 px-2 py-1 text-xs text-foreground">{output.path}</code>
-              {output.description ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{output.description}</p> : null}
-              {output.language ? <p className="mt-1 text-[11px] font-medium text-muted-foreground">{output.language}</p> : null}
-            </div>
-          </div>
-        </div>
-      );
-    case "link":
-      return (
-        <a className="flex items-start gap-2 rounded-xl border border-border/60 bg-background/75 px-3 py-2 hover:bg-muted/40" href={output.href} target="_blank" rel="noreferrer">
-          <LinkIcon className="mt-0.5 size-4 text-muted-foreground" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-foreground">{output.title}</span>
-            <span className="mt-1 block break-all text-xs text-muted-foreground">{output.href}</span>
-            {output.description ? <span className="mt-2 block text-xs leading-5 text-muted-foreground">{output.description}</span> : null}
-          </span>
-          <ExternalLink className="size-3 text-muted-foreground" />
-        </a>
-      );
-  }
-}
 
 export function evidenceLines(evidence: NodeResultEvidence | null | undefined) {
   if (!evidence) return [];
@@ -603,20 +490,11 @@ export function TaskPlanGraphInspectorRunPanel({
         <div className="space-y-3 rounded-2xl border border-border/60 bg-background/80 p-3">
           {runError ? (
             <pre className="whitespace-pre-wrap text-xs leading-5 text-red-700">{runError}</pre>
-          ) : resultOutputs.length > 0 ? (
-            <>
-              {runResult ? <p className="text-sm leading-6 text-muted-foreground">{runResult}</p> : null}
-              <div className="space-y-2">
-                {resultOutputs.map((output, index) => (
-                  <ResultOutputCard key={`${output.kind}:${index}`} output={output} graphCopy={graphCopy} />
-                ))}
-              </div>
-            </>
           ) : runResult ? (
             <p className="text-sm leading-6 text-foreground">{runResult}</p>
-          ) : (
+          ) : resultOutputs.length === 0 ? (
             <p className="text-sm text-muted-foreground">{graphCopy.runResultEmpty}</p>
-          )}
+          ) : null}
           {resultEvidence.length > 0 ? (
             <details className="rounded-xl border border-dashed border-border/60 bg-muted/[0.16] px-3 py-2">
               <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">{graphCopy.runEvidenceTitle}</summary>

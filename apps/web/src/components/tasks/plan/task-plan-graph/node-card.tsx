@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { Handle, Position, type NodeProps, type NodeTypes } from "@xyflow/react";
 import { Check, Circle, Clock3, ClipboardCheck, GitBranch, Hammer, Hand, Minus, MoreHorizontal, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -228,11 +229,15 @@ function NodeFrameShell({
   styles,
 }: NodeFrameShellProps) {
   const { node, stepNumber, tone, shape, isSelected, isCurrent, isFocus, visualWeight, onSelect } = data;
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onSelect(node.id);
+  };
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(node.id)}
+      onClick={handleClick}
       data-testid={`task-plan-node-${node.id}`}
       data-node-tone={node.linkedTaskId ? "child-task" : tone}
       data-node-shape={shape}

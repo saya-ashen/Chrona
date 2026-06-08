@@ -226,11 +226,11 @@ describe("TaskWorkspacePlanSection", () => {
     );
 
     expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
-    expect(within(commandCenter).getByText("Accept or regenerate plan")).toBeInTheDocument();
+    expect(within(commandCenter).getByRole("button", { name: "Accept plan" })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-generate"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Current node: Generated plan node" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Generated plan node" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: "Current node: Generated plan node" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Generated plan node" })).not.toBeInTheDocument());
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
     expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
 
@@ -287,12 +287,14 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    expect(within(commandCenter).getByText("Current node action")).toBeInTheDocument();
+    // The current-operation controls render in the Now tab (default).
     expect(within(commandCenter).getByLabelText(/Decision/)).toBeInTheDocument();
-    fireEvent.click(within(commandCenter).getByRole("tab", { name: "Activity" }));
-    expect(within(commandCenter).getByText("Starting plan")).toBeInTheDocument();
+    // Live runtime event content surfaces directly in the Now tab. With a
+    // pending checkpoint, the command center keeps the Now tab focused, so the
+    // live event is verified there rather than on the Trail tab.
+    expect(within(commandCenter).getByText("Tool: Starting plan")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-checkpoint"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Current node: Review generated output" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Review generated output" })).toBeInTheDocument());
   });
 
   it("adds generate plan as the command center operation when no plan exists", () => {
@@ -499,7 +501,7 @@ describe("TaskWorkspacePlanSection", () => {
     );
 
     fireEvent.click(screen.getByTestId("task-plan-node-node-a"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Current node: Node A" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Node A" })).toBeInTheDocument());
     fireEvent.click(screen.getAllByRole("tab", { name: "Activity" }).at(-1)!);
 
     expect(screen.getByText("Node activity")).toBeInTheDocument();
@@ -592,7 +594,6 @@ describe("TaskWorkspacePlanSection", () => {
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
-    expect(within(commandCenter).getByText("Accept or regenerate plan")).toBeInTheDocument();
     expect(within(commandCenter).getByText("User instruction for this plan revision")).toBeInTheDocument();
     expect(within(commandCenter).getByText("Prefer a smaller plan and keep the first step manual.")).toBeInTheDocument();
     expect(within(commandCenter).queryByText("Current node action")).not.toBeInTheDocument();
@@ -713,8 +714,8 @@ describe("TaskWorkspacePlanSection", () => {
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
-    expect(within(commandCenter).getByText("No current operation")).toBeInTheDocument();
     expect(within(commandCenter).queryByText("Current node action")).not.toBeInTheDocument();
+    expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();
     expect(within(commandCenter).queryByRole("button", { name: "Send Submit input" })).not.toBeInTheDocument();
   });
 
@@ -768,7 +769,6 @@ describe("TaskWorkspacePlanSection", () => {
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
-    expect(within(commandCenter).getByText("Current node action")).toBeInTheDocument();
     expect(within(commandCenter).getAllByText(blocker).length).toBeGreaterThan(0);
     expect(within(commandCenter).queryByRole("button", { name: "Start plan" })).not.toBeInTheDocument();
 
@@ -825,10 +825,11 @@ describe("TaskWorkspacePlanSection", () => {
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
-    expect(within(commandCenter).getByText("Task completed")).toBeInTheDocument();
-    expect(within(commandCenter).queryByText("请提供创建天气脚本所需的关键信息。")).not.toBeInTheDocument();
+    // A completed plan reports full progress and exposes no pending action input.
+    expect(within(commandCenter).getByText("1/1")).toBeInTheDocument();
     expect(within(commandCenter).queryByText("Ready to run")).not.toBeInTheDocument();
     expect(within(commandCenter).queryByRole("button", { name: "Send input" })).not.toBeInTheDocument();
+    expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();
   });
 
   it("opens and closes the node drawer from selected graph nodes", async () => {

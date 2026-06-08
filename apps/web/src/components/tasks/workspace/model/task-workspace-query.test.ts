@@ -191,7 +191,7 @@ describe("task workspace execution console view model", () => {
     expect(view.readiness).toMatchObject({ title: "Current work", statusLabel: "Running", tone: "info", actionNodeId: "active" });
     expect(view.latestResult).toMatchObject({ title: "Latest run" });
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "artifact-1" }));
-    expect(view.activity).toEqual(expect.arrayContaining([expect.objectContaining({ id: "run-run-1", tone: "info" })]));
+    expect(view.activity.some((item) => item.id === "run-run-1")).toBe(false);
   });
 
   it("prioritizes persisted provider activity over summary activity", () => {
@@ -214,7 +214,7 @@ describe("task workspace execution console view model", () => {
     });
 
     expect(view.activity[0]).toMatchObject({ id: "provider-event-1", title: "Tool started", sourceNodeId: "active", sourceNodeTitle: "Active node" });
-    expect(view.activity).toEqual(expect.arrayContaining([expect.objectContaining({ id: "run-run-1" })]));
+    expect(view.activity.some((item) => item.id === "run-run-1")).toBe(false);
   });
 
   it("surfaces pending schedule proposals as readiness and activity", () => {
@@ -239,7 +239,7 @@ describe("task workspace execution console view model", () => {
       title: "Ready to schedule",
       tone: "warning",
     });
-    expect(view.activity[0]).toMatchObject({ id: "schedule-proposal-proposal-1", tone: "warning" });
+    expect(view.activity.some((item) => item.id === "schedule-proposal-proposal-1")).toBe(false);
   });
 
   it("surfaces blocked task or waiting node as attention", () => {
@@ -260,43 +260,28 @@ describe("task workspace execution console view model", () => {
     expect(view.states).toMatchObject({ isPermissionLimited: false, isEmpty: false });
   });
 
-  it("uses node result output and completion summary for completed states", () => {
+  it("uses completion summary for completed result summaries", () => {
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData(),
       graphPlan: graph([node({
         id: "done",
         status: "done",
         completionSummary: "Finished research",
-        resultOutputs: [{ kind: "markdown", content: "summary" }],
+        resultOutputs: [],
       })]),
     });
 
     expect(view.progress).toMatchObject({ completedSteps: 1, totalSteps: 1, percentComplete: 100 });
-    expect(view.latestResult).toMatchObject({ description: "Finished research", tone: "success", actionNodeId: "done" });
-    expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "done-output-0", sourceNodeId: "done" }));
-  });
-
-  it("uses provider output text from JSON result wrappers", () => {
-    const view = createTaskWorkspaceExecutionConsoleView({
-      pageData: pageData(),
-      graphPlan: graph([node({
-        id: "done",
-        status: "done",
-        resultOutputs: [{
-          kind: "json",
-          value: {
-            runtimeRunRef: "run-1",
-            runtimeName: "hermes",
-            outputText: "Readable final answer",
-          },
-        }],
-      })]),
+    expect(view.latestResult).toMatchObject({
+      description: "Finished research",
+      summary: "Finished research",
+      tone: "success",
+      actionNodeId: "done",
     });
-
-    expect(view.latestResult).toMatchObject({ description: "Readable final answer" });
-    expect(view.latestResult.content).toBe("Readable final answer");
-    expect(view.artifacts).toContainEqual(expect.objectContaining({ content: "Readable final answer" }));
+    expect(view.latestResult.content).toBeUndefined();
+    expect(view.artifacts).toEqual([]);
   });
+
 
   it("keeps latest result tied to the newest completed result when selection changes", () => {
     const first = node({
@@ -372,11 +357,9 @@ describe("task workspace execution console view model", () => {
     });
     expect(view.nodeDetail.currentNode?.id).toBe("input");
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "artifact-1", title: "Release notes" }));
-    expect(view.activity).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "approval-approval-1", description: "Approval Pending" }),
-      expect.objectContaining({ id: "artifact-artifact-1", description: "Artifact markdown" }),
-      expect.objectContaining({ id: "node-input", description: "waiting_for_user" }),
-    ]));
+    expect(view.activity.some((item) => item.id === "approval-approval-1")).toBe(false);
+    expect(view.activity.some((item) => item.id === "artifact-artifact-1")).toBe(false);
+    expect(view.activity.some((item) => item.id === "node-input")).toBe(false);
   });
 
   it("uses orchestrator execution summary for primary workspace state", () => {
@@ -659,7 +642,7 @@ describe("task workspace execution console view model", () => {
       status: "approval-needed",
       stepPosition: "2/2",
       autoRefreshEnabled: true,
-      tabs: ["result", "activity", "action", "configuration"],
+      tabs: ["result", "activity", "configuration"],
       isEmpty: false,
     });
   });

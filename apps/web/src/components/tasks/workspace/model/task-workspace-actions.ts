@@ -295,7 +295,7 @@ export function buildWorkspaceCheckpointActionInput(input: {
   };
 }
 
-function actionKindForNode(node: PlanNodeDataModel, selectedAction: PlanNodeAction | null): CheckpointActionKind | null {
+export function actionKindForNode(node: PlanNodeDataModel, selectedAction: PlanNodeAction | null): CheckpointActionKind | null {
   const kind = selectedAction?.kind;
 
   if (kind === "approve" || node.interactionType === "approve" || node.interactionType === "confirm") {

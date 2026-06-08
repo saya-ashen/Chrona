@@ -26,7 +26,7 @@ export type AppBootData = {
 };
 
 export type ScheduleRouteData = {
-  schedule: Awaited<ReturnType<typeof import("@chrona/engine/modules/scheduling/get-schedule-page").getSchedulePage>>;
+  schedule: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-schedule-page").getSchedulePage>>;
 };
 
 export type InboxRouteData = {
