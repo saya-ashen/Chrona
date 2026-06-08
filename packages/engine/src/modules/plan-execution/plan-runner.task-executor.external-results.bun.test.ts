@@ -34,7 +34,10 @@ describe("plan-runner task executor external results", () => {
         action: {
           action: "complete_manual_node",
           summary: "Hermes completed externally",
-          output: { source: "hermes" },
+          output: {
+            root: "root",
+            elements: { root: { type: "JsonView", props: { value: { source: "hermes" } } } },
+          },
         },
       });
       expect(submittedResult.status).toBe("completed");
@@ -239,7 +242,15 @@ describe("plan-runner task executor external results", () => {
             action: "complete_manual_node",
             sessionId: "provider-runtime-session",
             summary: "Runtime tool completed first task",
-            output: { source: "chrona_node_output" },
+            output: {
+              root: "root",
+              elements: {
+                root: {
+                  type: "JsonView",
+                  props: { value: { source: "chrona_node_output" } },
+                },
+              },
+            },
           },
         });
         expect(submittedResult.status).toBe("running");
