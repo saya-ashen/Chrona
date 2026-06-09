@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
-import { cn } from "@/lib/utils";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
@@ -17,9 +16,10 @@ import type {
 import { SpecRenderer } from "../catalog/spec-renderer";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
+import { TaskWorkspaceActionRail } from "./action-rail";
 
 type OverviewAction = (nodeId?: string) => void;
-type CommandCenterTab = "now" | "output" | "trail";
+type CommandCenterTab = "output" | "trail";
 
 export type CommandCenterPrimaryAction = {
   kind?: string;
@@ -44,8 +44,8 @@ export type CommandCenterCopy = {
 
 const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
   nowTab: "Now",
-  outputTab: "Output",
-  trailTab: "Trail",
+  outputTab: "Results",
+  trailTab: "Activity",
 };
 
 const TRAIL_ACTIVITY_LIMIT = 100;
@@ -55,16 +55,6 @@ function commandCenterTrailItems(commandCenter?: { documents: { trail: UiDocumen
   if (!items || typeof items !== "object" || Array.isArray(items)) return [];
   const trailItems = (items as { items?: unknown }).items;
   return Array.isArray(trailItems) ? trailItems as WorkspaceActivityItem[] : [];
-}
-
-function isActionablePrimary(primaryAction?: CommandCenterPrimaryAction | null) {
-  const kind = primaryAction?.kind;
-  return (
-    kind === "current-operation" ||
-    kind === "start-plan" ||
-    kind === "accept-or-regenerate" ||
-    kind === "generate"
-  );
 }
 
 function buildNodeResultContentSpec(node: PlanNodeDataModel | null, emptyMessage: string) {
@@ -83,6 +73,7 @@ function buildNodeResultContentSpec(node: PlanNodeDataModel | null, emptyMessage
 }
 
 export function TaskWorkspaceExecutionOverview({
+  taskId,
   progress,
   readiness,
   attention,
@@ -97,6 +88,7 @@ export function TaskWorkspaceExecutionOverview({
   commandCenterActionHandlers,
   onAction,
 }: {
+  taskId: string;
   progress: ProgressSummary;
   readiness: ExecutionOverviewCard;
   /** Retained for callers; the Now tab derives its status card from readiness/attention. */
@@ -119,24 +111,12 @@ export function TaskWorkspaceExecutionOverview({
   } | null;
   commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
 }) {
-  const [activeTab, setActiveTab] = useState<CommandCenterTab>("now");
+  const [activeTab, setActiveTab] = useState<CommandCenterTab>("output");
   const { messages } = useI18n();
   const ws = messages.components?.taskWorkspace ?? {};
   const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
-  const hasAttention = attention !== null;
-  const needsNow = hasAttention || primaryAction?.kind === "current-operation";
-  const showNowBadge = needsNow || isActionablePrimary(primaryAction);
-
-  const prevNeedsNowRef = useRef(needsNow);
-  useEffect(() => {
-    if (needsNow && !prevNeedsNowRef.current) {
-      setActiveTab("now");
-    }
-    prevNeedsNowRef.current = needsNow;
-  }, [needsNow]);
 
   const tabs: Array<{ id: CommandCenterTab; label: string; badge?: boolean }> = [
-    { id: "now", label: copy.nowTab, badge: showNowBadge },
     { id: "output", label: copy.outputTab },
     { id: "trail", label: copy.trailTab },
   ];
@@ -164,14 +144,6 @@ export function TaskWorkspaceExecutionOverview({
     ?? readiness.statusLabel
     ?? null;
 
-  const nowHandlers = {
-    ...(commandCenterActionHandlers ?? {}),
-    ...(primaryAction?.actionHandlers ?? {}),
-    "command-center-primary": (params: Record<string, unknown>) => {
-      const actionId = typeof params.actionId === "string" ? params.actionId : null;
-      if (actionId === (primaryAction?.kind ?? primaryAction?.label)) primaryAction?.onClick?.();
-    },
-  };
   const locateHandlers = {
     "locate-workspace-node": (params: Record<string, unknown>) => {
       const nodeId = typeof params.nodeId === "string" ? params.nodeId : undefined;
@@ -196,11 +168,22 @@ export function TaskWorkspaceExecutionOverview({
                 {ws.taskEyebrow ?? "Task"}
               </p>
               <h2 className="font-heading text-base font-semibold leading-tight text-foreground">
-                {ws.commandCenter ?? "Command Center"}
+                {ws.commandCenter ?? "Execution"}
               </h2>
             </div>
           </div>
         </div>
+
+        <TaskWorkspaceActionRail
+          taskId={taskId}
+          serverNowSpec={commandCenter?.documents.now ?? null}
+          primaryAction={primaryAction}
+          readiness={readiness}
+          attention={attention}
+          runtimeEvents={runtimeEvents}
+          commandCenterActionHandlers={commandCenterActionHandlers}
+          copy={ws}
+        />
 
         <div className="mb-3 shrink-0 space-y-1.5 rounded-xl border border-border/60 bg-muted/35 px-3 py-2">
           <div className="flex items-center justify-between gap-2">
@@ -228,35 +211,18 @@ export function TaskWorkspaceExecutionOverview({
           onValueChange={(value) => setActiveTab(value as CommandCenterTab)}
           className="min-h-0 flex-1 gap-3 overflow-hidden"
         >
-          <TabsList className="grid h-auto w-full shrink-0 grid-cols-3 gap-1 rounded-[1rem] border border-border/60 bg-muted/70 p-1 shadow-inner">
+          <TabsList className="flex h-auto w-full shrink-0 flex-wrap justify-start gap-1.5 rounded-none border-b border-border/70 bg-transparent p-0 pb-2 shadow-none">
             {tabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="relative rounded-[0.78rem] px-2.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                className="relative flex-none rounded-full border border-border/60 bg-muted/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
               >
                 {tab.label}
-                {tab.badge ? (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "absolute right-1 top-1 size-1.5 rounded-full",
-                      attention ? "bg-warning" : "bg-primary",
-                    )}
-                  />
-                ) : null}
               </TabsTrigger>
             ))}
           </TabsList>
-
-          <TabsContent value="now" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            <SpecRenderer
-              key="now"
-              spec={commandCenter?.documents.now ?? null}
-              handlers={nowHandlers}
-            />
-          </TabsContent>
 
           <TabsContent value="output" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
             <SpecRenderer

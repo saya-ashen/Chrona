@@ -228,9 +228,14 @@ describe("TaskWorkspacePlanSection", () => {
     expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
     expect(within(commandCenter).getByRole("button", { name: "Accept plan" })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-generate"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Generated plan node" })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: "Generated plan node" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: /Generated plan node/ })).toBeInTheDocument());
+    // Node detail opens as a delineated overlay (dialog) over the task overview,
+    // with an explicit close control, rather than silently swapping the rail.
+    const nodeOverlay = screen.getByRole("dialog", { name: "Selected node details" });
+    expect(within(nodeOverlay).getByRole("heading", { name: /Generated plan node/ })).toBeInTheDocument();
+    fireEvent.click(within(nodeOverlay).getByRole("button", { name: "Close node details" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("heading", { name: /Generated plan node/ })).not.toBeInTheDocument();
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
     await waitFor(() => expect(onApplyPlan).toHaveBeenCalledWith(draftPlan));
 
@@ -287,14 +292,12 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    // The current-operation controls render in the Now tab (default).
+    // The current-operation controls render in the persistent action rail.
     expect(within(commandCenter).getByLabelText(/Decision/)).toBeInTheDocument();
-    // Live runtime event content surfaces directly in the Now tab. With a
-    // pending checkpoint, the command center keeps the Now tab focused, so the
-    // live event is verified there rather than on the Trail tab.
+    // Live runtime event content surfaces directly in the action rail.
     expect(within(commandCenter).getByText("Tool: Starting plan")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-checkpoint"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Review generated output" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: /Review generated output/ })).toBeInTheDocument());
   });
 
   it("adds generate plan as the command center operation when no plan exists", () => {
@@ -455,12 +458,16 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
   });
 
-  it("wires selected-node activity into the node drawer", async () => {
+  it("wires selected-node activity into the node inspector", async () => {
     const graphPlan = createTaskWorkspaceFixtureGraph([
       createTaskWorkspaceFixtureNode({ id: "node-a", title: "Node A", status: "active" }),
       createTaskWorkspaceFixtureNode({ id: "node-b", title: "Node B", status: "ready" }),
     ], "node-a");
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+    // Return a fresh Response per call: the command center also renders the
+    // ProviderApprovalBanner, which issues its own fetch. A single shared
+    // Response body can only be read once, so reuse would starve the
+    // node-activity request.
+    const nodeActivityPayload = {
       items: [{
         id: "activity-node-a",
         kind: "tool_started",
@@ -475,9 +482,10 @@ describe("TaskWorkspacePlanSection", () => {
       }],
       nextCursor: null,
       scope: { type: "node", taskId: "task-1", nodeId: "node-a", limit: 100 },
-    }), {
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(new Response(JSON.stringify(nodeActivityPayload), {
       headers: { "Content-Type": "application/json" },
-    }));
+    })));
 
     renderWithQueryClient(
       <TaskWorkspacePlanSection
@@ -501,7 +509,7 @@ describe("TaskWorkspacePlanSection", () => {
     );
 
     fireEvent.click(screen.getByTestId("task-plan-node-node-a"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Node A" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: /Node A/ })).toBeInTheDocument());
     fireEvent.click(screen.getAllByRole("tab", { name: "Activity" }).at(-1)!);
 
     expect(screen.getByText("Node activity")).toBeInTheDocument();
@@ -832,7 +840,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();
   });
 
-  it("opens and closes the node drawer from selected graph nodes", async () => {
+  it("opens node detail as a dismissible overlay over the task overview", async () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "review",
       title: "Review task output",
@@ -842,72 +850,58 @@ describe("TaskWorkspacePlanSection", () => {
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "review");
 
     renderWithQueryClient(
-      <>
-        <button type="button">Top navigation action</button>
-        <button type="button">Left navigation action</button>
-        <TaskWorkspacePlanSection
-          label="Plan"
-          graphPlan={graphPlan}
-          isGraphPlanPending={false}
-          pageData={createTaskWorkspaceFixturePageData()}
-          plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
-          planGenerationStatus="idle"
-          acceptPlanError={null}
-          planningTaskDraft={{
-            title: "Review task output",
-            description: "",
-            priority: "Medium",
-            dueAt: null,
-            scheduledStartAt: null,
-            scheduledEndAt: null,
-          }}
-          hasUnsavedConfigChanges={false}
-          unsavedConfigDraft={null}
-          runtimeEvents={[]}
-          onGeneratePlan={vi.fn()}
-          onPlanLoaded={vi.fn()}
-          onApplyPlan={vi.fn()}
-          onSaveConfigBeforeRegenerate={vi.fn()}
-          onDispatchExecutionAction={vi.fn()}
-        />
-      </>,
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData()}
+        plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
+        planGenerationStatus="idle"
+        acceptPlanError={null}
+        planningTaskDraft={{
+          title: "Review task output",
+          description: "",
+          priority: "Medium",
+          dueAt: null,
+          scheduledStartAt: null,
+          scheduledEndAt: null,
+        }}
+        hasUnsavedConfigChanges={false}
+        unsavedConfigDraft={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onPlanLoaded={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onSaveConfigBeforeRegenerate={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
     );
 
     expect(screen.getByTestId("task-plan-node-review")).toHaveTextContent("Review task output");
+    // No overlay before a node is selected; the task overview owns the rail.
+    expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
 
+    // Selecting a graph node opens the node detail as an overlay layered on top
+    // of the overview, with the node title and explicit dismiss controls.
     fireEvent.click(screen.getByTestId("task-plan-node-review"));
+    const overlay = await screen.findByRole("dialog", { name: "Selected node details" });
+    expect(within(overlay).getByText("Node details")).toBeInTheDocument();
+    expect(within(overlay).getByRole("heading", { name: /Review task output/ })).toBeInTheDocument();
+    expect(within(overlay).getByRole("button", { name: "Task overview" })).toBeInTheDocument();
+    expect(within(overlay).getByRole("button", { name: "Close node details" })).toBeInTheDocument();
+
+    // Pressing Escape inside the overlay dismisses it back to the overview.
+    fireEvent.keyDown(overlay, { key: "Escape" });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Close selected node drawer" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Close selected node drawer" })).not.toBeInTheDocument();
-    });
-    expect(screen.getByRole("button", { name: "Open selected node drawer" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Open selected node drawer" }));
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Close selected node drawer" })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Close selected node drawer" })).not.toBeInTheDocument();
-    });
-    expect(screen.getByRole("button", { name: "Open selected node drawer" })).toBeInTheDocument();
-
+    // Re-selecting the node re-opens the overlay; the close button dismisses it.
     fireEvent.click(screen.getByTestId("task-plan-node-review"));
+    const reopened = await screen.findByRole("dialog", { name: "Selected node details" });
+    fireEvent.click(within(reopened).getByRole("button", { name: "Close node details" }));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Close selected node drawer" })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Close selected node drawer" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Close selected node drawer" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
     });
   });
 });

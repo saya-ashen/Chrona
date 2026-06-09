@@ -335,6 +335,10 @@ async function dispatchWorkspaceCommand(taskId: string, body: Record<string, unk
   return await response.json() as unknown as WorkspaceCommandAck;
 }
 
+function isWorkspaceEventInSelectedScope(event: TaskWorkspaceSseEvent, selectedWorkBlockId: string | null) {
+  return (event.workBlockId ?? null) === selectedWorkBlockId;
+}
+
 export function useTaskWorkspacePlanState(
   task: TaskData,
   refreshWorkspace: () => Promise<void>,
@@ -380,6 +384,7 @@ export function useTaskWorkspacePlanState(
     setIsGeneratingPlan(false);
     setGenerationActivitySummary(null);
     setRuntimeEvents([]);
+    setLiveActivity([]);
     setPlanFlow(createPlanFlowFromSnapshot(planStateQuery.data));
   }, [planStateQuery.data, selectedWorkBlockKey]);
 
@@ -431,7 +436,7 @@ export function useTaskWorkspacePlanState(
     );
 
     for (const event of nextEvents) {
-      if (event.workBlockId !== undefined && event.workBlockId !== null && event.workBlockId !== selectedWorkBlockId) continue;
+      if (!isWorkspaceEventInSelectedScope(event, selectedWorkBlockId)) continue;
       const activityItem = workspaceEventToWorkspaceActivity(event, event.sequence ?? 0);
       if (activityItem) {
         setLiveActivity((current) => mergeWorkspaceActivity([activityItem, ...current]));
@@ -485,7 +490,7 @@ export function useTaskWorkspacePlanState(
         void planStateQuery.refetch();
       }
     }
-  }, [currentExecutionQuery, planStateQuery, task.id, workspaceEvents]);
+  }, [currentExecutionQuery, planStateQuery, selectedWorkBlockId, workspaceEvents]);
 
   useEffect(() => {
     if (!plan) {
@@ -569,10 +574,11 @@ export function useTaskWorkspacePlanState(
     setGenerationUserInstruction(userInstruction);
     setIsGeneratingPlan(true);
     setGenerationActivitySummary("Generating plan");
-    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction }).catch((cause) => {
-      setIsGeneratingPlan(false);
-      setGenerationActivitySummary(cause instanceof Error ? cause.message : "Failed to generate plan");
-    });
+    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction })
+      .catch((cause) => {
+        setIsGeneratingPlan(false);
+        setGenerationActivitySummary(cause instanceof Error ? cause.message : "Failed to generate plan");
+      });
   }, [selectedWorkBlockId, task.id]);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {

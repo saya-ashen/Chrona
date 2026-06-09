@@ -143,20 +143,20 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.queryByText(/Structured result is ready/)).not.toBeInTheDocument();
   });
 
-  it("renders expanded drawer content as a selectable fixed panel", () => {
+  it("renders the selected node as an inline details panel, not a floating drawer", () => {
     const node = createTaskWorkspaceFixtureNode({
-      id: "drawer-node",
-      title: "Drawer node",
+      id: "panel-node",
+      title: "Panel node",
       status: "done",
       completionSummary: "Selectable result text",
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} variant="drawer" drawerSize="expanded" />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} />);
 
-    const drawer = screen.getByLabelText("Current node details");
-    expect(drawer).toHaveAttribute("data-node-detail-drawer", "true");
-    expect(drawer).not.toHaveAttribute("data-vaul-drawer");
-    expect(drawer).toHaveClass("select-text");
+    const panel = screen.getByLabelText("Current node details");
+    // The merged inspector renders node details inline in the right rail — no floating drawer overlay.
+    expect(panel).not.toHaveAttribute("data-node-detail-drawer");
+    expect(panel).not.toHaveClass("fixed");
   });
 
   it("renders json-render Spec result output via SpecRenderer", () => {

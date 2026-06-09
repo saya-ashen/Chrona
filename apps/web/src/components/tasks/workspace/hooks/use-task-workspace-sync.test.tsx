@@ -320,7 +320,7 @@ beforeEach(() => {
       });
     }
 
-    if (url.endsWith("/plan")) {
+    if (url.includes("/api/tasks/") && url.includes("/plan") && !url.includes("/generations")) {
       return new Response(JSON.stringify(mocks.planResponses.shift()), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -402,6 +402,7 @@ describe("task workspace page synchronization", () => {
 
     workspaceEvents = [nextWorkspaceEvent({
       type: "execution.runtime_event",
+      workBlockId: "block-first",
       eventKind: "tool_started",
       action: "start_manual",
       nodeId: "node-1",
@@ -436,6 +437,104 @@ describe("task workspace page synchronization", () => {
     expect(result.current.planGenerationStatus).toBe("accepted");
     expect(result.current.latestActivitySummary).toBeNull();
     expect(result.current.runtimeEvents).toEqual([]);
+  });
+  it("ignores live activity from another recurring work block", async () => {
+    const currentPlan = planReadModel({ id: "plan-current", status: "accepted", title: "Current occurrence plan" });
+    const task = recurringPageData({
+      taskStatus: "Running",
+      plan: currentPlan,
+      runStatus: "Running",
+      workBlockId: "block-current",
+    }).task;
+
+    const { result } = renderHook(
+      () => useTaskWorkspacePlanState(task, vi.fn(async () => undefined), [
+        nextWorkspaceEvent({
+          type: "execution.runtime_event",
+          workBlockId: "block-other",
+          eventKind: "tool_started",
+          action: "start_manual",
+          nodeId: "node-1",
+          nodeTitle: "Other node",
+          runtimeName: "hermes",
+          provider: "hermes",
+          runId: "run-other",
+          event: { type: "assistant_text_delta", text: "Other occurrence activity" },
+        }),
+      ]),
+      { wrapper: createQueryWrapper() },
+    );
+
+    expect(result.current.latestActivitySummary).toBeNull();
+    expect(result.current.liveActivity).toEqual([]);
+    expect(result.current.runtimeEvents).toEqual([]);
+  });
+
+  it("clears live trail activity when switching recurring work block", async () => {
+    const firstPlan = planReadModel({ id: "plan-first", status: "accepted", title: "First occurrence plan" });
+    const secondPlan = planReadModel({ id: "plan-second", status: "accepted", title: "Second occurrence plan" });
+    let task = recurringPageData({ taskStatus: "Running", plan: firstPlan, runStatus: "Running", workBlockId: "block-first" }).task;
+    let workspaceEvents = [nextWorkspaceEvent({
+      type: "execution.runtime_event",
+      workBlockId: "block-first",
+      eventKind: "tool_started",
+      action: "start_manual",
+      nodeId: "node-1",
+      nodeTitle: "First node",
+      runtimeName: "hermes",
+      provider: "hermes",
+      runId: "run-first",
+      event: { type: "assistant_text_delta", text: "First occurrence activity" },
+    })];
+
+    const { result, rerender } = renderHook(
+      () => useTaskWorkspacePlanState(task, vi.fn(async () => undefined), workspaceEvents),
+      { wrapper: createQueryWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.latestActivitySummary).toBe("First occurrence activity"));
+
+    task = recurringPageData({ taskStatus: "Running", plan: secondPlan, runStatus: "Running", workBlockId: "block-second" }).task;
+    workspaceEvents = [];
+    await act(async () => {
+      rerender();
+    });
+
+    await waitFor(() => expect(result.current.liveActivity).toEqual([]));
+    expect(result.current.latestActivitySummary).toBeNull();
+    expect(result.current.runtimeEvents).toEqual([]);
+  });
+
+
+  it("syncs router loader data into cached occurrence page data", async () => {
+    const firstPlan = planReadModel({ id: "plan-first", status: "accepted", title: "First occurrence plan" });
+    const secondPlan = planReadModel({ id: "plan-second", status: "accepted", title: "Second occurrence plan" });
+    const firstInitial = recurringPageData({ taskStatus: "Ready", plan: firstPlan, workBlockId: "block-first" });
+    const secondInitial = recurringPageData({ taskStatus: "Ready", plan: secondPlan, workBlockId: "block-second" });
+    const firstFresh = recurringPageData({ taskStatus: "Running", plan: firstPlan, runStatus: "Running", workBlockId: "block-first" });
+
+    firstInitial.task.title = "First occurrence stale";
+    secondInitial.task.title = "Second occurrence";
+    firstFresh.task.title = "First occurrence fresh";
+
+    let initialData = firstInitial;
+    const { result, rerender } = renderHook(() => useTaskWorkspacePageState(initialData), { wrapper: createQueryWrapper() });
+
+    expect(result.current.pageData.task.title).toBe("First occurrence stale");
+
+    initialData = secondInitial;
+    await act(async () => {
+      rerender();
+    });
+    await waitFor(() => expect(result.current.pageData.task.title).toBe("Second occurrence"));
+
+    initialData = firstFresh;
+    await act(async () => {
+      rerender();
+    });
+
+    await waitFor(() => expect(result.current.pageData.task.title).toBe("First occurrence fresh"));
+    expect(result.current.pageData.task.status).toBe("Running");
   });
 
   it("updates the rendered plan graph when a projection event refetches the full workspace page", async () => {
@@ -711,6 +810,38 @@ describe("task workspace page synchronization", () => {
 
     expect(mocks.pageFetchCount).toBe(0);
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
+  });
+
+  it("refreshes recurring plan generation events for the selected work block", async () => {
+    const initialPlan = planReadModel({ id: "plan-first", status: "ready", title: "Old recurring plan" });
+    const generatedPlan = planReadModel({ id: "plan-generated", status: "draft", title: "Generated recurring plan" });
+    const initialPage = recurringPageData({
+      taskStatus: "Ready",
+      plan: initialPlan,
+      aiPlanGenerationStatus: "generating",
+      workBlockId: "block-first",
+    });
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: generatedPlan },
+    ];
+
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
+    await act(async () => {
+      emitWorkspaceEvent(nextWorkspaceEvent({
+        type: "plan.generation.event",
+        eventKind: "result",
+        workBlockId: "block-first",
+      }));
+    });
+
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated recurring plan"));
+    expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance");
   });
 
   it("exposes the latest plan generation activity summary", async () => {

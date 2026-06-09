@@ -2,7 +2,8 @@ import { buildActivitySpec, UI_ACTION, type ToolDetailLabels, type UiDocument } 
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
-import type { WorkspaceActivityItem, WorkspaceArtifactItem } from "../model/task-workspace-types";
+import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../model/task-workspace-types";
+import type { CommandCenterPrimaryAction } from "./task-workspace-execution-overview";
 
 type WorkspaceCopy = Record<string, string | undefined>;
 type MutableElements = UiDocument["elements"];
@@ -21,6 +22,127 @@ function appendDocument(
     };
   }
   children.push(`${keyPrefix}:${document.root}`);
+}
+
+function mergeDocumentState(target: UiDocument, document: UiDocument | null | undefined) {
+  if (!document?.state) return;
+  target.state = { ...(target.state ?? {}), ...document.state };
+}
+
+function normalizeTone(tone: ExecutionOverviewCard["tone"] | CommandCenterPrimaryAction["tone"] | undefined) {
+  return tone === "critical" ? "danger" : (tone ?? "info");
+}
+
+function compactRuntimeText(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+function describeRuntimeEvent(event: WorkspaceRuntimeEvent): { label: string; detail: string } {
+  const value = event.event;
+  switch (value.type) {
+    case "assistant_text_delta":
+      return { label: "Assistant", detail: compactRuntimeText(value.text) };
+    case "reasoning_delta":
+      return { label: "Reasoning", detail: compactRuntimeText(value.text) };
+    case "tool_started":
+      return { label: "Tool", detail: compactRuntimeText(value.label) };
+    case "tool_completed":
+      return { label: "Tool", detail: compactRuntimeText(value.error ? `${value.label} failed` : `${value.label} completed`) };
+    case "approval_required":
+      return { label: "Approval", detail: "Approval required" };
+    case "run_status":
+      return { label: "Status", detail: compactRuntimeText(value.message ?? value.status) };
+    case "raw_event":
+      return { label: "Event", detail: compactRuntimeText(value.rawEventType ?? "Runtime event") };
+  }
+}
+
+function primaryActionId(action: CommandCenterPrimaryAction) {
+  return action.kind ?? action.label;
+}
+
+function buildPrimaryActionSpec(primaryAction: CommandCenterPrimaryAction | null | undefined, copy: WorkspaceCopy): UiDocument | null {
+  if (!primaryAction?.onClick) return null;
+  return {
+    root: "root",
+    elements: {
+      root: { type: "Stack", props: { gap: "sm" }, children: ["action"] },
+      action: {
+        type: "Button",
+        props: {
+          label: primaryAction.isLoading ? (copy.generating ?? "Generating...") : primaryAction.label,
+          variant: primaryAction.tone === "critical" ? "danger" : "primary",
+          ...((primaryAction.disabled || primaryAction.isLoading) && { disabled: true }),
+        },
+        on: { press: { action: UI_ACTION.commandCenterPrimary, params: { actionId: primaryActionId(primaryAction) } } },
+      },
+    },
+  };
+}
+
+/**
+ * Frontend fallback for the persistent action rail when the server does not
+ * supply `commandCenter.documents.now`. Renders the current-operation status
+ * card, recent live runtime events, and the resolved primary action (an
+ * embedded action spec such as the accept/regenerate or checkpoint controls,
+ * and/or a single primary button).
+ */
+export function buildCommandCenterNowSpec(input: {
+  primaryAction?: CommandCenterPrimaryAction | null;
+  readiness: ExecutionOverviewCard;
+  attention: ExecutionOverviewCard | null;
+  runtimeEvents: WorkspaceRuntimeEvent[];
+  copy: WorkspaceCopy;
+}): UiDocument {
+  const elements: MutableElements = {};
+  const rootChildren: string[] = [];
+  elements.root = { type: "Stack", props: { gap: "sm" }, children: rootChildren };
+
+  const statusCard = input.attention ?? input.readiness;
+  const statusIcon = input.attention ? "warning" : "sparkles";
+  elements["status-card"] = {
+    type: "WorkspaceSummaryCard",
+    props: {
+      eyebrow: input.copy.currentOperation ?? "Current operation",
+      title: statusCard.title,
+      description: statusCard.description,
+      statusLabel: statusCard.statusLabel,
+      tone: normalizeTone(statusCard.tone),
+      icon: statusIcon,
+    },
+  };
+  rootChildren.push("status-card");
+
+  if (input.runtimeEvents.length > 0) {
+    const recentEvents = input.runtimeEvents.slice(-8);
+    const eventChildren: string[] = [];
+    recentEvents.forEach((event, i) => {
+      const key = `event-${i}`;
+      const { label, detail } = describeRuntimeEvent(event);
+      elements[key] = {
+        type: "Text",
+        props: { text: detail ? `${label}: ${detail}` : label, variant: "muted" },
+      };
+      eventChildren.push(key);
+    });
+    elements["live-header"] = {
+      type: "Text",
+      props: { text: input.copy.liveEvents ?? "Live", variant: "caption" },
+    };
+    elements["live-stack"] = {
+      type: "Stack",
+      props: { gap: "xs" },
+      children: ["live-header", ...eventChildren],
+    };
+    rootChildren.push("live-stack");
+  }
+
+  appendDocument(elements, rootChildren, "primary-action", input.primaryAction?.actionSpec);
+  appendDocument(elements, rootChildren, "primary-button", buildPrimaryActionSpec(input.primaryAction, input.copy));
+
+  const spec: UiDocument = { root: "root", elements };
+  mergeDocumentState(spec, input.primaryAction?.actionSpec);
+  return spec;
 }
 
 

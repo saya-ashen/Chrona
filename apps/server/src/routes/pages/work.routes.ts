@@ -29,6 +29,7 @@ function publishCommandEvent(input: {
   commandType: string;
   type: "command.accepted" | "command.failed";
   message?: string;
+  workBlockId?: string | null;
 }) {
   appendTaskWorkspaceEvent({
     type: input.type,
@@ -37,8 +38,13 @@ function publishCommandEvent(input: {
     commandId: input.commandId,
     commandType: input.commandType,
     message: input.message,
+    workBlockId: input.workBlockId,
   });
 }
+function commandWorkBlockId(command: ReturnType<typeof workCommandBodySchema.parse>) {
+  return "workBlockId" in command ? command.workBlockId ?? null : null;
+}
+
 
 function planGenerationWorkspacePayload(event: GeneratePlanSSEEvent) {
   switch (event.type) {
@@ -73,7 +79,14 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
   command: ReturnType<typeof workCommandBodySchema.parse>;
 }) {
   const { taskId, workspaceId, commandId, command } = input;
-  publishCommandEvent({ taskId, workspaceId, commandId, commandType: command.type, type: "command.accepted" });
+  publishCommandEvent({
+    taskId,
+    workspaceId,
+    commandId,
+    commandType: command.type,
+    type: "command.accepted",
+    workBlockId: commandWorkBlockId(command),
+  });
 
   try {
     if (command.type === "plan.generate") {
@@ -92,6 +105,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
           type: "plan.generation.event",
           eventKind: event.type,
           generationId: generation.generationId,
+          workBlockId: commandWorkBlockId(command),
           ...planGenerationWorkspacePayload(event),
         });
       }
@@ -188,6 +202,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
       commandId,
       commandType: command.type,
       type: "command.failed",
+      workBlockId: commandWorkBlockId(command),
       message: httpError?.message ?? (cause instanceof Error ? cause.message : "Workspace command failed"),
     });
   }

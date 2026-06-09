@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
@@ -10,22 +10,13 @@ import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/pl
 import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import { Button } from "@/components/ui/button";
 import { buildAcceptOrRegenerateSpec } from "../execution/build-execution-overview-spec";
-import {
-  TaskWorkspaceExecutionOverview,
-  type CommandCenterCopy,
-  type CommandCenterPrimaryAction,
+import type {
+  CommandCenterCopy,
+  CommandCenterPrimaryAction,
 } from "../execution/task-workspace-execution-overview";
 import { useActionSpecRenderConfig } from "../execution/action-tab";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { TaskWorkspaceNodeDetailPanel, type NodeDrawerFrame } from "../execution/task-workspace-node-detail-panel";
-import {
-  applyNodeDrawerSelection,
-  createNodeDrawerMachineState,
-  expandNodeDrawer,
-  recordNodeDrawerGraphClick,
-  recordNodeDrawerOutsideClick,
-  setNodeDrawerSize as resolveNodeDrawerSize,
-} from "../model/task-workspace-node-drawer-machine";
+import { TaskWorkspaceInspector } from "../execution/task-workspace-inspector";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import {
   createTaskWorkspaceExecutionConsoleView,
@@ -86,18 +77,6 @@ function graphNodeIdForAction(action: TaskAction | null | undefined, pageData: T
     ?? null;
 }
 
-function isNodeDetailDrawerTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-
-  return Boolean(target.closest("[data-node-detail-drawer]"));
-}
-
-function isPlanGraphTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-
-  return Boolean(target.closest("[data-plan-graph-surface]"));
-}
-
 type TaskWorkspacePlanSectionProps = {
   label: string;
   commandCenterCopy?: Partial<CommandCenterCopy>;
@@ -153,10 +132,6 @@ export function TaskWorkspacePlanSection({
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"result" | null>(null);
-  const [nodeDrawerState, setNodeDrawerState] = useState(createNodeDrawerMachineState);
-  const nodeDrawerSize = nodeDrawerState.size;
-  const [nodeDrawerFrame, setNodeDrawerFrame] = useState<NodeDrawerFrame | null>(null);
-  const nodeDrawerFrameRef = useRef<HTMLDivElement | null>(null);
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
   const { messages } = useI18n();
@@ -220,14 +195,18 @@ export function TaskWorkspacePlanSection({
       nodeId: selectedDetailNode?.id ?? "",
       limit: 100,
     }),
-    enabled: Boolean(selectedDetailNode?.id) && nodeDrawerSize !== "collapsed",
+    enabled: Boolean(selectedDetailNode?.id) && Boolean(selectedPlanNode),
   });
+  // Scope follows the user's explicit graph selection. `selectedDetailNode`
+  // falls back to the active node for display, so it must not drive scope.
+  const inspectorScope = selectedPlanNode ? "node" : "task";
   const selectedNodeRuntimeEvents = selectedDetailNode?.id
     ? runtimeEvents.filter((event) => event.nodeId === selectedDetailNode.id)
     : [];
   const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
   const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
+  const commandCenterScopeKey = pageData.task.currentWorkBlock?.id ?? pageData.task.id;
   const currentOperationAction = useActionSpecRenderConfig({
     node: currentOperationNode,
     disabledActionReason: operationConsoleView.nodeDetail.disabledActionReason,
@@ -332,7 +311,6 @@ export function TaskWorkspacePlanSection({
     nodes: PlanNodeDataModel[],
   ) => {
     handleSelectedPlanNodeChange(node, nodes);
-    setNodeDrawerState((current) => applyNodeDrawerSelection(current, { hasNode: Boolean(node) }));
   }, [handleSelectedPlanNodeChange]);
   const focusNodeActions = (nodeId?: string) => {
     if (nodeId && graphPlan) {
@@ -340,7 +318,6 @@ export function TaskWorkspacePlanSection({
         graphPlan.nodes.find((candidate) => candidate.id === nodeId) ?? null;
       if (node) {
         handleSelectedPlanNodeChange(node, [node]);
-        setNodeDrawerState((current) => current.size === "collapsed" ? expandNodeDrawer(current) : current);
       }
     }
     setPreferredNodeDetailTab("result");
@@ -350,45 +327,9 @@ export function TaskWorkspacePlanSection({
       actionsPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   };
-  useEffect(() => {
-    const handleDocumentClick = (event: MouseEvent) => {
-      if (isNodeDetailDrawerTarget(event.target)) return;
-      if (isPlanGraphTarget(event.target)) {
-        setNodeDrawerState(recordNodeDrawerGraphClick);
-        return;
-      }
-
-      setNodeDrawerState(recordNodeDrawerOutsideClick);
-    };
-
-    document.addEventListener("click", handleDocumentClick, { capture: true });
-
-    return () => {
-      document.removeEventListener("click", handleDocumentClick, { capture: true });
-    };
-  }, []);
-  useEffect(() => {
-    const frame = nodeDrawerFrameRef.current;
-    if (!frame) return;
-
-    const updateFrame = () => {
-      const rect = frame.getBoundingClientRect();
-      setNodeDrawerFrame({ left: rect.left, width: rect.width });
-    };
-
-    updateFrame();
-
-    const resizeObserver = typeof ResizeObserver === "undefined"
-      ? null
-      : new ResizeObserver(updateFrame);
-    resizeObserver?.observe(frame);
-    window.addEventListener("resize", updateFrame);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateFrame);
-    };
-  }, []);
+  const handleBackToTask = useCallback(() => {
+    handleSelectedPlanNodeChange(null, []);
+  }, [handleSelectedPlanNodeChange]);
 
   return (
     <section
@@ -431,12 +372,11 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : null}
 
-      <div className="relative flex min-h-[760px] flex-1 flex-col gap-2.5 xl:min-h-0">
-        <div className="grid min-h-0 flex-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
+      <div className="relative flex min-h-[680px] flex-1 flex-col gap-2.5 xl:min-h-0">
+        <div className="grid min-h-0 flex-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <section
             aria-label={copy.executionFlow ?? "Execution flow"}
             className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/55 shadow-sm"
-            data-plan-graph-surface
           >
             <TaskWorkspacePlanContent
               label={label}
@@ -449,28 +389,27 @@ export function TaskWorkspacePlanSection({
               onSelectedNodeChange={handlePlanNodeChange}
             />
           </section>
-
-          <aside
-            className="min-h-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/45 p-1 shadow-sm"
-            aria-label={copy.commandCenterAria ?? "Task command center"}
-          >
-            <TaskWorkspaceExecutionOverview
-              progress={consoleView.progress}
-              readiness={consoleView.readiness}
-              latestResult={consoleView.latestResult}
-              attention={consoleView.attention}
-              latestCompletedNode={consoleView.latestCompletedNode}
-              artifacts={consoleView.artifacts}
-              activity={consoleView.activity}
-              commandCenterActionHandlers={commandCenterActionHandlers}
-              commandCenter={pageData.commandCenter ?? null}
-              runtimeEvents={runtimeEvents}
-              liveActivity={liveActivity}
-              primaryAction={primaryAction}
-              copy={commandCenterCopy}
-              onAction={focusNodeActions}
-            />
-            {shouldShowPlanGenerationPanel ? (
+          <TaskWorkspaceInspector
+            key={commandCenterScopeKey}
+            taskId={pageData.task.id}
+            scope={inspectorScope}
+            consoleView={consoleView}
+            primaryAction={primaryAction}
+            commandCenter={pageData.commandCenter ?? null}
+            commandCenterActionHandlers={commandCenterActionHandlers}
+            runtimeEvents={runtimeEvents}
+            liveActivity={liveActivity}
+            commandCenterCopy={commandCenterCopy}
+            copy={copy}
+            selectedNodes={selectedPlanNodes}
+            selectedNodeRuntimeEvents={selectedNodeRuntimeEvents}
+            nodeActivity={nodeActivityQuery.data?.items ?? []}
+            isNodeActivityLoading={nodeActivityQuery.isLoading || nodeActivityQuery.isFetching}
+            preferredNodeDetailTab={preferredNodeDetailTab}
+            onPreferredNodeDetailTabApplied={() => setPreferredNodeDetailTab(null)}
+            onAction={focusNodeActions}
+            onBackToTask={handleBackToTask}
+            planGenerationPanel={shouldShowPlanGenerationPanel ? (
               <TaskPlanGenerationPanel
                 taskId={pageData.task.id}
                 title={planningTaskDraft.title}
@@ -493,27 +432,7 @@ export function TaskWorkspacePlanSection({
                 renderIdleEmptyState={false}
               />
             ) : null}
-          </aside>
-        </div>
-
-        <div className="pointer-events-none relative z-20 grid h-[72px] shrink-0 gap-2.5 xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
-          <div ref={nodeDrawerFrameRef} className="relative min-w-0">
-            <div className="absolute inset-x-0 bottom-2">
-              <TaskWorkspaceNodeDetailPanel
-                detail={consoleView.nodeDetail}
-                activity={nodeActivityQuery.data?.items ?? []}
-                runtimeEvents={selectedNodeRuntimeEvents}
-                isActivityLoading={nodeActivityQuery.isLoading || nodeActivityQuery.isFetching}
-                selectedNodes={selectedPlanNodes}
-                variant="drawer"
-                drawerSize={nodeDrawerSize}
-                drawerFrame={nodeDrawerFrame}
-                onDrawerSizeChange={(size) => setNodeDrawerState((current) => resolveNodeDrawerSize(current, size))}
-                preferredTab={preferredNodeDetailTab}
-                onPreferredTabApplied={() => setPreferredNodeDetailTab(null)}
-              />
-            </div>
-          </div>
+          />
         </div>
       </div>
     </section>

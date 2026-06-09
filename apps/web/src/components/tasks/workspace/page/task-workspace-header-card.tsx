@@ -62,9 +62,10 @@ function actionIcon(actionId: TaskHeaderAction["id"]) {
 }
 
 function actionVariant(actionId: TaskHeaderAction["id"]) {
-  if (actionId === "start") return "default" as const;
+  // Phase 4: the right-rail ActionRail is the primary "start execution" entry.
+  // Header keeps Start as a secondary shortcut, not a competing primary CTA.
   if (actionId === "stop") return "destructive" as const;
-  return "secondary" as const;
+  return "outline" as const;
 }
 
 type RecurrenceOccurrenceOption = NonNullable<TaskData["recurrenceOccurrences"]>[number];
@@ -344,7 +345,7 @@ export function TaskWorkspaceHeaderCard({
                 onClick={() => void handleAction(action)}
                 variant={actionVariant(action.id)}
                 size="sm"
-                className={action.id === "start" ? "min-w-24 rounded-xl" : "rounded-xl"}
+                className="rounded-xl"
               >
                 <Icon className={isPending ? "size-3.5 animate-pulse" : "size-3.5"} />
                 {isPending ? `${action.label}...` : action.label}

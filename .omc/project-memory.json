@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1780559770810,
+  "lastScanned": 1780991549120,
   "projectRoot": "/home/saya/workspace/Chrona",
   "techStack": {
     "languages": [
@@ -57,8 +57,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd /home/saya/workspace/Chrona; bunx tsc --noEmit --pretty false > /tmp/tsc.out 2>&1; echo \"EXIT: $status\"; grep -v \"node_modules\" /tmp/tsc.out | grep -i \"error\" | head -30; echo \"---error count---\"; grep -c \"error TS\" /tmp/tsc.out",
-    "testCommand": "cd /home/saya/workspace/Chrona; bun test packages/engine/src/modules/plan-execution/ 2>&1 | tail -6",
+    "buildCommand": "timeout 200 npx tsc -p apps/web/tsconfig.json --noEmit 2>&1 | grep -E \"action-rail\" | grep -v \"bun:\\|nativeRunId\\|db.ts\\|hermes\" | head; echo \"=== overview suite ===\"; npx vitest run apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx 2>&1 | grep -E \"×|Tests |Test Files|Unable|expected\" | head -20",
+    "testCommand": "timeout 200 npx tsc -p apps/web/tsconfig.json --noEmit 2>&1 | grep -E \"action-rail\" | grep -v \"bun:\\|nativeRunId\\|db.ts\\|hermes\" | head; echo \"=== overview suite ===\"; npx vitest run apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx 2>&1 | grep -E \"×|Tests |Test Files|Unable|expected\" | head -20",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -71,6 +71,13 @@
       "lint": "eslint .",
       "deadcode": "knip --include unresolved,duplicates",
       "check": "bun run chrona check",
+      "map:build": "bun run scripts/build-feature-test-map.ts",
+      "map:check": "bun run scripts/build-feature-test-map.ts --check",
+      "feature-docs:select": "bun run scripts/feature-docs.ts select",
+      "feature-docs:scaffold": "bun run scripts/feature-docs.ts scaffold",
+      "feature-docs:sync": "bun run scripts/feature-docs.ts sync",
+      "feature-docs:check": "bun run scripts/feature-docs.ts check",
+      "feature-docs:index": "bun run scripts/feature-docs.ts index",
       "check:ui-foundation": "bun run scripts/check-ui-foundation.mjs",
       "analyze": "bun run chrona check all",
       "test": "bun run chrona test all",
@@ -119,7 +126,7 @@
       "path": "__pycache__",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780559770796,
+      "lastAccessed": 1780991549101,
       "keyFiles": [
         "weather.cpython-313.pyc"
       ]
@@ -128,14 +135,14 @@
       "path": "apps",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780559770797,
+      "lastAccessed": 1780991549105,
       "keyFiles": []
     },
     "artifacts": {
       "path": "artifacts",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1780559770805,
+      "lastAccessed": 1780991549112,
       "keyFiles": [
         "settings-after-desktop.png",
         "settings-after-mobile.png",
@@ -148,7 +155,7 @@
       "path": "assets",
       "purpose": "Static assets",
       "fileCount": 3,
-      "lastAccessed": 1780559770807,
+      "lastAccessed": 1780991549113,
       "keyFiles": [
         "2026-04-27-12-09-14.png",
         "2026-04-27-12-09-21.png",
@@ -159,7 +166,7 @@
       "path": "coverage",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1780559770807,
+      "lastAccessed": 1780991549116,
       "keyFiles": [
         "base.css",
         "block-navigation.js",
@@ -172,7 +179,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 2,
-      "lastAccessed": 1780559770807,
+      "lastAccessed": 1780991549116,
       "keyFiles": [
         "bun-entry.js",
         "cli.js"
@@ -181,8 +188,8 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 8,
-      "lastAccessed": 1780559770808,
+      "fileCount": 7,
+      "lastAccessed": 1780991549116,
       "keyFiles": [
         "README.md",
         "api-reference.md",
@@ -195,14 +202,14 @@
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780559770808,
+      "lastAccessed": 1780991549116,
       "keyFiles": []
     },
     "external-plugins": {
       "path": "external-plugins",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780559770808,
+      "lastAccessed": 1780991549116,
       "keyFiles": [
         "README.md"
       ]
@@ -211,21 +218,21 @@
       "path": "file:",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780559770808,
+      "lastAccessed": 1780991549116,
       "keyFiles": []
     },
     "packages": {
       "path": "packages",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780559770808,
+      "lastAccessed": 1780991549117,
       "keyFiles": []
     },
     "prisma": {
       "path": "prisma",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1780559770808,
+      "lastAccessed": 1780991549117,
       "keyFiles": [
         "dev.db",
         "dev.db-shm",
@@ -237,21 +244,21 @@
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 14,
-      "lastAccessed": 1780559770808,
+      "fileCount": 16,
+      "lastAccessed": 1780991549117,
       "keyFiles": [
         "build-binaries.ts",
+        "build-feature-test-map.ts",
         "check-ui-foundation.mjs",
         "check-web-page-reachability.ts",
-        "chrona.bun.test.ts",
-        "chrona.ts"
+        "chrona.bun.test.ts"
       ]
     },
     "specs": {
       "path": "specs",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1780559770808,
+      "lastAccessed": 1780991549117,
       "keyFiles": [
         "auto-execute-create-dialog-default.png",
         "auto-execute-settings-desktop.png",
@@ -264,14 +271,14 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780559770809,
+      "lastAccessed": 1780991549117,
       "keyFiles": []
     },
     "coverage/scripts": {
       "path": "coverage/scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 2,
-      "lastAccessed": 1780559770809,
+      "lastAccessed": 1780991549118,
       "keyFiles": [
         "check-ui-foundation.mjs.html",
         "index.html"
@@ -281,7 +288,7 @@
       "path": "docs/assets",
       "purpose": "Static assets",
       "fileCount": 4,
-      "lastAccessed": 1780559770810,
+      "lastAccessed": 1780991549119,
       "keyFiles": [
         "AIClients.png",
         "CreateTask.png",
@@ -292,9 +299,19 @@
       "path": "prisma/migrations",
       "purpose": "Database migrations",
       "fileCount": 1,
-      "lastAccessed": 1780559770810,
+      "lastAccessed": 1780991549119,
       "keyFiles": [
         "migration_lock.toml"
+      ]
+    },
+    "scripts/lib": {
+      "path": "scripts/lib",
+      "purpose": "Library code",
+      "fileCount": 2,
+      "lastAccessed": 1780991549119,
+      "keyFiles": [
+        "feature-test-map-model.ts",
+        "feature-test-map-render.ts"
       ]
     }
   },

@@ -627,10 +627,72 @@ async function persistProviderRuntimeEvent(input: {
         event: input.event,
         requestedAt: eventTime,
       });
+    } else {
+      await reconcilePendingProviderApprovals({
+        providerRunId: context.providerRunId,
+        event: input.event,
+        observedAt: eventTime,
+      });
     }
   } catch {
     // Runtime event persistence must not interrupt provider streaming.
   }
+}
+
+const HERMES_DEFAULT_APPROVAL_TIMEOUT_MS = 60_000;
+
+async function reconcilePendingProviderApprovals(input: {
+  providerRunId?: string | null;
+  event: ProviderRunEvent;
+  observedAt: Date;
+}) {
+  if (!input.providerRunId) return;
+
+  const pendingApprovals = await db.taskPlanProviderApproval.findMany({
+    where: {
+      providerRunId: input.providerRunId,
+      status: "pending",
+    },
+    select: {
+      id: true,
+      requestedAt: true,
+    },
+  });
+  if (pendingApprovals.length === 0) return;
+
+  const isTerminalEvent =
+    input.event.type === "run_completed" ||
+    input.event.type === "run_failed" ||
+    input.event.type === "run_cancelled";
+  const expiredApprovalIds = pendingApprovals
+    .filter((approval) =>
+      isTerminalEvent || input.observedAt.getTime() - approval.requestedAt.getTime() >= HERMES_DEFAULT_APPROVAL_TIMEOUT_MS,
+    )
+    .map((approval) => approval.id);
+  if (expiredApprovalIds.length === 0) return;
+
+  await db.taskPlanProviderApproval.updateMany({
+    where: {
+      id: { in: expiredApprovalIds },
+      status: "pending",
+    },
+    data: {
+      status: "superseded",
+      resolvedAt: input.observedAt,
+      resolvedBy: "provider",
+      resolutionRaw: toJsonInput({
+        resolution_source: "provider_reconciliation",
+        reason: isTerminalEvent
+          ? "provider_run_ended_without_chrona_resolution"
+          : "provider_continued_after_default_approval_timeout",
+        inferred_result: "default_denied",
+        timeoutMs: HERMES_DEFAULT_APPROVAL_TIMEOUT_MS,
+        observed_event_type: input.event.type,
+        observed_status: "run" in input.event ? input.event.run?.status : undefined,
+        nativeRunId: input.event.nativeRunId ?? input.event.runId,
+      }),
+    },
+  });
 }
 
 async function persistProviderApproval(input: {
