@@ -1,8 +1,15 @@
 export {
   buildDefaultTaskSessionKey,
   buildWorkBlockTaskSessionKey,
+  buildWorkBlockPlanTaskSessionKey,
+  buildPlanGenerationTaskSessionKey,
+  buildPlanExecutionTaskSessionKey,
+  buildLegacyPlanExecutionTaskSessionKey,
   ensureDefaultTaskSession,
   ensureWorkBlockTaskSession,
+  ensureWorkBlockPlanTaskSession,
+  ensurePlanGenerationTaskSession,
+  ensurePlanExecutionTaskSession,
   updateTaskSessionStateFromRun,
 } from "./task-sessions";
 export {

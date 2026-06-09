@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { appendTaskWorkspaceEvent, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
 import { workCommandBodySchema, workProjectionParamSchema } from "@chrona/contracts/api";
+import type { GeneratePlanSSEEvent } from "@chrona/contracts";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
@@ -37,6 +38,21 @@ function publishCommandEvent(input: {
     commandType: input.commandType,
     message: input.message,
   });
+}
+
+function planGenerationWorkspacePayload(event: GeneratePlanSSEEvent) {
+  switch (event.type) {
+    case "status":
+      return { phase: event.phase, message: event.message };
+    case "tool_call":
+      return { tool: event.tool, message: `Using ${event.tool}...` };
+    case "result":
+      return { planTitle: event.result.blueprint.title };
+    case "error":
+      return { code: event.code, message: event.message };
+    default:
+      return {};
+  }
 }
 
 function publishWorkspaceTrigger(input: {
@@ -75,6 +91,8 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
           commandId,
           type: "plan.generation.event",
           eventKind: event.type,
+          generationId: generation.generationId,
+          ...planGenerationWorkspacePayload(event),
         });
       }
       generation.finish();
@@ -82,14 +100,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
     }
 
     if (command.type === "plan.accept") {
-      const result = await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
-      publishWorkspaceTrigger({
-        taskId,
-        workspaceId,
-        commandId,
-        type: "plan.generation.event",
-        eventKind: result.savedPlan?.status ?? "accepted",
-      });
+      await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
       return;
     }
 

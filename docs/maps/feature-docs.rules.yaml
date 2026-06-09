@@ -188,4 +188,25 @@ selection:
       reason: "task-workspace-command-center-json-render-documents"
       symbols:
         - "getTaskCommandCenter"
+    - path: "packages/engine/src/modules/tasks/get-task-bootstrap.ts"
+      reason: "task-workspace-recurring-occurrence-bootstrap"
+      symbols:
+        - "getTaskBootstrap"
+    - path: "packages/engine/src/modules/plans/task-planning.ts"
+      reason: "task-plan-lifecycle-acceptance-scope"
+      symbols:
+        - "TaskPlanning"
+    - path: "packages/engine/src/modules/plans/task-plan-read-model.ts"
+      reason: "task-plan-lifecycle-read-model-scope"
+      symbols:
+        - "getLatestTaskPlanReadModel"
+        - "resolveSavedPlanEffectiveGraph"
+    - path: "apps/server/src/routes/pages/work.routes.ts"
+      reason: "task-workspace-async-command-route"
+      symbols:
+        - "createWorkRoutes"
+    - path: "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts"
+      reason: "task-workspace-plan-acceptance-hook"
+      symbols:
+        - "useTaskWorkspacePlanState"
 describe_threshold: 5

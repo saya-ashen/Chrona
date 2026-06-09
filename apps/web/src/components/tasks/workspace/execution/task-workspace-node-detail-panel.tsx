@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronUp, X } from "lucide-react";
-import { buildResultSpec, validateChronaSpec } from "@chrona/ui-protocol";
+import { buildResultSpec, normalizeChronaSpec, validateChronaSpec } from "@chrona/ui-protocol";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
 import { extractRunError } from "@/components/tasks/plan/task-plan-graph/inspector-run-panel";
@@ -68,7 +68,7 @@ function ResultTab({ node }: { node: PlanNodeDataModel }) {
   if (specOutput) {
     const result = validateChronaSpec(specOutput);
     if (result.ok) {
-      return <SpecRenderer spec={specOutput} />;
+      return <SpecRenderer spec={normalizeChronaSpec(result.spec)} />;
     }
     const detail = result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
     return (

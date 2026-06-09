@@ -4,7 +4,7 @@ import type {
   TaskPlanReadModel,
 } from "@chrona/contracts";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
-import { getLatestCompiledPlan, saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { getCompiledPlanByPlanId, saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { ensureTaskInWorkspace } from "@/modules/tasks/task-by-id";
 import { applyPlanMutationCommand, applyPlanPatchCommand } from "./apply-plan-patch-command";
 import { generateTaskPlanManualStream } from "./generate-task-plan-manual-stream";
@@ -87,13 +87,12 @@ export class TaskPlanning {
       await ensurePlanInWorkspace(input.planId, input.taskId, input.workspaceId);
     }
 
-    const latest = await getLatestCompiledPlan(input.taskId, input.workBlockId ?? null)
-      ?? await getLatestCompiledPlan(input.taskId, null);
-    if (!latest || latest.compiledPlan.editablePlanId !== input.planId) {
+    const latest = await getCompiledPlanByPlanId(input.taskId, input.planId);
+    if (!latest) {
       throw new EngineError(ENGINE_ERROR_CODES.PLAN_NOT_FOUND, "Plan not found");
     }
 
-    const effectiveWorkBlockId = latest.workBlockId ?? input.workBlockId ?? null;
+    const effectiveWorkBlockId = latest.workBlockId ?? null;
 
     await saveCompiledPlan({
       workspaceId: latest.workspaceId,

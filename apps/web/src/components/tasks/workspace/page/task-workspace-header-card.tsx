@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, Ellipsis, Loader2, Pause, Pencil, Play, Sparkles, Square, Trash2 } from "lucide-react";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,41 @@ function formatOccurrenceOption(occurrence: RecurrenceOccurrenceOption, locale: 
     ?? occurrence.title;
 }
 
+type HeaderExecutionStatus = {
+  status: "started" | "running" | "waiting_for_user" | "waiting_for_approval" | "blocked" | "failed" | "completed" | "cancelled" | "no_plan";
+  message?: string | null;
+} | null;
+
+function executionStatusLabel(status: NonNullable<HeaderExecutionStatus>["status"]) {
+  if (status === "started" || status === "running") return "Running now";
+  if (status === "waiting_for_user") return "Waiting for input";
+  if (status === "waiting_for_approval") return "Waiting for approval";
+  if (status === "completed") return "Run completed";
+  if (status === "failed") return "Run failed";
+  if (status === "blocked") return "Run blocked";
+  if (status === "cancelled") return "Run cancelled";
+  return null;
+}
+
+function ExecutionStatusPill({ executionStatus }: { executionStatus: HeaderExecutionStatus }) {
+  if (!executionStatus) return null;
+  const label = executionStatusLabel(executionStatus.status);
+  if (!label) return null;
+  const running = executionStatus.status === "started" || executionStatus.status === "running";
+  const completed = executionStatus.status === "completed";
+  const Icon = running ? Loader2 : completed ? CheckCircle2 : Sparkles;
+  return (
+    <div className="flex max-w-full items-center gap-2 rounded-full border border-primary/25 bg-primary-soft/70 px-2.5 py-1 text-xs font-medium text-primary shadow-[0_0_0_1px_rgba(255,255,255,0.45)_inset]">
+      <span className="relative flex size-4 items-center justify-center">
+        {running ? <span className="absolute inline-flex size-3 rounded-full bg-primary/35 opacity-75 animate-ping" /> : null}
+        <Icon className={running ? "relative size-3.5 animate-spin" : "relative size-3.5"} />
+      </span>
+      <span className="shrink-0">{label}</span>
+      {executionStatus.message ? <span className="min-w-0 truncate text-primary/75">{executionStatus.message}</span> : null}
+    </div>
+  );
+}
+
 
 type TaskWorkspaceHeaderCardProps = {
   task: TaskData;
@@ -106,6 +141,7 @@ type TaskWorkspaceHeaderCardProps = {
     disabled?: boolean;
     onClick: () => void;
   };
+  executionStatus?: HeaderExecutionStatus;
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
   onSelectOccurrence: (occurrence: RecurrenceOccurrenceOption) => void;
   onEdit: () => void;
@@ -122,6 +158,7 @@ export function TaskWorkspaceHeaderCard({
   backToScheduleLabel,
   workspaceStateLabel,
   workspaceStateGuidance,
+  executionStatus = null,
   planAction,
   onAction,
   onSelectOccurrence,
@@ -216,6 +253,7 @@ export function TaskWorkspaceHeaderCard({
             <Badge variant={priorityTone(task.priority)}>
               {task.priority}
             </Badge>
+            <ExecutionStatusPill executionStatus={executionStatus} />
             {showOccurrenceSelector && currentOccurrence ? (
               <Select
                 value={occurrenceValue(currentOccurrence)}

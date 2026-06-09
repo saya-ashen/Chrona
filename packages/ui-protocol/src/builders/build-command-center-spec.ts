@@ -1,6 +1,6 @@
 import type { UiDocument } from "../document/document";
 import { UI_ACTION } from "../actions/actions";
-import { buildActivitySpec, type ActivityItemInput, type ToolDetailLabels } from "./build-activity-spec";
+import type { ActivityItemInput, ToolDetailLabels } from "./build-activity-spec";
 
 export interface CommandCenterArtifactInput {
   id: string;
@@ -234,31 +234,37 @@ export function buildCommandCenterTrailSpec(input: {
   copy?: CommandCenterCopyInput;
   toolLabels: ToolDetailLabels;
 }): UiDocument {
-  const elements: MutableElements = {};
-  const children: string[] = [];
-  elements.root = { type: "Stack", props: { gap: "sm" }, children };
-  elements.title = { type: "Heading", props: { text: input.copy?.activityTitle ?? "Execution activity", level: 3 } };
-  elements.stats = {
-    type: "Text",
-    props: { text: `${input.activity.length} shown · ${input.liveCount ?? 0} live · ${input.savedCount ?? input.activity.length} saved`, variant: "caption" },
+  const activity = input.activity;
+  const savedCount = input.savedCount ?? activity.length;
+  return {
+    root: "root",
+    state: {
+      trail: {
+        items: activity,
+        liveCount: input.liveCount ?? 0,
+        savedCount,
+        provider: input.provider ?? null,
+      },
+    },
+    elements: {
+      root: { type: "Stack", props: { gap: "sm" }, children: ["title", "provider", "activity"] },
+      title: { type: "Heading", props: { text: input.copy?.activityTitle ?? "Execution activity", level: 3 } },
+      stats: {
+        type: "Text",
+        props: { text: `${activity.length} shown · ${input.liveCount ?? 0} live · ${savedCount} saved`, variant: "caption" },
+      },
+      provider: { type: "Badge", props: { label: input.provider ?? "", variant: "secondary" }, visible: { $state: "/trail/provider" } },
+      activity: {
+        type: "ActivityStream",
+        props: {
+          items: { $bindState: "/trail/items" },
+          liveCount: { $bindState: "/trail/liveCount" },
+          savedCount: { $bindState: "/trail/savedCount" },
+          provider: { $bindState: "/trail/provider" },
+          emptyMessage: input.copy?.activityEmpty ?? "Activity will appear after planning or execution starts.",
+          toolLabels: input.toolLabels,
+        },
+      },
+    },
   };
-  children.push("title", "stats");
-  if (input.provider) {
-    elements.provider = { type: "Badge", props: { label: input.provider, variant: "secondary" } };
-    children.push("provider");
-  }
-  if (input.activity.length === 0) {
-    elements.empty = { type: "Alert", props: { title: input.copy?.activityEmpty ?? "Activity will appear after planning or execution starts.", type: "info" } };
-    children.push("empty");
-  } else {
-    const activitySpec = buildActivitySpec(input.activity, input.toolLabels);
-    for (const [key, element] of Object.entries(activitySpec.elements)) {
-      elements[`activity:${key}`] = {
-        ...element,
-        children: element.children?.map((child) => `activity:${child}`),
-      };
-    }
-    children.push(`activity:${activitySpec.root}`);
-  }
-  return { root: "root", elements };
 }

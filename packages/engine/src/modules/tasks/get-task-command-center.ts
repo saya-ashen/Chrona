@@ -28,25 +28,31 @@ function nowTitle(status: string) {
 
 export async function getTaskCommandCenter(input: { taskId: string; workBlockId?: string | null }) {
   const selectedWorkBlockId = input.workBlockId ?? null;
-  const [task, currentExecution] = await Promise.all([
-    db.task.findUnique({
-      where: { id: input.taskId },
-      select: {
-        artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
-        timelineItems: {
-          where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
-          orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
-          take: 100,
-        },
-        events: {
-          where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
-          orderBy: { ingestSequence: "desc" },
-          take: 300,
-        },
+  const currentExecution = await getCurrentExecution({ taskId: input.taskId, workBlockId: selectedWorkBlockId });
+  const scopedEventWhere = selectedWorkBlockId !== null
+    ? {
+        OR: [
+          { workBlockId: selectedWorkBlockId },
+          ...(currentExecution.mainSessionId ? [{ workBlockId: null, taskSessionId: currentExecution.mainSessionId }] : []),
+        ],
+      }
+    : {};
+  const task = await db.task.findUnique({
+    where: { id: input.taskId },
+    select: {
+      artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
+      timelineItems: {
+        where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
+        orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
+        take: 100,
       },
-    }),
-    getCurrentExecution({ taskId: input.taskId, workBlockId: selectedWorkBlockId }),
-  ]);
+      events: {
+        where: scopedEventWhere,
+        orderBy: { ingestSequence: "desc" },
+        take: 300,
+      },
+    },
+  });
   if (!task) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }

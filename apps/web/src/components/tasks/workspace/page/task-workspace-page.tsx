@@ -34,6 +34,7 @@ type TaskWorkspaceHeaderEditorProps = {
   workspaceStateGuidance: string;
   backToScheduleLabel: string;
   planAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["planAction"];
+  executionStatus?: Parameters<typeof TaskWorkspaceHeaderCard>[0]["executionStatus"];
   onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
   onSelectOccurrence: (occurrence: NonNullable<TaskData["recurrenceOccurrences"]>[number]) => void;
   showDeleteConfirm: boolean;
@@ -88,6 +89,7 @@ function TaskWorkspaceHeaderEditor({
   workspaceStateLabel,
   workspaceStateGuidance,
   backToScheduleLabel,
+  executionStatus,
   planAction,
   onAction,
   onSelectOccurrence,
@@ -108,6 +110,7 @@ function TaskWorkspaceHeaderEditor({
         backToScheduleLabel={backToScheduleLabel}
         workspaceStateLabel={workspaceStateLabel}
         workspaceStateGuidance={workspaceStateGuidance}
+        executionStatus={executionStatus}
         planAction={planAction}
         onAction={onAction}
         onSelectOccurrence={onSelectOccurrence}
@@ -229,6 +232,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     setAcceptPlanError,
     generationUserInstruction,
     runtimeEvents,
+    liveActivity,
     latestActivitySummary,
     currentExecution,
     acceptPlanById,
@@ -312,6 +316,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           workspaceStateLabel={consoleView.states.treatment.label ?? undefined}
           workspaceStateGuidance={`${copy.nextAction}: ${consoleView.states.treatment.guidance}`}
           planAction={planAction}
+          executionStatus={currentExecution ? { status: currentExecution.status, message: currentExecution.message } : null}
           onSelectOccurrence={handleSelectOccurrence}
           onAction={async (action) => {
             if (action.id === "start") {
@@ -370,6 +375,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         unsavedConfigDraft={planningTaskDraft}
         generationUserInstruction={generationUserInstruction}
         runtimeEvents={runtimeEvents}
+        liveActivity={liveActivity}
         currentExecution={currentExecution}
         onGeneratePlan={handleGeneratePlanFromHeader}
         onPlanLoaded={setPlan}

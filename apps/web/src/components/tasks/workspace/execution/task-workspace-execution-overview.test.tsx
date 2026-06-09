@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { UiDocument } from "@chrona/ui-protocol";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { buildCommandCenterTrailSpec, type UiDocument } from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "./task-workspace-execution-overview";
@@ -83,6 +83,99 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Execution running")).toBeInTheDocument();
     expect(screen.queryByText("Tool: 正在读取计划")).not.toBeInTheDocument();
   });
+
+
+  it("renders persisted server-driven Trail items once", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const commandCenter = {
+      documents: {
+        now: nowDocument("Execution running"),
+        output: nowDocument("Output"),
+        trail: buildCommandCenterTrailSpec({
+          activity: [{
+            id: "persisted-plan-status",
+            kind: "task",
+            title: "Plan generation update",
+            summary: "Requesting AI provider...",
+            description: "Requesting AI provider...",
+            tone: "info",
+            timestamp: "2026-05-12T10:00:00.000Z",
+          }],
+          savedCount: 1,
+          toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+        }),
+      },
+    };
+
+    renderOverview(view, { commandCenter });
+    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
+
+    expect(screen.getByText("Plan generation update")).toBeInTheDocument();
+    expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
+    expect(screen.getAllByText("1 shown · 0 live · 1 saved")).toHaveLength(1);
+    expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
+  });
+
+  it("streams live runtime events into a server-driven Trail document", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
+    const liveEvent = {
+      type: "runtime_event" as const,
+      action: "start_manual" as const,
+      nodeId: "execute",
+      nodeTitle: "execute",
+      runtimeName: "hermes",
+      provider: "hermes",
+      runId: "run-1",
+      sequence: 1,
+      timestamp: "2026-05-12T10:01:00.000Z",
+      event: { type: "tool_started" as const, toolName: "chrona_plan_read", label: "正在读取计划" },
+    };
+
+    const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [] });
+    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
+    expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
+
+    rerender(
+      <TaskWorkspaceExecutionOverview
+        progress={view.progress}
+        readiness={view.readiness}
+        latestResult={view.latestResult}
+        attention={view.attention}
+        latestCompletedNode={view.latestCompletedNode}
+        artifacts={view.artifacts}
+        activity={view.activity}
+        commandCenter={commandCenter}
+        runtimeEvents={[liveEvent]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
+
+    return waitFor(() => expect(screen.getByText("正在读取计划")).toBeInTheDocument());
+  });
+
+  it("streams live workspace events into a server-driven Trail document", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
+
+    renderOverview(view, {
+      commandCenter,
+      liveActivity: [{
+        id: "event-plan-status-1",
+        kind: "task",
+        title: "Plan generation update",
+        summary: "Requesting AI provider...",
+        description: "Requesting AI provider...",
+        tone: "info",
+        timestamp: "2026-05-12T10:00:00.000Z",
+      }],
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
+
+    expect(screen.getByText("Plan generation update")).toBeInTheDocument();
+    expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
+  });
+
 
   it("renders the latest completed node result and artifacts in the output tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);

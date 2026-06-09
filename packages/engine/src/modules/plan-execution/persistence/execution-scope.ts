@@ -48,6 +48,17 @@ export async function resolveExecutionScope(
     return { workBlockId: hint.workBlockId, planId: null, executionSessionId: null };
   }
 
+  const workBlockIdFromSessionKey = parseWorkBlockPlanSessionKey(taskId, hint?.sessionId);
+  if (workBlockIdFromSessionKey) {
+    const workBlock = await db.workBlock.findFirst({
+      where: { id: workBlockIdFromSessionKey, taskId },
+      select: { id: true, planId: true },
+    });
+    if (workBlock) {
+      return { workBlockId: workBlock.id, planId: workBlock.planId, executionSessionId: null };
+    }
+  }
+
   if (typeof hint?.sessionId === "string" && hint.sessionId.length > 0) {
     const session = await db.taskSession.findFirst({
       where: {
@@ -98,6 +109,21 @@ export async function resolveScopeWorkBlockId(
   hint?: { workBlockId?: string | null; sessionId?: string | null },
 ): Promise<string | null> {
   return (await resolveExecutionScope(taskId, hint)).workBlockId;
+}
+
+function parseWorkBlockPlanSessionKey(taskId: string, sessionId?: string | null): string | null {
+  const currentPrefix = `chrona:task:${taskId}:work-block:`;
+  const currentSuffix = ":plan-generation";
+  if (sessionId?.startsWith(currentPrefix) && sessionId.endsWith(currentSuffix)) {
+    const workBlockId = sessionId.slice(currentPrefix.length, -currentSuffix.length);
+    return workBlockId.length > 0 ? workBlockId : null;
+  }
+
+  const legacyPrefix = `chrona:task:${taskId}:wb:`;
+  const legacySuffix = ":pg";
+  if (!sessionId?.startsWith(legacyPrefix) || !sessionId.endsWith(legacySuffix)) return null;
+  const workBlockId = sessionId.slice(legacyPrefix.length, -legacySuffix.length);
+  return workBlockId.length > 0 ? workBlockId : null;
 }
 
 /**

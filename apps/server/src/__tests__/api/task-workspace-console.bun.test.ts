@@ -161,6 +161,45 @@ describe("task workspace console read data", () => {
     });
   });
 
+  it("returns command center Trail items from persisted database activity", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Command Center Trail Activity");
+    const { taskId } = await seedTask(workspaceId, { title: "Render command center trail" });
+    await db.event.createMany({
+      data: [{
+        eventType: "plan_generation.started",
+        workspaceId,
+        taskId,
+        actorType: "system",
+        actorId: "plan-generator",
+        source: "plan_generation",
+        payload: { generation_id: "generation-command-center", instruction: "Make a plan" },
+        dedupeKey: "command-center-trail-plan-started",
+        occurredAt: new Date("2026-05-12T12:01:06.000Z"),
+        ingestSequence: 1,
+      }, {
+        eventType: "plan_generation.status",
+        workspaceId,
+        taskId,
+        actorType: "system",
+        actorId: "plan-generator",
+        source: "plan_generation",
+        payload: { generation_id: "generation-command-center", message: "Requesting AI provider..." },
+        dedupeKey: "command-center-trail-plan-status",
+        occurredAt: new Date("2026-05-12T12:01:07.000Z"),
+        ingestSequence: 2,
+      }],
+    });
+
+    const response = await app().request(`/api/tasks/${taskId}/command-center`);
+    expect(response.status).toBe(200);
+
+    const body = await json<{ documents: { trail: { state?: { trail?: { items?: Array<{ title?: string; description?: string; rawEventType?: string; activityGroup?: { kind?: string; id?: string } }> } } } } }>(response);
+    const items = body.documents.trail.state?.trail?.items ?? [];
+    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation started", description: "Make a plan", rawEventType: "plan_generation.started", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
+    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation update", description: "Requesting AI provider...", rawEventType: "plan_generation.status", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
+  });
+
+
   it("returns persisted provider runtime activity for the workspace activity timeline", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Provider Activity");
     const { taskId } = await seedTask(workspaceId, { title: "Stream provider activity" });

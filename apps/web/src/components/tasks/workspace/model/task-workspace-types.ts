@@ -246,6 +246,11 @@ export type WorkspaceAssistantActivity = {
   isPartial?: boolean;
 };
 
+export type WorkspaceActivityGroup = {
+  kind: "plan_generation" | "execution_node" | "provider_run";
+  id: string;
+};
+
 export type WorkspaceActivityItem = {
   id: string;
   kind: WorkspaceActivityKind;
@@ -262,6 +267,7 @@ export type WorkspaceActivityItem = {
   nativeRunId?: string;
   sequence?: number;
   rawEventType?: string;
+  activityGroup?: WorkspaceActivityGroup;
   tool?: WorkspaceToolActivity;
   assistant?: WorkspaceAssistantActivity;
   raw?: unknown;

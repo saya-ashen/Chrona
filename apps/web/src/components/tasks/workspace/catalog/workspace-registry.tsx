@@ -2,11 +2,14 @@ import { useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
+import { ActivityTimeline } from "../execution/activity-timeline";
+import type { WorkspaceActivityItem } from "../model/task-workspace-types";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
 import { chronaCatalog } from "@chrona/ui-protocol";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
 type Tone = "neutral" | "info" | "success" | "warning" | "danger" | undefined;
@@ -150,6 +153,15 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Select: shadcnComponents.Select,
     Tabs: shadcnComponents.Tabs,
     Table: shadcnComponents.Table,
+    heading: shadcnComponents.Heading,
+    paragraph: ({ props }) => <p className="text-sm leading-6 text-foreground/85">{props.text ?? props.content}</p>,
+    table: shadcnComponents.Table,
+    section: ({ props, children }) => (
+      <section className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3">
+        {props.title ? <h3 className="font-heading text-sm font-semibold text-foreground">{props.title}</h3> : null}
+        {children}
+      </section>
+    ),
 
     WorkspaceActionGroup: ({ props, children }) => <WorkspaceActionGroup label={props.label} layout={props.layout}>{children}</WorkspaceActionGroup>,
     WorkspaceActionCard: ({ props, children }) => <WorkspaceActionCard title={props.title} tone={props.tone as Tone}>{children}</WorkspaceActionCard>,
@@ -204,6 +216,28 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
             {children ? <div className="mt-1.5">{children}</div> : null}
           </div>
         </article>
+      );
+    },
+    ActivityStream: ({ props }) => {
+      const items = Array.isArray(props.items) ? props.items as WorkspaceActivityItem[] : [];
+      const liveCount = typeof props.liveCount === "number" ? props.liveCount : 0;
+      const savedCount = typeof props.savedCount === "number" ? props.savedCount : items.length;
+      return (
+        <section>
+          <div className="mb-3 text-xs text-muted-foreground">
+            {items.length} shown · {liveCount} live · {savedCount} saved
+          </div>
+          {items.length === 0 ? (
+            <div className="mt-3 rounded-2xl border border-dashed border-border/70 bg-background/70 px-3 py-4 text-center">
+              <p className="text-sm font-medium text-foreground">{props.emptyMessage}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{taskWorkspaceActivityMessages.emptyHint}</p>
+            </div>
+          ) : (
+            <div className="mt-4 pl-1">
+              <ActivityTimeline items={items} />
+            </div>
+          )}
+        </section>
       );
     },
     ToolDetails: ({ props }) => (

@@ -79,6 +79,7 @@ export function createKernelGraphCallbacks(
       if (!executor) return null;
       return executor.execute({
         taskId,
+        workBlockId,
         mainSession,
         node: executorInput.node,
         plan: executorInput.plan,

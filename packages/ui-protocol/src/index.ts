@@ -1,6 +1,7 @@
 export type { Spec, ChronaSpec, UiDocument } from "./document/document";
 export {
   validateChronaSpec,
+  normalizeChronaSpec,
   type ValidateResult,
   type ValidationIssue,
 } from "./document/validate";

@@ -43,26 +43,28 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
   edges: [],
 }));
 
-let streamStyle: "full" | "hermes" = "full";
+let streamStyle: "full" | "hermes" | "hermes-no-save" = "full";
 
 import { materializeGeneratedTaskPlan } from "./materialize-generated-task-plan";
 
 async function* aiGeneratePlanStreamMock(request: { title: string; description?: string; taskId: string }) {
   const blueprint = await aiGeneratePlanMock(request);
 
-  if (streamStyle === "hermes") {
+  if (streamStyle === "hermes" || streamStyle === "hermes-no-save") {
     yield { type: "tool_call" as const, tool: "chrona_plan_generate", input: { preview: "generating plan..." } };
     // Simulate what real Chrona-owned tool does: persist plan via DB.
     // In production the Hermes provider runs the tool internally and calls
     // chrona.plan.generate, which persists to DB behind the scenes.
-    const task = await db.task.findUnique({ where: { id: request.taskId } });
-    if (task) {
-      await materializeGeneratedTaskPlan({
-        taskId: task.id,
-        workspaceId: task.workspaceId,
-        blueprint,
-        generatedBy: "hermes",
-      });
+    if (streamStyle === "hermes") {
+      const task = await db.task.findUnique({ where: { id: request.taskId } });
+      if (task) {
+        await materializeGeneratedTaskPlan({
+          taskId: task.id,
+          workspaceId: task.workspaceId,
+          blueprint,
+          generatedBy: "hermes",
+        });
+      }
     }
     yield { type: "done" as const, text: "done" };
     return;
@@ -157,10 +159,11 @@ describe("generateTaskPlanForTask", () => {
       title: "Updated task title",
       description: "Updated description from DB",
       estimatedMinutes: 90,
-      sessionKey: `chrona:task:${task.id}:work-block:${workBlock.id}`,
+      sessionKey: `chrona:task:${task.id}:work-block:${workBlock.id}:plan-generation`,
     }));
 
     const saved = await getLatestTaskPlanGraph(task.id);
+    expect(saved!.id.startsWith("plan_")).toBe(false);
     const refreshedTask = await db.task.findUnique({ where: { id: task.id } });
     const sessions = await db.taskSession.findMany({ where: { taskId: task.id } });
     const activityEvents = await db.event.findMany({
@@ -174,7 +177,7 @@ describe("generateTaskPlanForTask", () => {
     expect(saved?.plan.completionPolicy).toEqual({ type: "all_tasks_completed" });
     expect(refreshedTask?.defaultSessionId).toBeNull();
     expect(sessions.map((session) => session.sessionKey)).toContain(
-      `chrona:task:${task.id}:work-block:${workBlock.id}`,
+      `chrona:task:${task.id}:work-block:${workBlock.id}:plan-generation`,
     );
     expect(activityEvents.map((event) => event.eventType)).toEqual([
       "plan_generation.started",
@@ -185,6 +188,7 @@ describe("generateTaskPlanForTask", () => {
       "plan_generation.status",
       "plan_generation.completed",
     ]);
+    expect(new Set(activityEvents.map((event) => event.workBlockId))).toEqual(new Set([workBlock.id]));
     expect(activityEvents[3]?.payload).toMatchObject({
       tool: "chrona_plan_generate",
       plan_title: "Plan for Updated task title",
@@ -465,6 +469,76 @@ describe("generateTaskPlanForTask", () => {
     const savedPlan = await getLatestTaskPlanReadModel(task.id, workBlock.id);
     expect(savedPlan).not.toBeNull();
     expect(savedPlan?.status).toBe("draft");
+  });
+
+  it("does not report a completed work-block generation from a different occurrence's saved plan", async () => {
+    streamStyle = "hermes-no-save";
+
+    const workspace = await db.workspace.create({
+      data: { name: "Hermes stale occurrence", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Recurring trend task",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    const previousWorkBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: "Previous occurrence",
+        status: "Completed",
+        scheduledStartAt: new Date("2026-06-05T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-05T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const targetWorkBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: "Target occurrence",
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-06T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-06T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    await materializeGeneratedTaskPlan({
+      taskId: task.id,
+      workspaceId: workspace.id,
+      workBlockId: previousWorkBlock.id,
+      blueprint: {
+        title: "Previous plan",
+        goal: "Existing accepted plan from another occurrence",
+        nodes: [{ id: "previous", type: "task", title: "Previous step" }],
+        edges: [],
+      },
+      generatedBy: "test",
+    });
+    await db.taskPlan.updateMany({
+      where: { taskId: task.id, workBlockId: previousWorkBlock.id },
+      data: { status: "Accepted" },
+    });
+
+    const events: Array<{ type: string; code?: string }> = [];
+    const { generateTaskPlanManualStream } = await import("@/modules/plans/generate-task-plan-manual-stream");
+    for await (const event of generateTaskPlanManualStream({
+      taskId: task.id,
+      workBlockId: targetWorkBlock.id,
+      forceRefresh: true,
+    })) {
+      events.push(event.type === "error" ? { type: event.type, code: event.code } : { type: event.type });
+    }
+
+    expect(events).toContainEqual({ type: "error", code: "INTERNAL_ERROR" });
+    expect(events.map((event) => event.type)).not.toContain("result");
+    expect(await getLatestTaskPlanReadModel(task.id, targetWorkBlock.id)).toBeNull();
   });
 
   it("generates and accepts plans when Hermes stream has no tool_result", async () => {

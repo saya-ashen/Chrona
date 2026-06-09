@@ -22,6 +22,41 @@ function isSpecLike(value: unknown): value is Spec {
   );
 }
 
+const COMPONENT_TYPE_ALIASES: Record<string, string> = {
+  heading: "heading",
+  paragraph: "paragraph",
+  table: "table",
+  section: "section",
+};
+
+function normalizeElement(element: Spec["elements"][string]) {
+  const type = COMPONENT_TYPE_ALIASES[element.type] ?? element.type;
+  return type === element.type ? element : { ...element, type };
+}
+
+export function normalizeChronaSpec(input: unknown): Spec {
+  if (!isSpecLike(input)) return input as Spec;
+  const elements = Object.fromEntries(
+    Object.entries(input.elements).map(([key, element]) => [key, normalizeElement(element)]),
+  ) as Spec["elements"];
+
+  if (elements[input.root]) {
+    return elements === input.elements ? input : { ...input, elements };
+  }
+
+  const childKeys = Object.keys(elements);
+  if (childKeys.length === 0) return { ...input, elements };
+  return {
+    ...input,
+    root: input.root,
+    elements: {
+      ...elements,
+      [input.root]: { type: "Stack", props: { gap: "md" }, children: childKeys },
+    },
+  };
+}
+
+
 /**
  * Strictly validate an unknown value as a Chrona UI document:
  *  1. structural shape (`{ root, elements }`);
@@ -39,7 +74,7 @@ export function validateChronaSpec(input: unknown): ValidateResult {
     return { ok: false, issues: [{ path: "", message: "not a spec ({ root, elements })" }] };
   }
 
-  const spec = input;
+  const spec = normalizeChronaSpec(input);
   const issues: ValidationIssue[] = [];
   const components = chronaCatalog.data.components as Record<string, { props: ZodType }>;
 

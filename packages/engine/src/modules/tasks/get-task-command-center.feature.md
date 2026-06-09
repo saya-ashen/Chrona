@@ -29,7 +29,7 @@ Invariants:
 - `workBlockId` filters saved timeline/events consistently with task workspace scope.
 - Checkpoint actions in `documents.now` must include enough whitelisted action metadata for the React host to dispatch `submit-checkpoint`; JSON never executes arbitrary code.
 
-Coverage: partial. API-level test `apps/server/src/__tests__/api/task-workspace-console.bun.test.ts` asserts the route returns only `documents` and includes `now`, `output`, and `trail` `UiDocument`s. It does not directly assert work-block filtering, task-not-found mapping, checkpoint action payload shape, or that every checkpoint button causes a network dispatch.
+Coverage: partial. API-level tests in `apps/server/src/__tests__/api/task-workspace-console.bun.test.ts` assert the route returns only `documents`, includes `now`, `output`, and `trail` `UiDocument`s, and projects persisted plan-generation events from the database into `documents.trail.state.trail.items`. Missing direct engine tests for nonexistent task, work-block isolation, event ordering, and failed/waiting checkpoint button payloads.
 <!-- ai:end -->
 
 ## Generated symbol inventory
@@ -53,7 +53,7 @@ Inputs/outputs: input is `{ taskId, workBlockId? }`. Output is `{ documents: { n
 
 Behavior: loads task artifacts, timeline items, raw execution events, and current execution state. It maps artifacts to `buildCommandCenterArtifactsSpec`, saved activity to `buildCommandCenterTrailSpec`, and execution status/checkpoint UI to `buildCommandCenterNowSpec`. Failure is explicit: a missing task throws `EngineError(TASK_NOT_FOUND)`.
 
-Coverage: partial. The public API test exercises successful document shape through Hono and catches regressions where raw data leaks back into the response. Missing direct engine tests for nonexistent task, work-block isolation, event ordering, and failed/waiting checkpoint button payloads.
+Coverage: partial. The public API tests exercise successful document shape through Hono, catch regressions where raw data leaks back into the response, and verify persisted database activity appears in the Trail document state. Missing direct engine tests for nonexistent task, work-block isolation, event ordering, and failed/waiting checkpoint button payloads.
 <!-- ai:end -->
 
 <!-- generated:tests:start getTaskCommandCenter -->

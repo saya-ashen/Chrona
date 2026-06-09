@@ -5,6 +5,7 @@ import type { TaskData, TaskHeaderView } from "../model/task-workspace-types";
 
 vi.mock("lucide-react", () => ({
   CalendarDays: () => null,
+  CheckCircle2: () => null,
   Ellipsis: () => null,
   Loader2: () => null,
   Pause: () => null,
@@ -112,6 +113,29 @@ describe("TaskWorkspaceHeaderCard", () => {
     expect(screen.getByText("Waiting")).toBeInTheDocument();
     expect(screen.queryByText("Draft")).not.toBeInTheDocument();
   });
+
+  it("shows a live execution status badge while the task is running", () => {
+    render(
+      <TaskWorkspaceHeaderCard
+        task={task}
+        header={header}
+        backToScheduleLabel="Back to schedule"
+        executionStatus={{ status: "running", message: "Executing Fetch trending repositories" }}
+        onAction={vi.fn()}
+        onSelectOccurrence={vi.fn()}
+        onEdit={vi.fn()}
+        showDeleteConfirm={false}
+        isDeleting={false}
+        onStartDeleteConfirm={vi.fn()}
+        onCancelDeleteConfirm={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Running now")).toBeInTheDocument();
+    expect(screen.getByText("Executing Fetch trending repositories")).toBeInTheDocument();
+  });
+
 
   it("shows the selected occurrence window", () => {
     render(

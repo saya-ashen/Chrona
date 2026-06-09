@@ -183,6 +183,33 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("This is the AI-produced UI output.")).toBeInTheDocument();
   });
 
+  it("renders lowercase json-render report output with a repaired root", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "ui-lowercase-result",
+      title: "Lowercase UI result node",
+      status: "done",
+      resultOutputs: [{
+        root: "github_trending_report",
+        elements: {
+          heading: { type: "heading", props: { text: "GitHub Trending" } },
+          summary_text: { type: "paragraph", props: { text: "Daily report" } },
+          table: { type: "table", props: { columns: ["Repo"], rows: [["chrona"]] } },
+        },
+      }],
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel
+      detail={detail({ currentNode: node, selectedNode: node, status: "completed" })}
+      activity={[]}
+      selectedNodes={[node]}
+    />);
+
+    expect(screen.getByText("GitHub Trending")).toBeInTheDocument();
+    expect(screen.getByText("Daily report")).toBeInTheDocument();
+    expect(screen.getByText("chrona")).toBeInTheDocument();
+  });
+
+
   it("does not render typed fallback when result output is invalid for SpecRenderer", () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "ui-compat",

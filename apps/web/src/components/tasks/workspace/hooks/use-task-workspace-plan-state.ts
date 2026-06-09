@@ -18,6 +18,8 @@ import {
 import type { TaskData } from "../model/task-workspace-types";
 import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
+import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../model/task-workspace-activity";
+import type { WorkspaceActivityItem } from "../model/task-workspace-types";
 
 const STARTING_NODE_STATUS_LABEL = "Starting";
 const STARTING_NODE_NEXT_ACTION = "Starting execution...";
@@ -363,6 +365,7 @@ export function useTaskWorkspacePlanState(
   const [generationActivitySummary, setGenerationActivitySummary] = useState<string | null>(null);
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
+  const [liveActivity, setLiveActivity] = useState<WorkspaceActivityItem[]>([]);
   const currentExecution = currentExecutionQuery.data ?? null;
   const latestCheckpoint = currentExecution?.checkpoint ?? null;
   const latestActivitySummary = getRuntimeActivity(runtimeEvents.at(-1)) ?? generationActivitySummary;
@@ -429,6 +432,11 @@ export function useTaskWorkspacePlanState(
 
     for (const event of nextEvents) {
       if (event.workBlockId !== undefined && event.workBlockId !== null && event.workBlockId !== selectedWorkBlockId) continue;
+      const activityItem = workspaceEventToWorkspaceActivity(event, event.sequence ?? 0);
+      if (activityItem) {
+        setLiveActivity((current) => mergeWorkspaceActivity([activityItem, ...current]));
+      }
+
 
       if (event.type === "command.accepted" && event.commandType === "plan.generate") {
         setIsGeneratingPlan(true);
@@ -642,6 +650,7 @@ export function useTaskWorkspacePlanState(
     setAcceptPlanError,
     generationUserInstruction,
     runtimeEvents,
+    liveActivity,
     latestActivitySummary,
     currentExecution,
     acceptPlanById,

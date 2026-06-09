@@ -26,7 +26,7 @@ const hiddenContextFieldNames = [
 ] as const;
 
 const hiddenContextArguments = {
-  sessionId: "chrona:task:task-1:plan-graph",
+  sessionId: "chrona:task:task-1:plan-generation",
   actorType: "agent",
   actorId: "hermes",
   evidence: { providerText: "generated plan" },
@@ -281,12 +281,31 @@ describe("MCP routes", () => {
     expect(JSON.stringify(body.result.structuredContent)).not.toContain("idempotency");
   });
 
+  it("allows execution tools in plan execution main sessions", async () => {
+    const { response, operations } = await postRpcWithOperations(
+      rpc("tools/call", {
+        name: "chrona_node_complete",
+        arguments: { summary: "Done" },
+        _meta: { sessionId: "chrona:task:task-1:execute:35faa86e" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(operations).toEqual([
+      expect.objectContaining({
+        toolName: "chrona.node.complete",
+        input: expect.objectContaining({ sessionId: "chrona:task:task-1:execute:35faa86e" }),
+      }),
+    ]);
+  });
+
   it("dispatches every exposed Chrona MCP tool to the expected internal operation", async () => {
-    const sessionId = "chrona:task:task-1:execute";
+    const executionSessionId = "chrona:task:task-1:execute";
+    const planSessionId = "chrona:task:task-1:plan-generation";
     const cases = [
-      ["chrona_execution_read", "chrona.execution.read", {}, {}],
-      ["chrona_plan_read", "chrona.plan.read", {}, {}],
-      ["chrona_plan_generate", "chrona.plan.generate", {
+      ["chrona_execution_read", "chrona.execution.read", executionSessionId, {}, {}],
+      ["chrona_plan_read", "chrona.plan.read", executionSessionId, {}, {}],
+      ["chrona_plan_generate", "chrona.plan.generate", planSessionId, {
         title: "Generated MCP plan",
         goal: "Persist a complete graph",
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
@@ -297,16 +316,16 @@ describe("MCP routes", () => {
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
         edges: [],
       }],
-      ["chrona_node_read", "chrona.node.read", {}, {}],
-      ["chrona_node_output", "chrona.node.output", { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
-      ["chrona_node_complete", "chrona.node.complete", { summary: "Done" }, { summary: "Done" }],
-      ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
-      ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
-      ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
-      ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
+      ["chrona_node_read", "chrona.node.read", executionSessionId, {}, {}],
+      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
+      ["chrona_node_complete", "chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
+      ["chrona_condition_select", "chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona_node_block", "chrona.node.block", executionSessionId, blockPayload, blockPayload],
+      ["chrona_node_fail", "chrona.node.fail", executionSessionId, { error: "Command failed" }, { error: "Command failed" }],
+      ["chrona_wait_complete", "chrona.node.wait_complete", executionSessionId, { summary: "Event observed" }, { summary: "Event observed" }],
     ] as const;
 
-    for (const [externalName, internalName, args, expectedPayload] of cases) {
+    for (const [externalName, internalName, sessionId, args, expectedPayload] of cases) {
       const { response, operations } = await postRpcWithOperations(
         rpc("tools/call", {
           name: externalName,
@@ -396,7 +415,7 @@ describe("MCP routes", () => {
     expect(operations[0]).toMatchObject({
       toolName: "chrona.plan.generate",
       input: {
-        sessionId: "chrona:task:task-1:plan-graph",
+        sessionId: "chrona:task:task-1:plan-generation",
         taskId: "task-from-session",
         payload: blueprint,
       },
@@ -405,10 +424,11 @@ describe("MCP routes", () => {
   });
 
   it("accepts hidden context injected into every public tool call", async () => {
+    const executionSessionId = "chrona:task:task-1:execute";
     const cases = [
-      ["chrona_execution_read", "chrona.execution.read", {}, {}],
-      ["chrona_plan_read", "chrona.plan.read", {}, {}],
-      ["chrona_plan_generate", "chrona.plan.generate", {
+      ["chrona_execution_read", "chrona.execution.read", executionSessionId, {}, {}],
+      ["chrona_plan_read", "chrona.plan.read", hiddenContextArguments.sessionId, {}, {}],
+      ["chrona_plan_generate", "chrona.plan.generate", hiddenContextArguments.sessionId, {
         title: "Generated MCP plan",
         goal: "Persist a complete graph",
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
@@ -419,20 +439,20 @@ describe("MCP routes", () => {
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
         edges: [],
       }],
-      ["chrona_node_read", "chrona.node.read", {}, {}],
-      ["chrona_node_output", "chrona.node.output", { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
-      ["chrona_node_complete", "chrona.node.complete", { summary: "Done" }, { summary: "Done" }],
-      ["chrona_condition_select", "chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
-      ["chrona_node_block", "chrona.node.block", blockPayload, blockPayload],
-      ["chrona_node_fail", "chrona.node.fail", { error: "Command failed" }, { error: "Command failed" }],
-      ["chrona_wait_complete", "chrona.node.wait_complete", { summary: "Event observed" }, { summary: "Event observed" }],
+      ["chrona_node_read", "chrona.node.read", executionSessionId, {}, {}],
+      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
+      ["chrona_node_complete", "chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
+      ["chrona_condition_select", "chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona_node_block", "chrona.node.block", executionSessionId, blockPayload, blockPayload],
+      ["chrona_node_fail", "chrona.node.fail", executionSessionId, { error: "Command failed" }, { error: "Command failed" }],
+      ["chrona_wait_complete", "chrona.node.wait_complete", executionSessionId, { summary: "Event observed" }, { summary: "Event observed" }],
     ] as const;
 
-    for (const [externalName, internalName, args, expectedPayload] of cases) {
+    for (const [externalName, internalName, sessionId, args, expectedPayload] of cases) {
       const { response, operations } = await postRpcWithOperations(
         rpc("tools/call", {
           name: externalName,
-          arguments: { ...args, ...hiddenContextArguments },
+          arguments: { ...args, ...hiddenContextArguments, sessionId },
         }),
       );
 
@@ -441,7 +461,7 @@ describe("MCP routes", () => {
       expect(operations[0]).toMatchObject({
         toolName: internalName,
         input: {
-          sessionId: hiddenContextArguments.sessionId,
+          sessionId,
           taskId: "task-from-session",
           payload: expectedPayload,
         },
@@ -455,7 +475,7 @@ describe("MCP routes", () => {
       rpc("tools/call", {
         name: "chrona_execution_read",
         arguments: {},
-        _meta: { sessionId: "chrona:task:task-1:plan-graph" },
+        _meta: { sessionId: "chrona:task:task-1:execute" },
       }),
     );
 
@@ -466,6 +486,80 @@ describe("MCP routes", () => {
           status: "accepted",
           message: "Tool executed.",
           state: { taskStatus: "Ready" },
+        },
+      },
+    });
+  });
+
+  it("rejects execution tools in plan generation sessions before dispatch", async () => {
+    const { response, operations } = await postRpcWithOperations(
+      rpc("tools/call", {
+        name: "chrona_execution_read",
+        arguments: {},
+        _meta: { sessionId: "chrona:task:task-1:plan-generation" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(operations).toHaveLength(0);
+    await expect(response.json()).resolves.toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: {
+          status: "rejected",
+          reasonCode: "UNAUTHORIZED",
+          recovery: { action: "stop" },
+        },
+      },
+    });
+  });
+
+  it("rejects execution tools in work-block plan generation sessions", async () => {
+    const { response, operations } = await postRpcWithOperations(
+      rpc("tools/call", {
+        name: "chrona_node_complete",
+        arguments: { summary: "Done" },
+        _meta: { sessionId: "chrona:task:task-1:work-block:block-1:plan-generation" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(operations).toHaveLength(0);
+    await expect(response.json()).resolves.toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: {
+          status: "rejected",
+          reasonCode: "UNAUTHORIZED",
+          recovery: { action: "stop" },
+        },
+      },
+    });
+  });
+
+  it("rejects plan generation in execution sessions before dispatch", async () => {
+    const { response, operations } = await postRpcWithOperations(
+      rpc("tools/call", {
+        name: "chrona_plan_generate",
+        arguments: {
+          title: "Generated MCP plan",
+          goal: "Persist a complete graph",
+          nodes: [{ id: "first_step", type: "task", title: "First step" }],
+          edges: [],
+        },
+        _meta: { sessionId: "chrona:task:task-1:work-block:block-1" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(operations).toHaveLength(0);
+    await expect(response.json()).resolves.toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: {
+          status: "rejected",
+          reasonCode: "UNAUTHORIZED",
+          recovery: { action: "use_allowed_tool" },
         },
       },
     });
@@ -508,7 +602,7 @@ describe("MCP routes", () => {
           nodes: [{ id: "task_inspect_unscheduled_cards", type: "task", title: "Inspect unscheduled cards" }],
           edges: [],
         },
-        _meta: { sessionId: "chrona:task:task-1:plan-graph" },
+        _meta: { sessionId: "chrona:task:task-1:plan-generation" },
       }),
       {
         status: "rejected",

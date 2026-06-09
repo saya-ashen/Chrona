@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
+import { createStateStore } from "@json-render/react";
 import { buildResultSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import type {
 } from "../model/task-workspace-types";
 import { SpecRenderer } from "../catalog/spec-renderer";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
+import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
 
 type OverviewAction = (nodeId?: string) => void;
 type CommandCenterTab = "now" | "output" | "trail";
@@ -45,6 +47,15 @@ const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
   outputTab: "Output",
   trailTab: "Trail",
 };
+
+const TRAIL_ACTIVITY_LIMIT = 100;
+
+function commandCenterTrailItems(commandCenter?: { documents: { trail: UiDocument } } | null) {
+  const items = commandCenter?.documents.trail.state?.trail;
+  if (!items || typeof items !== "object" || Array.isArray(items)) return [];
+  const trailItems = (items as { items?: unknown }).items;
+  return Array.isArray(trailItems) ? trailItems as WorkspaceActivityItem[] : [];
+}
 
 function isActionablePrimary(primaryAction?: CommandCenterPrimaryAction | null) {
   const kind = primaryAction?.kind;
@@ -79,6 +90,7 @@ export function TaskWorkspaceExecutionOverview({
   artifacts,
   activity,
   runtimeEvents = [],
+  liveActivity = [],
   primaryAction,
   copy: copyProp,
   commandCenter,
@@ -94,6 +106,7 @@ export function TaskWorkspaceExecutionOverview({
   artifacts: WorkspaceArtifactItem[];
   activity: WorkspaceActivityItem[];
   runtimeEvents?: WorkspaceRuntimeEvent[];
+  liveActivity?: WorkspaceActivityItem[];
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   onAction?: OverviewAction;
@@ -128,6 +141,24 @@ export function TaskWorkspaceExecutionOverview({
     { id: "trail", label: copy.trailTab },
   ];
 
+  const trailStore = useMemo(
+    () => commandCenter?.documents.trail ? createStateStore(commandCenter.documents.trail.state ?? {}) : null,
+    [commandCenter?.documents.trail],
+  );
+  const savedTrailActivity = useMemo(
+    () => commandCenter?.documents.trail ? commandCenterTrailItems(commandCenter) : activity,
+    [activity, commandCenter],
+  );
+  useEffect(() => {
+    if (!trailStore) return;
+    const limit = TRAIL_ACTIVITY_LIMIT;
+    const liveRuntimeActivity = runtimeEventsToWorkspaceActivity(runtimeEvents, limit);
+    const items = mergeWorkspaceActivity([...liveActivity, ...liveRuntimeActivity, ...savedTrailActivity], limit);
+    trailStore.set("/trail/items", items);
+    trailStore.set("/trail/liveCount", liveActivity.length + runtimeEvents.length);
+    trailStore.set("/trail/savedCount", savedTrailActivity.length);
+    trailStore.set("/trail/provider", runtimeEvents.at(-1)?.provider ?? null);
+  }, [liveActivity, runtimeEvents, savedTrailActivity, trailStore]);
   const statusLabel = primaryAction?.statusLabel
     ?? attention?.statusLabel
     ?? readiness.statusLabel
@@ -246,6 +277,7 @@ export function TaskWorkspaceExecutionOverview({
                 },
                 toolLabels: taskWorkspaceActivityMessages.toolLabels,
               })}
+              store={trailStore ?? undefined}
             />
           </TabsContent>
         </Tabs>

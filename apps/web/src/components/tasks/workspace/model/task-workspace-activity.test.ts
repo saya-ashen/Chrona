@@ -4,8 +4,10 @@ import {
   mergeWorkspaceActivity,
   orderWorkspaceActivity,
   runtimeEventToWorkspaceActivity,
+  workspaceEventToWorkspaceActivity,
 } from "./task-workspace-activity";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
+import type { TaskWorkspaceSseEvent } from "../hooks/use-task-workspace-page-state";
 import type { WorkspaceActivityItem } from "./task-workspace-types";
 
 function activity(overrides: Partial<WorkspaceActivityItem> & Pick<WorkspaceActivityItem, "id" | "kind">): WorkspaceActivityItem {
@@ -161,6 +163,30 @@ describe("workspace activity helpers", () => {
       title: "Run status",
       summary: "Provider run failed",
       tone: "danger",
+    });
+  });
+
+  it("keeps plan generation projection refreshes out of live activity", () => {
+    const projectionEvent: TaskWorkspaceSseEvent = {
+      type: "task_workspace_updated",
+      sequence: 3,
+      reason: "plan_generation.status",
+    };
+    const statusEvent: TaskWorkspaceSseEvent = {
+      type: "plan.generation.event",
+      sequence: 4,
+      eventKind: "status",
+      phase: "streaming",
+      message: "Using browser_console...",
+      generationId: "generation-1",
+    };
+
+    expect(workspaceEventToWorkspaceActivity(projectionEvent)).toBeNull();
+    expect(workspaceEventToWorkspaceActivity(statusEvent)).toMatchObject({
+      rawEventType: "plan_generation.status",
+      title: "Plan generation update",
+      summary: "Using browser_console...",
+      activityGroup: { kind: "plan_generation", id: "generation-1" },
     });
   });
 });

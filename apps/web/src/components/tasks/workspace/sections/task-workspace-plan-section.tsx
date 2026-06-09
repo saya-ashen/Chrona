@@ -38,6 +38,7 @@ import {
 import { loadNodeWorkspaceActivityPage } from "../model/task-workspace-actions";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
+  WorkspaceActivityItem,
   TaskPageData,
   TaskPlanGenerationStatus,
 } from "../model/task-workspace-types";
@@ -111,6 +112,7 @@ type TaskWorkspacePlanSectionProps = {
   hasUnsavedConfigChanges: boolean;
   unsavedConfigDraft: TaskConfigFormDraft | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
+  liveActivity?: WorkspaceActivityItem[];
   currentExecution?: PlanExecutionResult | null;
   generationUserInstruction?: string | null;
   onGeneratePlan: (request?: PlanGenerationRequest) => void;
@@ -140,6 +142,7 @@ export function TaskWorkspacePlanSection({
   unsavedConfigDraft,
   generationUserInstruction,
   runtimeEvents,
+  liveActivity = [],
   currentExecution,
   onGeneratePlan,
   onPlanLoaded,
@@ -462,6 +465,7 @@ export function TaskWorkspacePlanSection({
               commandCenterActionHandlers={commandCenterActionHandlers}
               commandCenter={pageData.commandCenter ?? null}
               runtimeEvents={runtimeEvents}
+              liveActivity={liveActivity}
               primaryAction={primaryAction}
               copy={commandCenterCopy}
               onAction={focusNodeActions}

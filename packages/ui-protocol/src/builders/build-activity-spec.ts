@@ -23,13 +23,17 @@ export interface ActivityItemInput {
   kind: string;
   title: string;
   summary?: string;
+  description?: string;
   tone?: ActivityTone;
   timestamp?: string | null;
+  sourceNodeId?: string;
   sourceNodeTitle?: string;
   provider?: string;
   runtimeName?: string;
   tool?: ActivityToolInput;
   assistant?: { text: string };
+  rawEventType?: string;
+  activityGroup?: { kind: "plan_generation" | "execution_node" | "provider_run"; id: string };
 }
 
 /** Localized labels for tool-detail rows, supplied by the caller (i18n-aware). */

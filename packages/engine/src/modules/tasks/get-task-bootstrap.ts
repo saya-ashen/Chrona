@@ -75,20 +75,29 @@ function pickTaskPageWorkBlock(workBlocks: TaskPageWorkBlock[], selectedWorkBloc
   const active = workBlocks.find((block) => block.status === "Active");
   if (active) return active;
 
+  const inWindowScheduled = workBlocks.find(
+    (block) =>
+      block.status === "Scheduled" &&
+      block.scheduledStartAt.getTime() <= now.getTime() &&
+      block.scheduledEndAt.getTime() > now.getTime(),
+  );
+  if (inWindowScheduled) return inWindowScheduled;
+
+  const overdueScheduled = workBlocks
+    .filter((block) => block.status === "Scheduled" && block.scheduledStartAt.getTime() < now.getTime())
+    .at(-1);
+  if (overdueScheduled) return overdueScheduled;
+
   const nextScheduled = workBlocks.find(
     (block) => block.status === "Scheduled" && block.scheduledStartAt.getTime() >= now.getTime(),
   );
   if (nextScheduled) return nextScheduled;
-
-  const overdueScheduled = workBlocks.find((block) => block.status === "Scheduled");
-  if (overdueScheduled) return overdueScheduled;
 
   return workBlocks.find((block) => block.status === "Completed") ?? null;
 }
 
 export async function getTaskBootstrap(input: { taskId: string; workBlockId?: string | null }) {
   const selectedWorkBlockId = input.workBlockId ?? null;
-  const latestSavedPlan = await getLatestTaskPlanReadModel(input.taskId, selectedWorkBlockId);
   const task = await db.task.findUnique({
     where: { id: input.taskId },
     include: {
@@ -143,6 +152,8 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
     : [];
 
   const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
+  const planWorkBlockId = selectedWorkBlockId ?? currentWorkBlock?.id ?? null;
+  const latestSavedPlan = await getLatestTaskPlanReadModel(input.taskId, planWorkBlockId);
   const importedEvent = task.importedCalendarEvents[0] ?? null;
   const sourceManaged = importedEvent
     ? {
@@ -160,7 +171,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
   ];
   const savedPlan = latestSavedPlan;
   const aiPlanGenerationStatus: TaskPlanGenerationStatus =
-    isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: selectedWorkBlockId })
+    isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: planWorkBlockId })
       ? "generating"
       : savedPlan !== null && savedPlan.status === "accepted"
         ? "accepted"

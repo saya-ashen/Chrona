@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
 import { getTaskPage } from "@/modules/tasks/get-task-page";
+import { getTaskBootstrap } from "@/modules/tasks/get-task-bootstrap";
 import { getTaskActivityPage } from "@/modules/tasks/task-activity";
 import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { createPlanGraphFromCompiledPlan, savePlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
@@ -249,6 +250,52 @@ describe("getTaskPage orchestrator read model", () => {
     expect(firstPage.task.savedPlan?.id).toBe("first-occurrence-plan");
     expect(secondPage.task.savedPlan?.id).toBe("second-occurrence-plan");
     expect(firstPage.task.savedPlan?.id).not.toBe(secondPage.task.savedPlan?.id);
+  });
+
+  it("keeps bootstrap current work block and saved plan on the same in-window occurrence", async () => {
+    const { workspace, task } = await seedTask("Recurring bootstrap scoped plan task");
+    const now = new Date();
+    const currentBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date(now.getTime() - 5 * 60_000),
+        scheduledEndAt: new Date(now.getTime() + 55 * 60_000),
+        trigger: "manual",
+      },
+    });
+    const futureBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: task.title,
+        status: "Scheduled",
+        scheduledStartAt: new Date(now.getTime() + 24 * 60 * 60_000),
+        scheduledEndAt: new Date(now.getTime() + 25 * 60 * 60_000),
+        trigger: "manual",
+      },
+    });
+    const scopedPlan = { ...makeCompiledPlan(), editablePlanId: "current-occurrence-draft", title: "Current occurrence draft" };
+
+    await saveCompiledPlan({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      workBlockId: currentBlock.id,
+      compiledPlan: scopedPlan,
+      status: "draft",
+      prompt: scopedPlan.title,
+      summary: scopedPlan.goal,
+      generatedBy: "orchestrator-test",
+    });
+
+    const page = await getTaskBootstrap({ taskId: task.id });
+
+    expect(page.task.currentWorkBlock?.id).toBe(currentBlock.id);
+    expect(page.task.currentWorkBlock?.id).not.toBe(futureBlock.id);
+    expect(page.task.savedPlan?.id).toBe(scopedPlan.editablePlanId);
+    expect(page.task.aiPlanGenerationStatus).toBe("waiting_acceptance");
   });
 
   it("returns recurrence series occurrences for workspace switching", async () => {

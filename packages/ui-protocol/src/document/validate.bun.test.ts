@@ -23,6 +23,26 @@ describe("validateChronaSpec", () => {
     expect(validateChronaSpec(spec).ok).toBe(true);
   });
 
+  test("normalizes lowercase report components and repairs missing root", () => {
+    const spec = {
+      root: "github_trending_report",
+      elements: {
+        heading: { type: "heading", props: { text: "GitHub Trending" } },
+        summary_text: { type: "paragraph", props: { text: "Daily report" } },
+        table: { type: "table", props: { columns: ["Repo"], rows: [["chrona"]] } },
+        trend_analysis: { type: "section", props: {}, children: ["raw_data_path"] },
+        raw_data_path: { type: "paragraph", props: { text: "data.json" } },
+      },
+    };
+
+    const result = validateChronaSpec(spec);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.spec.root).toBe("github_trending_report");
+    expect(result.spec.elements.github_trending_report).toMatchObject({ type: "Stack" });
+  });
+
+
   test("allows omitting optional/nullable props", () => {
     const spec: UiDocument = {
       root: "t",
