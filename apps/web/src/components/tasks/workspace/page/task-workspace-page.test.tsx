@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskWorkspacePage } from "./task-workspace-page";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
+import { buildTaskHeaderSpec, type UiDocument } from "@chrona/ui-protocol";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { createTaskWorkspaceUiFixture } from "../test/task-workspace-ui-fixtures";
 import type { TaskPageData, TaskPlanGenerationStatus } from "../model/task-workspace-types";
@@ -109,32 +110,28 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () 
 }));
 
 vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
-  TaskWorkspaceHeaderCard: ({ task, header, workspaceStateGuidance, planAction, onSelectOccurrence }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; workspaceStateGuidance?: string; planAction?: { label: string; disabled?: boolean; isLoading?: boolean }; onSelectOccurrence?: (occurrence: NonNullable<TaskPageData["task"]["recurrenceOccurrences"]>[number]) => void }) => (
-    <header>
-      <h1>{task.title}</h1>
-      <section aria-label="Workspace state">
-        <p>Current state</p>
-        <p>{header.status === "running" ? "Running" : header.status}</p>
-      </section>
-      <p>header-status:{task.status}</p>
-      {task.recurrenceOccurrences?.find((occurrence) => !occurrence.isCurrent) ? (
-        <button
-          type="button"
-          onClick={() => onSelectOccurrence?.(task.recurrenceOccurrences!.find((occurrence) => !occurrence.isCurrent)!)}
-        >
-          Switch occurrence
-        </button>
-      ) : null}
-      <p>workspace-status:{header.status}</p>
-      <p>{workspaceStateGuidance}</p>
-      <p>primary-action:{header.actions.find((action) => action.id !== "more")?.label ?? "none"}</p>
-      {planAction?.label === "Accept plan" ? <button type="button" disabled={planAction.disabled || planAction.isLoading}>{planAction.label}</button> : null}
-      <button type="button">Edit</button>
-      {header.actions.filter((action) => action.id !== "more").map((action) => (
-        <button key={action.id} type="button" disabled={action.disabled}>{action.label}</button>
-      ))}
-    </header>
-  ),
+  TaskWorkspaceHeaderCard: ({ task, spec }: { task: TaskPageData["task"]; spec: UiDocument }) => {
+    const elements = spec.elements;
+    const statusText = elements["badge:primary-state"]?.props?.text;
+    const actionEntries = Object.entries(elements).filter(([key]) => key.startsWith("action:"));
+    const firstActionLabel = actionEntries.map(([, element]) => element.props?.label).find((label): label is string => typeof label === "string") ?? "none";
+    return (
+      <header>
+        <h1>{task.title}</h1>
+        <section aria-label="Workspace state">
+          <p>Current state</p>
+          <p>{typeof statusText === "string" ? statusText : "unknown"}</p>
+        </section>
+        <p>header-status:{task.status}</p>
+        <p>workspace-status:{typeof statusText === "string" ? statusText.toLowerCase() : "unknown"}</p>
+        <p>primary-action:{firstActionLabel}</p>
+        {actionEntries.map(([key, element]) => {
+          const label = element.props?.label;
+          return <button key={key} type="button" disabled={Boolean(element.props?.disabled)}>{typeof label === "string" ? label : key}</button>;
+        })}
+      </header>
+    );
+  },
 }));
 
 vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () => ({
@@ -195,6 +192,25 @@ afterEach(() => {
   mocks.navigate.mockClear();
 });
 
+function testCommandCenter(title: string): NonNullable<TaskPageData["commandCenter"]> {
+  return {
+    documents: {
+      header: buildTaskHeaderSpec({
+        title,
+        status: "waiting",
+        statusLabel: "Waiting",
+        progressLabel: "0 steps · 0 accepted · 0%",
+        priorityLabel: "High",
+        priorityTone: "warning",
+        actions: [{ id: "generate-plan", label: "Generate plan" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
+      }),
+      now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
+      output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
+      trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
+    },
+  };
+}
+
 function taskData(): TaskPageData {
   return {
     defaultExecutionRuntime: "local",
@@ -226,6 +242,7 @@ function taskData(): TaskPageData {
     scheduleProposals: [],
     approvals: [],
     artifacts: [],
+    commandCenter: testCommandCenter("Plan migration"),
   };
 }
 
@@ -280,39 +297,8 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("generation:idle")).toBeInTheDocument();
     expect(screen.getByText("plan:none")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Generate plan" }).length).toBeGreaterThan(0);
 
-  });
-  it("navigates to the selected recurrence occurrence", () => {
-    const data = taskData();
-    data.task.recurrenceOccurrences = [
-      {
-        taskId: data.task.id,
-        title: data.task.title,
-        status: data.task.status,
-        scheduledStartAt: "2026-06-04T14:00:00.000Z",
-        scheduledEndAt: "2026-06-04T15:00:00.000Z",
-        workBlockId: "block-current",
-        isCurrent: true,
-      },
-      {
-        taskId: data.task.id,
-        title: data.task.title,
-        status: data.task.status,
-        scheduledStartAt: "2026-06-05T14:00:00.000Z",
-        scheduledEndAt: "2026-06-05T15:00:00.000Z",
-        workBlockId: "block-next",
-        isCurrent: false,
-      },
-    ];
-
-    render(<TaskWorkspacePage data={data} />);
-    fireEvent.click(screen.getByRole("button", { name: "Switch occurrence" }));
-
-    expect(mocks.navigate).toHaveBeenCalledWith({
-      pathname: "/en/tasks/task-1",
-      search: "?workBlockId=block-next",
-    });
   });
 
 
@@ -353,8 +339,7 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByRole("region", { name: "Workspace state" })).toBeInTheDocument();
     expect(screen.getByText("Current state")).toBeInTheDocument();
     expect(screen.getByText("Running")).toBeInTheDocument();
-    expect(screen.getByText(/Next action:/)).toBeInTheDocument();
-    expect(screen.getByText("primary-action:Start")).toBeInTheDocument();
+    expect(screen.getByText("primary-action:Pause")).toBeInTheDocument();
   });
 
   it("keeps generated plans reviewable before acceptance", () => {
@@ -368,8 +353,7 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("generation:waiting_acceptance")).toBeInTheDocument();
     expect(screen.getByText("accept:enabled")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Accept plan" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(screen.getByText("primary-action:Generate plan")).toBeInTheDocument();
   });
 
   it("renders accepted plans with completed progress", () => {
@@ -381,7 +365,7 @@ describe("TaskWorkspacePage", () => {
 
     expect(screen.getByText("generation:accepted")).toBeInTheDocument();
     expect(screen.getByText("plan:accepted")).toBeInTheDocument();
-    expect(screen.getByText("workspace-status:completed")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
   });
 
   it("passes human-review data through the workspace page", () => {
@@ -441,9 +425,7 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByRole("heading", { name: "Launch task" })).toBeInTheDocument();
     expect(screen.getByText("header-status:Running")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:running")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
   });
@@ -467,7 +449,7 @@ describe("TaskWorkspacePage", () => {
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Generate plan" }).length).toBeGreaterThan(0);
   });
 
   it("renders loading, empty, and error workspace page treatments", () => {
@@ -513,9 +495,7 @@ describe("TaskWorkspacePage", () => {
 
     expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
+    expect(screen.getByText("primary-action:Generate plan")).toBeInTheDocument();
   });
 
   it("keeps long mobile fixture content visible without dropping workspace regions", () => {

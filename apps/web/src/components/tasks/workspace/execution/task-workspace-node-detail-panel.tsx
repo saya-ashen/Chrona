@@ -215,9 +215,9 @@ export function TaskWorkspaceNodeDetailPanel({
   const drawerReason = drawerReasonLabel(node, copy);
   const tabs = (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as NodeDetailPanelState["tabs"][number])} className="min-h-0 flex-1 gap-0">
-      <TabsList aria-label={copy.nodeDetailTabsAria ?? "Node detail tabs"} className="flex h-auto justify-start gap-1.5 rounded-none border-b border-border/70 bg-muted/35 px-3 py-2">
+      <TabsList aria-label={copy.nodeDetailTabsAria ?? "Node detail tabs"} className="inline-grid h-auto w-fit max-w-full grid-cols-3 gap-1 rounded-2xl border border-border/60 bg-muted/45 p-1 shadow-[inset_0_1px_0_hsl(var(--background)/0.75),0_1px_2px_hsl(var(--foreground)/0.06)]">
         {orderedTabs.map((tab) => (
-          <TabsTrigger key={tab} value={tab} onClick={() => setActiveTab(tab)} className="flex-none rounded-full border border-border/60 bg-muted/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger key={tab} value={tab} onClick={() => setActiveTab(tab)} className="min-h-8 min-w-[6rem] rounded-xl border border-transparent px-4 py-1.5 text-xs font-semibold text-muted-foreground transition-[background-color,border-color,box-shadow,color] hover:bg-background/55 hover:text-foreground data-[state=active]:border-border/70 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_3px_hsl(var(--foreground)/0.10),inset_0_1px_0_hsl(var(--background)/0.90)]">
             {tabLabels[tab]}
           </TabsTrigger>
         ))}

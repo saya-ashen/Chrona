@@ -5,9 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
-import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
 import { Button } from "@/components/ui/button";
 import { buildAcceptOrRegenerateSpec } from "../execution/build-execution-overview-spec";
 import type {
@@ -87,17 +85,12 @@ type TaskWorkspacePlanSectionProps = {
   planGenerationStatus: TaskPlanGenerationStatus;
   canAcceptPlan?: boolean;
   acceptPlanError: string | null;
-  planningTaskDraft: TaskConfigFormDraft;
-  hasUnsavedConfigChanges: boolean;
-  unsavedConfigDraft: TaskConfigFormDraft | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
   liveActivity?: WorkspaceActivityItem[];
   currentExecution?: PlanExecutionResult | null;
   generationUserInstruction?: string | null;
   onGeneratePlan: (request?: PlanGenerationRequest) => void;
-  onPlanLoaded: (savedPlan: TaskPlanReadModel | null) => void;
   onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;
-  onSaveConfigBeforeRegenerate: () => Promise<void>;
   onDispatchExecutionAction: (
     action: ExecutionActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
@@ -116,17 +109,12 @@ export function TaskWorkspacePlanSection({
   planGenerationStatus,
   canAcceptPlan,
   acceptPlanError,
-  planningTaskDraft,
-  hasUnsavedConfigChanges,
-  unsavedConfigDraft,
   generationUserInstruction,
   runtimeEvents,
   liveActivity = [],
   currentExecution,
   onGeneratePlan,
-  onPlanLoaded,
   onApplyPlan,
-  onSaveConfigBeforeRegenerate,
   onDispatchExecutionAction,
   onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
@@ -171,7 +159,6 @@ export function TaskWorkspacePlanSection({
   const isGeneratingPlan = planGenerationStatus === "generating";
   const isPlanAccepted = plan?.status === "accepted";
   const isPlanAwaitingAcceptance = Boolean(plan && !isPlanAccepted);
-  const shouldShowPlanGenerationPanel = isGeneratingPlan;
   const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
   const currentOperationNode = operationConsoleView.nodeDetail.currentNode;
@@ -334,7 +321,7 @@ export function TaskWorkspacePlanSection({
   return (
     <section
       aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
-      className="relative flex flex-col overflow-visible rounded-[1.75rem] border border-border/80 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--canvas)_88%,var(--background)),var(--canvas))] p-2.5 pb-0 shadow-[0_18px_60px_rgba(15,23,42,0.08)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+      className="relative flex flex-col overflow-visible rounded-[1.75rem] border border-border/80 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--canvas)_88%,var(--background)),var(--canvas))] p-2 pb-0 shadow-[0_18px_60px_rgba(15,23,42,0.08)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
       {stateMessage ? (
         <div
@@ -372,8 +359,8 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : null}
 
-      <div className="relative flex min-h-[680px] flex-1 flex-col gap-2.5 xl:min-h-0">
-        <div className="grid min-h-0 flex-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="relative flex min-h-[680px] flex-1 flex-col gap-2 xl:min-h-0">
+        <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1.18fr)_minmax(30rem,0.82fr)]">
           <section
             aria-label={copy.executionFlow ?? "Execution flow"}
             className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/55 shadow-sm"
@@ -409,29 +396,6 @@ export function TaskWorkspacePlanSection({
             onPreferredNodeDetailTabApplied={() => setPreferredNodeDetailTab(null)}
             onAction={focusNodeActions}
             onBackToTask={handleBackToTask}
-            planGenerationPanel={shouldShowPlanGenerationPanel ? (
-              <TaskPlanGenerationPanel
-                taskId={pageData.task.id}
-                title={planningTaskDraft.title}
-                description={planningTaskDraft.description}
-                priority={planningTaskDraft.priority}
-                dueAt={planningTaskDraft.dueAt}
-                autoRequest={false}
-                savedPlan={plan}
-                generationStatus={planGenerationStatus}
-                onPlanLoaded={onPlanLoaded}
-                onApply={canAcceptPlan ? onApplyPlan : undefined}
-                activeAcceptedPlanId={isPlanAccepted ? plan.id : null}
-                hasUnsavedConfigChanges={hasUnsavedConfigChanges}
-                unsavedConfigDraft={unsavedConfigDraft}
-                onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
-                showGraph={false}
-                userInstruction={generationUserInstruction}
-                showEmptyGenerateButton={false}
-                showRegenerateButton={false}
-                renderIdleEmptyState={false}
-              />
-            ) : null}
           />
         </div>
       </div>

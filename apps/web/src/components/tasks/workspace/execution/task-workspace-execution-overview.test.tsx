@@ -58,41 +58,15 @@ describe("TaskWorkspaceExecutionOverview", () => {
     cleanup();
   });
 
-  it("surfaces the action rail alongside the results and activity tabs", () => {
+  it("surfaces results and activity tabs without a separate current-operation rail", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
-    const onAction = vi.fn();
-    renderOverview(view, { commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: nowDocument("Trail") } }, onAction });
+    renderOverview(view, { commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: nowDocument("Trail") } } });
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
-    // "Now" is no longer a tab — it is a persistent rail above the tabs.
     expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Results" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
-    // Rail content is visible without selecting any tab. (The fixture reuses the
-    // same document for the now/output panes, so the text appears more than once.)
-    expect(screen.getAllByText("Backend-rendered now tab.").length).toBeGreaterThan(0);
-  });
-
-  it("renders live runtime events in the now tab", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
-    renderOverview(view, {
-      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
-      runtimeEvents: [{
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 1,
-        timestamp: "2026-05-12T10:01:00.000Z",
-        event: { type: "tool_started", toolName: "chrona_plan_read", label: "正在读取计划" },
-      }],
-    });
-
-    expect(screen.getByText("Execution running")).toBeInTheDocument();
-    expect(screen.queryByText("Tool: 正在读取计划")).not.toBeInTheDocument();
+    expect(screen.queryByText("Backend-rendered now tab.")).toBeInTheDocument();
   });
 
 
@@ -204,7 +178,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
 
-  it("renders a command center primary action in the now tab", () => {
+  it("does not render command center primary actions inside the execution panel", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
     const onClick = vi.fn();
     renderOverview(view, {
@@ -219,7 +193,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
       },
     });
 
-    expect(screen.getByText("Execution running")).toBeInTheDocument();
+    expect(screen.queryByText("Execution running")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
     expect(onClick).not.toHaveBeenCalled();
   });
@@ -254,104 +228,4 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("No current operation")).not.toBeInTheDocument();
   });
 
-  it("hides the current operation card on a completed task even when the engine emits a now document", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
-
-    // The backend still emits a server `now` document for completed tasks
-    // ("Execution complete / No active execution session."). A passive
-    // primary action must still collapse the rail — there is no operation.
-    renderOverview(view, {
-      attention: null,
-      runtimeEvents: [],
-      commandCenter: { documents: { now: nowDocument("Execution complete"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
-      primaryAction: {
-        kind: "task-completed",
-        label: "Task completed",
-        description: "Execution has finished.",
-        tone: "success",
-        suppressAttentionCard: true,
-      },
-    });
-
-    expect(screen.queryByText("Current operation")).not.toBeInTheDocument();
-    expect(screen.queryByText("Execution complete")).not.toBeInTheDocument();
-    expect(screen.queryByText("Backend-rendered now tab.")).not.toBeInTheDocument();
-  });
-
-  it("shows the current operation card when an attention item is present", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
-
-    renderOverview(view, {
-      attention: {
-        id: "attention-1",
-        title: "Needs your input",
-        description: "Provide input to continue.",
-        tone: "warning",
-      } as React.ComponentProps<typeof TaskWorkspaceExecutionOverview>["attention"],
-      primaryAction: {
-        kind: "no-operation",
-        label: "No current operation",
-        description: "Passive status.",
-        tone: "neutral",
-        suppressAttentionCard: true,
-      },
-    });
-
-    expect(screen.getByText("Current operation")).toBeInTheDocument();
-    expect(screen.getByText("Needs your input")).toBeInTheDocument();
-  });
-
-  it("keeps the action rail visible regardless of the active tab", () => {
-    // The action rail replaces the old auto-switching "Now" tab: attention
-    // content is always visible and never traps the user on a tab.
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
-    renderOverview(view, {
-      commandCenter: { documents: { now: nowDocument("Needs your approval"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
-    });
-
-    // Rail content is shown without selecting any tab.
-    expect(screen.getByText("Needs your approval")).toBeInTheDocument();
-
-    // Switching to an archive tab does not hide the rail.
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
-    expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Needs your approval")).toBeInTheDocument();
-  });
-  it("renders API-provided now documents without frontend augmentation", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
-    const apiNowSpec: UiDocument = {
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "sm" }, children: ["status-card"] },
-        "status-card": {
-          type: "WorkspaceSummaryCard",
-          props: {
-            eyebrow: "Current operation",
-            title: "Execution running",
-            description: "No active execution session.",
-            statusLabel: "started",
-            tone: "info",
-            icon: "sparkles",
-          },
-        },
-      },
-    };
-
-    renderOverview(view, {
-      commandCenter: { documents: { now: apiNowSpec, output: apiNowSpec, trail: apiNowSpec } },
-      primaryAction: {
-        kind: "task-primary-action",
-        label: "Retry Sync",
-        description: "Retry sync or repair this node before continuing execution.",
-        statusLabel: "Degraded",
-        tone: "critical",
-        onClick: vi.fn(),
-      },
-    });
-
-    // Fixture reuses one document across the now/output panes, so the title renders more than once.
-    expect(screen.getAllByText("Execution running").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "Retry Sync" })).not.toBeInTheDocument();
-    expect(apiNowSpec.elements.root.children).toEqual(["status-card"]);
-  });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
@@ -45,7 +45,6 @@ export function TaskWorkspaceInspector({
   onPreferredNodeDetailTabApplied,
   onAction,
   onBackToTask,
-  planGenerationPanel,
 }: {
   taskId: string;
   scope: "task" | "node";
@@ -65,7 +64,6 @@ export function TaskWorkspaceInspector({
   onPreferredNodeDetailTabApplied: () => void;
   onAction: (nodeId?: string) => void;
   onBackToTask: () => void;
-  planGenerationPanel?: ReactNode;
 }) {
   const isNodeScope = scope === "node" && consoleView.nodeDetail.currentNode !== null;
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -117,7 +115,6 @@ export function TaskWorkspaceInspector({
           copy={commandCenterCopy}
           onAction={onAction}
         />
-        {planGenerationPanel}
       </div>
 
       {/* Overlay layer: selected node detail, slid in over the overview. A

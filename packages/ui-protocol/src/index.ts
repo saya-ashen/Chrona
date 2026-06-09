@@ -56,3 +56,11 @@ export {
   type CommandCenterCheckpointInput,
   type CommandCenterCopyInput,
 } from "./builders/build-command-center-spec";
+export {
+  buildTaskHeaderSpec,
+  type TaskHeaderActionInput,
+  type TaskHeaderBadgeInput,
+  type TaskHeaderExecutionStatus,
+  type TaskHeaderSpecInput,
+  type TaskHeaderTaskStatus,
+} from "./builders/build-task-header-spec";

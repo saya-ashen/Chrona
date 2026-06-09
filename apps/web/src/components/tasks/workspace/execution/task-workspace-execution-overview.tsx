@@ -16,7 +16,6 @@ import type {
 import { SpecRenderer } from "../catalog/spec-renderer";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
-import { TaskWorkspaceActionRail } from "./action-rail";
 
 type OverviewAction = (nodeId?: string) => void;
 type CommandCenterTab = "output" | "trail";
@@ -73,7 +72,6 @@ function buildNodeResultContentSpec(node: PlanNodeDataModel | null, emptyMessage
 }
 
 export function TaskWorkspaceExecutionOverview({
-  taskId,
   progress,
   readiness,
   attention,
@@ -85,7 +83,6 @@ export function TaskWorkspaceExecutionOverview({
   primaryAction,
   copy: copyProp,
   commandCenter,
-  commandCenterActionHandlers,
   onAction,
 }: {
   taskId: string;
@@ -174,16 +171,6 @@ export function TaskWorkspaceExecutionOverview({
           </div>
         </div>
 
-        <TaskWorkspaceActionRail
-          taskId={taskId}
-          serverNowSpec={commandCenter?.documents.now ?? null}
-          primaryAction={primaryAction}
-          readiness={readiness}
-          attention={attention}
-          runtimeEvents={runtimeEvents}
-          commandCenterActionHandlers={commandCenterActionHandlers}
-          copy={ws}
-        />
 
         <div className="mb-3 shrink-0 space-y-1.5 rounded-xl border border-border/60 bg-muted/35 px-3 py-2">
           <div className="flex items-center justify-between gap-2">
@@ -211,13 +198,13 @@ export function TaskWorkspaceExecutionOverview({
           onValueChange={(value) => setActiveTab(value as CommandCenterTab)}
           className="min-h-0 flex-1 gap-3 overflow-hidden"
         >
-          <TabsList className="flex h-auto w-full shrink-0 flex-wrap justify-start gap-1.5 rounded-none border-b border-border/70 bg-transparent p-0 pb-2 shadow-none">
+          <TabsList className="inline-flex h-auto w-fit max-w-full shrink-0 gap-1 rounded-2xl border border-border/60 bg-muted/45 p-1 shadow-[inset_0_1px_0_hsl(var(--background)/0.75),0_1px_2px_hsl(var(--foreground)/0.06)]">
             {tabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="relative flex-none rounded-full border border-border/60 bg-muted/60 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                className="min-h-8 min-w-[6.75rem] flex-none rounded-xl border border-transparent px-4 py-1.5 text-xs font-semibold text-muted-foreground transition-[background-color,border-color,box-shadow,color] hover:bg-background/55 hover:text-foreground data-[state=active]:border-border/70 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_3px_hsl(var(--foreground)/0.10),inset_0_1px_0_hsl(var(--background)/0.90)]"
               >
                 {tab.label}
               </TabsTrigger>

@@ -110,6 +110,7 @@ export type TaskPageData = {
   activityTimeline?: WorkspaceActivityItem[];
   commandCenter?: {
     documents: {
+      header?: UiDocument;
       now: UiDocument;
       output: UiDocument;
       trail: UiDocument;

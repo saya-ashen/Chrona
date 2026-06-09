@@ -155,6 +155,7 @@ describe("task workspace console read data", () => {
     expect(body).not.toHaveProperty("activityTimeline");
     expect(body).not.toHaveProperty("ui");
     expect(body.documents).toMatchObject({
+      header: { root: "root", elements: expect.any(Object) },
       now: { root: "root", elements: expect.any(Object) },
       output: { root: "root", elements: expect.any(Object) },
       trail: { root: "root", elements: expect.any(Object) },
