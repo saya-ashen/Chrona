@@ -90,12 +90,25 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
 
   try {
     if (command.type === "plan.generate") {
+      const workBlockId = commandWorkBlockId(command);
+      appendTaskWorkspaceEvent({
+        type: "spec.patch",
+        document: "header",
+        taskId,
+        workspaceId,
+        workBlockId,
+        patches: [
+          { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan..." },
+          { op: "replace", path: "/elements/action:generate-plan/props/disabled", value: true },
+        ],
+      });
       const generation = engine.tasks.plan.generate({
         taskId,
         workBlockId: command.workBlockId ?? null,
         forceRefresh: command.forceRefresh ?? true,
         userInstruction: command.userInstruction ?? undefined,
       });
+      let planGenerationFailed = false;
       for await (const event of generation.events) {
         generation.emit(event);
         publishWorkspaceTrigger({
@@ -105,11 +118,33 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
           type: "plan.generation.event",
           eventKind: event.type,
           generationId: generation.generationId,
-          workBlockId: commandWorkBlockId(command),
+          workBlockId,
           ...planGenerationWorkspacePayload(event),
         });
+        if (event.type === "error") {
+          planGenerationFailed = true;
+          appendTaskWorkspaceEvent({
+            type: "spec.patch",
+            document: "header",
+            taskId,
+            workspaceId,
+            workBlockId,
+            patches: [
+              { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan" },
+              { op: "remove", path: "/elements/action:generate-plan/props/disabled" },
+            ],
+          });
+        }
       }
       generation.finish();
+      appendTaskWorkspaceEvent({
+        type: "task_workspace_updated",
+        taskId,
+        workspaceId,
+        workBlockId,
+        reason: planGenerationFailed ? "plan.generation.failed" : "plan.generated",
+        updatedAt: new Date().toISOString(),
+      });
       return;
     }
 
@@ -196,15 +231,29 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
     publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "checkpoint.result", eventKind: result.execution.status });
   } catch (cause) {
     const httpError = toHttpError(cause);
+    const workBlockId = commandWorkBlockId(command);
     publishCommandEvent({
       taskId,
       workspaceId,
       commandId,
       commandType: command.type,
       type: "command.failed",
-      workBlockId: commandWorkBlockId(command),
+      workBlockId,
       message: httpError?.message ?? (cause instanceof Error ? cause.message : "Workspace command failed"),
     });
+    if (command.type === "plan.generate") {
+      appendTaskWorkspaceEvent({
+        type: "spec.patch",
+        document: "header",
+        taskId,
+        workspaceId,
+        workBlockId,
+        patches: [
+          { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan" },
+          { op: "remove", path: "/elements/action:generate-plan/props/disabled" },
+        ],
+      });
+    }
   }
 }
 

@@ -57,8 +57,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "timeout 200 npx tsc -p apps/web/tsconfig.json --noEmit 2>&1 | grep -E \"action-rail\" | grep -v \"bun:\\|nativeRunId\\|db.ts\\|hermes\" | head; echo \"=== overview suite ===\"; npx vitest run apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx 2>&1 | grep -E \"×|Tests |Test Files|Unable|expected\" | head -20",
-    "testCommand": "timeout 200 npx tsc -p apps/web/tsconfig.json --noEmit 2>&1 | grep -E \"action-rail\" | grep -v \"bun:\\|nativeRunId\\|db.ts\\|hermes\" | head; echo \"=== overview suite ===\"; npx vitest run apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx 2>&1 | grep -E \"×|Tests |Test Files|Unable|expected\" | head -20",
+    "buildCommand": "npx tsc -p apps/server/tsconfig.json --noEmit 2>&1 | grep -E \"work\\.routes|task-projection-events|error TS\" | grep -v \"execution.routes\\|nativeRunId\\|bun:\" | head -20; echo \"done\"",
+    "testCommand": "npx vitest run apps/web/src/components/tasks/workspace/page/task-workspace-header-card.test.tsx apps/web/src/components/tasks/workspace/page/task-workspace-page.test.tsx 2>&1 | grep -E \"✓|×|Tests |Test Files|FAIL|expected|TypeError\" | head -30",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -449,6 +449,24 @@
       "type": "file"
     },
     {
+      "path": "packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781016377590,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/services/task-plan.service.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781016377722,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/task-planning.ts",
+      "accessCount": 3,
+      "lastAccessed": 1781016388895,
+      "type": "file"
+    },
+    {
       "path": "packages/graph-runtime/package.json",
       "accessCount": 2,
       "lastAccessed": 1780560735686,
@@ -491,33 +509,27 @@
       "type": "file"
     },
     {
-      "path": "packages/engine/src/modules/plans/task-planning.ts",
-      "accessCount": 2,
-      "lastAccessed": 1780579837910,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/services/task-plan.service.ts",
-      "accessCount": 2,
-      "lastAccessed": 1780580310037,
-      "type": "file"
-    },
-    {
       "path": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
       "accessCount": 2,
       "lastAccessed": 1780582501354,
       "type": "file"
     },
     {
-      "path": "packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
+      "path": "packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
       "accessCount": 2,
-      "lastAccessed": 1780582508355,
+      "lastAccessed": 1781015135016,
+      "type": "file"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "accessCount": 2,
+      "lastAccessed": 1781015149775,
       "type": "file"
     },
     {
       "path": "packages/contracts/src/plan-runtime/execution-state.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780560645216,
+      "accessCount": 2,
+      "lastAccessed": 1781015271641,
       "type": "file"
     },
     {
@@ -548,12 +560,6 @@
       "path": "packages/graph-runtime/src/resolve.ts",
       "accessCount": 1,
       "lastAccessed": 1780569891690,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780569891750,
       "type": "file"
     },
     {
@@ -602,12 +608,6 @@
       "path": "packages/engine/src/errors.ts",
       "accessCount": 1,
       "lastAccessed": 1780577578925,
-      "type": "file"
-    },
-    {
-      "path": "packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
-      "accessCount": 1,
-      "lastAccessed": 1780579017775,
       "type": "file"
     },
     {

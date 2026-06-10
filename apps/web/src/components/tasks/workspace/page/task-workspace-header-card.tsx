@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { type StateStore } from "@json-render/react";
 import { useI18n } from "@chrona/i18n/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ type HeaderActionId = TaskHeaderAction["id"];
 type TaskWorkspaceHeaderCardProps = {
   task: Pick<TaskData, "title">;
   spec: UiDocument;
+  store: StateStore;
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
   onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void | Promise<void>;
@@ -45,6 +47,7 @@ function findActionLabel(spec: UiDocument, actionId: HeaderActionId) {
 export function TaskWorkspaceHeaderCard({
   task,
   spec,
+  store,
   onAction,
   onAcceptPlan,
   onGeneratePlan,
@@ -60,45 +63,61 @@ export function TaskWorkspaceHeaderCard({
   const [pendingActionId, setPendingActionId] = useState<HeaderActionId | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
 
-  const handleExecutionAction = async (actionId: HeaderActionId) => {
-    if (actionId === "more" || pendingActionId) return;
-    const label = findActionLabel(spec, actionId);
-    setPendingActionId(actionId);
-    setActionStatus(null);
-    try {
-      await onAction({ id: actionId, label });
-      setActionStatus(`${label} ${copy.requestSentSuffix ?? "request sent."}`);
-    } catch (error) {
-      setActionStatus(error instanceof Error ? error.message : `${copy.actionFailedPrefix ?? "Failed to"} ${label.toLowerCase()}.`);
-    } finally {
-      setPendingActionId(null);
-    }
-  };
+  // Refs so that the handlers object (passed to ActionProvider which stores it in
+  // useState on mount and never re-syncs prop updates) always reads the current
+  // values rather than the stale closure from the initial render.
+  const ref = useRef({ onAcceptPlan, onGeneratePlan, onEdit, onStartDeleteConfirm, onAction, store, spec, copy, pendingActionId });
+  ref.current = { onAcceptPlan, onGeneratePlan, onEdit, onStartDeleteConfirm, onAction, store, spec, copy, pendingActionId };
 
+  // Empty deps: stable identity across all re-renders. Reads from ref at call time.
   const handlers = useMemo(() => ({
     "edit-task": () => {
-      onEdit();
+      ref.current.onEdit();
     },
     "delete-task": () => {
-      onStartDeleteConfirm();
+      ref.current.onStartDeleteConfirm();
+    },
+    "header-overflow-action": (params: Record<string, unknown>) => {
+      const actionId = params.actionId;
+      if (actionId === "edit") {
+        ref.current.onEdit();
+        ref.current.store.set("/headerOverflowAction", "");
+        return;
+      }
+      if (actionId === "delete") {
+        ref.current.onStartDeleteConfirm();
+        ref.current.store.set("/headerOverflowAction", "");
+      }
     },
     [UI_ACTION.acceptPlan]: async () => {
-      await Promise.resolve(onAcceptPlan());
+      await Promise.resolve(ref.current.onAcceptPlan());
     },
     [UI_ACTION.regeneratePlan]: async () => {
-      await Promise.resolve(onGeneratePlan());
+      await Promise.resolve(ref.current.onGeneratePlan());
     },
     [UI_ACTION.dispatchExecution]: async (params: Record<string, unknown>) => {
       const actionId = params.actionId;
-      if (actionId === "start" || actionId === "pause" || actionId === "stop" || actionId === "more") {
-        await handleExecutionAction(actionId);
+      if (actionId !== "start" && actionId !== "pause" && actionId !== "stop" && actionId !== "more") return;
+      if (actionId === "more" || ref.current.pendingActionId) return;
+      const { spec: currentSpec, copy: currentCopy, onAction: currentOnAction } = ref.current;
+      const label = findActionLabel(currentSpec, actionId);
+      setPendingActionId(actionId);
+      setActionStatus(null);
+      try {
+        await currentOnAction({ id: actionId, label });
+        setActionStatus(`${label} ${currentCopy.requestSentSuffix ?? "request sent."}`);
+      } catch (error) {
+        setActionStatus(error instanceof Error ? error.message : `${currentCopy.actionFailedPrefix ?? "Failed to"} ${label.toLowerCase()}.`);
+      } finally {
+        setPendingActionId(null);
       }
     },
-  }), [onAcceptPlan, onEdit, onGeneratePlan, onStartDeleteConfirm, pendingActionId, spec]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
 
   return (
     <>
-      <SpecRenderer spec={spec} handlers={handlers} />
+      <SpecRenderer spec={spec} handlers={handlers} store={store} />
       {actionStatus ? (
         <p className="mt-1 px-2 text-xs text-muted-foreground" role="status">
           {actionStatus}

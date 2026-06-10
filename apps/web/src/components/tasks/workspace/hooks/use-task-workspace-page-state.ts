@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { applySpecPatch, createStateStore, type StateStore } from "@json-render/core";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import { fetchTaskWorkspacePage, taskWorkspaceQueryKeys } from "../model/task-workspace-query";
+import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 
 type RefreshOptions = {
@@ -26,7 +28,7 @@ const FALLBACK_REFRESH_INTERVAL_MS = Number(
     import.meta.env.VITE_TASK_WORKSPACE_POLL_INTERVAL_MS ??
     30000,
 );
-const NON_REFRESH_WORKSPACE_EVENTS = new Set(["ready", "heartbeat"]);
+const NON_REFRESH_WORKSPACE_EVENTS = new Set(["ready", "heartbeat", "spec.patch"]);
 const PAGE_REFRESH_WORKSPACE_EVENTS = new Set([
   "task_projection_updated",
   "task_workspace_updated",
@@ -170,6 +172,14 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
   const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const initialDataRef = useRef(initialData);
+  const [headerSpec, setHeaderSpec] = useState<UiDocument>(() => {
+    const doc = initialData.commandCenter?.documents.header;
+    if (!doc) throw new Error("Task workspace header document is missing from command center payload.");
+    return doc;
+  });
+  const headerStoreRef = useRef<StateStore>(createStateStore(
+    initialData.commandCenter?.documents.header?.state ?? {},
+  ));
   const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
   const pageQueryKey = useMemo(
     () => taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId),
@@ -209,9 +219,34 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     });
   }, [initialData, pageQueryKey, queryClient]);
   const handleWorkspaceEvent = useCallback((event: TaskWorkspaceSseEvent) => {
+    if (event.type === "spec.patch") {
+      if (event.document === "header" && Array.isArray(event.patches)) {
+        const patches = event.patches as Array<{ op: string; path: string; value?: unknown; from?: string }>;
+        setHeaderSpec((prev) => {
+          const next = structuredClone(prev) as typeof prev;
+          for (const patch of patches) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            applySpecPatch(next as any, patch as any);
+          }
+          return next;
+        });
+      }
+      return;
+    }
     setWorkspaceEvents((current) => [...current.slice(-199), event]);
   }, []);
   useTaskWorkspaceEventStream(taskId, refreshWorkspacePage, handleWorkspaceEvent);
+
+  // When a full refresh completes, replace the local spec with the authoritative server spec.
+  const prevPageDataRef = useRef(pageQuery.data);
+  useEffect(() => {
+    if (prevPageDataRef.current === pageQuery.data) return;
+    prevPageDataRef.current = pageQuery.data;
+    const serverHeaderSpec = pageQuery.data?.commandCenter?.documents.header;
+    if (serverHeaderSpec) {
+      setHeaderSpec(serverHeaderSpec);
+    }
+  }, [pageQuery.data]);
 
   useEffect(() => {
     if (previousWorkBlockKeyRef.current === selectedWorkBlockKey) return;
@@ -248,5 +283,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     refreshWorkspace,
     isRefreshing: pageQuery.isFetching,
     workspaceEvents,
+    headerSpec,
+    headerStore: headerStoreRef.current,
   };
 }

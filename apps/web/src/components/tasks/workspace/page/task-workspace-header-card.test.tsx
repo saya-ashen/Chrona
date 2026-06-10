@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createStateStore } from "@json-render/core";
 import { buildTaskHeaderSpec } from "@chrona/ui-protocol";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
 import type { TaskData } from "../model/task-workspace-types";
@@ -61,6 +62,7 @@ function renderHeader(spec = buildTaskHeaderSpec({
     <TaskWorkspaceHeaderCard
       task={task}
       spec={spec}
+      store={createStateStore(spec.state ?? {})}
       onAction={vi.fn()}
       onAcceptPlan={vi.fn()}
       onGeneratePlan={vi.fn()}
@@ -84,23 +86,18 @@ describe("TaskWorkspaceHeaderCard", () => {
     expect(screen.queryByText("Draft")).not.toBeInTheDocument();
   });
 
-  it("renders server-provided live execution status", () => {
+  it("renders one server-provided execution status", () => {
     renderHeader(buildTaskHeaderSpec({
       title: task.title,
       status: "running",
       statusLabel: "Running",
       progressLabel: "1 steps · 0 accepted · 0%",
       priorityLabel: "Medium",
-      executionStatus: {
-        status: "running",
-        label: "Running now",
-        message: "Executing Fetch trending repositories",
-      },
       actions: [{ id: "pause", label: "Pause" }, { id: "stop", label: "Stop" }],
     }));
 
-    expect(screen.getByText("Running now")).toBeInTheDocument();
-    expect(screen.getByText("Executing Fetch trending repositories")).toBeInTheDocument();
+    expect(screen.getByText("Running")).toBeInTheDocument();
+    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
   });
 
   it("renders server-provided occurrence label", () => {

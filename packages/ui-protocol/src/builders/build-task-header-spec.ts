@@ -1,17 +1,6 @@
 import { UI_ACTION } from "../actions/actions";
 import type { UiDocument } from "../document/document";
 
-export type TaskHeaderExecutionStatus =
-  | "started"
-  | "running"
-  | "waiting_for_user"
-  | "waiting_for_approval"
-  | "blocked"
-  | "failed"
-  | "completed"
-  | "cancelled"
-  | "no_plan";
-
 export type TaskHeaderTaskStatus = "completed" | "running" | "waiting" | "approval-needed" | "blocked";
 
 export type TaskHeaderActionInput = {
@@ -20,6 +9,14 @@ export type TaskHeaderActionInput = {
   disabled?: boolean;
   disabledReason?: string;
   loading?: boolean;
+};
+
+export type TaskHeaderOccurrenceOptionInput = {
+  value: string;
+  label: string;
+  taskId: string;
+  date: string | null;
+  workBlockId: string | null;
 };
 
 export type TaskHeaderBadgeInput = {
@@ -38,12 +35,9 @@ export type TaskHeaderSpecInput = {
   workspaceStateLabel?: string | null;
   workspaceStateGuidance?: string | null;
   occurrenceLabel?: string | null;
+  occurrenceValue?: string | null;
+  occurrenceOptions?: TaskHeaderOccurrenceOptionInput[];
   sourceLabel?: string | null;
-  executionStatus?: {
-    status: TaskHeaderExecutionStatus;
-    label?: string | null;
-    message?: string | null;
-  } | null;
   actions: TaskHeaderActionInput[];
 };
 
@@ -92,6 +86,20 @@ function appendButton(elements: MutableElements, children: string[], action: Tas
   children.push(key);
 }
 
+function appendOverflowMenu(elements: MutableElements, children: string[], actions: TaskHeaderActionInput[]) {
+  if (actions.length === 0) return;
+  elements["header-overflow"] = {
+    type: "DropdownMenu",
+    props: {
+      label: "...",
+      value: { $bindState: "/headerOverflowAction" },
+      items: actions.map((action) => ({ label: action.label, value: action.id })),
+    },
+    on: { select: { action: "header-overflow-action", params: { actionId: { $state: "/headerOverflowAction" } } } },
+  };
+  children.push("header-overflow");
+}
+
 function statusTone(status: TaskHeaderTaskStatus): TaskHeaderBadgeInput["tone"] {
   if (status === "blocked") return "danger";
   if (status === "completed") return "success";
@@ -99,11 +107,21 @@ function statusTone(status: TaskHeaderTaskStatus): TaskHeaderBadgeInput["tone"] 
   return "neutral";
 }
 
-function executionTone(status: TaskHeaderExecutionStatus): TaskHeaderBadgeInput["tone"] {
-  if (status === "failed" || status === "blocked" || status === "cancelled") return "danger";
-  if (status === "completed") return "success";
-  if (status === "waiting_for_user" || status === "waiting_for_approval") return "warning";
-  return "info";
+function appendOccurrence(elements: MutableElements, children: string[], input: TaskHeaderSpecInput) {
+  if (input.occurrenceOptions && input.occurrenceOptions.length > 1) {
+    elements["occurrence-calendar"] = {
+      type: "WorkspaceOccurrenceCalendar",
+      props: {
+        label: "Occurrence",
+        value: input.occurrenceValue ?? input.occurrenceOptions.find((option) => option.label === input.occurrenceLabel)?.value ?? input.occurrenceOptions[0]?.value ?? "",
+        options: input.occurrenceOptions,
+      },
+    };
+    children.push("occurrence-calendar");
+    return;
+  }
+
+  appendBadge(elements, children, input.occurrenceLabel ? { id: "occurrence", label: input.occurrenceLabel, tone: "neutral" } : null);
 }
 
 export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
@@ -116,17 +134,13 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   appendBadge(elements, statusChildren, { id: "primary-state", label: input.statusLabel, tone: statusTone(input.status) });
   appendBadge(elements, statusChildren, input.priorityLabel ? { id: "priority", label: input.priorityLabel, tone: input.priorityTone ?? "neutral" } : null);
 
-  if (input.executionStatus?.label && input.executionStatus.label !== input.statusLabel) {
-    appendBadge(elements, statusChildren, { id: "execution", label: input.executionStatus.label, tone: executionTone(input.executionStatus.status) });
-  }
-  if (input.executionStatus?.message && input.executionStatus.status !== "completed") {
-    elements["execution-message"] = { type: "Text", props: { text: input.executionStatus.message, variant: "caption" } };
-    metaChildren.push("execution-message");
-  }
-  appendBadge(elements, metaChildren, input.occurrenceLabel ? { id: "occurrence", label: input.occurrenceLabel, tone: "neutral" } : null);
+  appendOccurrence(elements, metaChildren, input);
   appendBadge(elements, metaChildren, input.sourceLabel ? { id: "source", label: input.sourceLabel, tone: "neutral" } : null);
 
-  for (const action of input.actions) appendButton(elements, actionChildren, action);
+  const overflowActions = input.actions.filter((action) => action.id === "edit" || action.id === "delete");
+  const primaryActions = input.actions.filter((action) => action.id !== "edit" && action.id !== "delete");
+  for (const action of primaryActions) appendButton(elements, actionChildren, action);
+  appendOverflowMenu(elements, actionChildren, overflowActions);
 
   elements.root = {
     type: "Card",
@@ -148,5 +162,5 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   }
   elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "xs", align: "center", justify: "end", className: "w-full flex-wrap sm:w-auto" }, children: actionChildren };
 
-  return { root: "root", elements };
+  return { root: "root", elements, state: { headerOverflowAction: "" } };
 }

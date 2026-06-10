@@ -1,4 +1,4 @@
-export type { TaskProjectionEvent } from "./task-projection-events";
+export type { TaskProjectionEvent, SpecPatch } from "./task-projection-events";
 export {
   appendTaskWorkspaceEvent,
   publishTaskProjectionEvent,

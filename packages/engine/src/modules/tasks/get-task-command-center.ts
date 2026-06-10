@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { buildCommandCenterArtifactsSpec, buildCommandCenterNowSpec, buildCommandCenterTrailSpec, buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
+import { buildCommandCenterArtifactsSpec, buildCommandCenterNowSpec, buildCommandCenterTrailSpec, buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
@@ -13,14 +13,15 @@ function nowTone(status: string) {
   if (status === "completed") return "success" as const;
   if (status === "failed" || status === "blocked") return "danger" as const;
   if (status.startsWith("waiting")) return "warning" as const;
-  if (status === "running" || status === "started") return "info" as const;
+  if (status === "running") return "info" as const;
   return "neutral" as const;
 }
 
 function nowTitle(status: string) {
   if (status === "no_plan") return "No accepted plan";
+  if (status === "started") return "Ready to start";
   if (status === "completed") return "Execution complete";
-  if (status === "running" || status === "started") return "Execution running";
+  if (status === "running") return "Execution running";
   if (status.startsWith("waiting")) return "Needs input";
   if (status === "blocked") return "Execution blocked";
   if (status === "failed") return "Execution failed";
@@ -33,10 +34,12 @@ function taskStatusLabel(status: TaskHeaderTaskStatus) {
 }
 
 function taskHeaderStatus(input: { taskStatus: string; executionStatus: string }): TaskHeaderTaskStatus {
-  if (input.executionStatus === "completed" || input.taskStatus === "Completed" || input.taskStatus === "Done") return "completed";
-  if (input.executionStatus === "running" || input.executionStatus === "started" || input.taskStatus === "Running") return "running";
+  if (input.executionStatus === "running") return "running";
   if (input.executionStatus === "waiting_for_user" || input.executionStatus === "waiting_for_approval") return "approval-needed";
   if (input.executionStatus === "blocked" || input.taskStatus === "Blocked") return "blocked";
+  if (input.executionStatus === "failed") return "blocked";
+  if (input.executionStatus === "completed" || input.taskStatus === "Completed" || input.taskStatus === "Done") return "completed";
+  if (input.taskStatus === "Running") return "running";
   return "waiting";
 }
 
@@ -54,21 +57,46 @@ function formatOccurrenceWindow(start: Date | null, end: Date | null) {
   return endLabel ? `${dateLabel} ${startLabel}-${endLabel}` : `${dateLabel} ${startLabel}`;
 }
 
-function executionStatusLabel(status: string) {
-  if (status === "started" || status === "running") return "Running now";
-  if (status === "waiting_for_user") return "Waiting for input";
-  if (status === "waiting_for_approval") return "Waiting for approval";
-  if (status === "failed") return "Run failed";
-  if (status === "blocked") return "Run blocked";
-  if (status === "cancelled") return "Run cancelled";
-  return null;
+type HeaderWorkBlock = {
+  id: string;
+  status: string;
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+};
+
+type HeaderOccurrenceSortOption = {
+  option: TaskHeaderOccurrenceOptionInput;
+  sortTime: number;
+};
+
+function pickHeaderWorkBlock(workBlocks: HeaderWorkBlock[], selectedWorkBlockId: string | null, now: Date) {
+  if (selectedWorkBlockId) {
+    const selected = workBlocks.find((block) => block.id === selectedWorkBlockId);
+    if (selected) return selected;
+  }
+  const active = workBlocks.find((block) => block.status === "Active");
+  if (active) return active;
+  return workBlocks.find((block) => block.scheduledStartAt.getTime() <= now.getTime() && block.scheduledEndAt.getTime() > now.getTime())
+    ?? workBlocks.find((block) => block.scheduledStartAt.getTime() > now.getTime())
+    ?? workBlocks[0]
+    ?? null;
 }
+
+function occurrenceValue(taskId: string, workBlockId: string | null) {
+  return workBlockId ? `${taskId}:${workBlockId}` : taskId;
+}
+
+function occurrenceLabel(input: { title: string; status: string; start: Date | null; end: Date | null }) {
+  const window = formatOccurrenceWindow(input.start, input.end);
+  return window ? `${window} · ${input.status}` : `${input.title} · ${input.status}`;
+}
+
 
 function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAcceptedPlan: boolean; isRunnable: boolean }): TaskHeaderActionInput[] {
   if (!input.hasPlan) return [{ id: "generate-plan", label: "Generate plan" }];
   if (!input.hasAcceptedPlan) return [{ id: "accept-plan", label: "Accept plan" }];
   if (input.executionStatus === "completed" || input.executionStatus === "cancelled") return [];
-  if (input.executionStatus === "running" || input.executionStatus === "started") return [
+  if (input.executionStatus === "running") return [
     { id: "pause", label: "Pause" },
     { id: "stop", label: "Stop" },
   ];
@@ -90,11 +118,23 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
   const task = await db.task.findUnique({
     where: { id: input.taskId },
     select: {
+      id: true,
+      workspaceId: true,
+      seriesExternalUid: true,
       title: true,
       status: true,
       priority: true,
       dueAt: true,
       projection: { select: { scheduledStartAt: true, scheduledEndAt: true } },
+      workBlocks: {
+        where: { status: { in: ["Scheduled", "Active", "Completed"] } },
+        orderBy: [
+          { status: "asc" },
+          { scheduledStartAt: "asc" },
+          { updatedAt: "desc" },
+        ],
+        take: 50,
+      },
       importedCalendarEvents: {
         take: 1,
         include: { calendarSource: { select: { name: true } } },
@@ -116,6 +156,30 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
 
+
+  const recurrenceSeriesTasks = task.seriesExternalUid
+    ? await db.task.findMany({
+        where: {
+          workspaceId: task.workspaceId,
+          seriesExternalUid: task.seriesExternalUid,
+          id: { not: task.id },
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          workBlocks: {
+            where: { status: { in: ["Scheduled", "Active", "Completed"] } },
+            orderBy: [
+              { status: "asc" },
+              { scheduledStartAt: "asc" },
+              { updatedAt: "desc" },
+            ],
+            take: 50,
+          },
+        },
+      })
+    : [];
   const artifacts = task.artifacts.map((artifact) => ({
     id: artifact.id,
     title: artifact.title,
@@ -129,15 +193,46 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
       ]).slice(0, 100)
     : buildActivityTimeline([...task.events].reverse());
 
+  const now = new Date();
+  const currentWorkBlock = pickHeaderWorkBlock(task.workBlocks, selectedWorkBlockId, now);
+  const recurrenceOccurrences = [{ id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks }, ...recurrenceSeriesTasks];
+  const occurrenceOptions = recurrenceOccurrences
+    .flatMap<HeaderOccurrenceSortOption>((occurrence) => {
+      if (occurrence.workBlocks.length === 0) {
+        return [{
+          option: {
+            value: occurrenceValue(occurrence.id, null),
+            label: occurrenceLabel({ title: occurrence.title, status: occurrence.status, start: null, end: null }),
+            taskId: occurrence.id,
+            date: null,
+            workBlockId: null,
+          },
+          sortTime: Number.MAX_SAFE_INTEGER,
+        }];
+      }
+
+      return occurrence.workBlocks.map((workBlock) => ({
+        option: {
+          value: occurrenceValue(occurrence.id, workBlock.id),
+          label: occurrenceLabel({ title: occurrence.title, status: workBlock.status, start: workBlock.scheduledStartAt, end: workBlock.scheduledEndAt }),
+          taskId: occurrence.id,
+          date: workBlock.scheduledStartAt.toISOString().slice(0, 10),
+          workBlockId: workBlock.id,
+        },
+        sortTime: workBlock.scheduledStartAt.getTime(),
+      }));
+    })
+    .sort((left, right) => left.sortTime - right.sortTime)
+    .map(({ option }) => option satisfies TaskHeaderOccurrenceOptionInput);
+  const occurrenceValueCurrent = occurrenceValue(task.id, currentWorkBlock?.id ?? null);
   const savedPlan = await getLatestTaskPlanReadModel(input.taskId, selectedWorkBlockId);
   const totalSteps = savedPlan?.effectivePlan.nodes.length ?? 0;
   const completedSteps = savedPlan?.effectivePlan.completedNodeIds.length ?? currentExecution.executedNodeIds.length;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
   const status = taskHeaderStatus({ taskStatus: task.status, executionStatus: currentExecution.status });
-  const executionLabel = executionStatusLabel(currentExecution.status);
   const occurrenceWindow = formatOccurrenceWindow(
-    task.projection?.scheduledStartAt ?? task.dueAt ?? null,
-    task.projection?.scheduledEndAt ?? null,
+    currentWorkBlock?.scheduledStartAt ?? task.projection?.scheduledStartAt ?? task.dueAt ?? null,
+    currentWorkBlock?.scheduledEndAt ?? task.projection?.scheduledEndAt ?? null,
   );
   const source = task.importedCalendarEvents[0] ?? null;
   const actions = headerActions({
@@ -159,11 +254,8 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
         priorityTone: priorityTone(task.priority),
         occurrenceLabel: occurrenceWindow ? `Occurrence · ${occurrenceWindow}` : null,
         sourceLabel: source?.calendarSource.name ?? null,
-        executionStatus: {
-          status: currentExecution.status,
-          label: executionLabel,
-          message: currentExecution.message,
-        },
+        occurrenceValue: occurrenceValueCurrent,
+        occurrenceOptions,
         actions,
       }),
       now: buildCommandCenterNowSpec({

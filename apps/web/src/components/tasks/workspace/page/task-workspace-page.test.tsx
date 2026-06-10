@@ -64,6 +64,22 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () =
     setTask: vi.fn(),
     refreshWorkspace: vi.fn(),
     isRefreshing: false,
+    workspaceEvents: [],
+    headerSpec: data.commandCenter?.documents.header ?? buildTaskHeaderSpec({
+      title: data.task.title,
+      status: "waiting",
+      statusLabel: "Waiting",
+      progressLabel: "",
+      actions: [],
+    }),
+    headerStore: {
+      get: vi.fn(),
+      set: vi.fn(),
+      update: vi.fn(),
+      getSnapshot: () => ({}),
+      getServerSnapshot: () => ({}),
+      subscribe: () => vi.fn(),
+    },
   }),
 }));
 
@@ -114,6 +130,7 @@ vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
     const elements = spec.elements;
     const statusText = elements["badge:primary-state"]?.props?.text;
     const actionEntries = Object.entries(elements).filter(([key]) => key.startsWith("action:"));
+    const hasOverflow = Boolean(elements["header-overflow"]);
     const firstActionLabel = actionEntries.map(([, element]) => element.props?.label).find((label): label is string => typeof label === "string") ?? "none";
     return (
       <header>
@@ -129,6 +146,7 @@ vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
           const label = element.props?.label;
           return <button key={key} type="button" disabled={Boolean(element.props?.disabled)}>{typeof label === "string" ? label : key}</button>;
         })}
+        {hasOverflow ? <button type="button">...</button> : null}
       </header>
     );
   },
@@ -296,7 +314,7 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
     expect(screen.getByText("generation:idle")).toBeInTheDocument();
     expect(screen.getByText("plan:none")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "..." })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Generate plan" }).length).toBeGreaterThan(0);
 
   });
@@ -425,7 +443,7 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByRole("heading", { name: "Launch task" })).toBeInTheDocument();
     expect(screen.getByText("header-status:Running")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:running")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "..." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
   });

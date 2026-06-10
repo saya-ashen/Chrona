@@ -31,6 +31,14 @@ const activityGroupSchema = z.object({
   id: z.string(),
 });
 
+const occurrenceOptionSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  taskId: z.string(),
+  date: z.string().nullable(),
+  workBlockId: z.string().nullable(),
+});
+
 const activityItemSchema = z.object({
   id: z.string(),
   kind: z.string(),
@@ -90,6 +98,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     Stack: shadcn.Stack,
     Separator: shadcn.Separator,
     Text: shadcn.Text,
+    DropdownMenu: shadcn.DropdownMenu,
     Heading: shadcn.Heading,
     Badge: shadcn.Badge,
     Alert: shadcn.Alert,
@@ -115,6 +124,14 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       description: "Compatibility section container for AI-produced result specs.",
     },
     // --- Chrona-custom domain components ---
+    WorkspaceOccurrenceCalendar: {
+      props: z.object({
+        label: z.string(),
+        value: z.string(),
+        options: z.array(occurrenceOptionSchema),
+      }),
+      description: "Compact occurrence calendar picker for recurring task workspace header.",
+    },
     Markdown: {
       props: z.object({ content: z.string(), title: z.string().optional() }),
       description: "Rendered markdown result content.",

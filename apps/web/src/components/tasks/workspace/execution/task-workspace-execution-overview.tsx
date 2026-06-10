@@ -213,7 +213,7 @@ export function TaskWorkspaceExecutionOverview({
 
           <TabsContent value="output" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
             <SpecRenderer
-              spec={commandCenter?.documents.output ?? buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws })}
+              spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
               handlers={locateHandlers}
             />
           </TabsContent>

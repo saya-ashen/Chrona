@@ -7,6 +7,13 @@ type WorkspaceEventBase = {
   commandId?: string;
 };
 
+export type SpecPatch = {
+  op: "add" | "remove" | "replace" | "move" | "copy" | "test";
+  path: string;
+  value?: unknown;
+  from?: string;
+};
+
 type TaskProjectionUpdatedEvent = WorkspaceEventBase & {
   type: "task_projection_updated";
   persistedStatus: string;
@@ -36,7 +43,14 @@ type TaskWorkspaceRuntimeEvent = WorkspaceEventBase & {
   [key: string]: unknown;
 };
 
+type SpecPatchEvent = WorkspaceEventBase & {
+  type: "spec.patch";
+  document: "header" | "now" | "output" | "trail";
+  patches: SpecPatch[];
+};
+
 type TaskProjectionEvent =
+  | SpecPatchEvent
   | TaskProjectionUpdatedEvent
   | TaskWorkspaceUpdatedEvent
   | TaskWorkspaceCommandEvent

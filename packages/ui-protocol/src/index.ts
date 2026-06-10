@@ -60,7 +60,7 @@ export {
   buildTaskHeaderSpec,
   type TaskHeaderActionInput,
   type TaskHeaderBadgeInput,
-  type TaskHeaderExecutionStatus,
+  type TaskHeaderOccurrenceOptionInput,
   type TaskHeaderSpecInput,
   type TaskHeaderTaskStatus,
 } from "./builders/build-task-header-spec";

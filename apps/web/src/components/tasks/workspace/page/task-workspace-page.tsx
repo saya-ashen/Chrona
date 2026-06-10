@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { StateStore } from "@json-render/react";
 import { useI18n } from "@chrona/i18n/react";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
@@ -28,6 +29,7 @@ type Props = {
 type TaskWorkspaceHeaderEditorProps = {
   task: Parameters<typeof TaskWorkspaceHeaderCard>[0]["task"];
   spec: Parameters<typeof TaskWorkspaceHeaderCard>[0]["spec"];
+  store: StateStore;
   onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
   onAcceptPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAcceptPlan"];
   onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
@@ -79,6 +81,7 @@ const DEFAULT_COPY = {
 function TaskWorkspaceHeaderEditor({
   task,
   spec,
+  store,
   onAction,
   onAcceptPlan,
   onGeneratePlan,
@@ -96,6 +99,7 @@ function TaskWorkspaceHeaderEditor({
       <TaskWorkspaceHeaderCard
         task={task}
         spec={spec}
+        store={store}
         onAction={onAction}
         onAcceptPlan={onAcceptPlan}
         onGeneratePlan={onGeneratePlan}
@@ -128,7 +132,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const { messages } = useI18n();
   const executionConsoleCopy = messages.components?.taskWorkspace ?? {};
   const { registerHandlers, setPageContext } = useAssistantSurface();
-  const { pageData, setTask, refreshWorkspace, workspaceEvents } = useTaskWorkspacePageState(data);
+  const { pageData, setTask, refreshWorkspace, workspaceEvents, headerSpec, headerStore } = useTaskWorkspacePageState(data);
   const task = pageData.task;
 
   const {
@@ -167,10 +171,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
     [pageData, graphPlan, executionConsoleCopy],
   );
-  const headerSpec = pageData.commandCenter?.documents.header;
-  if (!headerSpec) {
-    throw new Error("Task workspace header document is missing from command center payload.");
-  }
   const assistantActivitySummary = latestActivitySummary ?? getLatestPersistedActivitySummary(pageData);
   const {
     currentProposal,
@@ -227,6 +227,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         <TaskWorkspaceHeaderEditor
           task={consoleView.task}
           spec={headerSpec}
+          store={headerStore}
           onAcceptPlan={() => acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById })}
           onGeneratePlan={handleGeneratePlanFromHeader}
           onAction={async (action) => {
