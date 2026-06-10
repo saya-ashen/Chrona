@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
-import { appendTaskWorkspaceEvent, publishTaskStateUpdate, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
+import { randomUUID } from "node:crypto";
+import { appendTaskWorkspaceEvent, publishTaskStateUpdate, publishTaskWorkspaceUpdatedEvent, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
 import { workCommandBodySchema, workProjectionParamSchema } from "@chrona/contracts/api";
 import type { GeneratePlanSSEEvent } from "@chrona/contracts";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
@@ -235,6 +235,22 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
 
     if (command.type === "plan.accept") {
       await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
+      // Acceptance flips the task's accepted plan + primary action
+      // (Accept plan → Start plan). rebuildTaskProjection already
+      // publishes `task_projection_updated` (which the SSE pipe also
+      // routes to the client), but we publish a dedicated
+      // `task_workspace_updated` here as well: the workspace stream
+      // gateway treats it as the canonical "REST snapshot is stale,
+      // refetch" trigger, and emitting both makes the auto-refresh
+      // path independent of the rebuild path's event ordering. The
+      // other state-mutating commands (`plan.generate`, `result.accept`)
+      // already do this; plan.accept was the odd one out.
+      publishTaskWorkspaceUpdatedEvent({
+        taskId,
+        workspaceId,
+        workBlockId: commandWorkBlockId(command),
+        reason: "plan.accepted",
+      });
       return;
     }
     if (command.type === "execution.action") {
