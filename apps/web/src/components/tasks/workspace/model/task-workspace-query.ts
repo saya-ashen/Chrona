@@ -10,11 +10,12 @@ import type {
   TaskData,
   TaskHeaderView,
   TaskPageData,
+  TaskPlanGenerationStatus,
   TaskWorkspaceBootstrapData,
   TaskWorkspaceCommandCenterData,
+  TaskWorkspaceHeaderData,
   TaskWorkspaceReviewContextData,
   TaskWorkspaceRuntimeContextData,
-  TaskPlanGenerationStatus,
   TaskWorkspaceUserStatus,
   TaskWorkspaceExecutionConsoleView,
   WorkspaceActivityItem,
@@ -154,14 +155,24 @@ export const taskWorkspaceQueryKeys = {
   currentExecution: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "current-execution", taskId, workBlockId ?? null] as const,
 };
 
-// Command-center documents (header / now / output / trail) have a dedicated
-// cache key so they can be loaded and invalidated independently of the
+// Command-center documents (now / output / trail) have a dedicated cache
+// key so they can be loaded and invalidated independently of the
 // (large, expensive) page metadata query. The endpoint
-// `GET /api/tasks/:taskId/command-center` already returns a json-render-only
+// `GET /api/tasks/:taskId/command-center` returns a json-render-only
 // payload, so this split mirrors the server's route boundary.
 export const commandCenterQueryKeys = {
   all: ["task-workspace", "command-center"] as const,
   detail: (taskId: string, workBlockId?: string | null) => [...commandCenterQueryKeys.all, taskId, workBlockId ?? null] as const,
+};
+
+// Header spec has its own endpoint
+// (`GET /api/tasks/:taskId/workspace/header`) and its own cache key so
+// `spec.patch` SSE events can replace the header spec without touching
+// command-center, and a command-center refresh can't clobber header
+// spec patches.
+export const headerQueryKeys = {
+  all: ["task-workspace", "header"] as const,
+  detail: (taskId: string, workBlockId?: string | null) => [...headerQueryKeys.all, taskId, workBlockId ?? null] as const,
 };
 
 function isDoneStatus(status: PlanNodeDataModel["status"]) {
@@ -603,16 +614,29 @@ export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: strin
 }
 
 /**
- * Fetch only the json-render command-center documents (header / now / output
- * / trail) for a task. Kept separate from {@link fetchTaskWorkspacePage} so
+ * Fetch only the json-render command-center documents (now / output /
+ * trail) for a task. Kept separate from {@link fetchTaskWorkspacePage} so
  * that:
  *   - the heavy page metadata query does not embed spec blobs, and
  *   - SSE-driven refreshes (e.g. `task_workspace_updated`) can invalidate
  *     this query without re-running the page bootstrap.
+ * The header spec lives on its own endpoint — see
+ * {@link fetchTaskHeaderSpec}.
  */
 export async function fetchTaskCommandCenter(taskId: string, workBlockId?: string | null): Promise<TaskWorkspaceCommandCenterData> {
   const query = taskScopedQuery(workBlockId);
   return apiJson<TaskWorkspaceCommandCenterData>(`/api/tasks/${encodeURIComponent(taskId)}/command-center${query}`);
+}
+
+/**
+ * Fetch only the json-render header spec for a task. Header has its own
+ * endpoint and its own query key so `spec.patch` SSE events can replace
+ * the header spec without touching command-center, and command-center
+ * refreshes can't clobber header spec patches.
+ */
+export async function fetchTaskHeaderSpec(taskId: string, workBlockId?: string | null): Promise<TaskWorkspaceHeaderData> {
+  const query = taskScopedQuery(workBlockId);
+  return apiJson<TaskWorkspaceHeaderData>(`/api/tasks/${encodeURIComponent(taskId)}/workspace/header${query}`);
 }
 
 export async function fetchTaskPlanState(taskId: string, workBlockId?: string | null): Promise<TaskPlanState> {

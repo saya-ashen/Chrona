@@ -18,6 +18,8 @@ type FetchEventSourceOptions = {
 const mocks = vi.hoisted(() => ({
   pageResponses: [] as TaskPageData[],
   pageFetchCount: 0,
+  headerResponses: [] as Array<{ spec: { root: string; elements: Record<string, { type: string; props?: Record<string, unknown>; children?: string[] }> } }>,
+  headerFetchCount: 0,
   planResponses: [] as Array<{ taskId: string; aiPlanGenerationStatus?: string; savedPlan?: TaskPlanReadModel | null; generationSession?: unknown }>,
   acceptResponse: null as { savedPlan?: TaskPlanReadModel | null } | null,
   commandResponses: [] as Array<{ commandId: string; taskId: string; acceptedAt: string }>,
@@ -261,12 +263,12 @@ function pageData(input: {
     artifacts: [],
     commandCenter: {
       documents: {
-        header: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } },
         now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
         output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
         trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
       },
     },
+    header: { spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } } },
   };
 }
 
@@ -322,7 +324,14 @@ beforeEach(() => {
     const url = input instanceof Request ? input.url : String(input);
     mocks.fetchCalls.push({ input: url, init });
 
-    if (url.includes("/api/tasks/") && !url.includes("/plan") && !url.includes("/execution")) {
+    if (url.includes("/api/tasks/") && url.includes("/workspace/header")) {
+      mocks.headerFetchCount += 1;
+      return new Response(JSON.stringify(mocks.headerResponses.shift() ?? {
+        spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+
+    if (url.includes("/api/tasks/") && !url.includes("/plan") && !url.includes("/execution") && !url.includes("/workspace/header")) {
       mocks.pageFetchCount += 1;
       return new Response(JSON.stringify(mocks.pageResponses.shift()), {
         status: 200,

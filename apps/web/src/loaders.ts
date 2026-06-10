@@ -15,6 +15,7 @@ import type {
 import type {
   TaskWorkspaceBootstrapData,
   TaskWorkspaceCommandCenterData,
+  TaskWorkspaceHeaderData,
   TaskWorkspaceReviewContextData,
   TaskWorkspaceRuntimeContextData,
 } from "./components/tasks/workspace/model/task-workspace-types";
@@ -129,11 +130,12 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
   const suffix = query.size ? `?${query.toString()}` : "";
 
   const taskPath = `${origin}/api/tasks/${params.taskId}`;
-  const [bootstrap, runtimeContext, reviewContext, commandCenter] = await Promise.all([
+  const [bootstrap, runtimeContext, reviewContext, commandCenter, header] = await Promise.all([
     apiJson<TaskWorkspaceBootstrapData>(`${taskPath}${suffix}`),
     apiJson<TaskWorkspaceRuntimeContextData>(`${taskPath}/runtime-context${suffix}`),
     apiJson<TaskWorkspaceReviewContextData>(`${taskPath}/review-context${suffix}`),
     apiJson<TaskWorkspaceCommandCenterData>(`${taskPath}/command-center${suffix}`),
+    apiJson<TaskWorkspaceHeaderData>(`${taskPath}/workspace/header${suffix}`),
   ]);
 
   return {
@@ -146,6 +148,7 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
       artifacts: [],
       activityTimeline: [],
       commandCenter,
+      header,
     } as TaskPageRouteData["task"],
   };
 }

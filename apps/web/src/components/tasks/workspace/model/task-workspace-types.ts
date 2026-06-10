@@ -110,16 +110,20 @@ export type TaskPageData = {
   activityTimeline?: WorkspaceActivityItem[];
   commandCenter?: {
     documents: {
-      header?: UiDocument;
       now: UiDocument;
       output: UiDocument;
       trail: UiDocument;
     };
   };
+  // Header spec lives on its own endpoint
+  // (`GET /api/tasks/:taskId/workspace/header`) and SSR loader puts the
+  // first-paint value here. Runtime updates come from the dedicated
+  // `useTaskHeaderSpec` query plus `spec.patch` SSE events.
+  header?: { spec: UiDocument };
 };
 
 export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
-  "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "commandCenter"
+  "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "commandCenter" | "header"
 >;
 
 export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes">;
@@ -127,6 +131,8 @@ export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecuti
 export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "scheduleProposals" | "approvals">;
 
 export type TaskWorkspaceCommandCenterData = NonNullable<TaskPageData["commandCenter"]>;
+
+export type TaskWorkspaceHeaderData = NonNullable<TaskPageData["header"]>;
 
 export type EditableTask = {
   title: string;

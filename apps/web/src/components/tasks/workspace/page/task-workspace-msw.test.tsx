@@ -47,6 +47,9 @@ function splitWorkspaceHandlers(data: TaskPageData, onPageRequest?: () => void) 
     http.get("/api/tasks/:taskId/command-center", () => HttpResponse.json(
       data.commandCenter ?? emptyCommandCenterDocuments,
     )),
+    http.get("/api/tasks/:taskId/workspace/header", () => HttpResponse.json(
+      data.header ?? { spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } } },
+    )),
   ];
 }
 

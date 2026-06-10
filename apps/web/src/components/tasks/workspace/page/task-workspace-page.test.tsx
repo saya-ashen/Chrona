@@ -65,7 +65,7 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () =
     refreshWorkspace: vi.fn(),
     isRefreshing: false,
     workspaceEvents: [],
-    headerSpec: data.commandCenter?.documents.header ?? buildTaskHeaderSpec({
+    headerSpec: data.header?.spec ?? buildTaskHeaderSpec({
       title: data.task.title,
       status: "waiting",
       statusLabel: "Waiting",
@@ -213,19 +213,24 @@ afterEach(() => {
 function testCommandCenter(title: string): NonNullable<TaskPageData["commandCenter"]> {
   return {
     documents: {
-      header: buildTaskHeaderSpec({
-        title,
-        status: "waiting",
-        statusLabel: "Waiting",
-        progressLabel: "0 steps · 0 accepted · 0%",
-        priorityLabel: "High",
-        priorityTone: "warning",
-        actions: [{ id: "generate-plan", label: "Generate plan" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
-      }),
       now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
       output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
       trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
     },
+  };
+}
+
+function testHeader(title: string): NonNullable<TaskPageData["header"]> {
+  return {
+    spec: buildTaskHeaderSpec({
+      title,
+      status: "waiting",
+      statusLabel: "Waiting",
+      progressLabel: "0 steps · 0 accepted · 0%",
+      priorityLabel: "High",
+      priorityTone: "warning",
+      actions: [{ id: "generate-plan", label: "Generate plan" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
+    }),
   };
 }
 
@@ -261,6 +266,7 @@ function taskData(): TaskPageData {
     approvals: [],
     artifacts: [],
     commandCenter: testCommandCenter("Plan migration"),
+    header: testHeader("Plan migration"),
   };
 }
 

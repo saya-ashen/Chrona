@@ -12,7 +12,9 @@ import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import {
   commandCenterQueryKeys,
   fetchTaskCommandCenter,
+  fetchTaskHeaderSpec,
   fetchTaskWorkspacePage,
+  headerQueryKeys,
   taskWorkspaceQueryKeys,
 } from "../model/task-workspace-query";
 import type { UiDocument } from "@chrona/ui-protocol";
@@ -280,20 +282,18 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const initialDataRef = useRef(initialData);
   // Header spec and header state store are initialized once from the
-  // first-paint command-center payload. They are NOT re-derived from the
-  // commandCenterQuery on every refetch — the only writes to headerSpec are
-  // (a) the initial render and (b) `spec.patch` SSE events. Re-syncing on
-  // every refetch would clobber local spec patches and any in-flight
-  // header state.
-  const commandCenterInitial = initialData.commandCenter ?? null;
+  // first-paint header payload (sourced from /api/tasks/:taskId/workspace/header
+  // via the SSR loader). They are NOT re-derived from the headerQuery on
+  // every refetch — the only writes to headerSpec are (a) the initial
+  // render and (b) `spec.patch` SSE events. Re-syncing on every refetch
+  // would clobber local spec patches and any in-flight header state.
+  const headerInitial = initialData.header ?? null;
   const [headerSpec, setHeaderSpec] = useState<UiDocument>(() => {
-    const doc = commandCenterInitial?.documents.header;
-    if (!doc) throw new Error("Task workspace header document is missing from command center payload.");
+    const doc = headerInitial?.spec;
+    if (!doc) throw new Error("Task workspace header spec is missing from header payload.");
     return doc;
   });
-  const [headerStore] = useState<StateStore>(() => createStateStore(
-    commandCenterInitial?.documents.header?.state ?? {},
-  ));
+  const [headerStore] = useState<StateStore>(() => createStateStore({}));
   const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
   const pageQueryKey = useMemo(
     () => taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId),
@@ -301,6 +301,10 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   );
   const commandCenterQueryKey = useMemo(
     () => commandCenterQueryKeys.detail(taskId, selectedWorkBlockId),
+    [selectedWorkBlockId, taskId],
+  );
+  const headerQueryKey = useMemo(
+    () => headerQueryKeys.detail(taskId, selectedWorkBlockId),
     [selectedWorkBlockId, taskId],
   );
   const pageQuery = useQuery({
@@ -311,14 +315,19 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const commandCenterQuery = useQuery({
     queryKey: commandCenterQueryKey,
     queryFn: () => fetchTaskCommandCenter(taskId, selectedWorkBlockId),
-    initialData: commandCenterInitial ?? undefined,
+    initialData: initialData.commandCenter ?? undefined,
+  });
+  const headerQuery = useQuery({
+    queryKey: headerQueryKey,
+    queryFn: () => fetchTaskHeaderSpec(taskId, selectedWorkBlockId),
+    initialData: headerInitial ?? undefined,
   });
   const pageData = pageQuery.data;
-  // The runtime source of truth for command-center documents (header / now
-  // / output / trail) is the dedicated query — independent cache key,
-  // independent invalidation. First-paint value still flows through
+  // The runtime source of truth for command-center documents (now / output
+  // / trail) is the dedicated query — independent cache key, independent
+  // invalidation. First-paint value still flows through
   // `initialData.commandCenter` for SSR consistency.
-  const commandCenter = commandCenterQuery.data ?? commandCenterInitial;
+  const commandCenter = commandCenterQuery.data ?? initialData.commandCenter ?? null;
 
   useEffect(() => {
     return bindTaskPlanSessionToStateStore(taskId, selectedWorkBlockId, headerStore);
@@ -333,10 +342,11 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: pageQueryKey }),
       queryClient.invalidateQueries({ queryKey: commandCenterQueryKey }),
+      queryClient.invalidateQueries({ queryKey: headerQueryKey }),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.planState(taskId, selectedWorkBlockId) }),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId, selectedWorkBlockId) }),
     ]);
-  }, [commandCenterQueryKey, pageQueryKey, queryClient, selectedWorkBlockId, taskId]);
+  }, [commandCenterQueryKey, headerQueryKey, pageQueryKey, queryClient, selectedWorkBlockId, taskId]);
   const refreshWorkspacePage = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: pageQueryKey });
   }, [pageQueryKey, queryClient]);

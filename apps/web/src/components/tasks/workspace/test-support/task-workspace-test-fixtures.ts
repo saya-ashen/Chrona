@@ -77,26 +77,31 @@ export function createTaskWorkspaceFixtureGraph(
 }
 
 function createFixtureCommandCenter(task: Partial<TaskPageData["task"]> = {}): NonNullable<TaskPageData["commandCenter"]> {
+  return {
+    documents: {
+      now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
+      output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
+      trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
+    },
+  };
+}
+
+function createFixtureHeader(task: Partial<TaskPageData["task"]> = {}): NonNullable<TaskPageData["header"]> {
   const title = task.title ?? "Launch task";
   const priority = task.priority ?? "High";
   const actions: TaskHeaderActionInput[] = task.status === "Running"
     ? [{ id: "pause", label: "Pause" }, { id: "stop", label: "Stop" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }]
     : [{ id: "generate-plan", label: "Generate plan" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }];
   return {
-    documents: {
-      header: buildTaskHeaderSpec({
-        title,
-        status: task.status === "Running" ? "running" : task.status === "Completed" ? "completed" : "waiting",
-        statusLabel: task.status === "Running" ? "Running" : task.status === "Completed" ? "Completed" : "Waiting",
-        progressLabel: "0 steps · 0 accepted · 0%",
-        priorityLabel: priority,
-        priorityTone: priority === "High" ? "warning" : "neutral",
-        actions,
-      }),
-      now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
-      output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
-      trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
-    },
+    spec: buildTaskHeaderSpec({
+      title,
+      status: task.status === "Running" ? "running" : task.status === "Completed" ? "completed" : "waiting",
+      statusLabel: task.status === "Running" ? "Running" : task.status === "Completed" ? "Completed" : "Waiting",
+      progressLabel: "0 steps · 0 accepted · 0%",
+      priorityLabel: priority,
+      priorityTone: priority === "High" ? "warning" : "neutral",
+      actions,
+    }),
   };
 }
 export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixturePageOverrides = {}): TaskPageData {
@@ -135,6 +140,7 @@ export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixtu
     approvals: [],
     artifacts: [],
     commandCenter: createFixtureCommandCenter(taskOverrides),
+    header: createFixtureHeader(taskOverrides),
     ...pageOverrides,
   };
 }
