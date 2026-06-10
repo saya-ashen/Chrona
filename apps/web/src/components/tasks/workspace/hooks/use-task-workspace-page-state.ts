@@ -12,9 +12,7 @@ import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import {
   commandCenterQueryKeys,
   fetchTaskCommandCenter,
-  fetchTaskHeaderSpec,
   fetchTaskWorkspacePage,
-  headerQueryKeys,
   taskWorkspaceQueryKeys,
 } from "../model/task-workspace-query";
 import type { UiDocument } from "@chrona/ui-protocol";
@@ -303,10 +301,6 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     () => commandCenterQueryKeys.detail(taskId, selectedWorkBlockId),
     [selectedWorkBlockId, taskId],
   );
-  const headerQueryKey = useMemo(
-    () => headerQueryKeys.detail(taskId, selectedWorkBlockId),
-    [selectedWorkBlockId, taskId],
-  );
   const pageQuery = useQuery({
     queryKey: pageQueryKey,
     queryFn: () => fetchTaskWorkspacePage(taskId, selectedWorkBlockId),
@@ -316,11 +310,6 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     queryKey: commandCenterQueryKey,
     queryFn: () => fetchTaskCommandCenter(taskId, selectedWorkBlockId),
     initialData: initialData.commandCenter ?? undefined,
-  });
-  const headerQuery = useQuery({
-    queryKey: headerQueryKey,
-    queryFn: () => fetchTaskHeaderSpec(taskId, selectedWorkBlockId),
-    initialData: headerInitial ?? undefined,
   });
   const pageData = pageQuery.data;
   // The runtime source of truth for command-center documents (now / output
@@ -342,11 +331,10 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: pageQueryKey }),
       queryClient.invalidateQueries({ queryKey: commandCenterQueryKey }),
-      queryClient.invalidateQueries({ queryKey: headerQueryKey }),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.planState(taskId, selectedWorkBlockId) }),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId, selectedWorkBlockId) }),
     ]);
-  }, [commandCenterQueryKey, headerQueryKey, pageQueryKey, queryClient, selectedWorkBlockId, taskId]);
+  }, [commandCenterQueryKey, pageQueryKey, queryClient, selectedWorkBlockId, taskId]);
   const refreshWorkspacePage = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: pageQueryKey });
   }, [pageQueryKey, queryClient]);

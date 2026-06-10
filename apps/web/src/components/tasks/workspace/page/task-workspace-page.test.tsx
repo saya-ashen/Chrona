@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskWorkspacePage } from "./task-workspace-page";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
-import { buildTaskHeaderSpec, type UiDocument } from "@chrona/ui-protocol";
-import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
+import { createHeaderSpecFixture, taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { createTaskWorkspaceUiFixture } from "../test/task-workspace-ui-fixtures";
+import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskPageData, TaskPlanGenerationStatus } from "../model/task-workspace-types";
 
 const mocks = vi.hoisted(() => ({
@@ -61,17 +61,12 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", ()
 vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () => ({
   useTaskWorkspacePageState: (data: TaskPageData) => ({
     pageData: data,
+    commandCenter: data.commandCenter,
     setTask: vi.fn(),
-    refreshWorkspace: vi.fn(),
+    refreshWorkspace: vi.fn(async () => undefined),
     isRefreshing: false,
     workspaceEvents: [],
-    headerSpec: data.header?.spec ?? buildTaskHeaderSpec({
-      title: data.task.title,
-      status: "waiting",
-      statusLabel: "Waiting",
-      progressLabel: "",
-      actions: [],
-    }),
+    headerSpec: data.header?.spec ?? createHeaderSpecFixture({ title: data.task.title }),
     headerStore: {
       get: vi.fn(),
       set: vi.fn(),
@@ -209,8 +204,7 @@ afterEach(() => {
   mocks.setPageContext.mockClear();
   mocks.navigate.mockClear();
 });
-
-function testCommandCenter(title: string): NonNullable<TaskPageData["commandCenter"]> {
+function testCommandCenter(): NonNullable<TaskPageData["commandCenter"]> {
   return {
     documents: {
       now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
@@ -222,15 +216,7 @@ function testCommandCenter(title: string): NonNullable<TaskPageData["commandCent
 
 function testHeader(title: string): NonNullable<TaskPageData["header"]> {
   return {
-    spec: buildTaskHeaderSpec({
-      title,
-      status: "waiting",
-      statusLabel: "Waiting",
-      progressLabel: "0 steps · 0 accepted · 0%",
-      priorityLabel: "High",
-      priorityTone: "warning",
-      actions: [{ id: "generate-plan", label: "Generate plan" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
-    }),
+    spec: createHeaderSpecFixture({ title }),
   };
 }
 
@@ -265,7 +251,7 @@ function taskData(): TaskPageData {
     scheduleProposals: [],
     approvals: [],
     artifacts: [],
-    commandCenter: testCommandCenter("Plan migration"),
+    commandCenter: testCommandCenter(),
     header: testHeader("Plan migration"),
   };
 }

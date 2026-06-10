@@ -2,10 +2,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStateStore } from "@json-render/core";
-import { buildTaskHeaderSpec } from "@chrona/ui-protocol";
+import { createHeaderSpecFixture } from "../test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
 import type { TaskData } from "../model/task-workspace-types";
-
 type ChildrenProps = { children?: React.ReactNode };
 
 vi.mock("@/components/ui/button", () => ({
@@ -48,13 +47,10 @@ const task = {
   blockReason: null,
   dependencies: [],
 } satisfies TaskData;
-
-function renderHeader(spec = buildTaskHeaderSpec({
+function renderHeader(spec = createHeaderSpecFixture({
   title: task.title,
-  status: "waiting",
-  statusLabel: "Waiting",
+  priority: "Medium",
   progressLabel: "1 steps · 0 accepted · 0%",
-  priorityLabel: "Medium",
   occurrenceLabel: "Occurrence · Wed, May 27 04:30 AM-05:30 AM",
   actions: [{ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
 })) {
@@ -88,14 +84,12 @@ describe("TaskWorkspaceHeaderCard", () => {
     expect(screen.getByText("Waiting")).toBeInTheDocument();
     expect(screen.queryByText("Draft")).not.toBeInTheDocument();
   });
-
   it("renders one server-provided execution status", () => {
-    renderHeader(buildTaskHeaderSpec({
+    renderHeader(createHeaderSpecFixture({
       title: task.title,
       status: "running",
-      statusLabel: "Running",
+      priority: "Medium",
       progressLabel: "1 steps · 0 accepted · 0%",
-      priorityLabel: "Medium",
       actions: [{ id: "pause", label: "Pause" }, { id: "stop", label: "Stop" }],
     }));
 
