@@ -154,6 +154,16 @@ export const taskWorkspaceQueryKeys = {
   currentExecution: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "current-execution", taskId, workBlockId ?? null] as const,
 };
 
+// Command-center documents (header / now / output / trail) have a dedicated
+// cache key so they can be loaded and invalidated independently of the
+// (large, expensive) page metadata query. The endpoint
+// `GET /api/tasks/:taskId/command-center` already returns a json-render-only
+// payload, so this split mirrors the server's route boundary.
+export const commandCenterQueryKeys = {
+  all: ["task-workspace", "command-center"] as const,
+  detail: (taskId: string, workBlockId?: string | null) => [...commandCenterQueryKeys.all, taskId, workBlockId ?? null] as const,
+};
+
 function isDoneStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "completed" || status === "skipped" || status === "cancelled" || status === "invalidated";
 }
@@ -577,11 +587,10 @@ function taskScopedQuery(workBlockId?: string | null) {
 export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: string | null): Promise<TaskPageData> {
   const taskPath = `/api/tasks/${encodeURIComponent(taskId)}`;
   const query = taskScopedQuery(workBlockId);
-  const [bootstrap, runtimeContext, reviewContext, commandCenter] = await Promise.all([
+  const [bootstrap, runtimeContext, reviewContext] = await Promise.all([
     apiJson<TaskWorkspaceBootstrapData>(`${taskPath}${query}`),
     apiJson<TaskWorkspaceRuntimeContextData>(`${taskPath}/runtime-context${query}`),
     apiJson<TaskWorkspaceReviewContextData>(`${taskPath}/review-context${query}`),
-    apiJson<TaskWorkspaceCommandCenterData>(`${taskPath}/command-center${query}`),
   ]);
 
   return {
@@ -590,8 +599,20 @@ export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: strin
     ...reviewContext,
     artifacts: [],
     activityTimeline: [],
-    commandCenter,
   };
+}
+
+/**
+ * Fetch only the json-render command-center documents (header / now / output
+ * / trail) for a task. Kept separate from {@link fetchTaskWorkspacePage} so
+ * that:
+ *   - the heavy page metadata query does not embed spec blobs, and
+ *   - SSE-driven refreshes (e.g. `task_workspace_updated`) can invalidate
+ *     this query without re-running the page bootstrap.
+ */
+export async function fetchTaskCommandCenter(taskId: string, workBlockId?: string | null): Promise<TaskWorkspaceCommandCenterData> {
+  const query = taskScopedQuery(workBlockId);
+  return apiJson<TaskWorkspaceCommandCenterData>(`/api/tasks/${encodeURIComponent(taskId)}/command-center${query}`);
 }
 
 export async function fetchTaskPlanState(taskId: string, workBlockId?: string | null): Promise<TaskPlanState> {
