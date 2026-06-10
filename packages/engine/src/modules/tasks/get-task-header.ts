@@ -4,10 +4,7 @@ import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 
-// Shared header builder. Both `getTaskCommandCenter` and the dedicated
-// `getTaskHeaderSpec` use case call this so the header document stays
-// byte-identical regardless of which endpoint serves it.
-export type HeaderTaskView = NonNullable<Awaited<ReturnType<typeof loadHeaderTaskView>>>;
+type HeaderTaskView = NonNullable<Awaited<ReturnType<typeof loadHeaderTaskView>>>;
 
 async function loadHeaderTaskView(taskId: string) {
   return db.task.findUnique({
@@ -113,7 +110,7 @@ function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAc
   return [{ id: "start", label: "Start", disabled: !input.isRunnable, disabledReason: input.isRunnable ? undefined : "Task is not runnable." }];
 }
 
-export type BuildHeaderSpecInput = {
+type BuildHeaderSpecInput = {
   task: NonNullable<Awaited<ReturnType<typeof loadHeaderTaskView>>>;
   recurrenceSeriesTasks: Array<Pick<NonNullable<Awaited<ReturnType<typeof loadHeaderTaskView>>>, "id" | "title" | "status" | "workBlocks">>;
   currentExecution: Awaited<ReturnType<typeof getCurrentExecution>>;
@@ -123,9 +120,8 @@ export type BuildHeaderSpecInput = {
 
 /**
  * Pure transformer: header task view + current execution + saved plan →
- * header `UiDocument`. Used by `getTaskHeaderSpec` (the dedicated use case)
- * and by `getTaskCommandCenter` (which now returns `now / output / trail`
- * only — header lives on its own endpoint).
+ * header `UiDocument`. Called by `getTaskHeaderSpec` (the dedicated use case
+ * for `GET /api/tasks/:taskId/workspace/header`).
  */
 export function buildHeaderSpecFromTask(input: BuildHeaderSpecInput) {
   const { task, recurrenceSeriesTasks, currentExecution, savedPlan, workBlockId } = input;
