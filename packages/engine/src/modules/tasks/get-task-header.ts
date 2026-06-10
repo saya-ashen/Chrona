@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderSpecInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
+import type { PlanExecutionStatus } from "@chrona/contracts";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
@@ -40,12 +41,36 @@ function taskStatusLabel(status: TaskHeaderTaskStatus) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-function taskHeaderStatus(input: { taskStatus: string; executionStatus: string }): TaskHeaderTaskStatus {
+const ACTIVE_EXECUTION_STATUSES = new Set<PlanExecutionStatus>([
+  "running",
+  "waiting_for_user",
+  "waiting_for_approval",
+  "blocked",
+  "failed",
+]);
+
+function isActiveExecutionStatus(status: PlanExecutionStatus): boolean {
+  return ACTIVE_EXECUTION_STATUSES.has(status);
+}
+
+export function taskHeaderStatus(input: {
+  taskStatus: string;
+  executionStatus: PlanExecutionStatus;
+  hasActiveExecution: boolean;
+}): TaskHeaderTaskStatus {
   if (input.executionStatus === "running") return "running";
-  if (input.executionStatus === "waiting_for_user" || input.executionStatus === "waiting_for_approval") return "approval-needed";
-  if (input.executionStatus === "blocked" || input.taskStatus === "Blocked") return "blocked";
-  if (input.executionStatus === "failed") return "blocked";
-  if (input.executionStatus === "completed" || input.taskStatus === "Completed" || input.taskStatus === "Done") return "completed";
+  if (input.executionStatus === "waiting_for_user" || input.executionStatus === "waiting_for_approval") {
+    return "approval-needed";
+  }
+  if (input.executionStatus === "blocked" || input.executionStatus === "failed") return "blocked";
+  if (input.hasActiveExecution && input.taskStatus === "Blocked") return "blocked";
+  if (
+    input.executionStatus === "completed" ||
+    input.taskStatus === "Completed" ||
+    input.taskStatus === "Done"
+  ) {
+    return "completed";
+  }
   if (input.taskStatus === "Running") return "running";
   return "waiting";
 }
@@ -162,7 +187,11 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
   const totalSteps = savedPlan?.effectivePlan.nodes.length ?? 0;
   const completedSteps = savedPlan?.effectivePlan.completedNodeIds.length ?? currentExecution.executedNodeIds.length;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-  const status = taskHeaderStatus({ taskStatus: task.status, executionStatus: currentExecution.status });
+  const status = taskHeaderStatus({
+    taskStatus: task.status,
+    executionStatus: currentExecution.status,
+    hasActiveExecution: isActiveExecutionStatus(currentExecution.status),
+  });
   const occurrenceWindow = formatOccurrenceWindow(
     currentWorkBlock?.scheduledStartAt ?? task.projection?.scheduledStartAt ?? task.dueAt ?? null,
     currentWorkBlock?.scheduledEndAt ?? task.projection?.scheduledEndAt ?? null,
