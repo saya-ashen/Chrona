@@ -357,3 +357,111 @@ describe("POST /work/:taskId/commands plan.generate — event volume", () => {
     }
   });
 });
+
+describe("POST /work/:taskId/commands plan.generate — error state.update", () => {
+  it("emits a state.update with /plan/generation/error/* paths and keeps the terminal task_workspace_updated", async () => {
+    const taskId = "task-1";
+    const stateUpdates: Array<Record<string, unknown>> = [];
+    const workspaceUpdates: string[] = [];
+    let trigger: { unsubscribe: () => void } | null = null;
+    const terminalReceived = new Promise<void>((resolve, reject) => {
+      trigger = subscribeToTaskProjectionEvents(taskId, (event) => {
+        if (event.type === "state.update") {
+          stateUpdates.push((event as TaskProjectionEvent & { updates: Record<string, unknown> }).updates);
+          return;
+        }
+        if (event.type === "task_workspace_updated") {
+          workspaceUpdates.push(event.type);
+        }
+        if (event.type === "task_workspace_updated" && workspaceUpdates.length === 1) {
+          trigger?.unsubscribe();
+          resolve();
+        }
+        setTimeout(() => {
+          trigger?.unsubscribe();
+          reject(new Error("timed out waiting for terminal task_workspace_updated"));
+        }, 5000);
+      });
+    });
+
+    try {
+      const res = await honoApp.request(`http://local/api/work/${taskId}/commands`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "plan.generate", forceRefresh: true }),
+      });
+      expect(res.status).toBe(202);
+
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (state.currentStream) resolve();
+          else setTimeout(check, 5);
+        };
+        check();
+      });
+
+      const stream = state.currentStream!;
+      stream.emit({ type: "status", phase: "requesting_provider", message: "Contacting LLM" });
+      stream.emit({
+        type: "error",
+        code: "PROVIDER_ERROR",
+        message: "chrona_plan_generate failed: provider returned 502",
+      });
+      stream.finish();
+
+      await terminalReceived;
+
+      const errorUpdate = stateUpdates.find((updates) => updates["/plan/generation/error/code"] === "PROVIDER_ERROR");
+      expect(errorUpdate).toBeDefined();
+      expect(errorUpdate!["/plan/generation/error/message"]).toBe("chrona_plan_generate failed: provider returned 502");
+      expect(errorUpdate!["/plan/generation/error/buttonRetry"]).toBe(true);
+      expect(errorUpdate!["/plan/generation/error/buttonEditInstruction"]).toBe(true);
+      expect(errorUpdate!["/plan/generation/error/buttonCancel"]).toBe(false);
+      expect(workspaceUpdates).toHaveLength(1);
+    } finally {
+      trigger!.unsubscribe();
+    }
+  });
+
+  it("disables retry for non-retryable errors (TASK_NOT_FOUND)", async () => {
+    const taskId = "task-1";
+    const stateUpdates: Array<Record<string, unknown>> = [];
+    const trigger = subscribeToTaskProjectionEvents(taskId, (event) => {
+      if (event.type === "state.update") {
+        stateUpdates.push((event as TaskProjectionEvent & { updates: Record<string, unknown> }).updates);
+      }
+    });
+
+    try {
+      const res = await honoApp.request(`http://local/api/work/${taskId}/commands`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "plan.generate", forceRefresh: true }),
+      });
+      expect(res.status).toBe(202);
+
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (state.currentStream) resolve();
+          else setTimeout(check, 5);
+        };
+        check();
+      });
+
+      const stream = state.currentStream!;
+      stream.emit({ type: "status", phase: "loading_task", message: "Loading task context" });
+      stream.emit({ type: "error", code: "TASK_NOT_FOUND", message: "Task not found" });
+      stream.finish();
+
+      // Give the route handler time to publish the terminal state.update.
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+
+      const errorUpdate = stateUpdates.find((updates) => updates["/plan/generation/error/code"] === "TASK_NOT_FOUND");
+      expect(errorUpdate).toBeDefined();
+      expect(errorUpdate!["/plan/generation/error/buttonRetry"]).toBe(false);
+      expect(errorUpdate!["/plan/generation/error/buttonEditInstruction"]).toBe(true);
+    } finally {
+      trigger.unsubscribe();
+    }
+  });
+});

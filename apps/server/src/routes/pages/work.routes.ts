@@ -46,20 +46,6 @@ function commandWorkBlockId(command: ReturnType<typeof workCommandBodySchema.par
 }
 
 
-function planGenerationWorkspacePayload(event: GeneratePlanSSEEvent) {
-  switch (event.type) {
-    case "status":
-      return { phase: event.phase, message: event.message };
-    case "tool_call":
-      return { tool: event.tool, message: `Using ${event.tool}...` };
-    case "result":
-      return { planTitle: event.result.blueprint.title };
-    case "error":
-      return { code: event.code, message: event.message };
-    default:
-      return {};
-  }
-}
 
 function publishWorkspaceTrigger(input: {
   taskId: string;
@@ -150,6 +136,21 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
     case "cancelled":
     case "done":
       return { "/plan/generation/status": event.type };
+    case "error": {
+      // Surface a `state.update` so the header spec can render an inline
+      // error Alert and a recovery-actions row. `buttonRetry` /
+      // `buttonEditInstruction` / `buttonCancel` are pre-defined boolean
+      // flags the spec gates its recovery buttons on; the server picks
+      // which ones are appropriate for the failure class.
+      const retryable = event.code !== "TASK_NOT_FOUND";
+      return {
+        "/plan/generation/error/code": event.code,
+        "/plan/generation/error/message": event.message,
+        "/plan/generation/error/buttonRetry": retryable,
+        "/plan/generation/error/buttonEditInstruction": true,
+        "/plan/generation/error/buttonCancel": false,
+      };
+    }
     default:
       return null;
   }

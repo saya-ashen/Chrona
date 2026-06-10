@@ -72,6 +72,9 @@ function renderHeader(spec = buildTaskHeaderSpec({
       onStartDeleteConfirm={vi.fn()}
       onCancelDeleteConfirm={vi.fn()}
       onDelete={vi.fn()}
+      onRecoveryRetry={vi.fn()}
+      onRecoveryEditInstruction={vi.fn()}
+      onRecoveryCancel={vi.fn()}
     />,
   );
 }
