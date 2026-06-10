@@ -142,7 +142,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const { messages } = useI18n();
   const executionConsoleCopy = messages.components?.taskWorkspace ?? {};
   const { registerHandlers, setPageContext } = useAssistantSurface();
-  const { pageData, setTask, refreshWorkspace, workspaceEvents, headerSpec, headerStore } = useTaskWorkspacePageState(data);
+  const { pageData, commandCenter, setTask, refreshWorkspace, workspaceEvents, headerSpec, headerStore } = useTaskWorkspacePageState(data);
   const task = pageData.task;
   const [isEditExpanded, setIsEditExpanded] = useState(false);
   const toggleEditExpanded = useCallback(() => {
@@ -320,6 +320,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         graphPlan={graphPlan}
         isGraphPlanPending={isGraphPlanPending}
         pageData={pageData}
+        commandCenter={commandCenter}
         plan={plan}
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}

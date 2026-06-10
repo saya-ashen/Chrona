@@ -86,6 +86,7 @@ type TaskWorkspacePlanSectionProps = {
   canAcceptPlan?: boolean;
   acceptPlanError: string | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
+  commandCenter?: NonNullable<TaskPageData["commandCenter"]> | null;
   liveActivity?: WorkspaceActivityItem[];
   currentExecution?: PlanExecutionResult | null;
   generationUserInstruction?: string | null;
@@ -105,6 +106,7 @@ export function TaskWorkspacePlanSection({
   graphPlan,
   isGraphPlanPending,
   pageData,
+  commandCenter,
   plan,
   planGenerationStatus,
   canAcceptPlan,
@@ -382,7 +384,7 @@ export function TaskWorkspacePlanSection({
             scope={inspectorScope}
             consoleView={consoleView}
             primaryAction={primaryAction}
-            commandCenter={pageData.commandCenter ?? null}
+            commandCenter={commandCenter ?? null}
             commandCenterActionHandlers={commandCenterActionHandlers}
             runtimeEvents={runtimeEvents}
             liveActivity={liveActivity}
