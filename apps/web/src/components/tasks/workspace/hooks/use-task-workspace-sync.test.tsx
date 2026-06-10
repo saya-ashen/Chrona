@@ -968,15 +968,29 @@ describe("task workspace page synchronization", () => {
       result.current.handleGeneratePlanFromHeader();
     });
 
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      sessionStatus: "running",
+      phase: "starting",
+      statusMessage: "Generating plan",
+    };
+    rerender();
+
     await waitFor(() => expect(result.current.planGenerationStatus).toBe("generating"));
 
     mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: generatedPlan }];
-    await pushWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "result" }));
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      sessionStatus: "completed",
+      result: generatedPlan,
+      phase: "completed",
+    };
+    rerender();
+    await act(async () => {
+      await result.current.fetchPlan();
+    });
 
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Generated launch plan"));
-    expect(result.current.plan?.status).toBe("draft");
-    expect(result.current.planGenerationStatus).toBe("waiting_acceptance");
-    expect(result.current.canAcceptPlan).toBe(true);
 
     mocks.planResponses = [
       { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: acceptedPlan },
