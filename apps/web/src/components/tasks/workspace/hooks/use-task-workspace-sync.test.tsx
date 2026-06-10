@@ -130,6 +130,7 @@ vi.mock("@/lib/rpc-client", () => ({
 
 vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
   useTaskPlanGenerationSession: () => mocks.generationSession,
+  bindTaskPlanSessionToStateStore: () => () => undefined,
 }));
 
 function createQueryWrapper() {
@@ -218,34 +219,35 @@ function pageData(input: {
   runStatus?: string | null;
   workBlockId?: string | null;
 }): TaskPageData {
+  const task: TaskPageData["task"] = {
+    id: "task-1",
+    workspaceId: "workspace-1",
+    title: "Launch task",
+    description: null,
+    executionRuntime: "local",
+    executionConfig: null,
+    autoPlanGeneration: false,
+    autoExecute: false,
+    autoPlanGenerationTiming: "at_start",
+    autoExecuteTiming: "at_start",
+    status: input.taskStatus,
+    priority: "High",
+    dueAt: null,
+    scheduledStartAt: null,
+    scheduledEndAt: null,
+    scheduleStatus: "Unscheduled",
+    scheduleSource: null,
+    isRunnable: true,
+    runnabilitySummary: "Ready",
+    savedPlan: input.plan,
+    aiPlanGenerationStatus: input.aiPlanGenerationStatus ?? (input.plan ? "accepted" : "idle"),
+    blockReason: null,
+    dependencies: [],
+  };
   return {
     defaultExecutionRuntime: "local",
     executionRuntimes: [],
-    task: {
-      id: "task-1",
-      workspaceId: "workspace-1",
-      title: "Launch task",
-      description: null,
-      executionRuntime: "local",
-      executionConfig: null,
-      autoPlanGeneration: false,
-      autoExecute: false,
-      autoPlanGenerationTiming: "at_start",
-      autoExecuteTiming: "at_start",
-      status: input.taskStatus,
-      priority: "High",
-      dueAt: null,
-      scheduledStartAt: null,
-      scheduledEndAt: null,
-      scheduleStatus: "Unscheduled",
-      scheduleSource: null,
-      isRunnable: true,
-      runnabilitySummary: "Ready",
-      savedPlan: input.plan,
-      aiPlanGenerationStatus: input.aiPlanGenerationStatus ?? (input.plan ? "accepted" : "idle"),
-      blockReason: null,
-      dependencies: [],
-    },
+    task,
     latestRunSummary: input.runStatus
       ? {
           id: "run-1",
@@ -257,6 +259,14 @@ function pageData(input: {
     scheduleProposals: [],
     approvals: [],
     artifacts: [],
+    commandCenter: {
+      documents: {
+        header: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } },
+        now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
+        output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
+        trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
+      },
+    },
   };
 }
 

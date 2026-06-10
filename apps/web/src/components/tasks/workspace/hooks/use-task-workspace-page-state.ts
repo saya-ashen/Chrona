@@ -9,7 +9,12 @@ import {
   type StateStore,
 } from "@json-render/core";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
-import { fetchTaskWorkspacePage, taskWorkspaceQueryKeys } from "../model/task-workspace-query";
+import {
+  commandCenterQueryKeys,
+  fetchTaskCommandCenter,
+  fetchTaskWorkspacePage,
+  taskWorkspaceQueryKeys,
+} from "../model/task-workspace-query";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 import { bindTaskPlanSessionToStateStore } from "@/hooks/ai/task-plan-generation-session-store";
@@ -274,17 +279,28 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
   const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const initialDataRef = useRef(initialData);
+  // Header spec and header state store are initialized once from the
+  // first-paint command-center payload. They are NOT re-derived from the
+  // commandCenterQuery on every refetch — the only writes to headerSpec are
+  // (a) the initial render and (b) `spec.patch` SSE events. Re-syncing on
+  // every refetch would clobber local spec patches and any in-flight
+  // header state.
+  const commandCenterInitial = initialData.commandCenter ?? null;
   const [headerSpec, setHeaderSpec] = useState<UiDocument>(() => {
-    const doc = initialData.commandCenter?.documents.header;
+    const doc = commandCenterInitial?.documents.header;
     if (!doc) throw new Error("Task workspace header document is missing from command center payload.");
     return doc;
   });
   const [headerStore] = useState<StateStore>(() => createStateStore(
-    initialData.commandCenter?.documents.header?.state ?? {},
+    commandCenterInitial?.documents.header?.state ?? {},
   ));
   const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
   const pageQueryKey = useMemo(
     () => taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId),
+    [selectedWorkBlockId, taskId],
+  );
+  const commandCenterQueryKey = useMemo(
+    () => commandCenterQueryKeys.detail(taskId, selectedWorkBlockId),
     [selectedWorkBlockId, taskId],
   );
   const pageQuery = useQuery({
@@ -292,7 +308,17 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     queryFn: () => fetchTaskWorkspacePage(taskId, selectedWorkBlockId),
     initialData,
   });
+  const commandCenterQuery = useQuery({
+    queryKey: commandCenterQueryKey,
+    queryFn: () => fetchTaskCommandCenter(taskId, selectedWorkBlockId),
+    initialData: commandCenterInitial ?? undefined,
+  });
   const pageData = pageQuery.data;
+  // The runtime source of truth for command-center documents (header / now
+  // / output / trail) is the dedicated query — independent cache key,
+  // independent invalidation. First-paint value still flows through
+  // `initialData.commandCenter` for SSR consistency.
+  const commandCenter = commandCenterQuery.data ?? commandCenterInitial;
 
   useEffect(() => {
     return bindTaskPlanSessionToStateStore(taskId, selectedWorkBlockId, headerStore);
@@ -306,10 +332,11 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const refreshWorkspace = useCallback(async (_options: RefreshOptions = {}) => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: pageQueryKey }),
+      queryClient.invalidateQueries({ queryKey: commandCenterQueryKey }),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.planState(taskId, selectedWorkBlockId) }),
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId, selectedWorkBlockId) }),
     ]);
-  }, [pageQueryKey, queryClient, selectedWorkBlockId, taskId]);
+  }, [commandCenterQueryKey, pageQueryKey, queryClient, selectedWorkBlockId, taskId]);
   const refreshWorkspacePage = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: pageQueryKey });
   }, [pageQueryKey, queryClient]);
@@ -343,16 +370,6 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   }, [headerStore]);
   const isStreamHealthy = useTaskWorkspaceEventStream(taskId, refreshWorkspacePage, handleWorkspaceEvent, applyStateEvent, selectedWorkBlockId);
 
-  // When a full refresh completes, replace the local spec with the authoritative server spec.
-  const prevPageDataRef = useRef(pageQuery.data);
-  useEffect(() => {
-    if (prevPageDataRef.current === pageQuery.data) return;
-    prevPageDataRef.current = pageQuery.data;
-    const serverHeaderSpec = pageQuery.data?.commandCenter?.documents.header;
-    if (serverHeaderSpec) {
-      setHeaderSpec(serverHeaderSpec);
-    }
-  }, [pageQuery.data]);
 
   useEffect(() => {
     if (previousWorkBlockKeyRef.current === selectedWorkBlockKey) return;
@@ -387,6 +404,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 
   return {
     pageData,
+    commandCenter,
     setTask,
     refreshWorkspace,
     isRefreshing: pageQuery.isFetching,
