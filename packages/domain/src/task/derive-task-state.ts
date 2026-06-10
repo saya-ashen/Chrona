@@ -8,6 +8,17 @@ type DeriveTaskStateInput = {
     currentNodeId: string | null;
     pauseReason: string | null;
   } | null;
+  /**
+   * Latest compiled plan for the same scope the runs/sessions were read
+   * for. When the latest run failed and no execution session is active,
+   * the presence of a fresh `draft` plan signals the user is preparing a
+   * retry — the persisted status should clear out of `Blocked` so the UI
+   * stops surfacing the stale failure cause.
+   */
+  latestPlan?: {
+    status: "draft" | "accepted" | "superseded" | "archived";
+    updatedAt: Date;
+  } | null;
 };
 
 type BlockReason = {
@@ -108,6 +119,25 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
   if (activeRun?.status === "Running" || activeRun?.status === "Pending") {
     return {
       persistedStatus: "Running",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    };
+  }
+
+  if (
+    activeRun?.status === "Failed" &&
+    !input.executionSession &&
+    input.latestPlan?.status === "draft" &&
+    input.latestPlan.updatedAt.getTime() > activeRun.updatedAt.getTime()
+  ) {
+    // The user regenerated a plan after a failed run. The new draft is
+    // younger than the run it would otherwise surface as a block, so the
+    // persisted status must step out of `Blocked` — otherwise the UI keeps
+    // showing a stale failure cause that the user is actively trying to
+    // leave behind. Drop back to `Draft` (plan ready, awaiting acceptance).
+    return {
+      persistedStatus: "Draft",
       displayState: null,
       blockReason: null,
       blockSince: null,
