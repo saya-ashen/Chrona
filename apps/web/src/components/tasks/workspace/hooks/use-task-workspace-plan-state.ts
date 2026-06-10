@@ -387,11 +387,20 @@ export function useTaskWorkspacePlanState(
   });
   const planState = planStateQuery.data;
   const [generationUserInstruction, setGenerationUserInstruction] = useState<string | null>(null);
-  // `isGeneratingPlan` and `generationActivitySummary` are derived from the
-  // shared `useTaskPlanGenerationSession` store, which the workspace
-  // SSE pipeline keeps in sync via `state.update` events.
+  // `isGeneratingPlan` flips to true when EITHER:
+  //  (a) the shared `useTaskPlanGenerationSession` store — kept current by
+  //      the workspace SSE pipeline — reports a running session, OR
+  //  (b) the persisted `/api/tasks/:taskId/plan` snapshot reports
+  //      `aiPlanGenerationStatus === "generating"`.
+  // Source (b) is the only signal that survives a hard page refresh. The
+  // page loader and the `fetchTaskPlanState` query both read
+  // `isTaskPlanGenerationRunning` on the server, so the moment a generation
+  // is in flight the spec API surfaces "generating" — the button must
+  // honour it on the very first render after the refresh, before the SSE
+  // snapshot or session-store hydrate has a chance to fire.
   const generationSession = useTaskPlanGenerationSession(task.id, selectedWorkBlockId);
-  const isGeneratingPlan = generationSession.sessionStatus === "running";
+  const isGeneratingPlan = generationSession.sessionStatus === "running"
+    || planState?.aiPlanGenerationStatus === "generating";
   const generationActivitySummary = isGeneratingPlan
     ? (generationSession.statusMessage ?? activitySummaryFromPhase(generationSession.phase))
     : null;
