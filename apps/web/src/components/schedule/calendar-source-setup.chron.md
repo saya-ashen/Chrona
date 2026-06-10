@@ -15,6 +15,8 @@ symbols:
     source_name: "CalendarSourceSetup"
     kind: "component"
     describe: true
+    signature_hash: "856e4b0f3b26b1ca"
+    body_hash: "519a0b82b5a89cfe"
 ---
 # calendar-source-setup
 

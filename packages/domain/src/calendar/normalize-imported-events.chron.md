@@ -13,8 +13,10 @@ sync:
 symbols:
   - id: "normalizeImportedEvents"
     source_name: "normali"
-    kind: "unknown"
+    kind: "function"
     describe: true
+    signature_hash: "4d3f9b91c422b41b"
+    body_hash: "abf50b8566a012f2"
 ---
 # normalize-imported-events
 

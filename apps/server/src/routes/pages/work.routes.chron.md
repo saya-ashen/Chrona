@@ -8,13 +8,15 @@ layer: "server"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "ce2ff4a8f1f3bf8f"
+  source_hash: "443554577780acb3"
   last_scanned_commit: ""
 symbols:
   - id: "createWorkRoutes"
     source_name: "createWorkRoutes"
     kind: "route"
     describe: true
+    signature_hash: "b32e0e9467ee2564"
+    body_hash: "f50a0736090f41fb"
 ---
 # work.routes
 

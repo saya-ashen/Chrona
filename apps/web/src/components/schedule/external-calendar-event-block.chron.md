@@ -15,6 +15,8 @@ symbols:
     source_name: "ExternalCalendarEventBlock"
     kind: "component"
     describe: true
+    signature_hash: "5da870139f04de81"
+    body_hash: "dd6b3d2b1cae17bf"
 ---
 # external-calendar-event-block
 

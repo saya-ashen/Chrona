@@ -8,13 +8,15 @@ layer: "server"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "d4a7a48b8b11fa86"
+  source_hash: "67773fa9ec04f2fc"
   last_scanned_commit: ""
 symbols:
   - id: "createTasksRoutes"
     source_name: "createTasksRoutes"
     kind: "route"
     describe: true
+    signature_hash: "e6e39c0f034abcdb"
+    body_hash: "cca89583db312ac7"
 ---
 # crud.routes
 

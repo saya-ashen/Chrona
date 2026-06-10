@@ -15,6 +15,8 @@ symbols:
     source_name: "createCalendarSourceRoutes"
     kind: "route"
     describe: true
+    signature_hash: "fa4196fa867e980e"
+    body_hash: "e8202a6cb586458d"
 ---
 # calendar-sources.routes
 

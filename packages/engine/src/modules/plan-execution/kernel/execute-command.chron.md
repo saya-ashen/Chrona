@@ -8,13 +8,15 @@ layer: "engine"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "a02f76d54679119f"
+  source_hash: "c3ca5586bc907abc"
   last_scanned_commit: ""
 symbols:
   - id: "executeCommand"
     source_name: "executeCommand"
     kind: "function"
     describe: true
+    signature_hash: "159ea49a9ba09405"
+    body_hash: "ddf0509cad57bc92"
 ---
 # execute-command
 

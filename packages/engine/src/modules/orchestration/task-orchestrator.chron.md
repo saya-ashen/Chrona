@@ -15,6 +15,8 @@ symbols:
     source_name: "createTaskOrchestrator"
     kind: "function"
     describe: true
+    signature_hash: "eb033606b1d0a483"
+    body_hash: "aaf111e63d2a5347"
 ---
 # task-orchestrator
 

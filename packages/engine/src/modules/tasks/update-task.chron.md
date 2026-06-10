@@ -15,6 +15,8 @@ symbols:
     source_name: "updateTask"
     kind: "function"
     describe: true
+    signature_hash: "70e18a94af95b9ed"
+    body_hash: "de6d9c23b69d0a4d"
 ---
 # update-task
 

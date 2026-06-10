@@ -15,6 +15,8 @@ symbols:
     source_name: "createExternalCalendarService"
     kind: "function"
     describe: true
+    signature_hash: "b5ff338edeb6e8c6"
+    body_hash: "f7630f5b04347412"
 ---
 # external-calendar-service
 

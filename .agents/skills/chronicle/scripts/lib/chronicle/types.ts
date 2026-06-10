@@ -20,6 +20,13 @@ export const ChronicleSymbolSchema = z.object({
   source_name: z.string().min(1),
   kind: z.enum(SYMBOL_KINDS),
   describe: z.boolean(),
+  // Structural AST fingerprints, stamped by sync/scaffold. `signature_hash`
+  // tracks the declaration head (params/return type); `body_hash` tracks the
+  // implementation. A mismatch against a fresh scan means the documented code
+  // changed and the prose may be stale. Optional for back-compat with docs
+  // written before per-symbol hashing existed (run sync to stamp them).
+  signature_hash: z.string().optional(),
+  body_hash: z.string().optional(),
 });
 
 export const ChronicleFrontMatterSchema = z.object({
@@ -88,6 +95,8 @@ export interface SourceSymbol {
   kind: ChronicleSymbolKind;
   exported: boolean;
   signature: string;
+  signatureHash: string;
+  bodyHash: string;
   hints: string[];
   score: number;
   reason: string;

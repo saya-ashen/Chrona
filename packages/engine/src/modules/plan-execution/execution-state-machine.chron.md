@@ -15,18 +15,26 @@ symbols:
     source_name: "executionStatusFromEffectiveGraph"
     kind: "function"
     describe: true
+    signature_hash: "889ad69d45f1a4c1"
+    body_hash: "417562af6c2e31f6"
   - id: "executionStatusFromGraphOutcome"
     source_name: "executionStatusFromGraphOutcome"
     kind: "function"
     describe: true
+    signature_hash: "4e2005bc863df2a2"
+    body_hash: "a458e70497b6d825"
   - id: "executionTransition"
     source_name: "executionTransition"
     kind: "function"
     describe: true
+    signature_hash: "98bcd8c629ac5212"
+    body_hash: "4b95b8c233a8424f"
   - id: "graphStatusForExecutionStatus"
     source_name: "graphStatusForExecutionStatus"
     kind: "function"
     describe: true
+    signature_hash: "33dadc9e3d40ba88"
+    body_hash: "cf29877fab9277d8"
 ---
 # execution-state-machine
 

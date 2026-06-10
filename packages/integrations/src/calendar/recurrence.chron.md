@@ -15,6 +15,8 @@ symbols:
     source_name: "expandRecurrenceRule"
     kind: "function"
     describe: true
+    signature_hash: "ba471cbdc0d12221"
+    body_hash: "14e137a6d1f8ee66"
 ---
 # recurrence
 

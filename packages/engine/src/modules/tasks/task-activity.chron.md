@@ -8,17 +8,21 @@ layer: "engine"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "5f1150a133cffb92"
+  source_hash: "f61df6b53e78de68"
   last_scanned_commit: ""
 symbols:
   - id: "buildActivityTimeline"
     source_name: "buildActivityTimeline"
     kind: "function"
     describe: true
+    signature_hash: "e1990e0bbff79d1e"
+    body_hash: "8648fbb17f861de3"
   - id: "getTaskActivityPage"
     source_name: "getTaskActivityPage"
     kind: "function"
     describe: true
+    signature_hash: "299b75a6bc029c77"
+    body_hash: "a77679a4ce8f6d00"
 ---
 # task-activity
 

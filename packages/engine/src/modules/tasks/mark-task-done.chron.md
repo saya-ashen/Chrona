@@ -15,6 +15,8 @@ symbols:
     source_name: "markTaskDone"
     kind: "function"
     describe: true
+    signature_hash: "e944f83d302d48ad"
+    body_hash: "1fa3e4d241b81d43"
 ---
 # mark-task-done
 

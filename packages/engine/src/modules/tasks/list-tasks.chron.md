@@ -15,6 +15,8 @@ symbols:
     source_name: "listTasksByWorkspace"
     kind: "function"
     describe: true
+    signature_hash: "d20915a705fbf9a5"
+    body_hash: "73a7843f0917cd3a"
 ---
 # list-tasks
 

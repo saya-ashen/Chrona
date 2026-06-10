@@ -15,6 +15,8 @@ symbols:
     source_name: "CalendarSourceActions"
     kind: "component"
     describe: true
+    signature_hash: "29da7221ef5a4563"
+    body_hash: "927df5e9528fde89"
 ---
 # calendar-source-actions
 

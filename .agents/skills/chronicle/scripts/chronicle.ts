@@ -16,7 +16,7 @@ import {
   ensureSymbolSection,
   markStaleSymbolSection,
 } from "./lib/chronicle/markdown";
-import { ChronicleFrontMatterSchema, type ChronicleFrontMatter, type SourceFileScan, type SourceSymbol, type TestRefs } from "./lib/chronicle/types";
+import { ChronicleFrontMatterSchema, type ChronicleFrontMatter, type ChronicleSymbol, type SourceFileScan, type SourceSymbol, type TestRefs } from "./lib/chronicle/types";
 
 const INDEX_PATH = path.join("docs", "maps", "chronicle.index.md");
 
@@ -51,13 +51,15 @@ function fileSymbolsForDoc(scan: SourceFileScan): SourceSymbol[] {
 
 function frontMatterFor(scan: SourceFileScan, symbols: SourceSymbol[], tests: TestRefs, existing?: ChronicleFrontMatter): ChronicleFrontMatter {
   const byId = new Map((existing?.symbols ?? []).map((symbol) => [symbol.id, symbol]));
-  const nextSymbols = symbols.map((symbol) => {
+  const nextSymbols: ChronicleSymbol[] = symbols.map((symbol) => {
     const prev = byId.get(symbol.id);
     return {
       id: symbol.id,
       source_name: prev?.source_name ?? symbol.sourceName,
       kind: symbol.kind,
       describe: symbol.describe,
+      signature_hash: symbol.signatureHash,
+      body_hash: symbol.bodyHash,
     };
   });
   for (const prev of existing?.symbols ?? []) {
@@ -219,7 +221,19 @@ function checkDocMarkers(doc: string, scanBySource: Map<string, SourceFileScan>,
     const match = content.match(markerRegex("generated", "symbols"));
     const actual = match?.[0].replace(/^<!-- generated:symbols:start -->\n?/, "").replace(/\n?<!-- generated:symbols:end -->$/, "").trim();
     if (actual !== expected) errors.push(`${doc}: generated symbol inventory stale`);
-    if (parsed.frontMatter.sync.source_hash !== scan.sourceHash) errors.push(`${doc}: source hash stale`);
+    const scanById = new Map(fileSymbolsForDoc(scan).map((symbol) => [symbol.id, symbol]));
+    for (const fmSymbol of parsed.frontMatter.symbols) {
+      if (!fmSymbol.describe) continue;
+      const current = scanById.get(fmSymbol.id);
+      if (!current) continue; // symbol disappearance is reported separately below
+      if (fmSymbol.signature_hash === undefined || fmSymbol.body_hash === undefined) {
+        errors.push(`${doc}: symbol ${fmSymbol.id} missing AST hash; run chronicle:sync to stamp it`);
+      } else if (fmSymbol.signature_hash !== current.signatureHash) {
+        errors.push(`${doc}: symbol ${fmSymbol.id} signature changed — description likely stale; review and run chronicle:sync`);
+      } else if (fmSymbol.body_hash !== current.bodyHash) {
+        errors.push(`${doc}: symbol ${fmSymbol.id} implementation changed — review description, then run chronicle:sync`);
+      }
+    }
     const tests = testRefsForSource(scan.filePath);
     for (const symbol of fileSymbolsForDoc(scan)) {
       const refs = tests.bySymbol.get(symbol.sourceName) ?? { direct: [], transitive: [] };

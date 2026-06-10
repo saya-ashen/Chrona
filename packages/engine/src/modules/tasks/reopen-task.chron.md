@@ -15,6 +15,8 @@ symbols:
     source_name: "reopenTask"
     kind: "function"
     describe: true
+    signature_hash: "cd70a2722a304087"
+    body_hash: "78746c22e00c9769"
 ---
 # reopen-task
 

@@ -15,26 +15,38 @@ symbols:
     source_name: "createCalendarSource"
     kind: "function"
     describe: true
+    signature_hash: "e0dd4ab0013c5a8a"
+    body_hash: "2e0f6c68503b1f4f"
   - id: "listImportedCalendarEventsInRange"
     source_name: "listImportedCalendarEventsInRange"
     kind: "function"
     describe: true
+    signature_hash: "a520fb083f95c6c0"
+    body_hash: "cf19030997568c46"
   - id: "markCalendarSourceRemoved"
     source_name: "markCalendarSourceRemoved"
     kind: "function"
     describe: true
+    signature_hash: "b70a305bff3c8a96"
+    body_hash: "6745e18b1b8616c2"
   - id: "replaceImportedCalendarEvents"
     source_name: "replaceImportedCalendarEvents"
     kind: "function"
     describe: true
+    signature_hash: "d1084ece6ce6c81e"
+    body_hash: "d7439e42faa3f17c"
   - id: "updateCalendarSource"
     source_name: "updateCalendarSource"
     kind: "function"
     describe: true
+    signature_hash: "40c933c24f74f218"
+    body_hash: "25d40bf472e6d93a"
   - id: "updateCalendarSourceSyncStatus"
     source_name: "updateCalendarSourceSyncStatus"
     kind: "function"
     describe: true
+    signature_hash: "9bc809566db02ca4"
+    body_hash: "25d40bf472e6d93a"
 ---
 # external-calendar
 

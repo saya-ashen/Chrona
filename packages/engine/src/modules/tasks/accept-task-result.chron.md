@@ -15,6 +15,8 @@ symbols:
     source_name: "acceptTaskResult"
     kind: "function"
     describe: true
+    signature_hash: "7eb2cc152e33a084"
+    body_hash: "7186c5b51b2f98c8"
 ---
 # accept-task-result
 

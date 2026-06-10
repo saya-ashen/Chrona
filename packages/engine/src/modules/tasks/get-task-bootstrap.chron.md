@@ -15,6 +15,8 @@ symbols:
     source_name: "getTaskBootstrap"
     kind: "function"
     describe: true
+    signature_hash: "6038580012e5dd2c"
+    body_hash: "e4b575996d42d0a5"
 ---
 # get-task-bootstrap
 

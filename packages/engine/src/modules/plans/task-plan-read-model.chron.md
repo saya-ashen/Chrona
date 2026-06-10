@@ -15,10 +15,14 @@ symbols:
     source_name: "getLatestTaskPlanReadModel"
     kind: "function"
     describe: true
+    signature_hash: "3e7d218b7a9f06b0"
+    body_hash: "f6c6f59a4f86ea02"
   - id: "resolveSavedPlanEffectiveGraph"
     source_name: "resolveSavedPlanEffectiveGraph"
     kind: "function"
     describe: true
+    signature_hash: "6522ec8e171d01fa"
+    body_hash: "1aeebdda2e5b1da9"
 ---
 # task-plan-read-model
 

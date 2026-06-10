@@ -15,6 +15,8 @@ symbols:
     source_name: "parseICalendarFeed"
     kind: "function"
     describe: true
+    signature_hash: "e3f5de00113e7950"
+    body_hash: "e5ceb1225441cd64"
 ---
 # normalizer
 

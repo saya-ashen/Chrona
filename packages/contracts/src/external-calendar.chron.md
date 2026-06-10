@@ -15,26 +15,38 @@ symbols:
     source_name: "calendarSourceSummarySchema"
     kind: "schema"
     describe: true
+    signature_hash: "0f240c1e82bf157b"
+    body_hash: "6864c24fdc6c80d9"
   - id: "calendarSyncStatusSchema"
     source_name: "calendarSyncStatusSchema"
     kind: "schema"
     describe: true
+    signature_hash: "336d67743c3f018a"
+    body_hash: "9f08b1cbcc4d5c4a"
   - id: "createCalendarSourceRequestSchema"
     source_name: "createCalendarSourceRequestSchema"
     kind: "schema"
     describe: true
+    signature_hash: "b91497807ee4805c"
+    body_hash: "2878818f540680fb"
   - id: "importedCalendarEventSummarySchema"
     source_name: "importedCalendarEventSummarySchema"
     kind: "schema"
     describe: true
+    signature_hash: "af12fc3f42c8d54f"
+    body_hash: "b4f9c3f4dcf36070"
   - id: "updateCalendarSourceRequestSchema"
     source_name: "updateCalendarSourceRequestSchema"
     kind: "schema"
     describe: true
+    signature_hash: "cb9244f3224e6408"
+    body_hash: "ab7f164e65fcdccf"
   - id: "validateCalendarSourceResponseSchema"
     source_name: "validateCalendarSourceResponseSchema"
     kind: "schema"
     describe: true
+    signature_hash: "f3b9328a5ee3bdc5"
+    body_hash: "d9f4fbcefd46ce5b"
 ---
 # external-calendar
 

@@ -8,13 +8,15 @@ layer: "engine"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "ae25aa4bab95bee5"
+  source_hash: "a1e55fd19e686779"
   last_scanned_commit: ""
 symbols:
   - id: "getTaskCommandCenter"
     source_name: "getTaskCommandCenter"
     kind: "function"
     describe: true
+    signature_hash: "a09c21812fa4c961"
+    body_hash: "0e6739862d98e7eb"
 ---
 # get-task-command-center
 

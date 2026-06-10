@@ -15,6 +15,8 @@ symbols:
     source_name: "TaskPlanning"
     kind: "class"
     describe: true
+    signature_hash: "164f288de7e2c23d"
+    body_hash: "2c99893a86853916"
 ---
 # task-planning
 

@@ -183,8 +183,14 @@ symbols:
     source_name: "createTask"
     kind: "function"
     describe: true
+    signature_hash: "614df133636aba96"
+    body_hash: "0aa48c7cf333f3ec"
 ---
 ```
+
+`signature_hash` / `body_hash` are structural AST fingerprints stamped by
+`sync`/`scaffold`. They are how Chronicle knows a documented function changed —
+see "Staleness detection" below. Treat them as script-owned; never hand edit.
 
 Marker forms:
 
@@ -233,6 +239,40 @@ Coverage language:
 - `weak`: structural coverage or thin assertions.
 - `none`: no direct behavior coverage.
 - `unknown`: not inspected.
+
+## Staleness detection (AST hashing)
+
+Chronicle fingerprints each documented symbol with two structural hashes so it
+can tell when prose has gone stale against the code it describes.
+
+- `signature_hash` — the declaration head (name, params, return type).
+- `body_hash` — the implementation (function/method/arrow body, or a const's
+  initializer; falls back to the whole declaration).
+
+Both are **structural AST hashes**, not text hashes: the scanner walks ts-morph
+nodes and hashes their syntactic kinds plus identifier/literal text. Comments
+and formatting are trivia (not nodes), so reflowing or commenting a function
+does **not** change its hash; changing logic, identifiers, literals, or the
+signature does.
+
+`sync` and `scaffold` stamp the current hashes into front matter. `check`
+recomputes them from a fresh scan and compares:
+
+- signature mismatch → `symbol X signature changed — description likely stale`
+  (high confidence: the interface moved).
+- body mismatch only → `symbol X implementation changed — review description`
+  (medium confidence: could be a pure refactor — glance, then re-stamp).
+- missing hash (doc written before this feature) → `run chronicle:sync to stamp`.
+
+Workflow when `check` reports drift: read the changed symbol, update its
+`<!-- ai:start -->` prose if the behavior changed, then run `chronicle:sync` to
+re-stamp the hash. Running `sync` blesses current code as documented, so do not
+run it blindly in CI — CI should run `check` only.
+
+Known limit: hashes catch **direct** edits to the documented symbol, not
+**transitive** drift (a helper, type, or constant it depends on changing). A
+green `check` means "the code you described hasn't been edited," not "the
+description is still semantically perfect."
 
 ## Rules and scoring
 

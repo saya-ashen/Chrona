@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { Project, SyntaxKind, type Node, type SourceFile } from "ts-morph";
+import { Node, Project, SyntaxKind, type SourceFile } from "ts-morph";
 import type { ChronicleFrontMatter, ChronicleRules, ChronicleSymbolKind, SourceFileScan, SourceSymbol } from "./types";
 
 const ROOT = process.cwd();
@@ -73,6 +73,47 @@ function signatureFor(node: Node): string {
   return (idx >= 0 ? text.slice(0, idx).trim() : text).slice(0, 220);
 }
 
+// Leaf nodes whose literal text carries meaning (identifiers, literals).
+// Everything else contributes only its syntactic kind, so the resulting hash
+// ignores formatting and comments (trivia are not nodes) while staying
+// sensitive to logic, identifier, and literal changes.
+function isHashableLeaf(node: Node): boolean {
+  switch (node.getKind()) {
+    case SyntaxKind.Identifier:
+    case SyntaxKind.PrivateIdentifier:
+    case SyntaxKind.StringLiteral:
+    case SyntaxKind.NumericLiteral:
+    case SyntaxKind.BigIntLiteral:
+    case SyntaxKind.NoSubstitutionTemplateLiteral:
+    case SyntaxKind.RegularExpressionLiteral:
+    case SyntaxKind.TemplateHead:
+    case SyntaxKind.TemplateMiddle:
+    case SyntaxKind.TemplateTail:
+      return true;
+    default:
+      return false;
+  }
+}
+
+function structuralHash(node: Node): string {
+  const tokens: string[] = [];
+  node.forEachDescendant((descendant) => {
+    tokens.push(isHashableLeaf(descendant) ? `${descendant.getKindName()}:${descendant.getText()}` : descendant.getKindName());
+  });
+  return sourceHash(tokens.join("|"));
+}
+
+// The implementation to fingerprint for body_hash: a function/method/arrow
+// body, or a documented const's initializer, falling back to the whole node.
+function bodyNodeOf(node: Node): Node {
+  let target: Node = node;
+  if (Node.isVariableDeclaration(target)) target = target.getInitializer() ?? target;
+  if (Node.isFunctionDeclaration(target) || Node.isFunctionExpression(target) || Node.isArrowFunction(target) || Node.isMethodDeclaration(target)) {
+    return target.getBody() ?? target;
+  }
+  return target;
+}
+
 function isReactComponentName(name: string): boolean {
   return /^[A-Z]/.test(name);
 }
@@ -122,7 +163,8 @@ function excludedSymbol(name: string, kind: ChronicleSymbolKind, rules: Chronicl
 function addSymbol(out: SourceSymbol[], name: string, baseKind: ChronicleSymbolKind, exported: boolean, file: string, node: Node, rules: ChronicleRules) {
   const kind = classifyKind(name, baseKind, file);
   if (excludedSymbol(name, kind, rules)) return;
-  const partial = { id: name, sourceName: name, kind, exported, signature: signatureFor(node), hints: hintsFor(name, file, node) };
+  const signature = signatureFor(node);
+  const partial = { id: name, sourceName: name, kind, exported, signature, signatureHash: sourceHash(signature), bodyHash: structuralHash(bodyNodeOf(node)), hints: hintsFor(name, file, node) };
   const scored = scoreSymbol(partial, rules);
   const selected = selectedEntryFor(file, rules);
   if (rules.selection.mode === "explicit") {

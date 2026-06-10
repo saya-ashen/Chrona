@@ -15,10 +15,14 @@ symbols:
     source_name: "currentExecutionStatusFromEffectiveGraph"
     kind: "function"
     describe: true
+    signature_hash: "4b78c03be1733b1d"
+    body_hash: "c3f1ebd09437c5e7"
   - id: "getCurrentExecution"
     source_name: "getCurrentExecution"
     kind: "function"
     describe: true
+    signature_hash: "c39dd4810062f3cd"
+    body_hash: "f617152af0b079b2"
 ---
 # get-current-execution
 

@@ -8,17 +8,21 @@ layer: "engine"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "2946b91158258971"
+  source_hash: "729a281a243ce70a"
   last_scanned_commit: ""
 symbols:
   - id: "AiRuntimeInvoker"
     source_name: "AiRuntimeInvoker"
     kind: "class"
     describe: true
+    signature_hash: "20b9e6107c299037"
+    body_hash: "54b0606235107db5"
   - id: "runProviderRequest"
     source_name: "runProviderRequest"
     kind: "function"
     describe: true
+    signature_hash: "dc398443de45a1f3"
+    body_hash: "8faa2a1530e997a0"
 ---
 # ai-runtime-invoker
 

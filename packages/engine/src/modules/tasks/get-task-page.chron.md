@@ -8,13 +8,15 @@ layer: "engine"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "5e8ac05b42dfb00f"
+  source_hash: "1265d193a3414fc6"
   last_scanned_commit: ""
 symbols:
   - id: "getTaskPage"
     source_name: "getTaskPage"
     kind: "function"
     describe: true
+    signature_hash: "a5fb677660ebbfd1"
+    body_hash: "9fcf89d064138670"
 ---
 # get-task-page
 

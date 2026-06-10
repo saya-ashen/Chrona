@@ -8,13 +8,15 @@ layer: "engine"
 status: "active"
 sync:
   mode: "scaffold-and-check"
-  source_hash: "b7d3b0137a3b25b7"
+  source_hash: "d779aea4552aed88"
   last_scanned_commit: ""
 symbols:
   - id: "createKernelGraphCallbacks"
     source_name: "createKernelGraphCallbacks"
     kind: "function"
     describe: true
+    signature_hash: "a2f6eec544221826"
+    body_hash: "f38fc9f423010df2"
 ---
 # graph-callbacks
 

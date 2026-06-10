@@ -15,6 +15,8 @@ symbols:
     source_name: "createTask"
     kind: "function"
     describe: true
+    signature_hash: "614df133636aba96"
+    body_hash: "0aa48c7cf333f3ec"
 ---
 # create-task
 

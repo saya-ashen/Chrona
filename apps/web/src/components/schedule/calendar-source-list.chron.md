@@ -15,6 +15,8 @@ symbols:
     source_name: "CalendarSourceList"
     kind: "component"
     describe: true
+    signature_hash: "725499d534e812ed"
+    body_hash: "4d223ca0b9f8134a"
 ---
 # calendar-source-list
 

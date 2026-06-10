@@ -15,6 +15,8 @@ symbols:
     source_name: "deleteTask"
     kind: "function"
     describe: true
+    signature_hash: "34c9257aeeb4102c"
+    body_hash: "66f4551d5a5eb074"
 ---
 # delete-task
 
