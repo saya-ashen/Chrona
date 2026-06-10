@@ -29,19 +29,16 @@ type TaskWorkspaceHeaderCardProps = {
   onStartDeleteConfirm: () => void;
   onCancelDeleteConfirm: () => void;
   onDelete: () => void;
+  onRecoveryRetry: () => void | Promise<void>;
+  onRecoveryEditInstruction: () => void | Promise<void>;
+  onRecoveryCancel: () => void;
 };
 
-const EXECUTION_ACTION_LABELS: Record<HeaderActionId, string> = {
-  start: "Start",
-  pause: "Pause",
-  stop: "Stop",
-  more: "More",
-};
 
 function findActionLabel(spec: UiDocument, actionId: HeaderActionId) {
   const key = `action:${actionId}`;
-  const label = spec.elements[key]?.props?.label;
-  return typeof label === "string" ? label.replace(/\.\.\.$/, "") : EXECUTION_ACTION_LABELS[actionId];
+  const label = (spec.elements[key]?.props as { label?: string } | undefined)?.label;
+  return label ?? actionId;
 }
 
 export function TaskWorkspaceHeaderCard({
@@ -57,6 +54,9 @@ export function TaskWorkspaceHeaderCard({
   onStartDeleteConfirm,
   onCancelDeleteConfirm,
   onDelete,
+  onRecoveryRetry,
+  onRecoveryEditInstruction,
+  onRecoveryCancel,
 }: TaskWorkspaceHeaderCardProps) {
   const { messages } = useI18n();
   const copy = messages.components?.taskWorkspace ?? {};
@@ -66,8 +66,34 @@ export function TaskWorkspaceHeaderCard({
   // Refs so that the handlers object (passed to ActionProvider which stores it in
   // useState on mount and never re-syncs prop updates) always reads the current
   // values rather than the stale closure from the initial render.
-  const ref = useRef({ onAcceptPlan, onGeneratePlan, onEdit, onStartDeleteConfirm, onAction, store, spec, copy, pendingActionId });
-  ref.current = { onAcceptPlan, onGeneratePlan, onEdit, onStartDeleteConfirm, onAction, store, spec, copy, pendingActionId };
+  const ref = useRef({
+    onAcceptPlan,
+    onGeneratePlan,
+    onEdit,
+    onStartDeleteConfirm,
+    onAction,
+    onRecoveryRetry,
+    onRecoveryEditInstruction,
+    onRecoveryCancel,
+    store,
+    spec,
+    copy,
+    pendingActionId,
+  });
+  ref.current = {
+    onAcceptPlan,
+    onGeneratePlan,
+    onEdit,
+    onStartDeleteConfirm,
+    onAction,
+    onRecoveryRetry,
+    onRecoveryEditInstruction,
+    onRecoveryCancel,
+    store,
+    spec,
+    copy,
+    pendingActionId,
+  };
 
   // Empty deps: stable identity across all re-renders. Reads from ref at call time.
   const handlers = useMemo(() => ({
@@ -112,7 +138,15 @@ export function TaskWorkspaceHeaderCard({
         setPendingActionId(null);
       }
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    [UI_ACTION.recoveryRetry]: async () => {
+      await Promise.resolve(ref.current.onRecoveryRetry());
+    },
+    [UI_ACTION.recoveryEditInstruction]: async () => {
+      await Promise.resolve(ref.current.onRecoveryEditInstruction());
+    },
+    [UI_ACTION.recoveryCancel]: () => {
+      ref.current.onRecoveryCancel();
+    },
   }), []);
 
   return (

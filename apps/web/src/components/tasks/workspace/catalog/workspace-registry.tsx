@@ -489,5 +489,14 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     "locate-workspace-node": async () => {
       throw new Error('[ui-protocol] action "locate-workspace-node" requires a host handler.');
     },
+    "recovery-retry": async () => {
+      throw new Error('[ui-protocol] action "recovery-retry" requires a host handler.');
+    },
+    "recovery-edit-instruction": async () => {
+      throw new Error('[ui-protocol] action "recovery-edit-instruction" requires a host handler.');
+    },
+    "recovery-cancel": async () => {
+      throw new Error('[ui-protocol] action "recovery-cancel" requires a host handler.');
+    },
   },
 });

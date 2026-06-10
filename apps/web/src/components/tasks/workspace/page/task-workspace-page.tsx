@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StateStore } from "@json-render/react";
 import { useI18n } from "@chrona/i18n/react";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
@@ -33,6 +33,11 @@ type TaskWorkspaceHeaderEditorProps = {
   onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
   onAcceptPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAcceptPlan"];
   onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
+  onRecoveryRetry: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryRetry"];
+  onRecoveryEditInstruction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryEditInstruction"];
+  onRecoveryCancel: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryCancel"];
+  isEditExpanded: boolean;
+  onToggleEditExpanded: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
@@ -77,7 +82,6 @@ const DEFAULT_COPY = {
   commandCenterOutputTab: "Results",
   commandCenterTrailTab: "Activity",
 };
-
 function TaskWorkspaceHeaderEditor({
   task,
   spec,
@@ -85,6 +89,11 @@ function TaskWorkspaceHeaderEditor({
   onAction,
   onAcceptPlan,
   onGeneratePlan,
+  onRecoveryRetry,
+  onRecoveryEditInstruction,
+  onRecoveryCancel,
+  isEditExpanded,
+  onToggleEditExpanded,
   showDeleteConfirm,
   isDeleting,
   onStartDeleteConfirm,
@@ -92,8 +101,6 @@ function TaskWorkspaceHeaderEditor({
   onDelete,
   editSectionProps,
 }: TaskWorkspaceHeaderEditorProps) {
-  const [isEditExpanded, setIsEditExpanded] = useState(false);
-
   return (
     <>
       <TaskWorkspaceHeaderCard
@@ -103,17 +110,20 @@ function TaskWorkspaceHeaderEditor({
         onAction={onAction}
         onAcceptPlan={onAcceptPlan}
         onGeneratePlan={onGeneratePlan}
-        onEdit={() => setIsEditExpanded((current) => !current)}
+        onEdit={onToggleEditExpanded}
         showDeleteConfirm={showDeleteConfirm}
         isDeleting={isDeleting}
         onStartDeleteConfirm={onStartDeleteConfirm}
         onCancelDeleteConfirm={onCancelDeleteConfirm}
         onDelete={onDelete}
+        onRecoveryRetry={onRecoveryRetry}
+        onRecoveryEditInstruction={onRecoveryEditInstruction}
+        onRecoveryCancel={onRecoveryCancel}
       />
       <TaskWorkspaceEditSection
         {...editSectionProps}
         isEditExpanded={isEditExpanded}
-        onToggleExpanded={() => setIsEditExpanded((current) => !current)}
+        onToggleExpanded={onToggleEditExpanded}
       />
     </>
   );
@@ -134,6 +144,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const { registerHandlers, setPageContext } = useAssistantSurface();
   const { pageData, setTask, refreshWorkspace, workspaceEvents, headerSpec, headerStore } = useTaskWorkspacePageState(data);
   const task = pageData.task;
+  const [isEditExpanded, setIsEditExpanded] = useState(false);
+  const toggleEditExpanded = useCallback(() => {
+    setIsEditExpanded((current) => !current);
+  }, []);
 
   const {
     hasUnsavedConfigChanges,
@@ -241,6 +255,37 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
               await dispatchExecutionAction({ action: "cancel_session", reason: "Stopped from task workspace" });
             }
           }}
+          onRecoveryRetry={() => {
+            // Clearing the error keys first lets the header render the
+            // disabled "Generate plan" button while the new stream opens;
+            // the next `state.update` will repopulate error fields if it
+            // fails again.
+            headerStore.set("/plan/generation/error/code", null);
+            headerStore.set("/plan/generation/error/message", null);
+            headerStore.set("/plan/generation/error/buttonRetry", false);
+            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set("/plan/generation/error/buttonCancel", false);
+            void handleGeneratePlanFromHeader();
+          }}
+          onRecoveryEditInstruction={() => {
+            headerStore.set("/plan/generation/error/code", null);
+            headerStore.set("/plan/generation/error/message", null);
+            headerStore.set("/plan/generation/error/buttonRetry", false);
+            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set("/plan/generation/error/buttonCancel", false);
+            setAcceptPlanError(null);
+            setSaveError(null);
+            setIsEditExpanded(true);
+          }}
+          onRecoveryCancel={() => {
+            headerStore.set("/plan/generation/error/code", null);
+            headerStore.set("/plan/generation/error/message", null);
+            headerStore.set("/plan/generation/error/buttonRetry", false);
+            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set("/plan/generation/error/buttonCancel", false);
+          }}
+          isEditExpanded={isEditExpanded}
+          onToggleEditExpanded={toggleEditExpanded}
           showDeleteConfirm={showDeleteConfirm}
           isDeleting={isDeleting}
           onStartDeleteConfirm={() => setShowDeleteConfirm(true)}
