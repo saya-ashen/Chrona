@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { applySpecPatch, createStateStore, type StateStore } from "@json-render/core";
+import {
+  applySpecPatch,
+  createStateStore,
+  getByPath,
+  type JsonPatch,
+  type Spec,
+  type StateStore,
+} from "@json-render/core";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import { fetchTaskWorkspacePage, taskWorkspaceQueryKeys } from "../model/task-workspace-query";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskData, TaskPageData } from "../model/task-workspace-types";
-
+import { bindTaskPlanSessionToStateStore } from "@/hooks/ai/task-plan-generation-session-store";
 type RefreshOptions = {
   silent?: boolean;
 };
@@ -20,6 +27,19 @@ export type TaskWorkspaceSseEvent = {
   [key: string]: unknown;
 };
 
+type WorkspaceSpecPatch = {
+  op: JsonPatch["op"];
+  path: string;
+  value?: unknown;
+  from?: string;
+};
+
+type HeaderSpecPatchEvent = {
+  type: "spec.patch";
+  document: "header";
+  patches: WorkspaceSpecPatch[];
+};
+
 const SSE_STALE_TIMEOUT_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_STALE_TIMEOUT_MS ?? 45000);
 const SSE_RECONNECT_BASE_DELAY_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_RECONNECT_BASE_DELAY_MS ?? 5000);
 const SSE_RECONNECT_MAX_DELAY_MS = Number(import.meta.env.VITE_TASK_WORKSPACE_SSE_RECONNECT_MAX_DELAY_MS ?? 60000);
@@ -28,7 +48,11 @@ const FALLBACK_REFRESH_INTERVAL_MS = Number(
     import.meta.env.VITE_TASK_WORKSPACE_POLL_INTERVAL_MS ??
     30000,
 );
-const NON_REFRESH_WORKSPACE_EVENTS = new Set(["ready", "heartbeat", "spec.patch"]);
+// Events that the workspace stream emits for protocol bookkeeping only
+// (no UI side effect, no page refresh). `spec.patch` is intentionally
+// excluded so the dispatcher can deliver it to the patch handler that
+// applies the JSON-Patch onto the live header spec.
+const STREAM_NOOP_EVENTS = new Set(["ready", "heartbeat"]);
 const PAGE_REFRESH_WORKSPACE_EVENTS = new Set([
   "task_projection_updated",
   "task_workspace_updated",
@@ -42,7 +66,8 @@ const PAGE_REFRESH_WORKSPACE_EVENTS = new Set([
 ]);
 
 function shouldRefreshWorkspacePageForEvent(event: string) {
-  if (NON_REFRESH_WORKSPACE_EVENTS.has(event)) return false;
+  if (STREAM_NOOP_EVENTS.has(event)) return false;
+  if (event === "spec.patch") return false;
   if (PAGE_REFRESH_WORKSPACE_EVENTS.has(event)) return true;
 
   return !event.startsWith("plan.")
@@ -75,10 +100,82 @@ function isWorkspaceActive(pageData: TaskPageData) {
     : false);
 }
 
+function isHeaderSpecPatchEvent(event: TaskWorkspaceSseEvent): event is HeaderSpecPatchEvent {
+  return event.type === "spec.patch"
+    && (event as { document?: unknown }).document === "header"
+    && Array.isArray((event as { patches?: unknown }).patches);
+}
+
+type StateSnapshotEnvelope = { type: "state.snapshot"; state: Record<string, unknown> };
+type StateUpdateEnvelope = { type: "state.update"; updates: Record<string, unknown> };
+
+function isWorkspaceStateEvent(event: TaskWorkspaceSseEvent): event is TaskWorkspaceSseEvent & (StateSnapshotEnvelope | StateUpdateEnvelope) {
+  return event.type === "state.snapshot" || event.type === "state.update";
+}
+
+/**
+ * Server snapshot contract is a flat `Record<jsonPointerPath, value>` map.
+ * We treat nested objects in the payload as opaque leaf values — the spec
+ * is free to push structured data under a single path (e.g. for `$state`
+ * bindings that consume an object) and we never recurse into them.
+ */
+function isPointerPathKey(key: string): boolean {
+  return key.startsWith("/");
+}
+
+function applyStateEventToStore(store: StateStore, event: StateSnapshotEnvelope | StateUpdateEnvelope) {
+  if (event.type === "state.snapshot") {
+    const newPaths = new Set<string>(Object.keys(event.state).filter(isPointerPathKey));
+    // Enumerate the previous JSON Pointer paths the store currently holds.
+    // `getSnapshot()` returns a nested tree after the first `set`, so we
+    // walk it to recover the original flat paths.
+    const previousPaths = collectPointerPaths(store.getSnapshot(), "");
+    const updates: Record<string, unknown> = {};
+    for (const path of previousPaths) {
+      if (!newPaths.has(path)) updates[path] = null;
+    }
+    for (const path of newPaths) {
+      if (getByPath(store.getSnapshot(), path) !== event.state[path]) {
+        updates[path] = event.state[path];
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      store.update(updates);
+    }
+    return;
+  }
+  // state.update
+  store.update(event.updates);
+}
+
+/**
+ * Walk a state tree and return every JSON Pointer path whose value is a
+ * non-object (i.e. a leaf). Mirrors the contract that `createStateStore`
+ * builds via `immutableSetByPath` so we can recover the original flat
+ * path keys from the nested snapshot.
+ */
+function collectPointerPaths(node: unknown, prefix: string): string[] {
+  if (node === null || typeof node !== "object" || Array.isArray(node)) {
+    return prefix === "" ? [] : [prefix];
+  }
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    const path = `${prefix}/${key}`;
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      paths.push(...collectPointerPaths(value, path));
+    } else {
+      paths.push(path);
+    }
+  }
+  return paths;
+}
+
 function useTaskWorkspaceEventStream(
   taskId: string,
   refreshWorkspacePage: () => Promise<void>,
   onWorkspaceEvent: (event: TaskWorkspaceSseEvent) => void,
+  applyStateEvent: (event: TaskWorkspaceSseEvent) => void,
+  workBlockId?: string | null,
 ) {
   const [streamRetryKey, setStreamRetryKey] = useState(0);
   const [isStreamHealthy, setIsStreamHealthy] = useState(true);
@@ -124,17 +221,22 @@ function useTaskWorkspaceEventStream(
 
     markStreamHealthy();
 
-    void fetchJsonEventSource(`/api/work/${taskId}/events`, {
+    const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
+    void fetchJsonEventSource(`/api/work/${taskId}/events${query}`, {
       method: "GET",
       signal: abortController.signal,
       headers: { Accept: "text/event-stream" },
       onEvent({ event, data }) {
         markStreamHealthy();
-        if (!NON_REFRESH_WORKSPACE_EVENTS.has(event)) {
-          onWorkspaceEvent({ type: event, ...data });
-          if (shouldRefreshWorkspacePageForEvent(event)) {
-            void refreshWorkspacePage();
-          }
+        if (STREAM_NOOP_EVENTS.has(event)) return;
+        const envelope = { type: event, ...data } as TaskWorkspaceSseEvent;
+        if (isWorkspaceStateEvent(envelope)) {
+          applyStateEvent(envelope);
+          return;
+        }
+        onWorkspaceEvent(envelope);
+        if (shouldRefreshWorkspacePageForEvent(event)) {
+          void refreshWorkspacePage();
         }
       },
     }).then(() => {
@@ -160,7 +262,7 @@ function useTaskWorkspaceEventStream(
         reconnectTimerRef.current = null;
       }
     };
-  }, [clearStaleTimer, markStreamHealthy, onWorkspaceEvent, refreshWorkspacePage, scheduleStreamReconnect, streamRetryKey, taskId]);
+  }, [applyStateEvent, clearStaleTimer, markStreamHealthy, onWorkspaceEvent, refreshWorkspacePage, scheduleStreamReconnect, streamRetryKey, taskId, workBlockId]);
 
   return isStreamHealthy;
 }
@@ -177,7 +279,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     if (!doc) throw new Error("Task workspace header document is missing from command center payload.");
     return doc;
   });
-  const headerStoreRef = useRef<StateStore>(createStateStore(
+  const [headerStore] = useState<StateStore>(() => createStateStore(
     initialData.commandCenter?.documents.header?.state ?? {},
   ));
   const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
@@ -193,11 +295,14 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const pageData = pageQuery.data;
 
   useEffect(() => {
+    return bindTaskPlanSessionToStateStore(taskId, selectedWorkBlockId, headerStore);
+  }, [headerStore, selectedWorkBlockId, taskId]);
+
+  useEffect(() => {
     if (initialDataRef.current === initialData) return;
     initialDataRef.current = initialData;
     queryClient.setQueryData(pageQueryKey, initialData);
   }, [initialData, pageQueryKey, queryClient]);
-
   const refreshWorkspace = useCallback(async (_options: RefreshOptions = {}) => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: pageQueryKey }),
@@ -219,23 +324,24 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     });
   }, [initialData, pageQueryKey, queryClient]);
   const handleWorkspaceEvent = useCallback((event: TaskWorkspaceSseEvent) => {
-    if (event.type === "spec.patch") {
-      if (event.document === "header" && Array.isArray(event.patches)) {
-        const patches = event.patches as Array<{ op: string; path: string; value?: unknown; from?: string }>;
-        setHeaderSpec((prev) => {
-          const next = structuredClone(prev) as typeof prev;
-          for (const patch of patches) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            applySpecPatch(next as any, patch as any);
-          }
-          return next;
-        });
-      }
+    if (isHeaderSpecPatchEvent(event)) {
+      const patches = event.patches;
+      setHeaderSpec((prev) => {
+        const next = structuredClone(prev) as unknown as Spec;
+        for (const patch of patches) {
+          applySpecPatch(next, patch satisfies JsonPatch);
+        }
+        return next as unknown as UiDocument;
+      });
       return;
     }
     setWorkspaceEvents((current) => [...current.slice(-199), event]);
   }, []);
-  useTaskWorkspaceEventStream(taskId, refreshWorkspacePage, handleWorkspaceEvent);
+  const applyStateEvent = useCallback((event: TaskWorkspaceSseEvent) => {
+    if (!isWorkspaceStateEvent(event)) return;
+    applyStateEventToStore(headerStore, event);
+  }, [headerStore]);
+  const isStreamHealthy = useTaskWorkspaceEventStream(taskId, refreshWorkspacePage, handleWorkspaceEvent, applyStateEvent, selectedWorkBlockId);
 
   // When a full refresh completes, replace the local spec with the authoritative server spec.
   const prevPageDataRef = useRef(pageQuery.data);
@@ -255,7 +361,10 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   }, [selectedWorkBlockKey]);
 
   useEffect(() => {
-    if (!isWorkspaceActive(pageData)) {
+    // Fallback poll is the safety net for an unhealthy SSE stream. When the stream
+    // is healthy, server-pushed state.update / spec.patch / task_workspace_updated
+    // events keep the workspace in sync; the periodic refresh is wasted bandwidth.
+    if (!isWorkspaceActive(pageData) || isStreamHealthy) {
       return;
     }
 
@@ -264,7 +373,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     }, FALLBACK_REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [pageData, refreshWorkspace]);
+  }, [isStreamHealthy, pageData, refreshWorkspace]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -272,7 +381,6 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
         void refreshWorkspace({ silent: true });
       }
     };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [refreshWorkspace]);
@@ -284,6 +392,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     isRefreshing: pageQuery.isFetching,
     workspaceEvents,
     headerSpec,
-    headerStore: headerStoreRef.current,
+    headerStore,
+    stateStore: headerStore,
   };
 }

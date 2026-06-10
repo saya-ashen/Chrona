@@ -299,45 +299,85 @@ async function ensureHydrated(taskId: string, workBlockId?: string | null) {
   return entry.hydratePromise;
 }
 
-function ensureActiveSubscription(taskId: string, workBlockId?: string | null) {
-  const key = sessionKey(taskId, workBlockId);
-  const entry = getEntry(key);
-  if (entry.activeSubscriptionController || entry.streamController || entry.state.sessionStatus !== "running") {
-    return;
-  }
+type StateStoreBinding = {
+  store: import("@json-render/core").StateStore;
+  unsubscribe: () => void;
+};
 
-  const controller = new AbortController();
-  entry.activeSubscriptionController = controller;
+const storeBindingsByKey = new Map<string, StateStoreBinding>();
 
-  void fetchJsonEventSource(`/api/tasks/${taskId}/plan/generations/active/events${workBlockQuery(workBlockId)}`, {
-    method: "GET",
-    headers: { Accept: "text/event-stream" },
-    signal: controller.signal,
-    onEvent({ event, data }) {
-      applyStreamEvent(key, event, data);
-    },
-  }).catch((error) => {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return;
+/**
+ * Bind a task-plan session to a workspace `StateStore`. The session store
+ * mirrors `/plan/*` paths from the store into its reducer-driven state
+ * (`sessionStatus`, `phase`, `partialText`, etc.) and returns an
+ * unsubscribe function. Used by the task workspace to consolidate runtime
+ * state through a single SSE instead of opening a second stream per task.
+ */
+export function bindTaskPlanSessionToStateStore(
+  taskId: string,
+  workBlockId: string | null | undefined,
+  store: import("@json-render/core").StateStore,
+): () => void {
+  const key = sessionKey(taskId, workBlockId ?? null);
+  const existing = storeBindingsByKey.get(key);
+  existing?.unsubscribe();
+  const listener = () => {
+    const snapshot = store.getSnapshot();
+    applyStateSnapshotToSession(key, snapshot);
+  };
+  const unsubscribe = store.subscribe(listener);
+  // Seed immediately so the first render after bind is consistent.
+  listener();
+  const binding: StateStoreBinding = { store, unsubscribe };
+  storeBindingsByKey.set(key, binding);
+  return () => {
+    const current = storeBindingsByKey.get(key);
+    if (current === binding) {
+      current.unsubscribe();
+      storeBindingsByKey.delete(key);
     }
-    patchState(key, (state) => ({
+  };
+}
+
+type AiPlanGenerationStatus = "accepted" | "generating" | "idle" | "waiting_acceptance";
+
+function applyStateSnapshotToSession(key: string, snapshot: Record<string, unknown>) {
+  const get = (path: string): unknown => (path in snapshot ? snapshot[path] : undefined);
+  const planStatus = (get("/plan/status") as AiPlanGenerationStatus | null | undefined) ?? null;
+  const generationId = (get("/plan/generation/id") as string | null | undefined) ?? null;
+  const phase = (get("/plan/generation/phase") as TaskPlanSessionState["phase"] | null | undefined) ?? null;
+  const partialText = (get("/plan/generation/partialText") as string | null | undefined) ?? "";
+  const statusMessage = (get("/plan/generation/statusMessage") as string | null | undefined) ?? null;
+  const errorMessage = (get("/plan/generation/error/message") as string | null | undefined) ?? null;
+  const errorCode = (get("/plan/generation/error/code") as GeneratePlanErrorCode | null | undefined) ?? null;
+  const generationStatus = (get("/plan/generation/status") as TaskPlanSessionState["sessionStatus"] | null | undefined) ?? null;
+
+  patchState(key, (state) => {
+    const nextSessionStatus: TaskPlanSessionState["sessionStatus"] = planStatus === "generating"
+      ? "running"
+      : planStatus === "accepted"
+        ? "completed"
+        : planStatus === null
+          ? state.sessionStatus
+          : (generationStatus ?? "idle");
+    return {
       ...state,
-      connected: false,
-      error: error instanceof Error ? error.message : "Failed to subscribe to active plan generation",
-      errorCode: state.errorCode,
+      generationId: generationId ?? state.generationId,
+      sessionStatus: nextSessionStatus,
+      isLoading: nextSessionStatus === "running",
+      phase: phase ?? (nextSessionStatus === "completed" ? "done" : nextSessionStatus === "failed" ? "error" : state.phase),
+      statusMessage,
+      partialText: partialText ?? state.partialText,
+      error: errorMessage ?? state.error,
+      errorCode: errorCode ?? state.errorCode,
+      connected: true,
       hydrated: true,
-    }));
-  }).finally(() => {
-    const current = getEntry(key);
-    if (current.activeSubscriptionController === controller) {
-      current.activeSubscriptionController = null;
-    }
+    };
   });
 }
 
 export async function hydrateTaskPlanGenerationSession(taskId: string, workBlockId?: string | null) {
   await ensureHydrated(taskId, workBlockId);
-  ensureActiveSubscription(taskId, workBlockId);
 }
 
 export async function startTaskPlanGenerationSession(input: {
@@ -409,8 +449,6 @@ export async function startTaskPlanGenerationSession(input: {
         // Leave current state in place when reconciliation fetch fails.
       }
     }
-
-    ensureActiveSubscription(taskId, workBlockId);
   }
 }
 

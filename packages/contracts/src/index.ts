@@ -89,6 +89,12 @@ export { TASK_PRIORITIES, TASK_STATUSES } from "./task";
 
 export type { AutomationTimingPreset } from "./automation-timing";
 
+export type {
+  StateModel as TaskWorkspaceStateModel,
+  TaskWorkspaceStateSnapshotEvent,
+  TaskWorkspaceStateUpdateEvent,
+} from "./task-workspace-state";
+
 export {
   AUTOMATION_TIMING_PRESETS,
   DEFAULT_AUTOMATION_TIMING,

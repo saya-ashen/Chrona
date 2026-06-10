@@ -1,6 +1,12 @@
 export { createChronaEngine } from "./engine";
 export type { ChronaEngine } from "./engine";
-export { appendTaskWorkspaceEvent, subscribeToTaskProjectionEvents } from "./modules/projections";
+export {
+  appendTaskWorkspaceEvent,
+  publishTaskStateSnapshot,
+  publishTaskStateUpdate,
+  publishTaskWorkspaceUpdatedEvent,
+  subscribeToTaskProjectionEvents,
+} from "./modules/projections";
 export { startAutoPlanGenerationForTask } from "./modules/plans/auto-generate-task-plan";
 export type { TaskProjectionEvent, SpecPatch } from "./modules/projections";
 export type {
