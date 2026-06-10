@@ -277,6 +277,10 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
   const taskId = initialData.task.id;
   const selectedWorkBlockId = initialData.task.currentWorkBlock?.id ?? null;
   const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
+  // The header state store is per-occurrence. A fresh occurrence must not
+  // inherit the prior occurrence's SSE-applied pointer paths, so it is
+  // re-created on the same work-block-key transition that swaps the spec.
+  const [headerStore, setHeaderStore] = useState<StateStore>(() => createStateStore({}));
   const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const initialDataRef = useRef(initialData);
   // Header spec and header state store are initialized once from the
@@ -291,7 +295,6 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     if (!doc) throw new Error("Task workspace header spec is missing from header payload.");
     return doc;
   });
-  const [headerStore] = useState<StateStore>(() => createStateStore({}));
   const [workspaceEvents, setWorkspaceEvents] = useState<TaskWorkspaceSseEvent[]>([]);
   const pageQueryKey = useMemo(
     () => taskWorkspaceQueryKeys.page(taskId, selectedWorkBlockId),
@@ -373,12 +376,26 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     if (previousWorkBlockKeyRef.current === selectedWorkBlockKey) return;
     previousWorkBlockKeyRef.current = selectedWorkBlockKey;
     setWorkspaceEvents([]);
-  }, [selectedWorkBlockKey]);
-
+    // The loader hands us a new `initialData` for the new occurrence. Reset
+    // the header spec and clear the header state store so the previous
+    // occurrence's locally-patched spec fragments and SSE-applied
+    // pointer-paths do not bleed into the new header. Without this the
+    // header card keeps showing the prior occurrence's status, action
+    // disabled flags, and plan generation session state across the switch.
+    const nextHeaderSpec = initialData.header?.spec;
+    if (!nextHeaderSpec) {
+      throw new Error("Task workspace header spec is missing from header payload.");
+    }
+    setHeaderSpec(nextHeaderSpec);
+    // Re-create the store so the prior occurrence's pointer paths are dropped
+    // entirely (the StateStore API exposes `set`/`update` but no key delete).
+    setHeaderStore(createStateStore({}));
+  }, [initialData, selectedWorkBlockKey]);
   useEffect(() => {
-    // Fallback poll is the safety net for an unhealthy SSE stream. When the stream
-    // is healthy, server-pushed state.update / spec.patch / task_workspace_updated
-    // events keep the workspace in sync; the periodic refresh is wasted bandwidth.
+    // Fallback poll is the safety net for an unhealthy SSE stream. When the
+    // stream is healthy, server-pushed state.update / spec.patch /
+    // task_workspace_updated events keep the workspace in sync; the periodic
+    // refresh is wasted bandwidth.
     if (!isWorkspaceActive(pageData) || isStreamHealthy) {
       return;
     }
