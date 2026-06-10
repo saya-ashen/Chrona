@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
-import { appendTaskWorkspaceEvent, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
+import { appendTaskWorkspaceEvent, publishTaskStateUpdate, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
 import { workCommandBodySchema, workProjectionParamSchema } from "@chrona/contracts/api";
 import type { GeneratePlanSSEEvent } from "@chrona/contracts";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
@@ -32,13 +32,13 @@ function publishCommandEvent(input: {
   workBlockId?: string | null;
 }) {
   appendTaskWorkspaceEvent({
-    type: input.type,
     taskId: input.taskId,
     workspaceId: input.workspaceId,
     commandId: input.commandId,
     commandType: input.commandType,
-    message: input.message,
+    type: input.type,
     workBlockId: input.workBlockId,
+    ...(input.message ? { message: input.message } : {}),
   });
 }
 function commandWorkBlockId(command: ReturnType<typeof workCommandBodySchema.parse>) {
@@ -70,6 +70,89 @@ function publishWorkspaceTrigger(input: {
   [key: string]: unknown;
 }) {
   appendTaskWorkspaceEvent(input);
+}
+
+function resetGeneratePlanActionPatch(input: {
+  taskId: string;
+  workspaceId: string;
+  workBlockId: string | null;
+}) {
+  appendTaskWorkspaceEvent({
+    type: "spec.patch",
+    document: "header",
+    taskId: input.taskId,
+    workspaceId: input.workspaceId,
+    workBlockId: input.workBlockId,
+    patches: [
+      { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan" },
+      { op: "remove", path: "/elements/action:generate-plan/props/disabled" },
+    ],
+  });
+}
+
+/**
+ * Build the initial state payload pushed on SSE connect. The shape is a
+ * flat `Record<string, unknown>` keyed by JSON Pointer paths, matching
+ * `StateStore.update` from `@json-render/core`. New state paths must be
+ * declared here AND registered as `$state` expressions in the consuming
+ * spec elements.
+ */
+async function buildTaskWorkspaceStateSnapshot(
+  engine: ChronaEngine,
+  input: { taskId: string; workBlockId: string | null },
+): Promise<Record<string, unknown>> {
+  const state = await engine.tasks.plan.getState({
+    taskId: input.taskId,
+    workBlockId: input.workBlockId,
+  });
+  const session = state.generationSession;
+  return {
+    "/plan/status": state.aiPlanGenerationStatus,
+    "/plan/saved/id": state.savedPlan?.id ?? null,
+    "/plan/saved/status": state.savedPlan?.status ?? null,
+    "/plan/saved/revision": state.savedPlan?.revision ?? null,
+    "/plan/generation/id": session?.generationId ?? null,
+    "/plan/generation/status": session?.status ?? null,
+    "/plan/generation/phase": session?.phase ?? null,
+    "/plan/generation/partialText": session?.partialText ?? "",
+    "/plan/generation/statusMessage": session?.statusMessage ?? null,
+    "/plan/generation/error/message": session?.error?.message ?? null,
+    "/plan/generation/error/code": session?.error?.code ?? null,
+  };
+}
+
+/**
+ * Project a single plan-generation SSE event into a `state.update`
+ * payload. Returns `null` when the event has no state-bearing meaning
+ * for the workspace UI (e.g. `ready`, `heartbeat`).
+ */
+function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, unknown> | null {
+  switch (event.type) {
+    case "status":
+      return {
+        "/plan/generation/phase": event.phase,
+        "/plan/generation/statusMessage": event.message,
+      };
+    case "tool_call":
+      return {
+        "/plan/generation/lastTool": event.tool,
+        "/plan/generation/lastToolAt": new Date().toISOString(),
+      };
+    case "partial":
+      return { "/plan/generation/partialText": event.text };
+    case "result":
+      return {
+        "/plan/saved/id": event.result.id,
+        "/plan/saved/status": event.result.status,
+        "/plan/saved/revision": event.result.revision,
+        "/plan/generation/status": "completed",
+      };
+    case "cancelled":
+    case "done":
+      return { "/plan/generation/status": event.type };
+    default:
+      return null;
+  }
 }
 
 async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
@@ -108,41 +191,42 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         forceRefresh: command.forceRefresh ?? true,
         userInstruction: command.userInstruction ?? undefined,
       });
-      let planGenerationFailed = false;
       for await (const event of generation.events) {
         generation.emit(event);
-        publishWorkspaceTrigger({
-          taskId,
-          workspaceId,
-          commandId,
-          type: "plan.generation.event",
-          eventKind: event.type,
-          generationId: generation.generationId,
-          workBlockId,
-          ...planGenerationWorkspacePayload(event),
-        });
-        if (event.type === "error") {
-          planGenerationFailed = true;
-          appendTaskWorkspaceEvent({
-            type: "spec.patch",
-            document: "header",
+        // The plan stream is now driven exclusively through `state.update`:
+        // each event type maps to a flat JSON Pointer path the client
+        // StateProvider applies to the header store. The legacy
+        // `plan.generation.event` trigger is intentionally not emitted —
+        // its consumers (activity timeline, plan sidebar) read the same
+        // data either from the StateProvider snapshot or the canonical
+        // DB event log via REST hydration.
+        const stateUpdate = planGenerationStateUpdate(event);
+        if (stateUpdate) {
+          publishTaskStateUpdate({
             taskId,
             workspaceId,
             workBlockId,
-            patches: [
-              { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan" },
-              { op: "remove", path: "/elements/action:generate-plan/props/disabled" },
-            ],
+            updates: stateUpdate,
           });
         }
       }
       generation.finish();
+      // Always restore the header action to its idle state once the
+      // generation stream closes — success, error, and cancel all leave the
+      // button in a "Generate plan" / enabled state so the user can retry.
+      resetGeneratePlanActionPatch({ taskId, workspaceId, workBlockId });
+      // Single terminal `task_workspace_updated` for the whole plan stream
+      // so the client can refresh the REST snapshot (savedPlan on success,
+      // error state on failure). Intermediate `plan.generation.status` /
+      // `tool.called` / `started` events are deliberately not broadcast —
+      // their UI state already flows through `state.update` events emitted
+      // in the for-await loop above.
       appendTaskWorkspaceEvent({
         type: "task_workspace_updated",
         taskId,
         workspaceId,
         workBlockId,
-        reason: planGenerationFailed ? "plan.generation.failed" : "plan.generated",
+        reason: "plan.generation.finished",
         updatedAt: new Date().toISOString(),
       });
       return;
@@ -152,7 +236,6 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
       await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
       return;
     }
-
     if (command.type === "execution.action") {
       const action = {
         ...command,
@@ -242,17 +325,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
       message: httpError?.message ?? (cause instanceof Error ? cause.message : "Workspace command failed"),
     });
     if (command.type === "plan.generate") {
-      appendTaskWorkspaceEvent({
-        type: "spec.patch",
-        document: "header",
-        taskId,
-        workspaceId,
-        workBlockId,
-        patches: [
-          { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan" },
-          { op: "remove", path: "/elements/action:generate-plan/props/disabled" },
-        ],
-      });
+      resetGeneratePlanActionPatch({ taskId, workspaceId, workBlockId });
     }
   }
 }
@@ -300,6 +373,7 @@ export function createWorkRoutes(engine: ChronaEngine) {
     )
     .get("/work/:taskId/events", zValidator("param", workProjectionParamSchema), async (c) => {
       const { taskId } = c.req.valid("param");
+      const workBlockId = c.req.query("workBlockId") ?? null;
 
       return streamSSE(c, async (stream) => {
         let writeQueue = Promise.resolve();
@@ -320,6 +394,17 @@ export function createWorkRoutes(engine: ChronaEngine) {
         const writeEvent = (event: TaskProjectionEvent) => writeQueued(() => writeWorkEvent(stream, event));
         const writeHeartbeat = () => writeQueued(async () => {
           await stream.writeSSE({ event: "heartbeat", data: "{}" });
+        });
+        const writeSnapshot = (state: Record<string, unknown>) => writeQueued(async () => {
+          const workspaceId = await getWorkspaceId(engine, taskId);
+          const event = appendTaskWorkspaceEvent({
+            type: "state.snapshot",
+            taskId,
+            workspaceId,
+            workBlockId,
+            state,
+          });
+          await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
         let isClosed = false;
         let resolveClosed: (() => void) | null = null;
@@ -347,6 +432,8 @@ export function createWorkRoutes(engine: ChronaEngine) {
         });
 
         try {
+          const snapshot = await buildTaskWorkspaceStateSnapshot(engine, { taskId, workBlockId });
+          await writeSnapshot(snapshot);
           await writeQueued(() => stream.writeSSE({ event: "ready", data: JSON.stringify({ taskId }) }));
           await writeHeartbeat();
           await Promise.race([closed, heartbeatLoop()]);

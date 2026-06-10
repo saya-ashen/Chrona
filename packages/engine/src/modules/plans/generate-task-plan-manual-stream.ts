@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { aiGeneratePlanStream } from "@/modules/ai";
 import { appendCanonicalEvent } from "@/modules/events";
-import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 import { ensurePlanGenerationTaskSession, ensureWorkBlockPlanTaskSession, resolveExecutionRuntime } from "@/modules/execution-runtime";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { updateLatestCompiledPlanPrompt } from "@/modules/plan-execution/persistence/compiled-plan-store";
@@ -138,12 +137,10 @@ async function recordPlanGenerationEvent(input: {
       input.dedupeSuffix,
     ].filter(Boolean).join(":"),
   });
-  publishTaskWorkspaceUpdatedEvent({
-    taskId: input.task.id,
-    workspaceId: input.task.workspaceId,
-    workBlockId: input.workBlockId,
-    reason: `plan_generation.${input.type}`,
-  });
+  // Workspace-level `task_workspace_updated` is broadcast by the route
+  // handler (work.routes plan.generate) on stream finish, not here. The
+  // canonical event log row is enough for activity-feed hydration; the
+  // route owns the single terminal workspace update.
 }
 
 async function recordPlanGenerationStatus(input: {
