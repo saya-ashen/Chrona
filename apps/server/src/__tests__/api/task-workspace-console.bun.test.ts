@@ -154,12 +154,15 @@ describe("task workspace console read data", () => {
     expect(body).not.toHaveProperty("artifacts");
     expect(body).not.toHaveProperty("activityTimeline");
     expect(body).not.toHaveProperty("ui");
+    // Header spec now lives on its own endpoint
+    // (`GET /api/tasks/:taskId/workspace/header`) — command-center returns
+    // only the 3 right-pane documents.
     expect(body.documents).toMatchObject({
-      header: { root: "root", elements: expect.any(Object) },
       now: { root: "root", elements: expect.any(Object) },
       output: { root: "root", elements: expect.any(Object) },
       trail: { root: "root", elements: expect.any(Object) },
     });
+    expect(body.documents).not.toHaveProperty("header");
   });
 
   it("returns command center Trail items from persisted database activity", async () => {
@@ -408,5 +411,43 @@ describe("task workspace console read data", () => {
       description: "Generated plan",
       tone: "success",
     }));
+  });
+
+  it("returns a header json-render document for the dedicated workspace/header endpoint", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Header");
+    const { taskId } = await seedTask(workspaceId, { title: "Header doc task" });
+
+    const response = await app().request(`/api/tasks/${taskId}/workspace/header`);
+    expect(response.status).toBe(200);
+
+    const body = await json<Record<string, unknown>>(response);
+    expect(Object.keys(body).sort()).toEqual(["spec"]);
+    expect(body).not.toHaveProperty("documents");
+    expect(body.spec).toMatchObject({
+      root: expect.any(String),
+      elements: expect.any(Object),
+    });
+  });
+
+  it("404s the header endpoint for unknown task ids", async () => {
+    const response = await app().request("/api/tasks/missing-task/workspace/header");
+    expect(response.status).toBe(404);
+  });
+
+  it("scopes the header spec to the requested work block", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Header Scoped");
+    const { taskId } = await seedTask(workspaceId, { title: "Scoped header" });
+
+    const unscoped = await app().request(`/api/tasks/${taskId}/workspace/header`);
+    const scoped = await app().request(`/api/tasks/${taskId}/workspace/header?workBlockId=missing`);
+    expect(unscoped.status).toBe(200);
+    expect(scoped.status).toBe(200);
+    // The two responses have the same shape; the seedTask helper does
+    // not create a second work block, so the two payloads are
+    // byte-identical here — the assertion is that the route does not
+    // 500 when an unknown work block is requested.
+    const a = await json<Record<string, unknown>>(unscoped);
+    const b = await json<Record<string, unknown>>(scoped);
+    expect(Object.keys(a).sort()).toEqual(Object.keys(b).sort());
   });
 });

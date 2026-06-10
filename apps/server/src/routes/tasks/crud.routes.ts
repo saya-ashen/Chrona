@@ -193,6 +193,18 @@ export function createTasksRoutes(engine: ChronaEngine) {
       ),
     )
     .get(
+      "/tasks/:taskId/workspace/header",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(
+        c,
+        "GET /api/tasks/:taskId/workspace/header",
+        () => engine.tasks.getHeaderSpec({
+          taskId: c.req.valid("param").taskId,
+          workBlockId: c.req.query("workBlockId") ?? null,
+        }),
+      ),
+    )
+    .get(
       "/tasks/:taskId",
       zValidator("param", taskDetailParamSchema),
       async (c) => {
