@@ -7,7 +7,6 @@ import {
   listExecutionRuntimes,
 } from "@/modules/execution-runtime";
 import { deriveTaskRunnability } from "@chrona/shared";
-import { buildCommandCenterArtifactsSpec, buildCommandCenterTrailSpec } from "@chrona/ui-protocol";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
@@ -350,21 +349,5 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     })),
     artifacts,
     activityTimeline,
-    ui: {
-      commandCenter: {
-        artifactsSpec: buildCommandCenterArtifactsSpec({ artifacts }),
-        trailSpec: buildCommandCenterTrailSpec({
-          activity: activityTimeline,
-          savedCount: activityTimeline.length,
-          toolLabels: {
-            tool: "Tool",
-            input: "Input",
-            preview: "Preview",
-            duration: "Duration",
-            error: "Error",
-          },
-        }),
-      },
-    },
   };
 }

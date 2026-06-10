@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
+import { buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderSpecInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
@@ -111,21 +111,21 @@ function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAc
 }
 
 type BuildHeaderSpecInput = {
-  task: NonNullable<Awaited<ReturnType<typeof loadHeaderTaskView>>>;
-  recurrenceSeriesTasks: Array<Pick<NonNullable<Awaited<ReturnType<typeof loadHeaderTaskView>>>, "id" | "title" | "status" | "workBlocks">>;
+  task: HeaderTaskView;
+  recurrenceSeriesTasks: Array<Pick<HeaderTaskView, "id" | "title" | "status" | "workBlocks">>;
   currentExecution: Awaited<ReturnType<typeof getCurrentExecution>>;
   savedPlan: Awaited<ReturnType<typeof getLatestTaskPlanReadModel>>;
   workBlockId: string | null;
 };
 
 /**
- * Pure transformer: header task view + current execution + saved plan →
- * header `UiDocument`. Called by `getTaskHeaderSpec` (the dedicated use case
- * for `GET /api/tasks/:taskId/workspace/header`).
+ * Pure aggregation: task view + execution + plan → `TaskHeaderSpecInput` (ViewModel).
+ * Accepts an optional `now` for deterministic testing; defaults to `new Date()`.
+ * Called by `buildHeaderSpecFromTask` and directly in tests.
  */
-export function buildHeaderSpecFromTask(input: BuildHeaderSpecInput) {
+export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?: Date }): TaskHeaderSpecInput {
   const { task, recurrenceSeriesTasks, currentExecution, savedPlan, workBlockId } = input;
-  const now = new Date();
+  const now = input.now ?? new Date();
   const currentWorkBlock = pickHeaderWorkBlock(task.workBlocks, workBlockId, now);
   const recurrenceOccurrences = [
     { id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks },
@@ -176,7 +176,7 @@ export function buildHeaderSpecFromTask(input: BuildHeaderSpecInput) {
   });
   actions.push({ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" });
 
-  return buildTaskHeaderSpec({
+  return {
     title: task.title,
     status,
     statusLabel: taskStatusLabel(status),
@@ -188,11 +188,16 @@ export function buildHeaderSpecFromTask(input: BuildHeaderSpecInput) {
     occurrenceValue: occurrenceValueCurrent,
     occurrenceOptions,
     actions,
-  });
+  };
 }
 
-async function loadRecurrenceSeriesTasks(task: NonNullable<Awaited<ReturnType<typeof loadHeaderTaskView>>>) {
-  if (!task.seriesExternalUid) return [] as Array<Pick<typeof task, "id" | "title" | "status" | "workBlocks">>;
+/** Pure transformer: raw inputs → header `UiDocument`. */
+export function buildHeaderSpecFromTask(input: BuildHeaderSpecInput): ReturnType<typeof buildTaskHeaderSpec> {
+  return buildTaskHeaderSpec(resolveTaskHeaderViewModel(input));
+}
+
+async function loadRecurrenceSeriesTasks(task: HeaderTaskView) {
+  if (!task.seriesExternalUid) return [] as Array<Pick<HeaderTaskView, "id" | "title" | "status" | "workBlocks">>;
   return db.task.findMany({
     where: {
       workspaceId: task.workspaceId,
