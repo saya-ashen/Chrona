@@ -59,6 +59,13 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task command center");
       }
     },
+    async getHeaderSpec(input: Parameters<typeof tasks.getHeaderSpec>[0]) {
+      try {
+        return await tasks.getHeaderSpec(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task header spec");
+      }
+    },
     async getActivityPage(input: Parameters<typeof tasks.getActivityPage>[0]) {
       try {
         return await tasks.getActivityPage(input);
