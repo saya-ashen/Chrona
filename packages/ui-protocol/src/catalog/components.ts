@@ -10,6 +10,9 @@ import {
   locateWorkspaceNodePayloadSchema,
   regeneratePlanPayloadSchema,
   submitCheckpointPayloadSchema,
+  recoveryRetryPayloadSchema,
+  recoveryEditInstructionPayloadSchema,
+  recoveryCancelPayloadSchema,
 } from "../actions/actions";
 
 const toneSchema = z
@@ -284,6 +287,18 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     [UI_ACTION.submitCheckpoint]: {
       params: submitCheckpointPayloadSchema,
       description: "Submit checkpoint form values (with an optional chosen action).",
+    },
+    [UI_ACTION.recoveryRetry]: {
+      params: recoveryRetryPayloadSchema,
+      description: "Retry the failed plan generation surfaced in the header error banner.",
+    },
+    [UI_ACTION.recoveryEditInstruction]: {
+      params: recoveryEditInstructionPayloadSchema,
+      description: "Open the plan regeneration instruction editor after a generation failure.",
+    },
+    [UI_ACTION.recoveryCancel]: {
+      params: recoveryCancelPayloadSchema,
+      description: "Dismiss the header error banner without retrying.",
     },
   },
 });

@@ -145,7 +145,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   elements.root = {
     type: "Card",
     props: { className: "relative z-30 min-w-0 overflow-visible rounded-[0.9rem] border-border/70 bg-card/90 p-2 shadow-sm backdrop-blur" },
-    children: ["layout"],
+    children: ["layout", "error-region"],
   };
   elements.layout = {
     type: "Stack",
@@ -162,5 +162,51 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   }
   elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "xs", align: "center", justify: "end", className: "w-full flex-wrap sm:w-auto" }, children: actionChildren };
 
+  // Inline error banner. Visibility + content are driven by `state.update`
+  // pushes on `/plan/generation/error/*` from the workspace SSE bus. The
+  // server picks which recovery buttons to enable by setting the matching
+  // `error/button*` flag; missing/disabled buttons hide themselves.
+  appendErrorRegion(elements);
+
   return { root: "root", elements, state: { headerOverflowAction: "" } };
+}
+
+function appendErrorRegion(elements: MutableElements) {
+  elements["error-region"] = {
+    type: "Stack",
+    props: { direction: "vertical", gap: "xs", className: "mt-2" },
+    visible: { $state: "/plan/generation/error/code" },
+    children: ["error-alert", "error-actions"],
+  };
+  elements["error-alert"] = {
+    type: "Alert",
+    props: {
+      title: { $state: "/plan/generation/error/code" },
+      message: { $state: "/plan/generation/error/message" },
+      type: "error",
+    },
+  };
+  elements["error-actions"] = {
+    type: "Stack",
+    props: { direction: "horizontal", gap: "xs", className: "flex-wrap" },
+    children: ["error-action-retry", "error-action-edit-instruction", "error-action-cancel"],
+  };
+  elements["error-action-retry"] = {
+    type: "Button",
+    props: { label: "Retry", variant: "primary", size: "sm" },
+    visible: { $state: "/plan/generation/error/buttonRetry" },
+    on: { press: { action: UI_ACTION.recoveryRetry, params: {} } },
+  };
+  elements["error-action-edit-instruction"] = {
+    type: "Button",
+    props: { label: "Edit instruction", variant: "secondary", size: "sm" },
+    visible: { $state: "/plan/generation/error/buttonEditInstruction" },
+    on: { press: { action: UI_ACTION.recoveryEditInstruction, params: {} } },
+  };
+  elements["error-action-cancel"] = {
+    type: "Button",
+    props: { label: "Dismiss", variant: "outline", size: "sm" },
+    visible: { $state: "/plan/generation/error/buttonCancel" },
+    on: { press: { action: UI_ACTION.recoveryCancel, params: {} } },
+  };
 }
