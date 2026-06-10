@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { randomUUID } from "node:crypto";
-import { appendTaskWorkspaceEvent, publishTaskStateUpdate, publishTaskWorkspaceUpdatedEvent, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
+import { appendTaskWorkspaceEvent, getCurrentExecution, headerExecutionStateToStatePaths, publishTaskStateUpdate, publishTaskWorkspaceUpdatedEvent, resolveHeaderExecutionState, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
 import { workCommandBodySchema, workProjectionParamSchema } from "@chrona/contracts/api";
 import type { GeneratePlanSSEEvent } from "@chrona/contracts";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
@@ -87,11 +87,26 @@ async function buildTaskWorkspaceStateSnapshot(
   engine: ChronaEngine,
   input: { taskId: string; workBlockId: string | null },
 ): Promise<Record<string, unknown>> {
-  const state = await engine.tasks.plan.getState({
-    taskId: input.taskId,
-    workBlockId: input.workBlockId,
-  });
+  const [state, currentExecution] = await Promise.all([
+    engine.tasks.plan.getState({
+      taskId: input.taskId,
+      workBlockId: input.workBlockId,
+    }),
+    getCurrentExecution({ taskId: input.taskId, workBlockId: input.workBlockId }),
+  ]);
   const session = state.generationSession;
+  const hasPlan = Boolean(state.savedPlan);
+  const hasAcceptedPlan = state.savedPlan?.status === "accepted";
+  // Surface the live execution state through the same `state.update`
+  // channel the spec reads from — the Start / Pause / Stop buttons in
+  // the header card bind their `visible` / `disabled` to these paths.
+  const executionState = resolveHeaderExecutionState({
+    executionStatus: currentExecution.status,
+    hasPlan,
+    hasAcceptedPlan,
+    isRunnable: currentExecution.status !== "no_plan",
+    startDisabledReason: deriveStartDisabledReason(currentExecution.status, hasPlan, hasAcceptedPlan),
+  });
   return {
     "/plan/status": state.aiPlanGenerationStatus,
     "/plan/saved/id": state.savedPlan?.id ?? null,
@@ -104,7 +119,65 @@ async function buildTaskWorkspaceStateSnapshot(
     "/plan/generation/statusMessage": session?.statusMessage ?? null,
     "/plan/generation/error/message": session?.error?.message ?? null,
     "/plan/generation/error/code": session?.error?.code ?? null,
+    ...headerExecutionStateToStatePaths(executionState),
   };
+}
+
+/**
+ * English-only reason the Start button is currently disabled. Mirrors
+ * the disabled-reason logic in `task-workspace-query.ts#buildTaskHeaderView`
+ * — kept verbatim on the server so the state store can be populated
+ * without round-tripping through the i18n module. The header card
+ * surfaces this string as the `title` tooltip on the disabled button;
+ * the page can re-translate it on the client if needed.
+ */
+function deriveStartDisabledReason(
+  executionStatus: string,
+  hasPlan: boolean,
+  hasAcceptedPlan: boolean,
+): string | null {
+  if (!hasPlan) return "Generate and accept a plan before starting execution.";
+  if (!hasAcceptedPlan) return "Accept the generated plan before starting execution.";
+  if (executionStatus === "no_plan") return "Generate and accept a plan before starting execution.";
+  if (executionStatus === "running") return "Task is already running.";
+  if (executionStatus === "waiting_for_user" || executionStatus === "waiting_for_approval") {
+    return "Task is waiting for checkpoint input.";
+  }
+  if (executionStatus === "blocked" || executionStatus === "failed") {
+    return "Resolve the blocker before starting execution.";
+  }
+  if (executionStatus === "completed" || executionStatus === "cancelled") {
+    return "Task is completed.";
+  }
+  return null;
+}
+
+/**
+ * Project the engine's post-execution-action state onto the JSON
+ * Pointer paths the header spec reads from. Returns `null` when the
+ * caller didn't supply the required state inputs (e.g. for a `command.failed`
+ * branch) so the SSE publisher can no-op cleanly.
+ */
+async function buildHeaderExecutionStateUpdate(input: {
+  engine: ChronaEngine;
+  taskId: string;
+  workBlockId: string | null;
+  executionStatus: string;
+}): Promise<Record<string, unknown> | null> {
+  const state = await input.engine.tasks.plan.getState({
+    taskId: input.taskId,
+    workBlockId: input.workBlockId,
+  });
+  const hasPlan = Boolean(state.savedPlan);
+  const hasAcceptedPlan = state.savedPlan?.status === "accepted";
+  const executionState = resolveHeaderExecutionState({
+    executionStatus: input.executionStatus,
+    hasPlan,
+    hasAcceptedPlan,
+    isRunnable: input.executionStatus !== "no_plan",
+    startDisabledReason: deriveStartDisabledReason(input.executionStatus, hasPlan, hasAcceptedPlan),
+  });
+  return headerExecutionStateToStatePaths(executionState);
 }
 
 /**
@@ -291,6 +364,26 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
           });
         },
       });
+      // After the dispatch settles, push the post-action execution
+      // state onto the workspace header state store so the Start /
+      // Pause / Stop buttons in the spec re-render without waiting
+      // for a follow-up page refetch. `state.update` is a
+      // workspace-state event the SSE handler already routes through
+      // the StateProvider — it does not trigger a workspace refresh.
+      const headerStateUpdate = await buildHeaderExecutionStateUpdate({
+        engine,
+        taskId,
+        workBlockId: commandWorkBlockId(command),
+        executionStatus: result.status,
+      });
+      if (headerStateUpdate) {
+        publishTaskStateUpdate({
+          taskId,
+          workspaceId,
+          workBlockId: commandWorkBlockId(command),
+          updates: headerStateUpdate,
+        });
+      }
       publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "execution.result", eventKind: result.status });
       return;
     }
@@ -328,6 +421,23 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "execution.state.updated", eventKind: "state" });
       },
     });
+    // Push the post-checkpoint execution state onto the header
+    // state store so the action buttons re-render in lockstep
+    // with the runtime — same contract as `execution.action`.
+    const headerStateUpdate = await buildHeaderExecutionStateUpdate({
+      engine,
+      taskId,
+      workBlockId: commandWorkBlockId(command),
+      executionStatus: result.execution.status,
+    });
+    if (headerStateUpdate) {
+      publishTaskStateUpdate({
+        taskId,
+        workspaceId,
+        workBlockId: commandWorkBlockId(command),
+        updates: headerStateUpdate,
+      });
+    }
     publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "checkpoint.result", eventKind: result.execution.status });
   } catch (cause) {
     const httpError = toHttpError(cause);

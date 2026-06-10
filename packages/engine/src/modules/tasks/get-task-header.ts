@@ -123,6 +123,74 @@ function occurrenceLabel(input: { title: string; status: string; start: Date | n
   return window ? `${window} · ${input.status}` : `${input.title} · ${input.status}`;
 }
 
+export type HeaderExecutionState = {
+  hasPlan: boolean;
+  hasAcceptedPlan: boolean;
+  isRunnable: boolean;
+  executionStatus: string;
+  canStart: boolean;
+  canPause: boolean;
+  canStop: boolean;
+  showAcceptPlan: boolean;
+  showGeneratePlan: boolean;
+  startDisabled: boolean;
+  startDisabledReason: string | null;
+};
+
+export function resolveHeaderExecutionState(input: {
+  executionStatus: string;
+  hasPlan: boolean;
+  hasAcceptedPlan: boolean;
+  isRunnable: boolean;
+  startDisabledReason?: string | null;
+}): HeaderExecutionState {
+  const terminal = input.executionStatus === "completed" || input.executionStatus === "cancelled";
+  const running = input.executionStatus === "running";
+  const stoppable = running
+    || input.executionStatus === "waiting_for_user"
+    || input.executionStatus === "waiting_for_approval"
+    || input.executionStatus === "blocked"
+    || input.executionStatus === "failed";
+  const showStart = !terminal && !running && !stoppable && input.hasAcceptedPlan;
+  return {
+    hasPlan: input.hasPlan,
+    hasAcceptedPlan: input.hasAcceptedPlan,
+    isRunnable: input.isRunnable,
+    executionStatus: input.executionStatus,
+    canStart: showStart,
+    canPause: running,
+    canStop: stoppable,
+    showAcceptPlan: input.hasPlan && !input.hasAcceptedPlan,
+    showGeneratePlan: !input.hasPlan,
+    startDisabled: !input.isRunnable,
+    startDisabledReason: input.startDisabledReason ?? null,
+  };
+}
+
+/**
+ * Project a `HeaderExecutionState` onto the JSON Pointer paths the
+ * header `UiDocument` reads from the client state store. The
+ * `state.snapshot` SSE event pushes these on connect; subsequent
+ * `state.update` events carry the same shape after every state
+ * transition. The keys are kept in sync with the `$state` references
+ * emitted by `buildTaskHeaderSpec`.
+ */
+export function headerExecutionStateToStatePaths(state: HeaderExecutionState): Record<string, unknown> {
+  return {
+    "/execution/can-start": state.canStart,
+    "/execution/can-pause": state.canPause,
+    "/execution/can-stop": state.canStop,
+    "/execution/show-accept-plan": state.showAcceptPlan,
+    "/execution/show-generate-plan": state.showGeneratePlan,
+    "/execution/start-disabled": state.startDisabled,
+    "/execution/start-disabled-reason": state.startDisabledReason,
+    "/execution/status": state.executionStatus,
+    "/execution/has-plan": state.hasPlan,
+    "/execution/has-accepted-plan": state.hasAcceptedPlan,
+    "/execution/is-runnable": state.isRunnable,
+  };
+}
+
 function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAcceptedPlan: boolean; isRunnable: boolean }): TaskHeaderActionInput[] {
   if (!input.hasPlan) return [{ id: "generate-plan", label: "Generate plan" }];
   if (!input.hasAcceptedPlan) return [{ id: "accept-plan", label: "Accept plan" }];
@@ -134,7 +202,6 @@ function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAc
   if (["waiting_for_user", "waiting_for_approval", "blocked", "failed"].includes(input.executionStatus)) return [{ id: "stop", label: "Stop" }];
   return [{ id: "start", label: "Start", disabled: !input.isRunnable, disabledReason: input.isRunnable ? undefined : "Task is not runnable." }];
 }
-
 type BuildHeaderSpecInput = {
   task: HeaderTaskView;
   recurrenceSeriesTasks: Array<Pick<HeaderTaskView, "id" | "title" | "status" | "workBlocks">>;

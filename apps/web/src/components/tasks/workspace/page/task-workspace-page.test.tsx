@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   canAcceptPlan: false,
   setPageContext: vi.fn(),
   navigate: vi.fn(),
+  // Per-test overrides for the `/execution/can-*` state paths the
+  // mock header card consults to compute the visible primary action.
+  executionState: {} as Record<string, unknown>,
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -67,12 +70,17 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () =
     isRefreshing: false,
     workspaceEvents: [],
     headerSpec: data.header?.spec ?? createHeaderSpecFixture({ title: data.task.title }),
+    // Per-test overrides for the `/execution/can-*` state paths the
+    // mock header card consults to compute the visible primary action.
+    // Tests that want to assert a particular "running" / "completed"
+    // state can seed these via `mocks.executionState = { ... }`.
+    executionState: {} as Record<string, unknown>,
     headerStore: {
-      get: vi.fn(),
+      get: (path: string) => mocks.executionState[path],
       set: vi.fn(),
       update: vi.fn(),
-      getSnapshot: () => ({}),
-      getServerSnapshot: () => ({}),
+      getSnapshot: () => mocks.executionState,
+      getServerSnapshot: () => mocks.executionState,
       subscribe: () => vi.fn(),
     },
   }),
@@ -121,12 +129,28 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () 
 }));
 
 vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
-  TaskWorkspaceHeaderCard: ({ task, spec }: { task: TaskPageData["task"]; spec: UiDocument }) => {
+  TaskWorkspaceHeaderCard: ({ task, spec, store }: { task: TaskPageData["task"]; spec: UiDocument; store?: { get: (path: string) => unknown } }) => {
     const elements = spec.elements;
     const statusText = elements["badge:primary-state"]?.props?.text;
     const actionEntries = Object.entries(elements).filter(([key]) => key.startsWith("action:"));
+    // In the state-driven header architecture every execution action
+    // element exists in the spec — visibility is bound to `/execution/can-*`
+    // state paths that the renderer consults via the store. The mock
+    // re-implements that resolution locally so the test can assert the
+    // "primary" action the user would actually see for the current
+    // state, instead of just the first element in the spec.
+    const isActionVisible = (element: { visible?: unknown }): boolean => {
+      const v = element.visible;
+      if (!v || typeof v !== "object") return true;
+      const ref = (v as { $state?: string }).$state;
+      if (!ref) return true;
+      return Boolean(store?.get(ref));
+    };
+    const visibleActions = actionEntries.filter(([, element]) => isActionVisible(element));
+    const firstVisibleLabel = visibleActions
+      .map(([, element]) => element.props?.label)
+      .find((label): label is string => typeof label === "string") ?? "none";
     const hasOverflow = Boolean(elements["header-overflow"]);
-    const firstActionLabel = actionEntries.map(([, element]) => element.props?.label).find((label): label is string => typeof label === "string") ?? "none";
     return (
       <header>
         <h1>{task.title}</h1>
@@ -136,8 +160,8 @@ vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
         </section>
         <p>header-status:{task.status}</p>
         <p>workspace-status:{typeof statusText === "string" ? statusText.toLowerCase() : "unknown"}</p>
-        <p>primary-action:{firstActionLabel}</p>
-        {actionEntries.map(([key, element]) => {
+        <p>primary-action:{firstVisibleLabel}</p>
+        {visibleActions.map(([key, element]) => {
           const label = element.props?.label;
           return <button key={key} type="button" disabled={Boolean(element.props?.disabled)}>{typeof label === "string" ? label : key}</button>;
         })}
@@ -201,6 +225,7 @@ afterEach(() => {
   mocks.graphPlan = null;
   mocks.planGenerationStatus = "idle";
   mocks.canAcceptPlan = false;
+  mocks.executionState = {};
   mocks.setPageContext.mockClear();
   mocks.navigate.mockClear();
 });
@@ -343,6 +368,18 @@ describe("TaskWorkspacePage", () => {
     mocks.planGenerationStatus = "accepted";
     mocks.plan = { id: "plan-1", status: "accepted" };
     mocks.graphPlan = fixture.graphPlan;
+    // Mirror the SSE state snapshot the engine would push for a
+    // running task: Pause and Stop are visible, Start is not.
+    mocks.executionState = {
+      "/execution/can-start": false,
+      "/execution/can-pause": true,
+      "/execution/can-stop": true,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "Task is already running.",
+      "/execution/status": "running",
+    };
 
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
@@ -357,13 +394,26 @@ describe("TaskWorkspacePage", () => {
     mocks.plan = { id: "plan-1", status: "draft" };
     mocks.graphPlan = graphPlan("waiting_acceptance");
     mocks.canAcceptPlan = true;
+    // Plan exists but is not yet accepted, so the state-driven
+    // primary action is "Accept plan" (not "Generate plan" and not
+    // "Start" — those are hidden).
+    mocks.executionState = {
+      "/execution/can-start": false,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/execution/show-accept-plan": true,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
+      "/execution/status": "ready",
+    };
 
     render(<TaskWorkspacePage data={taskData()} />);
 
     expect(screen.getByText("generation:waiting_acceptance")).toBeInTheDocument();
     expect(screen.getByText("accept:enabled")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByText("primary-action:Generate plan")).toBeInTheDocument();
+    expect(screen.getByText("primary-action:Accept plan")).toBeInTheDocument();
   });
 
   it("renders accepted plans with completed progress", () => {
@@ -429,6 +479,18 @@ describe("TaskWorkspacePage", () => {
     mocks.planGenerationStatus = "accepted";
     mocks.plan = { id: "plan-1", status: "accepted" };
     mocks.graphPlan = fixture.graphPlan;
+    // The state-driven header for a running task exposes Pause and
+    // Stop; Start is hidden.
+    mocks.executionState = {
+      "/execution/can-start": false,
+      "/execution/can-pause": true,
+      "/execution/can-stop": true,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "Task is already running.",
+      "/execution/status": "running",
+    };
 
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
@@ -500,12 +562,24 @@ describe("TaskWorkspacePage", () => {
     const fixture = taskWorkspaceStateFixtures.permissionLimited;
     mocks.plan = { id: "plan-1", status: "accepted" };
     mocks.graphPlan = fixture.graphPlan;
+    // The fixture is in the "Ready" state with a plan accepted but
+    // never started; the state-driven primary action is "Start".
+    mocks.executionState = {
+      "/execution/can-start": true,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "You can view this task, but cannot run it",
+      "/execution/status": "ready",
+    };
 
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
     expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByText("primary-action:Generate plan")).toBeInTheDocument();
+    expect(screen.getByText("primary-action:Start")).toBeInTheDocument();
   });
 
   it("keeps long mobile fixture content visible without dropping workspace regions", () => {

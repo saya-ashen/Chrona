@@ -70,19 +70,39 @@ function appendBadge(elements: MutableElements, children: string[], badge: TaskH
   children.push(key);
 }
 
-function appendButton(elements: MutableElements, children: string[], action: TaskHeaderActionInput) {
-  const key = `action:${action.id}`;
-  elements[key] = {
-    type: "Button",
-    props: {
-      label: action.loading ? `${action.label}...` : action.label,
-      variant: buttonVariant(action.id),
-      size: "sm",
-      ...(action.disabled ? { disabled: true } : {}),
-      ...(action.disabledReason ? { title: action.disabledReason } : {}),
-    },
-    on: { press: actionBinding(action) },
+function appendAction(elements: MutableElements, children: string[], actionId: TaskHeaderActionInput["id"], label: string) {
+  const key = `action:${actionId}`;
+  const baseProps = {
+    label,
+    variant: buttonVariant(actionId),
+    size: "sm",
   };
+  const element: MutableElements[string] = {
+    type: "Button",
+    props: baseProps,
+    on: { press: actionBinding({ id: actionId, label }) },
+  };
+  if (actionId === "start") {
+    // `disabled` and the `title` tooltip are driven by the
+    // `/execution/start-disabled*` state paths so the server can
+    // toggle the button without re-emitting the whole spec on every
+    // execution state transition.
+    element.props = {
+      ...baseProps,
+      disabled: { $state: "/execution/start-disabled" },
+      title: { $state: "/execution/start-disabled-reason" },
+    };
+    element.visible = { $state: "/execution/can-start" };
+  } else if (actionId === "pause") {
+    element.visible = { $state: "/execution/can-pause" };
+  } else if (actionId === "stop") {
+    element.visible = { $state: "/execution/can-stop" };
+  } else if (actionId === "accept-plan") {
+    element.visible = { $state: "/execution/show-accept-plan" };
+  } else if (actionId === "generate-plan") {
+    element.visible = { $state: "/execution/show-generate-plan" };
+  }
+  elements[key] = element;
   children.push(key);
 }
 
@@ -137,10 +157,20 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   appendOccurrence(elements, metaChildren, input);
   appendBadge(elements, metaChildren, input.sourceLabel ? { id: "source", label: input.sourceLabel, tone: "neutral" } : null);
 
-  const overflowActions = input.actions.filter((action) => action.id === "edit" || action.id === "delete");
-  const primaryActions = input.actions.filter((action) => action.id !== "edit" && action.id !== "delete");
-  for (const action of primaryActions) appendButton(elements, actionChildren, action);
-  appendOverflowMenu(elements, actionChildren, overflowActions);
+  // Always materialise the five execution-flow action elements so the
+  // server can toggle their visibility/disabled through the
+  // `/execution/can-*` and `/execution/start-disabled*` state paths on
+  // every state transition (no spec rebuild required). The
+  // `input.actions` array is still accepted so existing call sites
+  // and tests can describe the action surface; it is intentionally
+  // unused here — visibility is driven by the live state store, not
+  // by the spec build.
+  appendAction(elements, actionChildren, "start", "Start");
+  appendAction(elements, actionChildren, "pause", "Pause");
+  appendAction(elements, actionChildren, "stop", "Stop");
+  appendAction(elements, actionChildren, "accept-plan", "Accept plan");
+  appendAction(elements, actionChildren, "generate-plan", "Generate plan");
+  appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "edit" || action.id === "delete"));
 
   elements.root = {
     type: "Card",
