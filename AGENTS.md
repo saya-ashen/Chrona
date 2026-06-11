@@ -12,6 +12,26 @@ patterns.
 - **Language:** TypeScript strict everywhere
 - **AI runtime:** Provider bridge via structured-result contracts
 
+## Understand the codebase — read these first
+
+Before exploring source, orient with the curated docs (kept current; faster and
+cheaper than reading files):
+
+| To understand… | Read |
+| --- | --- |
+| System: layers, workflows, data/projection model, architecture rules | [`docs/architecture.md`](docs/architecture.md) |
+| Where code belongs: per-package responsibilities, dependency rules, enforcement | [`docs/package-boundaries.md`](docs/package-boundaries.md) |
+| Frontend `apps/web`: routing, components, hooks, lib, conventions | [`docs/frontend-structure.md`](docs/frontend-structure.md) |
+| Execution internals | [`docs/backend-execution-flow.md`](docs/backend-execution-flow.md) |
+| Persistence | [`docs/data-model.md`](docs/data-model.md) |
+| HTTP/MCP surface | [`docs/api-reference.md`](docs/api-reference.md) |
+| Full doc index | [`docs/README.md`](docs/README.md) |
+
+For **structural** questions (what calls X, where is X defined, blast radius),
+prefer the codegraph / GitNexus MCP tools (see the tool sections below) over
+grepping — they are a pre-built AST index. Read source directly only when
+editing it or for literal-text searches.
+
 # context-mode — MANDATORY routing rules
 
 context-mode MCP tools available. Rules protect context window from flooding.

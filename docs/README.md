@@ -16,6 +16,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | Trace execution internals | [Backend Execution Flow](./backend-execution-flow.md) |
 | Understand persistence | [Data Model](./data-model.md) |
 | Place code in the right package | [Package Boundaries](./package-boundaries.md) |
+| Understand the frontend (`apps/web`) | [Frontend Structure](./frontend-structure.md) |
 | Extend AI/runtime providers | [Provider Boundary](./provider-boundary.md) |
 | Run tests | [中文测试指南](./zh/testing.md) |
 | See feature/test coverage map | [Feature + Test Map](./maps/feature-test-map.md) (regenerate: `bun run map:build`) |
@@ -47,6 +48,10 @@ Chrona is a Bun/TypeScript monorepo:
 | Database | `packages/db` + `prisma` | SQLite and Prisma 7 schema/migrations/seed |
 | Providers | `packages/providers/*` | External runtime/provider protocol adapters |
 | Hermes plugin | `external-plugins/hermes` | Chrona tools exposed to Hermes Agent |
+
+This table is a curated subset. For the complete package list (including
+`domain`, `ui-protocol`, `runtime-core`, `i18n`, `shared`) and the placement
+rules, see [Package Boundaries](./package-boundaries.md).
 
 ## Common commands for repository development
 
