@@ -1,0 +1,66 @@
+import { describe, expect, it } from "bun:test";
+import { Hono } from "hono";
+import { createChronaEngine } from "@chrona/engine";
+import { createApiRouter } from "../../routes/api";
+
+// GET /api/runtime/providers — execution runtime catalog.
+// Coverage audit gap: zero L1 coverage. The route returns the
+// list of registered runtimes (Hermes, optionally Debug) with
+// display labels. Pinned cases:
+//   - hermes is always exposed
+//   - debug is hidden unless CHRONA_ENABLE_DEBUG_PROVIDER or
+//     NODE_ENV=development
+//   - shape: { providers: [{ key, label }] }
+
+function app() {
+  const server = new Hono();
+  server.route("/api", createApiRouter(createChronaEngine()));
+  return server;
+}
+
+describe("GET /api/runtime/providers", () => {
+  it("always exposes the hermes runtime with a human label", async () => {
+    const res = await app().request("http://local/api/runtime/providers");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { providers: Array<{ key: string; label: string }> };
+    expect(Array.isArray(body.providers)).toBe(true);
+
+    const hermes = body.providers.find((p) => p.key === "hermes");
+    expect(hermes).toBeDefined();
+    expect(hermes?.label).toBe("Hermes");
+  });
+
+  it("hides the debug provider when no env flag is set", async () => {
+    const previous = process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
+    delete process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "test";
+
+    try {
+      const res = await app().request("http://local/api/runtime/providers");
+      const body = (await res.json()) as { providers: Array<{ key: string }> };
+      expect(body.providers.some((p) => p.key === "debug")).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
+      else process.env.CHRONA_ENABLE_DEBUG_PROVIDER = previous;
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it("exposes the debug provider when CHRONA_ENABLE_DEBUG_PROVIDER=true", async () => {
+    const previous = process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
+    process.env.CHRONA_ENABLE_DEBUG_PROVIDER = "true";
+
+    try {
+      const res = await app().request("http://local/api/runtime/providers");
+      const body = (await res.json()) as { providers: Array<{ key: string; label: string }> };
+      const debug = body.providers.find((p) => p.key === "debug");
+      expect(debug).toBeDefined();
+      expect(debug?.label).toBe("Debug Provider");
+    } finally {
+      if (previous === undefined) delete process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
+      else process.env.CHRONA_ENABLE_DEBUG_PROVIDER = previous;
+    }
+  });
+});
