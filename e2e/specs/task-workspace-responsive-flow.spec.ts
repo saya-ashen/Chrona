@@ -39,7 +39,7 @@ test.describe("Task workspace responsive flow", () => {
       await expect(page.getByRole("heading", { name: `Responsive workspace ${viewport}` })).toBeVisible();
       await expect(page).toHaveURL(new RegExp(`/en/tasks/${taskId}$`));
       await expect(page.getByRole("region", { name: "Task execution workspace" })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Command Center" })).toBeVisible();
+      await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
       await expectNoHorizontalScroll(page);
     });
   }

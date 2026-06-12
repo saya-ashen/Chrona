@@ -311,7 +311,7 @@ test.describe("Task Plan Generation via Hermes", () => {
       });
 
       await test.step("3. Generate a draft plan through Hermes", async () => {
-        await page.getByLabel("Actions").getByRole("button", { name: "Generate plan" }).click();
+        await page.getByRole("button", { name: "Generate plan" }).first().click();
 
         await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
         await expect(page.getByText("Collect task context").first()).toBeVisible();
@@ -322,7 +322,7 @@ test.describe("Task Plan Generation via Hermes", () => {
       await test.step("4. Verify Hermes received a generate_plan run with plan session", async () => {
         expect(hermes.runs).toHaveLength(1);
         const run = hermes.runs[0];
-        expect(run.session_id).toContain(`task:${createdTask?.taskId}:plan-graph`);
+        expect(run.session_id).toContain(`chrona:task:${createdTask?.taskId}:plan-generation`);
         expect(run.instructions).toContain("chrona_plan_generate");
         expect(run.input).toContain("E2E Hermes Plan Task");
       });
