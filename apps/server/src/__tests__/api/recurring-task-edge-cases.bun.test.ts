@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { Hono } from "hono";
 import { db } from "@chrona/db";
-import { createChronaEngine } from "@chrona/engine";
 import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/modules/orchestration/recurring-work-block-expansion-worker";
 import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/plans/task-plan-read-model";
 import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
 import { getCurrentExecution } from "@chrona/engine/modules/plan-execution/use-cases/get-current-execution";
 import { getTaskHeaderSpec } from "@chrona/engine/modules/tasks/get-task-header";
 import type { CompiledPlan } from "@chrona/contracts/ai";
-import { createApiRouter } from "../../routes/api";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
 // Cross-occurrence scope depth for recurring tasks. The shallow
@@ -26,11 +23,6 @@ import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 // because completion is a task row mutation, not a per-block
 // mutation. The tests pin this design.
 
-function app() {
-  const server = new Hono();
-  server.route("/api", createApiRouter(createChronaEngine()));
-  return server;
-}
 
 function minimalCompiledPlan(title: string): CompiledPlan {
   return {

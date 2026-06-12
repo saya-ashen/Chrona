@@ -167,7 +167,7 @@ describe("SSR loader fan-out — header + 4 read models are work-block scoped", 
     expect(block).toBeTruthy();
 
     const { bootstrap, runtimeContext, reviewContext } = await fetchSsrBundle(task.id, block!.id);
-    for (const [name, value] of Object.entries({ bootstrap, runtimeContext, reviewContext })) {
+    for (const [_name, value] of Object.entries({ bootstrap, runtimeContext, reviewContext })) {
       const obj = value as Record<string, unknown>;
       expect(obj).toBeTruthy();
       expect(typeof obj).toBe("object");
