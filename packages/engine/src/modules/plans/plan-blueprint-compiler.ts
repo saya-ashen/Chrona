@@ -203,7 +203,7 @@ export function compilePlanBlueprint(input: {
 }): { compiledPlan: CompiledPlan; planId: string } {
   validateBlueprint({ blueprint: input.blueprint });
 
-  const planId = input.planId ?? `plan_${randomUUID().slice(0, 8)}`;
+  const planId = input.planId ?? randomUUID().replaceAll("-", "").slice(0, 12);
   const editable = upgradeBlueprintToEditable(input.blueprint, planId, 1);
   const compiledPlan = compileEditablePlan(editable);
 

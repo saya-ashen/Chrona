@@ -1,8 +1,17 @@
 export { createChronaEngine } from "./engine";
 export type { ChronaEngine } from "./engine";
-export { appendTaskWorkspaceEvent, subscribeToTaskProjectionEvents } from "./modules/projections";
+export {
+  appendTaskWorkspaceEvent,
+  publishTaskStateSnapshot,
+  publishTaskStateUpdate,
+  publishTaskWorkspaceUpdatedEvent,
+  subscribeToTaskProjectionEvents,
+} from "./modules/projections";
+export { resolveHeaderExecutionState, headerExecutionStateToStatePaths } from "./modules/tasks/get-task-header";
+export { getCurrentExecution } from "./modules/plan-execution/use-cases/get-current-execution";
+export { getLatestTaskPlanReadModel } from "./modules/plans/task-plan-read-model";
 export { startAutoPlanGenerationForTask } from "./modules/plans/auto-generate-task-plan";
-export type { TaskProjectionEvent } from "./modules/projections";
+export type { TaskProjectionEvent, SpecPatch } from "./modules/projections";
 export type {
   GraphExecutionEvent,
   PlanExecutionRuntimeEvent,

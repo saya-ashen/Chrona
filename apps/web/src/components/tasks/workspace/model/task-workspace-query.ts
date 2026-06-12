@@ -11,6 +11,10 @@ import type {
   TaskHeaderView,
   TaskPageData,
   TaskPlanGenerationStatus,
+  TaskWorkspaceBootstrapData,
+  TaskWorkspaceCommandCenterData,
+  TaskWorkspaceReviewContextData,
+  TaskWorkspaceRuntimeContextData,
   TaskWorkspaceUserStatus,
   TaskWorkspaceExecutionConsoleView,
   WorkspaceActivityItem,
@@ -148,6 +152,11 @@ export const taskWorkspaceQueryKeys = {
   page: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "page", taskId, workBlockId ?? null] as const,
   planState: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "plan-state", taskId, workBlockId ?? null] as const,
   currentExecution: (taskId: string, workBlockId?: string | null) => [...taskWorkspaceQueryKeys.all, "current-execution", taskId, workBlockId ?? null] as const,
+};
+
+export const commandCenterQueryKeys = {
+  all: ["task-workspace", "command-center"] as const,
+  detail: (taskId: string, workBlockId?: string | null) => [...commandCenterQueryKeys.all, taskId, workBlockId ?? null] as const,
 };
 
 function isDoneStatus(status: PlanNodeDataModel["status"]) {
@@ -566,10 +575,38 @@ export function createTaskWorkspaceExecutionConsoleView(input: {
   };
 }
 
-export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: string | null): Promise<TaskPageData> {
-  const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
-  return apiJson<TaskPageData>(`/api/tasks/${encodeURIComponent(taskId)}${query}`);
+function taskScopedQuery(workBlockId?: string | null) {
+  return workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
 }
+
+export async function fetchTaskWorkspacePage(taskId: string, workBlockId?: string | null): Promise<TaskPageData> {
+  const taskPath = `/api/tasks/${encodeURIComponent(taskId)}`;
+  const query = taskScopedQuery(workBlockId);
+  const [bootstrap, runtimeContext, reviewContext] = await Promise.all([
+    apiJson<TaskWorkspaceBootstrapData>(`${taskPath}${query}`),
+    apiJson<TaskWorkspaceRuntimeContextData>(`${taskPath}/runtime-context${query}`),
+    apiJson<TaskWorkspaceReviewContextData>(`${taskPath}/review-context${query}`),
+  ]);
+
+  return {
+    ...bootstrap,
+    ...runtimeContext,
+    ...reviewContext,
+    artifacts: [],
+    activityTimeline: [],
+  };
+}
+
+/**
+ * Fetch only the json-render command-center documents (now / output /
+ * trail) for a task. Kept separate from {@link fetchTaskWorkspacePage} so
+ * that the heavy page metadata query does not embed spec blobs.
+ */
+export async function fetchTaskCommandCenter(taskId: string, workBlockId?: string | null): Promise<TaskWorkspaceCommandCenterData> {
+  const query = taskScopedQuery(workBlockId);
+  return apiJson<TaskWorkspaceCommandCenterData>(`/api/tasks/${encodeURIComponent(taskId)}/command-center${query}`);
+}
+
 
 export async function fetchTaskPlanState(taskId: string, workBlockId?: string | null): Promise<TaskPlanState> {
   const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";

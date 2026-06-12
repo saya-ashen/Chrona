@@ -183,4 +183,80 @@ describe("deriveTaskState", () => {
       blockSince: null,
     });
   });
+
+  it("clears a stale Blocked when a fresh draft plan is regenerated after a failed run", () => {
+    const result = deriveTaskState({
+      task: { status: "Blocked", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Failed", updatedAt }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: null,
+      latestPlan: { status: "draft", updatedAt: new Date("2026-05-10T12:05:00.000Z") },
+    });
+
+    expect(result).toEqual({
+      persistedStatus: "Draft",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    });
+  });
+
+  it("keeps Blocked when the draft plan is older than the failed run (out-of-order timestamps)", () => {
+    const result = deriveTaskState({
+      task: { status: "Blocked", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Failed", updatedAt: new Date("2026-05-10T12:10:00.000Z") }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: null,
+      latestPlan: { status: "draft", updatedAt: new Date("2026-05-10T12:00:00.000Z") },
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Blocked",
+      blockReason: { blockType: "run_failed" },
+    });
+  });
+
+  it("keeps Blocked when a fresh plan is in the accepted state and execution is still queued", () => {
+    // After `taskPlanning.accept`, the plan is `accepted` and the projection
+    // is expected to hand off the "needs execution" signal to the execution
+    // path, not to silently clear the failure. The new branch must only
+    // trigger on `draft` plans.
+    const result = deriveTaskState({
+      task: { status: "Blocked", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Failed", updatedAt }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: null,
+      latestPlan: { status: "accepted", updatedAt: new Date("2026-05-10T12:05:00.000Z") },
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Blocked",
+      blockReason: { blockType: "run_failed" },
+    });
+  });
+
+  it("keeps Blocked when a fresh draft plan exists but a paused session is active on the failed run", () => {
+    // A paused session still owns the execution slot. The draft plan is
+    // queued for acceptance, but the user has not yet accepted it. The
+    // failed-run block must persist so the user can resolve the session
+    // before starting over — but a paused session also satisfies
+    // `!== "Active"`, so the run_failed branch (not the new draft-recover
+    // branch) is the one that fires.
+    const result = deriveTaskState({
+      task: { status: "Blocked", latestRunId: "run_1" },
+      runs: [{ id: "run_1", status: "Failed", updatedAt }],
+      approvals: [],
+      sync: { stale: false },
+      executionSession: { status: "Paused", currentNodeId: "cn_retry_1", pauseReason: "manual_action" },
+      latestPlan: { status: "draft", updatedAt: new Date("2026-05-10T12:05:00.000Z") },
+    });
+
+    expect(result).toMatchObject({
+      persistedStatus: "Blocked",
+      blockReason: { blockType: "run_failed", actionRequired: "Retry Run" },
+    });
+  });
 });

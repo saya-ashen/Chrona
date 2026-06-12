@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import type { Context } from "hono";
 
+const addDays = (base: Date, days: number) => new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+const addMinutes = (d: Date, minutes: number) => new Date(d.getTime() + minutes * 60 * 1000);
+const iso = (d: Date) => d.toISOString();
+const FUTURE_BASE = new Date(Date.now() + 24 * 60 * 60 * 1000);
+FUTURE_BASE.setUTCHours(13, 0, 0, 0);
+
 import { db } from "@chrona/db";
 import { ScheduleSource } from "@chrona/db/generated/prisma/client";
 import type { ScheduleProposal } from "@chrona/db/generated/prisma/client";
@@ -85,8 +91,8 @@ describe("schedule proposal conflict workflow", () => {
   it("accepting one proposal leaves competing pending proposals unresolved for explicit user choice", async () => {
     const { workspaceId } = await seedWorkspace("Schedule conflict workflow");
     const { taskId } = await seedTask(workspaceId);
-    const first = await createProposal(taskId, "2026-06-01T09:00:00.000Z", "2026-06-01T10:00:00.000Z", "Morning slot");
-    const second = await createProposal(taskId, "2026-06-01T09:30:00.000Z", "2026-06-01T11:00:00.000Z", "Overlapping slot");
+    const first = await createProposal(taskId, iso(addDays(FUTURE_BASE, 0)), iso(addMinutes(addDays(FUTURE_BASE, 0), 60)), "Morning slot");
+    const second = await createProposal(taskId, iso(addMinutes(addDays(FUTURE_BASE, 0), 30)), iso(addMinutes(addDays(FUTURE_BASE, 0), 120)), "Overlapping slot");
 
     const decision = await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
@@ -102,15 +108,15 @@ describe("schedule proposal conflict workflow", () => {
       [first.proposalId, "Accepted", "Use earlier slot"],
       [second.proposalId, "Pending", null],
     ]);
-    expect(workBlock.scheduledStartAt.toISOString()).toBe("2026-06-01T09:00:00.000Z");
-    expect(workBlock.scheduledEndAt.toISOString()).toBe("2026-06-01T10:00:00.000Z");
+    expect(workBlock.scheduledStartAt.toISOString()).toBe(iso(addDays(FUTURE_BASE, 0)));
+    expect(workBlock.scheduledEndAt.toISOString()).toBe(iso(addMinutes(addDays(FUTURE_BASE, 0), 60)));
   });
 
   it("rejecting a conflicting proposal preserves accepted schedule projection", async () => {
     const { workspaceId } = await seedWorkspace("Schedule reject conflict workflow");
     const { taskId } = await seedTask(workspaceId);
-    const accepted = await createProposal(taskId, "2026-06-10T13:00:00.000Z", "2026-06-10T14:00:00.000Z", "Accepted slot");
-    const rejected = await createProposal(taskId, "2026-06-10T13:30:00.000Z", "2026-06-10T15:00:00.000Z", "Conflicting slot");
+    const accepted = await createProposal(taskId, iso(addDays(FUTURE_BASE, 1)), iso(addMinutes(addDays(FUTURE_BASE, 1), 60)), "Accepted slot");
+    const rejected = await createProposal(taskId, iso(addMinutes(addDays(FUTURE_BASE, 1), 30)), iso(addMinutes(addDays(FUTURE_BASE, 1), 120)), "Conflicting slot");
 
     await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",
@@ -128,8 +134,8 @@ describe("schedule proposal conflict workflow", () => {
     const rejectedProposal = await db.scheduleProposal.findUniqueOrThrow({ where: { id: rejected.proposalId } });
 
     expect(projection.scheduleStatus).toBe("Scheduled");
-    expect(projection.scheduledStartAt?.toISOString()).toBe("2026-06-10T13:00:00.000Z");
-    expect(projection.scheduledEndAt?.toISOString()).toBe("2026-06-10T14:00:00.000Z");
+    expect(projection.scheduledStartAt?.toISOString()).toBe(iso(addDays(FUTURE_BASE, 1)));
+    expect(projection.scheduledEndAt?.toISOString()).toBe(iso(addMinutes(addDays(FUTURE_BASE, 1), 60)));
     expect(rejectedProposal.status).toBe("Rejected");
     expect(rejectedProposal.resolutionNote).toBe("Conflicts with focus block");
   });
@@ -137,7 +143,7 @@ describe("schedule proposal conflict workflow", () => {
   it("blocks a second decision on an accepted conflicting proposal", async () => {
     const { workspaceId } = await seedWorkspace("Schedule duplicate decision workflow");
     const { taskId } = await seedTask(workspaceId);
-    const proposal = await createProposal(taskId, "2026-06-03T09:00:00.000Z", "2026-06-03T10:00:00.000Z", "One decision only");
+    const proposal = await createProposal(taskId, iso(addDays(FUTURE_BASE, 2)), iso(addMinutes(addDays(FUTURE_BASE, 2), 60)), "One decision only");
 
     await app().request("http://local/api/tasks/schedule-proposals/decision", {
       method: "POST",

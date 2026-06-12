@@ -2,6 +2,7 @@ import type { TaskConfigExecutionRuntime } from "@/components/schedule/forms/tas
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 import type { GraphNodeState, ReconciliationResult, TaskExecutionSummary } from "@chrona/contracts";
+import type { UiDocument } from "@chrona/ui-protocol";
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
@@ -107,7 +108,31 @@ export type TaskPageData = {
     uri?: string;
   }>;
   activityTimeline?: WorkspaceActivityItem[];
+  commandCenter?: {
+    documents: {
+      now: UiDocument;
+      output: UiDocument;
+      trail: UiDocument;
+    };
+  };
+  // Header spec lives on its own endpoint
+  // (`GET /api/tasks/:taskId/workspace/header`) and SSR loader puts the
+  // first-paint value here. Runtime updates come from the dedicated
+  // `useTaskHeaderSpec` query plus `spec.patch` SSE events.
+  header?: { spec: UiDocument };
 };
+
+export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
+  "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "commandCenter" | "header"
+>;
+
+export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes">;
+
+export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "scheduleProposals" | "approvals">;
+
+export type TaskWorkspaceCommandCenterData = NonNullable<TaskPageData["commandCenter"]>;
+
+export type TaskWorkspaceHeaderData = NonNullable<TaskPageData["header"]>;
 
 export type EditableTask = {
   title: string;
@@ -228,6 +253,11 @@ export type WorkspaceAssistantActivity = {
   isPartial?: boolean;
 };
 
+export type WorkspaceActivityGroup = {
+  kind: "plan_generation" | "execution_node" | "provider_run";
+  id: string;
+};
+
 export type WorkspaceActivityItem = {
   id: string;
   kind: WorkspaceActivityKind;
@@ -244,6 +274,7 @@ export type WorkspaceActivityItem = {
   nativeRunId?: string;
   sequence?: number;
   rawEventType?: string;
+  activityGroup?: WorkspaceActivityGroup;
   tool?: WorkspaceToolActivity;
   assistant?: WorkspaceAssistantActivity;
   raw?: unknown;

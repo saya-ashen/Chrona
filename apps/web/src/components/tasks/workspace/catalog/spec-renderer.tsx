@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { JSONUIProvider, Renderer } from "@json-render/react";
+import { JSONUIProvider, Renderer, type StateStore } from "@json-render/react";
 import { CATALOG_VERSION, isCatalogCompatible, type UiDocument } from "@chrona/ui-protocol";
 import { workspaceRegistry } from "./workspace-registry";
 
@@ -17,6 +17,7 @@ export function SpecRenderer({
   fallback,
   handlers,
   onStateChange,
+  store,
 }: {
   spec: UiDocument | null | undefined;
   catalogVersion?: string;
@@ -26,13 +27,14 @@ export function SpecRenderer({
   handlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
   /** State-change notifications from JSONUIProvider (path/value pairs). */
   onStateChange?: (changes: Array<{ path: string; value: unknown }>) => void;
+  store?: StateStore;
 }) {
   if (!spec || !isCatalogCompatible(catalogVersion)) {
     return <>{fallback}</>;
   }
 
   return (
-    <JSONUIProvider registry={workspaceRegistry} initialState={spec.state} handlers={handlers} onStateChange={onStateChange}>
+    <JSONUIProvider registry={workspaceRegistry} store={store} initialState={spec.state} handlers={handlers} onStateChange={onStateChange}>
       <Renderer spec={spec} registry={workspaceRegistry} loading={loading} />
     </JSONUIProvider>
   );

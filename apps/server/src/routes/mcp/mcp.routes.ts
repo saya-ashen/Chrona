@@ -248,6 +248,65 @@ function toChronaInput(
   };
 }
 
+const planGenerationTools = new Set<ChronaToolName>([
+  "chrona.plan.generate",
+  "chrona.plan.read",
+]);
+
+const executionTools = new Set<ChronaToolName>([
+  "chrona.execution.read",
+  "chrona.plan.read",
+  "chrona.node.read",
+  "chrona.node.output",
+  "chrona.node.complete",
+  "chrona.node.condition_select",
+  "chrona.node.block",
+  "chrona.node.fail",
+  "chrona.node.wait_complete",
+]);
+
+function toolSessionPurpose(sessionId?: string | null): "plan_generation" | "execution" | "unknown" {
+  if (!sessionId) return "unknown";
+  if (
+    sessionId.endsWith(":pg") ||
+    sessionId.endsWith(":plan-graph") ||
+    sessionId.endsWith(":plan-generation")
+  ) {
+    return "plan_generation";
+  }
+  if (
+    sessionId.includes(":work-block:") ||
+    sessionId.includes(":execute:") ||
+    sessionId.endsWith(":execute") ||
+    sessionId.includes(":plan-")
+  ) {
+    return "execution";
+  }
+  return "unknown";
+}
+
+function isToolAllowedForSession(toolName: ChronaToolName, sessionId?: string | null): boolean {
+  const purpose = toolSessionPurpose(sessionId);
+  if (purpose === "plan_generation") return planGenerationTools.has(toolName);
+  if (purpose === "execution") return executionTools.has(toolName);
+  return toolName.endsWith(".read");
+}
+
+function toolNotAllowedResult(toolName: ChronaToolName, sessionId?: string | null): CallToolResult {
+  const purpose = toolSessionPurpose(sessionId);
+  const message = `${toolName} is not allowed for ${purpose} session.`;
+  return {
+    content: [{ type: "text", text: message }],
+    structuredContent: {
+      status: "rejected",
+      message,
+      reasonCode: "UNAUTHORIZED",
+      recovery: { action: purpose === "plan_generation" ? "stop" : "use_allowed_tool" },
+    },
+    isError: true,
+  };
+}
+
 async function callChronaTool(
   engine: ChronaEngine,
   toolName: ChronaToolName,
@@ -271,6 +330,14 @@ async function callChronaTool(
   const resolvedInput = "resolveInputContext" in engine.agentTools
     ? await engine.agentTools.resolveInputContext(chronaInput)
     : chronaToolInputSchema.parse(chronaInput);
+  if (!isToolAllowedForSession(toolName, resolvedInput.sessionId)) {
+    logger.warn("tool.call.rejected_by_session_policy", {
+      toolName,
+      sessionId: resolvedInput.sessionId ?? null,
+      purpose: toolSessionPurpose(resolvedInput.sessionId),
+    });
+    return toolNotAllowedResult(toolName, resolvedInput.sessionId);
+  }
   logger.info("tool.call.resolved", {
     toolName,
     sessionId: resolvedInput.sessionId ?? null,

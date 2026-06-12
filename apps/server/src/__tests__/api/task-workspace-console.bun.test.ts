@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { ApprovalStatus, ArtifactType, RunStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
+import { Hono } from "hono";
+import { createChronaEngine } from "@chrona/engine";
+import { createApiRouter } from "../../routes/api";
 import { getTaskPage } from "@chrona/engine/modules/tasks/get-task-page";
-import { resetTestDb, seedScheduleProposal, seedTask, seedWorkspace } from "../bun-test-helpers";
+import { json, resetTestDb, seedScheduleProposal, seedTask, seedWorkspace } from "../bun-test-helpers";
+
+function app() {
+  const server = new Hono();
+  server.route("/api", createApiRouter(createChronaEngine()));
+  return server;
+}
 
 describe("task workspace console read data", () => {
   beforeEach(async () => {
@@ -110,6 +119,90 @@ describe("task workspace console read data", () => {
       uri: "file://patch.diff",
     }));
   });
+
+  it("returns command center json-render documents only", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Command Center API");
+    const { taskId } = await seedTask(workspaceId, { title: "Render command center" });
+    const run = await db.run.create({
+      data: {
+        taskId,
+        runtimeName: "hermes",
+        runtimeRunRef: "run-command-center-documents",
+        status: RunStatus.Completed,
+        triggeredBy: "agent",
+        startedAt: new Date("2026-05-12T11:00:00.000Z"),
+      },
+    });
+
+
+    await db.artifact.create({
+      data: {
+        workspaceId,
+        taskId,
+        runId: run.id,
+        type: ArtifactType.summary,
+        title: "Generated summary",
+        uri: "file://summary.md",
+      },
+    });
+
+    const response = await app().request(`/api/tasks/${taskId}/command-center`);
+    expect(response.status).toBe(200);
+
+    const body = await json<Record<string, unknown>>(response);
+    expect(Object.keys(body).sort()).toEqual(["documents"]);
+    expect(body).not.toHaveProperty("artifacts");
+    expect(body).not.toHaveProperty("activityTimeline");
+    expect(body).not.toHaveProperty("ui");
+    // Header spec now lives on its own endpoint
+    // (`GET /api/tasks/:taskId/workspace/header`) — command-center returns
+    // only the 3 right-pane documents.
+    expect(body.documents).toMatchObject({
+      now: { root: "root", elements: expect.any(Object) },
+      output: { root: "root", elements: expect.any(Object) },
+      trail: { root: "root", elements: expect.any(Object) },
+    });
+    expect(body.documents).not.toHaveProperty("header");
+  });
+
+  it("returns command center Trail items from persisted database activity", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Command Center Trail Activity");
+    const { taskId } = await seedTask(workspaceId, { title: "Render command center trail" });
+    await db.event.createMany({
+      data: [{
+        eventType: "plan_generation.started",
+        workspaceId,
+        taskId,
+        actorType: "system",
+        actorId: "plan-generator",
+        source: "plan_generation",
+        payload: { generation_id: "generation-command-center", instruction: "Make a plan" },
+        dedupeKey: "command-center-trail-plan-started",
+        occurredAt: new Date("2026-05-12T12:01:06.000Z"),
+        ingestSequence: 1,
+      }, {
+        eventType: "plan_generation.status",
+        workspaceId,
+        taskId,
+        actorType: "system",
+        actorId: "plan-generator",
+        source: "plan_generation",
+        payload: { generation_id: "generation-command-center", message: "Requesting AI provider..." },
+        dedupeKey: "command-center-trail-plan-status",
+        occurredAt: new Date("2026-05-12T12:01:07.000Z"),
+        ingestSequence: 2,
+      }],
+    });
+
+    const response = await app().request(`/api/tasks/${taskId}/command-center`);
+    expect(response.status).toBe(200);
+
+    const body = await json<{ documents: { trail: { state?: { trail?: { items?: Array<{ title?: string; description?: string; rawEventType?: string; activityGroup?: { kind?: string; id?: string } }> } } } } }>(response);
+    const items = body.documents.trail.state?.trail?.items ?? [];
+    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation started", description: "Make a plan", rawEventType: "plan_generation.started", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
+    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation update", description: "Requesting AI provider...", rawEventType: "plan_generation.status", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
+  });
+
 
   it("returns persisted provider runtime activity for the workspace activity timeline", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Provider Activity");
@@ -318,5 +411,43 @@ describe("task workspace console read data", () => {
       description: "Generated plan",
       tone: "success",
     }));
+  });
+
+  it("returns a header json-render document for the dedicated workspace/header endpoint", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Header");
+    const { taskId } = await seedTask(workspaceId, { title: "Header doc task" });
+
+    const response = await app().request(`/api/tasks/${taskId}/workspace/header`);
+    expect(response.status).toBe(200);
+
+    const body = await json<Record<string, unknown>>(response);
+    expect(Object.keys(body).sort()).toEqual(["spec"]);
+    expect(body).not.toHaveProperty("documents");
+    expect(body.spec).toMatchObject({
+      root: expect.any(String),
+      elements: expect.any(Object),
+    });
+  });
+
+  it("404s the header endpoint for unknown task ids", async () => {
+    const response = await app().request("/api/tasks/missing-task/workspace/header");
+    expect(response.status).toBe(404);
+  });
+
+  it("scopes the header spec to the requested work block", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Header Scoped");
+    const { taskId } = await seedTask(workspaceId, { title: "Scoped header" });
+
+    const unscoped = await app().request(`/api/tasks/${taskId}/workspace/header`);
+    const scoped = await app().request(`/api/tasks/${taskId}/workspace/header?workBlockId=missing`);
+    expect(unscoped.status).toBe(200);
+    expect(scoped.status).toBe(200);
+    // The two responses have the same shape; the seedTask helper does
+    // not create a second work block, so the two payloads are
+    // byte-identical here — the assertion is that the route does not
+    // 500 when an unknown work block is requested.
+    const a = await json<Record<string, unknown>>(unscoped);
+    const b = await json<Record<string, unknown>>(scoped);
+    expect(Object.keys(a).sort()).toEqual(Object.keys(b).sort());
   });
 });

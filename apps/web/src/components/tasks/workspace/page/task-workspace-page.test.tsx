@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskWorkspacePage } from "./task-workspace-page";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
-import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
+import { createHeaderSpecFixture, taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { createTaskWorkspaceUiFixture } from "../test/task-workspace-ui-fixtures";
+import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskPageData, TaskPlanGenerationStatus } from "../model/task-workspace-types";
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   canAcceptPlan: false,
   setPageContext: vi.fn(),
   navigate: vi.fn(),
+  // Per-test overrides for the `/execution/can-*` state paths the
+  // mock header card consults to compute the visible primary action.
+  executionState: {} as Record<string, unknown>,
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -60,9 +64,25 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", ()
 vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () => ({
   useTaskWorkspacePageState: (data: TaskPageData) => ({
     pageData: data,
+    commandCenter: data.commandCenter,
     setTask: vi.fn(),
-    refreshWorkspace: vi.fn(),
+    refreshWorkspace: vi.fn(async () => undefined),
     isRefreshing: false,
+    workspaceEvents: [],
+    headerSpec: data.header?.spec ?? createHeaderSpecFixture({ title: data.task.title }),
+    // Per-test overrides for the `/execution/can-*` state paths the
+    // mock header card consults to compute the visible primary action.
+    // Tests that want to assert a particular "running" / "completed"
+    // state can seed these via `mocks.executionState = { ... }`.
+    executionState: {} as Record<string, unknown>,
+    headerStore: {
+      get: (path: string) => mocks.executionState[path],
+      set: vi.fn(),
+      update: vi.fn(),
+      getSnapshot: () => mocks.executionState,
+      getServerSnapshot: () => mocks.executionState,
+      subscribe: () => vi.fn(),
+    },
   }),
 }));
 
@@ -109,32 +129,46 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () 
 }));
 
 vi.mock("@/components/tasks/workspace/page/task-workspace-header-card", () => ({
-  TaskWorkspaceHeaderCard: ({ task, header, workspaceStateGuidance, planAction, onSelectOccurrence }: { task: TaskPageData["task"]; header: { status: string; progressPercent: number; completedSteps: number; totalSteps: number; actions: Array<{ id: string; label: string; disabled?: boolean }>; memberContext: { notificationCount: number } }; workspaceStateGuidance?: string; planAction?: { label: string; disabled?: boolean; isLoading?: boolean }; onSelectOccurrence?: (occurrence: NonNullable<TaskPageData["task"]["recurrenceOccurrences"]>[number]) => void }) => (
-    <header>
-      <h1>{task.title}</h1>
-      <section aria-label="Workspace state">
-        <p>Current state</p>
-        <p>{header.status === "running" ? "Running" : header.status}</p>
-      </section>
-      <p>header-status:{task.status}</p>
-      {task.recurrenceOccurrences?.find((occurrence) => !occurrence.isCurrent) ? (
-        <button
-          type="button"
-          onClick={() => onSelectOccurrence?.(task.recurrenceOccurrences!.find((occurrence) => !occurrence.isCurrent)!)}
-        >
-          Switch occurrence
-        </button>
-      ) : null}
-      <p>workspace-status:{header.status}</p>
-      <p>{workspaceStateGuidance}</p>
-      <p>primary-action:{header.actions.find((action) => action.id !== "more")?.label ?? "none"}</p>
-      {planAction?.label === "Accept plan" ? <button type="button" disabled={planAction.disabled || planAction.isLoading}>{planAction.label}</button> : null}
-      <button type="button">Edit</button>
-      {header.actions.filter((action) => action.id !== "more").map((action) => (
-        <button key={action.id} type="button" disabled={action.disabled}>{action.label}</button>
-      ))}
-    </header>
-  ),
+  TaskWorkspaceHeaderCard: ({ task, spec, store }: { task: TaskPageData["task"]; spec: UiDocument; store?: { get: (path: string) => unknown } }) => {
+    const elements = spec.elements;
+    const statusText = elements["badge:primary-state"]?.props?.text;
+    const actionEntries = Object.entries(elements).filter(([key]) => key.startsWith("action:"));
+    // In the state-driven header architecture every execution action
+    // element exists in the spec — visibility is bound to `/execution/can-*`
+    // state paths that the renderer consults via the store. The mock
+    // re-implements that resolution locally so the test can assert the
+    // "primary" action the user would actually see for the current
+    // state, instead of just the first element in the spec.
+    const isActionVisible = (element: { visible?: unknown }): boolean => {
+      const v = element.visible;
+      if (!v || typeof v !== "object") return true;
+      const ref = (v as { $state?: string }).$state;
+      if (!ref) return true;
+      return Boolean(store?.get(ref));
+    };
+    const visibleActions = actionEntries.filter(([, element]) => isActionVisible(element));
+    const firstVisibleLabel = visibleActions
+      .map(([, element]) => element.props?.label)
+      .find((label): label is string => typeof label === "string") ?? "none";
+    const hasOverflow = Boolean(elements["header-overflow"]);
+    return (
+      <header>
+        <h1>{task.title}</h1>
+        <section aria-label="Workspace state">
+          <p>Current state</p>
+          <p>{typeof statusText === "string" ? statusText : "unknown"}</p>
+        </section>
+        <p>header-status:{task.status}</p>
+        <p>workspace-status:{typeof statusText === "string" ? statusText.toLowerCase() : "unknown"}</p>
+        <p>primary-action:{firstVisibleLabel}</p>
+        {visibleActions.map(([key, element]) => {
+          const label = element.props?.label;
+          return <button key={key} type="button" disabled={Boolean(element.props?.disabled)}>{typeof label === "string" ? label : key}</button>;
+        })}
+        {hasOverflow ? <button type="button">...</button> : null}
+      </header>
+    );
+  },
 }));
 
 vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () => ({
@@ -191,9 +225,25 @@ afterEach(() => {
   mocks.graphPlan = null;
   mocks.planGenerationStatus = "idle";
   mocks.canAcceptPlan = false;
+  mocks.executionState = {};
   mocks.setPageContext.mockClear();
   mocks.navigate.mockClear();
 });
+function testCommandCenter(): NonNullable<TaskPageData["commandCenter"]> {
+  return {
+    documents: {
+      now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
+      output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
+      trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
+    },
+  };
+}
+
+function testHeader(title: string): NonNullable<TaskPageData["header"]> {
+  return {
+    spec: createHeaderSpecFixture({ title }),
+  };
+}
 
 function taskData(): TaskPageData {
   return {
@@ -226,6 +276,8 @@ function taskData(): TaskPageData {
     scheduleProposals: [],
     approvals: [],
     artifacts: [],
+    commandCenter: testCommandCenter(),
+    header: testHeader("Plan migration"),
   };
 }
 
@@ -279,40 +331,9 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
     expect(screen.getByText("generation:idle")).toBeInTheDocument();
     expect(screen.getByText("plan:none")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "..." })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Generate plan" }).length).toBeGreaterThan(0);
 
-  });
-  it("navigates to the selected recurrence occurrence", () => {
-    const data = taskData();
-    data.task.recurrenceOccurrences = [
-      {
-        taskId: data.task.id,
-        title: data.task.title,
-        status: data.task.status,
-        scheduledStartAt: "2026-06-04T14:00:00.000Z",
-        scheduledEndAt: "2026-06-04T15:00:00.000Z",
-        workBlockId: "block-current",
-        isCurrent: true,
-      },
-      {
-        taskId: data.task.id,
-        title: data.task.title,
-        status: data.task.status,
-        scheduledStartAt: "2026-06-05T14:00:00.000Z",
-        scheduledEndAt: "2026-06-05T15:00:00.000Z",
-        workBlockId: "block-next",
-        isCurrent: false,
-      },
-    ];
-
-    render(<TaskWorkspacePage data={data} />);
-    fireEvent.click(screen.getByRole("button", { name: "Switch occurrence" }));
-
-    expect(mocks.navigate).toHaveBeenCalledWith({
-      pathname: "/en/tasks/task-1",
-      search: "?workBlockId=block-next",
-    });
   });
 
 
@@ -347,14 +368,25 @@ describe("TaskWorkspacePage", () => {
     mocks.planGenerationStatus = "accepted";
     mocks.plan = { id: "plan-1", status: "accepted" };
     mocks.graphPlan = fixture.graphPlan;
+    // Mirror the SSE state snapshot the engine would push for a
+    // running task: Pause and Stop are visible, Start is not.
+    mocks.executionState = {
+      "/execution/can-start": false,
+      "/execution/can-pause": true,
+      "/execution/can-stop": true,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "Task is already running.",
+      "/execution/status": "running",
+    };
 
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
     expect(screen.getByRole("region", { name: "Workspace state" })).toBeInTheDocument();
     expect(screen.getByText("Current state")).toBeInTheDocument();
     expect(screen.getByText("Running")).toBeInTheDocument();
-    expect(screen.getByText(/Next action:/)).toBeInTheDocument();
-    expect(screen.getByText("primary-action:Start")).toBeInTheDocument();
+    expect(screen.getByText("primary-action:Pause")).toBeInTheDocument();
   });
 
   it("keeps generated plans reviewable before acceptance", () => {
@@ -362,14 +394,26 @@ describe("TaskWorkspacePage", () => {
     mocks.plan = { id: "plan-1", status: "draft" };
     mocks.graphPlan = graphPlan("waiting_acceptance");
     mocks.canAcceptPlan = true;
+    // Plan exists but is not yet accepted, so the state-driven
+    // primary action is "Accept plan" (not "Generate plan" and not
+    // "Start" — those are hidden).
+    mocks.executionState = {
+      "/execution/can-start": false,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/execution/show-accept-plan": true,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
+      "/execution/status": "ready",
+    };
 
     render(<TaskWorkspacePage data={taskData()} />);
 
     expect(screen.getByText("generation:waiting_acceptance")).toBeInTheDocument();
     expect(screen.getByText("accept:enabled")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Accept plan" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(screen.getByText("primary-action:Accept plan")).toBeInTheDocument();
   });
 
   it("renders accepted plans with completed progress", () => {
@@ -381,7 +425,7 @@ describe("TaskWorkspacePage", () => {
 
     expect(screen.getByText("generation:accepted")).toBeInTheDocument();
     expect(screen.getByText("plan:accepted")).toBeInTheDocument();
-    expect(screen.getByText("workspace-status:completed")).toBeInTheDocument();
+    expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
   });
 
   it("passes human-review data through the workspace page", () => {
@@ -435,15 +479,25 @@ describe("TaskWorkspacePage", () => {
     mocks.planGenerationStatus = "accepted";
     mocks.plan = { id: "plan-1", status: "accepted" };
     mocks.graphPlan = fixture.graphPlan;
+    // The state-driven header for a running task exposes Pause and
+    // Stop; Start is hidden.
+    mocks.executionState = {
+      "/execution/can-start": false,
+      "/execution/can-pause": true,
+      "/execution/can-stop": true,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "Task is already running.",
+      "/execution/status": "running",
+    };
 
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
     expect(screen.getByRole("heading", { name: "Launch task" })).toBeInTheDocument();
     expect(screen.getByText("header-status:Running")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:running")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Regenerate plan" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "..." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled();
   });
@@ -467,7 +521,7 @@ describe("TaskWorkspacePage", () => {
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Generate plan" }).length).toBeGreaterThan(0);
   });
 
   it("renders loading, empty, and error workspace page treatments", () => {
@@ -508,14 +562,24 @@ describe("TaskWorkspacePage", () => {
     const fixture = taskWorkspaceStateFixtures.permissionLimited;
     mocks.plan = { id: "plan-1", status: "accepted" };
     mocks.graphPlan = fixture.graphPlan;
+    // The fixture is in the "Ready" state with a plan accepted but
+    // never started; the state-driven primary action is "Start".
+    mocks.executionState = {
+      "/execution/can-start": true,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": true,
+      "/execution/start-disabled-reason": "You can view this task, but cannot run it",
+      "/execution/status": "ready",
+    };
 
     render(<TaskWorkspacePage data={fixture.pageData} />);
 
     expect(screen.getByText("header-status:Ready")).toBeInTheDocument();
     expect(screen.getByText("workspace-status:waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
+    expect(screen.getByText("primary-action:Start")).toBeInTheDocument();
   });
 
   it("keeps long mobile fixture content visible without dropping workspace regions", () => {

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { SYNC_STALE_MS } from "../../constants";
 import { deriveScheduleState, deriveTaskState } from "@chrona/domain";
 import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
+import { getLatestCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { appendTaskWorkspaceEvent } from "./task-projection-events";
 
 
@@ -97,6 +98,13 @@ export async function rebuildTaskProjection(taskId: string) {
     session?.currentNodeId,
   );
 
+  // Latest compiled plan for this work-block scope. Scoped to the same
+  // work block as runs/sessions so a fresh draft on a sibling occurrence
+  // cannot mask a failed-run block on the canonical one. The draft-plan
+  // recover branch in deriveTaskState reads this to clear stale Blocked
+  // when the user regenerates a plan to retry.
+  const latestPlan = await getLatestCompiledPlan(taskId, scopeWorkBlockId);
+
   const derived = deriveTaskState({
     task: { status: task.status, latestRunId: task.latestRunId },
     runs: task.runs,
@@ -107,6 +115,12 @@ export async function rebuildTaskProjection(taskId: string) {
           status: session.status,
           currentNodeId: session.currentNodeId,
           pauseReason: session.pauseReason,
+        }
+      : null,
+    latestPlan: latestPlan
+      ? {
+          status: latestPlan.status,
+          updatedAt: new Date(latestPlan.updatedAt),
         }
       : null,
   });

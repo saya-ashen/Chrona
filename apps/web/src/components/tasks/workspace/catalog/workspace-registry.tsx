@@ -1,14 +1,97 @@
 import { useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
+import { ActivityTimeline } from "../execution/activity-timeline";
+import type { WorkspaceActivityItem } from "../model/task-workspace-types";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
+import { useLocale } from "@chrona/i18n/react";
 import { chronaCatalog } from "@chrona/ui-protocol";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { cn } from "@/lib/utils";
 
+type OccurrenceOption = {
+  value: string;
+  label: string;
+  taskId: string;
+  date: string | null;
+  workBlockId: string | null;
+};
+
+function isOccurrenceOption(value: unknown): value is OccurrenceOption {
+  return Boolean(value)
+    && typeof value === "object"
+    && typeof (value as { value?: unknown }).value === "string"
+    && typeof (value as { label?: unknown }).label === "string"
+    && typeof (value as { taskId?: unknown }).taskId === "string"
+    && (typeof (value as { date?: unknown }).date === "string" || (value as { date?: unknown }).date === null)
+    && (typeof (value as { workBlockId?: unknown }).workBlockId === "string" || (value as { workBlockId?: unknown }).workBlockId === null);
+}
+
+function dateFromKey(date: string) {
+  return new Date(`${date}T12:00:00`);
+}
+
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string; value: string; options: OccurrenceOption[] }) {
+  const [open, setOpen] = useState(false);
+  const locale = useLocale();
+  const navigate = useNavigate();
+  const current = options.find((option) => option.value === value) ?? options[0];
+  const availableDates = new Set(options.flatMap((option) => option.date ? [option.date] : []));
+  const selectedDate = current?.date ? dateFromKey(current.date) : undefined;
+
+  const navigateTo = (occurrence: OccurrenceOption) => {
+    const search = occurrence.workBlockId ? `?workBlockId=${encodeURIComponent(occurrence.workBlockId)}` : "";
+    void navigate({ pathname: `/${locale}/tasks/${occurrence.taskId}`, search });
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-7 max-w-[20rem] rounded-full bg-background/80 px-2.5 text-xs font-medium">
+          <span className="text-muted-foreground">{label}</span>
+          <span className="min-w-0 truncate">{current?.label ?? "Select occurrence"}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-2">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          defaultMonth={selectedDate}
+          disabled={(date) => !availableDates.has(dateKey(date))}
+          modifiers={{ occurrence: (date) => availableDates.has(dateKey(date)) }}
+          modifiersClassNames={{ occurrence: "font-semibold text-primary" }}
+          onSelect={(date) => {
+            if (!date) return;
+            const matches = options.filter((option) => option.date === dateKey(date));
+            if (matches.length === 1) navigateTo(matches[0]);
+          }}
+        />
+        <div className="max-h-40 space-y-1 overflow-y-auto border-t border-border/70 p-2">
+          {options.filter((option) => option.date === (selectedDate ? dateKey(selectedDate) : current?.date)).map((option) => (
+            <Button key={option.value} type="button" variant={option.value === value ? "secondary" : "ghost"} size="sm" className="h-7 w-full justify-start rounded-md px-2 text-xs" onClick={() => navigateTo(option)}>
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 type Tone = "neutral" | "info" | "success" | "warning" | "danger" | undefined;
 
 function toneBadgeVariant(tone: Tone) {
@@ -103,6 +186,24 @@ function WorkspaceArtifactList({
     </div>
   );
 }
+function WorkspaceActionGroup({ label, layout = "inline", children }: { label?: string; layout?: "inline" | "stack"; children?: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-border/60 bg-background/70 p-2.5 shadow-sm">
+      {label ? <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p> : null}
+      <div className={cn(layout === "inline" ? "flex flex-wrap gap-2" : "space-y-2")}>{children}</div>
+    </section>
+  );
+}
+
+function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?: Tone; children?: ReactNode }) {
+  return (
+    <div className={cn("min-w-0 rounded-lg border bg-card/80 p-2.5 shadow-xs", panelToneClassName(tone))}>
+      {title ? <p className="mb-2 text-xs font-semibold text-foreground">{title}</p> : null}
+      <div className="space-y-2 [&_button]:h-8 [&_button]:rounded-lg [&_button]:px-3 [&_textarea]:min-h-20 [&_textarea]:text-sm">{children}</div>
+    </div>
+  );
+}
+
 
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt
@@ -132,7 +233,26 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Select: shadcnComponents.Select,
     Tabs: shadcnComponents.Tabs,
     Table: shadcnComponents.Table,
+    heading: shadcnComponents.Heading,
+    DropdownMenu: shadcnComponents.DropdownMenu,
+    paragraph: ({ props }) => <p className="text-sm leading-6 text-foreground/85">{props.text ?? props.content}</p>,
+    table: shadcnComponents.Table,
+    section: ({ props, children }) => (
+      <section className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3">
+        {props.title ? <h3 className="font-heading text-sm font-semibold text-foreground">{props.title}</h3> : null}
+        {children}
+      </section>
+    ),
 
+    WorkspaceOccurrenceCalendar: ({ props }) => {
+      const rawOptions = Array.isArray(props.options) ? props.options : [];
+      const options = rawOptions.filter(isOccurrenceOption);
+      if (options.length <= 1) return null;
+      return <WorkspaceOccurrenceCalendar label={typeof props.label === "string" ? props.label : "Occurrence"} value={typeof props.value === "string" ? props.value : options[0]?.value ?? ""} options={options} />;
+    },
+
+    WorkspaceActionGroup: ({ props, children }) => <WorkspaceActionGroup label={props.label} layout={props.layout}>{children}</WorkspaceActionGroup>,
+    WorkspaceActionCard: ({ props, children }) => <WorkspaceActionCard title={props.title} tone={props.tone as Tone}>{children}</WorkspaceActionCard>,
     // domain components (Chrona)
     Markdown: ({ props }) => (
       <article className="rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm leading-6 text-foreground shadow-sm">
@@ -184,6 +304,28 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
             {children ? <div className="mt-1.5">{children}</div> : null}
           </div>
         </article>
+      );
+    },
+    ActivityStream: ({ props }) => {
+      const items = Array.isArray(props.items) ? props.items as WorkspaceActivityItem[] : [];
+      const liveCount = typeof props.liveCount === "number" ? props.liveCount : 0;
+      const savedCount = typeof props.savedCount === "number" ? props.savedCount : items.length;
+      return (
+        <section>
+          <div className="mb-3 text-xs text-muted-foreground">
+            {items.length} shown · {liveCount} live · {savedCount} saved
+          </div>
+          {items.length === 0 ? (
+            <div className="mt-3 rounded-2xl border border-dashed border-border/70 bg-background/70 px-3 py-4 text-center">
+              <p className="text-sm font-medium text-foreground">{props.emptyMessage}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{taskWorkspaceActivityMessages.emptyHint}</p>
+            </div>
+          ) : (
+            <div className="mt-4 pl-1">
+              <ActivityTimeline items={items} />
+            </div>
+          )}
+        </section>
       );
     },
     ToolDetails: ({ props }) => (
@@ -329,6 +471,15 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     ),
   },
   actions: {
+    "command-center-primary": async () => {
+      throw new Error('[ui-protocol] action "command-center-primary" requires a host handler.');
+    },
+    "accept-plan": async () => {
+      throw new Error('[ui-protocol] action "accept-plan" requires a host handler.');
+    },
+    "regenerate-plan": async () => {
+      throw new Error('[ui-protocol] action "regenerate-plan" requires a host handler.');
+    },
     "dispatch-execution": async () => {
       throw new Error('[ui-protocol] action "dispatch-execution" is wired in Phase 3 (Node action).');
     },
@@ -337,6 +488,15 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     },
     "locate-workspace-node": async () => {
       throw new Error('[ui-protocol] action "locate-workspace-node" requires a host handler.');
+    },
+    "recovery-retry": async () => {
+      throw new Error('[ui-protocol] action "recovery-retry" requires a host handler.');
+    },
+    "recovery-edit-instruction": async () => {
+      throw new Error('[ui-protocol] action "recovery-edit-instruction" requires a host handler.');
+    },
+    "recovery-cancel": async () => {
+      throw new Error('[ui-protocol] action "recovery-cancel" requires a host handler.');
     },
   },
 });

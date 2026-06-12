@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Context, Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
@@ -15,6 +15,21 @@ import {
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
+async function taskContextResponse(
+  c: Context,
+  contextName: string,
+  load: () => Promise<unknown>,
+) {
+  try {
+    return json(c, await load());
+  } catch (cause) {
+    const httpError = toHttpError(cause);
+    if (httpError) {
+      return error(c, httpError.message, httpError.status);
+    }
+    return internalServerError(c, contextName, cause, "Failed to get task context");
+  }
+}
 export function createTasksRoutes(engine: ChronaEngine) {
   const supportedExecutionRuntimes = engine.runtime.listExecutionRuntimes();
   const supportedCreateTaskBodySchema = createTaskBodySchemaForSupportedRuntimes(
@@ -148,13 +163,55 @@ export function createTasksRoutes(engine: ChronaEngine) {
       },
     )
     .get(
+      "/tasks/:taskId/runtime-context",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(
+        c,
+        "GET /api/tasks/:taskId/runtime-context",
+        () => engine.tasks.getRuntimeContext({ taskId: c.req.valid("param").taskId }),
+      ),
+    )
+    .get(
+      "/tasks/:taskId/review-context",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(
+        c,
+        "GET /api/tasks/:taskId/review-context",
+        () => engine.tasks.getReviewContext({ taskId: c.req.valid("param").taskId }),
+      ),
+    )
+    .get(
+      "/tasks/:taskId/command-center",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(
+        c,
+        "GET /api/tasks/:taskId/command-center",
+        () => engine.tasks.getCommandCenter({
+          taskId: c.req.valid("param").taskId,
+          workBlockId: c.req.query("workBlockId") ?? null,
+        }),
+      ),
+    )
+    .get(
+      "/tasks/:taskId/workspace/header",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => taskContextResponse(
+        c,
+        "GET /api/tasks/:taskId/workspace/header",
+        () => engine.tasks.getHeaderSpec({
+          taskId: c.req.valid("param").taskId,
+          workBlockId: c.req.query("workBlockId") ?? null,
+        }),
+      ),
+    )
+    .get(
       "/tasks/:taskId",
       zValidator("param", taskDetailParamSchema),
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
           const workBlockId = c.req.query("workBlockId") ?? null;
-          return json(c, await engine.tasks.getPage({ taskId, workBlockId }));
+          return json(c, await engine.tasks.getBootstrap({ taskId, workBlockId }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {

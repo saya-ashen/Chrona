@@ -4,8 +4,10 @@ import {
   mergeWorkspaceActivity,
   orderWorkspaceActivity,
   runtimeEventToWorkspaceActivity,
+  workspaceEventToWorkspaceActivity,
 } from "./task-workspace-activity";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
+import type { TaskWorkspaceSseEvent } from "../hooks/use-task-workspace-page-state";
 import type { WorkspaceActivityItem } from "./task-workspace-types";
 
 function activity(overrides: Partial<WorkspaceActivityItem> & Pick<WorkspaceActivityItem, "id" | "kind">): WorkspaceActivityItem {
@@ -91,6 +93,100 @@ describe("workspace activity helpers", () => {
         inputSummary: "taskId=task-1",
         state: "started",
       },
+    });
+  });
+
+  it("keeps assistant deltas separate across provider run boundaries", () => {
+    const merged = mergeWorkspaceActivity([
+      activity({ id: "a1", kind: "assistant_message", summary: "Before ", assistant: { text: "Before ", isReasoning: false }, runId: "run-1", sequence: 1 }),
+      activity({ id: "a2", kind: "assistant_message", summary: "after", assistant: { text: "after", isReasoning: false }, runId: "run-2", sequence: 2 }),
+    ], 10);
+
+    expect(merged.map((item) => item.summary)).toEqual(["after", "Before "]);
+  });
+
+  it("converts failed live tool events into danger activity with truncated error details", () => {
+    const longError = `${"Runtime permission denied. ".repeat(20)}Refresh credentials before retrying.`;
+
+    expect(runtimeEventToWorkspaceActivity(runtimeEvent({
+      nodeId: "node-1",
+      nodeTitle: "Fetch calendar",
+      rawEventType: "tool_completed",
+      event: {
+        type: "tool_completed",
+        toolName: "chrona_calendar_fetch",
+        label: "Fetch calendar",
+        durationMs: 42,
+        error: { message: longError },
+      },
+    }))).toMatchObject({
+      kind: "tool_completed",
+      title: "Tool failed",
+      summary: `Fetch calendar failed: ${longError}`,
+      tone: "danger",
+      tool: {
+        name: "chrona_calendar_fetch",
+        label: "Fetch calendar",
+        durationMs: 42,
+        state: "failed",
+        error: expect.stringMatching(/^Runtime permission denied\./),
+      },
+    });
+  });
+
+  it("keeps approval and failed run status events actionable in activity", () => {
+    expect(runtimeEventToWorkspaceActivity(runtimeEvent({
+      rawEventType: "approval_required",
+      event: ({
+        type: "approval_required",
+        approval: {
+          provider: "anthropic",
+          runId: "run-1",
+          kind: "checkpoint",
+          title: "Approve output",
+          summary: "Execution is waiting for approval.",
+          riskLevel: "medium",
+          choices: ["approve_once", "deny"],
+        },
+      } satisfies WorkspaceRuntimeEvent["event"]),
+    }))).toMatchObject({
+      kind: "approval",
+      title: "Approval required",
+      tone: "warning",
+    });
+
+    expect(runtimeEventToWorkspaceActivity(runtimeEvent({
+      rawEventType: "run_status",
+      event: { type: "run_status", status: "failed", message: "Provider run failed" },
+    }))).toMatchObject({
+      kind: "provider_run",
+      title: "Run status",
+      summary: "Provider run failed",
+      tone: "danger",
+    });
+  });
+
+  it("keeps plan generation projection refreshes out of live activity", () => {
+    const projectionEvent: TaskWorkspaceSseEvent = {
+      type: "task_workspace_updated",
+      sequence: 3,
+      reason: "plan_generation.status",
+    };
+    const statusEvent: TaskWorkspaceSseEvent = {
+      type: "plan.generation.event",
+      sequence: 4,
+      eventKind: "status",
+      phase: "streaming",
+      message: "Using browser_console...",
+      generationId: "generation-1",
+    };
+
+    expect(workspaceEventToWorkspaceActivity(projectionEvent)).toBeNull();
+    expect(workspaceEventToWorkspaceActivity(statusEvent)).toMatchObject({
+      rawEventType: "plan_generation.status",
+      title: "Plan generation update",
+      summary: "Using browser_console...",
+      activityGroup: { kind: "plan_generation", id: "generation-1" },
     });
   });
 });

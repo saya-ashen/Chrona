@@ -18,6 +18,7 @@ type NodeExecutionEvidence = NonNullable<
 
 export type NodeAiCapabilityInput = {
   taskId: string;
+  workBlockId?: string | null;
   mainSession: {
     id: string;
     taskId: string;
@@ -233,6 +234,7 @@ export async function runTaskNodeFeature(
   try {
     const invocation = await input.aiRuntimeInvoker.invoke({
       taskId: input.taskId,
+      workBlockId: input.workBlockId ?? null,
       taskSessionId: input.mainSession.id,
       runtimeName: input.runtimeName,
       runtimeSessionKey: input.mainSession.sessionKey,

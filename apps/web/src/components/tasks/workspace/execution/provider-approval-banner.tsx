@@ -64,7 +64,8 @@ export function ProviderApprovalBanner({ taskId }: { taskId: string }) {
     queryFn: () => apiJson<ProviderApprovalListResponse>(`/api/tasks/${taskId}/provider-approvals?status=pending`),
     refetchInterval: 5_000,
   });
-  const approval = data?.approvals[0];
+  const approvals = Array.isArray(data?.approvals) ? data.approvals : [];
+  const approval = approvals[0];
   const resolveMutation = useMutation({
     mutationFn: (input: { approvalId: string; choice: ProviderApprovalChoice }) => apiJson<ProviderApprovalResolveResponse>(
       `/api/tasks/${taskId}/provider-approvals/${input.approvalId}/resolve`,

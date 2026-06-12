@@ -104,7 +104,7 @@ export function ControlPlaneShell({
     <SidebarProvider
       defaultOpen
       className="h-screen min-h-0 bg-canvas text-foreground"
-      style={{ "--sidebar-width": "224px" } as CSSProperties}
+      style={{ "--sidebar-width": "200px" } as CSSProperties}
     >
       <Sidebar collapsible="none" className="hidden border-r border-border/60 bg-sidebar xl:flex">
         <SidebarHeader className="border-b border-border/60 px-3.5 py-3.5">

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
-import { createChronaEngine } from "@chrona/engine";
+import { createChronaEngine, subscribeToTaskProjectionEvents, type TaskProjectionEvent } from "@chrona/engine";
 import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
 import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
@@ -279,6 +279,120 @@ describe("Real router smoke", () => {
     expect(stateBody.aiPlanGenerationStatus).toBe("accepted");
     expect(stateBody.savedPlan?.id).toBe(compiledPlan.editablePlanId);
     expect(stateBody.savedPlan?.compiledPlan.nodes.length).toBeGreaterThan(0);
+  });
+
+  it("accepts a plan by plan id without moving it to a neighboring work block", async () => {
+    const { workspaceId } = await seedWorkspace("Real Router Scoped Plan");
+    const { taskId } = await seedTask(workspaceId, { title: "Scoped recurring plan parent" });
+    const sourceBlock = await db.workBlock.create({
+      data: {
+        workspaceId,
+        taskId,
+        title: "Today scoped occurrence",
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-08T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-08T15:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const neighboringBlock = await db.workBlock.create({
+      data: {
+        workspaceId,
+        taskId,
+        title: "Tomorrow neighboring occurrence",
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-09T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-09T15:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const compiledPlan = makeSmokeCompiledPlan("real-router-scoped-plan");
+
+    await saveCompiledPlan({
+      workspaceId,
+      taskId,
+      workBlockId: sourceBlock.id,
+      compiledPlan,
+      status: "draft",
+      prompt: compiledPlan.title,
+      summary: compiledPlan.goal,
+      generatedBy: "real-router-smoke",
+    });
+
+    const acceptRes = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planId: compiledPlan.editablePlanId, workspaceId, workBlockId: neighboringBlock.id }),
+    });
+
+    expect(acceptRes.status).toBe(200);
+    const stored = await db.taskPlan.findUniqueOrThrow({ where: { planId: compiledPlan.editablePlanId } });
+    expect(stored.status).toBe("Accepted");
+    expect(stored.workBlockId).toBe(sourceBlock.id);
+  });
+
+  it("runs scoped plan accept through the async work command route", async () => {
+    const { workspaceId } = await seedWorkspace("Real Router Async Scoped Plan");
+    const { taskId } = await seedTask(workspaceId, { title: "Async scoped recurring plan parent" });
+    const sourceBlock = await db.workBlock.create({
+      data: {
+        workspaceId,
+        taskId,
+        title: "Today async scoped occurrence",
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-08T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-08T15:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const neighboringBlock = await db.workBlock.create({
+      data: {
+        workspaceId,
+        taskId,
+        title: "Tomorrow async neighboring occurrence",
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-09T14:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-09T15:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const compiledPlan = makeSmokeCompiledPlan("real-router-async-scoped-plan");
+    const events: TaskProjectionEvent[] = [];
+    const subscription = subscribeToTaskProjectionEvents(taskId, (event) => events.push(event));
+
+    try {
+      await saveCompiledPlan({
+        workspaceId,
+        taskId,
+        workBlockId: sourceBlock.id,
+        compiledPlan,
+        status: "draft",
+        prompt: compiledPlan.title,
+        summary: compiledPlan.goal,
+        generatedBy: "real-router-smoke",
+      });
+
+      const commandRes = await app().request(`http://local/api/work/${taskId}/commands`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "plan.accept", planId: compiledPlan.editablePlanId, workBlockId: neighboringBlock.id }),
+      });
+
+      expect(commandRes.status).toBe(202);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      const stored = await db.taskPlan.findUniqueOrThrow({ where: { planId: compiledPlan.editablePlanId } });
+      expect(stored.status).toBe("Accepted");
+      expect(stored.workBlockId).toBe(sourceBlock.id);
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: "command.accepted", commandType: "plan.accept" }),
+        expect.objectContaining({ type: "task_projection_updated" }),
+      ]));
+      expect(events.some((event) => event.type === "plan.generation.event")).toBe(false);
+      expect(events.some((event) => event.type === "command.failed")).toBe(false);
+    } finally {
+      subscription.unsubscribe();
+    }
   });
 
   it("streams execution action state and result through SSE", async () => {

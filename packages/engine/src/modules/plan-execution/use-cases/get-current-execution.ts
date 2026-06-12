@@ -11,6 +11,23 @@ import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
 import { currentNodeFromEffective } from "../projection/execution-graph-selectors";
 import { buildExecutionResponse } from "../projection/execution-response";
 
+
+export function hasExecutionEvidence(effective: EffectivePlanGraph) {
+  return effective.completedNodeIds.length > 0
+    || effective.failedNodeIds.length > 0
+    || effective.blockedNodeIds.length > 0
+    || effective.runningNodeIds.length > 0
+    || effective.nodes.some((node) => node.status === "waiting_for_user" || node.status === "waiting_for_approval");
+}
+
+export function currentExecutionStatusFromEffectiveGraph(input: {
+  effective: EffectivePlanGraph;
+  hasActiveExecutionSession: boolean;
+}) {
+  return input.hasActiveExecutionSession || hasExecutionEvidence(input.effective)
+    ? executionStatusFromEffectiveGraph(input.effective)
+    : "started";
+}
 export async function getCurrentExecution(input: { taskId: string; workBlockId?: string | null }): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId ?? null);
   if (!runtime) {
@@ -47,9 +64,10 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     results: runtime.persisted.results,
   }) as unknown as EffectivePlanGraph;
   const hasActiveExecutionSession = Boolean(executionSession);
-  const status = hasActiveExecutionSession || effective.completedNodeIds.length > 0
-    ? executionStatusFromEffectiveGraph(effective)
-    : "started";
+  const status = currentExecutionStatusFromEffectiveGraph({
+    effective,
+    hasActiveExecutionSession,
+  });
   const currentNodeId = currentNodeFromEffective(effective)?.id
     ?? (!hasActiveExecutionSession && status === "started" ? effective.readyNodeIds[0] : null)
     ?? executionSession?.currentNodeId

@@ -143,20 +143,20 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.queryByText(/Structured result is ready/)).not.toBeInTheDocument();
   });
 
-  it("renders expanded drawer content as a selectable fixed panel", () => {
+  it("renders the selected node as an inline details panel, not a floating drawer", () => {
     const node = createTaskWorkspaceFixtureNode({
-      id: "drawer-node",
-      title: "Drawer node",
+      id: "panel-node",
+      title: "Panel node",
       status: "done",
       completionSummary: "Selectable result text",
     });
 
-    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} variant="drawer" drawerSize="expanded" />);
+    render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} />);
 
-    const drawer = screen.getByLabelText("Current node details");
-    expect(drawer).toHaveAttribute("data-node-detail-drawer", "true");
-    expect(drawer).not.toHaveAttribute("data-vaul-drawer");
-    expect(drawer).toHaveClass("select-text");
+    const panel = screen.getByLabelText("Current node details");
+    // The merged inspector renders node details inline in the right rail — no floating drawer overlay.
+    expect(panel).not.toHaveAttribute("data-node-detail-drawer");
+    expect(panel).not.toHaveClass("fixed");
   });
 
   it("renders json-render Spec result output via SpecRenderer", () => {
@@ -182,6 +182,33 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("AI Result")).toBeInTheDocument();
     expect(screen.getByText("This is the AI-produced UI output.")).toBeInTheDocument();
   });
+
+  it("renders lowercase json-render report output with a repaired root", () => {
+    const node = createTaskWorkspaceFixtureNode({
+      id: "ui-lowercase-result",
+      title: "Lowercase UI result node",
+      status: "done",
+      resultOutputs: [{
+        root: "github_trending_report",
+        elements: {
+          heading: { type: "heading", props: { text: "GitHub Trending" } },
+          summary_text: { type: "paragraph", props: { text: "Daily report" } },
+          table: { type: "table", props: { columns: ["Repo"], rows: [["chrona"]] } },
+        },
+      }],
+    });
+
+    render(<TaskWorkspaceNodeDetailPanel
+      detail={detail({ currentNode: node, selectedNode: node, status: "completed" })}
+      activity={[]}
+      selectedNodes={[node]}
+    />);
+
+    expect(screen.getByText("GitHub Trending")).toBeInTheDocument();
+    expect(screen.getByText("Daily report")).toBeInTheDocument();
+    expect(screen.getByText("chrona")).toBeInTheDocument();
+  });
+
 
   it("does not render typed fallback when result output is invalid for SpecRenderer", () => {
     const node = createTaskWorkspaceFixtureNode({

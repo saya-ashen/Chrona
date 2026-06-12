@@ -1,71 +1,15 @@
 import type { PlanExecutionResult } from "./execution-state";
-import type { NodeActionFormField } from "./node";
+import type { CheckpointActionKind } from "./_leaf";
 
-export interface CheckpointResponse {
-  id: string;
-  planRunId: string;
-  nodeId: string;
-  response: unknown;
-  submittedAt: string;
-}
-
-export type CheckpointFormField = NodeActionFormField & {
-  value?: string;
-};
-
-export interface CheckpointForm {
-  instructions: string;
-  submitLabel?: string;
-  inputFields: CheckpointFormField[];
-}
-
-export type ExecutionCheckpointKind =
-  | "user_input"
-  | "approval"
-  | "review"
-  | "replan_required"
-  | "blocked"
-  | "failed"
-  | "manual_recovery"
-  | "external_dependency";
-
-export type CheckpointActionKind =
-  | "submit_input"
-  | "approve_result"
-  | "reject_result"
-  | "request_changes"
-  | "request_replan"
-  | "accept_replan"
-  | "reject_replan"
-  | "retry_node"
-  | "resume_after_unblock"
-  | "mark_node_completed"
-  | "mark_node_skipped"
-  | "cancel_session"
-  | "fail_task";
-
-export interface CheckpointAction {
-  id: CheckpointActionKind;
-  label: string;
-  style: "primary" | "secondary" | "danger";
-  requiresPayload?: boolean;
-  payloadSchema?: unknown;
-}
-
-export interface ExecutionCheckpoint {
-  id: string;
-  taskId: string;
-  sessionId: string;
-  planRunId: string;
-  nodeId: string | null;
-  kind: ExecutionCheckpointKind;
-  title: string;
-  message: string;
-  severity: "info" | "warning" | "error";
-  form?: CheckpointForm;
-  availableActions: CheckpointAction[];
-  createdAt: string;
-}
+export type {
+  CheckpointResponse,
+  ExecutionCheckpointKind,
+  CheckpointActionKind,
+  CheckpointFormField,
+  CheckpointForm,
+  CheckpointAction,
+  ExecutionCheckpoint,
+} from "./_leaf";
 
 export type PostCheckpointTransition =
   | { type: "continue_next_ready" }

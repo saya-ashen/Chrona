@@ -1,14 +1,18 @@
 import { createTask } from "./create-task";
 import { deleteTask } from "./delete-task";
 import { getTaskPage } from "./get-task-page";
+import { getTaskBootstrap } from "./get-task-bootstrap";
+import { getTaskCommandCenter } from "./get-task-command-center";
+import { getTaskReviewContext } from "./get-task-review-context";
+import { getTaskHeaderSpec } from "./get-task-header";
 import { getTaskActivityPage } from "./task-activity";
+import { getTaskRuntimeContext } from "./get-task-runtime-context";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
 import { markTaskDone } from "./mark-task-done";
 import { reopenTask } from "./reopen-task";
 import { ensureTaskInWorkspace } from "./task-by-id";
 import { updateTask } from "./update-task";
-
 export class Tasks {
   create(input: Parameters<typeof createTask>[0]) {
     return createTask(input);
@@ -32,6 +36,26 @@ export class Tasks {
 
   getPage(input: { taskId: string; workBlockId?: string | null }) {
     return getTaskPage(input);
+  }
+
+  getBootstrap(input: Parameters<typeof getTaskBootstrap>[0]) {
+    return getTaskBootstrap(input);
+  }
+
+  getRuntimeContext(input: Parameters<typeof getTaskRuntimeContext>[0]) {
+    return getTaskRuntimeContext(input);
+  }
+
+  getReviewContext(input: Parameters<typeof getTaskReviewContext>[0]) {
+    return getTaskReviewContext(input);
+  }
+
+  getCommandCenter(input: Parameters<typeof getTaskCommandCenter>[0]) {
+    return getTaskCommandCenter(input);
+  }
+
+  getHeaderSpec(input: Parameters<typeof getTaskHeaderSpec>[0]) {
+    return getTaskHeaderSpec(input);
   }
 
   getActivityPage(input: Parameters<typeof getTaskActivityPage>[0]) {

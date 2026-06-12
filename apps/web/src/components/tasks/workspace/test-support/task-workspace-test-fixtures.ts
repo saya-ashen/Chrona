@@ -1,4 +1,5 @@
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
+import { buildTaskHeaderSpec, type TaskHeaderActionInput, type UiDocument } from "@chrona/ui-protocol";
 import type { TaskPageData } from "../model/task-workspace-types";
 
 type TaskWorkspaceFixturePageOverrides = Omit<Partial<TaskPageData>, "task"> & {
@@ -75,6 +76,64 @@ export function createTaskWorkspaceFixtureGraph(
   };
 }
 
+function createFixtureCommandCenter(): NonNullable<TaskPageData["commandCenter"]> {
+  return {
+    documents: {
+      now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
+      output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
+      trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
+    },
+  };
+}
+
+// Single source of truth for header-spec test fixtures. Re-exports the
+// real `buildTaskHeaderSpec` from `@chrona/ui-protocol` so any test that
+// needs a `UiDocument` for the header (page mock, header-card render,
+// plan section, etc.) routes through here. Keeps the builder import
+// in one place — the engine `getHeaderSpec` is the only other caller.
+export function createHeaderSpecFixture(input: {
+  title: string;
+  status?: "waiting" | "running" | "completed" | "blocked" | "approval-needed";
+  priority?: "Low" | "Medium" | "High" | "Urgent";
+  progressLabel?: string;
+  occurrenceLabel?: string | null;
+  actions?: TaskHeaderActionInput[];
+} = { title: "Launch task" }): UiDocument {
+  const status = input.status ?? "waiting";
+  const priority = input.priority ?? "High";
+  const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+  return buildTaskHeaderSpec({
+    title: input.title,
+    status,
+    statusLabel,
+    progressLabel: input.progressLabel ?? "0 steps · 0 accepted · 0%",
+    priorityLabel: priority,
+    priorityTone: priority === "Urgent" ? "danger" : priority === "High" ? "warning" : "neutral",
+    occurrenceLabel: input.occurrenceLabel ?? null,
+    actions: input.actions ?? [
+      { id: "generate-plan", label: "Generate plan" },
+      { id: "edit", label: "Edit" },
+      { id: "delete", label: "Delete Task" },
+    ],
+  });
+}
+
+function createFixtureHeader(task: Partial<TaskPageData["task"]> = {}): NonNullable<TaskPageData["header"]> {
+  const title = task.title ?? "Launch task";
+  const isRunning = task.status === "Running";
+  return {
+    spec: createHeaderSpecFixture({
+      title,
+      status: isRunning ? "running" : task.status === "Completed" ? "completed" : "waiting",
+      priority: task.priority === "Low" || task.priority === "Medium" || task.priority === "High" || task.priority === "Urgent"
+        ? task.priority
+        : "High",
+      actions: isRunning
+        ? [{ id: "pause", label: "Pause" }, { id: "stop", label: "Stop" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }]
+        : undefined,
+    }),
+  };
+}
 export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixturePageOverrides = {}): TaskPageData {
   const { task: taskOverrides = {}, ...pageOverrides } = overrides;
 
@@ -110,6 +169,8 @@ export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixtu
     scheduleProposals: [],
     approvals: [],
     artifacts: [],
+    commandCenter: createFixtureCommandCenter(),
+    header: createFixtureHeader(taskOverrides),
     ...pageOverrides,
   };
 }

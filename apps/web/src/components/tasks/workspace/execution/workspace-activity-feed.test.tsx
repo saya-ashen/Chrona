@@ -78,6 +78,22 @@ describe("WorkspaceActivityFeed", () => {
     expect(screen.getByText("Planning phase completed · 3 events · 2.0s")).toBeInTheDocument();
   });
 
+  it("groups plan generation events by activity group across interleaved activity", () => {
+    const group = { kind: "plan_generation" as const, id: "generation-1" };
+    render(<WorkspaceActivityFeed activity={[
+      activity({ id: "done", kind: "task", title: "Plan generated", summary: "Plan ready", tone: "success", timestamp: "2026-05-21T00:01:02.000Z", rawEventType: "plan_generation.completed", activityGroup: group }),
+      activity({ id: "refresh", kind: "task", title: "Task Workspace Updated", summary: "plan_generation.status", timestamp: "2026-05-21T00:01:01.500Z", rawEventType: "task_workspace_updated" }),
+      activity({ id: "status", kind: "task", title: "Plan generation update", summary: "Using browser_console...", timestamp: "2026-05-21T00:01:01.000Z", rawEventType: "plan_generation.status", activityGroup: group }),
+      activity({ id: "accepted", kind: "task", title: "Command accepted", summary: "plan.generate", timestamp: "2026-05-21T00:01:00.500Z", rawEventType: "command.accepted" }),
+      activity({ id: "started", kind: "task", title: "Plan generation started", summary: "Generating a task plan.", timestamp: "2026-05-21T00:01:00.000Z", rawEventType: "plan_generation.started", activityGroup: group }),
+    ]} />);
+
+    expect(screen.getAllByText("Planning phase")).toHaveLength(1);
+    expect(screen.getByText("3 events · 2.0s")).toBeInTheDocument();
+    expect(screen.getByText("Task Workspace Updated")).toBeInTheDocument();
+    expect(screen.getByText("Command accepted")).toBeInTheDocument();
+  });
+
   it("renders started, completed, and failed tool details with expansion", () => {
     render(<WorkspaceActivityFeed activity={[
       activity({ id: "started", kind: "tool_started", title: "Tool started", summary: "Read plan", tone: "info", timestamp: "2026-05-21T00:02:00.000Z", tool: { name: "chrona_plan_read", label: "Read plan", inputSummary: "taskId=task-1", preview: "Loading nodes", state: "started" } }),

@@ -4,6 +4,7 @@ import { api } from "@/lib/rpc-client";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
+import { useTaskPlanGenerationSession, type TaskPlanSessionState } from "@/hooks/ai/task-plan-generation-session-store";
 import {
   canAcceptPlanFromFlow,
   clearPlanFlowError,
@@ -18,6 +19,8 @@ import {
 import type { TaskData } from "../model/task-workspace-types";
 import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
+import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../model/task-workspace-activity";
+import type { WorkspaceActivityItem } from "../model/task-workspace-types";
 
 const STARTING_NODE_STATUS_LABEL = "Starting";
 const STARTING_NODE_NEXT_ACTION = "Starting execution...";
@@ -104,6 +107,27 @@ function shouldRefreshExecutionSnapshot(event: TaskWorkspaceSseEvent) {
     || event.type === "checkpoint.result"
     || event.type === "task_workspace_updated"
     || event.type === "task_projection_updated";
+}
+
+function activitySummaryFromPhase(phase: TaskPlanSessionState["phase"]): string {
+  switch (phase) {
+    case "starting":
+    case "loading_task":
+    case "requesting_provider":
+    case "streaming":
+    case "extracting_tool_payload":
+    case "compiling":
+    case "saving":
+      return "Generating plan";
+    case "completed":
+      return "Plan updated";
+    case "error":
+    case "done":
+      return "Plan generation failed";
+    case "idle":
+    case "connecting":
+      return "Plan ready";
+  }
 }
 
 function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationRunning: boolean) {
@@ -333,6 +357,10 @@ async function dispatchWorkspaceCommand(taskId: string, body: Record<string, unk
   return await response.json() as unknown as WorkspaceCommandAck;
 }
 
+function isWorkspaceEventInSelectedScope(event: TaskWorkspaceSseEvent, selectedWorkBlockId: string | null) {
+  return (event.workBlockId ?? null) === selectedWorkBlockId;
+}
+
 export function useTaskWorkspacePlanState(
   task: TaskData,
   refreshWorkspace: () => Promise<void>,
@@ -359,10 +387,26 @@ export function useTaskWorkspacePlanState(
   });
   const planState = planStateQuery.data;
   const [generationUserInstruction, setGenerationUserInstruction] = useState<string | null>(null);
-  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [generationActivitySummary, setGenerationActivitySummary] = useState<string | null>(null);
+  // `isGeneratingPlan` flips to true when EITHER:
+  //  (a) the shared `useTaskPlanGenerationSession` store — kept current by
+  //      the workspace SSE pipeline — reports a running session, OR
+  //  (b) the persisted `/api/tasks/:taskId/plan` snapshot reports
+  //      `aiPlanGenerationStatus === "generating"`.
+  // Source (b) is the only signal that survives a hard page refresh. The
+  // page loader and the `fetchTaskPlanState` query both read
+  // `isTaskPlanGenerationRunning` on the server, so the moment a generation
+  // is in flight the spec API surfaces "generating" — the button must
+  // honour it on the very first render after the refresh, before the SSE
+  // snapshot or session-store hydrate has a chance to fire.
+  const generationSession = useTaskPlanGenerationSession(task.id, selectedWorkBlockId);
+  const isGeneratingPlan = generationSession.sessionStatus === "running"
+    || planState?.aiPlanGenerationStatus === "generating";
+  const generationActivitySummary = isGeneratingPlan
+    ? (generationSession.statusMessage ?? activitySummaryFromPhase(generationSession.phase))
+    : null;
   const [planFlow, setPlanFlow] = useState(() => createPlanFlowFromSnapshot(planStateQuery.data));
   const [runtimeEvents, setRuntimeEvents] = useState<WorkspaceRuntimeEvent[]>([]);
+  const [liveActivity, setLiveActivity] = useState<WorkspaceActivityItem[]>([]);
   const currentExecution = currentExecutionQuery.data ?? null;
   const latestCheckpoint = currentExecution?.checkpoint ?? null;
   const latestActivitySummary = getRuntimeActivity(runtimeEvents.at(-1)) ?? generationActivitySummary;
@@ -374,9 +418,8 @@ export function useTaskWorkspacePlanState(
     previousWorkBlockKeyRef.current = selectedWorkBlockKey;
     lastWorkspaceEventSequenceRef.current = 0;
     setGenerationUserInstruction(null);
-    setIsGeneratingPlan(false);
-    setGenerationActivitySummary(null);
     setRuntimeEvents([]);
+    setLiveActivity([]);
     setPlanFlow(createPlanFlowFromSnapshot(planStateQuery.data));
   }, [planStateQuery.data, selectedWorkBlockKey]);
 
@@ -428,56 +471,38 @@ export function useTaskWorkspacePlanState(
     );
 
     for (const event of nextEvents) {
-      if (event.workBlockId !== undefined && event.workBlockId !== null && event.workBlockId !== selectedWorkBlockId) continue;
-
-      if (event.type === "command.accepted" && event.commandType === "plan.generate") {
-        setIsGeneratingPlan(true);
-        setGenerationActivitySummary("Generating plan");
+      if (!isWorkspaceEventInSelectedScope(event, selectedWorkBlockId)) continue;
+      const activityItem = workspaceEventToWorkspaceActivity(event, event.sequence ?? 0);
+      if (activityItem) {
+        setLiveActivity((current) => mergeWorkspaceActivity([activityItem, ...current]));
       }
 
-      if (event.type === "command.failed") {
-        setIsGeneratingPlan(false);
-        setGenerationActivitySummary(event.message ?? "Workspace command failed");
-        if (event.commandType === "plan.accept") {
-          setPlanFlow((current) => failPlanAccept(current, current.savedPlan?.id ?? "unknown", event.message ?? "Failed to accept plan"));
-        }
-      }
-
+      // `command.accepted` / `command.failed` flow through the
+      // `useTaskPlanGenerationSession` store. `plan.generation.event` still
+      // needs a workspace-plan refetch here because the session store
+      // surfaces the activity summary and final `result`, while the
+      // workspace plan / plan-state pair on the server is the source of
+      // truth for the rendered plan graph and the plan-state query used
+      // by callers (e.g. the editor). Without the refetch, a generated
+      // plan that finishes outside the AI panel would never appear in
+      // the workspace.
       if (event.type === "plan.generation.event") {
-        if (event.eventKind === "status") {
-          setIsGeneratingPlan(true);
-          setGenerationActivitySummary("Generating plan");
-        } else if (event.eventKind === "tool_call") {
-          setIsGeneratingPlan(true);
-          setGenerationActivitySummary("Running tool");
-        } else if (event.eventKind === "partial") {
-          setIsGeneratingPlan(true);
-          setGenerationActivitySummary("Generating plan");
-        } else if (event.eventKind === "result" || event.eventKind === "draft" || event.eventKind === "accepted") {
-          setIsGeneratingPlan(false);
-          setGenerationActivitySummary("Plan updated");
-          void planStateQuery.refetch();
-        } else if (event.eventKind === "error" || event.eventKind === "cancelled" || event.eventKind === "done") {
-          setIsGeneratingPlan(false);
-        }
+        void planStateQuery.refetch();
+        return;
       }
 
-      if (event.type === "execution.runtime_event") {
-        if (isFullRuntimeSseEvent(event)) {
-          const runtimeEvent: WorkspaceRuntimeEvent = { ...event, type: "runtime_event" };
-          setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
-          setGenerationActivitySummary(getRuntimeActivity(runtimeEvent) ?? "Execution updated");
-        } else {
-          setGenerationActivitySummary("Execution updated");
-        }
+      if (event.type === "execution.runtime_event" && isFullRuntimeSseEvent(event)) {
+        const runtimeEvent: WorkspaceRuntimeEvent = { ...event, type: "runtime_event" };
+        setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
       }
+
 
       if (shouldRefreshExecutionSnapshot(event)) {
         void currentExecutionQuery.refetch();
         void planStateQuery.refetch();
       }
     }
-  }, [currentExecutionQuery, planStateQuery, task.id, workspaceEvents]);
+  }, [currentExecutionQuery, planStateQuery, selectedWorkBlockId, workspaceEvents]);
 
   useEffect(() => {
     if (!plan) {
@@ -559,12 +584,12 @@ export function useTaskWorkspacePlanState(
   const handleGeneratePlanFromHeader = useCallback((request?: PlanGenerationRequest) => {
     const userInstruction = request?.userInstruction?.trim() || null;
     setGenerationUserInstruction(userInstruction);
-    setIsGeneratingPlan(true);
-    setGenerationActivitySummary("Generating plan");
-    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction }).catch((cause) => {
-      setIsGeneratingPlan(false);
-      setGenerationActivitySummary(cause instanceof Error ? cause.message : "Failed to generate plan");
-    });
+    // Server pushes `state.update` to the shared session store immediately
+    // after the command is accepted; `isGeneratingPlan` is derived from
+    // that store, so an optimistic flip is no longer needed. A transport
+    // failure bubbles as a rejected promise and is handled upstream; the
+    // session store surfaces any server-side error via `sessionStatus`.
+    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction });
   }, [selectedWorkBlockId, task.id]);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
@@ -642,6 +667,7 @@ export function useTaskWorkspacePlanState(
     setAcceptPlanError,
     generationUserInstruction,
     runtimeEvents,
+    liveActivity,
     latestActivitySummary,
     currentExecution,
     acceptPlanById,

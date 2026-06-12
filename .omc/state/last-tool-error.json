@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /home/saya/workspace/Chrona; echo \\\"=== ./ai resolution ===\\\"; ls packages/contracts/src/ai.ts packages/contracts/src/ai/index.ts 2>/dev/null; echo \\\"--- ai barrel content (feature-spec...",
-  "error": "Exit code 2\n=== ./ai resolution ===\npackages/contracts/src/ai.ts\n--- ai barrel content (feature-specs refs) ---\npackages/contracts/src/ai.ts:1:export * from \"./ai-feature-specs\";",
-  "timestamp": "2026-06-04T14:26:14.701Z",
-  "retry_count": 1
-}

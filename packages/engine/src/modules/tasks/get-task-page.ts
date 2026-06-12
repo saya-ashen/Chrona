@@ -222,6 +222,19 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       })
     : null;
 
+  const activityTimeline = task.timelineItems.length > 0
+    ? orderActivityNewestFirst([
+        ...task.timelineItems.map(mapTimelineItemToActivity),
+        ...buildActivityTimeline([...task.events].reverse()),
+      ]).slice(0, 100)
+    : buildActivityTimeline([...task.events].reverse());
+  const artifacts = task.artifacts.map((artifact) => ({
+    id: artifact.id,
+    title: artifact.title,
+    type: artifact.type,
+    uri: artifact.uri,
+  }));
+
   return {
     defaultExecutionRuntime: task.workspace.defaultRuntime,
     executionRuntimes: listExecutionRuntimes().map((key) => ({
@@ -334,17 +347,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       riskLevel: approval.riskLevel,
       requestedAt: approval.requestedAt.toISOString(),
     })),
-    artifacts: task.artifacts.map((artifact) => ({
-      id: artifact.id,
-      title: artifact.title,
-      type: artifact.type,
-      uri: artifact.uri,
-    })),
-    activityTimeline: task.timelineItems.length > 0
-      ? orderActivityNewestFirst([
-          ...task.timelineItems.map(mapTimelineItemToActivity),
-          ...buildActivityTimeline([...task.events].reverse()),
-        ]).slice(0, 100)
-      : buildActivityTimeline([...task.events].reverse()),
+    artifacts,
+    activityTimeline,
   };
 }

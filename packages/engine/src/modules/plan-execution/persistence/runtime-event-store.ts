@@ -5,6 +5,7 @@ import type { PlanGraphCommandEnvelope } from "../types";
 export async function appendGraphRuntimeEvents(input: {
   taskId: string;
   planId: string;
+  workBlockId?: string | null;
   sessionId: string;
   events: GraphExecutionEvent[];
   envelope?: PlanGraphCommandEnvelope;
@@ -20,6 +21,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "executable_path_computed",
           rawEvent: event,
           payload: {
@@ -38,6 +40,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "node_started",
           nodeId: event.node.id,
           nodeTitle: event.node.title,
@@ -54,6 +57,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "node_completed",
           nodeId: event.node.id,
           nodeTitle: event.node.title,
@@ -68,6 +72,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "node_waiting_for_user",
           nodeId: event.node.id,
           nodeTitle: event.node.title,
@@ -82,6 +87,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "node_waiting_for_approval",
           nodeId: event.node.id,
           nodeTitle: event.node.title,
@@ -96,6 +102,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "node_blocked",
           nodeId: event.node.id,
           nodeTitle: event.node.title,
@@ -110,6 +117,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "replan_proposed",
           nodeId: event.node.id,
           nodeTitle: event.node.title,
@@ -123,6 +131,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "graph_mutation_applied",
           rawEvent: event,
           payload: {
@@ -137,6 +146,7 @@ export async function appendGraphRuntimeEvents(input: {
           taskId: input.taskId,
           planId: input.planId,
           sessionId: input.sessionId,
+          workBlockId: input.workBlockId,
           eventType: "node_result_submitted",
           nodeId: event.nodeId,
           rawEvent: event,

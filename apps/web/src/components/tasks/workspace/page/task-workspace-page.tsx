@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { StateStore } from "@json-render/react";
 import { useI18n } from "@chrona/i18n/react";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
 import { TaskWorkspacePlanSection } from "../sections/task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "../sections/task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
-import { ProviderApprovalBanner } from "../execution/provider-approval-banner";
-import type { TaskData, TaskPageData } from "../model/task-workspace-types";
+import type { TaskPageData } from "../model/task-workspace-types";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { useTaskWorkspaceDeleteFlow } from "../hooks/use-task-workspace-delete-flow";
 import { useTaskWorkspaceEditorState } from "../hooks/use-task-workspace-editor-state";
@@ -29,13 +28,16 @@ type Props = {
 
 type TaskWorkspaceHeaderEditorProps = {
   task: Parameters<typeof TaskWorkspaceHeaderCard>[0]["task"];
-  header: Parameters<typeof TaskWorkspaceHeaderCard>[0]["header"];
-  workspaceStateLabel?: string;
-  workspaceStateGuidance: string;
-  backToScheduleLabel: string;
-  planAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["planAction"];
+  spec: Parameters<typeof TaskWorkspaceHeaderCard>[0]["spec"];
+  store: StateStore;
   onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
-  onSelectOccurrence: (occurrence: NonNullable<TaskData["recurrenceOccurrences"]>[number]) => void;
+  onAcceptPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAcceptPlan"];
+  onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
+  onRecoveryRetry: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryRetry"];
+  onRecoveryEditInstruction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryEditInstruction"];
+  onRecoveryCancel: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryCancel"];
+  isEditExpanded: boolean;
+  onToggleEditExpanded: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
@@ -44,12 +46,11 @@ type TaskWorkspaceHeaderEditorProps = {
   editSectionProps: Omit<Parameters<typeof TaskWorkspaceEditSection>[0], "isEditExpanded" | "onToggleExpanded">;
 };
 
-type HeaderPlanActionInput = {
+type HeaderPlanAcceptInput = {
   plan: ReturnType<typeof useTaskWorkspacePlanState>["plan"];
-  planGenerationStatus: ReturnType<typeof useTaskWorkspacePlanState>["planGenerationStatus"];
   canAcceptPlan: boolean;
-  onGeneratePlan: () => void;
-  onAcceptPlan: () => void;
+  setAcceptPlanError: (value: string | null) => void;
+  acceptPlanById: ReturnType<typeof useTaskWorkspacePlanState>["acceptPlanById"];
 };
 
 const DEFAULT_COPY = {
@@ -78,19 +79,21 @@ const DEFAULT_COPY = {
   currentState: "Current state",
   nextAction: "Next action",
   commandCenterNowTab: "Now",
-  commandCenterOutputTab: "Output",
-  commandCenterTrailTab: "Trail",
+  commandCenterOutputTab: "Results",
+  commandCenterTrailTab: "Activity",
 };
-
 function TaskWorkspaceHeaderEditor({
   task,
-  header,
-  workspaceStateLabel,
-  workspaceStateGuidance,
-  backToScheduleLabel,
-  planAction,
+  spec,
+  store,
   onAction,
-  onSelectOccurrence,
+  onAcceptPlan,
+  onGeneratePlan,
+  onRecoveryRetry,
+  onRecoveryEditInstruction,
+  onRecoveryCancel,
+  isEditExpanded,
+  onToggleEditExpanded,
   showDeleteConfirm,
   isDeleting,
   onStartDeleteConfirm,
@@ -98,109 +101,53 @@ function TaskWorkspaceHeaderEditor({
   onDelete,
   editSectionProps,
 }: TaskWorkspaceHeaderEditorProps) {
-  const [isEditExpanded, setIsEditExpanded] = useState(false);
-
   return (
     <>
       <TaskWorkspaceHeaderCard
         task={task}
-        header={header}
-        backToScheduleLabel={backToScheduleLabel}
-        workspaceStateLabel={workspaceStateLabel}
-        workspaceStateGuidance={workspaceStateGuidance}
-        planAction={planAction}
+        spec={spec}
+        store={store}
         onAction={onAction}
-        onSelectOccurrence={onSelectOccurrence}
-        onEdit={() => setIsEditExpanded((current) => !current)}
+        onAcceptPlan={onAcceptPlan}
+        onGeneratePlan={onGeneratePlan}
+        onEdit={onToggleEditExpanded}
         showDeleteConfirm={showDeleteConfirm}
         isDeleting={isDeleting}
         onStartDeleteConfirm={onStartDeleteConfirm}
         onCancelDeleteConfirm={onCancelDeleteConfirm}
         onDelete={onDelete}
+        onRecoveryRetry={onRecoveryRetry}
+        onRecoveryEditInstruction={onRecoveryEditInstruction}
+        onRecoveryCancel={onRecoveryCancel}
       />
       <TaskWorkspaceEditSection
         {...editSectionProps}
         isEditExpanded={isEditExpanded}
-        onToggleExpanded={() => setIsEditExpanded((current) => !current)}
+        onToggleExpanded={onToggleEditExpanded}
       />
     </>
   );
 }
 
-function createPlanAcceptanceHeader(header: TaskWorkspaceHeaderEditorProps["header"], plan: HeaderPlanActionInput["plan"]) {
-  if (plan?.status === "accepted") return header;
-
-  return {
-    ...header,
-    actions: header.actions.map((action) => {
-      if (action.id !== "start") return action;
-      return {
-        ...action,
-        disabled: true,
-        disabledReason: plan
-          ? "Accept the generated plan before starting execution."
-          : "Generate and accept a plan before starting execution.",
-      };
-    }),
-  } satisfies TaskWorkspaceHeaderEditorProps["header"];
+async function acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById }: HeaderPlanAcceptInput) {
+  if (!plan?.id || !canAcceptPlan) return;
+  setAcceptPlanError(null);
+  await acceptPlanById(plan.id);
 }
 
-function createHeaderPlanAction({
-  plan,
-  planGenerationStatus,
-  canAcceptPlan,
-  onGeneratePlan,
-  onAcceptPlan,
-}: HeaderPlanActionInput): TaskWorkspaceHeaderEditorProps["planAction"] {
-  if (planGenerationStatus === "generating") {
-    return {
-      label: "Generating...",
-      placement: "primary",
-      isLoading: true,
-      disabled: true,
-      onClick: onGeneratePlan,
-    };
-  }
 
-  if (plan && plan.status !== "accepted") {
-    return {
-      label: "Accept plan",
-      placement: "primary",
-      disabled: !canAcceptPlan,
-      onClick: onAcceptPlan,
-    };
-  }
-
-  if (plan) {
-    return {
-      label: "Regenerate plan",
-      placement: "menu",
-      disabled: false,
-      onClick: onGeneratePlan,
-    };
-  }
-
-  return {
-    label: "Generate plan",
-    placement: "primary",
-    disabled: false,
-    onClick: onGeneratePlan,
-  };
-}
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
-  const { locale, messages } = useI18n();
+  const { messages } = useI18n();
   const executionConsoleCopy = messages.components?.taskWorkspace ?? {};
   const { registerHandlers, setPageContext } = useAssistantSurface();
-  const { pageData, setTask, refreshWorkspace, workspaceEvents } = useTaskWorkspacePageState(data);
+  const { pageData, commandCenter, setTask, refreshWorkspace, workspaceEvents, headerSpec, headerStore } = useTaskWorkspacePageState(data);
   const task = pageData.task;
-  const navigate = useNavigate();
-  const handleSelectOccurrence = (occurrence: NonNullable<typeof task.recurrenceOccurrences>[number]) => {
-    if (occurrence.isCurrent) return;
-    const search = occurrence.workBlockId ? `?workBlockId=${encodeURIComponent(occurrence.workBlockId)}` : "";
-    void navigate({ pathname: `/${locale}/tasks/${occurrence.taskId}`, search });
-  };
+  const [isEditExpanded, setIsEditExpanded] = useState(false);
+  const toggleEditExpanded = useCallback(() => {
+    setIsEditExpanded((current) => !current);
+  }, []);
 
   const {
     hasUnsavedConfigChanges,
@@ -211,15 +158,12 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     taskConfigInitialValues,
     draftEditableTask,
     editSummary,
-    planningTaskDraft,
     handleTaskConfigDraftStateChange,
     persistTaskConfig,
-    handleSaveCurrentDraft,
   } = useTaskWorkspaceEditorState(task, setTask);
 
   const {
     plan,
-    setPlan,
     fetchPlan,
     planGenerationStatus,
     graphPlan,
@@ -229,7 +173,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     setAcceptPlanError,
     generationUserInstruction,
     runtimeEvents,
+    liveActivity,
     latestActivitySummary,
+    currentExecution,
     acceptPlanById,
     dispatchExecutionAction,
     submitCheckpointAction,
@@ -239,18 +185,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
     [pageData, graphPlan, executionConsoleCopy],
   );
-  const header = createPlanAcceptanceHeader(consoleView.header, plan);
-  const planAction = createHeaderPlanAction({
-    plan,
-    planGenerationStatus,
-    canAcceptPlan,
-    onGeneratePlan: handleGeneratePlanFromHeader,
-    onAcceptPlan: () => {
-      if (!plan?.id) return;
-      setAcceptPlanError(null);
-      void acceptPlanById(plan.id);
-    },
-  });
   const assistantActivitySummary = latestActivitySummary ?? getLatestPersistedActivitySummary(pageData);
   const {
     currentProposal,
@@ -306,12 +240,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       <div className="shrink-0 space-y-1">
         <TaskWorkspaceHeaderEditor
           task={consoleView.task}
-          header={header}
-          backToScheduleLabel={copy.backToSchedule}
-          workspaceStateLabel={consoleView.states.treatment.label ?? undefined}
-          workspaceStateGuidance={`${copy.nextAction}: ${consoleView.states.treatment.guidance}`}
-          planAction={planAction}
-          onSelectOccurrence={handleSelectOccurrence}
+          spec={headerSpec}
+          store={headerStore}
+          onAcceptPlan={() => acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById })}
+          onGeneratePlan={handleGeneratePlanFromHeader}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });
@@ -323,6 +255,37 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
               await dispatchExecutionAction({ action: "cancel_session", reason: "Stopped from task workspace" });
             }
           }}
+          onRecoveryRetry={() => {
+            // Clearing the error keys first lets the header render the
+            // disabled "Generate plan" button while the new stream opens;
+            // the next `state.update` will repopulate error fields if it
+            // fails again.
+            headerStore.set("/plan/generation/error/code", null);
+            headerStore.set("/plan/generation/error/message", null);
+            headerStore.set("/plan/generation/error/buttonRetry", false);
+            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set("/plan/generation/error/buttonCancel", false);
+            void handleGeneratePlanFromHeader();
+          }}
+          onRecoveryEditInstruction={() => {
+            headerStore.set("/plan/generation/error/code", null);
+            headerStore.set("/plan/generation/error/message", null);
+            headerStore.set("/plan/generation/error/buttonRetry", false);
+            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set("/plan/generation/error/buttonCancel", false);
+            setAcceptPlanError(null);
+            setSaveError(null);
+            setIsEditExpanded(true);
+          }}
+          onRecoveryCancel={() => {
+            headerStore.set("/plan/generation/error/code", null);
+            headerStore.set("/plan/generation/error/message", null);
+            headerStore.set("/plan/generation/error/buttonRetry", false);
+            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set("/plan/generation/error/buttonCancel", false);
+          }}
+          isEditExpanded={isEditExpanded}
+          onToggleEditExpanded={toggleEditExpanded}
           showDeleteConfirm={showDeleteConfirm}
           isDeleting={isDeleting}
           onStartDeleteConfirm={() => setShowDeleteConfirm(true)}
@@ -347,9 +310,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           }}
         />
       </div>
-      <ProviderApprovalBanner taskId={task.id} />
-
-
       <TaskWorkspacePlanSection
         label={copy.planPanelTitle ?? "Plan"}
         commandCenterCopy={{
@@ -360,23 +320,21 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         graphPlan={graphPlan}
         isGraphPlanPending={isGraphPlanPending}
         pageData={pageData}
+        commandCenter={commandCenter}
         plan={plan}
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}
         acceptPlanError={acceptPlanError}
-        planningTaskDraft={planningTaskDraft}
-        hasUnsavedConfigChanges={hasUnsavedConfigChanges}
-        unsavedConfigDraft={planningTaskDraft}
         generationUserInstruction={generationUserInstruction}
         runtimeEvents={runtimeEvents}
+        liveActivity={liveActivity}
+        currentExecution={currentExecution}
         onGeneratePlan={handleGeneratePlanFromHeader}
-        onPlanLoaded={setPlan}
         onApplyPlan={async (result) => {
           if (!result.id) return;
           setAcceptPlanError(null);
           await acceptPlanById(result.id);
         }}
-        onSaveConfigBeforeRegenerate={handleSaveCurrentDraft}
         onDispatchExecutionAction={dispatchExecutionAction}
         onSubmitCheckpointAction={submitCheckpointAction}
       />

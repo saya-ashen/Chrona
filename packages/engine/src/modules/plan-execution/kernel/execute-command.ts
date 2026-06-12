@@ -402,13 +402,14 @@ export async function executeCommand(
   const trigger: ExecutionTrigger =
     context.trigger ?? (command.type === "start" ? command.trigger : "manual");
 
-  const workBlockId =
+  const requestedWorkBlockId =
     command.type === "start"
       ? context.workBlockId ?? null
       : context.workBlockId ?? (await getActiveExecutionWorkBlockId(taskId));
 
-  const runtime = await ensureNativePlanRun(taskId, workBlockId);
+  const runtime = await ensureNativePlanRun(taskId, requestedWorkBlockId);
   if (!runtime) return noPlanResponse(taskId, context.sessionId);
+  const workBlockId = requestedWorkBlockId ?? runtime.workBlockId ?? null;
 
   const contextSessionId = context.sessionId ?? undefined;
   const existingContextSession = contextSessionId
@@ -560,6 +561,7 @@ export async function executeCommand(
 
   await appendGraphRuntimeEvents({
     taskId,
+    workBlockId: session.workBlockId,
     planId: runtime.planId,
     sessionId: mainSession.id,
     events: outcome.events,

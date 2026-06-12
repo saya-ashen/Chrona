@@ -5,11 +5,21 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import type { PropsWithChildren } from "react";
 
+import { buildResultSpec } from "@chrona/ui-protocol";
+
 import { createTestQueryClient } from "@/test/fixtures";
 import { server } from "@/test/msw/server";
 import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-state";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import type { TaskPageData } from "../model/task-workspace-types";
+
+const emptyCommandCenterDocuments = {
+  documents: {
+    now: buildResultSpec([], { emptyMessage: "No current operation." }),
+    output: buildResultSpec([], { emptyMessage: "No output yet." }),
+    trail: buildResultSpec([], { emptyMessage: "No activity yet." }),
+  },
+};
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());
@@ -17,6 +27,30 @@ afterAll(() => server.close());
 
 function wrapper({ children }: PropsWithChildren) {
   return <QueryClientProvider client={createTestQueryClient()}>{children}</QueryClientProvider>;
+}
+
+function splitWorkspaceHandlers(data: TaskPageData, onPageRequest?: () => void) {
+  return [
+    http.get("/api/tasks/:taskId", () => {
+      onPageRequest?.();
+      return HttpResponse.json({ task: data.task, reconciliation: data.reconciliation });
+    }),
+    http.get("/api/tasks/:taskId/runtime-context", () => HttpResponse.json({
+      defaultExecutionRuntime: data.defaultExecutionRuntime,
+      executionRuntimes: data.executionRuntimes,
+    })),
+    http.get("/api/tasks/:taskId/review-context", () => HttpResponse.json({
+      latestRunSummary: data.latestRunSummary,
+      scheduleProposals: data.scheduleProposals,
+      approvals: data.approvals,
+    })),
+    http.get("/api/tasks/:taskId/command-center", () => HttpResponse.json(
+      data.commandCenter ?? emptyCommandCenterDocuments,
+    )),
+    http.get("/api/tasks/:taskId/workspace/header", () => HttpResponse.json(
+      data.header ?? { spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } } },
+    )),
+  ];
 }
 
 describe("Task workspace MSW integration", () => {
@@ -54,9 +88,8 @@ describe("Task workspace MSW integration", () => {
       ].join("\n"), {
         headers: { "Content-Type": "text/event-stream" },
       })),
-      http.get("/api/tasks/:taskId", () => {
+      ...splitWorkspaceHandlers(refreshedData, () => {
         pageRequests += 1;
-        return HttpResponse.json(refreshedData);
       }),
     );
 
@@ -83,6 +116,9 @@ describe("Task workspace MSW integration", () => {
         pageRequests += 1;
         return HttpResponse.json({ error: "Workspace temporarily unavailable" }, { status: 503 });
       }),
+      http.get("/api/tasks/:taskId/runtime-context", () => HttpResponse.json({})),
+      http.get("/api/tasks/:taskId/review-context", () => HttpResponse.json({})),
+      http.get("/api/tasks/:taskId/command-center", () => HttpResponse.json({})),
     );
 
     const { result } = renderHook(() => useTaskWorkspacePageState(initialData), { wrapper });

@@ -151,12 +151,26 @@ export async function getAcceptedCompiledPlan(
   return row ? toSavedCompiledPlan(row) : null;
 }
 
+export async function getCompiledPlanByPlanId(
+  taskId: string,
+  planId: string,
+): Promise<SavedCompiledPlan | null> {
+  const row = await db.taskPlan.findFirst({
+    where: { taskId, planId },
+  });
+
+  return row ? toSavedCompiledPlan(row) : null;
+}
+
 export async function getLatestCompiledPlan(
   taskId: string,
   workBlockId?: string | null,
 ): Promise<SavedCompiledPlan | null> {
   const row = await db.taskPlan.findFirst({
-    where: { taskId, workBlockId: workBlockId ?? null },
+    where: {
+      taskId,
+      ...(workBlockId !== undefined ? { workBlockId } : {}),
+    },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
 

@@ -18,6 +18,29 @@ type EnsureWorkBlockTaskSessionInput = {
   sessionId?: string | null;
   label?: string | null;
 };
+type EnsurePlanGenerationTaskSessionInput = {
+  taskId: string;
+  taskTitle: string;
+  runtimeName: string;
+  label?: string | null;
+};
+
+
+type EnsureWorkBlockPlanTaskSessionInput = {
+  taskId: string;
+  taskTitle: string;
+  runtimeName: string;
+  workBlockId: string;
+  label?: string | null;
+};
+
+type EnsurePlanExecutionTaskSessionInput = {
+  taskId: string;
+  taskTitle: string;
+  runtimeName: string;
+  planId: string;
+  label?: string | null;
+};
 
 type TaskSessionStatus =
   | "idle"
@@ -38,6 +61,46 @@ export function buildWorkBlockTaskSessionKey(input: {
   workBlockId: string;
 }) {
   return `chrona:task:${input.taskId}:work-block:${input.workBlockId}`;
+}
+export function buildPlanGenerationTaskSessionKey(input: {
+  taskId: string;
+}) {
+  return `chrona:task:${input.taskId}:plan-generation`;
+}
+
+export function buildLegacyPlanGenerationTaskSessionKey(input: {
+  taskId: string;
+}) {
+  return buildDefaultTaskSessionKey({ taskId: input.taskId, suffix: "pg" });
+}
+
+
+export function buildWorkBlockPlanTaskSessionKey(input: {
+  taskId: string;
+  workBlockId: string;
+}) {
+  return `chrona:task:${input.taskId}:work-block:${input.workBlockId}:plan-generation`;
+}
+
+export function buildLegacyWorkBlockPlanTaskSessionKey(input: {
+  taskId: string;
+  workBlockId: string;
+}) {
+  return `chrona:task:${input.taskId}:wb:${input.workBlockId}:pg`;
+}
+
+export function buildPlanExecutionTaskSessionKey(input: {
+  taskId: string;
+  planId: string;
+}) {
+  return `chrona:task:${input.taskId}:execute:${input.planId}`;
+}
+
+export function buildLegacyPlanExecutionTaskSessionKey(input: {
+  taskId: string;
+  planId: string;
+}) {
+  return buildDefaultTaskSessionKey({ taskId: input.taskId, suffix: `plan-${input.planId}` });
 }
 
 export async function ensureDefaultTaskSession(
@@ -161,6 +224,129 @@ export async function ensureWorkBlockTaskSession(
   });
 
   return createdSession;
+}
+
+export async function ensurePlanGenerationTaskSession(
+  input: EnsurePlanGenerationTaskSessionInput,
+) {
+  const expectedSessionKey = buildPlanGenerationTaskSessionKey({ taskId: input.taskId });
+  const legacySessionKey = buildLegacyPlanGenerationTaskSessionKey({ taskId: input.taskId });
+
+  const existingSession = await db.taskSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      sessionKey: { in: [expectedSessionKey, legacySessionKey] },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (existingSession) {
+    if (existingSession.sessionKey !== expectedSessionKey) {
+      return db.taskSession.update({
+        where: { id: existingSession.id },
+        data: { sessionKey: expectedSessionKey },
+      });
+    }
+    return existingSession;
+  }
+
+  return db.taskSession.create({
+    data: {
+      taskId: input.taskId,
+      runtimeName: input.runtimeName,
+      sessionKey: expectedSessionKey,
+      label:
+        input.label?.trim() ||
+        `${input.taskTitle.trim() || "Task"} · Plan generation session`,
+      createdByFramework: true,
+    },
+  });
+}
+
+export async function ensureWorkBlockPlanTaskSession(
+  input: EnsureWorkBlockPlanTaskSessionInput,
+) {
+  const expectedSessionKey = buildWorkBlockPlanTaskSessionKey({
+    taskId: input.taskId,
+    workBlockId: input.workBlockId,
+  });
+
+  const legacySessionKey = buildLegacyWorkBlockPlanTaskSessionKey({
+    taskId: input.taskId,
+    workBlockId: input.workBlockId,
+  });
+  const existingSession = await db.taskSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      sessionKey: { in: [expectedSessionKey, legacySessionKey] },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (existingSession) {
+    if (existingSession.sessionKey !== expectedSessionKey) {
+      return db.taskSession.update({
+        where: { id: existingSession.id },
+        data: { sessionKey: expectedSessionKey },
+      });
+    }
+    return existingSession;
+  }
+
+  return db.taskSession.create({
+    data: {
+      taskId: input.taskId,
+      runtimeName: input.runtimeName,
+      sessionKey: expectedSessionKey,
+      label:
+        input.label?.trim() ||
+        `${input.taskTitle.trim() || "Task"} · Work block plan generation session`,
+      createdByFramework: true,
+    },
+  });
+}
+
+export async function ensurePlanExecutionTaskSession(
+  input: EnsurePlanExecutionTaskSessionInput,
+) {
+  const expectedSessionKey = buildPlanExecutionTaskSessionKey({
+    taskId: input.taskId,
+    planId: input.planId,
+  });
+  const legacySessionKey = buildLegacyPlanExecutionTaskSessionKey({
+    taskId: input.taskId,
+    planId: input.planId,
+  });
+
+  const existingSession = await db.taskSession.findFirst({
+    where: {
+      taskId: input.taskId,
+      sessionKey: { in: [expectedSessionKey, legacySessionKey] },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (existingSession) {
+    if (existingSession.sessionKey !== expectedSessionKey) {
+      return db.taskSession.update({
+        where: { id: existingSession.id },
+        data: { sessionKey: expectedSessionKey },
+      });
+    }
+    return existingSession;
+  }
+
+  return db.taskSession.create({
+    data: {
+      taskId: input.taskId,
+      runtimeName: input.runtimeName,
+      sessionKey: expectedSessionKey,
+      label:
+        input.label?.trim() ||
+        `${input.taskTitle.trim() || "Task"} · Plan execution main session`,
+      createdByFramework: true,
+    },
+  });
 }
 
 export async function updateTaskSessionStateFromRun(input: {

@@ -7,6 +7,13 @@ type WorkspaceEventBase = {
   commandId?: string;
 };
 
+export type SpecPatch = {
+  op: "add" | "remove" | "replace" | "move" | "copy" | "test";
+  path: string;
+  value?: unknown;
+  from?: string;
+};
+
 type TaskProjectionUpdatedEvent = WorkspaceEventBase & {
   type: "task_projection_updated";
   persistedStatus: string;
@@ -36,11 +43,42 @@ type TaskWorkspaceRuntimeEvent = WorkspaceEventBase & {
   [key: string]: unknown;
 };
 
+type SpecPatchEvent = WorkspaceEventBase & {
+  type: "spec.patch";
+  document: "header" | "now" | "output" | "trail";
+  patches: SpecPatch[];
+};
+
+/**
+ * Full state snapshot pushed on SSE connect. Client uses this to seed the
+ * `StateProvider` store before any delta arrives. `state` is a flat
+ * `Record<string, unknown>` keyed by JSON Pointer paths, matching
+ * `createStateStore`'s shape.
+ */
+type StateSnapshotEvent = WorkspaceEventBase & {
+  type: "state.snapshot";
+  state: Record<string, unknown>;
+};
+
+/**
+ * Batched state delta. `updates` is a `{ [jsonPointerPath]: value }` map.
+ * Mirrors `StateStore.update` semantics: only paths whose value changes are
+ * applied, and a single subscriber notification is emitted.
+ */
+type StateUpdateEvent = WorkspaceEventBase & {
+  type: "state.update";
+  updates: Record<string, unknown>;
+};
+
 type TaskProjectionEvent =
+  | SpecPatchEvent
   | TaskProjectionUpdatedEvent
   | TaskWorkspaceUpdatedEvent
   | TaskWorkspaceCommandEvent
-  | TaskWorkspaceRuntimeEvent;
+  | TaskWorkspaceRuntimeEvent
+  | StateSnapshotEvent
+  | StateUpdateEvent;
+
 
 type TaskProjectionEventListener = (event: TaskProjectionEvent) => void;
 
@@ -88,6 +126,49 @@ export function publishTaskWorkspaceUpdatedEvent(input: {
     workBlockId: input.workBlockId,
     reason: input.reason,
     updatedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Push a full state snapshot onto the SSE bus. Callers (typically the
+ * workspace SSE handler) emit this once on connect so the client
+ * `StateProvider` store can be seeded before deltas arrive.
+ *
+ * `state` is a flat map of JSON Pointer paths to values, matching
+ * `StateStore.update`'s input shape.
+ */
+export function publishTaskStateSnapshot(input: {
+  taskId: string;
+  workspaceId: string;
+  workBlockId?: string | null;
+  state: Record<string, unknown>;
+}) {
+  appendTaskWorkspaceEvent({
+    type: "state.snapshot",
+    taskId: input.taskId,
+    workspaceId: input.workspaceId,
+    workBlockId: input.workBlockId,
+    state: input.state,
+  });
+}
+
+/**
+ * Push a batched state delta onto the SSE bus. Caller is responsible
+ * for batching (e.g. coalescing rapid plan generation events into a
+ * single tick) so clients only get one store notification per batch.
+ */
+export function publishTaskStateUpdate(input: {
+  taskId: string;
+  workspaceId: string;
+  workBlockId?: string | null;
+  updates: Record<string, unknown>;
+}) {
+  appendTaskWorkspaceEvent({
+    type: "state.update",
+    taskId: input.taskId,
+    workspaceId: input.workspaceId,
+    workBlockId: input.workBlockId,
+    updates: input.updates,
   });
 }
 

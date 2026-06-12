@@ -1,5 +1,10 @@
 import { db } from "@/lib/db";
 
+export type WorkspaceActivityGroup = {
+  kind: "plan_generation" | "execution_node" | "provider_run";
+  id: string;
+};
+
 export type WorkspaceActivityTimelineItem = {
   id: string;
   kind: "assistant_message" | "reasoning" | "tool_started" | "tool_completed" | "provider_run" | "approval" | "node" | "task" | "artifact" | "schedule" | "raw";
@@ -16,6 +21,7 @@ export type WorkspaceActivityTimelineItem = {
   nativeRunId?: string;
   sequence?: number;
   rawEventType?: string;
+  activityGroup?: WorkspaceActivityGroup;
   tool?: {
     name?: string;
     label?: string;
@@ -91,6 +97,11 @@ function numberPayloadValue(payload: unknown, key: string) {
   return payload && typeof payload === "object" && !Array.isArray(payload) && typeof (payload as Record<string, unknown>)[key] === "number"
     ? (payload as Record<string, number>)[key]
     : null;
+}
+
+function planGenerationActivityGroup(payload: unknown) {
+  const id = stringPayloadValue(payload, "generation_id");
+  return id ? { kind: "plan_generation" as const, id } : undefined;
 }
 
 function compactParts(parts: Array<string | null | undefined>) {
@@ -287,9 +298,9 @@ function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTime
     case "task.auto_start.skipped":
       return taskActivityItem({ id: event.id, kind: "schedule", title: "Auto-start skipped", description: stringPayloadValue(payload, "reason") ?? "Scheduled task was not auto-started.", tone: "warning", timestamp });
     case "plan_generation.started":
-      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation started", description: stringPayloadValue(payload, "instruction") ?? "Generating a task plan.", tone: "info", timestamp });
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation started", description: stringPayloadValue(payload, "instruction") ?? "Generating a task plan.", tone: "info", timestamp, rawEventType: event.eventType, activityGroup: planGenerationActivityGroup(payload) });
     case "plan_generation.status":
-      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation update", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "phase") ?? "Plan generation progressed.", tone: "info", timestamp });
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation update", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "phase") ?? "Plan generation progressed.", tone: "info", timestamp, rawEventType: event.eventType, activityGroup: planGenerationActivityGroup(payload) });
     case "plan_generation.tool_called":
       return taskActivityItem({
         id: event.id,
@@ -302,15 +313,17 @@ function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTime
         ]) || "AI produced a plan blueprint.",
         tone: "info",
         timestamp,
+        rawEventType: event.eventType,
+        activityGroup: planGenerationActivityGroup(payload),
       });
     case "plan_generation.draft_saved":
-      return taskActivityItem({ id: event.id, kind: "task", title: "Plan draft saved", description: stringPayloadValue(payload, "plan_title") ?? "Generated plan draft was saved.", tone: "success", timestamp });
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan draft saved", description: stringPayloadValue(payload, "plan_title") ?? "Generated plan draft was saved.", tone: "success", timestamp, rawEventType: event.eventType, activityGroup: planGenerationActivityGroup(payload) });
     case "plan_generation.completed":
-      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generated", description: stringPayloadValue(payload, "plan_title") ?? "Plan generation completed.", tone: "success", timestamp });
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generated", description: stringPayloadValue(payload, "plan_title") ?? "Plan generation completed.", tone: "success", timestamp, rawEventType: event.eventType, activityGroup: planGenerationActivityGroup(payload) });
     case "plan_generation.failed":
-      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation failed", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "code") ?? "Plan generation failed.", tone: "danger", timestamp });
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation failed", description: stringPayloadValue(payload, "message") ?? stringPayloadValue(payload, "code") ?? "Plan generation failed.", tone: "danger", timestamp, rawEventType: event.eventType, activityGroup: planGenerationActivityGroup(payload) });
     case "plan_generation.cancelled":
-      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation cancelled", description: "Plan generation was cancelled.", tone: "warning", timestamp });
+      return taskActivityItem({ id: event.id, kind: "task", title: "Plan generation cancelled", description: "Plan generation was cancelled.", tone: "warning", timestamp, rawEventType: event.eventType, activityGroup: planGenerationActivityGroup(payload) });
     default:
       if (event.eventType.startsWith("plan_execution.")) {
         const title = humanizeEventType(event.eventType);

@@ -151,7 +151,7 @@ async function seedSavedCompiledPlan(input: {
   edges?: Parameters<typeof makeCompiledPlan>[0]["edges"];
 }) {
   const compiledPlan = makeCompiledPlan({
-    id: input.planId ?? `plan_${Date.now()}`,
+    id: input.planId ?? `${Date.now()}`,
     nodes: input.nodes,
     edges: input.edges,
   });

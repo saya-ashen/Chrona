@@ -253,4 +253,73 @@ describe("plan-runner task executor continuation", () => {
     ]);
   });
 
+  it("does not duplicate downstream provider runs when start is retried after runtime sync advances the graph", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "First runtime run started",
+        evidence: { sessionId: "main-session", runId: "run_first_restart" },
+        output: { runtimeRunRef: "runtime-first-restart" },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "Second runtime run started",
+        evidence: { sessionId: "main-session", runId: "run_second_restart" },
+        output: { runtimeRunRef: "runtime-second-restart" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner restart after graph advancement");
+    const compiledPlan = makeTwoTaskPlan("graph_restart_after_runtime_sync");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const started = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(started.status).toBe("running");
+    expect(started.currentNodeId).toBe("first_task");
+
+    await taskPlanExecution.syncRuntimeResult({
+      taskId: task.id,
+      runtimeRunRef: "runtime-first-restart",
+      status: "Completed",
+      summary: "First task complete before restart",
+      output: { root: "root", elements: { root: { type: "JsonView", props: { value: { restart: "safe" } } } } },
+    });
+
+    const restarted = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(restarted.status).toBe("running");
+    expect(restarted.message).toBe("Execution running: no ready nodes");
+    expect(executeTaskNodeCapabilityMock.mock.calls.map((call) => call[0].node.id)).toEqual([
+      "first_task",
+      "second_task",
+    ]);
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_task", "succeeded"],
+      ["second_task", "running"],
+    ]);
+    const runningSecondAttempts = await db.taskPlanNodeAttempt.count({
+      where: { taskId: task.id, nodeId: "second_task", status: "running" },
+    });
+    expect(runningSecondAttempts).toBe(1);
+    expect(persisted?.results.map((result) => [result.nodeId, result.status, result.outputSummary])).toEqual([
+      ["first_task", "current", "First task complete before restart"],
+    ]);
+
+    const sessions = await db.executionSession.findMany({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "asc" },
+      select: { status: true, currentNodeId: true, currentNodeAttemptId: true },
+    });
+    expect(sessions).toEqual([
+      { status: "Active", currentNodeId: null, currentNodeAttemptId: null },
+    ]);
+  });
+
 });

@@ -18,6 +18,11 @@ function isPlanGenerationEvent(item: WorkspaceActivityItem) {
   return item.rawEventType?.startsWith("plan_generation.") || item.id.includes("plan_generation.");
 }
 
+
+function planGenerationGroupKey(item: WorkspaceActivityItem) {
+  if (!isPlanGenerationEvent(item)) return undefined;
+  return item.activityGroup?.kind === "plan_generation" ? item.activityGroup.id : "legacy-plan-generation";
+}
 function isPlanGenerationMilestone(item: WorkspaceActivityItem) {
   const text = `${item.rawEventType ?? ""} ${item.title} ${item.summary}`.toLowerCase();
   return item.tone === "success" || text.includes("plan generated") || text.includes("generated");
@@ -35,14 +40,12 @@ function pushNodeHeader(result: RenderEntry[], item: WorkspaceActivityItem, last
   return nodeKey ?? lastNodeId;
 }
 
-function collectPlanGenerationGroup(items: WorkspaceActivityItem[], startIndex: number) {
-  const group = [items[startIndex]];
-  let nextIndex = startIndex;
-  while (items[nextIndex + 1] && isPlanGenerationEvent(items[nextIndex + 1])) {
-    group.push(items[nextIndex + 1]);
-    nextIndex++;
+function collectPlanGenerationGroup(items: WorkspaceActivityItem[], startIndex: number, groupKey: string) {
+  const group: WorkspaceActivityItem[] = [];
+  for (let index = startIndex; index < items.length; index += 1) {
+    if (planGenerationGroupKey(items[index]) === groupKey) group.push(items[index]);
   }
-  return { group, nextIndex };
+  return group;
 }
 
 function getToolPair(items: WorkspaceActivityItem[], item: WorkspaceActivityItem, index: number) {
@@ -62,15 +65,18 @@ function getToolPair(items: WorkspaceActivityItem[], item: WorkspaceActivityItem
 function buildRenderList(items: WorkspaceActivityItem[]): RenderEntry[] {
   const result: RenderEntry[] = [];
   let lastNodeId: string | undefined = undefined;
+  const groupedPlanGenerationKeys = new Set<string>();
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     lastNodeId = pushNodeHeader(result, item, lastNodeId);
 
-    if (isPlanGenerationEvent(item)) {
-      const { group, nextIndex } = collectPlanGenerationGroup(items, i);
-      result.push({ type: "plan_phase", key: `plan:${group[0].id}:${group.length}`, items: group });
-      i = nextIndex;
+    const planGroupKey = planGenerationGroupKey(item);
+    if (planGroupKey) {
+      if (groupedPlanGenerationKeys.has(planGroupKey)) continue;
+      const group = collectPlanGenerationGroup(items, i, planGroupKey);
+      groupedPlanGenerationKeys.add(planGroupKey);
+      result.push({ type: "plan_phase", key: `plan:${planGroupKey}:${group[0]?.id ?? item.id}:${group.length}`, items: group });
       continue;
     }
 

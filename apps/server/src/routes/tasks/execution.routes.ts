@@ -23,6 +23,64 @@ import { error, toHttpError } from "../../lib/http";
 import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "./runtime-event-summary";
 
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
+const HERMES_DEFAULT_APPROVAL_TIMEOUT_MS = 60_000;
+
+function toJsonInput(value: unknown) {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value));
+}
+
+async function reconcileTimedOutProviderApprovals(taskId: string) {
+  const pendingApprovals = await db.taskPlanProviderApproval.findMany({
+    where: {
+      taskId,
+      status: "pending",
+    },
+    select: {
+      id: true,
+      providerRunId: true,
+      requestedAt: true,
+    },
+  });
+
+  for (const approval of pendingApprovals) {
+    if (!approval.providerRunId) continue;
+    const timeoutAt = new Date(approval.requestedAt.getTime() + HERMES_DEFAULT_APPROVAL_TIMEOUT_MS);
+    const laterEvent = await db.event.findFirst({
+      where: {
+        providerRunId: approval.providerRunId,
+        occurredAt: { gte: timeoutAt },
+        NOT: { eventType: "approval_required" },
+      },
+      orderBy: { occurredAt: "asc" },
+      select: {
+        eventType: true,
+        occurredAt: true,
+      },
+    });
+    if (!laterEvent) continue;
+
+    await db.taskPlanProviderApproval.updateMany({
+      where: {
+        id: approval.id,
+        status: "pending",
+      },
+      data: {
+        status: "superseded",
+        resolvedAt: laterEvent.occurredAt,
+        resolvedBy: "provider",
+        resolutionRaw: toJsonInput({
+          resolution_source: "provider_reconciliation",
+          reason: "provider_emitted_event_after_default_approval_timeout",
+          inferred_result: "default_denied",
+          timeoutMs: HERMES_DEFAULT_APPROVAL_TIMEOUT_MS,
+          observed_event_type: laterEvent.eventType,
+        }),
+      },
+    });
+  }
+}
+
 
 function startSseHeartbeat(stream: SseStream) {
   const timer = setInterval(() => {
@@ -221,6 +279,9 @@ export function createExecutionRoutes(engine: ChronaEngine) {
       try {
         const { taskId } = c.req.valid("param");
         const { status = "pending" } = c.req.valid("query");
+        if (status === "pending" || status === "all") {
+          await reconcileTimedOutProviderApprovals(taskId);
+        }
         const approvals = await db.taskPlanProviderApproval.findMany({
           where: {
             taskId,

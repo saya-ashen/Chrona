@@ -1,4 +1,5 @@
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
+import type { TaskWorkspaceSseEvent } from "../hooks/use-task-workspace-page-state";
 import type { WorkspaceActivityItem } from "./task-workspace-types";
 
 const DEFAULT_LIMIT = 30;
@@ -18,6 +19,152 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
+
+function eventKindValue(event: TaskWorkspaceSseEvent) {
+  return typeof event.eventKind === "string" ? event.eventKind : undefined;
+}
+
+function eventMessageValue(event: TaskWorkspaceSseEvent) {
+  return typeof event.message === "string" ? event.message : undefined;
+}
+
+function eventStringValue(event: TaskWorkspaceSseEvent, key: string) {
+  const value = event[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function workspaceEventTimestamp(event: TaskWorkspaceSseEvent) {
+  return eventStringValue(event, "occurredAt") ?? eventStringValue(event, "timestamp") ?? undefined;
+}
+
+function isPlanGenerationProjectionUpdate(event: TaskWorkspaceSseEvent) {
+  if (event.type !== "task_projection_updated" && event.type !== "task_workspace_updated") return false;
+  return eventStringValue(event, "reason")?.startsWith("plan_generation.") ?? false;
+}
+
+function workspaceEventId(event: TaskWorkspaceSseEvent, suffix: string) {
+  return `workspace-${event.sequence ?? event.commandId ?? suffix}-${event.type}`;
+}
+
+function workspaceEventActivityGroup(event: TaskWorkspaceSseEvent) {
+  if (event.type !== "plan.generation.event") return undefined;
+  const id = eventStringValue(event, "generationId") ?? eventStringValue(event, "generation_id") ?? event.commandId;
+  return id ? { kind: "plan_generation" as const, id } : undefined;
+}
+
+function planGenerationTitle(kind: string | undefined) {
+  if (kind === "status") return "Plan generation update";
+  if (kind === "tool_call") return "Plan tool called";
+  if (kind === "partial") return "Plan generation update";
+  if (kind === "result" || kind === "draft" || kind === "accepted") return "Plan generated";
+  if (kind === "error") return "Plan generation failed";
+  if (kind === "cancelled") return "Plan generation cancelled";
+  if (kind === "done") return "Plan generation done";
+  return "Plan generation event";
+}
+
+function planGenerationTone(kind: string | undefined) {
+  if (kind === "error") return "danger" as const;
+  if (kind === "cancelled") return "warning" as const;
+  if (kind === "result" || kind === "draft" || kind === "accepted" || kind === "done") return "success" as const;
+  return "info" as const;
+}
+
+export function workspaceEventToWorkspaceActivity(event: TaskWorkspaceSseEvent, index = 0): WorkspaceActivityItem | null {
+  if (event.type === "execution.runtime_event") return null;
+
+  if (event.type === "command.accepted" || event.type === "command.failed") {
+    const commandType = typeof event.commandType === "string" ? event.commandType : "command";
+    const failed = event.type === "command.failed";
+    const description = eventMessageValue(event) ?? (failed ? `${commandType} failed.` : `${commandType} accepted.`);
+    return {
+      id: workspaceEventId(event, String(index)),
+      kind: "task",
+      title: failed ? "Command failed" : "Command accepted",
+      summary: description,
+      description,
+      tone: failed ? "danger" : "info",
+      timestamp: workspaceEventTimestamp(event),
+      sequence: event.sequence,
+      rawEventType: event.type,
+      raw: event,
+    };
+  }
+
+  if (event.type === "plan.generation.event") {
+    const kind = eventKindValue(event);
+    const description = eventMessageValue(event)
+      ?? eventStringValue(event, "phase")
+      ?? eventStringValue(event, "planTitle")
+      ?? eventStringValue(event, "plan_title")
+      ?? planGenerationTitle(kind);
+    return {
+      id: workspaceEventId(event, String(index)),
+      kind: "task",
+      title: planGenerationTitle(kind),
+      summary: description,
+      description,
+      tone: planGenerationTone(kind),
+      timestamp: workspaceEventTimestamp(event),
+      sequence: event.sequence,
+      rawEventType: `plan_generation.${kind ?? "event"}`,
+      activityGroup: workspaceEventActivityGroup(event),
+      raw: event,
+    };
+  }
+
+  if (event.type === "execution.state.updated" || event.type === "execution.result" || event.type === "checkpoint.result") {
+    const kind = eventKindValue(event);
+    const description = eventMessageValue(event) ?? kind ?? event.type;
+    return {
+      id: workspaceEventId(event, String(index)),
+      kind: event.type === "checkpoint.result" ? "task" : "node",
+      title: humanizeWorkspaceEventType(event.type),
+      summary: description,
+      description,
+      tone: kind === "failed" ? "danger" : kind === "completed" ? "success" : "info",
+      timestamp: workspaceEventTimestamp(event),
+      sequence: event.sequence,
+      rawEventType: event.type,
+      raw: event,
+    };
+  }
+
+  if (isPlanGenerationProjectionUpdate(event)) return null;
+
+  if (event.type === "task_projection_updated" || event.type === "task_workspace_updated") {
+    const description = eventStringValue(event, "reason") ?? eventMessageValue(event) ?? event.type;
+    return {
+      id: workspaceEventId(event, String(index)),
+      kind: "task",
+      title: humanizeWorkspaceEventType(event.type),
+      summary: description,
+      description,
+      tone: "info",
+      timestamp: workspaceEventTimestamp(event),
+      sequence: event.sequence,
+      rawEventType: event.type,
+      raw: event,
+    };
+  }
+
+  return {
+    id: workspaceEventId(event, String(index)),
+    kind: "raw",
+    title: "Workspace event",
+    summary: humanizeWorkspaceEventType(event.type),
+    description: eventMessageValue(event) ?? humanizeWorkspaceEventType(event.type),
+    tone: "neutral",
+    timestamp: workspaceEventTimestamp(event),
+    sequence: event.sequence,
+    rawEventType: event.type,
+    raw: event,
+  };
+}
+
+function humanizeWorkspaceEventType(eventType: string) {
+  return eventType.replace(/[._-]+/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
 
 export function getWorkspaceActivityIdentity(item: WorkspaceActivityItem) {
   return [

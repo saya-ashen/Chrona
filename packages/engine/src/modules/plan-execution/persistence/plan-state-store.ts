@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import {
-  ensureDefaultTaskSession,
-  buildDefaultTaskSessionKey,
+  buildLegacyPlanExecutionTaskSessionKey,
+  buildPlanExecutionTaskSessionKey,
+  ensurePlanExecutionTaskSession,
 } from "@/modules/execution-runtime";
 import {
   appendCanonicalEvent,
@@ -36,15 +37,14 @@ export async function ensurePlanMainSession(input: {
 }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { title: true, workspaceId: true, defaultSessionId: true },
+    select: { title: true, workspaceId: true },
   });
 
-  const session = await ensureDefaultTaskSession({
+  const session = await ensurePlanExecutionTaskSession({
     taskId: input.taskId,
     taskTitle: task.title,
     runtimeName: input.runtimeName ?? "default",
-    defaultSessionId: task.defaultSessionId,
-    suffix: `plan-${input.planId}`,
+    planId: input.planId,
     label: `${task.title} · Plan execution main session`,
   });
 
@@ -63,15 +63,19 @@ async function _findPlanMainSession(input: {
   taskId: string;
   planId: string;
 }) {
-  const expectedKey = buildDefaultTaskSessionKey({
+  const expectedKey = buildPlanExecutionTaskSessionKey({
     taskId: input.taskId,
-    suffix: `plan-${input.planId}`,
+    planId: input.planId,
+  });
+  const legacyKey = buildLegacyPlanExecutionTaskSessionKey({
+    taskId: input.taskId,
+    planId: input.planId,
   });
 
   const session = await db.taskSession.findFirst({
     where: {
       taskId: input.taskId,
-      sessionKey: expectedKey,
+      sessionKey: { in: [expectedKey, legacyKey] },
     },
   });
 
@@ -108,6 +112,7 @@ export async function appendMainSessionEvent(input: {
   const rawEvent = await appendRawEventLog({
     workspaceId: task.workspaceId,
     taskId: input.taskId,
+    workBlockId: input.workBlockId,
     taskSessionId: input.sessionId,
     planId: input.planId,
     nodeId: input.nodeId ?? null,
@@ -164,6 +169,7 @@ export async function appendMainSessionEvent(input: {
 
   await appendTaskTimelineItem({
     workspaceId: task.workspaceId,
+    workBlockId: input.workBlockId,
     taskId: input.taskId,
     taskSessionId: input.sessionId,
     planId: input.planId,

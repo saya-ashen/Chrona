@@ -71,6 +71,7 @@ export interface NodeExecutor {
 
 export interface NodeExecutorInput {
   taskId: string;
+  workBlockId?: string | null;
   mainSession: {
     id: string;
     taskId: string;

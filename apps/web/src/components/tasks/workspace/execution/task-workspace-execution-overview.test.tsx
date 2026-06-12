@@ -1,6 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { buildCommandCenterTrailSpec, type UiDocument } from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "./task-workspace-execution-overview";
@@ -9,8 +11,10 @@ function renderOverview(
   view: ReturnType<typeof createTaskWorkspaceExecutionConsoleView>,
   extra: Partial<React.ComponentProps<typeof TaskWorkspaceExecutionOverview>> = {},
 ) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <TaskWorkspaceExecutionOverview
+      taskId="task-1"
       progress={view.progress}
       readiness={view.readiness}
       latestResult={view.latestResult}
@@ -20,86 +24,144 @@ function renderOverview(
       activity={view.activity}
       {...extra}
     />,
+    {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      ),
+    },
   );
 }
+
+function nowDocument(title = "Current operation"): UiDocument {
+  return {
+    root: "root",
+    elements: {
+      root: { type: "Stack", props: { gap: "sm" }, children: ["status-card"] },
+      "status-card": {
+        type: "WorkspaceSummaryCard",
+        props: {
+          eyebrow: "Current operation",
+          title,
+          description: "Backend-rendered now tab.",
+          statusLabel: "started",
+          tone: "info",
+          icon: "sparkles",
+        },
+      },
+    },
+  };
+}
+
 
 describe("TaskWorkspaceExecutionOverview", () => {
   afterEach(() => {
     cleanup();
   });
 
-  it("renders the now, output, and trail tabs", () => {
+  it("surfaces results and activity tabs without a separate current-operation rail", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
-    const onAction = vi.fn();
-
-    renderOverview(view, { onAction });
+    renderOverview(view, { commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: nowDocument("Trail") } } });
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
-    expect(screen.getByRole("tab", { name: "Now" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Output" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Trail" })).toBeInTheDocument();
-    // Now tab shows the current operation status card from attention/readiness.
-    expect(screen.getByText("Current operation")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Results" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.queryByText("Backend-rendered now tab.")).toBeInTheDocument();
   });
 
-  it("renders live runtime events in the now tab", () => {
+
+  it("renders persisted server-driven Trail items once", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const commandCenter = {
+      documents: {
+        now: nowDocument("Execution running"),
+        output: nowDocument("Output"),
+        trail: buildCommandCenterTrailSpec({
+          activity: [{
+            id: "persisted-plan-status",
+            kind: "task",
+            title: "Plan generation update",
+            summary: "Requesting AI provider...",
+            description: "Requesting AI provider...",
+            tone: "info",
+            timestamp: "2026-05-12T10:00:00.000Z",
+          }],
+          savedCount: 1,
+          toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+        }),
+      },
+    };
+
+    renderOverview(view, { commandCenter });
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    expect(screen.getByText("Plan generation update")).toBeInTheDocument();
+    expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
+    expect(screen.getAllByText("1 shown · 0 live · 1 saved")).toHaveLength(1);
+    expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
+  });
+
+  it("streams live runtime events into a server-driven Trail document", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
+    const liveEvent = {
+      type: "runtime_event" as const,
+      action: "start_manual" as const,
+      nodeId: "execute",
+      nodeTitle: "execute",
+      runtimeName: "hermes",
+      provider: "hermes",
+      runId: "run-1",
+      sequence: 1,
+      timestamp: "2026-05-12T10:01:00.000Z",
+      event: { type: "tool_started" as const, toolName: "chrona_plan_read", label: "正在读取计划" },
+    };
+
+    const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [] });
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
+
+    rerender(
+      <TaskWorkspaceExecutionOverview
+        taskId="task-1"
+        progress={view.progress}
+        readiness={view.readiness}
+        latestResult={view.latestResult}
+        attention={view.attention}
+        latestCompletedNode={view.latestCompletedNode}
+        artifacts={view.artifacts}
+        activity={view.activity}
+        commandCenter={commandCenter}
+        runtimeEvents={[liveEvent]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    return waitFor(() => expect(screen.getByText("正在读取计划")).toBeInTheDocument());
+  });
+
+  it("streams live workspace events into a server-driven Trail document", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
 
     renderOverview(view, {
-      runtimeEvents: [{
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 1,
-        timestamp: "2026-05-12T10:01:00.000Z",
-        event: { type: "tool_started", toolName: "chrona_plan_read", label: "正在读取计划" },
-      }, {
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 2,
-        timestamp: "2026-05-12T10:01:01.000Z",
-        event: { type: "assistant_text_delta", text: "Runtime " },
-      }, {
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 3,
-        timestamp: "2026-05-12T10:01:01.500Z",
-        event: { type: "assistant_text_delta", text: "answer" },
-      }, {
-        type: "runtime_event",
-        action: "start_manual",
-        nodeId: "execute",
-        nodeTitle: "execute",
-        runtimeName: "hermes",
-        provider: "hermes",
-        runId: "run-1",
-        sequence: 4,
-        timestamp: "2026-05-12T10:01:02.000Z",
-        event: { type: "reasoning_delta", text: "Runtime reasoning" },
+      commandCenter,
+      liveActivity: [{
+        id: "event-plan-status-1",
+        kind: "task",
+        title: "Plan generation update",
+        summary: "Requesting AI provider...",
+        description: "Requesting AI provider...",
+        tone: "info",
+        timestamp: "2026-05-12T10:00:00.000Z",
       }],
     });
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
 
-    // Live event content surfaces directly in the Now tab. Raw (unmerged)
-    // events are rendered individually with a kind label prefix.
-    expect(screen.getByText("Tool: 正在读取计划")).toBeInTheDocument();
-    expect(screen.getByText("Assistant: Runtime")).toBeInTheDocument();
-    expect(screen.getByText("Assistant: answer")).toBeInTheDocument();
-    expect(screen.getByText("Reasoning: Runtime reasoning")).toBeInTheDocument();
+    expect(screen.getByText("Plan generation update")).toBeInTheDocument();
+    expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
   });
+
 
   it("renders the latest completed node result and artifacts in the output tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
@@ -107,7 +169,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view, { onAction });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Output" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Results" }));
     expect(screen.getByText("summary")).toBeInTheDocument();
     expect(screen.queryByText(/runtimeRunRef/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Locate source node" }));
@@ -116,11 +178,11 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
 
-  it("renders a command center primary action in the now tab", () => {
+  it("does not render command center primary actions inside the execution panel", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
     const onClick = vi.fn();
-
     renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
       primaryAction: {
         kind: "generate",
         label: "Generate plan",
@@ -131,9 +193,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
       },
     });
 
-    expect(screen.getByText("Current operation")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Generate plan" }));
-    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Execution running")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it("renders an empty output state when no node has completed", () => {
@@ -141,55 +203,29 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Output" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Results" }));
     expect(screen.getByText("No execution result yet.")).toBeInTheDocument();
   });
 
-  it("auto-switches to the now tab when attention first appears", () => {
-    const calm = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
-    const attentive = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
+  it("hides the current operation card when there is nothing to act on", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
 
-    const { rerender } = render(
-      <TaskWorkspaceExecutionOverview
-        progress={calm.progress}
-        readiness={calm.readiness}
-        latestResult={calm.latestResult}
-        attention={null}
-        latestCompletedNode={calm.latestCompletedNode}
-        artifacts={calm.artifacts}
-        activity={calm.activity}
-      />,
-    );
+    // No server now document, no attention, and a passive primary action
+    // (suppressAttentionCard, no onClick/actionSpec) → the rail collapses.
+    renderOverview(view, {
+      attention: null,
+      runtimeEvents: [],
+      primaryAction: {
+        kind: "no-operation",
+        label: "No current operation",
+        description: "The accepted plan is running, but the engine has not returned an actionable checkpoint yet.",
+        tone: "neutral",
+        suppressAttentionCard: true,
+      },
+    });
 
-    // User moves to the Trail tab while nothing needs attention.
-    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
-    expect(screen.getByRole("tab", { name: "Trail" })).toHaveAttribute("aria-selected", "true");
-
-    // Attention appears: the console pulls focus back to Now exactly once.
-    rerender(
-      <TaskWorkspaceExecutionOverview
-        progress={attentive.progress}
-        readiness={attentive.readiness}
-        latestResult={attentive.latestResult}
-        attention={attentive.attention}
-        latestCompletedNode={attentive.latestCompletedNode}
-        artifacts={attentive.artifacts}
-        activity={attentive.activity}
-      />,
-    );
-    expect(screen.getByRole("tab", { name: "Now" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("Current operation")).not.toBeInTheDocument();
+    expect(screen.queryByText("No current operation")).not.toBeInTheDocument();
   });
 
-  it("lets the user leave the now tab while attention persists", () => {
-    // Regression: a blocked/attention state must not trap the user on Now.
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
-
-    renderOverview(view);
-
-    expect(screen.getByRole("tab", { name: "Now" })).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(screen.getByRole("tab", { name: "Trail" }));
-    expect(screen.getByRole("tab", { name: "Trail" })).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(screen.getByRole("tab", { name: "Output" }));
-    expect(screen.getByRole("tab", { name: "Output" })).toHaveAttribute("aria-selected", "true");
-  });
 });

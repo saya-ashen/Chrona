@@ -1,13 +1,18 @@
+// Graph-runtime command shapes. Pulls leaf dispatch types from
+// `../types/dispatch` (re-exported via `../types`) to avoid a cycle
+// with `../execution/types`, which depends on this file's
+// `GraphRuntimeCommand` symbol.
+
 import type {
   GraphExecutionCallbacks,
-  GraphExecutionEvent,
-  GraphExecutionOutcome,
   GraphExecutionState,
   GraphExecutionTrigger,
   GraphExecutorRegistry,
   GraphSubmittedNodeResult,
-} from "../execution/types";
+} from "../types";
 import type { GraphMutationOperation, NodeResult } from "../types";
+import type { GraphExecutionControl } from "../types/dispatch";
+import type { GraphExecutionEvent, GraphExecutionOutcome } from "../execution/types";
 
 export type GraphRuntimeCommand =
   | {
@@ -102,7 +107,7 @@ export type GraphRuntimeOptions<TContext = unknown> = {
   runtimeName: string;
   callbacks?: Partial<GraphExecutionCallbacks<TContext>>;
   executors?: GraphExecutorRegistry<TContext>;
-  control?: import("../execution/types").GraphExecutionControl;
+  control?: GraphExecutionControl;
   policies?: GraphRuntimePolicies;
   now?: () => number;
 };

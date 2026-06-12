@@ -166,6 +166,47 @@ describe("TaskPlanGraph", () => {
     expect(acceptedNode).toHaveAttribute("data-node-shape", "parallelogram");
   });
 
+  it("notifies selection when clicking the already selected node", async () => {
+    const onSelectedNodeChange = vi.fn();
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "node-pending",
+      steps: [
+        {
+          id: "node-pending",
+          title: "准备执行",
+          objective: "等待启动",
+          phase: "execution",
+          status: "ready",
+          requiresHumanInput: false,
+          type: "task",
+          displayType: "task",
+          executionMode: "automatic",
+          linkedTaskId: null,
+        },
+      ],
+      edges: [],
+    });
+
+    render(
+      <TaskPlanGraph
+        mode="full"
+        plan={plan}
+        onSelectedNodeChange={onSelectedNodeChange}
+      />,
+    );
+
+    const pendingNode = await screen.findByTestId("task-plan-node-node-pending");
+    onSelectedNodeChange.mockClear();
+
+    fireEvent.click(pendingNode);
+    expect(onSelectedNodeChange).toHaveBeenCalledWith(plan.nodes[0], plan.nodes);
+
+    onSelectedNodeChange.mockClear();
+    fireEvent.click(pendingNode);
+    expect(onSelectedNodeChange).toHaveBeenCalledWith(plan.nodes[0], plan.nodes);
+  });
+
   it("maps user-facing execution states to stable node markers", async () => {
     render(
       <TaskPlanGraph

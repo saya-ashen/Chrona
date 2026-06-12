@@ -4,14 +4,82 @@ import { shadcnComponentDefinitions as shadcn } from "@json-render/shadcn/catalo
 import { chronaSchema } from "../schema";
 import {
   UI_ACTION,
+  commandCenterPrimaryPayloadSchema,
+  acceptPlanPayloadSchema,
   dispatchExecutionPayloadSchema,
   locateWorkspaceNodePayloadSchema,
+  regeneratePlanPayloadSchema,
   submitCheckpointPayloadSchema,
+  recoveryRetryPayloadSchema,
+  recoveryEditInstructionPayloadSchema,
+  recoveryCancelPayloadSchema,
 } from "../actions/actions";
 
 const toneSchema = z
   .enum(["neutral", "info", "success", "warning", "danger"])
   .optional();
+
+const activityToolSchema = z.object({
+  name: z.string().optional(),
+  label: z.string().optional(),
+  preview: z.string().optional(),
+  inputSummary: z.string().optional(),
+  durationMs: z.number().optional(),
+  error: z.string().optional(),
+  state: z.enum(["started", "completed", "failed"]),
+});
+
+const activityGroupSchema = z.object({
+  kind: z.enum(["plan_generation", "execution_node", "provider_run"]),
+  id: z.string(),
+});
+
+const occurrenceOptionSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+  taskId: z.string(),
+  date: z.string().nullable(),
+  workBlockId: z.string().nullable(),
+});
+
+const activityItemSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  title: z.string(),
+  summary: z.string().optional(),
+  tone: toneSchema,
+  timestamp: z.string().nullable().optional(),
+  sourceNodeTitle: z.string().optional(),
+  provider: z.string().optional(),
+  runtimeName: z.string().optional(),
+  tool: activityToolSchema.optional(),
+  activityGroup: activityGroupSchema.optional(),
+  assistant: z.object({ text: z.string() }).optional(),
+});
+
+const paragraphSchema = z.object({
+  text: z.string().optional(),
+  content: z.string().optional(),
+  variant: z.string().optional(),
+});
+
+const sectionSchema = z.object({
+  title: z.string().optional(),
+});
+
+
+const stateBindingSchema = z.object({ $bindState: z.string() });
+
+const toolDetailLabelsSchema = z.object({
+  tool: z.string(),
+  input: z.string(),
+  preview: z.string(),
+  duration: z.string(),
+  error: z.string(),
+});
+
+const bindableNumberSchema = z.union([z.number(), stateBindingSchema]).optional();
+const bindableStringSchema = z.union([z.string(), stateBindingSchema]).optional();
 
 /**
  * The Chrona workspace catalog: the single trust boundary shared by document
@@ -33,6 +101,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     Stack: shadcn.Stack,
     Separator: shadcn.Separator,
     Text: shadcn.Text,
+    DropdownMenu: shadcn.DropdownMenu,
     Heading: shadcn.Heading,
     Badge: shadcn.Badge,
     Alert: shadcn.Alert,
@@ -44,7 +113,28 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     Tabs: shadcn.Tabs,
     Table: shadcn.Table,
 
+
+    // --- lowercase compatibility aliases for AI-produced json-render specs ---
+    heading: shadcn.Heading,
+    paragraph: {
+      props: paragraphSchema,
+      description: "Compatibility alias for text paragraphs in AI-produced result specs.",
+    },
+    table: shadcn.Table,
+    section: {
+      props: sectionSchema,
+      slots: ["default"],
+      description: "Compatibility section container for AI-produced result specs.",
+    },
     // --- Chrona-custom domain components ---
+    WorkspaceOccurrenceCalendar: {
+      props: z.object({
+        label: z.string(),
+        value: z.string(),
+        options: z.array(occurrenceOptionSchema),
+      }),
+      description: "Compact occurrence calendar picker for recurring task workspace header.",
+    },
     Markdown: {
       props: z.object({ content: z.string(), title: z.string().optional() }),
       description: "Rendered markdown result content.",
@@ -81,6 +171,17 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       }),
       slots: ["default"],
       description: "A single activity entry; optional ToolDetails child.",
+    },
+    ActivityStream: {
+      props: z.object({
+        items: z.union([z.array(activityItemSchema), stateBindingSchema]),
+        liveCount: bindableNumberSchema,
+        savedCount: bindableNumberSchema,
+        provider: bindableStringSchema,
+        emptyMessage: z.string().optional(),
+        toolLabels: toolDetailLabelsSchema,
+      }),
+      description: "Streaming activity feed backed by json-render state.",
     },
     ToolDetails: {
       props: z.object({
@@ -124,6 +225,22 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       }),
       description: "One workspace artifact row with an optional locate action.",
     },
+    WorkspaceActionGroup: {
+      props: z.object({
+        label: z.string().optional(),
+        layout: z.enum(["inline", "stack"]).optional(),
+      }),
+      slots: ["default"],
+      description: "Compact action group used by command center checkpoint controls.",
+    },
+    WorkspaceActionCard: {
+      props: z.object({
+        title: z.string().optional(),
+        tone: toneSchema,
+      }),
+      slots: ["default"],
+      description: "Contained command center action with optional input field.",
+    },
     WorkspaceDiffPreview: {
       props: z.object({
         summary: z.string(),
@@ -147,6 +264,18 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     },
   },
   actions: {
+    [UI_ACTION.commandCenterPrimary]: {
+      params: commandCenterPrimaryPayloadSchema,
+      description: "Run a host-owned primary command center action.",
+    },
+    [UI_ACTION.acceptPlan]: {
+      params: acceptPlanPayloadSchema,
+      description: "Accept the current generated plan.",
+    },
+    [UI_ACTION.regeneratePlan]: {
+      params: regeneratePlanPayloadSchema,
+      description: "Regenerate the current generated plan with optional user instruction.",
+    },
     [UI_ACTION.dispatchExecution]: {
       params: dispatchExecutionPayloadSchema,
       description: "Dispatch a pre-defined execution action for the current node.",
@@ -158,6 +287,18 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     [UI_ACTION.submitCheckpoint]: {
       params: submitCheckpointPayloadSchema,
       description: "Submit checkpoint form values (with an optional chosen action).",
+    },
+    [UI_ACTION.recoveryRetry]: {
+      params: recoveryRetryPayloadSchema,
+      description: "Retry the failed plan generation surfaced in the header error banner.",
+    },
+    [UI_ACTION.recoveryEditInstruction]: {
+      params: recoveryEditInstructionPayloadSchema,
+      description: "Open the plan regeneration instruction editor after a generation failure.",
+    },
+    [UI_ACTION.recoveryCancel]: {
+      params: recoveryCancelPayloadSchema,
+      description: "Dismiss the header error banner without retrying.",
     },
   },
 });

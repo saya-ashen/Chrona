@@ -1,7 +1,16 @@
 import type { PlanBlueprint } from "../ai-plan-blueprint";
 import type { ExecutionActionType } from "./commands";
-import type { EffectivePlanGraph } from "./graph";
+import type { EffectivePlanGraph } from "./_leaf";
 import type { PlanExecutionResult, TaskPlanReadModel } from "./execution-state";
+import type {
+  GeneratePlanStatusPhase,
+  GeneratePlanErrorCode,
+} from "./_leaf";
+
+export type {
+  GeneratePlanStatusPhase,
+  GeneratePlanErrorCode,
+} from "./_leaf";
 
 export type ProviderApprovalChoice = "approve_once" | "approve_session" | "approve_always" | "deny";
 
@@ -117,16 +126,6 @@ export type PlanExecutionSSEEvent =
       type: "done";
     };
 
-export type GeneratePlanStatusPhase =
-  | "starting"
-  | "loading_task"
-  | "requesting_provider"
-  | "streaming"
-  | "extracting_tool_payload"
-  | "compiling"
-  | "saving"
-  | "completed";
-
 export interface GeneratePlanStatusEvent {
   type: "status";
   phase: GeneratePlanStatusPhase;
@@ -153,17 +152,6 @@ export interface GeneratePlanResultEvent {
 export interface GeneratePlanCancelledEvent {
   type: "cancelled";
 }
-
-
-export type GeneratePlanErrorCode =
-  | "TASK_NOT_FOUND"
-  | "PLAN_GENERATION_IN_FLIGHT"
-  | "NO_AI_CLIENT"
-  | "INVALID_TOOL_PAYLOAD"
-  | "EMPTY_PLAN"
-  | "PROVIDER_ERROR"
-  | "ABORTED"
-  | "INTERNAL_ERROR";
 
 export interface GeneratePlanErrorEvent {
   type: "error";

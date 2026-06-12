@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
+import { createStateStore } from "@json-render/react";
 import { buildResultSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
@@ -14,11 +14,11 @@ import type {
   WorkspaceArtifactItem,
 } from "../model/task-workspace-types";
 import { SpecRenderer } from "../catalog/spec-renderer";
-import { buildArtifactsSpec, buildNowTabSpec } from "./build-execution-overview-spec";
-import { WorkspaceActivityFeed } from "./workspace-activity-feed";
+import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
+import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
 
 type OverviewAction = (nodeId?: string) => void;
-type CommandCenterTab = "now" | "output" | "trail";
+type CommandCenterTab = "output" | "trail";
 
 export type CommandCenterPrimaryAction = {
   kind?: string;
@@ -43,37 +43,32 @@ export type CommandCenterCopy = {
 
 const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
   nowTab: "Now",
-  outputTab: "Output",
-  trailTab: "Trail",
+  outputTab: "Results",
+  trailTab: "Activity",
 };
 
-function isActionablePrimary(primaryAction?: CommandCenterPrimaryAction | null) {
-  const kind = primaryAction?.kind;
-  return (
-    kind === "current-operation" ||
-    kind === "start-plan" ||
-    kind === "accept-or-regenerate" ||
-    kind === "generate"
-  );
+const TRAIL_ACTIVITY_LIMIT = 100;
+
+function commandCenterTrailItems(commandCenter?: { documents: { trail: UiDocument } } | null) {
+  const items = commandCenter?.documents.trail.state?.trail;
+  if (!items || typeof items !== "object" || Array.isArray(items)) return [];
+  const trailItems = (items as { items?: unknown }).items;
+  return Array.isArray(trailItems) ? trailItems as WorkspaceActivityItem[] : [];
 }
 
-function NodeResultContent({ node, emptyMessage }: { node: PlanNodeDataModel | null; emptyMessage: string }) {
+function buildNodeResultContentSpec(node: PlanNodeDataModel | null, emptyMessage: string) {
   const specOutput = node?.resultOutputs?.[0] ?? null;
   if (specOutput) {
     const result = validateChronaSpec(specOutput);
     if (!result.ok) {
       const detail = result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
-      return (
-        <SpecRenderer
-          spec={buildResultSpec([], {
-            errorMessage: `Unable to render this node's result (${detail}).`,
-          })}
-        />
-      );
+      return buildResultSpec([], {
+        errorMessage: `Unable to render this node's result (${detail}).`,
+      });
     }
-    return <SpecRenderer spec={specOutput} />;
+    return specOutput;
   }
-  return <SpecRenderer spec={buildResultSpec([], { emptyMessage })} />;
+  return buildResultSpec([], { emptyMessage });
 }
 
 export function TaskWorkspaceExecutionOverview({
@@ -84,10 +79,13 @@ export function TaskWorkspaceExecutionOverview({
   artifacts,
   activity,
   runtimeEvents = [],
+  liveActivity = [],
   primaryAction,
   copy: copyProp,
+  commandCenter,
   onAction,
 }: {
+  taskId: string;
   progress: ProgressSummary;
   readiness: ExecutionOverviewCard;
   /** Retained for callers; the Now tab derives its status card from readiness/attention. */
@@ -97,36 +95,59 @@ export function TaskWorkspaceExecutionOverview({
   artifacts: WorkspaceArtifactItem[];
   activity: WorkspaceActivityItem[];
   runtimeEvents?: WorkspaceRuntimeEvent[];
+  liveActivity?: WorkspaceActivityItem[];
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   onAction?: OverviewAction;
+  commandCenter?: {
+    documents: {
+      now: UiDocument;
+      output: UiDocument;
+      trail: UiDocument;
+    };
+  } | null;
+  commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
 }) {
-  const [activeTab, setActiveTab] = useState<CommandCenterTab>("now");
+  const [activeTab, setActiveTab] = useState<CommandCenterTab>("output");
   const { messages } = useI18n();
   const ws = messages.components?.taskWorkspace ?? {};
   const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
-  const hasAttention = attention !== null;
-  const needsNow = hasAttention || primaryAction?.kind === "current-operation";
-  const showNowBadge = needsNow || isActionablePrimary(primaryAction);
-
-  const prevNeedsNowRef = useRef(needsNow);
-  useEffect(() => {
-    if (needsNow && !prevNeedsNowRef.current) {
-      setActiveTab("now");
-    }
-    prevNeedsNowRef.current = needsNow;
-  }, [needsNow]);
 
   const tabs: Array<{ id: CommandCenterTab; label: string; badge?: boolean }> = [
-    { id: "now", label: copy.nowTab, badge: showNowBadge },
     { id: "output", label: copy.outputTab },
     { id: "trail", label: copy.trailTab },
   ];
 
+  const trailStore = useMemo(
+    () => commandCenter?.documents.trail ? createStateStore(commandCenter.documents.trail.state ?? {}) : null,
+    [commandCenter?.documents.trail],
+  );
+  const savedTrailActivity = useMemo(
+    () => commandCenter?.documents.trail ? commandCenterTrailItems(commandCenter) : activity,
+    [activity, commandCenter],
+  );
+  useEffect(() => {
+    if (!trailStore) return;
+    const limit = TRAIL_ACTIVITY_LIMIT;
+    const liveRuntimeActivity = runtimeEventsToWorkspaceActivity(runtimeEvents, limit);
+    const items = mergeWorkspaceActivity([...liveActivity, ...liveRuntimeActivity, ...savedTrailActivity], limit);
+    trailStore.set("/trail/items", items);
+    trailStore.set("/trail/liveCount", liveActivity.length + runtimeEvents.length);
+    trailStore.set("/trail/savedCount", savedTrailActivity.length);
+    trailStore.set("/trail/provider", runtimeEvents.at(-1)?.provider ?? null);
+  }, [liveActivity, runtimeEvents, savedTrailActivity, trailStore]);
   const statusLabel = primaryAction?.statusLabel
     ?? attention?.statusLabel
     ?? readiness.statusLabel
     ?? null;
+
+  const locateHandlers = {
+    "locate-workspace-node": (params: Record<string, unknown>) => {
+      const nodeId = typeof params.nodeId === "string" ? params.nodeId : undefined;
+      if (nodeId) onAction?.(nodeId);
+    },
+  };
+  const resultSpec = buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet ?? "No output yet.");
 
   return (
     <aside
@@ -144,11 +165,12 @@ export function TaskWorkspaceExecutionOverview({
                 {ws.taskEyebrow ?? "Task"}
               </p>
               <h2 className="font-heading text-base font-semibold leading-tight text-foreground">
-                {ws.commandCenter ?? "Command Center"}
+                {ws.commandCenter ?? "Execution"}
               </h2>
             </div>
           </div>
         </div>
+
 
         <div className="mb-3 shrink-0 space-y-1.5 rounded-xl border border-border/60 bg-muted/35 px-3 py-2">
           <div className="flex items-center justify-between gap-2">
@@ -176,89 +198,39 @@ export function TaskWorkspaceExecutionOverview({
           onValueChange={(value) => setActiveTab(value as CommandCenterTab)}
           className="min-h-0 flex-1 gap-3 overflow-hidden"
         >
-          <TabsList className="grid h-auto w-full shrink-0 grid-cols-3 gap-1 rounded-[1rem] border border-border/60 bg-muted/70 p-1 shadow-inner">
+          <TabsList className="inline-flex h-auto w-fit max-w-full shrink-0 gap-1 rounded-2xl border border-border/60 bg-muted/45 p-1 shadow-[inset_0_1px_0_hsl(var(--background)/0.75),0_1px_2px_hsl(var(--foreground)/0.06)]">
             {tabs.map((tab) => (
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="relative rounded-[0.78rem] px-2.5 py-2 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                className="min-h-8 min-w-[6.75rem] flex-none rounded-xl border border-transparent px-4 py-1.5 text-xs font-semibold text-muted-foreground transition-[background-color,border-color,box-shadow,color] hover:bg-background/55 hover:text-foreground data-[state=active]:border-border/70 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_3px_hsl(var(--foreground)/0.10),inset_0_1px_0_hsl(var(--background)/0.90)]"
               >
                 {tab.label}
-                {tab.badge ? (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "absolute right-1 top-1 size-1.5 rounded-full",
-                      attention ? "bg-warning" : "bg-primary",
-                    )}
-                  />
-                ) : null}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <TabsContent value="now" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            <SpecRenderer spec={buildNowTabSpec({ primaryAction, readiness, attention, runtimeEvents, copy: ws })} />
-            {primaryAction?.actionSpec ? (
-              <div className="px-3">
-                <SpecRenderer
-                  spec={primaryAction.actionSpec}
-                  handlers={primaryAction.actionHandlers}
-                  onStateChange={primaryAction.onActionStateChange}
-                />
-              </div>
-            ) : null}
-            {primaryAction?.onClick ? (
-              <div className="px-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 rounded-full px-3 text-xs shadow-sm"
-                  disabled={primaryAction.disabled || primaryAction.isLoading}
-                  onClick={primaryAction.onClick}
-                >
-                  {primaryAction.isLoading ? (ws.generating ?? "Generating...") : primaryAction.label}
-                </Button>
-              </div>
-            ) : null}
-          </TabsContent>
-
           <TabsContent value="output" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            {latestCompletedNode ? (
-              <div className="flex items-center justify-between gap-2 px-1 pb-1">
-                <span className="truncate text-xs text-muted-foreground">
-                  {ws.from ?? "from"}: {latestCompletedNode.title}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 shrink-0 rounded-full px-2 text-xs"
-                  onClick={() => onAction?.(latestCompletedNode.id)}
-                >
-                  {ws.locateSourceNode ?? "Locate source node"}
-                </Button>
-              </div>
-            ) : null}
-            <NodeResultContent node={latestCompletedNode} emptyMessage={ws.noResultYet ?? "No output yet."} />
-            {artifacts.length > 0 ? (
-              <SpecRenderer
-                spec={buildArtifactsSpec({ artifacts, copy: ws, onLocate: true })}
-                handlers={{
-                  "locate-workspace-node": (params) => {
-                    const nodeId = typeof params.nodeId === "string" ? params.nodeId : undefined;
-                    if (nodeId) onAction?.(nodeId);
-                  },
-                }}
-              />
-            ) : null}
+            <SpecRenderer
+              spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
+              handlers={locateHandlers}
+            />
           </TabsContent>
 
           <TabsContent value="trail" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            <WorkspaceActivityFeed
-              activity={activity}
-              runtimeEvents={runtimeEvents}
+            <SpecRenderer
+              spec={commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
+                activity,
+                runtimeEvents,
+                copy: {
+                  ...ws,
+                  activityTitle: taskWorkspaceActivityMessages.taskTitle,
+                  activityEmpty: taskWorkspaceActivityMessages.taskEmpty,
+                },
+                toolLabels: taskWorkspaceActivityMessages.toolLabels,
+              })}
+              store={trailStore ?? undefined}
             />
           </TabsContent>
         </Tabs>

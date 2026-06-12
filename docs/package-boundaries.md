@@ -15,6 +15,7 @@ This document explains where code belongs in Chrona's monorepo.
 | `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
 | `packages/graph-runtime` | Graph construction, resolution, transitions, and execution-command primitives |
 | `packages/providers/*` | External AI/runtime protocol adapters |
+| `packages/ui-protocol` | Declarative UI document schema, builders, and action catalog (json-render) shared by server renderers and the web client |
 | `packages/runtime-core` | Runtime support types/utilities shared by engine/providers |
 | `packages/i18n` | Shared localization message infrastructure |
 | `packages/shared` | Small cross-cutting utilities that are not domain/application logic |
@@ -103,21 +104,28 @@ Do not put here:
 
 ### Internal module structure
 
-`packages/engine` is the largest package (~21k LOC) because it is the
+`packages/engine` is the largest package (~22k LOC) because it is the
 application's orchestration core. Internally it is split into
-`src/modules/<name>/`, and those modules fall into two kinds with different
-import rules:
+`src/modules/<name>/` — currently `agent-tools`, `ai`, `events`,
+`execution-runtime`, `orchestration`, `pages`, `plan-execution`, `plans`,
+`projections`, `scheduling`, `tasks`, `workspaces` — and those modules fall
+into two kinds with different import rules:
 
-- **Capability ("sink") modules** — `events`, `ai`, `task-execution`,
+- **Capability ("sink") modules** — `events`, `ai`, `execution-runtime`,
   `workspaces`. These have *zero* outbound dependencies on other engine
   modules. Each exposes a public `index.ts` barrel, and everything outside the
   module MUST import through that barrel, never its internal files. Because a
   sink has no cross-module dependencies, routing through its barrel can never
   create an import cycle, and its internal files stay free to move. This is
-  enforced by the `engine-sink-modules-via-barrel` dependency-cruiser rule
-  (type-only imports are exempt, mirroring the package-level policy).
-- **Co-recursive core modules** — `plan-execution`, `plans`, `tasks`,
-  `scheduling`, `orchestration`, `projections`. These are mutually recursive by
+  intended to be enforced by the `engine-sink-modules-via-barrel`
+  dependency-cruiser rule (type-only imports are exempt, mirroring the
+  package-level policy). **⚠️ Drift:** that rule's path still names the
+  pre-rename `task-execution`, which no longer exists, so the runtime sink
+  (`execution-runtime`) is not actually barrel-enforced until the rule is
+  updated — see [Known violations](#known-violations-debt).
+- **Co-recursive / consumer core modules** — `plan-execution`, `plans`,
+  `tasks`, `scheduling`, `orchestration`, `projections`, plus the page-readers
+  (`pages`) and agent tool use cases (`agent-tools`). These are mutually recursive by
   domain necessity: creating a task starts plan generation, planning validates
   the task, plan execution writes projections, projection rebuild reads
   plan-execution scope, scheduling starts plans, and so on. They reference each
@@ -219,6 +227,24 @@ Do not put here:
 
 See `docs/provider-boundary.md` for the detailed provider rules.
 
+## `packages/ui-protocol`
+
+Put here:
+
+- the declarative UI document schema (`schema.ts`) and document types (`document/`)
+- spec builders (`builders/`) the server uses to describe a surface
+- the action catalog (`actions/`, `catalog/`) of UI-dispatchable commands
+
+This is the shared contract for "json-render": the server builds a UI document
+spec and the web client interprets it, so neither side hard-codes the other's
+layout. Keep it schema/builder focused.
+
+Do not put here:
+
+- React components or DOM rendering
+- HTTP handlers or provider calls
+- engine business orchestration
+
 ## `packages/runtime-core`
 
 Put here:
@@ -291,14 +317,23 @@ These boundaries are enforced, not just documented. Two gates run in
 
 `.dependency-cruiser-known-violations.json` freezes the pre-existing
 `error`-level violations so the gate can run green while still catching new
-ones. It currently holds a single entry:
+ones. It holds a single entry for an engine→web import:
 
-- `packages/engine/src/modules/scheduling/get-schedule-page.ts` imports
-  `buildPlanningSummary` / `formatDateKey` / `startOfDay` from
-  `apps/web/src/components/schedule/`. These are pure aggregation/date helpers
-  that belong in a shared layer (`packages/domain` or `packages/shared`);
-  migrating them (and flipping the ~16 web consumers) clears the entry. Do not
+- An engine page-reader imports `schedule-page-utils.ts` (pure
+  aggregation/date helpers) from `apps/web/src/components/schedule/`. These
+  helpers belong in a shared layer (`packages/domain` or `packages/shared`);
+  migrating them (and flipping the web consumers) clears the violation. Do not
   add new entries to work around the rule — fix the import instead.
+
+  **⚠️ The baseline is currently stale and `check:boundaries` is RED.** The
+  source file moved from `modules/scheduling/get-schedule-page.ts` to
+  `modules/pages/get-schedule-page.ts`, but the frozen baseline entry still
+  references the old `scheduling/` path. Because the path no longer matches,
+  the violation at the new `pages/` location is *unfrozen* and surfaces as a
+  hard error. Resolve it one of two ways: (a) the proper fix — move the shared
+  helpers out of `apps/web` into `packages/domain`/`shared`; or (b) re-snapshot
+  the baseline at the new path as a stopgap (note this contradicts the
+  "fix the import" rule above and should be temporary).
 
 Regenerate the baseline only when intentionally clearing or re-snapshotting
 debt: `bunx dependency-cruiser --config .dependency-cruiser.cjs --output-type baseline apps packages`, then keep only the `error`-severity entries.
