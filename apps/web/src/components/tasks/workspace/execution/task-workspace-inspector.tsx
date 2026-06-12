@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { WorkspaceActivityItem } from "../model/task-workspace-types";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
+import { TaskWorkspaceActionRail } from "./action-rail";
 import {
   TaskWorkspaceExecutionOverview,
   type CommandCenterCopy,
@@ -98,6 +99,16 @@ export function TaskWorkspaceInspector({
         inert={isNodeScope ? true : undefined}
         aria-hidden={isNodeScope ? true : undefined}
       >
+        <TaskWorkspaceActionRail
+          taskId={taskId}
+          serverNowSpec={commandCenter?.documents.now ?? null}
+          primaryAction={primaryAction}
+          readiness={consoleView.readiness}
+          attention={consoleView.attention}
+          runtimeEvents={runtimeEvents}
+          commandCenterActionHandlers={commandCenterActionHandlers}
+          copy={copy}
+        />
         <TaskWorkspaceExecutionOverview
           taskId={taskId}
           progress={consoleView.progress}

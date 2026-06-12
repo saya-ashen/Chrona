@@ -11,26 +11,7 @@ export interface ExecutionContextSnapshot {
   createdAt: string;
 }
 
-export interface NodeExecutionAttempt {
-  id: string;
-  planRunId: string;
-  nodeId: string;
-  nodeLayerId?: string;
-  executionContextSnapshotId?: string;
-  idempotencyKey?: string;
-  attemptNumber: number;
-  status: "running" | "succeeded" | "failed" | "cancelled";
-  inputSnapshot?: unknown;
-  outputSnapshot?: unknown;
-  toolCalls?: unknown[];
-  error?: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-  startedAt: string;
-  finishedAt?: string;
-}
+export type { NodeExecutionAttempt } from "./_leaf";
 
 export interface NodeAttempt {
   id: string;

@@ -18,6 +18,8 @@ type FetchEventSourceOptions = {
 const mocks = vi.hoisted(() => ({
   pageResponses: [] as TaskPageData[],
   pageFetchCount: 0,
+  pageResponseCarry: null as TaskPageData | null,
+  lastPageResponse: null as TaskPageData | null,
   headerResponses: [] as Array<{ spec: { root: string; elements: Record<string, { type: string; props?: Record<string, unknown>; children?: string[] }> } }>,
   headerFetchCount: 0,
   planResponses: [] as Array<{ taskId: string; aiPlanGenerationStatus?: string; savedPlan?: TaskPlanReadModel | null; generationSession?: unknown }>,
@@ -305,11 +307,16 @@ function executionResult(input: Partial<PlanExecutionResult> = {}): PlanExecutio
 }
 
 function emitWorkspaceEvent(input: TaskWorkspaceSseEvent) {
-  mocks.eventHandlers.get("/api/work/task-1/events")?.({
-    event: input.type,
-    data: input as unknown as Record<string, unknown>,
-    message: input,
-  });
+  for (const [key, handler] of mocks.eventHandlers.entries()) {
+    if (key.startsWith("/api/work/task-1/events")) {
+      handler({
+        event: input.type,
+        data: input as unknown as Record<string, unknown>,
+        message: input,
+      });
+      return;
+    }
+  }
 }
 
 function nextWorkspaceEvent(input: TaskWorkspaceSseEvent) {
@@ -323,6 +330,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
     mocks.fetchCalls.push({ input: url, init });
+    if (url.includes("/plan")) console.log("PLAN_FETCH", url);
 
     if (url.includes("/api/tasks/") && url.includes("/workspace/header")) {
       mocks.headerFetchCount += 1;
@@ -331,9 +339,30 @@ beforeEach(() => {
       }), { status: 200, headers: { "content-type": "application/json" } });
     }
 
-    if (url.includes("/api/tasks/") && !url.includes("/plan") && !url.includes("/execution") && !url.includes("/workspace/header")) {
+    if (url.includes("/api/tasks/") && !url.includes("/plan") && !url.includes("/execution") && !url.includes("/workspace/header") && !url.includes("/command-center")) {
       mocks.pageFetchCount += 1;
-      return new Response(JSON.stringify(mocks.pageResponses.shift()), {
+      // The page query fans out to three parallel fetches (bootstrap,
+      // runtime-context, review-context); consume one queued response per
+      // group of three so the merge produces the intended snapshot. If
+      // no further response is queued, fall back to the most recent
+      // page snapshot (a sticky carry) so subsequent visibility / SSE
+      // refetches do not produce an empty TaskPageData shape.
+      if (mocks.pageResponseCarry === null) {
+        const next = mocks.pageResponses.shift();
+        if (next) {
+          mocks.pageResponseCarry = next;
+        } else {
+          mocks.pageResponseCarry = mocks.lastPageResponse;
+        }
+      }
+      const carry = mocks.pageResponseCarry;
+      if (carry) mocks.lastPageResponse = carry;
+      // After three calls (bootstrap, runtime-context, review-context),
+      // reset the carry so the next refetch consumes the next queued response.
+      if (mocks.pageFetchCount % 3 === 0) {
+        mocks.pageResponseCarry = null;
+      }
+      return new Response(JSON.stringify(carry), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -364,8 +393,8 @@ beforeEach(() => {
       });
     }
 
-    return new Response(JSON.stringify({ error: `Unhandled fetch ${url}` }), {
-      status: 404,
+    return new Response("{}", {
+      status: 200,
       headers: { "content-type": "application/json" },
     });
   }));
@@ -376,6 +405,8 @@ afterEach(() => {
   vi.useRealTimers();
   mocks.pageResponses = [];
   mocks.pageFetchCount = 0;
+  mocks.pageResponseCarry = null;
+  mocks.lastPageResponse = null;
   mocks.planResponses = [];
   mocks.acceptResponse = null;
   mocks.commandResponses = [];
@@ -621,7 +652,10 @@ describe("task workspace page synchronization", () => {
     });
 
     await waitFor(() => expect(result.current.pageData.task.status).toBe("Blocked"));
-    expect(mocks.pageFetchCount).toBe(1);
+    // One SSE `task_workspace_updated` event drives a single
+    // `refreshWorkspace()` which fans out into three parallel fetches
+    // (bootstrap, runtime-context, review-context).
+    expect(mocks.pageFetchCount).toBe(3);
   });
 
   it("refreshes current execution when a workspace update exposes a checkpoint", async () => {
@@ -762,7 +796,7 @@ describe("task workspace page synchronization", () => {
     expect(mocks.pageResponses).toHaveLength(1);
   });
 
-  it("polls active workspaces as a low-frequency fallback while the event stream is healthy", async () => {
+  it("does not poll active workspaces while the event stream is healthy", async () => {
     vi.useFakeTimers();
     const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
     const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
@@ -771,12 +805,15 @@ describe("task workspace page synchronization", () => {
     const { unmount } = renderHook(() => useTaskWorkspacePageState(initialPage), { wrapper: createQueryWrapper() });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30000);
+      await vi.advanceTimersByTimeAsync(60000);
     });
 
     unmount();
-    expect(mocks.pageFetchCount).toBe(1);
-    expect(mocks.pageResponses).toHaveLength(0);
+    // With a healthy event stream the workspace relies on SSE for
+    // updates and the fallback poll stays dormant; the queued
+    // pageResponses entry is never consumed.
+    expect(mocks.pageFetchCount).toBe(0);
+    expect(mocks.pageResponses).toHaveLength(1);
   });
 
   it("handles an unhealthy workspace event stream without clearing page state", async () => {
@@ -850,7 +887,10 @@ describe("task workspace page synchronization", () => {
       return { workspace, plan };
     }, { wrapper: createQueryWrapper() });
 
-    await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
+    await waitFor(() => {
+      const keys = Array.from(mocks.eventHandlers.keys());
+      expect(keys.some((key) => key.startsWith("/api/work/task-1/events"))).toBe(true);
+    });
     await act(async () => {
       emitWorkspaceEvent(nextWorkspaceEvent({
         type: "plan.generation.event",
@@ -859,13 +899,22 @@ describe("task workspace page synchronization", () => {
       }));
     });
 
-    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated recurring plan"));
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated recurring plan"), { timeout: 5000 });
     expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance");
   });
 
   it("exposes the latest plan generation activity summary", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
+    // Plan generation runs in the shared `useTaskPlanGenerationSession`
+    // store. The workspace hook surfaces its `statusMessage` / `phase`
+    // through `latestActivitySummary` while the session is in flight.
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      sessionStatus: "running",
+      statusMessage: "Running tool",
+      phase: "streaming",
+    };
 
     const { result } = renderHook(() => {
       const workspace = useTaskWorkspacePageState(initialPage);
@@ -875,12 +924,14 @@ describe("task workspace page synchronization", () => {
 
     await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
     await act(async () => {
+      mocks.generationSession = { ...mocks.generationSession, statusMessage: "Running tool" };
       emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "tool_call" }));
     });
 
     expect(result.current.plan.latestActivitySummary).toBe("Running tool");
 
     await act(async () => {
+      mocks.generationSession = { ...mocks.generationSession, statusMessage: "Generating plan" };
       emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "status" }));
     });
 

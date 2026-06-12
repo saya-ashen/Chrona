@@ -477,13 +477,20 @@ export function useTaskWorkspacePlanState(
         setLiveActivity((current) => mergeWorkspaceActivity([activityItem, ...current]));
       }
 
-      // `command.accepted` / `command.failed` / `plan.generation.event` are
-      // intentionally not handled here: their state is now pushed through
-      // `state.update` events into the shared `useTaskPlanGenerationSession`
-      // store, which the `generationSession` derivation at the top of this
-      // hook consumes. This hook only needs to handle execution-flow events
-      // (runtime stream, state transitions) that do not yet have a
-      // `state.update` equivalent on the server.
+      // `command.accepted` / `command.failed` flow through the
+      // `useTaskPlanGenerationSession` store. `plan.generation.event` still
+      // needs a workspace-plan refetch here because the session store
+      // surfaces the activity summary and final `result`, while the
+      // workspace plan / plan-state pair on the server is the source of
+      // truth for the rendered plan graph and the plan-state query used
+      // by callers (e.g. the editor). Without the refetch, a generated
+      // plan that finishes outside the AI panel would never appear in
+      // the workspace.
+      if (event.type === "plan.generation.event") {
+        void planStateQuery.refetch();
+        return;
+      }
+
       if (event.type === "execution.runtime_event" && isFullRuntimeSseEvent(event)) {
         const runtimeEvent: WorkspaceRuntimeEvent = { ...event, type: "runtime_event" };
         setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));

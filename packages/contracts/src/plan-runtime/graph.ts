@@ -1,70 +1,43 @@
-import type {
-  CompiledPlanCompletionPolicy,
-  TaskExecutor,
-  TaskMode,
-  ValidationWarning,
-} from "../ai-plan-blueprint";
+// graph.ts owns graph-mutation and layer types. The heavy compiled/
+// effective shapes (CompiledNode, CompiledEdge, CompiledPlan,
+// EffectivePlanNode, EffectivePlanEdge, EffectivePlanGraph,
+// PlanGraphStatus, NodeRuntimeState, NodeRuntimeStatus) live in
+// ./_leaf so they can be referenced by execution-state.ts without
+// forming a back-edge import. They are re-exported here so external
+// consumers (which import these names from @chrona/contracts/ai)
+// keep working.
+
+import type { TaskExecutor, TaskMode } from "../ai-plan-blueprint";
 import type { NodeAttempt } from "./attempts";
-import type { NodeRuntimeState, NodeRuntimeStatus } from "./execution-state";
 import type { NodeResult } from "./node-result";
 import type {
   NodeConfig,
   NodeDefinition,
-  TaskPriority,
-  WaitKind,
 } from "./node";
+import type {
+  CompiledNode,
+  CompiledEdge,
+  CompiledPlan,
+  EffectivePlanNode,
+  EffectivePlanEdge,
+  EffectivePlanGraph,
+  PlanGraphStatus,
+} from "./_leaf";
+import type { NodeRuntimeState } from "./execution-state";
 
-export interface CompiledNode {
-  id: string;
-  localId: string;
-  type: "task" | "checkpoint" | "condition" | "wait";
-  title: string;
-  description?: string;
-  priority?: TaskPriority;
-  linkedTaskId?: string;
-  config: NodeConfig;
-  dependencies: string[];
-  dependents: string[];
-  executor?: TaskExecutor;
-  mode?: TaskMode;
-  estimatedMinutes?: number;
-}
-
-export interface CompiledEdge {
-  id: string;
-  from: string;
-  to: string;
-  label?: string;
-}
-
-export interface CompiledPlan {
-  id: string;
-  editablePlanId: string;
-  sourceVersion: number;
-  title: string;
-  goal: string;
-  assumptions: string[];
-  nodes: CompiledNode[];
-  edges: CompiledEdge[];
-  entryNodeIds: string[];
-  terminalNodeIds: string[];
-  topologicalOrder: string[];
-  completionPolicy: CompiledPlanCompletionPolicy;
-  validationWarnings: ValidationWarning[];
-}
+export type {
+  CompiledNode,
+  CompiledEdge,
+  CompiledPlan,
+  EffectivePlanNode,
+  EffectivePlanEdge,
+  EffectivePlanGraph,
+  PlanGraphStatus,
+} from "./_leaf";
 
 // ═══════════════════════════════════════════════════════════════
 // Layered Mutable Plan Graph
 // ═══════════════════════════════════════════════════════════════
-
-export type PlanGraphStatus =
-  | "draft"
-  | "active"
-  | "paused"
-  | "completed"
-  | "cancelled"
-  | "superseded"
-  | "archived";
 
 export type PlanEdgeType =
   | "hard_dependency"
@@ -241,89 +214,6 @@ export interface ResultLayer {
 }
 
 export type PlanOverlayLayer = StructuralLayer | RuntimeLayer | ResultLayer;
-
-// ─── Effective Plan Graph (resolved view) ───
-
-export interface EffectivePlanNode {
-  /** Stable plan node ID. Preserved as `id` for existing UI consumers. */
-  id: string;
-  nodeId: string;
-  activeLayerId: string | null;
-  semanticKey: string;
-  definition: NodeDefinition;
-  invalidated: boolean;
-  invalidationReason?: string;
-  waitKind?: WaitKind;
-  reviewRequired?: boolean;
-  /** Original editable plan node ID */
-  localId: string;
-  type: "task" | "checkpoint" | "condition" | "wait";
-  title: string;
-  description?: string;
-  priority?: TaskPriority;
-  linkedTaskId?: string;
-  config: NodeConfig;
-  executor?: TaskExecutor;
-  mode?: TaskMode;
-  estimatedMinutes?: number;
-  /** Compiled node IDs this node depends on */
-  dependencies: string[];
-  /** Compiled node IDs that depend on this node */
-  dependents: string[];
-  /** Merged from latest active RuntimeLayer */
-  status: NodeRuntimeStatus;
-  attempts: number;
-  lastError?: string;
-  startedAt?: string;
-  completedAt?: string;
-  /** Merged from latest active ResultLayer */
-  result?: NodeResult;
-  /** Reason why node is blocked or waiting */
-  blockedReason?: string;
-  /** Engine-level metadata (e.g. linkedTaskId for materialized child tasks) */
-  metadata: Record<string, unknown>;
-  /** Computed: all dependencies are completed/skipped */
-  dependenciesSatisfied: boolean;
-  /** Computed: can be executed now */
-  ready: boolean;
-  /** Computed: whether this node is still reachable in the selected branch path */
-  reachable: boolean;
-}
-
-export interface EffectivePlanEdge {
-  id: string;
-  from: string;
-  to: string;
-  label?: string;
-  active: boolean;
-}
-
-export interface EffectivePlanGraph {
-  graphId: string;
-  basePlanId: string;
-  resolvedAt: string;
-  resolvedVersion: number;
-  nodes: EffectivePlanNode[];
-  edges: EffectivePlanEdge[];
-  /** Computed: nodes with no incoming edges */
-  entryNodeIds: string[];
-  /** Computed: nodes with no outgoing edges */
-  terminalNodeIds: string[];
-  /** Denormalized subsets for fast runtime lookup */
-  readyNodeIds: string[];
-  blockedNodeIds: string[];
-  waitingNodeIds: string[];
-  waitingForUserNodeIds: string[];
-  waitingForApprovalNodeIds: string[];
-  degradedNodeIds: string[];
-  skippedNodeIds: string[];
-  cancelledNodeIds: string[];
-  completedNodeIds: string[];
-  runningNodeIds: string[];
-  invalidatedNodeIds: string[];
-  failedNodeIds: string[];
-  pendingNodeIds: string[];
-}
 
 export interface ResolveEffectivePlanGraphInput {
   graph: PlanGraph;
