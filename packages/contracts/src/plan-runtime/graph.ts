@@ -16,11 +16,6 @@ import type {
 } from "./node";
 import type {
   CompiledNode,
-  CompiledEdge,
-  CompiledPlan,
-  EffectivePlanNode,
-  EffectivePlanEdge,
-  EffectivePlanGraph,
   PlanGraphStatus,
 } from "./_leaf";
 import type { NodeRuntimeState } from "./execution-state";

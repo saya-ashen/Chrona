@@ -56,7 +56,6 @@ async function reconcileTimedOutProviderApprovals(taskId: string) {
       select: {
         eventType: true,
         occurredAt: true,
-        nativeRunId: true,
       },
     });
     if (!laterEvent) continue;
@@ -76,7 +75,6 @@ async function reconcileTimedOutProviderApprovals(taskId: string) {
           inferred_result: "default_denied",
           timeoutMs: HERMES_DEFAULT_APPROVAL_TIMEOUT_MS,
           observed_event_type: laterEvent.eventType,
-          nativeRunId: laterEvent.nativeRunId,
         }),
       },
     });

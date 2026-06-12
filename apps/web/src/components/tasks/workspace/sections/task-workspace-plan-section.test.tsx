@@ -110,14 +110,6 @@ describe("TaskWorkspacePlanSection", () => {
     const onGeneratePlan = vi.fn();
     const onApplyPlan = vi.fn().mockResolvedValue(undefined);
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Started" });
-    const planningTaskDraft = {
-      title: "Launch workspace flow",
-      description: "",
-      priority: "Medium",
-      dueAt: null,
-      scheduledStartAt: null,
-      scheduledEndAt: null,
-    } as const;
     const draftPlan = {
       id: "plan-1",
       status: "draft",
@@ -162,14 +154,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={null}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={planningTaskDraft}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={onApplyPlan}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
@@ -189,14 +176,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={null}
         planGenerationStatus="generating"
         acceptPlanError={null}
-        planningTaskDraft={planningTaskDraft}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={onApplyPlan}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
@@ -213,14 +195,9 @@ describe("TaskWorkspacePlanSection", () => {
         planGenerationStatus="waiting_acceptance"
         canAcceptPlan
         acceptPlanError={null}
-        planningTaskDraft={planningTaskDraft}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={onApplyPlan}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
@@ -248,14 +225,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={acceptedPlan}
         planGenerationStatus="accepted"
         acceptPlanError={null}
-        planningTaskDraft={planningTaskDraft}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={onApplyPlan}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
@@ -273,9 +245,6 @@ describe("TaskWorkspacePlanSection", () => {
         plan={acceptedPlan}
         planGenerationStatus="accepted"
         acceptPlanError={null}
-        planningTaskDraft={planningTaskDraft}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[{
           type: "runtime_event",
           action: "start_manual",
@@ -284,9 +253,7 @@ describe("TaskWorkspacePlanSection", () => {
           event: { type: "tool_started", toolName: "chrona_execution_dispatch", label: "Starting plan" },
         }]}
         onGeneratePlan={onGeneratePlan}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={onApplyPlan}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
         onSubmitCheckpointAction={vi.fn()}
       />,
@@ -312,21 +279,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={null}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
       />,
     );
@@ -382,21 +337,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={acceptedPlan}
         planGenerationStatus="accepted"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
@@ -433,21 +376,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={acceptedPlan}
         planGenerationStatus="accepted"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
@@ -496,14 +427,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{ title: "Review task output", description: "", priority: "Medium", dueAt: null, scheduledStartAt: null, scheduledEndAt: null }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
       />,
     );
@@ -532,21 +458,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
@@ -581,21 +495,9 @@ describe("TaskWorkspacePlanSection", () => {
         planGenerationStatus="waiting_acceptance"
         canAcceptPlan
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={onApplyPlan}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
       />,
     );
@@ -643,21 +545,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
         onSubmitCheckpointAction={onSubmitCheckpointAction}
       />,
@@ -700,21 +590,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
         onSubmitCheckpointAction={vi.fn()}
       />,
@@ -755,21 +633,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "创建一个获取天气的脚本",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
         onSubmitCheckpointAction={onSubmitCheckpointAction}
       />,
@@ -812,21 +678,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "创建一个获取天气的脚本",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
       />,
     );
@@ -858,21 +712,9 @@ describe("TaskWorkspacePlanSection", () => {
         plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
         planGenerationStatus="idle"
         acceptPlanError={null}
-        planningTaskDraft={{
-          title: "Review task output",
-          description: "",
-          priority: "Medium",
-          dueAt: null,
-          scheduledStartAt: null,
-          scheduledEndAt: null,
-        }}
-        hasUnsavedConfigChanges={false}
-        unsavedConfigDraft={null}
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
-        onPlanLoaded={vi.fn()}
         onApplyPlan={vi.fn()}
-        onSaveConfigBeforeRegenerate={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
       />,
     );
