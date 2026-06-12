@@ -1,11 +1,11 @@
-import { defineConfig, type PluginOption } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 const apiBaseUrl = process.env.VITE_API_BASE_URL ?? "http://127.0.0.1:3101";
 const devServerPort = Number(process.env.CHRONA_WEB_PORT ?? "3100");
 
 export default defineConfig({
-  plugins: [react() as PluginOption],
+  plugins: [react()],
   resolve: {
     tsconfigPaths: true,
   },
@@ -30,5 +30,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
   },
 });
