@@ -17,6 +17,7 @@ node_modules/
 /.playwright-browsers
 /test-results
 /artifacts/demo/playwright
+/playwright-report
 
 /out/
 
