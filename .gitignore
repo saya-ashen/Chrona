@@ -85,3 +85,7 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# oh-my-claudecode runtime state (sessions, HUD cache, project memory, replay logs)
+/.omc/
+.omc/
