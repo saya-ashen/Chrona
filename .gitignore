@@ -89,3 +89,7 @@ Thumbs.db
 # oh-my-claudecode runtime state (sessions, HUD cache, project memory, replay logs)
 /.omc/
 .omc/
+
+# understand-anything skill intermediate output (re-derivable scan/batch JSON)
+/.understand-anything/
+.understand-anything/
