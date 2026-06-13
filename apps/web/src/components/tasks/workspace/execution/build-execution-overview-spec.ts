@@ -2,6 +2,7 @@ import { buildActivitySpec, UI_ACTION, type ToolDetailLabels, type UiDocument } 
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
+import type { TaskWorkspacePlanFlowState } from "../model/task-workspace-plan-flow-machine";
 import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../model/task-workspace-types";
 import type { CommandCenterPrimaryAction } from "./task-workspace-execution-overview";
 
@@ -31,6 +32,120 @@ function mergeDocumentState(target: UiDocument, document: UiDocument | null | un
 
 function normalizeTone(tone: ExecutionOverviewCard["tone"] | CommandCenterPrimaryAction["tone"] | undefined) {
   return tone === "critical" ? "danger" : (tone ?? "info");
+}
+
+/**
+ * Spec 019 — "Current operation" card has 4 distinct variants, one per
+ * `TaskWorkspacePlanFlowState` (`idle` / `generating` / `waiting_acceptance`
+ * / `accepted`). This pure helper computes the per-state card copy + visual
+ * (title, description, statusLabel, tone, icon).
+ *
+ * When `planFlow` is `null` (caller doesn't track plan state — e.g. legacy
+ * `<TaskWorkspaceActionRail>`) the helper returns `null` and the wrapper
+ * falls back to the legacy `attention ?? readiness` path. The split is
+ * contained inside this helper so the wrapper has no branching.
+ *
+ * Pure: no React, no IO, no module state. Truncates `planSummary` to 120
+ * chars with `…` if longer. See `specs/019-plan-card-and-accept-tests/plan.md` §1.
+ */
+/**
+ * Per-state card copy + visual for the "Current operation" slot. The
+ * generator and review variants share a description template that
+ * optionally uses the plan summary.
+ */
+type CardSpec = {
+  title: string;
+  description: string;
+  statusLabel: string;
+  tone: "info" | "success";
+  icon: "sparkles" | "check";
+};
+
+const PLAN_CARDS: Record<TaskWorkspacePlanFlowState["status"], Omit<CardSpec, "description"> & { descriptionIfSummary: string; fallbackDescription: string }> = {
+  idle: {
+    title: "No plan yet",
+    statusLabel: "Idle",
+    tone: "info",
+    icon: "sparkles",
+    descriptionIfSummary: "",
+    fallbackDescription: "Generate a plan to start this task.",
+  },
+  generating: {
+    title: "Generating plan…",
+    statusLabel: "Generating",
+    tone: "info",
+    icon: "sparkles",
+    descriptionIfSummary: "",
+    fallbackDescription: "Chrona is drafting a plan for this task.",
+  },
+  waiting_acceptance: {
+    title: "Plan ready for review",
+    statusLabel: "Waiting for acceptance",
+    tone: "info",
+    icon: "sparkles",
+    descriptionIfSummary: "",
+    fallbackDescription: "Review the generated plan and accept it to enable execution.",
+  },
+  accepting: {
+    // The accept button is in flight; show the same card as
+    // `waiting_acceptance` so the user sees context while we wait for the
+    // server's 202. Only the status label differs.
+    title: "Plan ready for review",
+    statusLabel: "Accepting",
+    tone: "info",
+    icon: "sparkles",
+    descriptionIfSummary: "",
+    fallbackDescription: "Review the generated plan and accept it to enable execution.",
+  },
+  accepted: {
+    title: "Plan accepted",
+    statusLabel: "Accepted",
+    tone: "success",
+    icon: "check",
+    descriptionIfSummary: "",
+    fallbackDescription: "Execution will start when the block is due.",
+  },
+  failed: {
+    // `failed` carries `error` text; surface it instead of the generic
+    // copy. The Accept/Regenerate buttons are still rendered separately
+    // by `buildAcceptOrRegenerateSpec` and they show the `<Alert>` from
+    // `acceptPlanError`.
+    title: "Couldn't accept the plan",
+    statusLabel: "Accept failed",
+    tone: "info",
+    icon: "sparkles",
+    descriptionIfSummary: "",
+    fallbackDescription: "",
+  },
+};
+
+export function resolveCurrentOperationCardSpec(input: {
+  planFlow: TaskWorkspacePlanFlowState | null;
+  planSummary: string | null;
+}): CardSpec | null {
+  if (!input.planFlow) return null;
+
+  const card = PLAN_CARDS[input.planFlow.status];
+  const summary = input.planSummary?.trim() ?? "";
+  const truncated = summary.length > 120 ? `${summary.slice(0, 120)}…` : summary;
+
+  // `generating` / `waiting_acceptance` / `accepting` surface the plan
+  // summary when one is available; other states always show their
+  // fallback copy.
+  let description = card.fallbackDescription;
+  if ((input.planFlow.status === "generating" || input.planFlow.status === "waiting_acceptance" || input.planFlow.status === "accepting") && truncated.length > 0) {
+    description = truncated;
+  } else if (input.planFlow.status === "failed") {
+    description = input.planFlow.error;
+  }
+
+  return {
+    title: card.title,
+    description,
+    statusLabel: card.statusLabel,
+    tone: card.tone,
+    icon: card.icon,
+  };
 }
 
 function compactRuntimeText(value: string) {
@@ -93,22 +208,63 @@ export function buildCommandCenterNowSpec(input: {
   attention: ExecutionOverviewCard | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
   copy: WorkspaceCopy;
+  /**
+   * Spec 019 — when supplied, the "Current operation" card uses one of the
+   * 4 plan-state variants from `resolveCurrentOperationCardSpec`. When
+   * omitted, the wrapper falls back to the legacy
+   * `input.attention ?? input.readiness` path so existing callers
+   * (e.g. `<TaskWorkspaceActionRail>`) are unaffected.
+   */
+  planFlow?: TaskWorkspacePlanFlowState | null;
+  /**
+   * Spec 019 — `savedPlan.summary` for the `generating` / `waiting_acceptance`
+   * / `accepting` / `failed` cards. Truncated to 120 chars by the helper.
+   */
+  planSummary?: string | null;
 }): UiDocument {
   const elements: MutableElements = {};
   const rootChildren: string[] = [];
   elements.root = { type: "Stack", props: { gap: "sm" }, children: rootChildren };
 
-  const statusCard = input.attention ?? input.readiness;
-  const statusIcon = input.attention ? "warning" : "sparkles";
+  // Spec 019 — when `planFlow` is provided, drive the card from the plan
+  // state. Otherwise fall back to the legacy `attention ?? readiness`.
+  const planCard = resolveCurrentOperationCardSpec({
+    planFlow: input.planFlow ?? null,
+    planSummary: input.planSummary ?? null,
+  });
+  const statusCardProps: {
+    title: string;
+    description: string;
+    statusLabel: string | undefined;
+    tone: "neutral" | "info" | "success" | "warning" | "danger";
+    icon: "sparkles" | "warning" | "check";
+  } = planCard
+    ? {
+        title: planCard.title,
+        description: planCard.description,
+        statusLabel: planCard.statusLabel,
+        tone: planCard.tone,
+        icon: planCard.icon,
+      }
+    : (() => {
+        const statusCard = input.attention ?? input.readiness;
+        return {
+          title: statusCard.title,
+          description: statusCard.description,
+          statusLabel: statusCard.statusLabel,
+          tone: normalizeTone(statusCard.tone),
+          icon: input.attention ? ("warning" as const) : ("sparkles" as const),
+        };
+      })();
   elements["status-card"] = {
     type: "WorkspaceSummaryCard",
     props: {
       eyebrow: input.copy.currentOperation ?? "Current operation",
-      title: statusCard.title,
-      description: statusCard.description,
-      statusLabel: statusCard.statusLabel,
-      tone: normalizeTone(statusCard.tone),
-      icon: statusIcon,
+      title: statusCardProps.title,
+      description: statusCardProps.description,
+      statusLabel: statusCardProps.statusLabel,
+      tone: statusCardProps.tone,
+      icon: statusCardProps.icon,
     },
   };
   rootChildren.push("status-card");
