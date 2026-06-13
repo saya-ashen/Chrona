@@ -1,4 +1,5 @@
 import { HermesProviderClient } from "@chrona/hermes";
+import { CHRONA_CLAUDE_CODE_PROVIDER_TYPE, ClaudeCodeProviderClient } from "@chrona/claude-code";
 import { CHRONA_DEBUG_PROVIDER_TYPE, normalizeDebugProviderProfile } from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
@@ -9,6 +10,7 @@ import type {
 import type {
   AiClientRecord,
   AiFeature,
+  ClaudeCodeClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
@@ -127,6 +129,21 @@ async function checkClientHealth(
       return {
         available: true,
         reason: health.reason ?? health.message ?? "Hermes API is reachable",
+      };
+    }
+
+    if (client.type === CHRONA_CLAUDE_CODE_PROVIDER_TYPE) {
+      const config = client.config as ClaudeCodeClientConfig;
+      const health = await new ClaudeCodeProviderClient({ config }).checkHealth();
+      if (!health.ok) {
+        return {
+          available: false,
+          reason: health.reason ?? health.message ?? "Claude Code health check failed",
+        };
+      }
+      return {
+        available: true,
+        reason: health.reason ?? health.message ?? "Claude Code CLI is reachable",
       };
     }
 

@@ -327,6 +327,7 @@ export type {
   DebugProviderProfile,
   HermesClientConfig,
   DebugClientConfig,
+  ClaudeCodeClientConfig,
   LLMClientConfig,
   AgentProviderClientConfig,
   SmartSuggestRequest,

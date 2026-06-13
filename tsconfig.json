@@ -36,6 +36,8 @@
       "@chrona/hermes/*": ["./packages/providers/hermes/src/*"],
       "@chrona/providers-debug": ["./packages/providers/debug/src/index.ts"],
       "@chrona/providers-debug/*": ["./packages/providers/debug/src/*"],
+      "@chrona/claude-code": ["./packages/providers/claude-code/src/index.ts"],
+      "@chrona/claude-code/*": ["./packages/providers/claude-code/src/*"],
       "@chrona/graph-runtime": ["./packages/graph-runtime/src/index.ts"],
       "@chrona/graph-runtime/*": ["./packages/graph-runtime/src/*"],
       "@chrona/domain": ["./packages/domain/src/index.ts"],
