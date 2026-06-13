@@ -8,6 +8,12 @@ import {
 } from "./task-workspace-test-helpers";
 
 const TASK_URL = (taskId: string) => `/en/tasks/${taskId}`;
+const WORK_URL = (taskId: string) => `/en/work/${taskId}`;
+
+type ExecutionCurrentBody = {
+  status?: string;
+  checkpoint?: { id?: string; type?: string } | null;
+};
 
 async function expectNoHorizontalScroll(page: Page) {
   await expect.poll(async () => page.evaluate(() => ({
@@ -30,24 +36,167 @@ async function dismissTaskEditorIfOpen(page: Page) {
   }
 }
 
-async function getCurrentExecutionStatus(request: APIRequestContext, taskId: string): Promise<string> {
+async function getCurrentExecution(
+  request: APIRequestContext,
+  taskId: string,
+): Promise<ExecutionCurrentBody> {
   const response = await request.get(`/api/tasks/${taskId}/execution/current`);
   expect(response.ok()).toBeTruthy();
-  const body = (await response.json()) as { status?: string };
-  return body.status ?? "unknown";
+  return (await response.json()) as ExecutionCurrentBody;
 }
 
+/**
+ * Bind a debug AI client as the workspace default for ALL execution features
+ * so the manual lifecycle can run end-to-end (not just generate a plan).
+ * `generateDebugTaskWorkspacePlan` binds only `generate_plan`; this binds the
+ * three execute-time features the debug plan graph needs.
+ */
+async function bindAllDebugFeatures(
+  request: APIRequestContext,
+  taskId: string,
+): Promise<void> {
+  const createRes = await request.post("/api/ai/clients", {
+    data: {
+      name: `E2E Lifecycle Debug Client ${taskId}`,
+      type: "debug",
+      config: { profile: "deterministic" },
+      isDefault: true,
+    },
+  });
+  expect(createRes.ok()).toBeTruthy();
+  const created = (await createRes.json()) as { client: { id?: string } };
+  const clientId = created.client.id;
+  expect(clientId).toBeTruthy();
+
+  const bindRes = await request.put(`/api/ai/clients/${clientId}/bindings`, {
+    data: {
+      features: [
+        "generate_plan",
+        "execute_task_node",
+        "evaluate_condition_node",
+        "review_checkpoint_node",
+      ],
+    },
+  });
+  expect(bindRes.ok()).toBeTruthy();
+}
+
+/** Generate + accept a debug plan, asserting the saved plan reaches `accepted`. */
+async function generateAndAcceptPlan(
+  request: APIRequestContext,
+  taskId: string,
+): Promise<void> {
+  const generationResponse = await request.post(
+    `/api/tasks/${taskId}/plan/generations`,
+    { data: { forceRefresh: true }, headers: { accept: "text/event-stream" } },
+  );
+  expect(generationResponse.ok()).toBeTruthy();
+  await generationResponse.text();
+
+  let planId: string | null = null;
+  await expect.poll(async () => {
+    const res = await request.get(`/api/tasks/${taskId}/plan`);
+    if (!res.ok()) return null;
+    const body = (await res.json()) as { savedPlan?: { id?: string; status?: string } | null };
+    planId = body.savedPlan?.id ?? null;
+    return body.savedPlan?.status === "draft" ? planId : null;
+  }, { timeout: 20_000 }).not.toBeNull();
+
+  const acceptRes = await request.post(`/api/tasks/${taskId}/plan/accept`, {
+    data: { planId },
+  });
+  expect(acceptRes.ok()).toBeTruthy();
+}
+
+/** Poll execution/current until predicate passes, returning the matching body. */
+async function pollExecution(
+  request: APIRequestContext,
+  taskId: string,
+  predicate: (body: ExecutionCurrentBody) => boolean,
+  timeoutMs = 40_000,
+): Promise<ExecutionCurrentBody> {
+  let last: ExecutionCurrentBody = {};
+  await expect.poll(async () => {
+    last = await getCurrentExecution(request, taskId);
+    return predicate(last);
+  }, { timeout: timeoutMs, intervals: [300, 500, 1_000] }).toBe(true);
+  return last;
+}
+
+/** Resolve a checkpoint via the workspace commands endpoint. */
+async function postCheckpointAction(
+  request: APIRequestContext,
+  taskId: string,
+  checkpointId: string,
+  action: string,
+  payload?: Record<string, unknown>,
+): Promise<void> {
+  const body: Record<string, unknown> = { type: "checkpoint.action", checkpointId, action };
+  if (payload !== undefined) body.payload = payload;
+  const res = await request.post(`/api/work/${taskId}/commands`, { data: body });
+  if (!res.ok()) {
+    const text = await res.text().catch(() => "<no body>");
+    throw new Error(`checkpoint.action ${action} failed: HTTP ${res.status()} body=${text.slice(0, 500)}`);
+  }
+  const ack = (await res.json()) as { commandId?: string };
+  expect(ack.commandId).toBeTruthy();
+}
+
+/**
+ * Drive the three debug-plan gates in order, asserting the exact execution
+ * status at each one. The debug `deterministic` plan deterministically yields:
+ *   input checkpoint (waiting_for_user)
+ *     → approval checkpoint (waiting_for_approval)
+ *     → manual node (blocked)  → Completed.
+ */
+async function resolveDebugPlanGates(
+  request: APIRequestContext,
+  taskId: string,
+): Promise<void> {
+  await test.step("Resolve input checkpoint (submit_input)", async () => {
+    const exec = await pollExecution(
+      request, taskId,
+      (b) => b.status === "waiting_for_user" && !!b.checkpoint?.id,
+    );
+    await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "submit_input", {
+      inputFields: { scenario_label: "fast", include_slow_wait: false, priority: "normal" },
+    });
+  });
+
+  await test.step("Resolve approval checkpoint (approve_result)", async () => {
+    const exec = await pollExecution(
+      request, taskId,
+      (b) => b.status === "waiting_for_approval" && !!b.checkpoint?.id,
+    );
+    await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "approve_result", {
+      feedback: "approved by e2e lifecycle",
+    });
+  });
+
+  await test.step("Resolve manual node (mark_node_completed)", async () => {
+    const exec = await pollExecution(
+      request, taskId,
+      (b) => b.status === "blocked" && !!b.checkpoint?.id,
+    );
+    await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "mark_node_completed", {
+      root: "root",
+      elements: { root: { type: "Text", props: { value: "Manual review completed by e2e lifecycle" } } },
+    });
+  });
+}
 
 test.describe("Task create → plan → run → result", () => {
   test("drives the full lifecycle from creation through accepted result", async ({
     page,
     request,
   }, testInfo) => {
+    // Plan generation + three-gate manual resolution is deterministic but
+    // spans several engine round-trips.
+    test.setTimeout(180_000);
     const viewport = selectViewport(testInfo);
     await setTaskWorkspaceViewport(page, viewport);
 
-    // 1. Create a task and open the workspace. Header should be in the
-    //    "no-plan" state with Generate plan visible.
+    // 1. Create a task and open the workspace; assert the empty-graph state.
     const task = await createTaskWorkspaceTask(request, {
       title: `E2E Lifecycle ${viewport} ${Date.now()}`,
       description: "Drive a task through plan generation, accept, start, and accept result.",
@@ -57,27 +206,25 @@ test.describe("Task create → plan → run → result", () => {
     await expect(page.getByRole("heading", { name: new RegExp(`E2E Lifecycle ${viewport}`) })).toBeVisible();
     await expect(page.getByText("The plan graph will appear here once AI generates a plan.")).toBeVisible();
 
-    // 2. Install a debug AI client and generate + accept a plan.
-    await test.step("Configure debug AI client and generate a draft plan", async () => {
-      await generateDebugTaskWorkspacePlan(request, task.taskId);
+    // Before any plan exists the engine reports exactly `no_plan`.
+    expect((await getCurrentExecution(request, task.taskId)).status).toBe("no_plan");
+
+    // 2. Bind all debug features, then generate + accept a plan.
+    await test.step("Configure debug AI client and accept a plan", async () => {
+      await bindAllDebugFeatures(request, task.taskId);
+      await generateAndAcceptPlan(request, task.taskId);
     });
 
-    // 3. The plan graph appears in the UI. Cross-check the engine state
-    //    via REST to confirm the plan is no longer in `no_plan` — the
-    //    exact primary-action label depends on the engine state and
-    //    SSE snapshot ordering, so we don't pin it in the spec.
+    // 3. The plan graph appears; engine moves to the pre-start `started`
+    //    state (accepted plan, no execution session yet).
     await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
     await expect
-      .poll(async () => getCurrentExecutionStatus(request, task.taskId), { timeout: 10_000 })
-      .not.toBe("no_plan");
+      .poll(async () => (await getCurrentExecution(request, task.taskId)).status, { timeout: 10_000 })
+      .toBe("started");
 
-    // 4. Start execution. Dispatch the command via the workspace command
-    //    endpoint, then poll the REST execution endpoint until the engine
-    //    has moved off the pre-start state (`no_plan`). The debug plan's
-    //    last node waits on an external event so the execution legitimately
-    //    settles into `running` and may stay there; we only assert that the
-    //    start command was accepted and the engine has progressed.
-    await test.step("Start execution and confirm engine progression", async () => {
+    // 4. Start execution manually and drive the three debug gates to
+    //    Completed, asserting each exact intermediate status along the way.
+    await test.step("Start execution and resolve gates to Completed", async () => {
       const ack = await dispatchWorkspaceCommand(request, task.taskId, {
         type: "execution.action",
         action: "start_manual",
@@ -85,69 +232,56 @@ test.describe("Task create → plan → run → result", () => {
         idempotencyKey: `e2e-start-${task.taskId}`,
       });
       expect(ack.commandId).toBeTruthy();
-      // Wait for the engine to flip off `no_plan` — the start command
-      // should always move the status off the pre-start state, even if
-      // the runtime then enters a long-running phase.
-      await expect
-        .poll(async () => getCurrentExecutionStatus(request, task.taskId), {
-          timeout: 10_000,
-          intervals: [200, 500, 1_000],
-        })
-        .not.toBe("no_plan");
-    });
 
-    // 5. Reload the page to pick up the result-panel state driven by the
-    //    refreshed REST snapshot. Then accept the result through the UI.
-    //    The debug runtime can park in `running` indefinitely on its
-    //    `wait_external_event` node — the spec asserts the result
-    //    surface is reachable from the page (Accept result or Retry
-    //    button rendered) without requiring a specific terminal status.
-    await test.step("Result surface renders after the runtime starts", async () => {
-      await page.goto(TASK_URL(task.taskId));
-      await dismissTaskEditorIfOpen(page);
-      const acceptResult = page.getByRole("button", { name: /^Accept result$/ });
-      const retry = page.getByRole("button", { name: /^Retry$/ });
-      // Try a few times — the result surface may render only after the
-      // runtime has produced at least one node event.
-      let observedStatus = "unknown";
+      await resolveDebugPlanGates(request, task.taskId);
+
       await expect
         .poll(async () => {
-          // Drive a no-op status refresh; if the runtime is still busy
-          // the page will show runtime progress controls instead of
-          // result actions. We only assert that the page is "still on
-          // the workspace" and reachable.
-          const work = await request.get(`/api/work/${task.taskId}`);
-          const body = (await work.json()) as { taskShell?: { status?: string } };
-          observedStatus = body.taskShell?.status ?? "unknown";
-          return observedStatus;
-        }, { timeout: 10_000, intervals: [500, 1_000, 2_000] })
-        .not.toBe("no_plan");
-      expect(observedStatus).not.toBe("no_plan");
+          const res = await request.get(`/api/work/${task.taskId}`);
+          if (!res.ok()) return null;
+          const body = (await res.json()) as { taskShell?: { status?: string } };
+          return body.taskShell?.status ?? null;
+        }, { timeout: 30_000, intervals: [300, 500, 1_000] })
+        .toBe("Completed");
+    });
 
-      // If the result panel has surfaced the Accept result / Retry
-      // button, drive it through the UI; otherwise (debug runtime still
-      // in `running` on a wait node) the spec stops here without
-      // pinning a specific terminal — exercising both the start and
-      // the persistence paths is the spec's main value.
-      const aVisible = await acceptResult.isVisible().catch(() => false);
-      const rVisible = await retry.isVisible().catch(() => false);
-      if (aVisible) {
-        const acceptPromise = page.waitForResponse((res) =>
-          res.url().includes(`/api/tasks/${task.taskId}/result/accept`)
-          && res.request().method() === "POST"
-        );
-        await acceptResult.click();
-        const res = await acceptPromise;
-        expect(res.ok()).toBeTruthy();
-      } else if (rVisible) {
-        const ack = await dispatchWorkspaceCommand(request, task.taskId, {
-          type: "execution.action",
-          action: "retry_node",
-          nodeId: "entry",
-          idempotencyKey: `e2e-retry-${task.taskId}`,
-        });
-        expect(ack.commandId).toBeTruthy();
-      }
+    // 5. Accept the result. The Work page exposes acceptance through the
+    //    REST contract the UI's `acceptResult` action also calls
+    //    (`POST /api/tasks/:taskId/result/accept`); there is no standalone
+    //    "Accept result" button in the current passive-hero surface. Assert
+    //    the engine projection before and after acceptance so the state
+    //    transition is pinned exactly.
+    await test.step("Accept the result and confirm the projection flips", async () => {
+      const before = await request.get(`/api/work/${task.taskId}`);
+      expect(before.ok()).toBeTruthy();
+      const beforeBody = (await before.json()) as {
+        currentRun?: { status?: string };
+        closure?: { canAcceptResult?: boolean; resultAccepted?: boolean };
+      };
+      expect(beforeBody.currentRun?.status).toBe("Completed");
+      expect(beforeBody.closure?.resultAccepted).toBe(false);
+      expect(beforeBody.closure?.canAcceptResult).toBe(true);
+
+      const acceptRes = await request.post(`/api/tasks/${task.taskId}/result/accept`);
+      expect(acceptRes.ok()).toBeTruthy();
+
+      await expect
+        .poll(async () => {
+          const res = await request.get(`/api/work/${task.taskId}`);
+          if (!res.ok()) return null;
+          const body = (await res.json()) as { closure?: { resultAccepted?: boolean; canAcceptResult?: boolean } };
+          return body.closure ?? null;
+        }, { timeout: 15_000, intervals: [300, 500, 1_000] })
+        .toEqual(expect.objectContaining({ resultAccepted: true, canAcceptResult: false }));
+    });
+
+    // 6. The Work page header badge reflects the completed execution.
+    await test.step("Work page badge shows the completed execution", async () => {
+      await page.goto(WORK_URL(task.taskId));
+      await dismissTaskEditorIfOpen(page);
+      await expect(
+        page.locator('[data-slot="badge"]').filter({ hasText: /^completed$/i }),
+      ).toBeVisible({ timeout: 15_000 });
     });
 
     if (viewport === "mobile") {

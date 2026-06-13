@@ -45,6 +45,35 @@ const copy = {
   editPlaceholder: "Needs edits before approval",
 };
 
+function renderSingleItem(
+  item: {
+    id: string;
+    kind: string;
+    actionType: string;
+    riskLevel: string;
+    sourceTaskTitle: string;
+    sourceTaskId: string;
+    currentRunLabel: string | null;
+    summary: string;
+  },
+  copyOverrides: Record<string, string> = {},
+) {
+  render(
+    <InboxPageClient
+      workspaceId="ws_1"
+      copy={{ ...copy, ...copyOverrides }}
+      initialData={[
+        {
+          ...item,
+          workspaceId: "ws_1",
+          detail: item.actionType,
+          consequence: "Execution stays paused until resolved.",
+        } as never,
+      ]}
+    />,
+  );
+}
+
 describe("InboxPageClient", () => {
   it("submits approval decisions directly from inbox approval cards", async () => {
     const user = userEvent.setup();
@@ -110,6 +139,90 @@ describe("InboxPageClient", () => {
     await waitFor(() => expect(decideScheduleProposal).toHaveBeenCalledWith({
       proposalId: "proposal_1",
       decision: "Accepted",
+    }));
+  });
+
+  it("retries a failed recovery item via start_manual", async () => {
+    const user = userEvent.setup();
+    renderSingleItem({
+      id: "run_failed",
+      kind: "recovery",
+      actionType: "Recovery needed",
+      riskLevel: "critical",
+      sourceTaskTitle: "Build site",
+      sourceTaskId: "task_3",
+      currentRunLabel: "run_failed",
+      summary: "The latest run stopped before finishing.",
+    }, { retry: "Retry" });
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
+      taskId: "task_3",
+      action: { action: "start_manual" },
+    }));
+  });
+
+  it("resumes a blocked item via resume_after_unblock", async () => {
+    const user = userEvent.setup();
+    renderSingleItem({
+      id: "task_4",
+      kind: "blocked",
+      actionType: "Blocked",
+      riskLevel: "high",
+      sourceTaskTitle: "Deploy service",
+      sourceTaskId: "task_4",
+      currentRunLabel: null,
+      summary: "Provider hermes is offline.",
+    }, { resume: "Resume" });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+
+    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
+      taskId: "task_4",
+      action: { action: "resume_after_unblock" },
+    }));
+  });
+
+  it("offers an Open Task recovery link for a WaitingForInput item", async () => {
+    renderSingleItem({
+      id: "run_input",
+      kind: "input",
+      actionType: "Input needed",
+      riskLevel: "medium",
+      sourceTaskTitle: "Provision environment",
+      sourceTaskId: "task_5",
+      currentRunLabel: "run_input",
+      summary: "Which environment should I target?",
+    });
+
+    const links = screen.getAllByRole("link", { name: "Open Task" });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/en/tasks/task_5");
+    }
+    // WaitingForInput is resolved in the workbench, not auto-dispatched from inbox.
+    expect(dispatchExecutionAction).not.toHaveBeenCalled();
+  });
+
+  it("retries a cancelled recovery item via start_manual", async () => {
+    const user = userEvent.setup();
+    renderSingleItem({
+      id: "run_cancelled",
+      kind: "recovery",
+      actionType: "Recovery needed",
+      riskLevel: "medium",
+      sourceTaskTitle: "Generate report",
+      sourceTaskId: "task_6",
+      currentRunLabel: "run_cancelled",
+      summary: "The latest run was cancelled and needs operator review before restarting.",
+    }, { retry: "Retry" });
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
+      taskId: "task_6",
+      action: { action: "start_manual" },
     }));
   });
 });

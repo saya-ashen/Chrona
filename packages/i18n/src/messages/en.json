@@ -200,6 +200,8 @@
       "approve": "Approve",
       "reject": "Reject",
       "editAndApprove": "Edit and Approve",
+      "retry": "Retry",
+      "resume": "Resume",
       "emptyTitle": "You're all caught up",
       "emptyDescription": "No approvals, input requests, or schedule proposals need your attention right now."
     },

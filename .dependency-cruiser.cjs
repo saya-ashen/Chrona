@@ -144,7 +144,7 @@ module.exports = {
     // --- capability ("sink") engine modules expose a barrel; respect it ------
     // packages/engine is a large but internally-layered package. A subset of
     // its modules are pure capability *sinks*: they have ZERO outbound
-    // dependencies on other engine modules (events, ai, task-execution,
+    // dependencies on other engine modules (events, ai, execution-runtime,
     // workspaces). Those are safe to hide behind a barrel — importing them
     // through modules/<sink>/index.ts can never create a cycle, and it lets
     // their internal files move freely.
@@ -159,15 +159,15 @@ module.exports = {
     {
       name: "engine-sink-modules-via-barrel",
       comment:
-        "Import a capability module (events/ai/task-execution/workspaces) through its modules/<name>/index.ts barrel, not its internal files. These modules have no cross-module dependencies, so the barrel is cycle-safe; add the symbol to the barrel instead of deep-importing.",
+        "Import a capability module (events/ai/execution-runtime/workspaces) through its modules/<name>/index.ts barrel, not its internal files. These modules have no cross-module dependencies, so the barrel is cycle-safe; add the symbol to the barrel instead of deep-importing.",
       severity: "error",
       from: {
         path: "^(apps|packages)/",
-        pathNot: `(^packages/engine/src/modules/(events|ai|task-execution|workspaces)/|${TEST})`,
+        pathNot: `(^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/|${TEST})`,
       },
       to: {
-        path: "^packages/engine/src/modules/(events|ai|task-execution|workspaces)/",
-        pathNot: "^packages/engine/src/modules/(events|ai|task-execution|workspaces)/index\\.ts$",
+        path: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/",
+        pathNot: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/index\\.ts$",
         // Type-only imports are an acceptable end-to-end type contract (e.g. the
         // web app inferring a builder's return type); only runtime imports must
         // route through the barrel.
@@ -183,8 +183,8 @@ module.exports = {
         path: `^(apps|packages)/.*${TEST}`,
       },
       to: {
-        path: "^packages/engine/src/modules/(events|ai|task-execution|workspaces)/",
-        pathNot: "^packages/engine/src/modules/(events|ai|task-execution|workspaces)/index\\.ts$",
+        path: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/",
+        pathNot: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/index\\.ts$",
       },
     },
   ],

@@ -31,7 +31,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `bun run scripts/init-sqlite-db.ts --reset${E2E_TEMPLATE_ARG} "${E2E_DB_PATH}" && DATABASE_URL="${E2E_DATABASE_URL}" bun run db:seed && HOST=127.0.0.1 PORT="${E2E_API_PORT}" DATABASE_URL="${E2E_DATABASE_URL}" VITE_API_BASE_URL="${E2E_API_BASE_URL}" CHRONA_WEB_PORT="${E2E_WEB_PORT}" CHRONA_E2E_CALENDAR_FIXTURES=1 bun run dev`,
+    command: `bun run scripts/init-sqlite-db.ts --reset${E2E_TEMPLATE_ARG} "${E2E_DB_PATH}" && DATABASE_URL="${E2E_DATABASE_URL}" bun run db:seed && HOST=127.0.0.1 PORT="${E2E_API_PORT}" DATABASE_URL="${E2E_DATABASE_URL}" VITE_API_BASE_URL="${E2E_API_BASE_URL}" CHRONA_WEB_PORT="${E2E_WEB_PORT}" CHRONA_E2E_CALENDAR_FIXTURES=1 CHRONA_E2E_TEST_ROUTES=1 CHRONA_ENABLE_DEBUG_PROVIDER=true CHRONA_TASK_ORCHESTRATOR_ENABLED=true CHRONA_TASK_ORCHESTRATOR_INTERVAL_MS=600000 bun run dev`,
     url: E2E_BASE_URL,
     reuseExistingServer: false,
   },

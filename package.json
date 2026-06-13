@@ -44,6 +44,7 @@
     "test:e2e:mobile": "playwright test --project=mobile",
     "test:llm:replay": "bun run chrona test llm:replay",
     "db:generate": "prisma generate",
+    "postinstall": "prisma generate",
     "setup": "bun run db:generate && bun run db:seed",
     "db:seed": "bun prisma/seed.ts",
     "check:boundaries": "bun run chrona check boundaries"
