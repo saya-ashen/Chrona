@@ -848,6 +848,12 @@ function buildExecutionAiInput(input: {
     case "evaluate_condition_node":
     case "review_checkpoint_node":
       return runtimeInput;
+    case "suggest":
+    case "generate_plan":
+      return {
+        executionRuntime: input.executionRuntime,
+        runtimeInput,
+      };
     default:
       return {
         executionRuntime: input.executionRuntime,

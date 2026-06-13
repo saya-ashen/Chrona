@@ -148,6 +148,11 @@ function renderActionPanel(
         copy.actionObserveTitle,
         <p className="text-sm text-muted-foreground">{currentIntervention.description}</p>,
       );
+    case "idle":
+      return shell(
+        copy.actionDefaultTitle,
+        <p className="text-sm text-muted-foreground">{currentIntervention.description}</p>,
+      );
     default:
       return shell(
         copy.actionDefaultTitle,

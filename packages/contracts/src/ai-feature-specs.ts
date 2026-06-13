@@ -274,6 +274,13 @@ export function validatePreparedFeaturePayload(
     }
     case "suggest":
       return validateSuggestPayload(payload);
+    case "execute_task_node":
+    case "evaluate_condition_node":
+    case "review_checkpoint_node":
+      return {
+        ok: false,
+        error: `Feature '${spec.feature}' is not supported by the shared feature validator`,
+      };
     default:
       return {
         ok: false,

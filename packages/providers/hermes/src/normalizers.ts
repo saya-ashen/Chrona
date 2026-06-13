@@ -195,6 +195,12 @@ export function mapHermesEvent(
         type: "run_cancelled",
         raw,
       };
+    case undefined: {
+      if (options.strictUnknown) {
+        throw new Error(`Unknown Hermes stream event type: ${type ?? "<missing>"}`);
+      }
+      return undefined;
+    }
     default: {
       // When the caller opts into raw capture, surface unknown events as
       // raw_event so the Trail never silently loses provider activity. Only
@@ -340,6 +346,8 @@ function mapHermesApprovalChoices(value: unknown): ProviderApprovalChoice[] {
         break;
       case "deny":
         choices.push("deny");
+        break;
+      case undefined:
         break;
     }
   }

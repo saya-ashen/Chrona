@@ -97,7 +97,7 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "@typescript-eslint/no-unnecessary-condition": "warn",
-      "@typescript-eslint/switch-exhaustiveness-check": "warn",
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
     },
   },
   {

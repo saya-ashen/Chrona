@@ -142,6 +142,8 @@ function derivePrimaryAction(input: {
       return { type: "retry_sync", enabled: true, label: "Retry sync" };
     case "blocked":
       return { type: "replan", enabled: true, label: "Replan" };
+    case "running":
+      return noAction;
     default:
       return noAction;
   }
@@ -169,6 +171,8 @@ function executionStateFromTaskBlock(
       return "waiting_for_approval";
     case "blocked":
       return "blocked";
+    case undefined:
+      return null;
     case "failed":
       return "failed";
     default:

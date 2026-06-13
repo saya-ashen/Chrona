@@ -136,6 +136,8 @@ function terminalNodeResultFromSnapshot(input: {
         evidence: input.evidence,
         output: outputFromStructuredPayload({ structured: input.structured, fallback: undefined }),
       };
+    case undefined:
+      return undefined;
     default:
       return undefined;
   }
@@ -378,6 +380,10 @@ function errorSummaryFromNodeResult(result: NodeExecutionResult): string | null 
     case "blocked":
     case "replan_required":
       return result.reason;
+    case "waiting_for_user":
+    case "waiting_for_approval":
+    case "done":
+    case "started":
     default:
       return null;
   }

@@ -111,6 +111,8 @@ function getBadgeClass(kind: string | undefined) {
     case "result":
     case "output":
       return "border-success/30 bg-success/10 text-success";
+    case undefined:
+      return "border-border bg-card text-muted-foreground";
     default:
       return "border-border bg-card text-muted-foreground";
   }
@@ -126,6 +128,7 @@ function getCardClass(kind: string | undefined) {
     case "result":
     case "output":
       return "border-success/25 bg-success/8";
+    case undefined:
     default:
       return "border-border/70 bg-background/90";
   }

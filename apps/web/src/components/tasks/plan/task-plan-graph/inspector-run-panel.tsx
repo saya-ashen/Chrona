@@ -35,9 +35,13 @@ function getRunPanelTheme(mode: RunPanelMode) {
       return { badge: "border-destructive/30 bg-destructive/10 text-destructive", card: "border-destructive/25 bg-destructive/10" };
     case "wait":
       return { badge: "border-border bg-muted text-muted-foreground", card: "border-border bg-muted/45" };
+    case "observe":
+      return { badge: "border-border bg-muted text-muted-foreground", card: "border-border bg-muted/45" };
+    case undefined:
+      return { badge: "border-border bg-muted text-muted-foreground", card: "border-border bg-muted/45" };
     default:
       return { badge: "border-border bg-muted text-muted-foreground", card: "border-border bg-muted/45" };
-  }
+   }
 }
 
 function getRunPanelHints(mode: RunPanelMode, graphCopy: GraphCopy) {
@@ -57,10 +61,13 @@ function getRunPanelHints(mode: RunPanelMode, graphCopy: GraphCopy) {
     case "retry":
       return [graphCopy.runHintRetryCause, graphCopy.runHintRetryUse];
     case "wait":
-      return [graphCopy.runHintWaitManual, graphCopy.runHintWaitMonitor];
+    case "observe":
+      return [graphCopy.runHintObserveContext, graphCopy.runHintObserveAdvance];
+    case undefined:
+      return [graphCopy.runHintObserveContext, graphCopy.runHintObserveAdvance];
     default:
       return [graphCopy.runHintObserveContext, graphCopy.runHintObserveAdvance];
-  }
+   }
 }
 
 function buildDefaultFieldValues(fields: PlanNodeField[]) {
@@ -185,10 +192,14 @@ function getRunPanelCopy(mode: RunPanelMode, graphCopy: GraphCopy) {
       return { eyebrow: graphCopy.runPanelEditEyebrow, title: graphCopy.runPanelEditTitle, description: graphCopy.runPanelEditDescription, submitLabel: graphCopy.runActionSubmit, submitIcon: Send };
     case "approve":
       return { eyebrow: graphCopy.runPanelApproveEyebrow, title: graphCopy.runPanelApproveTitle, description: graphCopy.runPanelApproveDescription, submitLabel: graphCopy.runActionApprove, submitIcon: Check };
-    case "wait":
-      return { eyebrow: graphCopy.runPanelWaitEyebrow, title: graphCopy.runPanelWaitTitle, description: graphCopy.runPanelWaitDescription, submitLabel: graphCopy.runActionObserve, submitIcon: Sparkles };
     case "retry":
       return { eyebrow: graphCopy.runPanelRetryEyebrow, title: graphCopy.runPanelRetryTitle, description: graphCopy.runPanelRetryDescription, submitLabel: graphCopy.runActionRetry, submitIcon: RotateCcw };
+    case "wait":
+      return { eyebrow: graphCopy.runPanelWaitEyebrow, title: graphCopy.runPanelWaitTitle, description: graphCopy.runPanelWaitDescription, submitLabel: graphCopy.runActionObserve, submitIcon: Sparkles };
+    case "observe":
+      return { eyebrow: graphCopy.runPanelObserveEyebrow, title: graphCopy.runPanelObserveTitle, description: graphCopy.runPanelObserveDescription, submitLabel: graphCopy.runActionStartPlan, submitIcon: Play };
+    case undefined:
+      return { eyebrow: graphCopy.runPanelObserveEyebrow, title: graphCopy.runPanelObserveTitle, description: graphCopy.runPanelObserveDescription, submitLabel: graphCopy.runActionStartPlan, submitIcon: Play };
     default:
       return { eyebrow: graphCopy.runPanelObserveEyebrow, title: graphCopy.runPanelObserveTitle, description: graphCopy.runPanelObserveDescription, submitLabel: graphCopy.runActionStartPlan, submitIcon: Play };
   }

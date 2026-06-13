@@ -37,6 +37,11 @@ export function nodeKindLabel(
       return graphCopy.nodeTypeWait;
     case "checkpoint":
       return graphCopy.nodeTypeCheckpoint;
+    case "task":
+    case "step":
+    case "user_input":
+    case undefined:
+      return graphCopy.nodeTypeTask;
     default:
       return graphCopy.nodeTypeTask;
   }
@@ -58,12 +63,14 @@ export function interactionLabel(
       return "Edit";
     case "approve":
       return "Approve";
+    case "observe":
+    case undefined:
+    default:
+      return "Observe";
     case "wait":
       return "Wait";
     case "retry":
       return "Retry";
-    default:
-      return "Observe";
   }
 }
 
@@ -85,6 +92,7 @@ function edgeStroke(
       return "rgba(232, 121, 249, 0.78)";
     case "resume":
       return "rgba(96, 165, 250, 0.82)";
+    case "sequential":
     default:
       return "rgba(148, 163, 184, 0.68)";
   }

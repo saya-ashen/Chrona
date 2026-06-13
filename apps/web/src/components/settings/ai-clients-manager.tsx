@@ -217,6 +217,8 @@ function getStatusLabel(copy: Record<string, string>, status: TestStatus) {
       return copy.available;
     case "unavailable":
       return copy.unavailable;
+    case "idle":
+      return copy.statusUnknown;
     default:
       return copy.statusUnknown;
   }
@@ -230,6 +232,7 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
       return "destructive";
     case "testing":
       return "secondary";
+    case "idle":
     default:
       return "outline";
   }

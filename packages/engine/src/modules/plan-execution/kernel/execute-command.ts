@@ -69,6 +69,12 @@ function eventCommandType(command: ExecutionCommand): string {
       return "cancel_session";
     case "pause":
       return "pause_session";
+    case "resume_with_input":
+    case "resume_with_approval":
+    case "resume_after_unblock":
+    case "retry_node":
+    case "start":
+    case "apply_mutation":
     default:
       return command.type;
   }

@@ -97,6 +97,9 @@ export function webPlanNodeStatusForRuntimeStatus(
       return "invalidated";
     case "ready":
       return "ready";
+    case undefined:
+    case null:
+      return "idle";
     case "pending":
     default:
       return "idle";
@@ -113,6 +116,10 @@ export function runtimeProgressStatusForWaitKind(
     case "review":
     case "replan_required":
       return "waiting_for_approval";
+    case undefined:
+    case "manual_action":
+    case "external_dependency":
+    case "capability_unavailable":
     default:
       return "blocked";
   }

@@ -33,6 +33,8 @@ function getToolDisplayName(tool: string | undefined) {
       return "generating plan structure";
     case "skill_view":
       return "reading planning skill";
+    case undefined:
+      return tool ?? "AI tool";
     default:
       return tool ?? "AI tool";
   }
@@ -103,6 +105,9 @@ function summarizeGeneratePlanEvent(event: GeneratePlanSSEEvent) {
         message: event.message,
         diagnostics: previewDebugValue(event.diagnostics, 1200),
       };
+    case "cancelled":
+    case "status":
+    case "done":
     default:
       return { ...event };
   }
@@ -633,6 +638,8 @@ export async function* generateTaskPlanManualStream(input: {
           await dump?.close();
           return;
         }
+      case "result":
+        break;
     }
 
   }

@@ -93,6 +93,9 @@ function summarizePlanGenerationEvent(
         message: event.message,
         diagnostics: previewDebugValue(event.diagnostics, 1200),
       };
+    case "status":
+    case "cancelled":
+    case "done":
     default:
       return { ...event };
   }
