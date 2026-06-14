@@ -1,1 +1,0 @@
-ALTER TABLE "Task" ADD COLUMN "autoPlanGeneration" BOOLEAN NOT NULL DEFAULT false;
