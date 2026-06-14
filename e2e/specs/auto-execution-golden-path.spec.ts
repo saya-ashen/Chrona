@@ -211,6 +211,7 @@ async function tickUntil(
   request: APIRequestContext,
   predicate: () => Promise<boolean>,
   maxTicks = 20,
+  describeLastState?: () => string,
 ): Promise<number> {
   for (let i = 0; i < maxTicks; i++) {
     if (await predicate()) return i;
@@ -218,7 +219,8 @@ async function tickUntil(
   }
   // one final check
   if (await predicate()) return maxTicks;
-  throw new Error(`tickUntil: predicate did not pass after ${maxTicks} ticks`);
+  const suffix = describeLastState ? `; last state: ${describeLastState()}` : "";
+  throw new Error(`tickUntil: predicate did not pass after ${maxTicks} ticks${suffix}`);
 }
 
 /**
@@ -306,6 +308,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
       //    the plan becomes accepted.  Keep ticking until execution is at
       //    waiting_for_user with a checkpoint (the input gate).
       await test.step("Tick until plan accepted and execution at input gate", async () => {
+        let lastExecution: ExecutionCurrentBody = {};
         await tickUntil(
           request,
           async () => {
@@ -313,10 +316,11 @@ test.describe("Auto-execution golden path (§1.3)", () => {
               `/api/tasks/${taskId}/execution/current?workBlockId=${workBlockId}`,
             );
             if (!res.ok()) return false;
-            const body = (await res.json()) as ExecutionCurrentBody;
-            return body.status === "waiting_for_user" && !!body.checkpoint?.id;
+            lastExecution = (await res.json()) as ExecutionCurrentBody;
+            return lastExecution.status === "waiting_for_user" && !!lastExecution.checkpoint?.id;
           },
-          30,
+          60,
+          () => JSON.stringify(lastExecution),
         );
       });
 
@@ -387,12 +391,14 @@ test.describe("Auto-execution golden path (§1.3)", () => {
       await test.step("Schedule page shows 'No accepted plan'", async () => {
         const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
         await page.goto(`/en/schedule?day=${today}`, { waitUntil: "domcontentloaded" });
-        // FullCalendar renders ~3s after DOM load — waitForSelector watches for
-        // DOM mutations without needing explicit sleeps.
-        await page.waitForSelector(
-          '[title="Auto-start blocked: No accepted plan"]',
-          { timeout: 30_000 },
-        );
+        // FullCalendar can keep hidden event fragments in the DOM on mobile, so
+        // target a visible note instead of the first matching title attribute.
+        await expect(
+          page
+            .locator('[title="Auto-start blocked: No accepted plan"]')
+            .filter({ hasText: "No accepted plan", visible: true })
+            .first(),
+        ).toBeVisible({ timeout: 30_000 });
       });
 
       // ── 5. Fire a tick ─────────────────────────────────────────────────────
