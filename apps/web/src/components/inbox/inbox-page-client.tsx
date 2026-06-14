@@ -15,6 +15,8 @@ type InboxPageClientProps = {
     acceptProposal?: string;
     rejectProposal?: string;
     editPlaceholder?: string;
+    retry?: string;
+    resume?: string;
   };
 };
 
@@ -47,6 +49,18 @@ export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
             decision: action === "reject" ? "reject" : action === "edit" ? "request_changes" : "approve",
             feedback: action === "edit" ? copy.editPlaceholder : undefined,
           },
+        });
+      } else if (item.kind === "recovery") {
+        // Failed / cancelled run -> restart execution from the workbench entry point.
+        await dispatchExecutionAction({
+          taskId: item.sourceTaskId,
+          action: { action: "start_manual" },
+        });
+      } else if (item.kind === "blocked") {
+        // Blocked task -> signal the blocker is cleared and resume execution.
+        await dispatchExecutionAction({
+          taskId: item.sourceTaskId,
+          action: { action: "resume_after_unblock" },
         });
       } else {
         return;
@@ -83,7 +97,15 @@ export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
                   {copy.openSchedule ?? "Open Schedule"}
                 </LocalizedLink>
               </>
-            ) : item.kind === "approval" ? null : (
+            ) : item.kind === "approval" ? null : item.kind === "recovery" ? (
+              <Button type="button" disabled={pendingItemId === item.id} onClick={() => void runItemAction(item, "approve")}>
+                {copy.retry ?? "Retry"}
+              </Button>
+            ) : item.kind === "blocked" ? (
+              <Button type="button" disabled={pendingItemId === item.id} onClick={() => void runItemAction(item, "approve")}>
+                {copy.resume ?? "Resume"}
+              </Button>
+            ) : (
               <LocalizedLink href={`/tasks/${item.sourceTaskId}`} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90">
                 {copy.openTask ?? "Open Task"}
               </LocalizedLink>

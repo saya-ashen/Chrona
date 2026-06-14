@@ -12,13 +12,14 @@ import { createMcpRoutes } from "./mcp/mcp.routes";
 import { createRuntimeRoutes } from "./runtime.routes";
 import { createHermesIntegrationRoutes } from "./integrations/hermes.routes";
 import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "./calendar-sources.routes";
+import { areE2eTestRoutesEnabled, createTestSupportRoutes } from "./test-support.routes";
 
 export type ApiRouterOptions = {
   calendarSources?: CalendarSourceRouteOptions;
 };
 
 export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions = {}) {
-  return new Hono()
+  const router = new Hono()
     .get("/health", (c) => json(c, { status: "ok" }))
     .route("/", createTaskRoutes(engine))
     .route("/", createPageRoutes(engine))
@@ -29,6 +30,14 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createRuntimeRoutes(engine))
     .route("/", createAssistantSurfaceRoutes(engine))
     .route("/", createMcpRoutes(engine));
+
+  // Env-gated E2E test seam — only ever mounted when the Playwright webServer
+  // sets CHRONA_E2E_TEST_ROUTES=1. Keeps the production surface unchanged.
+  if (areE2eTestRoutesEnabled()) {
+    router.route("/", createTestSupportRoutes(engine));
+  }
+
+  return router;
 }
 
 /**

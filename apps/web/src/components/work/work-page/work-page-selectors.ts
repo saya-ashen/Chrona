@@ -23,6 +23,8 @@ export function getTaskSummary(
     case "Failed":
     case "Cancelled":
       return copy.taskFailedSummary;
+    case undefined:
+      return copy.taskReadySummary;
     default:
       return copy.taskReadySummary;
   }
@@ -44,6 +46,11 @@ export function getCurrentException(data: WorkPageClientProps["initialData"], co
         return pe.message || copy.waitingForInput;
       case "waiting_for_approval":
         return pe.message || copy.waitingForApproval;
+      case "running":
+      case "completed":
+      case "started":
+      default:
+        return;
     }
   }
 
@@ -63,6 +70,10 @@ export function getCurrentException(data: WorkPageClientProps["initialData"], co
         data.taskShell.blockReason?.actionRequired ??
         copy.executionInterrupted
       );
+    case undefined:
+      return isOverdueScheduleStatus(data.scheduleImpact.status)
+        ? copy.overdueSchedule
+        : null;
     default:
       return isOverdueScheduleStatus(data.scheduleImpact.status)
         ? copy.overdueSchedule
@@ -87,6 +98,8 @@ export function getQuickPrompts(
       return [copy?.quickPromptReviewA ?? "Summarize this round's output first", copy?.quickPromptReviewB ?? "Point out uncovered risks", copy?.quickPromptReviewC ?? "Suggest next steps"];
     case "observe":
       return [copy?.quickPromptObserveA ?? "Only add essential context", copy?.quickPromptObserveB ?? "Keep output concise", copy?.quickPromptObserveC ?? "Highlight any risks found"];
+    case undefined:
+    case "idle":
     default:
       break;
   }

@@ -151,11 +151,13 @@ function buildEffectiveGraphSummary(input: {
       case "cancelled":
         cancelledNodeIds.push(nodeId);
         break;
-      default:
-        if (!node.ready) {
-          pendingNodeIds.push(nodeId);
-        }
-        break;
+    case "pending":
+    case "ready":
+    default:
+      if (!node.ready) {
+        pendingNodeIds.push(nodeId);
+      }
+      break;
     }
   }
 
@@ -394,6 +396,8 @@ function mapWaitKindToNodeStatus(waitKind: WaitKind): EffectivePlanNode["status"
     case "manual_action":
     case "capability_unavailable":
       return "blocked";
+    case "replan_required":
+    case "external_dependency":
     default:
       return "waiting";
   }

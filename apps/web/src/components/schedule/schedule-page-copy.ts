@@ -188,7 +188,44 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   childTasksLabel: "Child Tasks",
   childTaskReopen: "Reopen",
   childTaskMarkDone: "Mark done",
+  autoStartNotScheduled: "Not on a schedule block yet",
+  autoStartNotDue: "Scheduled, not due yet",
+  autoStartAlreadyRunning: "Already running",
+  autoStartInvalidTaskStatus: "Task status can't auto-start",
+  autoStartNoRuntimeConfig: "No execution runtime configured",
+  autoStartNoAcceptedPlan: "No accepted plan",
+  autoStartRequiresHumanInput: "Waiting for your input",
+  autoStartRequiresApproval: "Waiting for approval",
+  autoStartRuntimeUnsupported: "Runtime doesn't support auto-start",
+  autoStartReasonLabel: "Auto-start blocked",
 } as const;
+
+const AUTO_START_REASON_COPY_KEYS = {
+  not_scheduled: "autoStartNotScheduled",
+  not_due: "autoStartNotDue",
+  already_running: "autoStartAlreadyRunning",
+  invalid_task_status: "autoStartInvalidTaskStatus",
+  no_runtime_config: "autoStartNoRuntimeConfig",
+  no_accepted_plan: "autoStartNoAcceptedPlan",
+  requires_human_input: "autoStartRequiresHumanInput",
+  requires_approval: "autoStartRequiresApproval",
+  runtime_unsupported: "autoStartRuntimeUnsupported",
+} as const;
+
+/**
+ * Maps an auto-start eligibility reason code to short plain-language copy.
+ * Returns null for unknown codes so the surface can omit the badge safely.
+ */
+export function getAutoStartReasonCopy(
+  copy: SchedulePageCopy,
+  reason: string | null | undefined,
+): string | null {
+  if (!reason || !(reason in AUTO_START_REASON_COPY_KEYS)) {
+    return null;
+  }
+  const key = AUTO_START_REASON_COPY_KEYS[reason as keyof typeof AUTO_START_REASON_COPY_KEYS];
+  return copy[key];
+}
 
 export type SchedulePageCopy = Record<
   keyof typeof DEFAULT_SCHEDULE_PAGE_COPY,

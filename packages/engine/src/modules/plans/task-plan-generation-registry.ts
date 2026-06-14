@@ -81,6 +81,8 @@ function broadcast(session: SessionRecord, event: GeneratePlanSSEEvent) {
         session.snapshot.status = session.snapshot.result ? "completed" : "cancelled";
       }
       break;
+    case "tool_call":
+      break;
   }
 
   for (const subscriber of session.subscribers) {

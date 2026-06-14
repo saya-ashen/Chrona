@@ -204,6 +204,13 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/plan/saved/id": event.result.id,
         "/plan/saved/status": event.result.status,
         "/plan/saved/revision": event.result.revision,
+        "/execution/has-plan": true,
+        "/execution/has-accepted-plan": false,
+        "/execution/show-accept-plan": true,
+        "/execution/show-generate-plan": false,
+        "/execution/can-start": false,
+        "/execution/start-disabled": true,
+        "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
         "/plan/generation/status": "completed",
       };
     case "cancelled":
@@ -229,6 +236,13 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
   }
 }
 
+
+function optimisticExecutionStatusForAction(action: ExecutionActionInput["action"]): string | null {
+  if (action === "start_manual") return "running";
+  if (action === "pause_session") return "waiting_for_user";
+  if (action === "cancel_session") return "cancelled";
+  return null;
+}
 async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
   taskId: string;
   workspaceId: string;
@@ -308,6 +322,20 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
 
     if (command.type === "plan.accept") {
       await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
+      const headerStateUpdate = await buildHeaderExecutionStateUpdate({
+        engine,
+        taskId,
+        workBlockId: commandWorkBlockId(command),
+        executionStatus: "started",
+      });
+      if (headerStateUpdate) {
+        publishTaskStateUpdate({
+          taskId,
+          workspaceId,
+          workBlockId: commandWorkBlockId(command),
+          updates: headerStateUpdate,
+        });
+      }
       // Acceptance flips the task's accepted plan + primary action
       // (Accept plan → Start plan). rebuildTaskProjection already
       // publishes `task_projection_updated` (which the SSE pipe also
@@ -331,6 +359,23 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         ...command,
         action: command.action,
       } as ExecutionActionInput;
+      const optimisticStatus = optimisticExecutionStatusForAction(action.action);
+      if (optimisticStatus) {
+        const optimisticHeaderState = await buildHeaderExecutionStateUpdate({
+          engine,
+          taskId,
+          workBlockId: commandWorkBlockId(command),
+          executionStatus: optimisticStatus,
+        });
+        if (optimisticHeaderState) {
+          publishTaskStateUpdate({
+            taskId,
+            workspaceId,
+            workBlockId: commandWorkBlockId(command),
+            updates: optimisticHeaderState,
+          });
+        }
+      }
       const result = await engine.tasks.execution.dispatch({
         taskId,
         action,

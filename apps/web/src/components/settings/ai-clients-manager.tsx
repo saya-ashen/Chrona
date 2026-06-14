@@ -45,6 +45,8 @@ type ClientFormValues = {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  model: string;
+  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
 };
@@ -116,6 +118,8 @@ function buildClientPayload(input: {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  model: string;
+  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
 }): ClientFormPayload {
@@ -217,6 +221,8 @@ function getStatusLabel(copy: Record<string, string>, status: TestStatus) {
       return copy.available;
     case "unavailable":
       return copy.unavailable;
+    case "idle":
+      return copy.statusUnknown;
     default:
       return copy.statusUnknown;
   }
@@ -230,6 +236,7 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
       return "destructive";
     case "testing":
       return "secondary";
+    case "idle":
     default:
       return "outline";
   }
@@ -313,6 +320,8 @@ function ClientForm({
     ),
     baseUrl: (initial?.config as { baseUrl?: string })?.baseUrl ?? LOCAL_HERMES_BASE_URL,
     apiKey: (initial?.config as { apiKey?: string })?.apiKey ?? "",
+    model: (initial?.config as { model?: string })?.model ?? "",
+    binaryPath: (initial?.config as { binaryPath?: string })?.binaryPath ?? "",
     hermesScope: (initial?.config as { scope?: HermesClientScope })?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initial?.config as { profile?: unknown })?.profile),
   }), [fallbackType, initial, providers]);
@@ -323,6 +332,7 @@ function ClientForm({
   const values = form.watch();
   const isDebugClient = values.type === "debug";
   const isHermesClient = values.type === "hermes";
+  const isClaudeCodeClient = values.type === "claude_code";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
@@ -544,7 +554,7 @@ function ClientForm({
               </Card>
             )}
 
-            {!isDebugClient && (
+            {!isDebugClient && !isClaudeCodeClient && (
               <>
                 <Field>
                   <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
@@ -581,6 +591,57 @@ function ClientForm({
                     {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
                   </Field>
                 </div>
+              </>
+            )}
+            {isClaudeCodeClient && (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-model">Model</FieldLabel>
+                    <Input
+                      {...form.register("model")}
+                      id="ai-client-model"
+                      placeholder="claude-opus-4-8"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-binary-path">Binary path</FieldLabel>
+                    <Input
+                      {...form.register("binaryPath")}
+                      id="ai-client-binary-path"
+                      placeholder="claude"
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-api-key">Anthropic API key</FieldLabel>
+                    <Input
+                      {...form.register("apiKey")}
+                      id="ai-client-api-key"
+                      type="password"
+                      placeholder="optional (subscription mode)"
+                    />
+                  </Field>
+                  <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                    <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                    <Input
+                      {...form.register("timeoutSeconds", {
+                        required: copy.timeoutSeconds,
+                        validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                      })}
+                      aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                      id="ai-client-timeout"
+                      type="number"
+                    />
+                    {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                  </Field>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  MCP base URL is set automatically by the engine. Pass an
+                  Anthropic API key for production usage to avoid the SDK
+                  subscription quota (2026-06-15 onward).
+                </p>
               </>
             )}
 

@@ -31,6 +31,8 @@ function getNodeStatusMeta(status: NodeViewStatus, copy: WorkCopy) {
       return { label: copy.waitingForUserStep, tone: "secondary" as const };
     case "blocked":
       return { label: copy.blockedStep, tone: "destructive" as const };
+    case "pending":
+      return { label: copy.pendingStep, tone: "outline" as const };
     default:
       return { label: copy.pendingStep, tone: "outline" as const };
   }
@@ -46,6 +48,7 @@ function getNodeStatusClassName(status: NodeViewStatus) {
       return "border-fuchsia-300/20 bg-fuchsia-300/10 text-fuchsia-100";
     case "blocked":
       return "border-rose-300/25 bg-rose-300/10 text-rose-100";
+    case "pending":
     default:
       return "border-white/10 bg-white/[0.055] text-slate-300";
   }

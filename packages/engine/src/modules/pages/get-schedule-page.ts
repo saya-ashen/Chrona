@@ -3,7 +3,7 @@ import {
   buildPlanningSummary,
   formatDateKey,
   startOfDay,
-} from "@/components/schedule/schedule-page-utils";
+} from "@chrona/domain";
 import {
   getRuntimeTaskConfigSpec,
   listExecutionRuntimes,
@@ -13,6 +13,7 @@ import { deriveTaskRunnability } from "@chrona/shared";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { getLatestTaskPlanReadModel, resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
 import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
+import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 
 function mapProjectionItem(
   item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & {
@@ -562,19 +563,56 @@ export async function getSchedulePage(workspaceId: string) {
   const workBlockScheduledItemsBase = workBlocks
     .map((block) => mapWorkBlockItem(block))
     .filter((item) => item.parentTaskId === null && item.scheduledStartAt && item.scheduledEndAt);
+  // Batch one query for active runs across all scheduled tasks so the
+  // eligibility derivation can reuse the same `already_running` signal as the
+  // auto-start runner without N+1 reads.
+  const scheduledTaskIds = Array.from(
+    new Set(workBlockScheduledItemsBase.map((item) => item.taskId)),
+  );
+  const activeRuns = scheduledTaskIds.length
+    ? await db.run.findMany({
+        where: {
+          taskId: { in: scheduledTaskIds },
+          status: { in: ["Pending", "Running", "WaitingForInput", "WaitingForApproval"] },
+        },
+        select: { taskId: true, status: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+  const activeRunByTaskId = new Map<string, { status: string }>();
+  for (const run of activeRuns) {
+    if (!activeRunByTaskId.has(run.taskId)) {
+      activeRunByTaskId.set(run.taskId, { status: run.status });
+    }
+  }
+  const eligibilityNow = new Date();
   const workBlockScheduledItems = await Promise.all(workBlockScheduledItemsBase.map(async (item) => {
     const savedPlan = await getLatestTaskPlanReadModel(item.taskId, item.workBlockId ?? null);
     const snapshot = savedPlan ? mapScheduleTaskPlanSnapshot(savedPlan) : null;
+    const aiPlanGenerationStatus = isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: item.workBlockId ?? null })
+      ? "generating" as const
+      : savedPlan?.status === "accepted"
+        ? "accepted" as const
+        : savedPlan
+          ? "waiting_acceptance" as const
+          : "idle" as const;
+    const eligibility = deriveAutoStartEligibility({
+      task: {
+        status: item.persistedStatus,
+        executionRuntime: item.executionRuntime,
+        hasAcceptedPlan: savedPlan?.status === "accepted",
+        autoExecuteTiming: item.autoExecuteTiming,
+      },
+      workBlock: { scheduledStartAt: item.scheduledStartAt },
+      now: eligibilityNow,
+      activeRun: activeRunByTaskId.get(item.taskId) ?? null,
+    });
     return {
       ...item,
       savedPlan: snapshot,
-      aiPlanGenerationStatus: isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: item.workBlockId ?? null })
-        ? "generating" as const
-        : savedPlan?.status === "accepted"
-          ? "accepted" as const
-          : savedPlan
-            ? "waiting_acceptance" as const
-            : "idle" as const,
+      aiPlanGenerationStatus,
+      autoStartEligible: eligibility.ok,
+      autoStartReason: eligibility.ok ? null : eligibility.reason,
     };
   }));
   const workBlockScheduledKeys = new Set(

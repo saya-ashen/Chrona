@@ -22,6 +22,9 @@ export function getRunStatusLabel(status: string | null | undefined) {
       return "Failed";
     case "Cancelled":
       return "Cancelled";
+    case undefined:
+    case null:
+      return "No run";
     default:
       return "No run";
   }
@@ -37,6 +40,8 @@ export function getSyncStatusLabel(
     case "stale":
     case "delayed":
       return copy.staleSync;
+    case undefined:
+    case null:
     default:
       return status ?? null;
   }

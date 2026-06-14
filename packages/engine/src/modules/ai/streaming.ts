@@ -145,6 +145,11 @@ function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
           ? evt.structuredPayload
           : null,
       };
+    case "reasoning_delta":
+    case "approval_required":
+    case "run_cancelled":
+    case "raw_event":
+      return null;
     case "run_started":
     default:
       return null;
@@ -193,6 +198,8 @@ export function summarizeStreamEvent(event: StreamEvent | null) {
         textLength: event.text?.length ?? 0,
         structured: previewDebugValue(event.structured, 1200),
       };
+    case "error":
+    case "status":
     default:
       return { ...event };
   }

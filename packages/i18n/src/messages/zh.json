@@ -200,6 +200,8 @@
       "approve": "批准",
       "reject": "拒绝",
       "editAndApprove": "编辑并批准",
+      "retry": "重试",
+      "resume": "恢复",
       "emptyTitle": "全部处理完毕",
       "emptyDescription": "暂时没有需要你处理的审批、输入请求或日程提案。"
     },

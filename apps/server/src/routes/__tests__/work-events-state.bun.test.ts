@@ -17,6 +17,14 @@ type StreamHandle = {
 
 const state = {
   currentStream: null as StreamHandle | null,
+  acceptedPlans: [] as Array<{ taskId?: string; planId?: string; workBlockId?: string | null }>,
+  dispatchedActions: [] as Array<{ taskId?: string; action?: unknown }>,
+  planState: {
+    taskId: "task-1",
+    aiPlanGenerationStatus: "idle" as "idle" | "accepted",
+    savedPlan: null as { id: string; status: "draft" | "accepted"; revision: number } | null,
+    generationSession: null,
+  },
 };
 
 function makeFakeEngine(): ChronaEngine {
@@ -79,7 +87,16 @@ function makeFakeEngine(): ChronaEngine {
             finish: handle.finish,
           };
         },
-        accept: async () => ({ savedPlan: null }),
+        accept: async (input: { taskId?: string; planId?: string; workBlockId?: string | null }) => {
+          state.acceptedPlans.push(input);
+          state.planState = {
+            ...state.planState,
+            taskId: input.taskId ?? "task-1",
+            aiPlanGenerationStatus: "accepted",
+            savedPlan: { id: input.planId ?? "plan-1", status: "accepted", revision: 1 },
+          };
+          return { savedPlan: state.planState.savedPlan };
+        },
         materialize: async () => {
           throw new Error("not used in this test");
         },
@@ -89,12 +106,7 @@ function makeFakeEngine(): ChronaEngine {
         patch: async () => {
           throw new Error("not used in this test");
         },
-        getState: async () => ({
-          taskId: "task-1",
-          aiPlanGenerationStatus: "idle" as const,
-          savedPlan: null,
-          generationSession: null,
-        }),
+        getState: async () => state.planState,
         getActiveGeneration: () => ({ generationSession: null }),
         getGenerationSession: () => ({ generationSession: null }),
         subscribeToActiveGeneration: () => ({
@@ -106,8 +118,19 @@ function makeFakeEngine(): ChronaEngine {
         stopGeneration: () => ({ stopped: false }),
       },
       execution: {
-        dispatch: async () => {
-          throw new Error("not used in this test");
+        dispatch: async (input: { taskId?: string; action?: { action?: string } }) => {
+          state.dispatchedActions.push(input);
+          const statusByAction: Record<string, string> = {
+            start_manual: "running",
+            pause_session: "waiting_for_user",
+            cancel_session: "cancelled",
+          };
+          const status = statusByAction[input.action?.action ?? ""] ?? "started";
+          return {
+            status,
+            checkpoint: null,
+            executedNodeIds: [],
+          };
         },
         submitCheckpointAction: async () => {
           throw new Error("not used in this test");
@@ -148,12 +171,220 @@ async function readSseUntil(
   }
 }
 
+async function postCommand(taskId: string, body: Record<string, unknown>) {
+  return honoApp.request(`http://local/api/work/${taskId}/commands`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function waitForEventsMatching(
+  taskId: string,
+  predicate: (events: TaskProjectionEvent[]) => boolean,
+): Promise<TaskProjectionEvent[]> {
+  const events: TaskProjectionEvent[] = [];
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      subscription.unsubscribe();
+      reject(new Error(`timed out waiting for task projection events; saw ${events.map((event) => event.type).join(", ")}`));
+    }, 5000);
+    const subscription = subscribeToTaskProjectionEvents(taskId, (event) => {
+      events.push(event);
+      if (!predicate(events)) return;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+      resolve(events);
+    });
+  });
+}
+
 beforeEach(() => {
   state.currentStream = null;
+  state.acceptedPlans = [];
+  state.dispatchedActions = [];
+  state.planState = {
+    taskId: "task-1",
+    aiPlanGenerationStatus: "idle",
+    savedPlan: null,
+    generationSession: null,
+  };
 });
 
 afterEach(() => {
   state.currentStream = null;
+});
+
+describe("POST /work/:taskId/commands — action refresh events", () => {
+  it("emits header state.update before task_workspace_updated after accepting a plan", async () => {
+    const taskId = "task-1";
+    const received = waitForEventsMatching(
+      taskId,
+      (events) => events.some((event) => event.type === "state.update")
+        && events.some((event) => event.type === "task_workspace_updated"),
+    );
+
+    const response = await postCommand(taskId, {
+      type: "plan.accept",
+      planId: "plan-1",
+    });
+    expect(response.status).toBe(202);
+
+    const events = await received;
+    expect(state.acceptedPlans).toEqual([
+      expect.objectContaining({ taskId, planId: "plan-1", workBlockId: null }),
+    ]);
+    const stateUpdate = events.find((event) => event.type === "state.update") as TaskProjectionEvent & {
+      updates?: Record<string, unknown>;
+    };
+    expect(stateUpdate.updates).toMatchObject({
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/can-start": true,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/execution/start-disabled": false,
+      "/execution/has-accepted-plan": true,
+    });
+
+    const workspaceUpdate = events.find((event) => event.type === "task_workspace_updated") as TaskProjectionEvent & {
+      reason?: string;
+      taskId?: string;
+      workspaceId?: string;
+      workBlockId?: string | null;
+    };
+    expect(workspaceUpdate).toMatchObject({
+      type: "task_workspace_updated",
+      taskId,
+      workspaceId: "ws-1",
+      workBlockId: null,
+      reason: "plan.accepted",
+    });
+    expect(events.findIndex((event) => event.type === "state.update")).toBeLessThan(events.findIndex((event) => event.type === "task_workspace_updated"));
+  });
+
+  it("emits header state.update before execution.result after starting execution", async () => {
+    const taskId = "task-1";
+    state.planState = {
+      taskId,
+      aiPlanGenerationStatus: "accepted",
+      savedPlan: { id: "plan-1", status: "accepted", revision: 1 },
+      generationSession: null,
+    };
+
+    const received = waitForEventsMatching(
+      taskId,
+      (events) => events.some((event) => event.type === "state.update")
+        && events.some((event) => event.type === "execution.result"),
+    );
+
+    const response = await postCommand(taskId, {
+      type: "execution.action",
+      action: "start_manual",
+      idempotencyKey: "start-test",
+    });
+    expect(response.status).toBe(202);
+
+    const events = await received;
+    expect(state.dispatchedActions).toHaveLength(1);
+    expect(state.dispatchedActions[0]).toMatchObject({
+      taskId,
+      action: expect.objectContaining({ action: "start_manual" }),
+    });
+
+    const stateUpdateIndex = events.findIndex((event) => event.type === "state.update");
+    const resultIndex = events.findIndex((event) => event.type === "execution.result");
+    expect(stateUpdateIndex).toBeGreaterThanOrEqual(0);
+    expect(resultIndex).toBeGreaterThanOrEqual(0);
+    expect(events.filter((event) => event.type === "state.update")).toHaveLength(2);
+    expect(stateUpdateIndex).toBeLessThan(resultIndex);
+
+    const stateUpdate = events[stateUpdateIndex] as TaskProjectionEvent & { updates?: Record<string, unknown> };
+    expect(stateUpdate.updates).toMatchObject({
+      "/execution/status": "running",
+      "/execution/can-start": false,
+      "/execution/can-pause": true,
+      "/execution/can-stop": true,
+      "/execution/has-plan": true,
+      "/execution/has-accepted-plan": true,
+    });
+    const result = events[resultIndex] as TaskProjectionEvent & { eventKind?: string };
+    expect(result.eventKind).toBe("running");
+  });
+
+  it("emits pause-session header state with Stop visible and Start hidden", async () => {
+    const taskId = "task-1";
+    state.planState = {
+      taskId,
+      aiPlanGenerationStatus: "accepted",
+      savedPlan: { id: "plan-1", status: "accepted", revision: 1 },
+      generationSession: null,
+    };
+
+    const received = waitForEventsMatching(
+      taskId,
+      (events) => events.some((event) => event.type === "state.update")
+        && events.some((event) => event.type === "execution.result"),
+    );
+
+    const response = await postCommand(taskId, {
+      type: "execution.action",
+      action: "pause_session",
+      reason: "Pause from test",
+      idempotencyKey: "pause-test",
+    });
+    expect(response.status).toBe(202);
+
+    const events = await received;
+    const stateUpdate = events.find((event) => event.type === "state.update") as TaskProjectionEvent & { updates?: Record<string, unknown> };
+    expect(stateUpdate.updates).toMatchObject({
+      "/execution/status": "waiting_for_user",
+      "/execution/can-start": false,
+      "/execution/can-pause": false,
+      "/execution/can-stop": true,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/has-accepted-plan": true,
+    });
+    expect(events.filter((event) => event.type === "state.update")).toHaveLength(2);
+  });
+
+  it("emits cancel-session header state with all primary run controls hidden", async () => {
+    const taskId = "task-1";
+    state.planState = {
+      taskId,
+      aiPlanGenerationStatus: "accepted",
+      savedPlan: { id: "plan-1", status: "accepted", revision: 1 },
+      generationSession: null,
+    };
+
+    const received = waitForEventsMatching(
+      taskId,
+      (events) => events.some((event) => event.type === "state.update")
+        && events.some((event) => event.type === "execution.result"),
+    );
+
+    const response = await postCommand(taskId, {
+      type: "execution.action",
+      action: "cancel_session",
+      reason: "Stop from test",
+      idempotencyKey: "stop-test",
+    });
+    expect(response.status).toBe(202);
+
+    const events = await received;
+    const stateUpdate = events.find((event) => event.type === "state.update") as TaskProjectionEvent & { updates?: Record<string, unknown> };
+    expect(stateUpdate.updates).toMatchObject({
+      "/execution/status": "cancelled",
+      "/execution/can-start": false,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/has-accepted-plan": true,
+    });
+    expect(events.filter((event) => event.type === "state.update")).toHaveLength(2);
+  });
 });
 
 describe("GET /work/:taskId/events — state.snapshot on connect", () => {
@@ -272,15 +503,18 @@ describe("POST /work/:taskId/commands plan.generate — state.update alongside p
       });
       expect(phases).toContain("requesting_provider");
 
-      // Result event should land plan saved fields + completed status.
-      // (The terminal `done` event overwrites the last state.update slot,
-      // so we search the array for the result update.)
+      // Result event must carry both saved-plan fields and header action
+      // visibility. Without the /execution flags, the client receives the
+      // generated plan but keeps rendering Generate Plan until refresh.
       const resultUpdate = stateUpdates.find((updates) =>
         typeof updates["/plan/saved/id"] === "string"
       );
       expect(resultUpdate).toBeDefined();
       expect(resultUpdate!["/plan/saved/id"]).toBe("plan-test");
       expect(resultUpdate!["/plan/generation/status"]).toBe("completed");
+      expect(resultUpdate!["/execution/show-accept-plan"]).toBe(true);
+      expect(resultUpdate!["/execution/show-generate-plan"]).toBe(false);
+      expect(resultUpdate!["/execution/can-start"]).toBe(false);
     } finally {
       trigger?.unsubscribe();
     }

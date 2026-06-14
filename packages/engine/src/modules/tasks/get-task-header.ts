@@ -202,7 +202,7 @@ function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAc
   if (["waiting_for_user", "waiting_for_approval", "blocked", "failed"].includes(input.executionStatus)) return [{ id: "stop", label: "Stop" }];
   return [{ id: "start", label: "Start", disabled: !input.isRunnable, disabledReason: input.isRunnable ? undefined : "Task is not runnable." }];
 }
-type BuildHeaderSpecInput = {
+export type BuildHeaderSpecInput = {
   task: HeaderTaskView;
   recurrenceSeriesTasks: Array<Pick<HeaderTaskView, "id" | "title" | "status" | "workBlocks">>;
   currentExecution: Awaited<ReturnType<typeof getCurrentExecution>>;
@@ -254,8 +254,16 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
   const totalSteps = savedPlan?.effectivePlan.nodes.length ?? 0;
   const completedSteps = savedPlan?.effectivePlan.completedNodeIds.length ?? currentExecution.executedNodeIds.length;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+  // Scope the header status to the selected occurrence. The task row
+  // (Task.status) is shared across the entire recurrence series, so its
+  // "Blocked" / "Open" / "Completed" value does not change when the user
+  // switches occurrences. The selected work block, in contrast, carries
+  // the per-occurrence status that should drive the header badge —
+  // matching the resolution used by `getTaskPage` for
+  // `page.task.status` (see `currentWorkBlock?.status ?? task.status`).
+  const scopedTaskStatus = currentWorkBlock?.status ?? task.status;
   const status = taskHeaderStatus({
-    taskStatus: task.status,
+    taskStatus: scopedTaskStatus,
     executionStatus: currentExecution.status,
     hasActiveExecution: isActiveExecutionStatus(currentExecution.status),
   });

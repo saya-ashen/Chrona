@@ -8,7 +8,7 @@ import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 type InboxListProps = {
   items: Array<{
     id: string;
-    kind: "approval" | "input" | "schedule_proposal" | "recovery";
+    kind: "approval" | "input" | "schedule_proposal" | "recovery" | "blocked";
     actionType: string;
     riskLevel: string;
     sourceTaskTitle: string;

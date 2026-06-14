@@ -192,6 +192,7 @@ function inferInteractionType(input: {
         return "edit";
       case "input":
         return "input";
+      case undefined:
       default:
         if (input.hasOptions) return "choose";
         if (input.hasInteractiveFields) return "input";
@@ -240,6 +241,11 @@ function statusLabel(status: PlanNodeStatus, copy: TaskPlanViewModelCopy) {
       return copy.statusCancelled;
     case "invalidated":
       return copy.statusInvalidated;
+    case "idle":
+    case "pending":
+    case "completed":
+    case "in_progress":
+      return copy.statusIdle;
     default:
       return copy.statusIdle;
   }

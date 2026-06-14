@@ -71,6 +71,10 @@ export function getPlanGenerationStatusFromFlow(
     case "accepting":
     case "failed":
       return state.savedPlan?.id ? "waiting_acceptance" : "idle";
+    case "accepted":
+    case "idle":
+    case "generating":
+    case "waiting_acceptance":
     default:
       return state.status;
   }

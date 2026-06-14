@@ -2,8 +2,10 @@ import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 
+const generateAndAcceptTaskPlanMock = mock();
 const startAutoPlanMock = mock();
 mock.module("@/modules/plans/auto-generate-task-plan", () => ({
+  generateAndAcceptTaskPlan: generateAndAcceptTaskPlanMock,
   startAutoPlanGenerationForTask: startAutoPlanMock,
 }));
 
@@ -60,6 +62,7 @@ async function createScheduledBlock(
 
 describe("auto-generate-scheduled-plan", () => {
   beforeEach(async () => {
+    generateAndAcceptTaskPlanMock.mockReset();
     startAutoPlanMock.mockReset();
     await resetDb();
   });
@@ -82,7 +85,7 @@ describe("auto-generate-scheduled-plan", () => {
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
     expect(result.triggered).toEqual([{ taskId: task.id, workBlockId: block.id, reason: "scheduled" }]);
-    expect(startAutoPlanMock).toHaveBeenCalledWith({ taskId: task.id, workBlockId: block.id, accept: true });
+    expect(generateAndAcceptTaskPlanMock).toHaveBeenCalledWith({ taskId: task.id, workBlockId: block.id, accept: true });
   });
 
   it("skips immediate timing (handled inline at create/update)", async () => {
@@ -126,7 +129,7 @@ describe("auto-generate-scheduled-plan", () => {
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
     expect(result.triggered).toEqual([{ taskId: task.id, workBlockId: block.id, reason: "scheduled" }]);
-    expect(startAutoPlanMock).toHaveBeenCalledTimes(1);
+    expect(generateAndAcceptTaskPlanMock).toHaveBeenCalledTimes(1);
   });
 
   it("skips when an active plan already exists", async () => {
@@ -176,7 +179,7 @@ describe("auto-generate-scheduled-plan", () => {
     const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
 
     expect(result.triggered).toEqual([{ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" }]);
-    expect(startAutoPlanMock).toHaveBeenCalledWith({ taskId: task.id, workBlockId: null, accept: false });
+    expect(generateAndAcceptTaskPlanMock).toHaveBeenCalledWith({ taskId: task.id, workBlockId: null, accept: false });
   });
 
   it("waits during the grace window before the no-schedule fallback", async () => {

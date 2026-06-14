@@ -1,51 +1,62 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
-  "entry": [
-    "scripts/**/*.ts",
-    "prisma/seed.ts",
-    "vitest.config.ts",
-    "prisma.config.ts"
-  ],
-  "project": [
-    "scripts/**/*.{ts,tsx}",
-    "!**/*.test.ts",
-    "!**/*.test.tsx",
-    "!**/__tests__/**",
-    "!**/*.spec.ts"
-  ],
   "ignore": [
     "postcss.config.mjs",
     "packages/cli/src/bun-entry.ts",
     "packages/db/src/generated/**"
   ],
-  "ignoreBinaries": [
-    "scripts/demo/readme-gif.ts"
-  ],
-  "ignoreDependencies": [
-    "esbuild",
-    "@tailwindcss/postcss",
-    "tailwindcss",
-    "tw-animate-css"
-  ],
-  "rules": {
-    "classMembers": "off",
-    "enumMembers": "off"
-  },
   "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.ts"
+      ],
+      "project": [
+        "scripts/**/*.{ts,tsx}",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/__tests__/**",
+        "!**/*.spec.ts"
+      ]
+    },
     "apps/server": {
-      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/__tests__/**"
+      ]
     },
     "apps/web": {
-      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/__tests__/**"
+      ]
     },
     "packages/*": {
-      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/__tests__/**"
+      ]
     },
     "packages/*/*": {
-      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/__tests__/**"
+      ]
     },
     "packages/*/*/*": {
-      "project": ["src/**/*.{ts,tsx}", "!**/*.test.ts", "!**/*.test.tsx", "!**/__tests__/**"]
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/__tests__/**"
+      ]
     }
   }
 }

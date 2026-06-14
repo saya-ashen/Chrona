@@ -41,10 +41,15 @@ function createE2eCalendarFixtureTransport(): CalendarFeedTransport {
     if (parsed.hostname !== "calendar-fixtures.test") return { status: 404, text: "" };
 
     const title = parsed.searchParams.get("title");
-    return {
-      status: 200,
-      text: title ? fixture.replace("SUMMARY:External standup", `SUMMARY:${title}`) : fixture,
-    };
+    const day = parsed.searchParams.get("day");
+    let text = title ? fixture.replace("SUMMARY:External standup", `SUMMARY:${title}`) : fixture;
+    if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      const compactDay = day.replaceAll("-", "");
+      text = text
+        .replace("DTSTART:20260504T090000Z", `DTSTART:${compactDay}T090000Z`)
+        .replace("DTEND:20260504T093000Z", `DTEND:${compactDay}T093000Z`);
+    }
+    return { status: 200, text };
   };
 }
 

@@ -137,9 +137,11 @@ export async function updateTask(
     input.executionConfig !== undefined ||
     input.sessionStrategy !== undefined;
   const nextAutoExecute = input.autoExecute ?? currentTask.autoExecute;
-  const nextAutoPlanGeneration = nextAutoExecute
-    ? true
-    : input.autoPlanGeneration ?? currentTask.autoPlanGeneration;
+  const nextAutoPlanGeneration = input.autoPlanGeneration !== undefined
+    ? input.autoPlanGeneration
+    : nextAutoExecute
+      ? true
+      : currentTask.autoPlanGeneration;
   const nextAutoPlanGenerationTiming =
     input.autoPlanGenerationTiming !== undefined
       ? normalizeAutomationTiming(input.autoPlanGenerationTiming)
