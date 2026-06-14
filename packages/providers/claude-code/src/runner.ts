@@ -23,7 +23,8 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-
+import { realpathSync } from "node:fs";
+import { join } from "node:path";
 import {
   appendProviderReplayRecord,
   providerReplayRecord,
@@ -32,13 +33,13 @@ import {
   type ProviderReplayRecord,
   type ProviderReplayStartRecord,
 } from "@chrona/providers-foundation";
+
 import type {
   ProviderRunEvent,
   ProviderRunRef,
   ProviderRunSnapshot,
   StartRunInput,
 } from "@chrona/providers-foundation";
-
 import {
   createNormalizerContext,
   mapClaudeCodeStreamItems,
@@ -46,10 +47,12 @@ import {
   type NormalizerOptions,
 } from "./normalizers";
 import {
+  mountChronaNodeSkill,
   renderPrompt,
   snapshotFromRef,
   stripTrailingSlash,
   writeMcpConfigFile,
+  writeSkillSettingsFile,
 } from "./runner-helpers";
 import { ClaudeCodeProviderError } from "./types";
 
@@ -69,6 +72,12 @@ export interface ClaudeCodeRunnerConfig {
   mcpBaseUrl: string;
   /** Per-run Bearer token sent in the MCP `Authorization` header. */
   mcpRunToken: string;
+  /** Control transport used by Chrona node execution. Default: "mcp". */
+  controlPlane?: "mcp" | "skill";
+  /** Chrona /agent/control base URL for skill-mode CLI calls. */
+  controlBaseUrl?: string;
+  /** Optional source skill directory override. */
+  skillDir?: string;
   /** CWD for the spawned process. Default: `process.cwd()`. */
   cwd?: string;
   /** Pass-through env (merged on top of `process.env`). */
@@ -185,6 +194,72 @@ async function resolveBackend(
     return "cli";
   }
 }
+/**
+ * Resolve the absolute path to the Chrona CLI binary that owns the
+ * current process tree. In the production flow, `chrona` is the entry
+ * point — `process.argv[1]` is the chrona binary path (or the compiled
+ * ELF / Mach-O / PE binary at the launcher cache). In dev, it's the
+ * workspace script (`packages/cli/src/index.ts` or `bun-entry.ts`)
+ * invoked through `bun run`. Either way, realpath resolves symlinks so
+ * the agent gets a stable absolute path.
+ *
+ * Returns `undefined` when argv[1] is missing, non-absolute, or
+ * unresolvable — callers fall back to bare `chrona` (PATH lookup).
+ */
+function resolveSelfChronaPath(): string | undefined {
+  const candidate = process.argv[1];
+  if (!candidate) return undefined;
+  try {
+    return realpathSync(candidate);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Build the env passed to a spawned `claude` process. Always sets
+ * `CHRONA_CLI` to a value the spawned process can resolve:
+ *   - Caller env override (`cfg.env.CHRONA_CLI`)
+ *   - Per-run skill mount (`<skillRoot>/.claude/skills/chrona-node/bin/chrona`)
+ *   - Real path of the current chrona binary (e.g. launcher cache ELF
+ *     in production, `packages/cli/src/index.ts` in dev)
+ *   - Bare `chrona` (PATH lookup) as final fallback
+ *
+ * When `controlPlane === "skill"`, also sets `CHRONA_BASE_URL` +
+ * `CHRONA_RUN_TOKEN` and prepends the mounted skill bin to `PATH` so
+ * the agent's `Bash` tool can resolve `chrona` without an absolute path.
+ *
+ * Exported for unit testing the env-construction seam without spawning
+ * a real `claude` process.
+ */
+export function skillEnv(cfg: ClaudeCodeRunnerConfig, input: StartRunInput, skillRoot?: string): NodeJS.ProcessEnv {
+  const env = { ...process.env, ...(cfg.env ?? {}) };
+  if (env.CHRONA_CLI === undefined) {
+    let resolved: string | undefined;
+    if (skillRoot) {
+      // Skill mount is the most explicit: the runner just wrote the
+      // per-run `bin/chrona` shim there. Use the absolute path so the
+      // agent never has to depend on PATH lookup at all.
+      const skillBin = join(skillRoot, ".claude", "skills", "chrona-node", "bin");
+      resolved = join(skillBin, "chrona");
+    } else {
+      // No skill mount. The current process was started by the chrona
+      // binary (production) or `bun run` of `packages/cli/src/index.ts`
+      // (dev). In both cases `process.argv[1]` is the chrona entry —
+      // resolve symlinks and pass the real absolute path.
+      resolved = resolveSelfChronaPath();
+    }
+    env.CHRONA_CLI = resolved ?? "chrona";
+  }
+  if (skillRoot) {
+    env.PATH = `${join(skillRoot, ".claude", "skills", "chrona-node", "bin")}:${env.PATH ?? ""}`;
+  }
+  if (cfg.controlPlane === "skill") {
+    env.CHRONA_BASE_URL = input.control?.baseUrl ?? cfg.controlBaseUrl ?? cfg.mcpBaseUrl;
+    env.CHRONA_RUN_TOKEN = input.control?.runToken ?? cfg.mcpRunToken;
+  }
+  return env;
+}
 
 /* -------------------------------------------------------------------------- */
 /*                                Replay runner                                */
@@ -279,7 +354,6 @@ class CliRunner implements ClaudeCodeRunner {
     const cfg = this.cfg;
     const model = cfg.model ?? DEFAULT_MODEL;
     const timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const mcpConfigPath = await writeMcpConfigFile(cfg);
     const args = [
       "-p",
       "--output-format",
@@ -288,20 +362,30 @@ class CliRunner implements ClaudeCodeRunner {
       "--include-partial-messages",
       "--model",
       model,
-      "--mcp-config",
-      mcpConfigPath,
-      "--strict-mcp-config",
       "--permission-mode",
       "bypassPermissions",
-      "--allowedTools",
-      "mcp__chrona__*",
     ];
+    let skillRoot: string | undefined;
+    if (cfg.controlPlane === "skill") {
+      skillRoot = await mountChronaNodeSkill(cfg, input.control?.skillsDir);
+      const settingsPath = await writeSkillSettingsFile(cfg, input.control?.skillName ?? "chrona-node");
+      args.push("--add-dir", skillRoot, "--settings", settingsPath, "--allowedTools", "Bash");
+    } else {
+      const mcpConfigPath = await writeMcpConfigFile(cfg);
+      args.push(
+        "--mcp-config",
+        mcpConfigPath,
+        "--strict-mcp-config",
+        "--allowedTools",
+        "mcp__chrona__*",
+      );
+    }
     const prompt = renderPrompt(input);
     if (prompt) args.push(prompt);
 
     const child = spawn(cfg.binaryPath ?? "claude", args, {
       cwd: cfg.cwd ?? process.cwd(),
-      env: { ...process.env, ...(cfg.env ?? {}) },
+      env: skillEnv(cfg, input, skillRoot),
       stdio: ["ignore", "pipe", "pipe"],
     });
     const runId = `claude-cli-${crypto.randomUUID()}`;
@@ -447,25 +531,37 @@ class SdkRunner implements ClaudeCodeRunner {
     const sdk = (await this.init()).sdkModule!;
     const cfg = this.cfg;
     const model = cfg.model ?? DEFAULT_MODEL;
-    const mcpServers = {
-      chrona: {
-        type: "http" as const,
-        url: `${stripTrailingSlash(cfg.mcpBaseUrl)}/api/mcp`,
-        headers: { Authorization: `Bearer ${cfg.mcpRunToken}` },
-      },
-    };
+    const skillMode = cfg.controlPlane === "skill";
+    const skillRoot = skillMode ? await mountChronaNodeSkill(cfg, input.control?.skillsDir) : undefined;
+    const mcpServers = skillMode
+      ? undefined
+      : {
+          chrona: {
+            type: "http" as const,
+            url: `${stripTrailingSlash(cfg.mcpBaseUrl)}/api/mcp`,
+            headers: { Authorization: `Bearer ${cfg.mcpRunToken}` },
+          },
+        };
     const abortController = new AbortController();
+    const skillOptions: { additionalDirectories?: string[]; skills?: string[] } = {};
+    if (skillMode && typeof skillRoot === "string") {
+      const mountedSkillRoot: string = skillRoot;
+      skillOptions.additionalDirectories = [mountedSkillRoot] as string[];
+      skillOptions.skills = [input.control?.skillName ?? "chrona-node"];
+    }
+    const options = {
+      model,
+      mcpServers,
+      allowedTools: skillMode ? ["Bash"] : ["mcp__chrona__*"],
+      permissionMode: "bypassPermissions",
+      abortController,
+      cwd: cfg.cwd,
+      env: skillEnv(cfg, input, skillRoot),
+      ...skillOptions,
+    } as Parameters<typeof sdk.query>[0]["options"];
     const queryObj = sdk.query({
       prompt: renderPrompt(input) ?? "",
-      options: {
-        model,
-        mcpServers,
-        allowedTools: ["mcp__chrona__*"],
-        permissionMode: "bypassPermissions",
-        abortController,
-        cwd: cfg.cwd,
-        env: cfg.env,
-      },
+      options,
     });
     const runId = `claude-sdk-${crypto.randomUUID()}`;
     const ref: ProviderRunRef = {

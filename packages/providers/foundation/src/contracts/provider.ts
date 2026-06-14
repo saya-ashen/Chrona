@@ -203,6 +203,24 @@ export const providerSessionRefSchema = z
   })
   .strict();
 
+/**
+ * Skill-mode control plane handoff (Spec 018). When the engine mints a run
+ * token, it threads it to the provider via this optional field so the
+ * `claude_code` provider can inject `CHRONA_BASE_URL` + `CHRONA_RUN_TOKEN`
+ * into the agent subprocess env and mount the `chrona-node` skill. For all
+ * other providers / control planes this is omitted and the field is
+ * irrelevant. The schema is intentionally minimal: the token binding
+ * (`taskId`, `nodeAttemptId`, etc.) is server-side, not parsed here.
+ */
+export const startRunControlInputSchema = z
+  .object({
+    baseUrl: z.string().min(1),
+    runToken: z.string().min(1),
+    skillsDir: z.string().min(1).optional(),
+    skillName: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const startRunInputSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -216,9 +234,23 @@ export const startRunInputSchema = z
     timeoutMs: z.number().int().positive().optional(),
     stream: z.boolean().optional(),
     signal: z.custom<AbortSignal>().optional(),
+    /** Optional skill-mode control plane handoff. See `startRunControlInputSchema`. */
+    control: startRunControlInputSchema.optional(),
   })
   .strict();
 
+/**
+ * Additive extension of {@link startRunInputSchema} that allows the
+ * engine to thread skill-mode control plane (baseUrl / runToken /
+ * skillsDir / skillName) into a `claude_code` provider run. Use this
+ * for validation when `StartRunInput.control` may be present; the base
+ * `startRunInputSchema` is preserved for callers that do not pass it.
+ */
+export const startRunInputWithControlSchema = startRunInputSchema.extend({
+  control: startRunControlInputSchema.optional(),
+});
+
+export type StartRunInputWithControl = z.infer<typeof startRunInputWithControlSchema>;
 export const existingRunStreamInputSchema = z
   .object({
     runId: z.string().min(1),
@@ -475,6 +507,8 @@ export type ProviderHealth = z.infer<typeof providerHealthSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;
 export type ProviderSessionRef = z.infer<typeof providerSessionRefSchema>;
 export type ProviderRunInput = z.infer<typeof providerRunInputSchema>;
+export type StartRunControlInput = z.infer<typeof startRunControlInputSchema>;
+
 export type StartRunInput = z.infer<typeof startRunInputSchema>;
 export type ExistingRunStreamInput = z.infer<typeof existingRunStreamInputSchema>;
 export type ProviderRunStatus = z.infer<typeof providerRunStatusSchema>;

@@ -7,8 +7,9 @@
  * to disk and returns the path).
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { cp, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { ProviderRunRef, ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
 
@@ -44,6 +45,30 @@ export function renderPrompt(input: StartRunInput): string | undefined {
   return undefined;
 }
 
+const CHRONA_NODE_SKILL_SOURCE = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  "skills",
+  "chrona-node",
+);
+
+export async function mountChronaNodeSkill(cfg: ClaudeCodeRunnerConfig, source = cfg.skillDir): Promise<string> {
+  const dir = join(cfg.recordDir ?? join(process.cwd(), ".claude-code-mcp"), `skill-${crypto.randomUUID()}`);
+  const target = join(dir, ".claude", "skills", "chrona-node");
+  await mkdir(target, { recursive: true });
+  await cp(source ?? CHRONA_NODE_SKILL_SOURCE, target, { recursive: true, force: true });
+  return dir;
+}
+
+export async function writeSkillSettingsFile(cfg: ClaudeCodeRunnerConfig, skillName: string): Promise<string> {
+  const dir = cfg.recordDir ?? join(process.cwd(), ".claude-code-mcp");
+  await mkdir(dir, { recursive: true });
+  const path = join(dir, `settings-${crypto.randomUUID()}.json`);
+  await writeFile(path, JSON.stringify({ skills: [skillName] }, null, 2), "utf8");
+  return path;
+}
 export async function writeMcpConfigFile(cfg: ClaudeCodeRunnerConfig): Promise<string> {
   const dir = cfg.recordDir ?? join(process.cwd(), ".claude-code-mcp");
   await mkdir(dir, { recursive: true });

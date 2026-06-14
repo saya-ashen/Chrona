@@ -49,11 +49,13 @@ type ClientFormValues = {
   binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
+  controlPlane: ControlPlaneMode;
 };
 
 type HermesClientScope = "local" | "remote";
 
 type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
+type ControlPlaneMode = "mcp" | "skill";
 
 const DEBUG_PROVIDER_PROFILES = [
   "deterministic",
@@ -122,6 +124,7 @@ function buildClaudeCodeConfig(input: {
   apiKey: string;
   model: string;
   binaryPath: string;
+  controlPlane: ControlPlaneMode;
 }): Record<string, unknown> {
   const model = nonEmptyEnvValue(input.model);
   const baseUrl = nonEmptyEnvValue(input.baseUrl);
@@ -137,6 +140,7 @@ function buildClaudeCodeConfig(input: {
     model,
     binaryPath,
     timeoutMs: Number(input.timeoutSeconds) * 1000,
+    controlPlane: input.controlPlane,
     env: Object.keys(env).length > 0 ? env : undefined,
   };
 }
@@ -152,6 +156,7 @@ function buildClientPayload(input: {
   binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
+  controlPlane: ControlPlaneMode;
 }): ClientFormPayload {
   if (input.type === "debug") {
     return {
@@ -369,6 +374,7 @@ function ClientForm({
     binaryPath: (initial?.config as { binaryPath?: string })?.binaryPath ?? "",
     hermesScope: (initial?.config as { scope?: HermesClientScope })?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initial?.config as { profile?: unknown })?.profile),
+    controlPlane: ((initial?.config as { controlPlane?: ControlPlaneMode })?.controlPlane === "skill" ? "skill" : "mcp"),
   }), [fallbackType, initial, providers]);
   const form = useForm<ClientFormValues>({
     defaultValues,
@@ -479,6 +485,7 @@ function ClientForm({
                   <p className="text-sm text-muted-foreground">
                     {isLocalHermes ? copy.hermesLocalDescription : copy.hermesRemoteDescription}
                   </p>
+                  <p className="text-xs text-muted-foreground">Hermes control plane: MCP only. Skill mode is unsupported for Hermes this milestone.</p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -677,6 +684,26 @@ function ClientForm({
                     />
                   </Field>
                 </div>
+                <Field>
+                  <FieldLabel>Control plane</FieldLabel>
+                  <Controller
+                    name="controlPlane"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label="Control plane">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="mcp">MCP</SelectItem>
+                            <SelectItem value="skill">Skill</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input

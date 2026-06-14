@@ -47,6 +47,8 @@ export interface HermesClientConfig {
   baseUrl?: string;
   apiKey?: string;
   timeoutMs?: number;
+  /** Hermes gateway stays MCP-only until a future safe per-run skill/env handoff exists. */
+  controlPlane?: "mcp";
 }
 
 /**
@@ -57,6 +59,8 @@ export interface HermesClientConfig {
  * `/api/mcp` server scoped to that run. See `plan.md` §0 for the
  * research-gate decisions behind these fields.
  */
+export type ControlPlaneMode = "mcp" | "skill";
+
 export interface ClaudeCodeClientConfig {
   /** Override the Claude Code CLI location (CLI fallback path only). */
   binaryPath?: string;
@@ -66,6 +70,8 @@ export interface ClaudeCodeClientConfig {
   timeoutMs?: number;
   /** Chrona /api/mcp base URL. Defaults to the hosting Chrona server. */
   mcpBaseUrl?: string;
+  /** Control transport for node execution. Defaults to "mcp". Skill mode is supported for claude_code only. */
+  controlPlane?: ControlPlaneMode;
   /** Anthropic API key (recommended for production; subscription quota may otherwise apply). */
   apiKey?: string;
   /** Optional: pass-through env vars to the Claude Code subprocess. */

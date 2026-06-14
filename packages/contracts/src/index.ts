@@ -133,6 +133,8 @@ export {
   taskRecoveryActionTypeSchema,
 } from "./task-orchestrator";
 
+export type { ControlPlaneMode } from "./ai-feature-types";
+
 export type {
   ChronaToolExpectedState,
   ChronaToolIdempotencyStatus,
@@ -143,9 +145,14 @@ export type {
   ChronaToolRecovery,
   ChronaToolRegistry,
   ChronaToolResult,
+  AgentControlActionBody,
+  AgentControlActionKind,
 } from "./api/mcp-task-tools.schema";
 
 export {
+  agentControlActionBodySchema,
+  agentControlActionKindSchema,
+  agentControlActionPayloadSchemas,
   chronaToolAffectedSchema,
   chronaToolContextSchema,
   chronaToolExpectedStateSchema,

@@ -26,6 +26,7 @@ import {
   type StartRunInput,
   type StreamRunInput,
 } from "@chrona/providers-foundation";
+import type { ControlPlaneMode } from "@chrona/contracts";
 
 import {
   createClaudeCodeRunner,
@@ -71,6 +72,18 @@ export interface ClaudeCodeProviderConfig {
   apiKey?: string;
   cwd?: string;
   env?: Record<string, string>;
+  /**
+   * Skill-mode selector (Spec 018). Defaults to "mcp".
+   * Mirrors the contracts-level `ClaudeCodeClientConfig.controlPlane`.
+   * Hermes is MCP-only and ignores this field.
+   */
+  controlPlane?: ControlPlaneMode;
+  /**
+   * Skill directory mounted into the spawned run when
+   * `controlPlane === "skill"`. Optional; can be overridden per-run via
+   * `StartRunInput.control.skillsDir`.
+   */
+  skillDir?: string;
 }
 
 const DEFAULT_MODEL = "claude-opus-4-8";
@@ -267,6 +280,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       this.opts.config.mcpBaseUrl ??
       readEnv("CHRONA_MCP_BASE_URL") ??
       "http://localhost:3000";
+    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
     // `apiKey` here is the Anthropic API key (subscription-mode users omit
     // it and rely on the OAuth session baked into the `claude` CLI). The
     // MCP server at /api/mcp currently does not enforce Bearer auth, but
@@ -274,22 +288,33 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     // side attribution) can adopt it without an adapter change. The
     // token is the per-process start timestamp — stable for the run's
     // lifetime, and unique across concurrent runs.
+    //
+    // Spec 018 (skill mode): when controlPlane === "skill" we still mint
+    // a fallback token for the MCP transport in case the invoker forgets
+    // to pass one, but the *authoritative* per-run token is whatever the
+    // engine hands us via `StartRunInput.control.runToken` (see runner
+    // start() where input.control overrides this). The skill-mode `env`
+    // payload (CHRONA_BASE_URL + CHRONA_RUN_TOKEN) is also injected at
+    // start() time so it is bound to the per-run token, not the runner
+    // instance lifetime.
     const mcpRunToken = `chrona-run-${new Date().toISOString()}`;
+    const env: Record<string, string> = {
+      ...(this.opts.config.env ?? {}),
+      ...(this.opts.config.apiKey ? { ANTHROPIC_API_KEY: this.opts.config.apiKey } : {}),
+    };
     const cfg: ClaudeCodeRunnerConfig = {
       model: this.opts.config.model ?? DEFAULT_MODEL,
       timeoutMs: this.opts.config.timeoutMs,
       mcpBaseUrl,
       mcpRunToken,
-      // Pass the Anthropic API key (if configured) through the env the
-      // SDK will spawn the `claude` binary under. SDK + CLI both honor
-      // `ANTHROPIC_API_KEY`.
-      env: this.opts.config.apiKey
-        ? { ...(this.opts.config.env ?? {}), ANTHROPIC_API_KEY: this.opts.config.apiKey }
-        : this.opts.config.env,
+      env: Object.keys(env).length > 0 ? env : undefined,
       binaryPath: this.opts.config.binaryPath,
       cwd: this.opts.config.cwd,
       recordDir,
       strictUnknownEvents: strict,
+      controlPlane: this.opts.config.controlPlane,
+      controlBaseUrl,
+      skillDir: this.opts.config.skillDir,
     };
     return createClaudeCodeRunner(cfg);
   }
