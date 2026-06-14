@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "packages/ai-features/src/index.ts",
+    "packages/engine/src/modules/tasks/task-dispatch-types.ts",
+    "packages/engine/src/modules/ai/__tests__/plan-generation.integration.test.ts",
+    "packages/ai-features/src/**/*.ts",
+    "packages/engine/src/modules/ai/types.ts",
+    "packages/engine/src/modules/tasks/task-plan-graph-store.ts",
+    "packages/db/src/**/*.ts",
+    "packages/engine/src/modules/task-execution/**/*.ts"
+  ]
+}
