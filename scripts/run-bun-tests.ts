@@ -53,6 +53,10 @@ if (initCode !== 0) {
 }
 
 let exitCode = 0;
+const failedFiles: Array<{ file: string; code: number }> = [];
+
+console.log(`Running ${files.length} Bun test file${files.length === 1 ? "" : "s"} sequentially...`);
+
 
 try {
   for (const file of files) {
@@ -65,11 +69,19 @@ try {
     const code = await proc.exited;
     if (code !== 0) {
       exitCode = code;
+      failedFiles.push({ file, code });
     }
   }
 } finally {
   if (existsSync(tempDbPath)) {
     rmSync(tempDbPath, { force: true });
+  }
+}
+
+if (failedFiles.length > 0) {
+  console.error("\nFailed Bun test files:");
+  for (const failure of failedFiles) {
+    console.error(`  - ${failure.file} (exit ${failure.code})`);
   }
 }
 
