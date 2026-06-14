@@ -575,6 +575,10 @@ export function DayTimeline({
           backgroundColor: `${sourceManaged.sourceColor}18`,
         }
       : undefined;
+    const autoStartReasonCopy = item.autoStartEligible === false && item.autoStartReason !== "not_due"
+      ? getAutoStartReasonCopy(copy, item.autoStartReason)
+      : null;
+    const autoStartReasonTitle = autoStartReasonCopy ? `${copy.autoStartReasonLabel}: ${autoStartReasonCopy}` : undefined;
 
     return (
       <div
@@ -587,6 +591,8 @@ export function DayTimeline({
               : "border-primary/45 bg-primary/12",
         )}
         style={sourceStyle}
+        title={autoStartReasonTitle}
+        aria-label={autoStartReasonTitle ? `${info.event.title}. ${autoStartReasonTitle}` : info.event.title}
         draggable={!isPending}
         onDragStart={() => {
           setHiddenTaskId(item.taskId);
