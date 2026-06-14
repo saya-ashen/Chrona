@@ -111,6 +111,36 @@ type HermesIntegrationResult = {
   restart?: { ok: boolean; message: string; exitCode: number | null };
 };
 
+function nonEmptyEnvValue(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function buildClaudeCodeConfig(input: {
+  timeoutSeconds: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  binaryPath: string;
+}): Record<string, unknown> {
+  const model = nonEmptyEnvValue(input.model);
+  const baseUrl = nonEmptyEnvValue(input.baseUrl);
+  const authToken = nonEmptyEnvValue(input.apiKey);
+  const binaryPath = nonEmptyEnvValue(input.binaryPath);
+  const env: Record<string, string> = {};
+
+  if (model) env.ANTHROPIC_MODEL = model;
+  if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl;
+  if (authToken) env.ANTHROPIC_AUTH_TOKEN = authToken;
+
+  return {
+    model,
+    binaryPath,
+    timeoutMs: Number(input.timeoutSeconds) * 1000,
+    env: Object.keys(env).length > 0 ? env : undefined,
+  };
+}
+
 function buildClientPayload(input: {
   name: string;
   type: AiClientType;
@@ -132,10 +162,19 @@ function buildClientPayload(input: {
     };
   }
 
-  return {
+  if (input.type === "claude_code") {
+    return {
       name: input.name,
       type: input.type,
-      config: {
+      config: buildClaudeCodeConfig(input),
+      isDefault: input.isDefault,
+    };
+  }
+
+  return {
+    name: input.name,
+    type: input.type,
+    config: {
       baseUrl: input.baseUrl || (input.hermesScope === "local" ? LOCAL_HERMES_BASE_URL : ""),
       apiKey: input.apiKey,
       timeoutMs: Number(input.timeoutSeconds) * 1000,
@@ -318,9 +357,15 @@ function ClientForm({
       (initial?.config as { timeoutSeconds?: number; timeoutMs?: number })?.timeoutSeconds
         ?? (((initial?.config as { timeoutMs?: number })?.timeoutMs ?? 120000) / 1000),
     ),
-    baseUrl: (initial?.config as { baseUrl?: string })?.baseUrl ?? LOCAL_HERMES_BASE_URL,
-    apiKey: (initial?.config as { apiKey?: string })?.apiKey ?? "",
-    model: (initial?.config as { model?: string })?.model ?? "",
+    baseUrl: (initial?.config as { baseUrl?: string; env?: Record<string, string> })?.baseUrl
+      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_BASE_URL
+      ?? "",
+    apiKey: (initial?.config as { apiKey?: string; env?: Record<string, string> })?.apiKey
+      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_AUTH_TOKEN
+      ?? "",
+    model: (initial?.config as { model?: string; env?: Record<string, string> })?.model
+      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_MODEL
+      ?? "",
     binaryPath: (initial?.config as { binaryPath?: string })?.binaryPath ?? "",
     hermesScope: (initial?.config as { scope?: HermesClientScope })?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initial?.config as { profile?: unknown })?.profile),
@@ -597,11 +642,30 @@ function ClientForm({
               <>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field>
-                    <FieldLabel htmlFor="ai-client-model">Model</FieldLabel>
+                    <FieldLabel htmlFor="ai-client-model">ANTHROPIC_MODEL</FieldLabel>
                     <Input
                       {...form.register("model")}
                       id="ai-client-model"
-                      placeholder="claude-opus-4-8"
+                      placeholder="optional model override"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-base-url">ANTHROPIC_BASE_URL</FieldLabel>
+                    <Input
+                      {...form.register("baseUrl")}
+                      id="ai-client-base-url"
+                      placeholder="optional custom Anthropic-compatible base URL"
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-api-key">ANTHROPIC_AUTH_TOKEN</FieldLabel>
+                    <Input
+                      {...form.register("apiKey")}
+                      id="ai-client-api-key"
+                      type="password"
+                      placeholder="optional auth token"
                     />
                   </Field>
                   <Field>
@@ -613,30 +677,19 @@ function ClientForm({
                     />
                   </Field>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-api-key">Anthropic API key</FieldLabel>
-                    <Input
-                      {...form.register("apiKey")}
-                      id="ai-client-api-key"
-                      type="password"
-                      placeholder="optional (subscription mode)"
-                    />
-                  </Field>
-                  <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
-                    <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
-                    <Input
-                      {...form.register("timeoutSeconds", {
-                        required: copy.timeoutSeconds,
-                        validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
-                      })}
-                      aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
-                      id="ai-client-timeout"
-                      type="number"
-                    />
-                    {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
-                  </Field>
-                </div>
+                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    {...form.register("timeoutSeconds", {
+                      required: copy.timeoutSeconds,
+                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                    })}
+                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                    id="ai-client-timeout"
+                    type="number"
+                  />
+                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                </Field>
                 <p className="text-xs text-muted-foreground">
                   MCP base URL is set automatically by the engine. Pass an
                   Anthropic API key for production usage to avoid the SDK
