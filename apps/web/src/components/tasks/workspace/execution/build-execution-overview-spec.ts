@@ -287,7 +287,7 @@ export function buildCommandCenterNowSpec(input: {
     };
     elements["live-stack"] = {
       type: "Stack",
-      props: { gap: "xs" },
+      props: { gap: "sm" },
       children: ["live-header", ...eventChildren],
     };
     rootChildren.push("live-stack");
@@ -316,7 +316,7 @@ function resultSourceSpec(node: PlanNodeDataModel, copy: WorkspaceCopy): UiDocum
   return {
     root: "root",
     elements: {
-      root: { type: "Stack", props: { gap: "xs" }, children: ["source", "locate"] },
+      root: { type: "Stack", props: { gap: "sm" }, children: ["source", "locate"] },
       source: { type: "Text", props: { text: `${copy.from ?? "from"}: ${node.title}`, variant: "caption" } },
       locate: {
         type: "Button",
@@ -449,7 +449,7 @@ export function buildAcceptOrRegenerateSpec(input: {
         placeholder: copy.instructionPlaceholder ?? "Tell Chrona what to change in the regenerated plan...",
       },
     },
-    actions: { type: "Stack", props: { gap: "xs" }, children: ["accept", "regenerate"] },
+    actions: { type: "Stack", props: { gap: "sm" }, children: ["accept", "regenerate"] },
     accept: {
       type: "Button",
       props: { label: copy.accept ?? "Accept plan", variant: "primary", ...(!input.canAcceptPlan && { disabled: true }) },
@@ -469,7 +469,7 @@ export function buildAcceptOrRegenerateSpec(input: {
   if (input.visibleGenerationInstruction) {
     elements["visible-instruction"] = {
       type: "Stack",
-      props: { gap: "xs" },
+      props: { gap: "sm" },
       children: ["visible-instruction-label", "visible-instruction-body"],
     };
     elements["visible-instruction-label"] = {

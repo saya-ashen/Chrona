@@ -162,7 +162,7 @@ export function buildCommandCenterCheckpointSpec(input: {
       };
       formActionChildren.push(actionKey);
     } else {
-      elements[actionKey] = { type: "Stack", props: { gap: "xs" }, children: actionChildren };
+      elements[actionKey] = { type: "Stack", props: { gap: "sm" }, children: actionChildren };
       inlineActionChildren.push(actionKey);
     }
   }
