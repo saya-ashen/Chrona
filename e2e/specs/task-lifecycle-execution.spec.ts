@@ -81,11 +81,10 @@ async function bindAllDebugFeatures(
   expect(bindRes.ok()).toBeTruthy();
 }
 
-/** Generate + accept a debug plan, asserting the saved plan reaches `accepted`. */
-async function generateAndAcceptPlan(
+async function generateDraftPlan(
   request: APIRequestContext,
   taskId: string,
-): Promise<void> {
+): Promise<string> {
   const generationResponse = await request.post(
     `/api/tasks/${taskId}/plan/generations`,
     { data: { forceRefresh: true }, headers: { accept: "text/event-stream" } },
@@ -101,6 +100,16 @@ async function generateAndAcceptPlan(
     planId = body.savedPlan?.id ?? null;
     return body.savedPlan?.status === "draft" ? planId : null;
   }, { timeout: 20_000 }).not.toBeNull();
+  expect(planId).toBeTruthy();
+  return planId!;
+}
+
+/** Generate + accept a debug plan, asserting the saved plan reaches `accepted`. */
+async function generateAndAcceptPlan(
+  request: APIRequestContext,
+  taskId: string,
+): Promise<void> {
+  const planId = await generateDraftPlan(request, taskId);
 
   const acceptRes = await request.post(`/api/tasks/${taskId}/plan/accept`, {
     data: { planId },
@@ -186,6 +195,39 @@ async function resolveDebugPlanGates(
 }
 
 test.describe("Task create → plan → run → result", () => {
+  test("updates header actions after clicking Accept plan and Start without reload", async ({ page, request }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "Focused live-refresh regression runs on desktop only.");
+    test.setTimeout(90_000);
+    await setTaskWorkspaceViewport(page, "desktop");
+
+    const task = await createTaskWorkspaceTask(request, {
+      title: `E2E Header Action Refresh ${Date.now()}`,
+      description: "Verify header Accept plan and Start actions refresh without manual reload.",
+    });
+    await bindAllDebugFeatures(request, task.taskId);
+    await generateDraftPlan(request, task.taskId);
+
+    await page.goto(TASK_URL(task.taskId));
+    await dismissTaskEditorIfOpen(page);
+    await expect(page.getByRole("heading", { name: /E2E Header Action Refresh/ })).toBeVisible();
+
+    await page.getByRole("button", { name: /accept plan/i }).click();
+    await expect(page.getByRole("button", { name: /^start$/i })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("button", { name: /^start$/i })).toBeEnabled();
+
+    await page.getByRole("button", { name: /^start$/i }).click();
+    await expect.poll(async () => (await getCurrentExecution(request, task.taskId)).status, {
+      timeout: 30_000,
+      intervals: [300, 500, 1_000],
+    }).not.toBe("started");
+
+    await expect.poll(async () => page.getByRole("button").evaluateAll((buttons) =>
+      buttons.map((button) => button.textContent?.trim()).filter(Boolean),
+    ), { timeout: 20_000, intervals: [300, 500, 1_000] }).toEqual(
+      expect.arrayContaining([expect.stringMatching(/stop/i)]),
+    );
+  });
+
   test("drives the full lifecycle from creation through accepted result", async ({
     page,
     request,
