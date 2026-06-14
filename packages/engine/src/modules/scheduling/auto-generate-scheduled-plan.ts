@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { TaskPlanStatus } from "@/generated/prisma/client";
-import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
+import { generateAndAcceptTaskPlan } from "@/modules/plans/auto-generate-task-plan";
 import {
   AUTOMATION_TIMING_PRESETS,
   automationTimingOffsetMs,
@@ -101,7 +101,7 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
       continue;
     }
 
-    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
+    await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
     fired.add(firedKey);
     result.triggered.push({ taskId: task.id, workBlockId: block.id, reason: "scheduled" });
   }
@@ -136,7 +136,7 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
       continue;
     }
 
-    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: null, accept: task.autoExecute });
+    await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: null, accept: task.autoExecute });
     fired.add(task.id);
     result.triggered.push({ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" });
   }
