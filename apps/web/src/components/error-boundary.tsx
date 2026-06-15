@@ -1,4 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("web.error-boundary");
 
 interface Props {
   children: ReactNode;
@@ -21,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("[Chrona] uncaught render error", { error: error.message, stack: error.stack, componentStack: errorInfo.componentStack });
+    logger.error("render.uncaught", { error, componentStack: errorInfo.componentStack });
   }
 
   override render() {

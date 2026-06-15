@@ -1,4 +1,4 @@
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import type { SubmittedNodeResult } from "@chrona/contracts/ai";
 import type { SyncPlanRunRuntimeResultInput } from "../types";
 import { executeCommand } from "./execute-command";

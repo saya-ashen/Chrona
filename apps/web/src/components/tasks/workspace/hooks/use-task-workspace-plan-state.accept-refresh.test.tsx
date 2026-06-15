@@ -85,6 +85,25 @@ vi.mock("@/lib/rpc-client", () => ({
   },
 }));
 
+/**
+ * `useTaskWorkspacePageState` opens a real `fetchJsonEventSource` against
+ * `/api/work/:taskId/events` on mount. Without this mock the helper keeps
+ * the stream alive (it owns reconnect timers and a `window`-bound fetch
+ * implementation from `@microsoft/fetch-event-source`), so React 19's
+ * scheduler queues a `processImmediate` callback that fires AFTER vitest
+ * tears the per-test jsdom window down. That callback references
+ * `window.event` inside `react-dom-client.development.js:17920` and
+ * throws `ReferenceError: window is not defined` — counted as an
+ * unhandled error even though every assertion passed. Mocking the helper
+ * matches the pattern used by every other workspace hook test
+ * (e.g. `use-task-workspace-sse-refresh.test.tsx`,
+ * `use-task-workspace-page-state.state-events.test.tsx`).
+ */
+vi.mock("@/lib/fetch-json-event-source", () => ({
+  fetchJsonEventSource: vi.fn(async () => undefined),
+}));
+
+
 const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
   const url = typeof input === "string" ? input : input.toString();
   if (url.includes("/plan/generations/active")) {
@@ -138,8 +157,13 @@ beforeEach(() => {
   };
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
+  // Flush React 19's pending `setImmediate` scheduler callbacks before
+  // vitest destroys the per-test jsdom environment. Without this, the
+  // scheduler callback reads `window.event` after `window` is gone and
+  // vitest reports an unhandled `ReferenceError`.
+  await new Promise<void>((resolve) => setImmediate(resolve));
 });
 
 describe("useTaskWorkspacePlanState — accept plan", () => {

@@ -25,9 +25,17 @@ export function stripTrailingSlash(s: string): string {
 }
 
 export function renderPrompt(input: StartRunInput): string | undefined {
-  if (typeof input.instructions === "string") return input.instructions;
-  if (typeof input.instructions === "object") {
-    const anyInst = input.instructions as { text?: unknown; messages?: unknown };
+  const instructions = renderInstructions(input.instructions);
+  const payload = renderInputPayload(input.input);
+  if (!payload) return instructions;
+  if (!instructions) return payload;
+  return `${instructions}\n\n## Chrona provider input\n${payload}`;
+}
+
+function renderInstructions(instructions: StartRunInput["instructions"]): string | undefined {
+  if (typeof instructions === "string") return instructions;
+  if (typeof instructions === "object") {
+    const anyInst = instructions as { text?: unknown; messages?: unknown };
     if (typeof anyInst.text === "string") return anyInst.text;
     if (Array.isArray(anyInst.messages)) {
       return (anyInst.messages as { role?: string; content?: unknown }[])
@@ -43,6 +51,14 @@ export function renderPrompt(input: StartRunInput): string | undefined {
     }
   }
   return undefined;
+}
+
+function renderInputPayload(input: StartRunInput["input"]): string | undefined {
+  if (typeof input === "string") return input;
+  if ("type" in input && input.type === "text" && typeof input.text === "string") return input.text;
+  const entries = Object.entries(input).filter(([key]) => key !== "signal");
+  if (entries.length === 0) return undefined;
+  return JSON.stringify(Object.fromEntries(entries), null, 2);
 }
 
 const CHRONA_NODE_SKILL_SOURCE = join(

@@ -4,11 +4,16 @@ import { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 import { runGraphAdvancementWorker } from "./graph-advancement-worker";
 import { runRecurringWorkBlockExpansionWorker } from "./recurring-work-block-expansion-worker";
 import { runRestartRecoveryWorker } from "./restart-recovery-worker";
+import { TaskPlanGenerationInFlightError } from "@/modules/plans/task-plan-generation-registry";
+import { createLogger } from "@chrona/logging";
+
 import {
   acquireSchedulerLease,
   releaseSchedulerLease,
   renewSchedulerLease,
 } from "./scheduler-lease-repository";
+
+const logger = createLogger("engine.orchestration.task-orchestrator");
 
 export type TaskOrchestratorWorker = {
   name: string;
@@ -84,10 +89,13 @@ export function createTaskOrchestrator(options: TaskOrchestratorOptions = {}): T
         try {
           await worker.run();
         } catch (cause) {
-          console.error("[task-orchestrator] worker failed", {
+          const taskId = cause instanceof TaskPlanGenerationInFlightError ? cause.taskId : null;
+          const workBlockId = cause instanceof TaskPlanGenerationInFlightError ? cause.workBlockId : null;
+          logger.error("worker.failed", {
             worker: worker.name,
-            error: cause instanceof Error ? cause.message : String(cause),
-            stack: cause instanceof Error ? cause.stack : undefined,
+            error: cause,
+            taskId,
+            workBlockId,
           });
         }
       }

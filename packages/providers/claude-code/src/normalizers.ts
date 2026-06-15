@@ -392,27 +392,36 @@ function mapContentBlockStop(
   const idx = typeof ev.index === "number" ? ev.index : -1;
   const callId = ctx.indexToCallId.get(idx);
   if (!callId) return;
-  const buf = ctx.toolInputBuffers.get(callId);
-  if (buf && buf.length > 0) {
-    let parsed: unknown = buf;
-    try {
-      parsed = JSON.parse(buf);
-    } catch {
-      // keep raw string
-    }
-    out.push(
-      buildEvent(ctx, options, {
-        type: "raw_event",
-        rawEventType: "content_block_stop/tool_input_parsed",
-        raw: { tool: ctx.toolNames.get(callId), input: parsed },
-      } as never),
-    );
-  }
+  const toolName = ctx.toolNames.get(callId) ?? "unknown_tool";
+  const parsedInput = parseBufferedToolInput(ctx.toolInputBuffers.get(callId));
+  out.push(
+    buildEvent(ctx, options, {
+      type: "tool_call",
+      tool: toolName,
+      callId,
+      input: parsedInput,
+      status: "pending",
+    }),
+  );
   out.push(
     buildEvent(ctx, options, {
       type: "tool_completed",
-      toolName: ctx.toolNames.get(callId),
+      toolName,
     }),
   );
+  ctx.toolInputBuffers.delete(callId);
+  ctx.indexToCallId.delete(idx);
+}
+
+function parseBufferedToolInput(buffer: string | undefined): Record<string, unknown> {
+  if (!buffer) return {};
+  try {
+    const parsed = JSON.parse(buffer) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : { value: parsed };
+  } catch {
+    return { raw: buffer };
+  }
 }
 

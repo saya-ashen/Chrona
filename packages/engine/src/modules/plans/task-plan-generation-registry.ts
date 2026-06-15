@@ -5,11 +5,17 @@ import type {
 import { randomUUID } from "node:crypto";
 
 export class TaskPlanGenerationInFlightError extends Error {
-  constructor(taskId: string) {
+  readonly taskId: string;
+  readonly workBlockId: string | null;
+  constructor(input: { taskId: string; workBlockId?: string | null }) {
     super(
-      `A task plan generation job is already running for task ${taskId}. Stop the current generation before starting a new one.`,
+      `A task plan generation job is already running for task ${input.taskId}${
+        input.workBlockId ? ` (work block ${input.workBlockId})` : ""
+      }. Stop the current generation before starting a new one.`,
     );
     this.name = "TaskPlanGenerationInFlightError";
+    this.taskId = input.taskId;
+    this.workBlockId = input.workBlockId ?? null;
   }
 }
 
@@ -110,9 +116,11 @@ export function startTaskPlanGeneration(input: { taskId: string; workBlockId?: s
   const key = generationKey(input.taskId, input.workBlockId ?? null);
   const existing = sessionsByKey.get(key);
   if (existing && !existing.controller.signal.aborted && !existing.done) {
-    throw new TaskPlanGenerationInFlightError(input.taskId);
+    throw new TaskPlanGenerationInFlightError({
+      taskId: input.taskId,
+      workBlockId: input.workBlockId ?? null,
+    });
   }
-
   const generationId = randomUUID();
   const session: SessionRecord = {
     generationId,

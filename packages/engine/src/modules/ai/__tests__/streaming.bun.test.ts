@@ -146,8 +146,11 @@ describe("generatePlanStream", () => {
       }
     }
 
-    expect(createSessionMock).toHaveBeenCalledTimes(1);
+    expect(createSessionMock).not.toHaveBeenCalled();
     expect(startRunMock).toHaveBeenCalledTimes(1);
+    expect(startRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: expect.stringMatching(/^ai-generate_plan-task-1-/) }),
+    );
     expect(startRunMock).toHaveBeenCalledWith(
       expect.not.objectContaining({ structuredOutputSchema: expect.anything() }),
     );

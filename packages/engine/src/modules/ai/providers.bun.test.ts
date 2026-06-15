@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { testAiClientAvailability } from "./providers";
+import { buildProviderFeatureRequest, testAiClientAvailability } from "./providers";
 
 /**
  * T10 — Golden-path validation (engine-side wireup).
@@ -58,6 +58,27 @@ const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
+describe("provider feature request input", () => {
+  it("uses feature inputText as the canonical provider input", () => {
+    const request = buildProviderFeatureRequest({
+      sessionKey: "scope-1",
+      input: { title: "Raw title", extra: "raw" },
+      featureSpec: {
+        feature: "generate_plan",
+        instructions: "System instructions",
+        inputText: "Create a concise plan.\nTitle: 查询并总结今天的github trendings",
+      },
+      stream: false,
+    });
+
+    expect(request.instructions).toBe("System instructions");
+    expect(request.input).toEqual({
+      type: "text",
+      text: "Create a concise plan.\nTitle: 查询并总结今天的github trendings",
+    });
+  });
+});
+
 
 describe("AI provider availability", () => {
   it("accepts the local Chrona debug provider without network calls", async () => {

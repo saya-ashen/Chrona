@@ -69,6 +69,13 @@ export interface ClaudeCodeProviderConfig {
   model?: string;
   timeoutMs?: number;
   mcpBaseUrl?: string;
+  /**
+   * Static Bearer token for the MCP server at `/api/mcp`. Usually
+   * omitted — `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars are
+   * the canonical sources. Required only if the operator wants the
+   * token baked into the config object instead of the env.
+   */
+  mcpRunToken?: string;
   apiKey?: string;
   cwd?: string;
   env?: Record<string, string>;
@@ -92,6 +99,19 @@ const PROVIDER_NAME = "claude_code";
 function readEnv(name: string): string | undefined {
   const v = process.env[name];
   return v && v.trim().length > 0 ? v.trim() : undefined;
+}
+
+/**
+ * Default MCP base URL when neither `config.mcpBaseUrl` nor
+ * `CHRONA_MCP_BASE_URL` is set. The provider runs in-process with the engine
+ * and HTTP server, so the server's own `PORT` (default 3101, see
+ * apps/server/src/config/env.ts) points at the live `/api/mcp` route. Deriving
+ * from `PORT` keeps the two in lockstep instead of hardcoding a port that
+ * drifts from the server default.
+ */
+function defaultMcpBaseUrl(): string {
+  const port = readEnv("PORT") ?? "3101";
+  return `http://localhost:${port}`;
 }
 
 export class ClaudeCodeProviderClient implements AgentProviderClient {
@@ -140,8 +160,17 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     };
   }
 
+  /**
+   * Mint a provider session ref. The Claude Code SDK owns session identity:
+   * the authoritative `session_id` is captured from the run stream (see
+   * `runner.ts` `extractSdkSessionId`) and written back onto the run ref, so
+   * the live execute/stream paths pass the engine `sessionId` straight to
+   * `startRun` and never route through here. This remains only to satisfy
+   * `AgentProviderClient`; it returns a fresh UUID (a shape the SDK accepts)
+   * rather than a Chrona-invented `claude-session-*` placeholder.
+   */
   async createSession(input: CreateSessionInput = {}): Promise<ProviderSessionRef> {
-    const sessionId = `claude-session-${crypto.randomUUID()}`;
+    const sessionId = crypto.randomUUID();
     return {
       provider: this.provider,
       sessionId,
@@ -339,25 +368,20 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     const mcpBaseUrl =
       this.opts.config.mcpBaseUrl ??
       readEnv("CHRONA_MCP_BASE_URL") ??
-      "http://localhost:3000";
+      defaultMcpBaseUrl();
     const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
-    // `apiKey` here is the Anthropic API key (subscription-mode users omit
-    // it and rely on the OAuth session baked into the `claude` CLI). The
-    // MCP server at /api/mcp currently does not enforce Bearer auth, but
-    // we send a per-run opaque token so future tightening (and server-
-    // side attribution) can adopt it without an adapter change. The
-    // token is the per-process start timestamp — stable for the run's
-    // lifetime, and unique across concurrent runs.
-    //
-    // Spec 018 (skill mode): when controlPlane === "skill" we still mint
-    // a fallback token for the MCP transport in case the invoker forgets
-    // to pass one, but the *authoritative* per-run token is whatever the
-    // engine hands us via `StartRunInput.control.runToken` (see runner
-    // start() where input.control overrides this). The skill-mode `env`
-    // payload (CHRONA_BASE_URL + CHRONA_RUN_TOKEN) is also injected at
-    // start() time so it is bound to the per-run token, not the runner
-    // instance lifetime.
-    const mcpRunToken = `chrona-run-${new Date().toISOString()}`;
+    // The MCP server at /api/mcp sits behind the same `apiKeyAuth()`
+    // middleware as every other /api/* route (apps/server/src/middleware/
+    // auth.ts), so the Bearer token we hand the SDK here MUST be the
+    // server's static `API_KEY` (the same one operators set in
+    // apps/server/.env). Skill mode overrides this via `input.control.
+    // runToken` (see runner start()), but the per-run token is a separate
+    // scope (per node attempt), not the MCP transport credential.
+    const mcpRunToken =
+      this.opts.config.mcpRunToken ??
+      readEnv("CHRONA_API_KEY") ??
+      readEnv("CHRONA_MCP_BEARER_TOKEN") ??
+      "";
     const env: Record<string, string> = {
       ...(this.opts.config.env ?? {}),
       ...(this.opts.config.apiKey ? { ANTHROPIC_API_KEY: this.opts.config.apiKey } : {}),

@@ -1,4 +1,4 @@
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import { ENGINE_ERROR_CODES } from "@chrona/engine";
 import { getApiMessages, type Locale } from "@chrona/i18n";
 

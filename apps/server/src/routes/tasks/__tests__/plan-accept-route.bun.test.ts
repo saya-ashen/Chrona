@@ -15,7 +15,7 @@
  *
  * Plan: specs/019-plan-card-and-accept-tests/plan.md §3 (test E).
  */
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
 import { createPlansRoutes } from "../plan.routes";
 import type { ChronaEngine } from "@chrona/engine";
@@ -78,29 +78,21 @@ describe("POST /api/tasks/:taskId/plan/accept", () => {
 
     const app = createPlansRoutes(engine);
 
-    const originalConsoleError = console.error;
-    const consoleError = mock(() => undefined);
-    console.error = consoleError;
-    try {
-      const res = await app.request(
-        "/tasks/task-1/plan/accept",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            planId: "plan-1",
-            workspaceId: "workspace-1",
-            workBlockId: null,
-          }),
-        },
-      );
+    const res = await app.request(
+      "/tasks/task-1/plan/accept",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          planId: "plan-1",
+          workspaceId: "workspace-1",
+          workBlockId: null,
+        }),
+      },
+    );
 
-      expect(res.status).toBe(500);
-      const body = await res.json() as { error?: string };
-      expect(body.error).toBe("Failed to accept task AI plan");
-      expect(consoleError).toHaveBeenCalledTimes(1);
-    } finally {
-      console.error = originalConsoleError;
-    }
+    expect(res.status).toBe(500);
+    const body = await res.json() as { error?: string };
+    expect(body.error).toBe("Failed to accept task AI plan");
   });
 });

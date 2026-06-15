@@ -135,3 +135,60 @@ describe("runProviderRequest stream-interruption fallback", () => {
     expect(getRun).not.toHaveBeenCalled();
   });
 });
+
+describe("runProviderRequest resume threading", () => {
+  it("forwards request.resumeSessionRef to the provider startRun for cross-process resume", async () => {
+    const startRun = mock(async () => runRef());
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+
+    const client = {
+      provider: "claude_code",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      resumeSessionRef: "sdk-session-prior",
+    });
+
+    expect(startRun).toHaveBeenCalledTimes(1);
+    expect(startRun).toHaveBeenCalledWith(
+      expect.objectContaining({ resumeSessionRef: "sdk-session-prior" }),
+    );
+    expect(snapshot.sessionId).toBe("sdk-session-1");
+  });
+
+  it("omits resumeSessionRef when the request has no prior provider session", async () => {
+    const startRun = mock(async () => runRef());
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+
+    const client = {
+      provider: "claude_code",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(client, request);
+
+    expect(startRun).toHaveBeenCalledWith(
+      expect.not.objectContaining({ resumeSessionRef: expect.anything() }),
+    );
+  });
+});

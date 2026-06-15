@@ -2,7 +2,7 @@ import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
 import { resolve } from "node:path";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
 
 const log = createLogger("apps.server");

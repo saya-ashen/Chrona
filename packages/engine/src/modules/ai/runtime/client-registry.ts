@@ -81,13 +81,16 @@ function toAiClientRecord(client: StoredAiClient): AiClientRecord {
 }
 
 function engineBaseUrl(): string {
-  // The Chrona server publishes itself on CHRONA_PUBLIC_URL when set, or
-  // falls back to CHRONA_PORT / 3000 on the loopback interface. We avoid
-  // introducing new env names; these are the same ones the server boot
-  // path already consults.
+  // The Chrona server publishes itself on CHRONA_PUBLIC_URL when set, then
+  // falls back to the port the HTTP server actually binds. That port comes
+  // from `PORT` (apps/server/src/config/env.ts, default 3101) — NOT
+  // `CHRONA_PORT`, which the server never reads. Using the wrong env name
+  // here defaulted the MCP base URL to :3000 and made every in-process MCP
+  // probe hit an unrelated service (HTTP 405). `CHRONA_PORT` is kept only as
+  // a legacy fallback for older deployments that set it.
   const explicit = readEnv("CHRONA_PUBLIC_URL");
   if (explicit) return stripTrailingSlash(explicit);
-  const port = readEnv("CHRONA_PORT") ?? "3000";
+  const port = readEnv("PORT") ?? readEnv("CHRONA_PORT") ?? "3101";
   return `http://localhost:${port}`;
 }
 

@@ -434,6 +434,24 @@ export async function runTaskNodeFeature(
     const structuredSummary = recordValue(structured, "summary");
     const summary = invocation.response.outputText?.trim() ||
       (typeof structuredSummary === "string" ? structuredSummary.trim() : undefined);
+    if (invocation.response.status === "failed") {
+      const errorMessage = invocation.response.error
+        || `Provider run ${invocation.runtimeRunRef ?? invocation.runId} failed`;
+      const failedResult: NodeExecutionResult = {
+        status: "failed",
+        error: errorMessage,
+        evidence,
+        details: buildFailureDetails({
+          node: input.node,
+          runtimeName: input.runtimeName,
+          runtimeSessionKey: input.mainSession.sessionKey,
+          message: errorMessage,
+        }),
+      };
+      await updateInvocationRunFromNodeResult(invocation, failedResult);
+      return failedResult;
+    }
+
     const terminalNodeResult = invocation.response.status === "completed"
       ? await resolveTerminalNodeResult({
           invocation,

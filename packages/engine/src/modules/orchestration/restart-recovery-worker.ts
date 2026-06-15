@@ -1,6 +1,9 @@
 import { db } from "@/lib/db";
 import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
 import { recordOrchestratorEvent } from "./scheduler-events";
+import { createLogger } from "@chrona/logging";
+
+const logger = createLogger("engine.orchestration.restart-recovery");
 
 type RecoveryTaskRef = { workspaceId: string } | null;
 
@@ -34,7 +37,7 @@ export async function runRestartRecoveryWorker(input: {
   for (const session of activeSessions) {
     const task = session.task as RecoveryTaskRef;
     if (task === null) {
-      console.warn("[restart-recovery-worker] active session missing task", {
+      logger.warn("active_session_missing_task", {
         sessionId: session.id,
         taskId: session.taskId,
       });
@@ -56,7 +59,7 @@ export async function runRestartRecoveryWorker(input: {
   for (const run of degradedRuns) {
     const task = run.task as RecoveryTaskRef;
     if (task === null) {
-      console.warn("[restart-recovery-worker] degraded run missing task", {
+      logger.warn("degraded_run_missing_task", {
         runId: run.id,
         taskId: run.taskId,
       });

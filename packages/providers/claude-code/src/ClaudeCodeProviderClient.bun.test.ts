@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { terminalSnapshotFromEvents } from "@chrona/providers-foundation";
 
 import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
+import { mapClaudeCodeStreamItems, createNormalizerContext } from "./normalizers";
 import { createReplayRunner } from "./runner";
 
 const FIXTURES_DIR = fileURLToPath(new URL("../fixtures", import.meta.url));
@@ -105,6 +106,56 @@ describe("ClaudeCodeProviderClient — happy path", () => {
     expect(a.sessionId).not.toBe(b.sessionId);
     expect(a.sessionKey).toBe("k1");
     expect(b.sessionKey).toBe("k2");
+  });
+});
+
+describe("Claude Code normalizer — streamed tool inputs", () => {
+  test("content_block_start/delta/stop emits a real tool_call with parsed input", () => {
+    const ctx = createNormalizerContext();
+    const events = mapClaudeCodeStreamItems([
+      {
+        type: "stream_event",
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: {
+            type: "tool_use",
+            id: "toolu_plan",
+            name: "mcp__chrona__chrona_plan_generate",
+          },
+        },
+      },
+      {
+        type: "stream_event",
+        event: {
+          type: "content_block_delta",
+          index: 0,
+          delta: {
+            type: "input_json_delta",
+            partial_json: "{\"title\":\"Generated\",\"goal\":\"Persist\",\"nodes\":[],\"edges\":[]}",
+          },
+        },
+      },
+      {
+        type: "stream_event",
+        event: { type: "content_block_stop", index: 0 },
+      },
+    ], ctx, { cancelRequested: false });
+
+    const call = events.find((event) => event.type === "tool_call");
+    expect(call).toBeDefined();
+    expect(call).toMatchObject({
+      type: "tool_call",
+      tool: "mcp__chrona__chrona_plan_generate",
+      callId: "toolu_plan",
+      input: {
+        title: "Generated",
+        goal: "Persist",
+        nodes: [],
+        edges: [],
+      },
+      status: "pending",
+    });
   });
 });
 

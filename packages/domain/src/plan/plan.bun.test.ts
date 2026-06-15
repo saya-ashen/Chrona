@@ -208,20 +208,18 @@ describe("validateEditablePlan", () => {
     ).toBe(true);
   });
 
-  it("8. warns about high-risk task without checkpoint", () => {
+  it("8. does not warn from text-only action heuristics", () => {
     const plan = makePlan(
       "plan_1",
       [makeTask("send_email", { title: "Send email to vendor" })],
       [],
     );
     const result = validateEditablePlan(plan);
-    expect(result.ok).toBe(true); // Warning, not error
-    expect(result.warnings.some((w) => w.message.includes("High-risk"))).toBe(
-      true,
-    );
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([]);
   });
 
-  it("9. accepts high-risk task with preceding checkpoint", () => {
+  it("9. accepts checkpointed action plans without advisory text heuristics", () => {
     const plan = makePlan(
       "plan_1",
       [
@@ -235,7 +233,7 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(true);
-    expect(result.warnings).toHaveLength(0);
+    expect(result.warnings).toEqual([]);
   });
 
   it("10. accepts valid snake_case ids with numbers and underscores", () => {
@@ -588,7 +586,7 @@ describe("compileEditablePlan", () => {
     expect(compiled.completionPolicy).toEqual({ type: "all_tasks_completed" });
   });
 
-  it("29. carries forward validation warnings", () => {
+  it("29. compiles without text-only validation warnings", () => {
     const plan = makePlan(
       "plan_warn",
       [makeTask("send_email", { title: "Send email" })],
@@ -597,10 +595,7 @@ describe("compileEditablePlan", () => {
 
     const compiled = compileEditablePlan(plan);
 
-    // Warning about high-risk task
-    expect(
-      compiled.validationWarnings.some((w) => w.message.includes("High-risk")),
-    ).toBe(true);
+    expect(compiled.validationWarnings).toEqual([]);
   });
 
   it("30. refuses to compile invalid plan", () => {

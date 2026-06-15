@@ -230,6 +230,14 @@ export const startRunInputSchema = z
     structuredOutputSchema: providerStructuredOutputSchemaSchema.optional(),
     terminalToolName: z.string().min(1).optional(),
     previousResponseId: z.string().min(1).optional(),
+    /**
+     * Provider-native session id captured from a PRIOR run for this Chrona
+     * session (e.g. Claude Code SDK `message.session_id`). Lets a fresh
+     * process resume the same provider conversation: the in-process runner
+     * cache is empty after restart, so the engine threads the persisted id
+     * here and the runner uses it as the SDK `resume` target.
+     */
+    resumeSessionRef: z.string().min(1).optional(),
     maxOutputTokens: z.number().int().positive().optional(),
     timeoutMs: z.number().int().positive().optional(),
     stream: z.boolean().optional(),

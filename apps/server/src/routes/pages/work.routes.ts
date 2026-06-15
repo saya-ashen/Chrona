@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { createLogger } from "@chrona/logging";
+
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { randomUUID } from "node:crypto";
@@ -9,6 +11,8 @@ import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
 import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "../tasks/runtime-event-summary";
+
+const logger = createLogger("apps.server.work");
 
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
 const WORKSPACE_SSE_HEARTBEAT_INTERVAL_MS = 5000;
@@ -554,9 +558,9 @@ export function createWorkRoutes(engine: ChronaEngine) {
             try {
               await write();
             } catch (cause) {
-              console.warn("[work-sse] write failed", {
+              logger.warn("work_sse.write_failed", {
                 taskId,
-                error: cause instanceof Error ? cause.message : String(cause),
+                error: cause,
               });
               throw cause;
             }

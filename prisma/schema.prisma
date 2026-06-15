@@ -417,6 +417,7 @@ model TaskSession {
   lastRunStatus      String?
   activeRunId        String?
   lastRunRef         String?
+  providerSessionRef String?
   createdByFramework Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

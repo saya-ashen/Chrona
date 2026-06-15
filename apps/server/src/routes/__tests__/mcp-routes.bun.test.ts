@@ -117,9 +117,9 @@ async function postRpc(body: unknown, rejected = false) {
   });
 }
 
-async function postRpcWithOperations(body: unknown) {
+async function postRpcWithOperations(body: unknown, path = "/api/mcp") {
   const operations: CapturedToolOperation[] = [];
-  const response = await app(false, operations).request("/api/mcp", {
+  const response = await app(false, operations).request(path, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -364,6 +364,26 @@ describe("MCP routes", () => {
     expect(JSON.stringify(body.result.structuredContent)).not.toContain("idempotencyKey");
   });
 
+  it("uses session_id from MCP URL when tool payload omits sessionId", async () => {
+    const { response, operations } = await postRpcWithOperations(
+      rpc("tools/call", {
+        name: "chrona_node_output",
+        arguments: { outputs: [nodeOutputSpec], mode: "replace" },
+      }),
+      "/api/mcp?session_id=chrona%3Atask%3Atask-1%3Aexecute%3Aurl",
+    );
+
+    expect(response.status).toBe(200);
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toMatchObject({
+      toolName: "chrona.node.output",
+      input: expect.objectContaining({
+        sessionId: "chrona:task:task-1:execute:url",
+        taskId: "task-from-session",
+      }),
+    });
+  });
+
   it("fails fast when mutating Chrona tools are called without sessionId", async () => {
     const response = await postRpc(
       rpc("tools/call", {
@@ -590,8 +610,8 @@ describe("MCP routes", () => {
 
   it("exposes plan generation validation issues to the model", async () => {
     const issue = {
-      path: "nodes.task_inspect_unscheduled_cards",
-      message: "High-risk task must be directly preceded by approve/confirm checkpoint",
+      path: "edges.0.to",
+      message: "Unknown target node 'missing_target'",
     };
     const response = await postRpcWithResult(
       rpc("tools/call", {
@@ -600,7 +620,7 @@ describe("MCP routes", () => {
           title: "Invalid plan",
           goal: "Expose validation issues",
           nodes: [{ id: "task_inspect_unscheduled_cards", type: "task", title: "Inspect unscheduled cards" }],
-          edges: [],
+          edges: [{ from: "task_inspect_unscheduled_cards", to: "missing_target" }],
         },
         _meta: { sessionId: "chrona:task:task-1:plan-generation" },
       }),

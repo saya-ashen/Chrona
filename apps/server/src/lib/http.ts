@@ -1,6 +1,9 @@
 import type { Context } from "hono";
 import { ENGINE_ERROR_CODES, EngineError } from "@chrona/engine";
 import { getApiMessages } from "@chrona/i18n";
+import { createLogger } from "@chrona/logging";
+
+const logger = createLogger("apps.server.http");
 
 export function json<T>(c: Context, payload: T, status: number = 200) {
   return c.json(payload, status as never);
@@ -16,7 +19,7 @@ export function internalServerError(
   cause: unknown,
   fallback: string,
 ) {
-  console.error(`${route} error:`, cause);
+  logger.error("route.internal_error", { route, error: cause });
   return error(c, fallback, 500);
 }
 

@@ -21,7 +21,13 @@ export interface ClaudeCodeProviderConfig {
   timeoutMs?: number;
   /** Chrona /api/mcp base URL. Defaults to the hosting server. */
   mcpBaseUrl: string;
-  /** Anthropic API key (recommended for production; subscription quota may otherwise apply). */
+  /**
+   * Static Bearer token presented to the MCP server at `/api/mcp`. MUST
+   * equal the server's `API_KEY` (or be supplied via the
+   * `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars). Required
+   * unless the MCP transport is disabled (skill mode only).
+   */
+  mcpRunToken: string;
   apiKey?: string;
   /** Pass-through env for the Claude Code subprocess / SDK call. */
   env?: Record<string, string>;

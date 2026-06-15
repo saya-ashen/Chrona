@@ -10,8 +10,6 @@ import type {
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
 const VALID_NODE_TYPES = new Set(["task", "checkpoint", "condition", "wait"]);
 
-const HIGH_RISK_PATTERN = /\b(send|email|message|calendar|schedule|book|pay|purchase|delete|remove|cancel|modify|update|submit|post|publish)\b/i;
-
 function isDag(nodeIds: string[], edges: Array<{ from: string; to: string }>): boolean {
   const indegree = new Map(nodeIds.map((id) => [id, 0]));
   const outgoing = new Map(nodeIds.map((id) => [id, [] as string[]]));
@@ -147,41 +145,6 @@ export function validateEditablePlan(plan: EditablePlan): ValidationResult {
         path: "edges",
         message: "Plan graph must be a DAG (no cycles allowed)",
       });
-    }
-  }
-
-  // 6. High-risk task warning (not error)
-  if (errors.length === 0) {
-    const incoming = new Map<string, string[]>();
-    for (const edge of plan.edges) {
-      if (!incoming.has(edge.to)) incoming.set(edge.to, []);
-      incoming.get(edge.to)!.push(edge.from);
-    }
-
-    const nodeMap = new Map(plan.nodes.map((n) => [n.id, n]));
-
-    for (const node of plan.nodes) {
-      if (node.type !== "task") continue;
-      const haystack = [node.title, node.expectedOutput, node.completionCriteria]
-        .filter(Boolean)
-        .join(" ");
-      if (!HIGH_RISK_PATTERN.test(haystack)) continue;
-
-      const predecessors = incoming.get(node.id) ?? [];
-      const hasGate = predecessors.some((candidateId) => {
-        const candidate = nodeMap.get(candidateId);
-        return (
-          candidate?.type === "checkpoint" &&
-          (candidate.checkpointType === "approve" || candidate.checkpointType === "confirm")
-        );
-      });
-
-      if (!hasGate) {
-        warnings.push({
-          path: `nodes.${node.id}`,
-          message: `High-risk task '${node.id}' should be preceded by an approve/confirm checkpoint`,
-        });
-      }
     }
   }
 

@@ -10,7 +10,7 @@ import {
   hasSpaDist,
   isSpaAssetPath,
 } from "./static/spa";
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
 import { readEnv, resolveAllowedOrigins } from "./config/env";
 

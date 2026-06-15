@@ -70,6 +70,15 @@ export interface ClaudeCodeClientConfig {
   timeoutMs?: number;
   /** Chrona /api/mcp base URL. Defaults to the hosting Chrona server. */
   mcpBaseUrl?: string;
+  /**
+   * Static Bearer token presented to the MCP server at `/api/mcp`. The MCP
+   * server sits behind the same `apiKeyAuth()` middleware as every other
+   * `/api/*` route, so this MUST equal the server's `API_KEY` (or be
+   * supplied via `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars).
+   * Skill mode is unaffected — the skill path uses a separate per-run
+   * token injected at `start()` time via `input.control.runToken`.
+   */
+  mcpRunToken?: string;
   /** Control transport for node execution. Defaults to "mcp". Skill mode is supported for claude_code only. */
   controlPlane?: ControlPlaneMode;
   /** Anthropic API key (recommended for production; subscription quota may otherwise apply). */
