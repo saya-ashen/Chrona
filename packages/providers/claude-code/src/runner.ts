@@ -3,7 +3,6 @@
  *
  * Sole place that touches:
  *   - the `@anthropic-ai/claude-agent-sdk` package
- *   - the spawned `claude -p` subprocess (CLI fallback)
  *   - the per-run filesystem / MCP config / replay tape
  *
  * Everything above this file (ClaudeCodeProviderClient, normalizers) works
@@ -12,17 +11,18 @@
  *
  * Backends:
  *   - "sdk"    : drives the local `claude` binary via the Agent SDK (`query()`).
- *                Default. Cancel via `Query.interrupt()`.
- *   - "cli"    : spawns `claude -p` directly with `--mcp-config` +
- *                `--strict-mcp-config`. Fallback when the SDK package is
- *                not installed or fails to load.
+ *                The only real-driver backend. Cancel via `Query.interrupt()`.
  *   - "replay" : CI / unit-test only. Replays a recorded NDJSON tape.
+ *
+ * The SDK package is a hard dependency: `createClaudeCodeRunner` requires it
+ * to load. There is no `claude -p` subprocess fallback — if the SDK cannot be
+ * imported the run fails loudly rather than silently degrading to an
+ * untested code path.
  *
  * Spec: specs/017-provider-claude-code/spec.md
  * Plan:  specs/017-provider-claude-code/plan.md §0.1, §0.5
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -51,22 +51,18 @@ import {
   renderPrompt,
   snapshotFromRef,
   stripTrailingSlash,
-  writeMcpConfigFile,
-  writeSkillSettingsFile,
 } from "./runner-helpers";
 import { ClaudeCodeProviderError } from "./types";
 
-/** How the runner connects to Claude Code. */
-export type RunnerBackend = "sdk" | "cli" | "replay";
-
 export interface ClaudeCodeRunnerConfig {
-  /** SDK / CLI mode. Ignored in `createReplayRunner`. */
-  backend?: Exclude<RunnerBackend, "replay">;
-  /** Override the `claude` CLI path (CLI mode only). Default: "claude". */
+  /**
+   * Path to the `claude` executable handed to the SDK
+   * (`pathToClaudeCodeExecutable`). Default: the SDK's built-in executable.
+   */
   binaryPath?: string;
   /** Default "claude-opus-4-8". */
   model?: string;
-  /** Total run timeout (ms). SDK uses as overall bound; CLI uses as SIGKILL fallback. */
+  /** Total run timeout (ms). Overall bound on the SDK run. */
   timeoutMs?: number;
   /** Chrona /api/mcp base URL. */
   mcpBaseUrl: string;
@@ -101,18 +97,6 @@ interface SdkHandle {
   cancelRequested: boolean;
 }
 
-interface CliHandle {
-  kind: "cli";
-  child: ChildProcess;
-  /** NDJSON line buffer (one line at a time). */
-  lineBuf: string;
-  cancelRequested: boolean;
-  /** Resolver for the next event (used by `stream()` to push via promise queue). */
-  pending: {
-    resolve: (event: ProviderRunEvent | null) => void;
-  } | null;
-}
-
 interface ReplayHandle {
   kind: "replay";
   records: readonly ProviderReplayRecord[];
@@ -123,7 +107,7 @@ interface ReplayHandle {
 export type ClaudeCodeRunHandle = {
   runId: string;
   ref: ProviderRunRef;
-  internal: SdkHandle | CliHandle | ReplayHandle;
+  internal: SdkHandle | ReplayHandle;
   normalizer: NormalizerContext;
   /** Optional path of the NDJSON tape we are writing to (real-driver record mode). */
   recordPath?: string;
@@ -153,17 +137,14 @@ const SDK_IMPORT_NAME = "@anthropic-ai/claude-agent-sdk";
 /* -------------------------------------------------------------------------- */
 
 /**
- * Create a real-driver runner. Tries to load the SDK at construction time;
- * if that fails, falls back to CLI mode automatically. Callers can force a
- * specific backend via `config.backend`.
+ * Create a real-driver runner. Loads the `@anthropic-ai/claude-agent-sdk`
+ * package and drives the local `claude` binary through it. The SDK is a
+ * hard dependency — `init()` throws if it cannot be imported (no CLI
+ * subprocess fallback).
  */
 export async function createClaudeCodeRunner(
   cfg: ClaudeCodeRunnerConfig,
 ): Promise<ClaudeCodeRunner> {
-  const backend = await resolveBackend(cfg);
-  if (backend === "cli") {
-    return new CliRunner(cfg).init();
-  }
   return new SdkRunner(cfg).init();
 }
 
@@ -178,22 +159,9 @@ export function createReplayRunner(tapePath: string): ClaudeCodeRunner {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               Backend resolution                            */
+/*                           Chrona self-path resolution                       */
 /* -------------------------------------------------------------------------- */
 
-async function resolveBackend(
-  cfg: ClaudeCodeRunnerConfig,
-): Promise<Exclude<RunnerBackend, "replay">> {
-  if (cfg.backend) return cfg.backend;
-  try {
-    await import(/* @vite-ignore */ SDK_IMPORT_NAME);
-    return "sdk";
-  } catch (err) {
-    // SDK package not present or failed to load — fall back to CLI.
-    void err;
-    return "cli";
-  }
-}
 /**
  * Resolve the absolute path to the Chrona CLI binary that owns the
  * current process tree. In the production flow, `chrona` is the entry
@@ -338,181 +306,24 @@ class ReplayRunner implements ClaudeCodeRunner {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 CLI runner                                  */
-/* -------------------------------------------------------------------------- */
-
-class CliRunner implements ClaudeCodeRunner {
-  private readonly cfg: ClaudeCodeRunnerConfig;
-  constructor(cfg: ClaudeCodeRunnerConfig) {
-    this.cfg = cfg;
-  }
-  async init(): Promise<this> {
-    return this;
-  }
-
-  async start(input: StartRunInput): Promise<{ handle: ClaudeCodeRunHandle }> {
-    const cfg = this.cfg;
-    const model = cfg.model ?? DEFAULT_MODEL;
-    const timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    const args = [
-      "-p",
-      "--output-format",
-      "stream-json",
-      "--verbose",
-      "--include-partial-messages",
-      "--model",
-      model,
-      "--permission-mode",
-      "bypassPermissions",
-    ];
-    let skillRoot: string | undefined;
-    if (cfg.controlPlane === "skill") {
-      skillRoot = await mountChronaNodeSkill(cfg, input.control?.skillsDir);
-      const settingsPath = await writeSkillSettingsFile(cfg, input.control?.skillName ?? "chrona-node");
-      args.push("--add-dir", skillRoot, "--settings", settingsPath, "--allowedTools", "Bash");
-    } else {
-      const mcpConfigPath = await writeMcpConfigFile(cfg);
-      args.push(
-        "--mcp-config",
-        mcpConfigPath,
-        "--strict-mcp-config",
-        "--allowedTools",
-        "mcp__chrona__*",
-      );
-    }
-    const prompt = renderPrompt(input);
-    if (prompt) args.push(prompt);
-
-    const child = spawn(cfg.binaryPath ?? "claude", args, {
-      cwd: cfg.cwd ?? process.cwd(),
-      env: skillEnv(cfg, input, skillRoot),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const runId = `claude-cli-${crypto.randomUUID()}`;
-    const ref: ProviderRunRef = {
-      provider: "claude_code",
-      runId,
-      nativeRunId: runId,
-      providerRunId: runId,
-      sessionId: runId,
-      status: "running",
-      startedAt: new Date().toISOString(),
-      stream: { supported: true, reconnectable: false },
-    };
-    const handle: ClaudeCodeRunHandle = {
-      runId,
-      ref,
-      internal: {
-        kind: "cli",
-        child,
-        lineBuf: "",
-        cancelRequested: false,
-        pending: null,
-      },
-      normalizer: createNormalizerContext(),
-      externalSignal: input.signal,
-    };
-
-    // Wall-clock timeout + external signal
-    installCliLifecycle(child, handle, timeoutMs, input.signal);
-
-    // Replay start record
-    if (cfg.recordDir) {
-      const path = replayPathForRun(cfg.recordDir, runId);
-      handle.recordPath = path;
-      const startRec: ProviderReplayStartRecord = providerReplayRecord(
-        "claude_code",
-        ref,
-        input,
-      );
-      await appendProviderReplayRecord(path, startRec);
-    }
-
-    return { handle };
-  }
-
-  async next(handle: ClaudeCodeRunHandle): Promise<ProviderRunEvent | null> {
-    if (handle.internal.kind !== "cli") {
-      throw new ClaudeCodeProviderError("CliRunner.next: bad handle kind", {
-        retryable: false,
-      });
-    }
-    const cli = handle.internal;
-    if (cli.child.exitCode !== null) {
-      // Process already exited; drain any remaining buffered partial line.
-      if (cli.lineBuf.trim().length > 0) {
-        const last = cli.lineBuf;
-        cli.lineBuf = "";
-        return normalizeCliLine(last, handle, cli.cancelRequested);
-      }
-      return null;
-    }
-    return new Promise<ProviderRunEvent | null>((resolve) => {
-      cli.pending = { resolve };
-    });
-  }
-
-  async snapshot(handle: ClaudeCodeRunHandle): Promise<ProviderRunSnapshot> {
-    if (handle.internal.kind !== "cli") {
-      throw new ClaudeCodeProviderError("CliRunner.snapshot: bad handle kind", {
-        retryable: false,
-      });
-    }
-    const cli = handle.internal;
-    const status: ProviderRunSnapshot["status"] = cli.child.exitCode === null
-      ? cli.cancelRequested
-        ? "cancelled"
-        : "running"
-      : "completed";
-    return {
-      provider: "claude_code",
-      runId: handle.runId,
-      nativeRunId: handle.ref.nativeRunId,
-      providerRunId: handle.ref.providerRunId,
-      sessionId: handle.ref.sessionId,
-      status,
-    };
-  }
-
-  async cancel(handle: ClaudeCodeRunHandle): Promise<void> {
-    if (handle.internal.kind !== "cli") {
-      throw new ClaudeCodeProviderError("CliRunner.cancel: bad handle kind", {
-        retryable: false,
-      });
-    }
-    handle.internal.cancelRequested = true;
-    handle.internal.child.kill("SIGTERM");
-  }
-
-  async dispose(handle: ClaudeCodeRunHandle): Promise<void> {
-    if (handle.internal.kind !== "cli") return;
-    if (handle.internal.child.exitCode === null) {
-      handle.internal.child.kill("SIGTERM");
-    }
-  }
-}
-
-function normalizeCliLine(
-  line: string,
-  handle: ClaudeCodeRunHandle,
-  cancelRequested: boolean,
-): ProviderRunEvent | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(line);
-  } catch {
-    return null; // skip malformed lines; record is best-effort
-  }
-  const events = mapClaudeCodeStreamItems([parsed], handle.normalizer, {
-    cancelRequested,
-    strictUnknownEvents: handle.normalizer.strictUnknownEvents,
-  } satisfies NormalizerOptions);
-  return events[0] ?? null;
-}
-
-/* -------------------------------------------------------------------------- */
 /*                                  SDK runner                                 */
 /* -------------------------------------------------------------------------- */
+
+/** SDK option fragment that pins the `claude` executable, when overridden. */
+function binaryOption(
+  cfg: ClaudeCodeRunnerConfig,
+): { pathToClaudeCodeExecutable?: string } {
+  return cfg.binaryPath ? { pathToClaudeCodeExecutable: cfg.binaryPath } : {};
+}
+
+/**
+ * Wall-clock bound on the run: abort the SDK query if it overruns. The timer
+ * is unref'd so it never keeps the process alive, and aborting an already-
+ * finished query is a harmless no-op.
+ */
+function armRunTimeout(abortController: AbortController, timeoutMs: number): void {
+  setTimeout(() => abortController.abort(), timeoutMs).unref();
+}
 
 class SdkRunner implements ClaudeCodeRunner {
   private readonly cfg: ClaudeCodeRunnerConfig;
@@ -557,8 +368,13 @@ class SdkRunner implements ClaudeCodeRunner {
       abortController,
       cwd: cfg.cwd,
       env: skillEnv(cfg, input, skillRoot),
+      // Honor an explicit binary override; otherwise the SDK uses its
+      // built-in `claude` executable.
+      ...binaryOption(cfg),
       ...skillOptions,
     } as Parameters<typeof sdk.query>[0]["options"];
+
+    armRunTimeout(abortController, cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const queryObj = sdk.query({
       prompt: renderPrompt(input) ?? "",
       options,
@@ -658,33 +474,6 @@ class SdkRunner implements ClaudeCodeRunner {
 /* -------------------------------------------------------------------------- */
 /*                              Replay snapshot helpers                       */
 /* -------------------------------------------------------------------------- */
-
-function installCliLifecycle(
-  child: ChildProcess,
-  handle: ClaudeCodeRunHandle,
-  timeoutMs: number,
-  externalSignal: AbortSignal | undefined,
-): void {
-  const killTimer = setTimeout(() => {
-    if (handle.internal.kind === "cli" && !handle.internal.cancelRequested) {
-      handle.internal.cancelRequested = true;
-      child.kill("SIGTERM");
-      setTimeout(() => child.killed || child.kill("SIGKILL"), 5000).unref();
-    }
-  }, timeoutMs);
-  child.once("exit", () => clearTimeout(killTimer));
-
-  if (externalSignal) {
-    const onAbort = () => {
-      if (handle.internal.kind === "cli") {
-        handle.internal.cancelRequested = true;
-        child.kill("SIGTERM");
-      }
-    };
-    if (externalSignal.aborted) onAbort();
-    else externalSignal.addEventListener("abort", onAbort, { once: true });
-  }
-}
 
 function snapshotFromReplayRecords(
   handle: ClaudeCodeRunHandle,

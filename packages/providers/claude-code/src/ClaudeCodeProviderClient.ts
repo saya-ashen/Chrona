@@ -173,13 +173,73 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
     const runner = await this.ensureRunner();
     const handle = await this.resolveStreamHandle(runner, input);
-    for await (const event of this.iterateRunEvents(runner, handle)) {
-      yield event;
-      if (this.isTerminalEvent(event)) {
-        await this.recordFinalSnapshot(handle, event);
+    try {
+      for await (const event of this.iterateRunEvents(runner, handle)) {
+        yield event;
+        if (this.isTerminalEvent(event)) {
+          await this.recordFinalSnapshot(handle, event);
+          return;
+        }
+      }
+      // The runner's iterator ended without a terminal event. If the run
+      // was cancelled (SdkRunner sets the internal `cancelRequested` flag
+      // and the SDK's `Query.interrupt()` closes the generator without
+      // emitting a result message), surface a synthetic `run_cancelled`
+      // so callers can rely on a terminal event in the stream.
+      const postSnap = await runner.snapshot(handle);
+      if (postSnap.status === "cancelled") {
+        const cancelledEvent: ProviderRunEvent = {
+          type: "run_cancelled",
+          run: this.snapshotAsRef(postSnap, handle),
+        };
+        yield cancelledEvent;
+        await this.recordFinalSnapshot(handle, cancelledEvent);
         return;
       }
+      if (postSnap.status === "failed") {
+        const failedEvent: ProviderRunEvent = {
+          type: "run_failed",
+          run: this.snapshotAsRef(postSnap, handle),
+          error: postSnap.error ?? "run ended without a terminal event",
+        };
+        yield failedEvent;
+        await this.recordFinalSnapshot(handle, failedEvent);
+        return;
+      }
+    } catch (err) {
+      // The SDK runner surfaces LLM errors (4xx, network, JSON parse) as
+      // thrown exceptions rather than `result` messages. Map them to a
+      // `run_failed` event so callers always see a terminal — matches the
+      // spec 017 §5 contract ("Map terminal events to run_completed /
+      // run_failed / run_cancelled") and lets the engine show the error
+      // in the Inbox without a separate `getRun` poll.
+      const message = errorMessage(err);
+      const snap = await runner.snapshot(handle).catch(() => null);
+      const failedEvent: ProviderRunEvent = {
+        type: "run_failed",
+        run: snap ? this.snapshotAsRef(snap, handle) : handle.ref,
+        error: message,
+      };
+      yield failedEvent;
+      await this.recordFinalSnapshot(handle, failedEvent);
+      return;
     }
+  }
+
+  /**
+   * Narrow a `ProviderRunSnapshot` (the full post-run state) down to the
+   * `ProviderRunRef` shape expected by terminal event schemas (`run_cancelled`,
+   * `run_failed`). Both shapes share the same identifier fields, so this is
+   * a structural cast that throws away `outputText` / `usage` etc.
+   */
+  private snapshotAsRef(
+    snap: ProviderRunSnapshot,
+    handle: ClaudeCodeRunHandle,
+  ): ProviderRunRef {
+    return {
+      ...handle.ref,
+      status: snap.status === "running" ? "running" : snap.status,
+    };
   }
 
   private async resolveStreamHandle(

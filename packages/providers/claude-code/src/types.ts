@@ -10,11 +10,14 @@ import type { ControlPlaneMode } from "@chrona/contracts";
 
 /** Constructed from `ClaudeCodeClientConfig` plus runner env state. */
 export interface ClaudeCodeProviderConfig {
-  /** Override the `claude` CLI path (CLI fallback only). Default: "claude". */
+  /**
+   * Path to the `claude` executable handed to the SDK
+   * (`pathToClaudeCodeExecutable`). Default: the SDK's built-in executable.
+   */
   binaryPath?: string;
   /** Default "claude-opus-4-8". */
   model?: string;
-  /** Total run timeout. SDK uses as overall bound; CLI uses as SIGKILL fallback. */
+  /** Total run timeout (ms). Overall wall-clock bound on the SDK run. */
   timeoutMs?: number;
   /** Chrona /api/mcp base URL. Defaults to the hosting server. */
   mcpBaseUrl: string;
@@ -44,7 +47,7 @@ export interface ClaudeCodeProviderConfig {
   skillDir?: string;
 }
 
-export type ClaudeCodeRunnerMode = "sdk" | "cli" | "replay";
+export type ClaudeCodeRunnerMode = "sdk" | "replay";
 
 /** Error category for `ClaudeCodeProviderClient`. Thrown only when retryable. */
 export class ClaudeCodeProviderError extends Error {

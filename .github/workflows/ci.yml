@@ -23,6 +23,13 @@ jobs:
       - name: Setup Bun
         run: npm install --global bun@1.3.11
 
+      # Live Claude Code provider tests spawn the real `claude` binary (with a
+      # mocked LLM). Installing it here makes those tests run deterministically
+      # instead of silently skipping; the in-suite CI guard fails the run if
+      # this step is ever removed or the binary goes missing.
+      - name: Install Claude Code CLI
+        run: npm install --global @anthropic-ai/claude-code
+
       - run: bun install --frozen-lockfile
 
       - run: bunx prisma generate

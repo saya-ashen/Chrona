@@ -159,9 +159,13 @@ describe("ClaudeCodeProviderClient — tool round-trip", () => {
 });
 
 describe("ClaudeCodeProviderClient — cancel + error paths", () => {
-  test("cancel-mid-run: streamRun honors the recorded snapshot status", async () => {
+  test("cancel-mid-run: streamRun synthesizes a run_cancelled from the post-snapshot", async () => {
+    // The replay tape records `text_delta` then a final `snapshot` with
+    // `status: "cancelled"` (no `run_cancelled` terminal event in the
+    // stream). Per the spec 017 §5 contract, the provider MUST emit a
+    // terminal event so callers can rely on it; we synthesize one from
+    // the post-snapshot rather than silently returning.
     const client = makeClient("cancel-mid-run");
-    // Drain a partial stream — the replay runner yields the events then null.
     const events = await collect(
       client.streamRun({
         sessionId: "chrona-session-fixture-cancel",
@@ -170,11 +174,13 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
       }),
     );
     const types = events.map((e) => e.type);
-    expect(types).toEqual(["run_started", "text_delta"]);
-    // No terminal in the tape → generator stops on the null sentinel.
-    expect(types.includes("run_completed")).toBe(false);
-    expect(types.includes("run_failed")).toBe(false);
-    expect(types.includes("run_cancelled")).toBe(false);
+    // The synthesized terminal lands at the end; the recorded text_delta
+    // surfaces before it.
+    expect(types).toEqual([
+      "run_started",
+      "text_delta",
+      "run_cancelled",
+    ]);
   });
 
   test("cancelRun: marks the handle cancelled and snapshot reflects it", async () => {

@@ -3,11 +3,11 @@
  *
  * Pulled out of the main runner file to keep each module under the lint
  * `max-lines` cap (500 lines). All helpers here are side-effect-free
- * (except `writeMcpConfigFile`, which only writes a per-run JSON file
- * to disk and returns the path).
+ * (except `mountChronaNodeSkill`, which copies the bundled skill into a
+ * per-run directory and returns its path).
  */
 
-import { cp, mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,34 +60,6 @@ export async function mountChronaNodeSkill(cfg: ClaudeCodeRunnerConfig, source =
   await mkdir(target, { recursive: true });
   await cp(source ?? CHRONA_NODE_SKILL_SOURCE, target, { recursive: true, force: true });
   return dir;
-}
-
-export async function writeSkillSettingsFile(cfg: ClaudeCodeRunnerConfig, skillName: string): Promise<string> {
-  const dir = cfg.recordDir ?? join(process.cwd(), ".claude-code-mcp");
-  await mkdir(dir, { recursive: true });
-  const path = join(dir, `settings-${crypto.randomUUID()}.json`);
-  await writeFile(path, JSON.stringify({ skills: [skillName] }, null, 2), "utf8");
-  return path;
-}
-export async function writeMcpConfigFile(cfg: ClaudeCodeRunnerConfig): Promise<string> {
-  const dir = cfg.recordDir ?? join(process.cwd(), ".claude-code-mcp");
-  await mkdir(dir, { recursive: true });
-  const path = join(dir, `mcp-${crypto.randomUUID()}.json`);
-  const content = JSON.stringify(
-    {
-      mcpServers: {
-        chrona: {
-          type: "http",
-          url: `${stripTrailingSlash(cfg.mcpBaseUrl)}/api/mcp`,
-          headers: { Authorization: `Bearer ${cfg.mcpRunToken}` },
-        },
-      },
-    },
-    null,
-    2,
-  );
-  await writeFile(path, content, "utf8");
-  return path;
 }
 
 export function snapshotFromRef(
