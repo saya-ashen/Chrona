@@ -29,7 +29,7 @@ import {
 /* -------------------------------------------------------------------------- */
 
 export interface NormalizerOptions {
-  /** When true, `result/subtype:"error_during_execution"` maps to `run_cancelled`. */
+  /** When true, any non-success `result` terminal maps to `run_cancelled` instead of `run_failed`. */
   cancelRequested: boolean;
   /** When true, throw on unrecognized stream `type` instead of mapping to `raw_event`. */
   strictUnknownEvents?: boolean;
@@ -280,7 +280,14 @@ function pushResult(
     );
     return;
   }
-  if (subtype === "error_during_execution" && options.cancelRequested) {
+  // Cancel wins: once the caller has requested cancellation, the SDK's
+  // post-interrupt `result` message can carry any non-success subtype
+  // (`error_during_execution`, `error`, an abort-induced code, …). Treating
+  // a user-initiated cancel as a failure surfaces a misleading "failed"
+  // badge, so any non-success terminal after a cancel maps to run_cancelled.
+  // This aligns the event stream with `snapshot()`, which already reports
+  // "cancelled" whenever `cancelRequested` is set.
+  if (options.cancelRequested) {
     out.push(buildEvent(ctx, options, { type: "run_cancelled", run: ref }));
     return;
   }

@@ -43,10 +43,12 @@ import {
 const HAS_CLAUDE = claudeBinaryAvailable();
 const TEST_TIMEOUT_MS = 90_000;
 
-// Fail-loud guard: on a dev machine without Claude Code the live suite is
-// allowed to skip, but in CI a missing binary means the live tests silently
-// vanished while the run still goes green — exactly the gap we want to close.
-// This test never skips, so a misconfigured CI image turns the run red.
+// Fail-loud guard: the `claude` binary ships inside the
+// `@anthropic-ai/claude-agent-sdk` platform package, so a correctly-installed
+// repo always has it (no external CLI install required). In CI a missing
+// binary therefore means a broken dependency install — the live tests would
+// silently vanish while the run still goes green. This test never skips, so
+// that turns the run red instead.
 describe("live suite CI guard", () => {
   test("the `claude` binary is available when running in CI", () => {
     if (process.env.CI) {
@@ -55,7 +57,8 @@ describe("live suite CI guard", () => {
   });
 });
 
-// `describe.skipIf` keeps the file green on machines without Claude Code.
+// `describe.skipIf` keeps the file green on the rare machine with no
+// SDK-bundled binary and no `claude` on PATH.
 describe.skipIf(!HAS_CLAUDE)(
   // eslint-disable-next-line max-lines-per-function -- test file; outer arrow aggregates 3 sub-describes.
   () => {

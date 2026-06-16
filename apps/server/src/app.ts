@@ -125,13 +125,24 @@ export async function createServerApp() {
   });
 
   app.onError((error, c) => {
+    const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
+
+    // A malformed JSON request body surfaces as a SyntaxError thrown by
+    // `c.req.json()`. That is a client mistake (400), not a server fault
+    // (500) — mapping it here keeps a bad payload from masquerading as an
+    // outage and from polluting error logs at the `error` level.
+    if (error instanceof SyntaxError) {
+      log.warn("malformed request body", { error: error.message });
+      return c.json({ error: messages.malformedJson }, 400);
+    }
+
     log.error("unhandled error", {
       error: error instanceof Error ? error.message : String(error),
     });
 
     return c.json(
       {
-        error: getApiMessages(getPreferredLocale(c.req.header("accept-language"))).internalServerError,
+        error: messages.internalServerError,
       },
       500,
     );

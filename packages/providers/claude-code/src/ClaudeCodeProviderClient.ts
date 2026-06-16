@@ -34,6 +34,7 @@ import {
   type ClaudeCodeRunner,
   type ClaudeCodeRunnerConfig,
 } from "./runner";
+import { resolveClaudeBinary } from "./claude-binary";
 import { ClaudeCodeProviderError } from "./types";
 
 export interface ClaudeCodeProviderOptions {
@@ -236,14 +237,26 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         return;
       }
     } catch (err) {
-      // The SDK runner surfaces LLM errors (4xx, network, JSON parse) as
-      // thrown exceptions rather than `result` messages. Map them to a
-      // `run_failed` event so callers always see a terminal — matches the
-      // spec 017 §5 contract ("Map terminal events to run_completed /
-      // run_failed / run_cancelled") and lets the engine show the error
+      // The SDK runner surfaces errors as thrown exceptions rather than
+      // `result` messages. `Query.interrupt()` (our cancel path) typically
+      // makes the generator throw an abort error — so a thrown exception
+      // after a cancel is a cancellation, not a failure. Check the snapshot
+      // first: SdkRunner reports "cancelled" once `cancelRequested` is set.
+      const snap = await runner.snapshot(handle).catch(() => null);
+      if (snap?.status === "cancelled") {
+        const cancelledEvent: ProviderRunEvent = {
+          type: "run_cancelled",
+          run: this.snapshotAsRef(snap, handle),
+        };
+        yield cancelledEvent;
+        await this.recordFinalSnapshot(handle, cancelledEvent);
+        return;
+      }
+      // Otherwise it is a genuine LLM/runtime error (4xx, network, JSON
+      // parse). Map it to `run_failed` so callers always see a terminal —
+      // matches the spec 017 §5 contract and lets the engine show the error
       // in the Inbox without a separate `getRun` poll.
       const message = errorMessage(err);
-      const snap = await runner.snapshot(handle).catch(() => null);
       const failedEvent: ProviderRunEvent = {
         type: "run_failed",
         run: snap ? this.snapshotAsRef(snap, handle) : handle.ref,
@@ -405,17 +418,24 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
 
   /**
    * Cheap probe: if we own a runner, just construct it (which will fail if
-   * the SDK can't be loaded and the `claude` binary is missing for the CLI
-   * path; but `createClaudeCodeRunner` never throws on construction — only
-   * on first `start`). We additionally run a `version --help` probe via
-   * `claude --version` for CLI availability.
+   * the SDK can't be loaded; `createClaudeCodeRunner` never throws on
+   * construction — only on first `start`). We additionally run a
+   * `claude --version` probe for binary availability.
+   *
+   * The binary resolves to (in order): an explicit `config.binaryPath`, the
+   * `claude` executable bundled inside the `@anthropic-ai/claude-agent-sdk`
+   * platform package, or a `claude` on PATH. Chrona never requires a
+   * system-installed Claude Code CLI — the SDK ships the binary.
    *
    * Reason strings are actionable per the spec.
    */
   private async probe(): Promise<string | null> {
     if (this.opts.runner) return null; // user provided runner → trust it
     if (readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR")) return null; // record-only
-    const binary = this.opts.config.binaryPath ?? "claude";
+    const binary = this.opts.config.binaryPath ?? resolveClaudeBinary();
+    if (!binary) {
+      return "Claude Code binary not found: the @anthropic-ai/claude-agent-sdk platform package is missing and no 'claude' is on PATH. Reinstall dependencies or set config.binaryPath.";
+    }
     try {
       const proc = Bun.spawn([binary, "--version"], {
         stdout: "pipe",
@@ -423,11 +443,11 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       });
       const exit = await proc.exited;
       if (exit !== 0) {
-        return `Claude Code CLI exited with code ${exit}; ensure '${binary}' is installed and on PATH (https://docs.claude.com/en/docs/claude-code/setup).`;
+        return `Claude Code binary exited with code ${exit}; '${binary}' is not runnable.`;
       }
       return null;
     } catch (err) {
-      return `Claude Code CLI not found on PATH (binary='${binary}'): ${errorMessage(err)}. Install Claude Code or set config.binaryPath.`;
+      return `Claude Code binary failed to spawn (binary='${binary}'): ${errorMessage(err)}.`;
     }
   }
 

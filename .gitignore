@@ -18,6 +18,7 @@ node_modules/
 /test-results
 /artifacts/demo/playwright
 /playwright-report
+/agent-test-runs
 
 /out/
 
