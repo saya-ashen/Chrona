@@ -3,10 +3,9 @@ import React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { act, render, waitFor } from "@testing-library/react";
 
-import { hydrateSchedulePageData } from "@/components/schedule/schedule-page-utils";
 import { AppShell } from "../app-shell";
-import { LocaleLandingPage, ScheduleRoutePage } from "../pages";
-import type { AppBootData, ScheduleRouteData } from "../pages";
+import { LocaleLandingPage } from "../pages";
+import type { AppBootData } from "../pages";
 
 const bootData: AppBootData = {
   locale: "en",
@@ -37,46 +36,9 @@ const bootData: AppBootData = {
   defaultWorkspace: { id: "ws-1" } as AppBootData["defaultWorkspace"],
 };
 
-const scheduleRouteData: ScheduleRouteData = {
-  schedule: hydrateSchedulePageData(({
-    defaultExecutionRuntime: "hermes",
-    executionRuntimes: [],
-    summary: {
-      scheduledCount: 0,
-      unscheduledCount: 0,
-      proposalCount: 0,
-      riskCount: 0,
-    },
-    planningSummary: {
-      scheduledMinutes: 0,
-      runnableQueueCount: 0,
-      conflictCount: 0,
-      overloadedDayCount: 0,
-      proposalCount: 0,
-      riskCount: 0,
-      todayLoadMinutes: 0,
-      overdueCount: 0,
-      atRiskCount: 0,
-      readyToScheduleCount: 0,
-      autoRunnableCount: 0,
-      waitingOnUserCount: 0,
-      dueSoonUnscheduledCount: 0,
-      largestIdleWindowMinutes: 0,
-      overloadedMinutes: 0,
-    },
-    focusZones: [],
-    automationCandidates: [],
-    scheduled: [],
-    unscheduled: [],
-    proposals: [],
-    risks: [],
-    listItems: [],
-    workBlocks: [],
-  } as unknown as ScheduleRouteData["schedule"])) as unknown as ScheduleRouteData["schedule"],
-};
 
 describe("localized root index route", () => {
-  it("lets the child index route read the parent loader data", async () => {
+  it("navigates from /:lang to /:lang/dashboard", async () => {
     const router = createMemoryRouter(
       [
         {
@@ -85,7 +47,7 @@ describe("localized root index route", () => {
           element: <AppShell />,
           children: [
             { index: true, element: <LocaleLandingPage /> },
-            { path: "schedule", loader: async () => scheduleRouteData, element: <ScheduleRoutePage /> },
+            { path: "dashboard", element: <div>Dashboard</div> },
           ],
         },
       ],
@@ -95,7 +57,7 @@ describe("localized root index route", () => {
     const view = render(<RouterProvider router={router} />);
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/en/schedule");
+      expect(router.state.location.pathname).toBe("/en/dashboard");
     });
 
     await act(async () => {
