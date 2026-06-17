@@ -5,6 +5,7 @@ import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projec
 import { validateScheduleWindow } from "@chrona/domain";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { ensureWorkBlockTaskSession } from "@/modules/execution-runtime";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export async function applySchedule(input: {
   taskId: string;
@@ -60,7 +61,10 @@ export async function applySchedule(input: {
         orderBy: { createdAt: "desc" },
       });
       if (activeBlock) {
-        throw new Error("Cannot reschedule while a work block is active");
+        throw new EngineError(
+          ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+          "Cannot reschedule while a work block is active",
+        );
       }
     }
 

@@ -188,7 +188,7 @@ export class AiRuntimeInvoker {
         response.sessionId,
         "provider snapshot",
       );
-      const runtimeRunRef = response.nativeRunId ?? response.runId ?? null;
+      const runtimeRunRef = await uniqueRuntimeRunRef(run.id, response.nativeRunId ?? response.runId);
       const conversationEntryIds = await persistRuntimeHistory({
         runId: run.id,
         request,
@@ -475,15 +475,26 @@ async function persistRuntimeRunRef(
 ) {
   if (!runId) return;
   const runtimeSessionRef = requireRuntimeSessionId(run.sessionId, "provider run ref");
+  const runtimeRunRef = await uniqueRuntimeRunRef(runId, run.nativeRunId ?? run.runId);
   await db.run.update({
     where: { id: runId },
     data: {
-      runtimeRunRef: run.nativeRunId ?? run.runId,
+      runtimeRunRef,
       runtimeSessionRef,
       status: RunStatus.Running,
       syncStatus: "healthy",
     },
   });
+}
+
+async function uniqueRuntimeRunRef(runId: string, providerRunRef: string | null) {
+  if (!providerRunRef) return null;
+  const existing = await db.run.findUnique({
+    where: { runtimeRunRef: providerRunRef },
+    select: { id: true },
+  });
+  if (!existing || existing.id === runId) return providerRunRef;
+  return `${providerRunRef}:${runId}`;
 }
 
 async function readTaskSessionProviderRef(

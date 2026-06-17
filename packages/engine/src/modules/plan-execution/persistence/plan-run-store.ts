@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 import { createPlanGraphFromCompiledPlan as createRuntimePlanGraphFromCompiledPlan } from "@chrona/graph-runtime";
 import type {
   CompiledPlan,
@@ -103,7 +104,10 @@ function toPersistedPlanRunRecord(input: {
     (input.compiledPlan ? createEmptyPlanRun(input.compiledPlan) : null);
 
   if (!planRun) {
-    throw new Error("Cannot persist plan run without compiledPlan or existing planRun");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Cannot persist plan run without compiledPlan or existing planRun",
+    );
   }
 
   let mutableGraph = existingMutable;

@@ -14,12 +14,18 @@ const logger = createLogger("engine.plan-execution.sync");
 export async function syncPlanRunRuntimeResult(
   input: SyncPlanRunRuntimeResultInput,
 ): Promise<void> {
-  const result: SubmittedNodeResult =
-    input.status === "Completed"
-      ? { kind: "done", summary: input.summary ?? undefined, output: input.output }
-      : input.status === "Cancelled"
-        ? { kind: "cancelled", reason: input.summary ?? undefined }
-        : { kind: "failed", error: input.error ?? input.summary ?? "Runtime run failed" };
+  const result: SubmittedNodeResult = (() => {
+    if (input.status === "Completed") {
+      if (input.output !== undefined) {
+        return { kind: "done", summary: input.summary ?? undefined, output: input.output };
+      }
+      const message = "Runtime run completed without a Chrona terminal result action";
+      return { kind: "failed", error: input.summary ? `${message}: ${input.summary}` : message };
+    }
+    return input.status === "Cancelled"
+      ? { kind: "cancelled", reason: input.summary ?? undefined }
+      : { kind: "failed", error: input.error ?? input.summary ?? "Runtime run failed" };
+  })();
 
   try {
     await executeCommand({

@@ -229,6 +229,7 @@ describe("runTaskNodeFeature", () => {
         sessionId: "main-session",
         runId: "local-run-1",
         runtimeName: "hermes",
+        provider: "claude_code",
         runtimeRunRef: "runtime-first-entry",
         conversationEntryIds: ["conversation-entry-1"],
       },

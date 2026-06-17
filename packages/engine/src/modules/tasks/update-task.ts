@@ -9,6 +9,7 @@ import { deriveTaskStaticState } from "@chrona/domain";
 import { normalizeAutomationTiming } from "@chrona/contracts";
 import { expandRecurrenceRule } from "@chrona/integrations";
 import type { UpdateTaskInput } from "@chrona/contracts";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const SELF_SERIES_WINDOW_DAYS = 180;
 const SELF_SERIES_MAX_OCCURRENCES = 365;
@@ -24,7 +25,7 @@ function normalizeRequiredUpdateTextField(
   const normalized = value.trim();
 
   if (!normalized) {
-    throw new Error(`${field} cannot be empty`);
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, `${field} cannot be empty`);
   }
 
   return normalized;
@@ -38,7 +39,10 @@ function normalizeExecutionConfig(
   }
 
   if (value === null || Array.isArray(value)) {
-    throw new Error("executionConfig must be an object");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "executionConfig must be an object",
+    );
   }
 
   return value;
@@ -169,7 +173,10 @@ export async function updateTask(
     : null;
 
   if (input.recurrenceRule && (!recurrenceAnchorStartAt || !recurrenceAnchorEndAt)) {
-    throw new Error("recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set",
+    );
   }
   if (
     input.recurrenceRule &&
@@ -177,7 +184,10 @@ export async function updateTask(
     recurrenceAnchorEndAt &&
     recurrenceAnchorEndAt.getTime() <= recurrenceAnchorStartAt.getTime()
   ) {
-    throw new Error("recurrenceAnchorEndAt must be after recurrenceAnchorStartAt");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "recurrenceAnchorEndAt must be after recurrenceAnchorStartAt",
+    );
   }
   const shouldCancelOpenWorkBlocks = nextStatus === TaskStatus.Cancelled &&
     currentTask.status !== TaskStatus.Cancelled;

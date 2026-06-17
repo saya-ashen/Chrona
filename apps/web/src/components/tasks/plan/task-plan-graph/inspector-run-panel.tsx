@@ -222,6 +222,7 @@ export function extractRunResult(node: PlanNodeDataModel) {
 export function evidenceLines(evidence: NodeResultEvidence | null | undefined) {
   if (!evidence) return [];
   return [
+    evidence.provider ? `provider=${evidence.provider}` : null,
     evidence.runtimeName ? `runtime=${evidence.runtimeName}` : null,
     evidence.runtimeRunRef ? `runtimeRunRef=${evidence.runtimeRunRef}` : null,
     evidence.runId ? `runId=${evidence.runId}` : null,
@@ -236,6 +237,7 @@ function formatErrorDetails(details: unknown): string | null {
   const record = details as Record<string, unknown>;
   const parts = [
     typeof record.errorSummary === "string" ? record.errorSummary : null,
+    typeof record.provider === "string" ? `provider=${record.provider}` : null,
     typeof record.runtimeName === "string" ? `runtime=${record.runtimeName}` : null,
     typeof record.runtimeRunRef === "string" ? `runtimeRunRef=${record.runtimeRunRef}` : null,
     typeof record.runId === "string" ? `runId=${record.runId}` : null,

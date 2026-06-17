@@ -335,6 +335,7 @@ function conditionSelectionResultFromSnapshot(input: {
 function buildFailureDetails(input: {
   node: EffectivePlanNode;
   runtimeName: string;
+  provider?: string;
   runtimeRunRef?: string | null;
   runId?: string;
   runtimeSessionKey?: string;
@@ -346,6 +347,7 @@ function buildFailureDetails(input: {
     nodeType: input.node.type,
     nodeStatus: input.node.status,
     runtimeName: input.runtimeName,
+    provider: input.provider ?? null,
     runtimeRunRef: input.runtimeRunRef ?? null,
     runId: input.runId ?? null,
     runtimeSessionKey: input.runtimeSessionKey ?? null,
@@ -419,15 +421,15 @@ export async function runTaskNodeFeature(
       sessionId: input.mainSession.id,
       runId: invocation.runId,
       runtimeName: input.runtimeName,
+      provider: invocation.providerName,
       runtimeRunRef: invocation.runtimeRunRef,
       conversationEntryIds: invocation.conversationEntryIds,
     };
 
     const structured = structuredPayload(invocation);
     const output = {
-      runtimeRunRef: invocation.runtimeRunRef,
       runtimeName: input.runtimeName,
-      provider: invocation.response.provider,
+      provider: invocation.providerName,
       outputText: invocation.response.outputText,
       structuredPayload: invocation.response.structuredPayload,
     };
@@ -444,6 +446,7 @@ export async function runTaskNodeFeature(
         details: buildFailureDetails({
           node: input.node,
           runtimeName: input.runtimeName,
+          provider: invocation.providerName,
           runtimeSessionKey: input.mainSession.sessionKey,
           message: errorMessage,
         }),
@@ -493,10 +496,12 @@ export async function runTaskNodeFeature(
       evidence: {
         sessionId: input.mainSession.id,
         runtimeName: input.runtimeName,
+        provider: "unknown",
       },
       details: buildFailureDetails({
         node: input.node,
         runtimeName: input.runtimeName,
+        provider: "unknown",
         runtimeSessionKey: input.mainSession.sessionKey,
         message: fullMessage,
       }),

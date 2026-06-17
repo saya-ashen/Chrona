@@ -25,6 +25,7 @@ import { ensurePlanMainSession } from "./persistence/plan-state-store";
 import { currentNodeFromEffective } from "./projection/execution-graph-selectors";
 import { executeCommand } from "./kernel/execute-command";
 import { resolveCheckpointTransition } from "./use-cases/checkpoint-transition/resolve-checkpoint-transition";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export { getCurrentExecution } from "./use-cases/get-current-execution";
 export { submitTerminalNodeResult } from "./use-cases/submit-terminal-node-result";
@@ -150,7 +151,10 @@ function commandForExecutionAction(
         context,
       };
     case "submit_node_output":
-      throw new Error("submit_node_output must be handled through node result submission");
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "submit_node_output must be handled through node result submission",
+      );
     case "complete_manual_node":
       return {
         command: {
@@ -199,7 +203,10 @@ function commandForExecutionAction(
       return { command: { type: "cancel", reason: action.reason }, context };
     default: {
       const exhaustiveCheck: never = action;
-      throw new Error(`Unsupported execution action: ${JSON.stringify(exhaustiveCheck)}`);
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        `Unsupported execution action: ${JSON.stringify(exhaustiveCheck)}`,
+      );
     }
   }
 }

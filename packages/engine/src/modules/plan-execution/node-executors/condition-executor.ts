@@ -95,29 +95,6 @@ export class ConditionNodeExecutor implements NodeExecutor {
       });
     }
 
-    const defaultBranch = config.defaultNextNodeId
-      ? {
-          label: "default",
-          nextNodeId: config.defaultNextNodeId,
-          source: "default" as const,
-        }
-      : null;
-    if (defaultBranch) {
-      return {
-        status: "done",
-        summary: `Condition resolved to branch: ${defaultBranch.label}`,
-        evidence: { sessionId: input.mainSession.id },
-        selectedBranch: {
-          ...defaultBranch,
-          nextNodeId: toCompiledBranchTarget(input, defaultBranch.nextNodeId),
-        },
-      };
-    }
-
-    return {
-      status: "blocked",
-      reason: `Condition node ${input.node.id} uses ${config.evaluationBy} evaluation without an AI evaluator or default branch.`,
-      evidence: { sessionId: input.mainSession.id },
-    };
+    throw new Error(`Unsupported condition evaluator: ${config.evaluationBy satisfies never}`);
   }
 }
