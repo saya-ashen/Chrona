@@ -179,6 +179,7 @@ function pushAssistant(
     | { content?: ReadonlyArray<Record<string, unknown>> }
     | undefined;
   const blocks = message?.content ?? [];
+  const before = out.length;
   for (const block of blocks) {
     if (block.type === "text" && typeof block.text === "string") {
       out.push(
@@ -204,6 +205,9 @@ function pushAssistant(
       );
     }
   }
+  if (out.length === before) {
+    out.push(buildRawEvent(ctx, options, rec, "assistant"));
+  }
 }
 
 function registerToolUse(
@@ -226,6 +230,7 @@ function pushUser(
     | { content?: ReadonlyArray<Record<string, unknown>> }
     | undefined;
   const blocks = message?.content ?? [];
+  const before = out.length;
   for (const block of blocks) {
     if (block.type === "tool_result" && typeof block.tool_use_id === "string") {
       const callId = block.tool_use_id;
@@ -241,6 +246,9 @@ function pushUser(
       ctx.toolInputBuffers.delete(callId);
       ctx.toolNames.delete(callId);
     }
+  }
+  if (out.length === before) {
+    out.push(buildRawEvent(ctx, options, rec, "user"));
   }
 }
 
@@ -398,7 +406,10 @@ function mapContentBlockStop(
 ): void {
   const idx = typeof ev.index === "number" ? ev.index : -1;
   const callId = ctx.indexToCallId.get(idx);
-  if (!callId) return;
+  if (!callId) {
+    out.push(buildRawEvent(ctx, options, ev, "content_block_stop"));
+    return;
+  }
   const toolName = ctx.toolNames.get(callId) ?? "unknown_tool";
   const parsedInput = parseBufferedToolInput(ctx.toolInputBuffers.get(callId));
   out.push(

@@ -17,7 +17,7 @@ import { terminalSnapshotFromEvents } from "@chrona/providers-foundation";
 
 import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
 import { mapClaudeCodeStreamItems, createNormalizerContext } from "./normalizers";
-import { createReplayRunner } from "./runner";
+import { createReplayRunner, type ClaudeCodeRunHandle, type ClaudeCodeRunner } from "./runner";
 
 const FIXTURES_DIR = fileURLToPath(new URL("../fixtures", import.meta.url));
 
@@ -244,6 +244,128 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     const cancelled = await client.cancelRun({ runId: ref.runId });
     expect(cancelled.runId).toBe(ref.runId);
     expect(["cancelled", "completed"]).toContain(cancelled.status);
+  });
+
+  test("streamRun does not blame user for SDK abort failures", async () => {
+    async function* emptyQuery() {}
+    const handle = {
+      runId: "run-aborted",
+      ref: {
+        provider: "claude_code",
+        runId: "run-aborted",
+        sessionId: "chrona-session-aborted",
+        status: "running",
+      },
+      internal: {
+        kind: "sdk",
+        query: Object.assign(emptyQuery(), { interrupt: async () => {} }),
+        cancelRequested: false,
+      },
+      normalizer: createNormalizerContext(),
+      chronaSessionId: "chrona-session-aborted",
+      logger: {} as ClaudeCodeRunHandle["logger"],
+    } satisfies ClaudeCodeRunHandle;
+    const runner: ClaudeCodeRunner = {
+      async start() {
+        return { handle };
+      },
+      async next() {
+        throw new Error("Claude Code process aborted by user");
+      },
+      async snapshot() {
+        return {
+          provider: "claude_code",
+          runId: "run-aborted",
+          sessionId: "chrona-session-aborted",
+          status: "running",
+        };
+      },
+      async cancel() {},
+      async dispose() {},
+    };
+    const client = new ClaudeCodeProviderClient({
+      config: { mcpBaseUrl: "http://localhost:3101" },
+      runner,
+    });
+
+    const ref = await client.startRun({
+      sessionId: "chrona-session-aborted",
+      instructions: "Trigger an SDK abort.",
+      input: { type: "text", text: "abort" },
+    });
+    const events = await collect(client.streamRun({ runId: ref.runId }));
+
+    expect(events.at(-1)).toMatchObject({
+      type: "run_failed",
+      error: "Claude Code process aborted before Chrona received node output",
+      raw: { stage: "before_node_output_submission" },
+
+    });
+  });
+
+  test("streamRun reports SDK idle timeout distinctly", async () => {
+    async function* emptyQuery() {}
+    const handle = {
+      runId: "run-timeout",
+      ref: {
+        provider: "claude_code",
+        runId: "run-timeout",
+        sessionId: "chrona-session-timeout",
+        status: "running",
+      },
+      internal: {
+        kind: "sdk",
+        query: Object.assign(emptyQuery(), { interrupt: async () => {} }),
+        cancelRequested: false,
+      },
+      normalizer: createNormalizerContext(),
+      chronaSessionId: "chrona-session-timeout",
+      logger: {} as ClaudeCodeRunHandle["logger"],
+      diagnostics: {
+        timeoutMs: 120_000,
+        timeoutMode: "idle",
+        timeoutTriggered: true,
+        recentRawEvents: [],
+      },
+    } satisfies ClaudeCodeRunHandle;
+    const runner: ClaudeCodeRunner = {
+      async start() {
+        return { handle };
+      },
+      async next() {
+        throw new Error("Claude Code process aborted by user");
+      },
+      async snapshot() {
+        return {
+          provider: "claude_code",
+          runId: "run-timeout",
+          sessionId: "chrona-session-timeout",
+          status: "running",
+        };
+      },
+      async cancel() {},
+      async dispose() {},
+    };
+    const client = new ClaudeCodeProviderClient({
+      config: { mcpBaseUrl: "http://localhost:3101" },
+      runner,
+    });
+
+    const ref = await client.startRun({
+      sessionId: "chrona-session-timeout",
+      instructions: "Trigger an SDK timeout.",
+      input: { type: "text", text: "timeout" },
+    });
+    const events = await collect(client.streamRun({ runId: ref.runId }));
+
+    expect(events.at(-1)).toMatchObject({
+      type: "run_failed",
+      error: "Claude Code run timed out after 120s idle timeout: Claude Code process aborted before Chrona received node output",
+      raw: {
+        stage: "before_node_output_submission",
+        runner: { timeoutTriggered: true, timeoutMode: "idle", timeoutMs: 120_000 },
+      },
+    });
   });
 
   test("streamRun with unknown runId: throws ClaudeCodeProviderError", () => {

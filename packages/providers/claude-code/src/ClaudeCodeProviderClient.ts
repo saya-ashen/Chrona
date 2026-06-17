@@ -92,6 +92,8 @@ export interface ClaudeCodeProviderConfig {
    * `StartRunInput.control.skillsDir`.
    */
   skillDir?: string;
+  /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
+  sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
 }
 
 const DEFAULT_MODEL = "claude-opus-4-8";
@@ -113,6 +115,89 @@ function readEnv(name: string): string | undefined {
 function defaultMcpBaseUrl(): string {
   const port = readEnv("PORT") ?? "3101";
   return `http://localhost:${port}`;
+}
+
+const SDK_ABORTED_BY_USER_MESSAGE = "Claude Code process aborted by user";
+
+interface ProviderFailureContext {
+  sawNodeOutputCall: boolean;
+  sawNodeOutputResult: boolean;
+  sawNodeCompleteResult: boolean;
+  lastEventType?: ProviderRunEvent["type"];
+  lastTool?: string;
+  lastText?: string;
+}
+
+function isChronaTool(tool: string | undefined, toolName: string): boolean {
+  return tool !== undefined && (tool === toolName || tool === `mcp__chrona__${toolName}` || tool.endsWith(`_${toolName}`));
+}
+
+function noteProviderEvent(ctx: ProviderFailureContext, event: ProviderRunEvent): void {
+  ctx.lastEventType = event.type;
+  if (event.type === "text_delta") ctx.lastText = event.text;
+  if (event.type === "tool_call") {
+    ctx.lastTool = event.tool;
+    if (isChronaTool(event.tool, "chrona_node_output")) ctx.sawNodeOutputCall = true;
+  }
+  if (event.type === "tool_result") {
+    ctx.lastTool = event.tool;
+    if (isChronaTool(event.tool, "chrona_node_output")) ctx.sawNodeOutputResult = true;
+    if (isChronaTool(event.tool, "chrona_node_complete")) ctx.sawNodeCompleteResult = true;
+  }
+}
+
+function newProviderFailureContext(): ProviderFailureContext {
+  return {
+    sawNodeOutputCall: false,
+    sawNodeOutputResult: false,
+    sawNodeCompleteResult: false,
+  };
+}
+
+function providerFailureDiagnostic(ctx: ProviderFailureContext) {
+  return {
+    stage: ctx.sawNodeCompleteResult
+      ? "after_node_complete_accepted"
+      : ctx.sawNodeOutputResult
+        ? "after_node_output_accepted"
+        : ctx.sawNodeOutputCall
+          ? "during_node_output_submission"
+          : "before_node_output_submission",
+    lastEventType: ctx.lastEventType,
+    lastTool: ctx.lastTool,
+    lastText: ctx.lastText,
+  };
+}
+
+function formatTimeout(timeoutMs?: number): string {
+  if (timeoutMs === undefined) return "configured idle timeout";
+  return `${Math.round(timeoutMs / 1000)}s idle timeout`;
+}
+
+function providerAbortMessage(ctx: ProviderFailureContext): string {
+  if (ctx.sawNodeCompleteResult) return "Claude Code process aborted after node completion was accepted";
+  if (ctx.sawNodeOutputResult) return "Claude Code process aborted after node output was accepted but before node completion";
+  if (ctx.sawNodeOutputCall) return "Claude Code process aborted while submitting node output";
+  return "Claude Code process aborted before Chrona received node output";
+}
+
+function providerFailureMessage(err: unknown, ctx?: ProviderFailureContext, handle?: ClaudeCodeRunHandle): string {
+  const message = errorMessage(err);
+  if (message !== SDK_ABORTED_BY_USER_MESSAGE) return message;
+  if (handle?.diagnostics?.timeoutTriggered) {
+    return `Claude Code run timed out after ${formatTimeout(handle.diagnostics.timeoutMs)}: ${providerAbortMessage(ctx ?? newProviderFailureContext())}`;
+  }
+  return providerAbortMessage(ctx ?? newProviderFailureContext());
+}
+
+function providerFailureRaw(err: unknown, ctx: ProviderFailureContext, handle?: ClaudeCodeRunHandle) {
+  return {
+    provider: "claude_code",
+    errorName: err instanceof Error ? err.name : undefined,
+    errorMessage: errorMessage(err),
+    ...providerFailureDiagnostic(ctx),
+    runner: handle?.diagnostics,
+  };
 }
 
 export class ClaudeCodeProviderClient implements AgentProviderClient {
@@ -203,8 +288,10 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
     const runner = await this.ensureRunner();
     const handle = await this.resolveStreamHandle(runner, input);
+    const failureContext = newProviderFailureContext();
     try {
       for await (const event of this.iterateRunEvents(runner, handle)) {
+        noteProviderEvent(failureContext, event);
         yield event;
         if (this.isTerminalEvent(event)) {
           await this.recordFinalSnapshot(handle, event);
@@ -256,11 +343,12 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       // parse). Map it to `run_failed` so callers always see a terminal —
       // matches the spec 017 §5 contract and lets the engine show the error
       // in the Inbox without a separate `getRun` poll.
-      const message = errorMessage(err);
+      const message = providerFailureMessage(err, failureContext, handle);
       const failedEvent: ProviderRunEvent = {
         type: "run_failed",
         run: snap ? this.snapshotAsRef(snap, handle) : handle.ref,
         error: message,
+        raw: providerFailureRaw(err, failureContext, handle),
       };
       yield failedEvent;
       await this.recordFinalSnapshot(handle, failedEvent);
@@ -412,6 +500,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       controlPlane: this.opts.config.controlPlane,
       controlBaseUrl,
       skillDir: this.opts.config.skillDir,
+      sdkOptions: this.opts.config.sdkOptions,
     };
     return createClaudeCodeRunner(cfg);
   }

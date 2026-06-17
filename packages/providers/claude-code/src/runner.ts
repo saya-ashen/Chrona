@@ -140,7 +140,7 @@ export interface ClaudeCodeRunnerConfig {
   binaryPath?: string;
   /** Default "claude-opus-4-8". */
   model?: string;
-  /** Total run timeout (ms). Overall bound on the SDK run. */
+  /** Idle timeout (ms). Aborts only when SDK produces no events within this window. */
   timeoutMs?: number;
   /** Chrona /api/mcp base URL. */
   mcpBaseUrl: string;
@@ -164,6 +164,66 @@ export interface ClaudeCodeRunnerConfig {
    * Mirrors Hermes's `CHRONA_HERMES_STRICT_UNKNOWN_EVENTS`.
    */
   strictUnknownEvents?: boolean;
+  /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
+  sdkOptions?: Partial<SdkQueryOptions>;
+}
+
+export interface ClaudeCodeRunnerDiagnostics {
+  debugFile?: string;
+  recordPath?: string;
+  abortSignalAborted?: boolean;
+  cancelRequested?: boolean;
+  lastRawEvent?: Record<string, unknown>;
+  lastMappedEvent?: Record<string, unknown>;
+  recentRawEvents?: Record<string, unknown>[];
+  iteratorError?: Record<string, unknown>;
+  timeoutMs?: number;
+  timeoutMode?: "idle";
+  timeoutTriggered?: boolean;
+  lastActivityAt?: string;
+  timedOutAt?: string;
+}
+
+function errorDiagnostics(err: unknown): Record<string, unknown> {
+  return {
+    name: err instanceof Error ? err.name : typeof err,
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  };
+}
+
+function summarizeSdkRawEvent(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object") return { valueType: typeof raw };
+  const rec = raw as Record<string, unknown>;
+  const message = typeof rec.message === "object" && rec.message !== null ? rec.message as Record<string, unknown> : undefined;
+  const content = Array.isArray(message?.content) ? message.content : undefined;
+  const tool = content?.find((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && "name" in item);
+  return {
+    type: rec.type ?? null,
+    subtype: rec.subtype ?? null,
+    sessionId: rec.session_id ?? rec.sessionId ?? null,
+    messageId: message?.id ?? null,
+    role: message?.role ?? null,
+    stopReason: message?.stop_reason ?? null,
+    toolName: tool?.name ?? null,
+    toolUseId: tool?.id ?? null,
+  };
+}
+
+function summarizeProviderEvent(event: ProviderRunEvent): Record<string, unknown> {
+  return {
+    type: event.type,
+    tool: "tool" in event ? event.tool : undefined,
+    text: event.type === "text_delta" ? event.text : undefined,
+  };
+}
+
+function pushRecentRaw(handle: ClaudeCodeRunHandle, rawSummary: Record<string, unknown>): void {
+  const diagnostics = handle.diagnostics ??= {};
+  diagnostics.lastRawEvent = rawSummary;
+  const recent = diagnostics.recentRawEvents ??= [];
+  recent.push(rawSummary);
+  if (recent.length > 8) recent.shift();
 }
 
 interface SdkHandle {
@@ -172,6 +232,7 @@ interface SdkHandle {
   query: AsyncGenerator<ProviderRunEvent, void> & {
     interrupt: () => Promise<void>;
   };
+  pendingEvents?: ProviderRunEvent[];
   cancelRequested: boolean;
 }
 
@@ -193,6 +254,8 @@ export type ClaudeCodeRunHandle = {
   chronaSessionId: string;
   logger: ChronaLogger;
   externalSignal?: AbortSignal;
+  diagnostics?: ClaudeCodeRunnerDiagnostics;
+  idleTimeout?: IdleTimeoutHandle;
 };
 
 export interface ClaudeCodeRunner {
@@ -209,7 +272,7 @@ export interface ClaudeCodeRunner {
 }
 
 const DEFAULT_MODEL = "claude-opus-4-8";
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = 120 * 1000;
 
 /* -------------------------------------------------------------------------- */
 /*                                Public factories                            */
@@ -652,13 +715,38 @@ function updateHandleSdkSession(
 
 
 
+interface IdleTimeoutHandle {
+  reset(): void;
+  clear(): void;
+}
+
 /**
- * Wall-clock bound on the run: abort the SDK query if it overruns. The timer
- * is unref'd so it never keeps the process alive, and aborting an already-
- * finished query is a harmless no-op.
+ * Idle bound on SDK progress: abort only if Claude Code produces no stream
+ * events for the configured window. Long tool/model runs survive as long as
+ * the SDK keeps making observable progress.
  */
-function armRunTimeout(abortController: AbortController, timeoutMs: number): void {
-  setTimeout(() => abortController.abort(), timeoutMs).unref();
+function armIdleTimeout(
+  abortController: AbortController,
+  diagnostics: ClaudeCodeRunnerDiagnostics,
+  timeoutMs: number,
+): IdleTimeoutHandle {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const reset = () => {
+    if (timer) clearTimeout(timer);
+    diagnostics.lastActivityAt = new Date().toISOString();
+    timer = setTimeout(() => {
+      diagnostics.timeoutTriggered = true;
+      diagnostics.timedOutAt = new Date().toISOString();
+      abortController.abort();
+    }, timeoutMs);
+    timer.unref();
+  };
+  const clear = () => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+  };
+  reset();
+  return { reset, clear };
 }
 
 class SdkRunner implements ClaudeCodeRunner {
@@ -736,6 +824,7 @@ class SdkRunner implements ClaudeCodeRunner {
       ? join(process.env["CHRONA_CLAUDE_DEBUG_DIR"] ?? "/tmp", `chrona-claude-${runId}.log`)
       : undefined;
     const options = {
+      ...(cfg.sdkOptions ?? {}),
       model,
       mcpServers,
       allowedTools: skillMode ? ["Bash"] : ["mcp__chrona__*"],
@@ -764,13 +853,13 @@ class SdkRunner implements ClaudeCodeRunner {
       cwd: cfg.cwd,
       binaryPath: cfg.binaryPath ?? null,
       timeoutMs: cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      timeoutMode: "idle",
       mcpBaseUrl,
       mcpUrl,
       skillRoot,
       options,
     });
     logProviderDebug(log, "claude_code.prompt", { prompt });
-    armRunTimeout(abortController, cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const queryObj = sdkQuery({
       prompt,
       options,
@@ -793,12 +882,23 @@ class SdkRunner implements ClaudeCodeRunner {
       internal: {
         kind: "sdk",
         query: queryObj as unknown as SdkHandle["query"],
+        pendingEvents: [],
         cancelRequested: false,
       },
       normalizer: createNormalizerContext(),
       logger: log,
       externalSignal: input.signal,
+      diagnostics: {
+        debugFile,
+        recordPath: undefined,
+        abortSignalAborted: input.signal?.aborted ?? false,
+        cancelRequested: false,
+        timeoutMs: cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        timeoutMode: "idle",
+        recentRawEvents: [],
+      },
     };
+    handle.idleTimeout = armIdleTimeout(abortController, handle.diagnostics ?? {}, cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     if (input.signal) {
       const onAbort = () => {
         if (handle.internal.kind === "sdk") {
@@ -813,6 +913,10 @@ class SdkRunner implements ClaudeCodeRunner {
     if (cfg.recordDir) {
       const path = replayPathForRun(cfg.recordDir, runId);
       handle.recordPath = path;
+      handle.diagnostics = {
+        ...(handle.diagnostics ?? {}),
+        recordPath: path,
+      };
       const startRec: ProviderReplayStartRecord = providerReplayRecord(
         "claude_code",
         ref,
@@ -829,37 +933,71 @@ class SdkRunner implements ClaudeCodeRunner {
         retryable: false,
       });
     }
+    const pendingEvents = handle.internal.pendingEvents ??= [];
+    if (pendingEvents.length > 0) {
+      return pendingEvents.shift() ?? null;
+    }
+
     const q = handle.internal.query;
-    const result = await q.next();
-    if (result.done) {
-      handle.logger.debug("claude_code.stream_done");
-      return null;
-    }
-    const sdkSessionId = extractSdkSessionId(result.value);
-    if (sdkSessionId) {
-      this.sdkSessionByChronaSessionId.set(handle.chronaSessionId, sdkSessionId);
-      updateHandleSdkSession(handle, sdkSessionId);
-    }
-    const events = mapClaudeCodeStreamItems(
-      [result.value],
-      handle.normalizer,
-      {
-        cancelRequested: handle.internal.cancelRequested,
-        strictUnknownEvents: handle.normalizer.strictUnknownEvents,
-      } satisfies NormalizerOptions,
-    );
-    const event = events[0];
-    handle.logger.debug("claude_code.stream_event", {
-      rawType: (result.value as { type?: unknown }).type ?? null,
-      mappedType: event.type,
-      emitted: true,
-    });
-    if (event.type === "run_completed" || event.type === "run_failed" || event.type === "run_cancelled") {
-      handle.logger.info("claude_code.run_terminal", {
-        status: event.type,
+    for (;;) {
+      let result: IteratorResult<ProviderRunEvent, void>;
+      try {
+        result = await q.next();
+      } catch (err) {
+        const diagnostics = handle.diagnostics ??= {};
+        diagnostics.abortSignalAborted = handle.externalSignal?.aborted ?? false;
+        diagnostics.cancelRequested = handle.internal.cancelRequested;
+        diagnostics.iteratorError = errorDiagnostics(err);
+        handle.logger.error("claude_code.sdk_iterator_failed", {
+          runId: handle.runId,
+          sdkSessionId: handle.ref.sessionId,
+          recordPath: handle.recordPath,
+          debugFile: diagnostics.debugFile,
+          abortSignalAborted: diagnostics.abortSignalAborted,
+          cancelRequested: diagnostics.cancelRequested,
+          lastRawEvent: diagnostics.lastRawEvent,
+          lastMappedEvent: diagnostics.lastMappedEvent,
+          recentRawEvents: diagnostics.recentRawEvents,
+          error: diagnostics.iteratorError,
+        });
+        throw err;
+      }
+      if (handle.idleTimeout) handle.idleTimeout.reset();
+      if (result.done) {
+        handle.logger.debug("claude_code.stream_done");
+        return null;
+      }
+      pushRecentRaw(handle, summarizeSdkRawEvent(result.value));
+      const sdkSessionId = extractSdkSessionId(result.value);
+      if (sdkSessionId) {
+        this.sdkSessionByChronaSessionId.set(handle.chronaSessionId, sdkSessionId);
+        updateHandleSdkSession(handle, sdkSessionId);
+      }
+      const events = mapClaudeCodeStreamItems(
+        [result.value],
+        handle.normalizer,
+        {
+          cancelRequested: handle.internal.cancelRequested,
+          strictUnknownEvents: handle.normalizer.strictUnknownEvents,
+        } satisfies NormalizerOptions,
+      );
+      if (events.length === 0) continue;
+      const [event, ...restEvents] = events as [ProviderRunEvent, ...ProviderRunEvent[]];
+      if (handle.diagnostics) handle.diagnostics.lastMappedEvent = summarizeProviderEvent(event);
+      handle.logger.debug("claude_code.stream_event", {
+        rawType: (result.value as { type?: unknown }).type ?? null,
+        mappedType: event.type,
+        emitted: true,
       });
+      pendingEvents.push(...restEvents);
+      if (event.type === "run_completed" || event.type === "run_failed" || event.type === "run_cancelled") {
+        handle.logger.info("claude_code.run_terminal", {
+          status: event.type,
+        });
+          if (handle.idleTimeout) handle.idleTimeout.clear();
+      }
+      return event;
     }
-    return event;
   }
 
   async snapshot(handle: ClaudeCodeRunHandle): Promise<ProviderRunSnapshot> {
@@ -879,6 +1017,7 @@ class SdkRunner implements ClaudeCodeRunner {
   async cancel(handle: ClaudeCodeRunHandle): Promise<void> {
     if (handle.internal.kind !== "sdk") return;
     handle.internal.cancelRequested = true;
+    if (handle.idleTimeout) handle.idleTimeout.clear();
     await handle.internal.query.interrupt();
   }
 

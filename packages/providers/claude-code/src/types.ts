@@ -51,6 +51,8 @@ export interface ClaudeCodeProviderConfig {
    * `StartRunInput.control.skillsDir`.
    */
   skillDir?: string;
+  /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
+  sdkOptions?: import("./runner").ClaudeCodeRunnerConfig["sdkOptions"];
 }
 
 export type ClaudeCodeRunnerMode = "sdk" | "replay";

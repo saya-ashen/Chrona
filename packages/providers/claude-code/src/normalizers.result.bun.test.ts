@@ -61,3 +61,60 @@ describe("normalizers result terminal mapping", () => {
     expect(mapResult({ subtype: "error", errors: ["boom"] }, false)).toBe("run_failed");
   });
 });
+
+describe("normalizers non-emitting SDK messages", () => {
+  test("assistant/user messages without mapped blocks emit raw_event instead of empty batch", () => {
+    const ctx = createNormalizerContext();
+    const options: NormalizerOptions = { cancelRequested: false };
+
+    const events = mapClaudeCodeStreamItems([
+      { type: "assistant", message: { content: [] } },
+      { type: "user", message: { content: [{ type: "text", text: "ignored" }] } },
+    ], ctx, options);
+
+    expect(events.map((event) => event.type)).toEqual(["raw_event", "raw_event"]);
+  });
+
+  test("content_block_stop without known call id emits raw_event instead of empty batch", () => {
+    const ctx = createNormalizerContext();
+    const options: NormalizerOptions = { cancelRequested: false };
+
+    const events = mapClaudeCodeStreamItems([
+      { type: "stream_event", event: { type: "content_block_stop", index: 0 } },
+    ], ctx, options);
+
+    expect(events.map((event) => event.type)).toEqual(["raw_event"]);
+  });
+
+  test("content_block_stop with known call id emits both tool events", () => {
+    const ctx = createNormalizerContext();
+    const options: NormalizerOptions = { cancelRequested: false };
+
+    const events = mapClaudeCodeStreamItems([
+      {
+        type: "stream_event",
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: { type: "tool_use", id: "toolu_1", name: "chrona_plan_generate" },
+        },
+      },
+      {
+        type: "stream_event",
+        event: {
+          type: "content_block_delta",
+          index: 0,
+          delta: { type: "input_json_delta", partial_json: "{\"title\":\"Plan\"}" },
+        },
+      },
+      { type: "stream_event", event: { type: "content_block_stop", index: 0 } },
+    ], ctx, options);
+
+    expect(events.map((event) => event.type)).toEqual([
+      "tool_started",
+      "raw_event",
+      "tool_call",
+      "tool_completed",
+    ]);
+  });
+});

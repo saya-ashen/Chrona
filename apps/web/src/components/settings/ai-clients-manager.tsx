@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
 
+const DEFAULT_PROVIDER_IDLE_TIMEOUT_MS = 120 * 1000;
+
 type AiClientType = "llm" | "hermes" | "debug" | (string & {});
 
 interface AiClientInfo {
@@ -360,7 +362,7 @@ function ClientForm({
     isDefault: initial?.isDefault ?? false,
     timeoutSeconds: String(
       (initial?.config as { timeoutSeconds?: number; timeoutMs?: number })?.timeoutSeconds
-        ?? (((initial?.config as { timeoutMs?: number })?.timeoutMs ?? 120000) / 1000),
+        ?? (((initial?.config as { timeoutMs?: number })?.timeoutMs ?? DEFAULT_PROVIDER_IDLE_TIMEOUT_MS) / 1000),
     ),
     baseUrl: (initial?.config as { baseUrl?: string; env?: Record<string, string> })?.baseUrl
       ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_BASE_URL
