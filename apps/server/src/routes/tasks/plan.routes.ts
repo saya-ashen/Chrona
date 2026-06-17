@@ -17,6 +17,7 @@ import {
 } from "@chrona/contracts/api";
 import { logger, planGenerationConflictBody } from "../helpers";
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
+import { startSseHeartbeat } from "../../lib/sse-heartbeat";
 
 function writePlanGenerationEvent(
   stream: Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never,
@@ -52,15 +53,6 @@ function writePlanGenerationEvent(
     case "done":
       return stream.writeSSE({ event: "done", data: "{}" });
   }
-}
-
-function startSseHeartbeat(
-  stream: Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never,
-) {
-  const timer = setInterval(() => {
-    void stream.writeSSE({ event: "heartbeat", data: "{}" }).catch(() => undefined);
-  }, 5_000);
-  return () => clearInterval(timer);
 }
 
 
