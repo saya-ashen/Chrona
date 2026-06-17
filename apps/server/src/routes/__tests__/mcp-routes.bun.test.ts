@@ -317,7 +317,7 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona_node_read", "chrona.node.read", executionSessionId, {}, {}],
-      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
+      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: JSON.stringify([nodeOutputSpec]) }, { outputs: [nodeOutputSpec] }],
       ["chrona_node_complete", "chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", executionSessionId, blockPayload, blockPayload],
@@ -368,7 +368,7 @@ describe("MCP routes", () => {
     const { response, operations } = await postRpcWithOperations(
       rpc("tools/call", {
         name: "chrona_node_output",
-        arguments: { outputs: [nodeOutputSpec], mode: "replace" },
+        arguments: { outputs: JSON.stringify([nodeOutputSpec]), mode: "replace" },
       }),
       "/api/mcp?session_id=chrona%3Atask%3Atask-1%3Aexecute%3Aurl",
     );
@@ -460,7 +460,7 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona_node_read", "chrona.node.read", executionSessionId, {}, {}],
-      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: [nodeOutputSpec] }, { outputs: [nodeOutputSpec] }],
+      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: JSON.stringify([nodeOutputSpec]) }, { outputs: [nodeOutputSpec] }],
       ["chrona_node_complete", "chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
       ["chrona_condition_select", "chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona_node_block", "chrona.node.block", executionSessionId, blockPayload, blockPayload],
@@ -671,17 +671,15 @@ describe("MCP routes", () => {
     );
 
     expect(nodeOutput.inputSchema.properties.outputs).toMatchObject({
-      type: "array",
-      minItems: 1,
-      items: {
-        type: "object",
-        required: expect.arrayContaining(["root", "elements"]),
-        properties: expect.objectContaining({
-          root: expect.objectContaining({ type: "string" }),
-          elements: expect.objectContaining({ type: "object" }),
-        }),
-      },
+      type: "string",
+      minLength: 1,
+      description: "JSON-encoded array of json-render Specs",
     });
+    expect(nodeOutput.description).toContain("json-render Specs");
+    expect(nodeOutput.description).toContain("columns: string[]");
+    expect(nodeOutput.description).toContain("rows: string[][]");
+    expect(nodeOutput.description).toContain("Do not wrap arrays as { item: [...] }");
+    expect(nodeOutput.description).toContain("CollapsibleText.threshold: 800, not \"800\"");
   });
 
   it("rejects node outputs that pass the old loose public schema", async () => {
@@ -690,7 +688,7 @@ describe("MCP routes", () => {
         name: "chrona_node_output",
         arguments: {
           summary: "Done",
-          outputs: [{ type: "script_spec", value: { ok: true } }],
+          outputs: JSON.stringify([{ type: "script_spec", value: { ok: true } }]),
         },
         _meta: { sessionId: "chrona:task:task-1:execute" },
       }),

@@ -48,6 +48,31 @@ function publicToolSchema(schema: z.ZodObject) {
   });
 }
 
+const jsonEncodedOutputsSchema = z.string().min(1).describe("JSON-encoded array of json-render Specs");
+
+function publicNodeOutputSchema() {
+  return publicToolSchema(
+    chronaPublicToolPayloadSchemas["chrona.node.output"].extend({
+      outputs: jsonEncodedOutputsSchema,
+    }),
+  );
+}
+
+function normalizeExternalPayload(toolName: ChronaToolName, payload: Record<string, unknown>) {
+  if (toolName !== "chrona.node.output" || typeof payload.outputs !== "string") return payload;
+  return {
+    ...payload,
+    outputs: JSON.parse(payload.outputs) as unknown,
+  };
+}
+const NODE_OUTPUT_DESCRIPTION = [
+  "Append or replace user-visible outputs for the current execution node. May be called multiple times before completion.",
+  "Submit outputs as complete json-render Specs: { root: string, elements: { [id]: { type, props, children } }, state? }.",
+  "Every children value must be a direct string array of element IDs.",
+  "Component props must match the Chrona catalog exactly. For Table, use columns: string[] and rows: string[][]. Do not wrap arrays as { item: [...] }.",
+  "Numeric props must be JSON numbers, not strings; e.g. CollapsibleText.threshold: 800, not \"800\".",
+].join(" ");
+
 const externalTools = {
   chrona_execution_read: {
     internalName: "chrona.execution.read",
@@ -76,8 +101,8 @@ const externalTools = {
   chrona_node_output: {
     internalName: "chrona.node.output",
     title: "Chrona Node Output",
-    description: "Append or replace user-visible outputs for the current execution node. May be called multiple times before completion.",
-    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.output"]),
+    description: NODE_OUTPUT_DESCRIPTION,
+    inputSchema: publicNodeOutputSchema(),
   },
   chrona_node_complete: {
     internalName: "chrona.node.complete",
@@ -235,7 +260,7 @@ function toChronaInput(
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
   requestSessionId?: string,
 ) {
-  const payload = { ...input };
+  const payload = normalizeExternalPayload(toolName, { ...input });
   for (const key of hiddenContextKeys) {
     delete payload[key];
   }
@@ -244,13 +269,16 @@ function toChronaInput(
   const evidence = meta.evidence && typeof meta.evidence === "object"
     ? meta.evidence as Record<string, unknown>
     : undefined;
+  const validatedPayload = toolName.endsWith(".read") || toolName === "chrona.schedule.clear"
+    ? {}
+    : chronaPublicToolPayloadSchemas[toolName].parse(payload);
   return {
     sessionId: sessionIdFrom(input, extra, requestSessionId),
     actorType: "agent" as const,
     idempotencyKey: idempotencyKeyFrom(input, toolName, payload, extra, requestSessionId),
     expectedRevision,
     evidence,
-    payload: toolName.endsWith(".read") || toolName === "chrona.schedule.clear" ? {} : payload,
+    payload: validatedPayload,
   };
 }
 
