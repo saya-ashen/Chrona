@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  agentControlActionBodySchema,
+  agentControlActionPayloadSchemas,
   chronaToolInputSchema,
   chronaToolOperationSchema,
   chronaToolResultSchema,
@@ -206,5 +208,24 @@ describe("MCP task tool contracts", () => {
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { summary: "Missing ref" })).toThrow();
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Missing node" })).toThrow();
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No extra ids" })).toThrow();
+  });
+
+  it("defines agent control actions from public MCP payload contracts", () => {
+    expect(agentControlActionPayloadSchemas.output).toBeDefined();
+    expect(agentControlActionBodySchema.parse({
+      kind: "fail",
+      payload: { error: "Command failed" },
+    })).toEqual({ kind: "fail", payload: { error: "Command failed" } });
+    expect(agentControlActionBodySchema.parse({
+      kind: "condition_select",
+      payload: { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" },
+    })).toEqual({
+      kind: "condition_select",
+      payload: { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" },
+    });
+    expect(() => agentControlActionBodySchema.parse({
+      kind: "complete",
+      payload: { nodeId: "node-1", summary: "Done" },
+    })).toThrow();
   });
 });

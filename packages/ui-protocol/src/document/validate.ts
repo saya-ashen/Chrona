@@ -29,6 +29,58 @@ const COMPONENT_TYPE_ALIASES: Record<string, string> = {
   section: "section",
 };
 
+/**
+ * True when `value` is a json-render dynamic expression object (`$state`,
+ * `$item`, `$template`, etc.). Such props carry no literal value at submission
+ * time — they are resolved against the state model at render time — so the
+ * catalog's per-component Zod prop types must not be applied to them.
+ *
+ * Mirrors the expression detectors in `@json-render/core` (which are not
+ * exported). The catalog prompt actively teaches the AI to use these, so the
+ * validator must accept them everywhere a literal value is otherwise expected.
+ */
+const STRING_EXPRESSION_KEYS = [
+  "$state",
+  "$item",
+  "$bindState",
+  "$bindItem",
+  "$template",
+  "$computed",
+] as const;
+
+function isDynamicExpression(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  if (v.$index === true) return true;
+  if ("$cond" in v && "$then" in v && "$else" in v) return true;
+  return STRING_EXPRESSION_KEYS.some((key) => typeof v[key] === "string");
+}
+
+/**
+ * Recursively drop dynamic expressions from a props value so that only literal
+ * parts are type-checked. Expression nodes become absent (object keys removed,
+ * array entries filtered), which `.partial()` then treats as optional. Literal
+ * siblings stay strictly validated, so genuine type errors (e.g. an invalid
+ * `gap` enum value) are still rejected.
+ */
+function stripDynamicExpressions(value: unknown): unknown {
+  if (isDynamicExpression(value)) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map(stripDynamicExpressions)
+      .filter((entry) => entry !== undefined);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      const stripped = stripDynamicExpressions(entry);
+      if (stripped !== undefined) out[key] = stripped;
+    }
+    return out;
+  }
+  return value;
+}
+
 function normalizeElement(element: Spec["elements"][string]) {
   const type = COMPONENT_TYPE_ALIASES[element.type] ?? element.type;
   return type === element.type ? element : { ...element, type };
@@ -87,10 +139,15 @@ export function validateChronaSpec(input: unknown): ValidateResult {
 
     // Presence-lenient, type-strict: relax required props (shadcn declares
     // optionals as `.nullable()` required keys) so omitting a prop is fine,
-    // while a present prop with the wrong type is still rejected.
+    // while a present prop with the wrong type is still rejected. Dynamic
+    // json-render expressions ($state/$item/$template/…) carry no literal
+    // value at submission time, so strip them first — otherwise a legitimate
+    // `{ "$item": "url" }` on a string prop is wrongly rejected as
+    // "expected string, received object".
     const propsSchema = definition.props as ZodType & { partial?: () => ZodType };
     const validator = typeof propsSchema.partial === "function" ? propsSchema.partial() : propsSchema;
-    const propsResult = validator.safeParse((element as { props?: unknown }).props ?? {});
+    const rawProps = (element as { props?: unknown }).props ?? {};
+    const propsResult = validator.safeParse(stripDynamicExpressions(rawProps));
     if (!propsResult.success) {
       for (const issue of propsResult.error.issues) {
         issues.push({

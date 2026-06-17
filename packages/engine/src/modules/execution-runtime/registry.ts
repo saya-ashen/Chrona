@@ -7,6 +7,7 @@ import type {
   RuntimeTaskConfigSpec,
 } from "@chrona/runtime-core";
 import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const HERMES_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
   runtime: HERMES_EXECUTION_RUNTIME,
@@ -66,13 +67,16 @@ export function getRuntimeAdapterDefinition(key: string) {
   const normalizedKey = key.trim();
 
   if (!normalizedKey) {
-    throw new Error("runtime key is required");
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "runtime key is required");
   }
 
   const definition = runtimeRegistry.get(normalizedKey);
 
   if (!definition) {
-    throw new Error(`Unknown runtime: ${normalizedKey}`);
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      `Unknown runtime: ${normalizedKey}`,
+    );
   }
 
   return definition;

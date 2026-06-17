@@ -234,6 +234,21 @@ describe("node runtime refs", () => {
     );
   });
 
+  it("spells out literal array and number props for json-render outputs", () => {
+    const current = node({
+      id: "task-real-456",
+      title: "Render table",
+      type: "task",
+    });
+    const plan = graph([current]);
+    const runtime = buildNodeRuntimePrompt({ plan, node: current });
+
+    expect(runtime.instructions).toContain("never wrap any array prop in { \"item\": ... }");
+    expect(runtime.instructions).toContain("Table.props.columns is [\"Repo\", \"Stars\"]");
+    expect(runtime.instructions).toContain("Table.props.rows is [[\"chrona\", \"120\"]]");
+    expect(runtime.instructions).toContain("CollapsibleText.props.threshold is 800, not \"800\"");
+  });
+
   it("does not expose checkpoint submit as an AI terminal tool", () => {
     const current = node({
       id: "checkpoint-real-123",

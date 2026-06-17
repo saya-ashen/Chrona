@@ -1,0 +1,13 @@
+{
+  "name": "@chrona/skill-chrona-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "chrona": "./bin/chrona"
+  },
+  "files": [
+    "SKILL.md",
+    "bin/chrona"
+  ]
+}

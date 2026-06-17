@@ -239,6 +239,6 @@ function checkpointActions(kind: ExecutionCheckpointKind): CheckpointAction[] {
         ACTIONS.cancelSession,
       ];
     case "failed":
-      return [ACTIONS.retryNode, ACTIONS.requestReplan, ACTIONS.failTask, ACTIONS.cancelSession];
+      return [ACTIONS.retryNode];
   }
 }

@@ -1,4 +1,4 @@
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import { getLatestCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { taskPlanning } from "./task-planning";
 import { TaskPlanGenerationInFlightError } from "./task-plan-generation-registry";

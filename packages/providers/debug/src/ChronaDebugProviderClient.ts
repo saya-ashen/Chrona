@@ -149,7 +149,7 @@ function debugPlanBlueprint() {
         type: "condition",
         title: "Route boundary scenario",
         condition: "Does the checkpoint input request the slow external wait path?",
-        evaluationBy: "system",
+        evaluationBy: "ai",
         branches: [
           { label: "slow wait", nextNodeId: "debug_wait_external_event" },
           { label: "fast path", nextNodeId: "debug_validate_parallel_join" },

@@ -108,6 +108,55 @@ describe("plan-runner task executor continuation", () => {
     ]);
   });
 
+  it("fails a completed runtime run that has no terminal node output", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "started",
+      summary: "First runtime run started",
+      evidence: { sessionId: "main-session", runId: "run_first" },
+      output: { runtimeRunRef: "runtime-first-missing-terminal" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner missing terminal result");
+    const compiledPlan = makeTwoTaskPlan("graph_runtime_sync_missing_terminal");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const started = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(started.status).toBe("running");
+    expect(started.currentNodeId).toBe("first_task");
+
+    await taskPlanExecution.syncRuntimeResult({
+      taskId: task.id,
+      runtimeRunRef: "runtime-first-missing-terminal",
+      status: "Completed",
+      summary: "Provider finished without calling Chrona terminal tools",
+    });
+
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
+
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(session.status).toBe("Paused");
+    expect(session.currentNodeId).toBe("first_task");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_task", "failed"],
+    ]);
+    expect(persisted?.planRun.status).toBe("failed");
+    expect(persisted?.attempts[0]?.error).toMatchObject({
+      message: expect.stringContaining("Runtime run completed without a Chrona terminal result action"),
+    });
+
+    const reloadedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(reloadedTask.status).toBe(TaskStatus.Blocked);
+  });
+
   it("starts the downstream provider run after syncing a completed runtime run", async () => {
     executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({

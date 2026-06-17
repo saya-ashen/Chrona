@@ -18,6 +18,58 @@ function startAt(offsetMs: number): Date {
   return new Date(NOW.getTime() + offsetMs);
 }
 
+
+describe("deriveAutoStartEligibility reasons", () => {
+  it("reports not_scheduled without a work block", () => {
+    expect(deriveAutoStartEligibility({ task: task(), workBlock: null, now: NOW })).toEqual({
+      ok: false,
+      reason: "not_scheduled",
+    });
+  });
+
+  it("reports already_running for active execution states", () => {
+    for (const status of ["Pending", "Running", "WaitingForInput", "WaitingForApproval"]) {
+      expect(
+        deriveAutoStartEligibility({
+          task: task(),
+          workBlock: { scheduledStartAt: startAt(-MINUTE) },
+          now: NOW,
+          activeRun: { status },
+        }),
+      ).toEqual({ ok: false, reason: "already_running" });
+    }
+  });
+
+  it("reports invalid_task_status before runtime and plan checks", () => {
+    expect(
+      deriveAutoStartEligibility({
+        task: task({ status: "Blocked", executionRuntime: null, hasAcceptedPlan: false }),
+        workBlock: { scheduledStartAt: startAt(-MINUTE) },
+        now: NOW,
+      }),
+    ).toEqual({ ok: false, reason: "invalid_task_status" });
+  });
+
+  it("reports no_runtime_config before accepted plan checks", () => {
+    expect(
+      deriveAutoStartEligibility({
+        task: task({ executionRuntime: null, hasAcceptedPlan: false }),
+        workBlock: { scheduledStartAt: startAt(-MINUTE) },
+        now: NOW,
+      }),
+    ).toEqual({ ok: false, reason: "no_runtime_config" });
+  });
+
+  it("reports no_accepted_plan when runtime is configured", () => {
+    expect(
+      deriveAutoStartEligibility({
+        task: task({ hasAcceptedPlan: false }),
+        workBlock: { scheduledStartAt: startAt(-MINUTE) },
+        now: NOW,
+      }),
+    ).toEqual({ ok: false, reason: "no_accepted_plan" });
+  });
+});
 describe("deriveAutoStartEligibility timing offsets", () => {
   it("at_start: not_due while start is in the future", () => {
     const result = deriveAutoStartEligibility({

@@ -1,10 +1,12 @@
-import { describe, expect, it, mock } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import type {
   AgentProviderClient,
   ProviderRunEvent,
   ProviderRunRef,
   ProviderRunSnapshot,
 } from "@chrona/providers-foundation";
+import { db } from "@/lib/db";
+import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { runProviderRequest } from "./ai-runtime-invoker";
 
 const request = {
@@ -31,6 +33,36 @@ function incompleteStream(): AsyncIterable<ProviderRunEvent> {
   })();
 }
 
+
+async function resetDb() {
+  await db.run.deleteMany();
+  await db.task.deleteMany();
+  await db.workspace.deleteMany();
+}
+
+async function seedRunPair() {
+  const workspace = await db.workspace.create({
+    data: { name: "Runtime ref workspace", status: "Active", defaultRuntime: "hermes" },
+  });
+  const task = await db.task.create({
+    data: { workspaceId: workspace.id, title: "Runtime ref task", executionRuntime: "hermes", executionConfig: {}, status: TaskStatus.Running, priority: TaskPriority.Medium },
+  });
+  const first = await db.run.create({
+    data: { taskId: task.id, runtimeName: "hermes", runtimeRunRef: "provider-run-1", runtimeSessionRef: "provider-session-1", status: RunStatus.Running, triggeredBy: "system" },
+  });
+  const second = await db.run.create({
+    data: { taskId: task.id, runtimeName: "hermes", status: RunStatus.Pending, triggeredBy: "system" },
+  });
+  return { first, second };
+}
+
+beforeEach(async () => {
+  await resetDb();
+});
+
+afterAll(async () => {
+  await resetDb();
+});
 describe("runProviderRequest stream-interruption fallback", () => {
   it("keeps the run Running when the stream ends with no terminal event and the provider still reports it running", async () => {
     const startRun = mock(async () => runRef());
@@ -133,5 +165,95 @@ describe("runProviderRequest stream-interruption fallback", () => {
     );
     expect(streamRun).toHaveBeenCalledTimes(1);
     expect(getRun).not.toHaveBeenCalled();
+  });
+});
+
+describe("runProviderRequest runtime ref persistence", () => {
+  it("stores a local run-scoped ref when a resumed provider session reuses nativeRunId", async () => {
+    const { first, second } = await seedRunPair();
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => ({
+        provider: "hermes",
+        runId: "provider-run-1",
+        nativeRunId: "provider-run-1",
+        sessionId: "provider-session-1",
+        status: "running",
+      } satisfies ProviderRunRef)),
+      streamRun: mock(() =>
+        (async function* () {
+          yield {
+            type: "run_completed",
+            run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "completed" },
+            outputText: "ok",
+          } as ProviderRunEvent;
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(client, request, { runId: second.id });
+
+    const runs = await db.run.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, runtimeRunRef: true } });
+    expect(runs).toEqual([
+      { id: first.id, runtimeRunRef: "provider-run-1" },
+      { id: second.id, runtimeRunRef: `provider-run-1:${second.id}` },
+    ]);
+  });
+});
+
+describe("runProviderRequest resume threading", () => {
+  it("forwards request.resumeSessionRef to the provider startRun for cross-process resume", async () => {
+    const startRun = mock(async () => runRef());
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+
+    const client = {
+      provider: "claude_code",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      resumeSessionRef: "sdk-session-prior",
+    });
+
+    expect(startRun).toHaveBeenCalledTimes(1);
+    expect(startRun).toHaveBeenCalledWith(
+      expect.objectContaining({ resumeSessionRef: "sdk-session-prior" }),
+    );
+    expect(snapshot.sessionId).toBe("sdk-session-1");
+  });
+
+  it("omits resumeSessionRef when the request has no prior provider session", async () => {
+    const startRun = mock(async () => runRef());
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+
+    const client = {
+      provider: "claude_code",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(client, request);
+
+    expect(startRun).toHaveBeenCalledWith(
+      expect.not.objectContaining({ resumeSessionRef: expect.anything() }),
+    );
   });
 });

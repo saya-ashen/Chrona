@@ -347,11 +347,15 @@ describe("plan-runner task executor external results", () => {
     const branchRef = buildSemanticRefHistory(initialEffective).branchRefs.find(
       (binding) => binding.nodeId === "manual_task",
     )!.ref;
+    const nodeRef = buildSemanticRefHistory(initialEffective).nodeRefs.find(
+      (binding) => binding.nodeId === "manual_task",
+    )!.ref;
 
     const branchSelected = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
         action: "complete_manual_node",
+        nodeId: nodeRef,
         terminalKind: "condition",
         branchRef,
         summary: "Condition selected continue branch",

@@ -97,6 +97,8 @@ describe("runRestartRecoveryWorker", () => {
       },
     });
 
+    // This task has a live Running run, so its Active session is NOT a crash
+    // orphan and must be left untouched (only the degraded-run scan fires).
     const result = await runRestartRecoveryWorker({
       now: new Date("2026-05-17T00:01:00.000Z"),
       deps: {
@@ -111,7 +113,8 @@ describe("runRestartRecoveryWorker", () => {
 
     expect(result).toEqual({
       expiredLeaseCount: 1,
-      activeSessionCount: 1,
+      activeSessionCount: 0,
+      abandonedSessionCount: 0,
       degradedRunCount: 1,
       runtimeReconciliation: {
         checked: 0,
@@ -123,9 +126,175 @@ describe("runRestartRecoveryWorker", () => {
     expect(await db.schedulerLease.count()).toBe(0);
     const events = await db.schedulerEvent.findMany({ where: { taskId: task.id } });
     expect(events.map((event) => event.reason)).toEqual([
-      "restart_active_session_scan",
       "restart_degraded_run_scan",
     ]);
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+    });
+    expect(session.status).toBe("Active");
+  });
+
+  it("abandons a crash-orphaned Active session and rebuilds its projection", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Orphan Abandon", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Stuck running task",
+        status: "Running",
+        priority: "High",
+        executionRuntime: "hermes",
+        executionConfig: { prompt: "Run" },
+      },
+    });
+    const session = await db.executionSession.create({
+      data: { workspaceId: workspace.id, taskId: task.id, status: "Active", planId: "plan_1" },
+    });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        planRun: {},
+        executionOwnerId: "stale-owner",
+        executionEpoch: 1,
+        executionLeaseUntil: new Date("2026-05-17T00:00:01.000Z"),
+      },
+    });
+    // A terminal (Failed) run — NOT live — so the session is a crash leftover.
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        runtimeRunRef: "runtime_dead",
+        status: "Failed",
+        triggeredBy: "scheduler",
+        syncStatus: "synced",
+        retryable: false,
+      },
+    });
+
+    const rebuiltTaskIds: string[] = [];
+    const result = await runRestartRecoveryWorker({
+      now: new Date("2026-05-17T00:01:00.000Z"),
+      deps: {
+        reconcileStaleRuntimeRuns: async () => ({
+          checked: 0,
+          synced: 0,
+          leftRunning: 0,
+          skipped: 0,
+        }),
+        rebuildTaskProjection: async (taskId: string) => {
+          rebuiltTaskIds.push(taskId);
+          return undefined as never;
+        },
+      },
+    });
+
+    expect(result.activeSessionCount).toBe(1);
+    expect(result.abandonedSessionCount).toBe(1);
+    expect(rebuiltTaskIds).toEqual([task.id]);
+
+    const abandoned = await db.executionSession.findFirstOrThrow({
+      where: { id: session.id },
+    });
+    expect(abandoned.status).toBe("Abandoned");
+    expect(abandoned.completedAt).not.toBeNull();
+    expect(abandoned.pauseReason).toBe("restart_recovery_abandoned");
+
+    const events = await db.schedulerEvent.findMany({ where: { taskId: task.id } });
+    expect(events.map((event) => event.reason)).toContain(
+      "restart_active_session_abandoned",
+    );
+  });
+
+  it("does not abandon an Active session whose task still has a live run", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Live Guard", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Genuinely running task",
+        status: "Running",
+        priority: "High",
+        executionRuntime: "hermes",
+        executionConfig: { prompt: "Run" },
+      },
+    });
+    const session = await db.executionSession.create({
+      data: { workspaceId: workspace.id, taskId: task.id, status: "Active", planId: "plan_1" },
+    });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan_1",
+        planRun: {},
+        executionOwnerId: "live-owner",
+        executionEpoch: 1,
+        executionLeaseUntil: new Date("2026-05-17T01:00:00.000Z"),
+      },
+    });
+    // Live run present — session must be left Active.
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        runtimeRunRef: "runtime_live",
+        status: "Running",
+        triggeredBy: "scheduler",
+        syncStatus: "synced",
+        retryable: false,
+      },
+    });
+
+    const rebuiltTaskIds: string[] = [];
+    const result = await runRestartRecoveryWorker({
+      now: new Date("2026-05-17T00:01:00.000Z"),
+      deps: {
+        reconcileStaleRuntimeRuns: async () => ({
+          checked: 0,
+          synced: 0,
+          leftRunning: 0,
+          skipped: 0,
+        }),
+        rebuildTaskProjection: async (taskId: string) => {
+          rebuiltTaskIds.push(taskId);
+          return undefined as never;
+        },
+      },
+    });
+
+    expect(result.activeSessionCount).toBe(0);
+    expect(result.abandonedSessionCount).toBe(0);
+    expect(rebuiltTaskIds).toEqual([]);
+
+    const guarded = await db.executionSession.findFirstOrThrow({
+      where: { id: session.id },
+    });
+    expect(guarded.status).toBe("Active");
   });
 
   it("skips recovery records whose task was deleted", async () => {
@@ -199,6 +368,7 @@ describe("runRestartRecoveryWorker", () => {
     expect(result).toEqual({
       expiredLeaseCount: 0,
       activeSessionCount: 0,
+      abandonedSessionCount: 0,
       degradedRunCount: 1,
       runtimeReconciliation: {
         checked: 0,

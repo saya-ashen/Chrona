@@ -77,6 +77,7 @@ describe("POST /api/tasks/:taskId/plan/accept", () => {
     });
 
     const app = createPlansRoutes(engine);
+
     const res = await app.request(
       "/tasks/task-1/plan/accept",
       {

@@ -72,6 +72,11 @@ const providersResponse = {
       features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
     },
     {
+      key: "claude_code",
+      label: "Claude Code",
+      features: ["generatePlan", "chat"],
+    },
+    {
       key: "debug",
       label: "Debug Provider",
       features: ["suggest", "generatePlan", "chat"],
@@ -186,6 +191,72 @@ describe("AiClientsManager", () => {
         apiKey: "hermes-token",
         scope: "local",
         timeoutMs: 45000,
+      },
+    });
+  });
+
+  it("creates a Claude Code client with Anthropic environment variables", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+
+    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+      target: { value: "Claude Code via 9router" },
+    });
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Claude Code"));
+    fireEvent.change(screen.getByLabelText("ANTHROPIC_MODEL"), {
+      target: { value: "cx/gpt-5.5" },
+    });
+    fireEvent.change(screen.getByLabelText("ANTHROPIC_BASE_URL"), {
+      target: { value: "https://9router.saya.love/v1" },
+    });
+    fireEvent.change(screen.getByLabelText("ANTHROPIC_AUTH_TOKEN"), {
+      target: { value: "sk-aaa" },
+    });
+    await user.click(screen.getByRole("combobox", { name: "Control plane" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Skill"));
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ client: { id: "client_claude_code" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const createCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients" && call[1]?.method === "POST");
+    expect(JSON.parse(createCall?.[1]?.body as string)).toMatchObject({
+      name: "Claude Code via 9router",
+      type: "claude_code",
+      config: {
+        model: "cx/gpt-5.5",
+        timeoutMs: 120000,
+        controlPlane: "skill",
+        env: {
+          ANTHROPIC_MODEL: "cx/gpt-5.5",
+          ANTHROPIC_BASE_URL: "https://9router.saya.love/v1",
+          ANTHROPIC_AUTH_TOKEN: "sk-aaa",
+        },
       },
     });
   });

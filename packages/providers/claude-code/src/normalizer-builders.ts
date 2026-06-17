@@ -177,9 +177,7 @@ export function buildBaseRef(
 ): ProviderRunRef {
   if (options.baseRef) return options.baseRef;
   const sessionId =
-    typeof rec.session_id === "string"
-      ? rec.session_id
-      : `claude-session-${crypto.randomUUID()}`;
+    typeof rec.session_id === "string" ? rec.session_id : crypto.randomUUID();
   return {
     provider: options.provider ?? "claude_code",
     runId: sessionId,

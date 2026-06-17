@@ -23,7 +23,7 @@ export const AI_INPUT_FIELD_TYPES = [
   "boolean",
   "choice",
 ] as const;
-export const AI_CONDITION_EVALUATORS = ["system", "ai", "user"] as const;
+export const AI_CONDITION_EVALUATORS = ["ai", "user"] as const;
 export const AI_WAIT_TIMEOUT_ACTIONS = [
   "continue",
   "pause",
@@ -91,7 +91,7 @@ function upgradeNode(node: PlanBlueprintNode): EditableNode {
     case "condition":
       return {
         ...node,
-        evaluationBy: node.evaluationBy ?? "system",
+        evaluationBy: node.evaluationBy ?? "ai",
       };
     case "wait":
       return {

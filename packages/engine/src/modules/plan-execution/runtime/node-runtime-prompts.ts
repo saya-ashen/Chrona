@@ -34,9 +34,10 @@ function nodeTypeInstructions(node: EffectivePlanNode): string {
     case "task":
       return `When the current task-node has user-visible deliverables, call chrona_node_output with those outputs before completion. Submit one json-render Spec using the Chrona workspace catalog (see CATALOG_UI_SPEC below). chrona_node_output may be called multiple times to replace the prior output with mode "replace". Call chrona_node_complete only when the current task-node objective is fully satisfied and required outputs have already been submitted. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_node_complete. Call chrona_node_fail for unrecoverable errors.
 
-For user-visible deliverables, chrona_node_output must use the official json-render Spec directly: { "outputs": [{ "root": "rootElementId", "elements": { "rootElementId": { "type": "ComponentName", "props": {}, "children": [] } }, "state": {} }], "mode": "replace" }.
+For user-visible deliverables, chrona_node_output takes outputs as a JSON-encoded string containing an array of complete json-render Specs. Almost always submit exactly ONE Spec. Each Spec is { "root": "rootElementId", "elements": { ...all elements... }, "state": {} }. Multi-element example:
+Tool argument example: { outputs: JSON.stringify([{ root: "root", elements: { root: { type: "Stack", props: { direction: "vertical" }, children: ["title", "body"] }, title: { type: "Heading", props: { text: "Result", level: "h3" }, children: [] }, body: { type: "Text", props: { text: "details" }, children: [] } }, state: {} }]), mode: "replace" }
 
-The spec is the official json-render flat element tree: root is one element id, elements is an object keyed by element id, each element has type plus optional props and children child-id arrays, and state is optional. Use component/action names and props exactly as listed in the catalog prompt. Never submit a json-render Spec as kind "json", kind "ui", or under another wrapper key.`;
+The Spec is the official json-render flat element tree (root key plus an elements map; each element is { "type", "props", "children" }). Hard rules, all enforced by validation: (1) Every element goes into the single "elements" object keyed by its own id — NEVER put elements as separate items in the "outputs" array; "outputs" holds whole Specs, not elements. (2) "children" MUST be a flat array of child element-id strings like ["a", "b"]; for leaf elements with no children use the empty array []. NEVER use an object such as { "item": [...] } and NEVER use a string such as "". (3) The catalog has no list/repeat directive: to render a list, create one element per item and list their ids in the parent's children array. (4) Array and number props are literal JSON only: never wrap any array prop in { "item": ... } or any other object. Table.props.columns is ["Repo", "Stars"]. Table.props.rows is [["chrona", "120"]]. CollapsibleText.props.threshold is 800, not "800". (5) Never emit a bare {} or a trailing empty object in elements or outputs. Use component/action names and props exactly as listed in the catalog prompt. Never submit a json-render Spec as kind "json", kind "ui", or under another wrapper key.`;
     case "condition":
       return `Evaluate exactly one listed branch and call chrona_condition_select with branchRef. Do not use labels, nextNodeId, default branches, natural-language conclusions, or incomplete JSON as routing authority. If no explicit branchRef is safe, call chrona_node_block.`;
     case "checkpoint":
@@ -65,7 +66,7 @@ export function buildNodeRuntimePrompt(input: {
   const catalogSection = input.node.type === "task"
     ? [
         "CATALOG_UI_SPEC — json-render Spec schema for Chrona task-node deliverables:",
-        chronaCatalog.prompt({ mode: "generate" }),
+        chronaCatalog.prompt(),
         `catalogVersion: "${CATALOG_VERSION}" — Chrona validates submitted Specs against this catalog version internally; do not include catalogVersion in the Spec.`,
       ]
     : [];

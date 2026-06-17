@@ -20,6 +20,7 @@ import type {
 } from "@chrona/engine";
 
 import { error, toHttpError } from "../../lib/http";
+import { startSseHeartbeat } from "../../lib/sse-heartbeat";
 import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "./runtime-event-summary";
 
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
@@ -81,13 +82,6 @@ async function reconcileTimedOutProviderApprovals(taskId: string) {
   }
 }
 
-
-function startSseHeartbeat(stream: SseStream) {
-  const timer = setInterval(() => {
-    void stream.writeSSE({ event: "heartbeat", data: "{}" }).catch(() => undefined);
-  }, 5_000);
-  return () => clearInterval(timer);
-}
 
 function summarizeGraphEvent(event: GraphExecutionEvent): Extract<PlanExecutionSSEEvent, { type: "graph_event" }> {
   if ("node" in event) {

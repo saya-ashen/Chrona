@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { validateChronaSpec, type ValidateResult } from "./validate";
+import { chronaCatalog, validateChronaSpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
@@ -40,6 +40,16 @@ describe("validateChronaSpec", () => {
     if (!result.ok) return;
     expect(result.spec.root).toBe("github_trending_report");
     expect(result.spec.elements.github_trending_report).toMatchObject({ type: "Stack" });
+  });
+
+  test("catalog prompt gives literal Table and CollapsibleText examples", () => {
+    const prompt = chronaCatalog.prompt();
+
+    expect(prompt).toContain("Table:");
+    expect(prompt).toContain("columns: [\"Repo\", \"Stars\"]");
+    expect(prompt).toContain("rows: [[\"chrona\", \"120\"]]");
+    expect(prompt).toContain("Do not wrap arrays in objects such as { item: [...] }");
+    expect(prompt).toContain("threshold MUST be a JSON number such as 800");
   });
 
 
@@ -90,5 +100,70 @@ describe("validateChronaSpec", () => {
       },
     };
     expect(validateChronaSpec(spec).ok).toBe(true);
+  });
+
+  test("accepts dynamic expressions on typed string props (repeat + $item)", () => {
+    // The catalog prompt teaches the AI to use repeat + $item for lists. This
+    // is the exact shape that was wrongly rejected as "expected string,
+    // received object" before expression-aware stripping.
+    const spec: UiDocument = {
+      root: "list",
+      elements: {
+        list: {
+          type: "Stack",
+          props: { direction: "vertical", gap: "sm" },
+          repeat: { statePath: "/repos", key: "fullName" },
+          children: ["title"],
+        },
+        title: { type: "Link", props: { label: { $item: "fullName" }, href: { $item: "url" } }, children: [] },
+      },
+      state: { repos: [{ fullName: "a/b", url: "https://example.com" }] },
+    };
+    expect(validateChronaSpec(spec).ok).toBe(true);
+  });
+
+  test("accepts $state, $template, and $cond expressions where literals are typed", () => {
+    for (const text of [
+      { $state: "/title" },
+      { $template: "Hi ${/name}" },
+      { $cond: { $state: "/flag" }, $then: "yes", $else: "no" },
+    ]) {
+      const spec = {
+        root: "h",
+        elements: { h: { type: "Heading", props: { text, level: "h2" }, children: [] } },
+        state: { title: "x", name: "y", flag: true },
+      };
+      expect(validateChronaSpec(spec).ok).toBe(true);
+    }
+  });
+
+  test("accepts a dynamic expression on a typed enum prop", () => {
+    const spec = {
+      root: "h",
+      elements: { h: { type: "Heading", props: { text: "x", level: { $state: "/level" } }, children: [] } },
+      state: { level: "h2" },
+    };
+    expect(validateChronaSpec(spec).ok).toBe(true);
+  });
+
+  test("still rejects a genuine invalid enum value (gap outside the documented set)", () => {
+    const spec = {
+      root: "s",
+      elements: { s: { type: "Stack", props: { gap: "xs" }, children: [] } },
+    };
+    expectIssue(validateChronaSpec(spec), "elements.s.props.gap");
+  });
+
+  test("rejects a literal type error even when a sibling prop is a dynamic expression", () => {
+    const spec = {
+      root: "s",
+      elements: { s: { type: "Stack", props: { gap: "xs", direction: { $state: "/d" } }, children: [] } },
+      state: { d: "vertical" },
+    };
+    const result = validateChronaSpec(spec);
+    expectIssue(result, "elements.s.props.gap");
+    if (result.ok) return;
+    // The dynamic sibling must NOT produce a spurious issue.
+    expect(result.issues.some((i) => i.path.includes("direction"))).toBe(false);
   });
 });

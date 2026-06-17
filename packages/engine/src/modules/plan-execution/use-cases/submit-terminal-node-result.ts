@@ -8,6 +8,7 @@ import type { ExecutionDispatchContext } from "../types";
 import type { ExecutionActionWithContinuation } from "../types";
 import { dispatchExecutionAction } from "../task-plan-execution";
 import { validateChronaSpec } from "@chrona/ui-protocol";
+import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
 function asOutputs(value: unknown): NodeResultOutput[] {
   return Array.isArray(value) ? value as NodeResultOutput[] : [];
@@ -20,7 +21,10 @@ function sanitizeNodeOutputs(outputs: NodeResultOutput[]): NodeResultOutput[] {
   for (const spec of outputs) {
     const result = validateChronaSpec(spec);
     if (!result.ok) {
-      throw new Error(`Invalid chrona_node_output json-render Spec: ${result.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`);
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        `Invalid chrona_node_output json-render Spec: ${result.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`,
+      );
     }
     validSpecs.push(spec);
   }
@@ -53,7 +57,11 @@ async function submitNodeOutput(input: {
   const accepted = await getAcceptedCompiledPlanForTask(input.taskId, {
     sessionId: input.action.sessionId,
   });
-  if (!accepted) throw new Error("No accepted plan. Create or accept a plan before submitting node output.");
+  if (!accepted)
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "No accepted plan. Create or accept a plan before submitting node output.",
+    );
   const persisted = await getPlanRun(input.taskId, accepted.compiledPlan.editablePlanId, accepted.workBlockId);
   if (!persisted?.graph) throw new Error("No runtime graph is available for output submission");
   const effective = toEffectivePlanGraph({

@@ -115,12 +115,12 @@ describe("compilePlanBlueprint", () => {
     })).toThrow(PlanCompileError);
   });
 
-  it("requires a checkpoint immediately before high-risk tasks", () => {
-    expect(() => compilePlanBlueprint({
+  it("does not reject tasks based on text-only high-risk heuristics", () => {
+    const result = compilePlanBlueprint({
       taskId: "task-1",
       blueprint: {
-        title: "Risky plan",
-        goal: "Protect risky actions",
+        title: "Action plan",
+        goal: "Do the requested work",
         nodes: [
           {
             id: "send_email",
@@ -132,7 +132,9 @@ describe("compilePlanBlueprint", () => {
         ],
         edges: [],
       },
-    })).toThrow(PlanCompileError);
+    });
+
+    expect(result.compiledPlan.nodes).toHaveLength(1);
   });
 
   it("does not require a checkpoint for schedule analysis or result delivery", () => {
@@ -167,8 +169,8 @@ describe("compilePlanBlueprint", () => {
     expect(result.compiledPlan.nodes).toHaveLength(2);
   });
 
-  it("still requires a checkpoint before modifying calendar events", () => {
-    expect(() => compilePlanBlueprint({
+  it("does not reject calendar wording without structural violations", () => {
+    const result = compilePlanBlueprint({
       taskId: "task-1",
       blueprint: {
         title: "Calendar update",
@@ -184,6 +186,8 @@ describe("compilePlanBlueprint", () => {
         ],
         edges: [],
       },
-    })).toThrow(PlanCompileError);
+    });
+
+    expect(result.compiledPlan.nodes).toHaveLength(1);
   });
 });

@@ -192,6 +192,39 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.node.wait_complete": waitCompletePayloadSchema.omit({ evidence: true }).strict(),
 } as const;
 
+export const agentControlActionKindSchema = z.enum([
+  "task_read",
+  "plan_read",
+  "output",
+  "complete",
+  "condition_select",
+  "wait_complete",
+  "block",
+  "fail",
+]);
+
+export const agentControlActionPayloadSchemas = {
+  task_read: chronaPublicToolPayloadSchemas["chrona.task.read"],
+  plan_read: chronaPublicToolPayloadSchemas["chrona.plan.read"],
+  output: chronaPublicToolPayloadSchemas["chrona.node.output"],
+  complete: chronaPublicToolPayloadSchemas["chrona.node.complete"],
+  condition_select: chronaPublicToolPayloadSchemas["chrona.node.condition_select"],
+  wait_complete: chronaPublicToolPayloadSchemas["chrona.node.wait_complete"],
+  block: chronaPublicToolPayloadSchemas["chrona.node.block"],
+  fail: chronaPublicToolPayloadSchemas["chrona.node.fail"],
+} as const;
+
+export const agentControlActionBodySchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("task_read"), payload: agentControlActionPayloadSchemas.task_read }).strict(),
+  z.object({ kind: z.literal("plan_read"), payload: agentControlActionPayloadSchemas.plan_read }).strict(),
+  z.object({ kind: z.literal("output"), payload: agentControlActionPayloadSchemas.output }).strict(),
+  z.object({ kind: z.literal("complete"), payload: agentControlActionPayloadSchemas.complete }).strict(),
+  z.object({ kind: z.literal("condition_select"), payload: agentControlActionPayloadSchemas.condition_select }).strict(),
+  z.object({ kind: z.literal("wait_complete"), payload: agentControlActionPayloadSchemas.wait_complete }).strict(),
+  z.object({ kind: z.literal("block"), payload: agentControlActionPayloadSchemas.block }).strict(),
+  z.object({ kind: z.literal("fail"), payload: agentControlActionPayloadSchemas.fail }).strict(),
+]);
+
 /**
  * Contracts for agent-operated MCP task tools. Provider text, tool traces, and
  * structured output belong in `input.evidence`; Chrona services remain the only
@@ -260,6 +293,8 @@ export type ChronaToolOperation = z.infer<typeof chronaToolOperationSchema>;
 export type ChronaToolResult = z.infer<typeof chronaToolResultSchema>;
 export type ChronaToolRecovery = z.infer<typeof chronaToolRecoverySchema>;
 export type ChronaToolRegistry = z.infer<typeof chronaToolRegistrySchema>;
+export type AgentControlActionKind = z.infer<typeof agentControlActionKindSchema>;
+export type AgentControlActionBody = z.infer<typeof agentControlActionBodySchema>;
 
 export function isChronaToolMutating(toolName: ChronaToolName) {
   return !toolName.endsWith(".read");

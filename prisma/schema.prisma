@@ -190,6 +190,8 @@ model Workspace {
   schedulerEvents      SchedulerEvent[]
   calendarSources      CalendarSource[]
   importedCalendarEvents ImportedCalendarEvent[]
+  runTokens            RunToken[]
+  taskPlanTerminalActions TaskPlanTerminalAction[]
 }
 
 model CalendarSource {
@@ -308,6 +310,8 @@ model Task {
   reconciliationEvents ReconciliationEvent[]
   schedulerEvents      SchedulerEvent[]
   importedCalendarEvents ImportedCalendarEvent[]
+  runTokens             RunToken[]
+  taskPlanTerminalActions TaskPlanTerminalAction[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
@@ -413,6 +417,7 @@ model TaskSession {
   lastRunStatus      String?
   activeRunId        String?
   lastRunRef         String?
+  providerSessionRef String?
   createdByFramework Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -529,6 +534,7 @@ model TaskPlanNodeAttempt {
   planRun                    TaskPlanRun           @relation(fields: [planRunId], references: [id], onDelete: Cascade)
   providerRuns               TaskPlanProviderRun[]
   providerApprovals TaskPlanProviderApproval[]
+  terminalActions            TaskPlanTerminalAction[]
 
   @@index([taskId, planId, nodeId, status])
   @@index([planRunId, nodeId, attemptNumber])
@@ -668,12 +674,15 @@ model Run {
   timelineItems         TaskTimelineItem[]
   conversationEntries   ConversationEntry[]
   runtimeCursor         RuntimeCursor?
+  runTokens             RunToken[]
+  terminalActions       TaskPlanTerminalAction[]
 
   @@index([taskId, status])
   @@index([taskId, workBlockId, status])
   @@index([taskSessionId, status])
   @@index([runtimeName, status])
 }
+
 
 model Approval {
   id             String         @id @default(cuid())
@@ -1129,4 +1138,50 @@ model ExecutionSession {
   @@index([workspaceId, status])
   @@index([taskId, status])
   @@index([workBlockId])
+}
+
+model RunToken {
+  id                String      @id @default(cuid())
+  tokenHash         String      @unique
+  taskId            String
+  taskSessionId     String?
+  runId             String
+  runtimeSessionKey String
+  nodeId            String?
+  nodeAttemptId     String?
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime    @default(now())
+  workspaceId       String
+  workspace         Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task              Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run               Run         @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+
+  @@index([taskId, nodeAttemptId])
+  @@index([runId])
+  @@index([expiresAt])
+}
+
+model TaskPlanTerminalAction {
+  id                String               @id @default(cuid())
+  workspaceId       String
+  taskId            String
+  runId             String
+  taskSessionId     String?
+  runtimeSessionKey String
+  nodeId            String?
+  nodeAttemptId     String?
+  kind              String
+  payload           Json
+  recordedAt        DateTime             @default(now())
+  workspace         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task              Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  run               Run                  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeAttempt       TaskPlanNodeAttempt? @relation(fields: [nodeAttemptId], references: [id], onDelete: Cascade)
+
+  @@index([runId, recordedAt])
+  @@index([nodeAttemptId, recordedAt])
+  @@index([taskId, kind])
+  @@unique([nodeAttemptId, kind])
 }

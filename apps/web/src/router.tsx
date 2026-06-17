@@ -5,6 +5,7 @@ import { defaultLocale, hasLocale } from "@chrona/i18n";
 import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import {
+  DashboardRoutePage,
   InboxRoutePage,
   LocaleLandingPage,
   MemoryRoutePage,
@@ -17,6 +18,7 @@ import {
 import { NotFoundPage } from "@/components/not-found-page";
 import {
   loadAppBootData,
+  loadDashboardRouteData,
   loadInboxRouteData,
   loadMemoryRouteData,
   loadScheduleRouteData,
@@ -50,6 +52,11 @@ export function createAppRouter() {
         {
           index: true,
           element: <LocaleLandingPage />,
+        },
+        {
+          path: "dashboard",
+          loader: loadDashboardRouteData,
+          element: <DashboardRoutePage />,
         },
         {
           path: "schedule",

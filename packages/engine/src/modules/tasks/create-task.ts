@@ -8,6 +8,7 @@ import { deriveTaskStaticState } from "@chrona/domain";
 import { normalizeAutomationTiming } from "@chrona/contracts";
 import type { CreateTaskInput } from "@chrona/contracts";
 import { expandRecurrenceRule } from "@chrona/integrations";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const SELF_SERIES_WINDOW_DAYS = 180;
 const SELF_SERIES_MAX_OCCURRENCES = 365;
@@ -20,7 +21,10 @@ function normalizeExecutionConfig(
   }
 
   if (value === null || Array.isArray(value)) {
-    throw new Error("executionConfig must be an object");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "executionConfig must be an object",
+    );
   }
 
   return value;
@@ -34,7 +38,7 @@ export async function createTask(input: CreateTaskInput) {
   );
 
   if (!title) {
-    throw new Error("title is required");
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "title is required");
   }
 
   const workspace = await db.workspace.findUnique({
@@ -52,7 +56,8 @@ export async function createTask(input: CreateTaskInput) {
     });
 
     if (!parentTask || parentTask.workspaceId !== input.workspaceId) {
-      throw new Error(
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
         "parentTaskId must reference a task in the same workspace",
       );
     }
@@ -92,13 +97,17 @@ export async function createTask(input: CreateTaskInput) {
       Number.isNaN(recurrenceAnchorStartAt.getTime()) ||
       Number.isNaN(recurrenceAnchorEndAt.getTime())
     ) {
-      throw new Error(
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
         "recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set",
       );
     }
 
     if (recurrenceAnchorEndAt.getTime() <= recurrenceAnchorStartAt.getTime()) {
-      throw new Error("recurrenceAnchorEndAt must be after recurrenceAnchorStartAt");
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "recurrenceAnchorEndAt must be after recurrenceAnchorStartAt",
+      );
     }
   }
 

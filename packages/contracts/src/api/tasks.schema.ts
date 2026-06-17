@@ -107,11 +107,18 @@ export const listTasksQuerySchema = z.object({
   pageSize: pageSizeParam,
 });
 
+// Upper bounds on free-text fields. Without a cap, a single request can
+// persist an arbitrarily large string (e.g. a 100KB title), a memory/disk
+// pressure vector on the local app and an unbounded API contract.
+export const TASK_TITLE_MAX = 500;
+export const TASK_DESCRIPTION_MAX = 10_000;
+export const TASK_RECURRENCE_RULE_MAX = 1_000;
+
 // ── POST /tasks ──
 export const createTaskBodySchema = z.object({
   workspaceId: workspaceId,
-  title: z.string().min(1, "title is required"),
-  description: z.string().optional(),
+  title: z.string().min(1, "title is required").max(TASK_TITLE_MAX),
+  description: z.string().max(TASK_DESCRIPTION_MAX).optional(),
   priority: taskPriorityEnum.optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),
@@ -120,7 +127,7 @@ export const createTaskBodySchema = z.object({
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   parentTaskId: z.string().nullable().optional(),
-  recurrenceRule: z.string().trim().min(1).nullable().optional(),
+  recurrenceRule: z.string().trim().min(1).max(TASK_RECURRENCE_RULE_MAX).nullable().optional(),
   recurrenceAnchorStartAt: z.string().datetime().nullable().optional(),
   recurrenceAnchorEndAt: z.string().datetime().nullable().optional(),
 });
@@ -151,8 +158,8 @@ export const updateTaskParamSchema = z.object({
 });
 export const updateTaskBodySchema = z.object({
   workspaceId: z.string().optional(),
-  title: z.string().optional(),
-  description: z.string().optional(),
+  title: z.string().min(1).max(TASK_TITLE_MAX).optional(),
+  description: z.string().max(TASK_DESCRIPTION_MAX).optional(),
   priority: taskPriorityEnum.optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),
@@ -161,7 +168,7 @@ export const updateTaskBodySchema = z.object({
   status: taskStatusEnum.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
-  recurrenceRule: z.string().trim().min(1).nullable().optional(),
+  recurrenceRule: z.string().trim().min(1).max(TASK_RECURRENCE_RULE_MAX).nullable().optional(),
   recurrenceAnchorStartAt: z.string().datetime().nullable().optional(),
   recurrenceAnchorEndAt: z.string().datetime().nullable().optional(),
 });

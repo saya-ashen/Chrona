@@ -11,6 +11,7 @@ type NodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
   runtimeName?: string;
+  provider?: string;
   runtimeRunRef?: string | null;
   artifactIds?: string[];
   conversationEntryIds?: string[];

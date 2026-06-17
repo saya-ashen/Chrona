@@ -53,7 +53,7 @@ import {
 import { appendGraphRuntimeEvents } from "../persistence/runtime-event-store";
 import { createKernelGraphCallbacks } from "./graph-callbacks";
 import type { EngineRuntimeContext, PlanExecutionObserver } from "./kernel-types";
-import { branchBindingForRef } from "../runtime/node-runtime-refs";
+import { branchBindingForRef, buildSemanticRefHistory } from "../runtime/node-runtime-refs";
 
 const DEFAULT_MAX_STEPS = 10;
 
@@ -125,12 +125,19 @@ function currentNode(effective: EffectivePlanGraph) {
   );
 }
 
+function resolveSubmittedNodeRef(nodeId: string, effective: EffectivePlanGraph): string {
+  const direct = effective.nodes.find((node) => node.id === nodeId || node.localId === nodeId);
+  if (direct) return direct.id;
+  const binding = buildSemanticRefHistory(effective).nodeRefs.find((candidate) => candidate.ref === nodeId);
+  return binding?.nodeId ?? nodeId;
+}
+
 function resolveSubmitNodeId(
   command: Extract<ExecutionCommand, { type: "submit_node_result" }>,
   state: GraphExecutionState,
   effective: EffectivePlanGraph,
 ): string | null {
-  if (command.nodeId) return command.nodeId;
+  if (command.nodeId) return resolveSubmittedNodeRef(command.nodeId, effective);
   if (command.runtimeRunRef) {
     const byResult = state.results.find(
       (result) => result.evidence?.runtimeRunRef === command.runtimeRunRef,

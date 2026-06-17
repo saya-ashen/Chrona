@@ -75,6 +75,10 @@ boundaries:
 api:
     bun run chrona test api
 
+# Regenerate the feature + test map (docs/maps/feature-test-map.{md,json}); pass --check to fail on drift
+map *args:
+    bun run scripts/build-feature-test-map.ts {{args}}
+
 # Run Bun-only tests
 bun-test:
     bun run chrona test bun

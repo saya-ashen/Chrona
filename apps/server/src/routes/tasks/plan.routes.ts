@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { ENGINE_ERROR_CODES, EngineError, type ChronaEngine } from "@chrona/engine";
 import { getApiMessages, getPreferredLocale } from "@chrona/i18n";
-import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
 import {
   planStateParamSchema,
   planAcceptParamSchema,
@@ -18,6 +17,7 @@ import {
 } from "@chrona/contracts/api";
 import { logger, planGenerationConflictBody } from "../helpers";
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
+import { startSseHeartbeat } from "../../lib/sse-heartbeat";
 
 function writePlanGenerationEvent(
   stream: Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never,
@@ -55,51 +55,7 @@ function writePlanGenerationEvent(
   }
 }
 
-function startSseHeartbeat(
-  stream: Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never,
-) {
-  const timer = setInterval(() => {
-    void stream.writeSSE({ event: "heartbeat", data: "{}" }).catch(() => undefined);
-  }, 5_000);
-  return () => clearInterval(timer);
-}
 
-function summarizePlanGenerationEvent(
-  event: import("@chrona/contracts").GeneratePlanSSEEvent,
-) {
-  switch (event.type) {
-    case "partial":
-      return {
-        type: event.type,
-        textLength: event.text.length,
-        text: previewDebugValue(event.text, 300),
-      };
-    case "tool_call":
-      return {
-        type: event.type,
-        tool: event.tool,
-        input: previewDebugValue(event.input, 1200),
-      };
-    case "result":
-      return {
-        type: event.type,
-        result: previewDebugValue(event.result, 1200),
-        taskSessionKey: event.taskSessionKey,
-      };
-    case "error":
-      return {
-        type: event.type,
-        code: event.code,
-        message: event.message,
-        diagnostics: previewDebugValue(event.diagnostics, 1200),
-      };
-    case "status":
-    case "cancelled":
-    case "done":
-    default:
-      return { ...event };
-  }
-}
 
 export function createPlansRoutes(engine: ChronaEngine) {
   return new Hono()
@@ -170,17 +126,6 @@ export function createPlansRoutes(engine: ChronaEngine) {
 
         return streamSSE(c, async (stream) => {
           const stopHeartbeat = startSseHeartbeat(stream);
-          const dump = await createDebugDump({
-            enabledEnv: "CHRONA_AI_STREAM_DUMP",
-            directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
-            kind: "ai-stream",
-            label: `server-active-${taskId}-${active.generationId}`,
-            meta: {
-              layer: "server.plan.routes.active.events",
-              taskId,
-              generationId: active.generationId,
-            },
-          });
           let resolveClosed: (() => void) | null = null;
           const closed = new Promise<void>((resolve) => {
             resolveClosed = resolve;
@@ -188,11 +133,6 @@ export function createPlansRoutes(engine: ChronaEngine) {
 
           const current = engine.tasks.plan.getActiveGeneration({ taskId, workBlockId }).generationSession;
           if (current && current.generationId === active.generationId) {
-            await dump?.write({
-              type: "write_sse",
-              event: "session",
-              snapshot: previewDebugValue(current, 1200),
-            });
             await stream.writeSSE({
               event: "session",
               data: JSON.stringify({ generationId: current.generationId, snapshot: current }),
@@ -202,14 +142,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
           let writeQueue = Promise.resolve();
           const writeEvent = (event: import("@chrona/contracts").GeneratePlanSSEEvent) => {
             writeQueue = writeQueue
-              .then(async () => {
-                await dump?.write({
-                  type: "write_sse",
-                  event: event.type,
-                  payload: summarizePlanGenerationEvent(event),
-                });
-                await writePlanGenerationEvent(stream, event);
-              })
+              .then(() => writePlanGenerationEvent(stream, event))
               .then(() => undefined);
 
             return writeQueue;
@@ -219,15 +152,9 @@ export function createPlansRoutes(engine: ChronaEngine) {
             taskId,
             workBlockId,
             onEvent(event) {
-              void dump?.write({
-                type: "subscription_event",
-                event: summarizePlanGenerationEvent(event),
-              });
               void writeEvent(event);
               if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
-                void writeQueue.finally(async () => {
-                  await dump?.write({ type: "close", reason: event.type });
-                  await dump?.close();
+                void writeQueue.finally(() => {
                   resolveClosed?.();
                 });
               }
@@ -235,14 +162,11 @@ export function createPlansRoutes(engine: ChronaEngine) {
           });
 
           if (!subscription || subscription.generationId !== active.generationId) {
-            await dump?.write({ type: "write_sse", event: "done", reason: "subscription_missing" });
             await stream.writeSSE({ event: "done", data: "{}" });
-            await dump?.close();
             return;
           }
 
           stream.onAbort(() => {
-            void dump?.write({ type: "abort" }).finally(() => dump.close());
             stopHeartbeat();
             subscription.unsubscribe();
             resolveClosed?.();
@@ -293,33 +217,11 @@ export function createPlansRoutes(engine: ChronaEngine) {
           });
 
           const generation = engine.tasks.plan.generate({ taskId, workBlockId, forceRefresh, userInstruction });
-          const generatorDump = await createDebugDump({
-            enabledEnv: "CHRONA_AI_STREAM_DUMP",
-            directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
-            kind: "ai-stream",
-            label: `server-generator-${taskId}-${generation.generationId}`,
-            meta: {
-              layer: "server.plan.routes.generations.generator",
-              requestId,
-              taskId,
-              generationId: generation.generationId,
-              forceRefresh: forceRefresh ?? false,
-              hasUserInstruction: Boolean(userInstruction?.trim()),
-            },
-          });
 
           void (async () => {
             try {
               for await (const event of generation.events) {
-                await generatorDump?.write({
-                  type: "engine_event",
-                  event: summarizePlanGenerationEvent(event),
-                });
                 generation.emit(event);
-                await generatorDump?.write({
-                  type: "registry_emit",
-                  eventType: event.type,
-                });
                 logger.info("stream.event", {
                   requestId,
                   feature: "generate_plan",
@@ -360,33 +262,15 @@ export function createPlansRoutes(engine: ChronaEngine) {
                 code: "INTERNAL_ERROR",
                 message: cause instanceof Error ? cause.message : "Failed to generate task plan",
               };
-              await generatorDump?.write({
-                type: "engine_error",
-                message: cause instanceof Error ? cause.message : String(cause),
-              });
               generation.emit(errorEvent);
-              await generatorDump?.write({ type: "registry_emit", eventType: errorEvent.type });
             } finally {
-              await generatorDump?.write({ type: "generation_finish" });
-              await generatorDump?.close();
               generation.finish();
             }
           })();
 
           return streamSSE(c, async (stream) => {
             const stopHeartbeat = startSseHeartbeat(stream);
-            const clientDump = await createDebugDump({
-              enabledEnv: "CHRONA_AI_STREAM_DUMP",
-              directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
-              kind: "ai-stream",
-              label: `server-client-${taskId}-${generation.generationId}`,
-              meta: {
-                layer: "server.plan.routes.generations.client",
-                requestId,
-                taskId,
-                generationId: generation.generationId,
-              },
-            });
+
             let resolveClosed: (() => void) | null = null;
             const closed = new Promise<void>((resolve) => {
               resolveClosed = resolve;
@@ -395,14 +279,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
             let writeQueue = Promise.resolve();
             const writeEvent = (event: import("@chrona/contracts").GeneratePlanSSEEvent) => {
               writeQueue = writeQueue
-                .then(async () => {
-                  await clientDump?.write({
-                    type: "write_sse",
-                    event: event.type,
-                    payload: summarizePlanGenerationEvent(event),
-                  });
-                  await writePlanGenerationEvent(stream, event);
-                })
+                .then(() => writePlanGenerationEvent(stream, event))
                 .then(() => undefined);
 
               return writeQueue;
@@ -411,15 +288,9 @@ export function createPlansRoutes(engine: ChronaEngine) {
             const subscription = engine.tasks.plan.subscribeToGeneration({
               generationId: generation.generationId,
               onEvent(event) {
-                void clientDump?.write({
-                  type: "subscription_event",
-                  event: summarizePlanGenerationEvent(event),
-                });
                 void writeEvent(event);
                 if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
-                  void writeQueue.finally(async () => {
-                    await clientDump?.write({ type: "close", reason: event.type });
-                    await clientDump?.close();
+                  void writeQueue.finally(() => {
                     resolveClosed?.();
                   });
                 }
@@ -427,7 +298,6 @@ export function createPlansRoutes(engine: ChronaEngine) {
             });
 
             if (!subscription) {
-              await clientDump?.write({ type: "write_sse", event: "error", reason: "subscription_missing" });
               await stream.writeSSE({
                 event: "error",
                 data: JSON.stringify({
@@ -435,18 +305,15 @@ export function createPlansRoutes(engine: ChronaEngine) {
                   message: "Failed to subscribe to task plan generation session",
                 }),
               });
-              await clientDump?.close();
               return;
             }
 
             stream.onAbort(() => {
-              void clientDump?.write({ type: "abort" }).finally(() => clientDump.close());
               stopHeartbeat();
               subscription.unsubscribe();
               resolveClosed?.();
             });
 
-            await clientDump?.write({ type: "write_sse", event: "session", generationId: generation.generationId });
             await stream.writeSSE({
               event: "session",
               data: JSON.stringify({ generationId: generation.generationId }),
@@ -456,11 +323,6 @@ export function createPlansRoutes(engine: ChronaEngine) {
               generationId: generation.generationId,
             }).generationSession;
             if (snapshot) {
-              await clientDump?.write({
-                type: "write_sse",
-                event: "session",
-                snapshot: previewDebugValue(snapshot, 1200),
-              });
               await stream.writeSSE({
                 event: "session",
                 data: JSON.stringify({

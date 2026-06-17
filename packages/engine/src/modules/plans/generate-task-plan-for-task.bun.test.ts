@@ -44,6 +44,7 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
 }));
 
 let streamStyle: "full" | "hermes" | "hermes-no-save" = "full";
+let planToolName = "chrona_plan_generate";
 
 import { materializeGeneratedTaskPlan } from "./materialize-generated-task-plan";
 
@@ -70,19 +71,19 @@ async function* aiGeneratePlanStreamMock(request: { title: string; description?:
     return;
   }
 
-  yield { type: "tool_call" as const, tool: "chrona_plan_generate", input: blueprint };
+  yield { type: "tool_call" as const, tool: planToolName, input: blueprint };
 
   if (blueprint.nodes.length === 0) {
     yield {
       type: "tool_result" as const,
-      tool: "chrona_plan_generate",
+      tool: planToolName,
       result: "Plan blueprint must contain at least one node.",
       error: true,
     };
     return;
   }
 
-  yield { type: "tool_result" as const, tool: "chrona_plan_generate", result: "completed" };
+  yield { type: "tool_result" as const, tool: planToolName, result: "completed" };
   yield { type: "done" as const, text: "done" };
 }
 
@@ -116,6 +117,7 @@ describe("generateTaskPlanForTask", () => {
   beforeEach(async () => {
     await resetDb();
     streamStyle = "full";
+    planToolName = "chrona_plan_generate";
     aiGeneratePlanMock.mockClear();
   });
 
@@ -194,6 +196,31 @@ describe("generateTaskPlanForTask", () => {
       plan_title: "Plan for Updated task title",
       node_count: 1,
     });
+  });
+
+  it("accepts Claude Code MCP-prefixed plan tool calls", async () => {
+    planToolName = "mcp__chrona__chrona_plan_generate";
+    const workspace = await db.workspace.create({
+      data: { name: "Prefixed plan tool", status: "Active", defaultRuntime: "claude_code" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Claude Code plan task",
+        status: "Ready",
+        priority: "High",
+        executionRuntime: "claude_code",
+        executionConfig: {},
+      },
+    });
+
+    const result = await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
+
+    expect(result?.summary).toBe("Plan for Claude Code plan task");
+    const failure = await db.event.findFirst({
+      where: { taskId: task.id, eventType: "plan_generation.failed" },
+    });
+    expect(failure).toBeNull();
   });
 
   it("stores regeneration user instruction on the generated plan", async () => {

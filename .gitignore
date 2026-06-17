@@ -18,6 +18,7 @@ node_modules/
 /test-results
 /artifacts/demo/playwright
 /playwright-report
+/agent-test-runs
 
 /out/
 
@@ -103,3 +104,9 @@ Thumbs.db
 # oh-my-claudecode runtime state (sessions, HUD cache, project memory, replay logs)
 /.omc/
 .omc/
+
+# claude-code provider per-run artifacts (mcp config / skill mounts, regenerable)
+.claude-code-mcp/
+
+# ralph scratch notes
+progress.txt

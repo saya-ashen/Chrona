@@ -1,0 +1,15 @@
+{
+  "name": "@chrona-org/agent-cli",
+  "version": "0.1.0",
+  "description": "Chrona agent control library — used by @chrona/cli to expose `chrona node <verb>` subcommands. Drives the skill-mode control plane from inside a provider run (claude_code). Scope is bound to CHRONA_BASE_URL + CHRONA_RUN_TOKEN; task/node ids are never accepted on argv.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./payloads": "./src/payloads.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "@chrona/contracts": "workspace:*"
+  }
+}

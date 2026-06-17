@@ -3,7 +3,7 @@ import type { CompiledPlan, ConditionConfig } from "./index";
 
 export function makeConditionConfig(input: {
   condition: string;
-  evaluationBy: "user" | "system";
+  evaluationBy: "user" | "ai";
   branches: Array<{ label: string; nextNodeId: string }>;
   defaultNextNodeId?: string;
 }): ConditionConfig {

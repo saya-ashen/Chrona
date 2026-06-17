@@ -67,6 +67,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
+    "@copilotkit/aimock": "^1.31.0",
     "@eslint/js": "^9.38.0",
     "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.1",

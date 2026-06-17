@@ -13,8 +13,10 @@ import type {
   ProviderRunInput,
   ProviderRunRef,
   StartRunInput,
+  StartRunInputWithControl,
 } from "@chrona/providers-foundation";
 import { requireAiClient } from "@/modules/ai";
+import { mintRunToken } from "./runtime/agent-control-store";
 
 type ProviderChatHistory = {
   messages: Array<{ role: string; content: string }>;
@@ -29,6 +31,7 @@ type ExecutionProviderRequest = {
   terminalToolName?: string;
   maxOutputTokens?: number;
   timeoutSeconds?: number;
+  resumeSessionRef?: string;
 };
 
 export type AiRuntimeInvocationInput = {
@@ -59,6 +62,13 @@ export type AiRuntimeInvocation = {
   runtimeSessionKey: string;
   conversationEntryIds: string[];
   response: ProviderRunSnapshot;
+  /**
+   * Plain run token minted for this invocation; null if the active provider is
+   * not `claude_code` or the caller did not opt into skill-mode control plane.
+   * Exposed only to the engine + provider; the CLI receives it via env.
+   */
+  controlRunToken: string | null;
+  providerName: string;
 };
 
 const TRANSIENT_PROVIDER_ERROR_CODES = new Set([
@@ -114,7 +124,27 @@ export class AiRuntimeInvoker {
           `AI client '${client.record.name}' does not support runtime execution`,
         );
       }
+      const providerName = client.providerClient.provider;
+      const useSkillControl = providerName === "claude_code";
+      let controlRunToken: string | null = null;
+      if (useSkillControl) {
+        controlRunToken = await mintRunToken({
+          taskId: input.taskId,
+          workspaceId: task.workspaceId,
+          taskSessionId: input.taskSessionId,
+          runId: run.id,
+          runtimeSessionKey: input.runtimeSessionKey,
+          nodeId: input.nodeContext?.nodeId,
+          nodeAttemptId: input.nodeAttemptId,
+        });
+      }
 
+      // Resume the prior provider conversation across process restarts: the
+      // runner's in-process SDK-session cache is empty on a fresh process, so
+      // seed it from the durable id captured on the Chrona TaskSession.
+      const priorProviderSessionRef = await readTaskSessionProviderRef(
+        input.taskSessionId,
+      );
       const request = buildExecutionGatewayRequest({
         instructions: input.instructions,
         runtimeInput: input.runtimeInput,
@@ -122,6 +152,7 @@ export class AiRuntimeInvoker {
         sessionKey: input.runtimeSessionKey,
         sessionId: input.runtimeSessionKey,
         executionRuntime: input.runtimeName,
+        resumeSessionRef: priorProviderSessionRef,
       });
       const terminalToolName = request.terminalToolName;
       const providerRun = await ensureProviderRunRecord({
@@ -135,6 +166,7 @@ export class AiRuntimeInvoker {
         runId: run.id,
         idempotencyKey: input.providerRunIdempotencyKey,
         providerRunRecordId: providerRun?.id,
+        controlRunToken,
         onRuntimeEvent: input.onRuntimeEvent,
         terminalToolName,
         eventPersistence: {
@@ -156,7 +188,7 @@ export class AiRuntimeInvoker {
         response.sessionId,
         "provider snapshot",
       );
-      const runtimeRunRef = response.nativeRunId ?? response.runId ?? null;
+      const runtimeRunRef = await uniqueRuntimeRunRef(run.id, response.nativeRunId ?? response.runId);
       const conversationEntryIds = await persistRuntimeHistory({
         runId: run.id,
         request,
@@ -173,6 +205,13 @@ export class AiRuntimeInvoker {
           errorSummary: response.error,
         },
       });
+      // Persist the provider-native session id for cross-process resume. The
+      // runner rewrites the run ref's sessionId to the captured SDK
+      // `session_id`, so when it differs from the engine session key it is the
+      // authoritative provider id worth remembering on the TaskSession.
+      if (runtimeSessionKey !== input.runtimeSessionKey) {
+        await persistTaskSessionProviderRef(input.taskSessionId, runtimeSessionKey);
+      }
       await updateProviderRunRecord(providerRun?.id, {
         providerRunRef: runtimeRunRef,
         runtimeName: input.runtimeName,
@@ -187,6 +226,8 @@ export class AiRuntimeInvoker {
         runtimeSessionKey,
         conversationEntryIds,
         response,
+        controlRunToken,
+        providerName,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -216,6 +257,9 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
     instructions: request.instructions,
     input: request.input as ProviderRunInput,
     maxOutputTokens: request.maxOutputTokens,
+    ...(request.resumeSessionRef
+      ? { resumeSessionRef: request.resumeSessionRef }
+      : {}),
     timeoutMs: request.timeoutSeconds
       ? request.timeoutSeconds * 1000
       : undefined,
@@ -230,6 +274,7 @@ export async function runProviderRequest(
     runId?: string;
     idempotencyKey?: string;
     providerRunRecordId?: string;
+    controlRunToken?: string | null;
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     terminalToolName?: string;
     eventPersistence?: RuntimeEventPersistenceContext;
@@ -240,17 +285,26 @@ export async function runProviderRequest(
   const idempotencyKey = options.idempotencyKey ?? (options.runId
     ? `chrona-runtime:${options.runId}`
     : undefined);
+  const controlPlane = providerClient.provider === "claude_code" && options.controlRunToken
+    ? {
+        baseUrl: process.env.CHRONA_BASE_URL ?? "",
+        runToken: options.controlRunToken,
+        skillsDir: process.env.CHRONA_SKILLS_DIR ?? "",
+        skillName: process.env.CHRONA_SKILL_NAME ?? undefined,
+      }
+    : undefined;
   const run = await providerClient.startRun({
     ...startInput,
     signal: options.signal,
     idempotencyKey,
-  } as StartRunInput & { idempotencyKey?: string });
+    ...(controlPlane ? { control: controlPlane } : {}),
+  } as StartRunInputWithControl & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
-      await updateProviderRunRecord(options.providerRunRecordId, {
-        providerRunRef: run.nativeRunId ?? run.runId,
-        nativeRunId: run.nativeRunId ?? null,
-        status: run.status ?? "running",
-      });
+  await updateProviderRunRecord(options.providerRunRecordId, {
+    providerRunRef: run.nativeRunId ?? run.runId,
+    nativeRunId: run.nativeRunId ?? null,
+    status: run.status ?? "running",
+  });
 
   try {
     return await collectProviderRunSnapshot(
@@ -421,14 +475,47 @@ async function persistRuntimeRunRef(
 ) {
   if (!runId) return;
   const runtimeSessionRef = requireRuntimeSessionId(run.sessionId, "provider run ref");
+  const runtimeRunRef = await uniqueRuntimeRunRef(runId, run.nativeRunId ?? run.runId);
   await db.run.update({
     where: { id: runId },
     data: {
-      runtimeRunRef: run.nativeRunId ?? run.runId,
+      runtimeRunRef,
       runtimeSessionRef,
       status: RunStatus.Running,
       syncStatus: "healthy",
     },
+  });
+}
+
+async function uniqueRuntimeRunRef(runId: string, providerRunRef: string | null) {
+  if (!providerRunRef) return null;
+  const existing = await db.run.findUnique({
+    where: { runtimeRunRef: providerRunRef },
+    select: { id: true },
+  });
+  if (!existing || existing.id === runId) return providerRunRef;
+  return `${providerRunRef}:${runId}`;
+}
+
+async function readTaskSessionProviderRef(
+  taskSessionId: string | undefined,
+): Promise<string | undefined> {
+  if (!taskSessionId) return undefined;
+  const session = await db.taskSession.findUnique({
+    where: { id: taskSessionId },
+    select: { providerSessionRef: true },
+  });
+  return session?.providerSessionRef?.trim() || undefined;
+}
+
+async function persistTaskSessionProviderRef(
+  taskSessionId: string | undefined,
+  providerSessionRef: string,
+): Promise<void> {
+  if (!taskSessionId) return;
+  await db.taskSession.update({
+    where: { id: taskSessionId },
+    data: { providerSessionRef },
   });
 }
 
@@ -807,6 +894,7 @@ function buildExecutionGatewayRequest(input: {
   sessionKey: string;
   sessionId: string;
   executionRuntime: string;
+  resumeSessionRef?: string;
 }): ExecutionProviderRequest {
   const aiInput = buildExecutionAiInput({
     executionRuntime: input.executionRuntime,
@@ -833,6 +921,9 @@ function buildExecutionGatewayRequest(input: {
     structuredOutputSchema: input.featureSpec.structuredOutputSchema,
     terminalToolName: input.featureSpec.terminalToolName,
     maxOutputTokens: typeof maxTokens === "number" ? maxTokens : undefined,
+    ...(input.resumeSessionRef
+      ? { resumeSessionRef: input.resumeSessionRef }
+      : {}),
   };
 }
 

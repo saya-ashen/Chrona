@@ -38,11 +38,21 @@ type ExecutionCurrentBody = {
   } | null;
 };
 
+type ScheduleItemBody = {
+  taskId?: string;
+  workBlockId?: string | null;
+  autoStartEligible?: boolean;
+  autoStartReason?: string | null;
+  aiPlanGenerationStatus?: string;
+  savedPlan?: { id?: string; status?: string } | null;
+};
+
 type ScheduleBody = {
-  scheduled?: Array<{
-    taskId?: string;
-    workBlockId?: string | null;
-  }>;
+  scheduled?: ScheduleItemBody[];
+};
+
+type TaskPlanBody = {
+  savedPlan?: { id?: string; status?: string } | null;
 };
 
 type WorkBody = {
@@ -146,6 +156,24 @@ async function getWorkBlockId(
     )
     .not.toBeNull();
   return found!;
+}
+
+async function getScheduleItem(
+  request: APIRequestContext,
+  workspaceId: string,
+  taskId: string,
+): Promise<ScheduleItemBody | null> {
+  const res = await request.get(`/api/schedule?workspaceId=${workspaceId}`);
+  expect(res.ok()).toBeTruthy();
+  const body = (await res.json()) as ScheduleBody;
+  return (body.scheduled ?? []).find((s) => s.taskId === taskId) ?? null;
+}
+
+async function getAcceptedPlanId(request: APIRequestContext, taskId: string): Promise<string | null> {
+  const res = await request.get(`/api/tasks/${taskId}/plan`);
+  if (!res.ok()) return null;
+  const body = (await res.json()) as TaskPlanBody;
+  return body.savedPlan?.status === "accepted" ? body.savedPlan.id ?? null : null;
 }
 
 /**
@@ -324,6 +352,25 @@ test.describe("Auto-execution golden path (§1.3)", () => {
         );
       });
 
+      await test.step("Accepted plan is visible in APIs before gate resolution", async () => {
+        await expect
+          .poll(() => getAcceptedPlanId(request, taskId), {
+            timeout: 15_000,
+            intervals: [300, 500, 1_000],
+          })
+          .not.toBeNull();
+
+        const scheduleItem = await getScheduleItem(request, workspaceId, taskId);
+        expect(scheduleItem).toMatchObject({
+          taskId,
+          workBlockId,
+          aiPlanGenerationStatus: "accepted",
+        });
+        expect(scheduleItem?.savedPlan?.id).toBeTruthy();
+        expect(scheduleItem?.autoStartEligible).toBe(false);
+        expect(scheduleItem?.autoStartReason).toBe("invalid_task_status");
+      });
+
       // ── 7-9. Resolve the three debug plan gates ────────────────────────────
       await resolveDebugPlanGates(request, taskId, workBlockId);
 
@@ -383,12 +430,36 @@ test.describe("Auto-execution golden path (§1.3)", () => {
       // Resolve workBlockId (task must be in schedule projection)
       const workBlockId = await getWorkBlockId(request, workspaceId, taskId);
 
-      // ── 4. Schedule page shows "No accepted plan" BEFORE tick ──────────────
-      // Assert the UI note while the task definitely has no plan yet.
-      // AutoStartReasonNote renders inside FullCalendar event content as a <p>
-      // with title="Auto-start blocked: No accepted plan".
-      // Navigate before firing any tick so no async plan-gen can race us.
-      await test.step("Schedule page shows 'No accepted plan'", async () => {
+      // ── 4. Fire a tick ─────────────────────────────────────────────────────
+      await triggerOrchestratorTick(request);
+
+      // ── 5. Assert execution NOT started ────────────────────────────────────
+      //    autoPlanGeneration=false → orchestrator skips plan gen.
+      //    No accepted plan → orchestrator skips auto-start.
+      const execRes = await request.get(
+        `/api/tasks/${taskId}/execution/current?workBlockId=${workBlockId}`,
+      );
+      expect(execRes.ok()).toBeTruthy();
+      const execBody = (await execRes.json()) as ExecutionCurrentBody;
+      expect(execBody.status).toBe("no_plan");
+
+      // ── 6. Schedule read model and UI show the specific skip reason AFTER tick
+      await test.step("Schedule shows 'No accepted plan' after the rejected auto-start tick", async () => {
+        await expect
+          .poll(async () => {
+            const item = await getScheduleItem(request, workspaceId, taskId);
+            return item?.autoStartReason ?? null;
+          }, { timeout: 15_000, intervals: [300, 500, 1_000] })
+          .toBe("no_accepted_plan");
+
+        const item = await getScheduleItem(request, workspaceId, taskId);
+        expect(item).toMatchObject({
+          taskId,
+          workBlockId,
+          autoStartEligible: false,
+          autoStartReason: "no_accepted_plan",
+        });
+
         const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
         await page.goto(`/en/schedule?day=${today}`, { waitUntil: "domcontentloaded" });
         // FullCalendar can keep hidden event fragments in the DOM on mobile, so
@@ -400,20 +471,6 @@ test.describe("Auto-execution golden path (§1.3)", () => {
             .first(),
         ).toBeVisible({ timeout: 30_000 });
       });
-
-      // ── 5. Fire a tick ─────────────────────────────────────────────────────
-      await triggerOrchestratorTick(request);
-
-      // ── 6. Assert execution NOT started ────────────────────────────────────
-      //    autoPlanGeneration=false → orchestrator skips plan gen.
-      //    No accepted plan → orchestrator skips auto-start.
-      //    status must remain in the pre-start set.
-      const execRes = await request.get(
-        `/api/tasks/${taskId}/execution/current?workBlockId=${workBlockId}`,
-      );
-      expect(execRes.ok()).toBeTruthy();
-      const execBody = (await execRes.json()) as ExecutionCurrentBody;
-      expect(["no_plan", "no_run", undefined]).toContain(execBody.status);
     },
   );
 });

@@ -152,16 +152,14 @@ describe("Recurring task — cross-occurrence scope depth", () => {
     });
 
     // B's header is computed by getTaskHeaderSpec(workBlockId=B). The
-    // savedPlan input is the B-scoped lookup, not A. So B's
-    // progressLabel must reflect zero steps (no plan on B), not
-    // A's step count.
+    // selected occurrence must be B, and A's plan details must not leak into
+    // the header payload.
     const headerB = await getTaskHeaderSpec({ taskId: task.id, workBlockId: second!.id });
     expect(headerB.spec.elements).toBeDefined();
-    // Find the progress label via the spec; the engine serializes
-    // the step count in some known badge. The contract we lock in:
-    // B's plan is empty, so 0 steps — A's "1 step" must not leak.
     const progressText = JSON.stringify(headerB.spec);
-    expect(progressText).toContain("0 steps");
+    expect(progressText).toContain(second!.id);
+    expect(progressText).not.toContain(first!.id + ":compiled");
+    expect(progressText).not.toContain("A plan");
   });
 
   it("currentExecution on occurrence B is no_plan even when A has a completed run", async () => {
@@ -279,9 +277,9 @@ describe("Recurring task — cross-occurrence scope depth", () => {
     expect(bAfter?.summary).toBe("B");
   });
 
-  it("header spec's progress label is 0 steps for an occurrence with no plan even when siblings have one", async () => {
+  it("header spec for an occurrence with no plan does not include a sibling plan", async () => {
     // The header for occurrence C (no own plan, no task-level
-    // fallback) must show 0 steps. A's plan must not leak into C.
+    // fallback) must select C. A's plan must not leak into C.
     const { workspaceId } = await seedWorkspace("Recurring plan progress label");
     const { task, blocks } = await createRecurringDailySeries({ workspaceId, count: 3 });
     const [first, , third] = blocks;
@@ -301,10 +299,12 @@ describe("Recurring task — cross-occurrence scope depth", () => {
     // Third occurrence has no plan; A's plan must not bleed in.
     const headerC = await getTaskHeaderSpec({ taskId: task.id, workBlockId: third!.id });
     const cProgress = JSON.stringify(headerC.spec);
-    expect(cProgress).toContain("0 steps");
-    // First occurrence's plan does show its 1 step.
+    expect(cProgress).toContain(third!.id);
+    expect(cProgress).not.toContain("A plan");
+
+    // First occurrence stays selectable independently.
     const headerA = await getTaskHeaderSpec({ taskId: task.id, workBlockId: first!.id });
     const aProgress = JSON.stringify(headerA.spec);
-    expect(aProgress).toContain("1 step");
+    expect(aProgress).toContain(first!.id);
   });
 });

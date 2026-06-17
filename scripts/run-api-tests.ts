@@ -25,6 +25,8 @@ const dirs = [
 ];
 
 let exitCode = 0;
+const failedFiles: Array<{ file: string; code: number }> = [];
+
 
 mkdirSync(dirname(tempDbPath), { recursive: true });
 rmSync(tempDbPath, { force: true });
@@ -53,12 +55,20 @@ try {
       const code = await proc.exited;
       if (code !== 0) {
         exitCode = code;
+        failedFiles.push({ file: path, code });
       }
     }
   }
 } finally {
   if (existsSync(tempDbPath)) {
     rmSync(tempDbPath, { force: true });
+  }
+}
+
+if (failedFiles.length > 0) {
+  console.error("\nFailed API test files:");
+  for (const failure of failedFiles) {
+    console.error(`  - ${failure.file} (exit ${failure.code})`);
   }
 }
 

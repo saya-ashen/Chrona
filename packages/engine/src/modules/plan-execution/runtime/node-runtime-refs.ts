@@ -9,6 +9,7 @@ import type {
   TaskConfig,
   WaitConfig,
 } from "@chrona/contracts/ai";
+import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -222,13 +223,22 @@ export function branchBindingForRef(input: {
     candidate.ref === input.branchRef && candidate.nodeId === input.node.id,
   );
   if (!binding) {
-    throw new Error("condition branchRef is not valid for the current node");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "condition branchRef is not valid for the current node",
+    );
   }
   if (binding.retiredAt) {
-    throw new Error("condition branchRef is retired and cannot be selected");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "condition branchRef is retired and cannot be selected",
+    );
   }
   if (!binding.nextNodeId) {
-    throw new Error("condition branchRef has no resolved next node");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "condition branchRef has no resolved next node",
+    );
   }
   return binding;
 }

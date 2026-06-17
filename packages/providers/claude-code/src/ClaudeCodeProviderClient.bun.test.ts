@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 import { terminalSnapshotFromEvents } from "@chrona/providers-foundation";
 
 import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
-import { createReplayRunner } from "./runner";
+import { mapClaudeCodeStreamItems, createNormalizerContext } from "./normalizers";
+import { createReplayRunner, type ClaudeCodeRunHandle, type ClaudeCodeRunner } from "./runner";
 
 const FIXTURES_DIR = fileURLToPath(new URL("../fixtures", import.meta.url));
 
@@ -108,6 +109,56 @@ describe("ClaudeCodeProviderClient — happy path", () => {
   });
 });
 
+describe("Claude Code normalizer — streamed tool inputs", () => {
+  test("content_block_start/delta/stop emits a real tool_call with parsed input", () => {
+    const ctx = createNormalizerContext();
+    const events = mapClaudeCodeStreamItems([
+      {
+        type: "stream_event",
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: {
+            type: "tool_use",
+            id: "toolu_plan",
+            name: "mcp__chrona__chrona_plan_generate",
+          },
+        },
+      },
+      {
+        type: "stream_event",
+        event: {
+          type: "content_block_delta",
+          index: 0,
+          delta: {
+            type: "input_json_delta",
+            partial_json: "{\"title\":\"Generated\",\"goal\":\"Persist\",\"nodes\":[],\"edges\":[]}",
+          },
+        },
+      },
+      {
+        type: "stream_event",
+        event: { type: "content_block_stop", index: 0 },
+      },
+    ], ctx, { cancelRequested: false });
+
+    const call = events.find((event) => event.type === "tool_call");
+    expect(call).toBeDefined();
+    expect(call).toMatchObject({
+      type: "tool_call",
+      tool: "mcp__chrona__chrona_plan_generate",
+      callId: "toolu_plan",
+      input: {
+        title: "Generated",
+        goal: "Persist",
+        nodes: [],
+        edges: [],
+      },
+      status: "pending",
+    });
+  });
+});
+
 describe("ClaudeCodeProviderClient — tool round-trip", () => {
   test("tool_call then tool_result then completed", async () => {
     const client = makeClient("tool-call-roundtrip");
@@ -159,9 +210,13 @@ describe("ClaudeCodeProviderClient — tool round-trip", () => {
 });
 
 describe("ClaudeCodeProviderClient — cancel + error paths", () => {
-  test("cancel-mid-run: streamRun honors the recorded snapshot status", async () => {
+  test("cancel-mid-run: streamRun synthesizes a run_cancelled from the post-snapshot", async () => {
+    // The replay tape records `text_delta` then a final `snapshot` with
+    // `status: "cancelled"` (no `run_cancelled` terminal event in the
+    // stream). Per the spec 017 §5 contract, the provider MUST emit a
+    // terminal event so callers can rely on it; we synthesize one from
+    // the post-snapshot rather than silently returning.
     const client = makeClient("cancel-mid-run");
-    // Drain a partial stream — the replay runner yields the events then null.
     const events = await collect(
       client.streamRun({
         sessionId: "chrona-session-fixture-cancel",
@@ -170,11 +225,13 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
       }),
     );
     const types = events.map((e) => e.type);
-    expect(types).toEqual(["run_started", "text_delta"]);
-    // No terminal in the tape → generator stops on the null sentinel.
-    expect(types.includes("run_completed")).toBe(false);
-    expect(types.includes("run_failed")).toBe(false);
-    expect(types.includes("run_cancelled")).toBe(false);
+    // The synthesized terminal lands at the end; the recorded text_delta
+    // surfaces before it.
+    expect(types).toEqual([
+      "run_started",
+      "text_delta",
+      "run_cancelled",
+    ]);
   });
 
   test("cancelRun: marks the handle cancelled and snapshot reflects it", async () => {
@@ -187,6 +244,128 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     const cancelled = await client.cancelRun({ runId: ref.runId });
     expect(cancelled.runId).toBe(ref.runId);
     expect(["cancelled", "completed"]).toContain(cancelled.status);
+  });
+
+  test("streamRun does not blame user for SDK abort failures", async () => {
+    async function* emptyQuery() {}
+    const handle = {
+      runId: "run-aborted",
+      ref: {
+        provider: "claude_code",
+        runId: "run-aborted",
+        sessionId: "chrona-session-aborted",
+        status: "running",
+      },
+      internal: {
+        kind: "sdk",
+        query: Object.assign(emptyQuery(), { interrupt: async () => {} }),
+        cancelRequested: false,
+      },
+      normalizer: createNormalizerContext(),
+      chronaSessionId: "chrona-session-aborted",
+      logger: {} as ClaudeCodeRunHandle["logger"],
+    } satisfies ClaudeCodeRunHandle;
+    const runner: ClaudeCodeRunner = {
+      async start() {
+        return { handle };
+      },
+      async next() {
+        throw new Error("Claude Code process aborted by user");
+      },
+      async snapshot() {
+        return {
+          provider: "claude_code",
+          runId: "run-aborted",
+          sessionId: "chrona-session-aborted",
+          status: "running",
+        };
+      },
+      async cancel() {},
+      async dispose() {},
+    };
+    const client = new ClaudeCodeProviderClient({
+      config: { mcpBaseUrl: "http://localhost:3101" },
+      runner,
+    });
+
+    const ref = await client.startRun({
+      sessionId: "chrona-session-aborted",
+      instructions: "Trigger an SDK abort.",
+      input: { type: "text", text: "abort" },
+    });
+    const events = await collect(client.streamRun({ runId: ref.runId }));
+
+    expect(events.at(-1)).toMatchObject({
+      type: "run_failed",
+      error: "Claude Code process aborted before Chrona received node output",
+      raw: { stage: "before_node_output_submission" },
+
+    });
+  });
+
+  test("streamRun reports SDK idle timeout distinctly", async () => {
+    async function* emptyQuery() {}
+    const handle = {
+      runId: "run-timeout",
+      ref: {
+        provider: "claude_code",
+        runId: "run-timeout",
+        sessionId: "chrona-session-timeout",
+        status: "running",
+      },
+      internal: {
+        kind: "sdk",
+        query: Object.assign(emptyQuery(), { interrupt: async () => {} }),
+        cancelRequested: false,
+      },
+      normalizer: createNormalizerContext(),
+      chronaSessionId: "chrona-session-timeout",
+      logger: {} as ClaudeCodeRunHandle["logger"],
+      diagnostics: {
+        timeoutMs: 120_000,
+        timeoutMode: "idle",
+        timeoutTriggered: true,
+        recentRawEvents: [],
+      },
+    } satisfies ClaudeCodeRunHandle;
+    const runner: ClaudeCodeRunner = {
+      async start() {
+        return { handle };
+      },
+      async next() {
+        throw new Error("Claude Code process aborted by user");
+      },
+      async snapshot() {
+        return {
+          provider: "claude_code",
+          runId: "run-timeout",
+          sessionId: "chrona-session-timeout",
+          status: "running",
+        };
+      },
+      async cancel() {},
+      async dispose() {},
+    };
+    const client = new ClaudeCodeProviderClient({
+      config: { mcpBaseUrl: "http://localhost:3101" },
+      runner,
+    });
+
+    const ref = await client.startRun({
+      sessionId: "chrona-session-timeout",
+      instructions: "Trigger an SDK timeout.",
+      input: { type: "text", text: "timeout" },
+    });
+    const events = await collect(client.streamRun({ runId: ref.runId }));
+
+    expect(events.at(-1)).toMatchObject({
+      type: "run_failed",
+      error: "Claude Code run timed out after 120s idle timeout: Claude Code process aborted before Chrona received node output",
+      raw: {
+        stage: "before_node_output_submission",
+        runner: { timeoutTriggered: true, timeoutMode: "idle", timeoutMs: 120_000 },
+      },
+    });
   });
 
   test("streamRun with unknown runId: throws ClaudeCodeProviderError", () => {

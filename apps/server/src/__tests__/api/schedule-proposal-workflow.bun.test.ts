@@ -191,9 +191,13 @@ describe("Schedule proposal workflow", () => {
     const ws = await seedWorkspace();
     const { taskId } = await seedTask(ws.workspaceId);
 
-    const start = new Date("2026-06-15T08:00:00Z");
-    const end = new Date("2026-06-15T12:00:00Z");
-    const due = new Date("2026-06-16T00:00:00Z");
+    // Use a window in the future relative to "now" so the accepted proposal
+    // projects as "Scheduled". Hardcoded calendar dates make this assertion
+    // rot the moment wall-clock time passes the window (it then derives
+    // "Overdue" — see deriveScheduleState).
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const end = new Date(Date.now() + 28 * 60 * 60 * 1000);
+    const due = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const createRes = await app().request(
       `http://local/api/tasks/${taskId}/schedule/proposals`,

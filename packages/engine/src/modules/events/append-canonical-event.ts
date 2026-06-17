@@ -135,15 +135,17 @@ async function resolveRawEventContextRefs(input: AppendRawEventLogInput) {
 }
 
 export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
-  const latest = await db.event.aggregate({ _max: { ingestSequence: true } });
+  const [latest, contextRefs] = await Promise.all([
+    db.event.aggregate({ _max: { ingestSequence: true } }),
+    resolveCanonicalEventContextRefs(input),
+  ]);
   const createData = {
     eventType: input.eventType,
     eventVersion: input.eventVersion ?? 1,
     workspaceId: input.workspaceId,
-    taskId: input.taskId ?? null,
-    workBlockId: input.workBlockId ?? null,
-    runId: input.runId ?? null,
-    taskSessionId: input.taskSessionId ?? null,
+    taskId: contextRefs.taskId,
+    workBlockId: contextRefs.workBlockId,
+    runId: contextRefs.runId,
     executionSessionId: input.executionSessionId ?? null,
     planId: input.planId ?? null,
     planRunId: input.planRunId ?? null,
@@ -151,7 +153,7 @@ export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
     providerRunId: input.providerRunId ?? null,
     nodeId: input.nodeId ?? null,
     nodeTitle: input.nodeTitle ?? null,
-    rawEventId: input.rawEventId ?? null,
+    rawEventId: contextRefs.rawEventId,
     parentEventId: input.parentEventId ?? null,
     causationEventId: input.causationEventId ?? null,
     correlationId: input.correlationId ?? null,
@@ -175,6 +177,30 @@ export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
     update: {},
     create: createData,
   });
+}
+
+async function resolveCanonicalEventContextRefs(input: AppendCanonicalEventInput) {
+  const [task, workBlock, run, rawEvent] = await Promise.all([
+    input.taskId
+      ? db.task.findUnique({ where: { id: input.taskId }, select: { id: true } })
+      : Promise.resolve(null),
+    input.workBlockId
+      ? db.workBlock.findUnique({ where: { id: input.workBlockId }, select: { id: true } })
+      : Promise.resolve(null),
+    input.runId
+      ? db.run.findUnique({ where: { id: input.runId }, select: { id: true } })
+      : Promise.resolve(null),
+    input.rawEventId
+      ? db.rawEventLog.findUnique({ where: { id: input.rawEventId }, select: { id: true } })
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    taskId: task?.id ?? null,
+    workBlockId: workBlock?.id ?? null,
+    runId: run?.id ?? null,
+    rawEventId: rawEvent?.id ?? null,
+  };
 }
 
 export async function appendTaskTimelineItem(input: AppendTaskTimelineItemInput) {

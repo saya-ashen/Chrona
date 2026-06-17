@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { applySchedule } from "@/modules/scheduling/apply-schedule";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export async function decideScheduleProposal(input: {
   proposalId: string;
@@ -13,7 +14,10 @@ export async function decideScheduleProposal(input: {
   });
 
   if (proposal.status !== "Pending") {
-    throw new Error("Only pending schedule proposals can be resolved.");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Only pending schedule proposals can be resolved.",
+    );
   }
 
   const resolvedProposal = await db.scheduleProposal.update({

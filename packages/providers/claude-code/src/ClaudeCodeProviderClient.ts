@@ -26,6 +26,7 @@ import {
   type StartRunInput,
   type StreamRunInput,
 } from "@chrona/providers-foundation";
+import type { ControlPlaneMode } from "@chrona/contracts";
 
 import {
   createClaudeCodeRunner,
@@ -33,6 +34,7 @@ import {
   type ClaudeCodeRunner,
   type ClaudeCodeRunnerConfig,
 } from "./runner";
+import { resolveClaudeBinary } from "./claude-binary";
 import { ClaudeCodeProviderError } from "./types";
 
 export interface ClaudeCodeProviderOptions {
@@ -68,9 +70,30 @@ export interface ClaudeCodeProviderConfig {
   model?: string;
   timeoutMs?: number;
   mcpBaseUrl?: string;
+  /**
+   * Static Bearer token for the MCP server at `/api/mcp`. Usually
+   * omitted — `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars are
+   * the canonical sources. Required only if the operator wants the
+   * token baked into the config object instead of the env.
+   */
+  mcpRunToken?: string;
   apiKey?: string;
   cwd?: string;
   env?: Record<string, string>;
+  /**
+   * Skill-mode selector (Spec 018). Defaults to "mcp".
+   * Mirrors the contracts-level `ClaudeCodeClientConfig.controlPlane`.
+   * Hermes is MCP-only and ignores this field.
+   */
+  controlPlane?: ControlPlaneMode;
+  /**
+   * Skill directory mounted into the spawned run when
+   * `controlPlane === "skill"`. Optional; can be overridden per-run via
+   * `StartRunInput.control.skillsDir`.
+   */
+  skillDir?: string;
+  /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
+  sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
 }
 
 const DEFAULT_MODEL = "claude-opus-4-8";
@@ -79,6 +102,102 @@ const PROVIDER_NAME = "claude_code";
 function readEnv(name: string): string | undefined {
   const v = process.env[name];
   return v && v.trim().length > 0 ? v.trim() : undefined;
+}
+
+/**
+ * Default MCP base URL when neither `config.mcpBaseUrl` nor
+ * `CHRONA_MCP_BASE_URL` is set. The provider runs in-process with the engine
+ * and HTTP server, so the server's own `PORT` (default 3101, see
+ * apps/server/src/config/env.ts) points at the live `/api/mcp` route. Deriving
+ * from `PORT` keeps the two in lockstep instead of hardcoding a port that
+ * drifts from the server default.
+ */
+function defaultMcpBaseUrl(): string {
+  const port = readEnv("PORT") ?? "3101";
+  return `http://localhost:${port}`;
+}
+
+const SDK_ABORTED_BY_USER_MESSAGE = "Claude Code process aborted by user";
+
+interface ProviderFailureContext {
+  sawNodeOutputCall: boolean;
+  sawNodeOutputResult: boolean;
+  sawNodeCompleteResult: boolean;
+  lastEventType?: ProviderRunEvent["type"];
+  lastTool?: string;
+  lastText?: string;
+}
+
+function isChronaTool(tool: string | undefined, toolName: string): boolean {
+  return tool !== undefined && (tool === toolName || tool === `mcp__chrona__${toolName}` || tool.endsWith(`_${toolName}`));
+}
+
+function noteProviderEvent(ctx: ProviderFailureContext, event: ProviderRunEvent): void {
+  ctx.lastEventType = event.type;
+  if (event.type === "text_delta") ctx.lastText = event.text;
+  if (event.type === "tool_call") {
+    ctx.lastTool = event.tool;
+    if (isChronaTool(event.tool, "chrona_node_output")) ctx.sawNodeOutputCall = true;
+  }
+  if (event.type === "tool_result") {
+    ctx.lastTool = event.tool;
+    if (isChronaTool(event.tool, "chrona_node_output")) ctx.sawNodeOutputResult = true;
+    if (isChronaTool(event.tool, "chrona_node_complete")) ctx.sawNodeCompleteResult = true;
+  }
+}
+
+function newProviderFailureContext(): ProviderFailureContext {
+  return {
+    sawNodeOutputCall: false,
+    sawNodeOutputResult: false,
+    sawNodeCompleteResult: false,
+  };
+}
+
+function providerFailureDiagnostic(ctx: ProviderFailureContext) {
+  return {
+    stage: ctx.sawNodeCompleteResult
+      ? "after_node_complete_accepted"
+      : ctx.sawNodeOutputResult
+        ? "after_node_output_accepted"
+        : ctx.sawNodeOutputCall
+          ? "during_node_output_submission"
+          : "before_node_output_submission",
+    lastEventType: ctx.lastEventType,
+    lastTool: ctx.lastTool,
+    lastText: ctx.lastText,
+  };
+}
+
+function formatTimeout(timeoutMs?: number): string {
+  if (timeoutMs === undefined) return "configured idle timeout";
+  return `${Math.round(timeoutMs / 1000)}s idle timeout`;
+}
+
+function providerAbortMessage(ctx: ProviderFailureContext): string {
+  if (ctx.sawNodeCompleteResult) return "Claude Code process aborted after node completion was accepted";
+  if (ctx.sawNodeOutputResult) return "Claude Code process aborted after node output was accepted but before node completion";
+  if (ctx.sawNodeOutputCall) return "Claude Code process aborted while submitting node output";
+  return "Claude Code process aborted before Chrona received node output";
+}
+
+function providerFailureMessage(err: unknown, ctx?: ProviderFailureContext, handle?: ClaudeCodeRunHandle): string {
+  const message = errorMessage(err);
+  if (message !== SDK_ABORTED_BY_USER_MESSAGE) return message;
+  if (handle?.diagnostics?.timeoutTriggered) {
+    return `Claude Code run timed out after ${formatTimeout(handle.diagnostics.timeoutMs)}: ${providerAbortMessage(ctx ?? newProviderFailureContext())}`;
+  }
+  return providerAbortMessage(ctx ?? newProviderFailureContext());
+}
+
+function providerFailureRaw(err: unknown, ctx: ProviderFailureContext, handle?: ClaudeCodeRunHandle) {
+  return {
+    provider: "claude_code",
+    errorName: err instanceof Error ? err.name : undefined,
+    errorMessage: errorMessage(err),
+    ...providerFailureDiagnostic(ctx),
+    runner: handle?.diagnostics,
+  };
 }
 
 export class ClaudeCodeProviderClient implements AgentProviderClient {
@@ -127,8 +246,17 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     };
   }
 
+  /**
+   * Mint a provider session ref. The Claude Code SDK owns session identity:
+   * the authoritative `session_id` is captured from the run stream (see
+   * `runner.ts` `extractSdkSessionId`) and written back onto the run ref, so
+   * the live execute/stream paths pass the engine `sessionId` straight to
+   * `startRun` and never route through here. This remains only to satisfy
+   * `AgentProviderClient`; it returns a fresh UUID (a shape the SDK accepts)
+   * rather than a Chrona-invented `claude-session-*` placeholder.
+   */
   async createSession(input: CreateSessionInput = {}): Promise<ProviderSessionRef> {
-    const sessionId = `claude-session-${crypto.randomUUID()}`;
+    const sessionId = crypto.randomUUID();
     return {
       provider: this.provider,
       sessionId,
@@ -160,13 +288,88 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
     const runner = await this.ensureRunner();
     const handle = await this.resolveStreamHandle(runner, input);
-    for await (const event of this.iterateRunEvents(runner, handle)) {
-      yield event;
-      if (this.isTerminalEvent(event)) {
-        await this.recordFinalSnapshot(handle, event);
+    const failureContext = newProviderFailureContext();
+    try {
+      for await (const event of this.iterateRunEvents(runner, handle)) {
+        noteProviderEvent(failureContext, event);
+        yield event;
+        if (this.isTerminalEvent(event)) {
+          await this.recordFinalSnapshot(handle, event);
+          return;
+        }
+      }
+      // The runner's iterator ended without a terminal event. If the run
+      // was cancelled (SdkRunner sets the internal `cancelRequested` flag
+      // and the SDK's `Query.interrupt()` closes the generator without
+      // emitting a result message), surface a synthetic `run_cancelled`
+      // so callers can rely on a terminal event in the stream.
+      const postSnap = await runner.snapshot(handle);
+      if (postSnap.status === "cancelled") {
+        const cancelledEvent: ProviderRunEvent = {
+          type: "run_cancelled",
+          run: this.snapshotAsRef(postSnap, handle),
+        };
+        yield cancelledEvent;
+        await this.recordFinalSnapshot(handle, cancelledEvent);
         return;
       }
+      if (postSnap.status === "failed") {
+        const failedEvent: ProviderRunEvent = {
+          type: "run_failed",
+          run: this.snapshotAsRef(postSnap, handle),
+          error: postSnap.error ?? "run ended without a terminal event",
+        };
+        yield failedEvent;
+        await this.recordFinalSnapshot(handle, failedEvent);
+        return;
+      }
+    } catch (err) {
+      // The SDK runner surfaces errors as thrown exceptions rather than
+      // `result` messages. `Query.interrupt()` (our cancel path) typically
+      // makes the generator throw an abort error — so a thrown exception
+      // after a cancel is a cancellation, not a failure. Check the snapshot
+      // first: SdkRunner reports "cancelled" once `cancelRequested` is set.
+      const snap = await runner.snapshot(handle).catch(() => null);
+      if (snap?.status === "cancelled") {
+        const cancelledEvent: ProviderRunEvent = {
+          type: "run_cancelled",
+          run: this.snapshotAsRef(snap, handle),
+        };
+        yield cancelledEvent;
+        await this.recordFinalSnapshot(handle, cancelledEvent);
+        return;
+      }
+      // Otherwise it is a genuine LLM/runtime error (4xx, network, JSON
+      // parse). Map it to `run_failed` so callers always see a terminal —
+      // matches the spec 017 §5 contract and lets the engine show the error
+      // in the Inbox without a separate `getRun` poll.
+      const message = providerFailureMessage(err, failureContext, handle);
+      const failedEvent: ProviderRunEvent = {
+        type: "run_failed",
+        run: snap ? this.snapshotAsRef(snap, handle) : handle.ref,
+        error: message,
+        raw: providerFailureRaw(err, failureContext, handle),
+      };
+      yield failedEvent;
+      await this.recordFinalSnapshot(handle, failedEvent);
+      return;
     }
+  }
+
+  /**
+   * Narrow a `ProviderRunSnapshot` (the full post-run state) down to the
+   * `ProviderRunRef` shape expected by terminal event schemas (`run_cancelled`,
+   * `run_failed`). Both shapes share the same identifier fields, so this is
+   * a structural cast that throws away `outputText` / `usage` etc.
+   */
+  private snapshotAsRef(
+    snap: ProviderRunSnapshot,
+    handle: ClaudeCodeRunHandle,
+  ): ProviderRunRef {
+    return {
+      ...handle.ref,
+      status: snap.status === "running" ? "running" : snap.status,
+    };
   }
 
   private async resolveStreamHandle(
@@ -266,47 +469,62 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     const mcpBaseUrl =
       this.opts.config.mcpBaseUrl ??
       readEnv("CHRONA_MCP_BASE_URL") ??
-      "http://localhost:3000";
-    // `apiKey` here is the Anthropic API key (subscription-mode users omit
-    // it and rely on the OAuth session baked into the `claude` CLI). The
-    // MCP server at /api/mcp currently does not enforce Bearer auth, but
-    // we send a per-run opaque token so future tightening (and server-
-    // side attribution) can adopt it without an adapter change. The
-    // token is the per-process start timestamp — stable for the run's
-    // lifetime, and unique across concurrent runs.
-    const mcpRunToken = `chrona-run-${new Date().toISOString()}`;
+      defaultMcpBaseUrl();
+    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
+    // The MCP server at /api/mcp sits behind the same `apiKeyAuth()`
+    // middleware as every other /api/* route (apps/server/src/middleware/
+    // auth.ts), so the Bearer token we hand the SDK here MUST be the
+    // server's static `API_KEY` (the same one operators set in
+    // apps/server/.env). Skill mode overrides this via `input.control.
+    // runToken` (see runner start()), but the per-run token is a separate
+    // scope (per node attempt), not the MCP transport credential.
+    const mcpRunToken =
+      this.opts.config.mcpRunToken ??
+      readEnv("CHRONA_API_KEY") ??
+      readEnv("CHRONA_MCP_BEARER_TOKEN") ??
+      "";
+    const env: Record<string, string> = {
+      ...(this.opts.config.env ?? {}),
+      ...(this.opts.config.apiKey ? { ANTHROPIC_API_KEY: this.opts.config.apiKey } : {}),
+    };
     const cfg: ClaudeCodeRunnerConfig = {
       model: this.opts.config.model ?? DEFAULT_MODEL,
       timeoutMs: this.opts.config.timeoutMs,
       mcpBaseUrl,
       mcpRunToken,
-      // Pass the Anthropic API key (if configured) through the env the
-      // SDK will spawn the `claude` binary under. SDK + CLI both honor
-      // `ANTHROPIC_API_KEY`.
-      env: this.opts.config.apiKey
-        ? { ...(this.opts.config.env ?? {}), ANTHROPIC_API_KEY: this.opts.config.apiKey }
-        : this.opts.config.env,
+      env: Object.keys(env).length > 0 ? env : undefined,
       binaryPath: this.opts.config.binaryPath,
       cwd: this.opts.config.cwd,
       recordDir,
       strictUnknownEvents: strict,
+      controlPlane: this.opts.config.controlPlane,
+      controlBaseUrl,
+      skillDir: this.opts.config.skillDir,
+      sdkOptions: this.opts.config.sdkOptions,
     };
     return createClaudeCodeRunner(cfg);
   }
 
   /**
    * Cheap probe: if we own a runner, just construct it (which will fail if
-   * the SDK can't be loaded and the `claude` binary is missing for the CLI
-   * path; but `createClaudeCodeRunner` never throws on construction — only
-   * on first `start`). We additionally run a `version --help` probe via
-   * `claude --version` for CLI availability.
+   * the SDK can't be loaded; `createClaudeCodeRunner` never throws on
+   * construction — only on first `start`). We additionally run a
+   * `claude --version` probe for binary availability.
+   *
+   * The binary resolves to (in order): an explicit `config.binaryPath`, the
+   * `claude` executable bundled inside the `@anthropic-ai/claude-agent-sdk`
+   * platform package, or a `claude` on PATH. Chrona never requires a
+   * system-installed Claude Code CLI — the SDK ships the binary.
    *
    * Reason strings are actionable per the spec.
    */
   private async probe(): Promise<string | null> {
     if (this.opts.runner) return null; // user provided runner → trust it
     if (readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR")) return null; // record-only
-    const binary = this.opts.config.binaryPath ?? "claude";
+    const binary = this.opts.config.binaryPath ?? resolveClaudeBinary();
+    if (!binary) {
+      return "Claude Code binary not found: the @anthropic-ai/claude-agent-sdk platform package is missing and no 'claude' is on PATH. Reinstall dependencies or set config.binaryPath.";
+    }
     try {
       const proc = Bun.spawn([binary, "--version"], {
         stdout: "pipe",
@@ -314,11 +532,11 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       });
       const exit = await proc.exited;
       if (exit !== 0) {
-        return `Claude Code CLI exited with code ${exit}; ensure '${binary}' is installed and on PATH (https://docs.claude.com/en/docs/claude-code/setup).`;
+        return `Claude Code binary exited with code ${exit}; '${binary}' is not runnable.`;
       }
       return null;
     } catch (err) {
-      return `Claude Code CLI not found on PATH (binary='${binary}'): ${errorMessage(err)}. Install Claude Code or set config.binaryPath.`;
+      return `Claude Code binary failed to spawn (binary='${binary}'): ${errorMessage(err)}.`;
     }
   }
 

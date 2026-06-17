@@ -144,6 +144,29 @@ describe("getSchedulePage auto-start eligibility reason", () => {
     expect(block?.autoStartReason).toBe("no_runtime_config");
   });
 
+  it("reports already_running when the task has an active run", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "ws", status: "Active", defaultRuntime: "hermes" },
+    });
+    const { task } = await seedScheduledBlock({
+      workspaceId: workspace.id,
+      accepted: true,
+    });
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "WaitingForInput",
+        triggeredBy: "scheduler",
+      },
+    });
+
+    const page = await getSchedulePage(workspace.id);
+    const block = findBlock(page, task.id);
+    expect(block?.autoStartEligible).toBe(false);
+    expect(block?.autoStartReason).toBe("already_running");
+  });
+
   it("reports not_due when the block is scheduled in the future", async () => {
     const workspace = await db.workspace.create({
       data: { name: "ws", status: "Active", defaultRuntime: "hermes" },

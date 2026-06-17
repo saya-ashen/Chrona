@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateScheduleWindow } from "@chrona/domain";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export async function moveWorkBlock(input: {
   workBlockId: string;
@@ -25,10 +26,16 @@ export async function moveWorkBlock(input: {
   });
 
   if (block.status === "Active") {
-    throw new Error("Cannot reschedule while a work block is active");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Cannot reschedule while a work block is active",
+    );
   }
   if (block.status === "Completed" || block.status === "Cancelled") {
-    throw new Error("Cannot reschedule a completed or cancelled work block");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Cannot reschedule a completed or cancelled work block",
+    );
   }
   if (block.importedCalendarEvent) {
     throw new Error(

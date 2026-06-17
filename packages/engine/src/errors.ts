@@ -75,25 +75,5 @@ export function engineErrorFromUnknown(
     });
   }
 
-  if (
-    normalized.includes("cannot") ||
-    normalized.includes("only ") ||
-    normalized.includes("no accepted plan") ||
-    normalized.includes("work block is active")
-  ) {
-    return new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, message, { cause });
-  }
-
-  if (
-    normalized.includes("required") ||
-    normalized.includes("invalid") ||
-    normalized.includes("must") ||
-    normalized.includes("unsupported") ||
-    normalized.includes("unknown") ||
-    normalized.includes("cannot be empty")
-  ) {
-    return new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, message, { cause });
-  }
-
   return new EngineError(fallbackCode, message, { cause });
 }

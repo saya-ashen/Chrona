@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
 
-import { appendRawEventLog } from "./append-canonical-event";
+import { appendCanonicalEvent, appendRawEventLog } from "./append-canonical-event";
 
 async function resetDb() {
   await db.importedCalendarEvent.deleteMany();
@@ -66,5 +66,40 @@ describe("appendRawEventLog", () => {
     expect(rawEvent.workspaceId).toBe("ws_event_context");
     expect(rawEvent.source).toBe("graph_runtime");
     expect(rawEvent.externalRef).toBe("plan_execution:execution_started:test");
+  });
+});
+
+describe("appendCanonicalEvent", () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  it("drops stale optional foreign-key refs before upsert", async () => {
+    await db.workspace.create({
+      data: {
+        id: "ws_event_context",
+        name: "Event context workspace",
+        defaultRuntime: "debug",
+        status: "Active",
+      },
+    });
+
+    const event = await appendCanonicalEvent({
+      workspaceId: "ws_event_context",
+      taskId: "missing-task",
+      workBlockId: "missing-block",
+      runId: "missing-run",
+      rawEventId: "missing-raw",
+      eventType: "plan_generation.failed",
+      actorType: "system",
+      source: "plan_generation",
+      payload: { code: "INVALID_TOOL_PAYLOAD" },
+      dedupeKey: "plan_generation:missing-task:generation:failed",
+    });
+
+    expect(event.taskId).toBeNull();
+    expect(event.workBlockId).toBeNull();
+    expect(event.runId).toBeNull();
+    expect(event.rawEventId).toBeNull();
   });
 });

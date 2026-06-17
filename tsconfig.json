@@ -29,6 +29,7 @@
       "@server/*": ["./apps/server/src/*"],
       "@chrona/runtime-core": ["./packages/runtime-core/src/index.ts"],
       "@chrona/runtime-core/*": ["./packages/runtime-core/src/*"],
+      "@chrona/logging": ["./packages/logging/src/index.ts"],
       "@chrona/i18n": ["./packages/i18n/src/locale.ts"],
       "@chrona/i18n/react": ["./packages/i18n/src/client.tsx"],
       "@chrona/i18n/*": ["./packages/i18n/src/*"],

@@ -414,11 +414,15 @@ export function buildProviderFeatureRequest(input: {
     input.instructions ??
     (typeof input.input === "string" ? input.input : JSON.stringify(input.input));
 
+  const providerInput = input.featureSpec?.inputText
+    ? { type: "text" as const, text: input.featureSpec.inputText }
+    : input.input;
+
   return {
     sessionId: input.sessionKey,
     sessionKey: input.sessionKey,
     instructions: input.featureSpec?.instructions ?? fallbackInstructions,
-    input: input.input,
+    input: providerInput,
     structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
     stream: input.stream,
     maxOutputTokens: input.maxOutputTokens,

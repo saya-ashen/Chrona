@@ -29,7 +29,7 @@ import {
 /* -------------------------------------------------------------------------- */
 
 export interface NormalizerOptions {
-  /** When true, `result/subtype:"error_during_execution"` maps to `run_cancelled`. */
+  /** When true, any non-success `result` terminal maps to `run_cancelled` instead of `run_failed`. */
   cancelRequested: boolean;
   /** When true, throw on unrecognized stream `type` instead of mapping to `raw_event`. */
   strictUnknownEvents?: boolean;
@@ -179,6 +179,7 @@ function pushAssistant(
     | { content?: ReadonlyArray<Record<string, unknown>> }
     | undefined;
   const blocks = message?.content ?? [];
+  const before = out.length;
   for (const block of blocks) {
     if (block.type === "text" && typeof block.text === "string") {
       out.push(
@@ -204,6 +205,9 @@ function pushAssistant(
       );
     }
   }
+  if (out.length === before) {
+    out.push(buildRawEvent(ctx, options, rec, "assistant"));
+  }
 }
 
 function registerToolUse(
@@ -226,6 +230,7 @@ function pushUser(
     | { content?: ReadonlyArray<Record<string, unknown>> }
     | undefined;
   const blocks = message?.content ?? [];
+  const before = out.length;
   for (const block of blocks) {
     if (block.type === "tool_result" && typeof block.tool_use_id === "string") {
       const callId = block.tool_use_id;
@@ -241,6 +246,9 @@ function pushUser(
       ctx.toolInputBuffers.delete(callId);
       ctx.toolNames.delete(callId);
     }
+  }
+  if (out.length === before) {
+    out.push(buildRawEvent(ctx, options, rec, "user"));
   }
 }
 
@@ -280,7 +288,14 @@ function pushResult(
     );
     return;
   }
-  if (subtype === "error_during_execution" && options.cancelRequested) {
+  // Cancel wins: once the caller has requested cancellation, the SDK's
+  // post-interrupt `result` message can carry any non-success subtype
+  // (`error_during_execution`, `error`, an abort-induced code, …). Treating
+  // a user-initiated cancel as a failure surfaces a misleading "failed"
+  // badge, so any non-success terminal after a cancel maps to run_cancelled.
+  // This aligns the event stream with `snapshot()`, which already reports
+  // "cancelled" whenever `cancelRequested` is set.
+  if (options.cancelRequested) {
     out.push(buildEvent(ctx, options, { type: "run_cancelled", run: ref }));
     return;
   }
@@ -391,28 +406,40 @@ function mapContentBlockStop(
 ): void {
   const idx = typeof ev.index === "number" ? ev.index : -1;
   const callId = ctx.indexToCallId.get(idx);
-  if (!callId) return;
-  const buf = ctx.toolInputBuffers.get(callId);
-  if (buf && buf.length > 0) {
-    let parsed: unknown = buf;
-    try {
-      parsed = JSON.parse(buf);
-    } catch {
-      // keep raw string
-    }
-    out.push(
-      buildEvent(ctx, options, {
-        type: "raw_event",
-        rawEventType: "content_block_stop/tool_input_parsed",
-        raw: { tool: ctx.toolNames.get(callId), input: parsed },
-      } as never),
-    );
+  if (!callId) {
+    out.push(buildRawEvent(ctx, options, ev, "content_block_stop"));
+    return;
   }
+  const toolName = ctx.toolNames.get(callId) ?? "unknown_tool";
+  const parsedInput = parseBufferedToolInput(ctx.toolInputBuffers.get(callId));
+  out.push(
+    buildEvent(ctx, options, {
+      type: "tool_call",
+      tool: toolName,
+      callId,
+      input: parsedInput,
+      status: "pending",
+    }),
+  );
   out.push(
     buildEvent(ctx, options, {
       type: "tool_completed",
-      toolName: ctx.toolNames.get(callId),
+      toolName,
     }),
   );
+  ctx.toolInputBuffers.delete(callId);
+  ctx.indexToCallId.delete(idx);
+}
+
+function parseBufferedToolInput(buffer: string | undefined): Record<string, unknown> {
+  if (!buffer) return {};
+  try {
+    const parsed = JSON.parse(buffer) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : { value: parsed };
+  } catch {
+    return { raw: buffer };
+  }
 }
 

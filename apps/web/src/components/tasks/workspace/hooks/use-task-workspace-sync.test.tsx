@@ -330,7 +330,6 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input);
     mocks.fetchCalls.push({ input: url, init });
-    if (url.includes("/plan")) console.log("PLAN_FETCH", url);
 
     if (url.includes("/api/tasks/") && url.includes("/workspace/header")) {
       mocks.headerFetchCount += 1;

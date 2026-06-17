@@ -18,6 +18,9 @@ import {
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 import { bindTaskPlanSessionToStateStore } from "@/hooks/ai/task-plan-generation-session-store";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("web.task-workspace.page-state");
 type RefreshOptions = {
   silent?: boolean;
 };
@@ -250,7 +253,7 @@ function useTaskWorkspaceEventStream(
       }
     }).catch((error) => {
       if (shouldReconnect && !abortController.signal.aborted) {
-        console.warn("Task workspace event stream closed", error);
+        logger.warn("event_stream.closed", { taskId, workBlockId: workBlockId ?? null, error });
         scheduleStreamReconnect();
       }
     });
