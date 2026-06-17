@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 
@@ -158,12 +158,13 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  vi.unstubAllGlobals();
+  cleanup();
   // Flush React 19's pending `setImmediate` scheduler callbacks before
   // vitest destroys the per-test jsdom environment. Without this, the
   // scheduler callback reads `window.event` after `window` is gone and
   // vitest reports an unhandled `ReferenceError`.
   await new Promise<void>((resolve) => setImmediate(resolve));
+  vi.unstubAllGlobals();
 });
 
 describe("useTaskWorkspacePlanState — accept plan", () => {
