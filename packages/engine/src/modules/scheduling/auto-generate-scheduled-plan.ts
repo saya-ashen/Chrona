@@ -111,7 +111,6 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
       result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "generation_in_flight" });
       continue;
     }
-
     await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
     fired.add(firedKey);
     result.triggered.push({ taskId: task.id, workBlockId: block.id, reason: "scheduled" });
@@ -156,7 +155,6 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
       result.skipped.push({ taskId: task.id, workBlockId: null, reason: "generation_in_flight" });
       continue;
     }
-
     await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: null, accept: task.autoExecute });
     fired.add(task.id);
     result.triggered.push({ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" });

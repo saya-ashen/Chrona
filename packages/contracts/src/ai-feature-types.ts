@@ -92,6 +92,34 @@ export interface ClaudeCodeClientConfig {
   cwd?: string;
 }
 
+/**
+ * Config for the Claude Code execution provider (Spec 017 / WS-B).
+ *
+ * The provider launches a local Claude Code headless run (Agent SDK preferred,
+ * `claude -p` subprocess fallback) per `startRun` and registers Chrona's
+ * `/api/mcp` server scoped to that run. See `plan.md` §0 for the
+ * research-gate decisions behind these fields.
+ */
+export interface ClaudeCodeClientConfig {
+  /** Override the Claude Code CLI location (CLI fallback path only). */
+  binaryPath?: string;
+  /** Model ID passed to Claude Code. Defaults to "claude-opus-4-8". */
+  model?: string;
+  /** Total run timeout. SDK uses this as the overall bound; CLI uses it as SIGKILL fallback. */
+  timeoutMs?: number;
+  /** Chrona /api/mcp base URL. Defaults to the hosting Chrona server. */
+  mcpBaseUrl?: string;
+  /** Anthropic API key (recommended for production; subscription quota may otherwise apply). */
+  apiKey?: string;
+  /** Optional: pass-through env vars to the Claude Code subprocess. */
+  env?: Record<string, string>;
+  /**
+   * Optional: working directory for the Claude Code run. Defaults to
+   * `process.cwd()`. Use this to constrain the agent's filesystem scope.
+   */
+  cwd?: string;
+}
+
 export type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
 
 export interface DebugClientConfig {

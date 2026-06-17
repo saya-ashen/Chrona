@@ -80,6 +80,7 @@ async function readSavedPlanAfterToolCompletion(input: {
 }
 
 
+
 async function recordPlanGenerationEvent(input: {
   type: "started" | "status" | "tool_called" | "draft_saved" | "completed" | "failed" | "cancelled";
   task: { id: string; workspaceId: string };

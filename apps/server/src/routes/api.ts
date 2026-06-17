@@ -32,6 +32,9 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createAssistantSurfaceRoutes(engine))
     .route("/", createMcpRoutes(engine))
     .route("/", createAgentControlRoutes());
+
+  // Env-gated E2E test seam — only ever mounted when the Playwright webServer
+  // sets CHRONA_E2E_TEST_ROUTES=1. Keeps the production surface unchanged.
   if (areE2eTestRoutesEnabled()) {
     router.route("/", createTestSupportRoutes(engine));
   }
