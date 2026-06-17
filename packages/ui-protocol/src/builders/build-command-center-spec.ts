@@ -54,6 +54,13 @@ function appendDocument(
 }
 
 
+const FAILED_RECOVERY_ACTION_IDS = new Set(["retry_node"]);
+function shouldRenderCheckpointAction(input: { isRecoveryCheckpoint: boolean; actionId: string }) {
+  if (!input.isRecoveryCheckpoint) return true;
+  return FAILED_RECOVERY_ACTION_IDS.has(input.actionId);
+}
+
+
 function actionVariant(style: CommandCenterCheckpointActionInput["style"]) {
   if (style === "danger") return "danger";
   if (style === "secondary") return "secondary";
@@ -112,10 +119,13 @@ export function buildCommandCenterCheckpointSpec(input: {
     },
   };
   const children = elements.root.children ?? [];
+  const recoveryActionChildren: string[] = [];
   const inlineActionChildren: string[] = [];
   const formActionChildren: string[] = [];
+  const isRecoveryCheckpoint = checkpoint.severity === "error";
 
   for (const action of checkpoint.availableActions) {
+    if (!shouldRenderCheckpointAction({ isRecoveryCheckpoint, actionId: action.id })) continue;
     const actionChildren: string[] = [];
     const actionKey = `action:${action.id}`;
     const stateKey = `payload_${action.id}`;
@@ -154,7 +164,10 @@ export function buildCommandCenterCheckpointSpec(input: {
     };
     actionChildren.push(submitKey);
 
-    if (action.requiresPayload) {
+    if (isRecoveryCheckpoint) {
+      elements[actionKey] = { type: "Stack", props: { gap: "sm" }, children: actionChildren };
+      recoveryActionChildren.push(actionKey);
+    } else if (action.requiresPayload) {
       elements[actionKey] = {
         type: "WorkspaceActionCard",
         props: { title: action.label, tone: action.style === "danger" ? "danger" : "neutral" },
@@ -165,6 +178,15 @@ export function buildCommandCenterCheckpointSpec(input: {
       elements[actionKey] = { type: "Stack", props: { gap: "sm" }, children: actionChildren };
       inlineActionChildren.push(actionKey);
     }
+  }
+
+  if (recoveryActionChildren.length > 0) {
+    elements["recovery-actions"] = {
+      type: "WorkspaceActionGroup",
+      props: { label: "Recovery actions", layout: "inline" },
+      children: recoveryActionChildren,
+    };
+    children.push("recovery-actions");
   }
 
   if (inlineActionChildren.length > 0) {

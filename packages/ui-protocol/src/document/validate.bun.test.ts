@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { validateChronaSpec, type ValidateResult } from "./validate";
+import { chronaCatalog, validateChronaSpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
@@ -40,6 +40,16 @@ describe("validateChronaSpec", () => {
     if (!result.ok) return;
     expect(result.spec.root).toBe("github_trending_report");
     expect(result.spec.elements.github_trending_report).toMatchObject({ type: "Stack" });
+  });
+
+  test("catalog prompt gives literal Table and CollapsibleText examples", () => {
+    const prompt = chronaCatalog.prompt();
+
+    expect(prompt).toContain("Table:");
+    expect(prompt).toContain("columns: [\"Repo\", \"Stars\"]");
+    expect(prompt).toContain("rows: [[\"chrona\", \"120\"]]");
+    expect(prompt).toContain("Do not wrap arrays in objects such as { item: [...] }");
+    expect(prompt).toContain("threshold MUST be a JSON number such as 800");
   });
 
 

@@ -63,6 +63,23 @@ const paragraphSchema = z.object({
   variant: z.string().optional(),
 });
 
+const tableComponentDefinition = {
+  ...shadcn.Table,
+  description:
+    "Data table. columns MUST be a direct JSON string array. rows MUST be a direct JSON 2D string array. Do not wrap arrays in objects such as { item: [...] }. Example: { columns: [\"Repo\", \"Stars\"], rows: [[\"chrona\", \"120\"]] }.",
+  example: {
+    columns: ["Repo", "Stars"],
+    rows: [["chrona", "120"]],
+  },
+};
+
+const collapsibleTextComponentDefinition = {
+  props: z.object({ text: z.string(), threshold: z.number().optional() }),
+  description:
+    "Long text with a show-more collapse. threshold MUST be a JSON number such as 800, not a string such as \"800\".",
+  example: { text: "Long output...", threshold: 800 },
+};
+
 const sectionSchema = z.object({
   title: z.string().optional(),
 });
@@ -111,7 +128,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     Textarea: shadcn.Textarea,
     Select: shadcn.Select,
     Tabs: shadcn.Tabs,
-    Table: shadcn.Table,
+    Table: tableComponentDefinition,
 
 
     // --- lowercase compatibility aliases for AI-produced json-render specs ---
@@ -120,7 +137,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       props: paragraphSchema,
       description: "Compatibility alias for text paragraphs in AI-produced result specs.",
     },
-    table: shadcn.Table,
+    table: tableComponentDefinition,
     section: {
       props: sectionSchema,
       slots: ["default"],
@@ -189,10 +206,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       }),
       description: "Expandable tool invocation detail rows.",
     },
-    CollapsibleText: {
-      props: z.object({ text: z.string(), threshold: z.number().optional() }),
-      description: "Long text with a show-more collapse.",
-    },
+    CollapsibleText: collapsibleTextComponentDefinition,
     WorkspaceSummaryCard: {
       props: z.object({
         eyebrow: z.string().optional(),
