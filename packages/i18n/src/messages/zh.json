@@ -2,6 +2,7 @@
   "nav": {
     "brandTitle": "Chrona",
     "brandTagline": "把任务排进日程，让 AI 推进执行",
+    "dashboard": "概览",
     "schedule": "日程",
     "tasks": "任务",
     "inbox": "收件箱",
@@ -1130,7 +1131,7 @@
       "occurrenceSelectorLabel": "选择本次循环",
       "edit": "编辑",
       "deleteTask": "删除任务",
-      "moreActions": "更多任务操作",
+      "moreActions": "更多操作",
       "deleting": "正在删除…",
       "deleteConfirmTitlePrefix": "删除",
       "deleteConfirmTitleSuffix": "？",
@@ -1271,7 +1272,6 @@
       "start": "启动",
       "pause": "暂停",
       "stop": "停止",
-      "moreActions": "更多操作",
       "actionAlreadySending": "操作正在发送中。",
       "completeRequiredField": "请填写必填字段：{fields}。",
       "completeRequiredFields": "请填写必填字段：{fields}。"
@@ -1337,6 +1337,125 @@
     }
   },
   "pages": {
+    "dashboard": {
+      "title": "Chrona 工作台",
+      "subtitle": "Chrona 做了什么、正在做什么、还需要你处理什么——任务的实时动态。",
+      "viewAllTasks": "全部任务",
+      "newTask": "新建任务",
+      "openTask": "打开任务",
+      "headline": {
+        "both": "今天 Chrona 已自动完成 {completed} 个任务，{attention} 个任务需要你处理。",
+        "completedOnly": "今天 Chrona 已自动完成 {completed} 个任务，暂时没有需要你处理的事项。",
+        "attentionOnly": "今天还没有自动完成的任务，有 {attention} 个任务需要你处理。",
+        "idle": "Chrona 正在待命。新建一个任务，它就会开始替你工作。"
+      },
+      "summary": {
+        "title": "需要你处理",
+        "pending": "{n} 个待处理",
+        "none": "全部处理完毕"
+      },
+      "nextStep": {
+        "approve_or_edit": "查看并审批",
+        "resolve_block": "去处理",
+        "provide_input": "去回复",
+        "await_completion": "查看",
+        "start_execution": "开始",
+        "reschedule": "重新排程",
+        "review_result": "查看结果"
+      },
+      "focus": {
+        "eyebrow": "当前重点",
+        "empty": "暂时没有需要你重点处理的事项。新建一个任务开始吧。"
+      },
+      "attention": {
+        "title": "需要你处理",
+        "description": "等待审批、等待输入、被阻塞、失败或排程有风险的任务。",
+        "empty": "暂时没有需要你处理的事项。",
+        "kind": {
+          "approval": "等待审批",
+          "input": "等待你的输入",
+          "blocked": "已阻塞",
+          "failed": "运行失败",
+          "schedule_risk": "排程有风险"
+        }
+      },
+      "inProgress": {
+        "title": "进行中",
+        "description": "Chrona 正在推进的任务。",
+        "empty": "暂时没有正在运行的任务。"
+      },
+      "completed": {
+        "title": "最近完成",
+        "totalLabel": "累计完成 {n} 个",
+        "empty": "暂无已完成的任务。"
+      },
+      "digest": {
+        "title": "Chrona 自动完成概览",
+        "description": "Chrona 在后台替你完成工作的每日摘要。",
+        "todayHeadline": "今天已自动完成 {n} 个任务",
+        "weekHeadline": "本周已自动完成 {n} 个任务",
+        "allTimeHeadline": "累计已自动完成 {n} 个任务",
+        "rangeToday": "今天",
+        "rangeWeek": "本周",
+        "rangeAll": "全部",
+        "breakdownTitle": "主要成果",
+        "recentTitle": "最近自动完成",
+        "viewAll": "查看全部已完成任务",
+        "empty": "Chrona 还没有自动完成任何任务。完成后，重点成果会显示在这里。",
+        "outputLabel": "产出",
+        "category": {
+          "report": "生成报告",
+          "research": "信息整理",
+          "code": "代码检查",
+          "automation": "计划更新"
+        },
+        "categoryUnit": {
+          "report": "{n} 份报告",
+          "research": "{n} 次整理",
+          "code": "{n} 次检查",
+          "automation": "{n} 个计划"
+        }
+      },
+      "feed": {
+        "title": "最新动态",
+        "description": "各任务最近发生的事情。",
+        "empty": "暂无动态。",
+        "category": {
+          "created": "已创建",
+          "plan": "已规划",
+          "started": "已开始",
+          "completed": "已完成",
+          "failed": "失败",
+          "blocked": "已阻塞",
+          "approval": "待审批",
+          "input": "待输入",
+          "schedule": "已改期"
+        }
+      },
+      "taskStream": {
+        "title": "任务流",
+        "description": "工作区内的全部任务，按你关心的维度筛选。",
+        "empty": "没有符合该筛选条件的任务。",
+        "filters": {
+          "all": "全部",
+          "attention": "需要处理",
+          "inProgress": "进行中",
+          "autoCompleted": "自动完成",
+          "archived": "已归档"
+        },
+        "lane": {
+          "attention": "需要处理",
+          "inProgress": "进行中",
+          "autoCompleted": "自动完成"
+        }
+      },
+      "time": {
+        "justNow": "刚刚",
+        "minutes": "{n} 分钟前",
+        "hours": "{n} 小时前",
+        "days": "{n} 天前"
+      }
+    },
     "tasks": {
       "title": "任务中心",
       "subtitle": "统一查看哪些任务正在运行、被阻塞、等待审批，或还没安排进日程，不必翻完整对话。",

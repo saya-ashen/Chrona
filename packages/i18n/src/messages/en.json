@@ -2,6 +2,7 @@
   "nav": {
     "brandTitle": "Chrona",
     "brandTagline": "Plan your day and move work forward with AI",
+    "dashboard": "Dashboard",
     "schedule": "Schedule",
     "tasks": "Tasks",
     "inbox": "Inbox",
@@ -1130,7 +1131,7 @@
       "occurrenceSelectorLabel": "Select occurrence",
       "edit": "Edit",
       "deleteTask": "Delete Task",
-      "moreActions": "More task actions",
+      "moreActions": "More actions",
       "deleting": "Deleting...",
       "deleteConfirmTitlePrefix": "Delete",
       "deleteConfirmTitleSuffix": "?",
@@ -1271,7 +1272,6 @@
       "start": "Start",
       "pause": "Pause",
       "stop": "Stop",
-      "moreActions": "More actions",
       "actionAlreadySending": "Action is already being sent.",
       "completeRequiredField": "Complete required field: {fields}.",
       "completeRequiredFields": "Complete required fields: {fields}."
@@ -1337,6 +1337,125 @@
     }
   },
   "pages": {
+    "dashboard": {
+      "title": "Chrona workspace",
+      "subtitle": "What Chrona did, what it is doing, and what needs you — your tasks as a live feed.",
+      "viewAllTasks": "All tasks",
+      "newTask": "New task",
+      "openTask": "Open",
+      "headline": {
+        "both": "Today Chrona auto-completed {completed} tasks, and {attention} need you.",
+        "completedOnly": "Today Chrona auto-completed {completed} tasks — nothing needs you right now.",
+        "attentionOnly": "Nothing auto-completed yet today, and {attention} tasks need you.",
+        "idle": "Chrona is standing by. Create a task and it will start working for you."
+      },
+      "summary": {
+        "title": "Needs you",
+        "pending": "{n} pending",
+        "none": "All clear"
+      },
+      "nextStep": {
+        "approve_or_edit": "Review & approve",
+        "resolve_block": "Resolve",
+        "provide_input": "Reply",
+        "await_completion": "Watch",
+        "start_execution": "Start",
+        "reschedule": "Reschedule",
+        "review_result": "Review result"
+      },
+      "focus": {
+        "eyebrow": "Focus now",
+        "empty": "Nothing needs your focus right now. Create a task to get started."
+      },
+      "attention": {
+        "title": "Needs you",
+        "description": "Tasks waiting on approval, input, blocked, failed, or at schedule risk.",
+        "empty": "Nothing needs you right now.",
+        "kind": {
+          "approval": "Waiting for approval",
+          "input": "Waiting for your input",
+          "blocked": "Blocked",
+          "failed": "Run failed",
+          "schedule_risk": "At schedule risk"
+        }
+      },
+      "inProgress": {
+        "title": "In progress",
+        "description": "Tasks Chrona is actively advancing.",
+        "empty": "Nothing is running right now."
+      },
+      "completed": {
+        "title": "Recently completed",
+        "totalLabel": "{n} completed all-time",
+        "empty": "No completed tasks yet."
+      },
+      "digest": {
+        "title": "Auto-completion overview",
+        "description": "A daily report of the work Chrona finished for you in the background.",
+        "todayHeadline": "{n} tasks auto-completed today",
+        "weekHeadline": "{n} tasks auto-completed this week",
+        "allTimeHeadline": "{n} tasks auto-completed all-time",
+        "rangeToday": "Today",
+        "rangeWeek": "This week",
+        "rangeAll": "All time",
+        "breakdownTitle": "What got done",
+        "recentTitle": "Recently auto-completed",
+        "viewAll": "View all completed tasks",
+        "empty": "Chrona hasn't auto-completed any tasks yet. Once it does, the highlights show up here.",
+        "outputLabel": "Output",
+        "category": {
+          "report": "Reports generated",
+          "research": "Research & summaries",
+          "code": "Code & checks",
+          "automation": "Plans & automation"
+        },
+        "categoryUnit": {
+          "report": "{n} reports",
+          "research": "{n} summaries",
+          "code": "{n} checks",
+          "automation": "{n} updates"
+        }
+      },
+      "feed": {
+        "title": "Latest activity",
+        "description": "The latest things that happened across your tasks.",
+        "empty": "No activity yet.",
+        "category": {
+          "created": "Created",
+          "plan": "Planned",
+          "started": "Started",
+          "completed": "Completed",
+          "failed": "Failed",
+          "blocked": "Blocked",
+          "approval": "Needs approval",
+          "input": "Needs input",
+          "schedule": "Rescheduled"
+        }
+      },
+      "taskStream": {
+        "title": "Task stream",
+        "description": "Everything across your workspace, filtered to what you care about.",
+        "empty": "No tasks match this filter.",
+        "filters": {
+          "all": "All",
+          "attention": "Needs you",
+          "inProgress": "In progress",
+          "autoCompleted": "Auto-completed",
+          "archived": "Archived"
+        },
+        "lane": {
+          "attention": "Needs you",
+          "inProgress": "In progress",
+          "autoCompleted": "Auto-completed"
+        }
+      },
+      "time": {
+        "justNow": "just now",
+        "minutes": "{n}m ago",
+        "hours": "{n}h ago",
+        "days": "{n}d ago"
+      }
+    },
     "tasks": {
       "title": "Task Center",
       "subtitle": "See what is running, blocked, waiting for approval, or still missing a schedule — without digging through full conversations.",
