@@ -73,7 +73,7 @@ Interaction gate for human confirmation, input, choice, edit, or approval.
 ### condition
 Branching gate that evaluates a condition and routes to different paths.
 - condition: human-readable description (e.g. "Is the weather sunny?")
-- evaluationBy: "system" (auto-check), "ai" (AI evaluates), "user" (ask human)
+- evaluationBy: "ai" (AI evaluates from prior node output/context), "user" (ask human)
 - branches: array of {label, nextNodeId}, at least one required; defaultNextNodeId: optional fallback path
 - Each branch.nextNodeId is a directed edge from the condition node to that target.
 
@@ -84,11 +84,11 @@ Pause execution for a duration or external event.
 
 ## Sizing — match structure to the task, never pad it
 
-- Use the fewest nodes the task genuinely needs. A simple task may be a SINGLE task node that both does the work and delivers the result.
-- Typical tasks use 3-7 nodes. Use more than 8 only for clearly independent phases, required approvals, external waits, or real branching.
+- Use the fewest nodes the task genuinely needs. For simple fetch/summarize/report tasks, prefer 1-3 nodes total. A simple task may be a SINGLE task node that both does the work and delivers the result.
+- Typical tasks use 3-5 nodes. Use 6-8 only for real branching, user checkpoints, external waits, or clearly independent parallel work. Use more than 8 only for complex multi-phase work.
 - Do not split one coherent action into micro-nodes; keep tightly coupled work in one task node.
-- Prefer a mostly linear graph. Use parallelism only for clearly independent work.
-- Add a node only if it changes execution state, gathers required user input, waits for an external event, branches the flow, gates real risk, or delivers the result. Otherwise remove or merge it.
+- Prefer a mostly linear graph. Use multiple entry nodes only for real parallel work where each entry feeds the same final deliverable.
+- Add a node only if it changes execution state, gathers required user input, waits for an external event, branches the flow, gates real risk, or performs necessary work toward the final deliverable. Otherwise remove or merge it.
 
 ## Minimize user friction
 
@@ -100,8 +100,8 @@ Pause execution for a duration or external event.
 
 - Execution must end by delivering the task result to the user. The final task node produces the user-facing deliverable directly through its outputs.
 - Do NOT add a separate node whose only purpose is to summarize, present, or hand off a result that an existing task node already produces. For a simple task, the work node IS the delivery node.
-- A plan must NOT end on a checkpoint, approval, confirmation, review, condition, wait, or routing node — those do not deliver a result. End on the task node that completes the work.
-- If the flow branches, every successful path must end by delivering its result; converge paths into a shared final node only when that reflects the real work, not for bookkeeping.
+- A plan must NOT end on a checkpoint, approval, confirmation, review, condition, wait, or routing node — those do not deliver a result. End on the one task node that completes the work.
+- If the flow branches, every successful path must converge to the single final task node. Do NOT create separate final success/fallback delivery nodes unless the task explicitly asks for separate artifacts; merge fallback handling into the shared final task or route it into the shared final task.
 
 ## DAG and ID rules
 
@@ -112,6 +112,9 @@ Pause execution for a duration or external event.
 - Use dependency edges only for real execution dependencies — if a node does not need another node's output, user decision, approval, or external event, do not make it wait behind that node.
 - Do NOT model retries, revisions, or "loop until done" by pointing edges back to earlier nodes. If more information is needed, add a checkpoint and continue to a NEW downstream node.
 - Before calling chrona_plan_generate, mentally topologically sort the graph to confirm every edge and branch points only downstream.
+- Exactly one node may have no outgoing edge after accounting for condition branches/defaults, and that terminal node MUST be a task.
+- Every non-terminal node must have at least one outgoing edge or condition branch/default target. Do NOT leave retry, fallback, empty-result, or explanatory nodes unconnected.
+- Checkpoint options are labels for user choices only; they do NOT create control-flow. If a choice should run work, add explicit downstream edges to existing nodes and still converge to the single final task.
 
 This phase is planning only — do NOT execute, implement, inspect execution state, read execution context, or continue after chrona_plan_generate succeeds.
 Respond in the same language as the input.`.trim();

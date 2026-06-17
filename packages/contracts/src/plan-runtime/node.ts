@@ -1,4 +1,4 @@
-import type { TaskExecutor, TaskMode } from "../ai-plan-blueprint";
+import type { ConditionEvaluator, TaskExecutor, TaskMode } from "../ai-plan-blueprint";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
@@ -37,7 +37,7 @@ export interface NodeActionForm {
 
 export interface ConditionConfig {
   condition: string;
-  evaluationBy: string;
+  evaluationBy: ConditionEvaluator;
   branches: Array<{
     label: string;
     nextNodeId: string;
