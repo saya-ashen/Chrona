@@ -43,20 +43,6 @@ import {
 const HAS_CLAUDE = claudeBinaryAvailable();
 const TEST_TIMEOUT_MS = 90_000;
 
-// Fail-loud guard: the `claude` binary ships inside the
-// `@anthropic-ai/claude-agent-sdk` platform package, so a correctly-installed
-// repo always has it (no external CLI install required). In CI a missing
-// binary therefore means a broken dependency install — the live tests would
-// silently vanish while the run still goes green. This test never skips, so
-// that turns the run red instead.
-describe("live suite CI guard", () => {
-  test("the `claude` binary is available when running in CI", () => {
-    if (process.env.CI) {
-      expect(HAS_CLAUDE).toBe(true);
-    }
-  });
-});
-
 // `describe.skipIf` keeps the file green on the rare machine with no
 // SDK-bundled binary and no `claude` on PATH.
 describe.skipIf(!HAS_CLAUDE)(

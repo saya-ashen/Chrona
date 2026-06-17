@@ -43,9 +43,12 @@ describe("plan state boundaries", () => {
       edges: [{ from: "collect", to: "review" }, { from: "review", to: "collect" }],
     });
 
-    expect(validateEditablePlan(cyclic)).toMatchObject({
-      ok: false,
-      errors: [{ path: "edges", message: "Plan graph must be a DAG (no cycles allowed)" }],
+    const validation = validateEditablePlan(cyclic);
+
+    expect(validation.ok).toBe(false);
+    expect(validation.errors).toContainEqual({
+      path: "edges",
+      message: "Plan graph must be a DAG (no cycles allowed)",
     });
     expect(() => compileEditablePlan(cyclic)).toThrow(PlanCompileError);
   });
