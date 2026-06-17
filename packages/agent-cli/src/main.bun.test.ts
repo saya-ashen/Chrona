@@ -85,7 +85,7 @@ describe("run", () => {
     let stdout = "";
     const code = await run({
       argv: ["node", "fail", "--error", "boom"],
-      env: { CHRONA_BASE_URL: "http://127.0.0.1:3101/", CHRONA_RUN_TOKEN: "run-token" },
+      env: { CHRONA_BASE_URL: "http://127.0.0.1:3101///", CHRONA_RUN_TOKEN: "run-token" },
       fetchImpl: (url: string | URL | Request, init?: RequestInit) => {
         requests.push({ url: String(url), init });
         return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));

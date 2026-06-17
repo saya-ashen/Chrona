@@ -19,6 +19,12 @@ export class ConfigError extends Error {
   }
 }
 
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return end === value.length ? value : value.slice(0, end);
+}
+
 function endpointFromEnv(env: ChronaAgentEnv) {
   const baseUrl = env.CHRONA_BASE_URL?.trim();
   const token = env.CHRONA_RUN_TOKEN?.trim();
@@ -26,7 +32,7 @@ function endpointFromEnv(env: ChronaAgentEnv) {
   if (missing.length > 0) {
     throw new ConfigError(`Missing ${missing.join(" and ")}. Chrona agent commands require CHRONA_BASE_URL and CHRONA_RUN_TOKEN.`);
   }
-  return { url: `${baseUrl!.replace(/\/+$/, "")}/agent/control`, token: token! };
+  return { url: `${stripTrailingSlashes(baseUrl!)}/agent/control`, token: token! };
 }
 
 export async function sendControlAction(body: AgentControlActionBody, options: SendOptions) {
