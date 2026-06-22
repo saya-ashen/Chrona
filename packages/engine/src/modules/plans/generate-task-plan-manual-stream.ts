@@ -417,7 +417,8 @@ export async function* generateTaskPlanManualStream(input: {
               code: "PROVIDER_ERROR",
               message: `${PLAN_GENERATE_TOOL_NAME} failed: ${event.result}`,
             };
-            await recordPlanGenerationEvent({ workBlockId: effectiveWorkBlockId,
+            await recordPlanGenerationEvent({
+              workBlockId: effectiveWorkBlockId,
               type: "failed",
               task,
               generationId,
@@ -433,7 +434,8 @@ export async function* generateTaskPlanManualStream(input: {
             phase: "saving",
             message: "Reading saved plan...",
           };
-          await recordPlanGenerationStatus({ workBlockId: effectiveWorkBlockId,
+          await recordPlanGenerationStatus({
+            workBlockId: effectiveWorkBlockId,
             task,
             generationId,
             phase: savingEvent.phase,
@@ -454,7 +456,8 @@ export async function* generateTaskPlanManualStream(input: {
               code: "INTERNAL_ERROR",
               message: `${PLAN_GENERATE_TOOL_NAME} completed but no saved plan was found.`,
             };
-            await recordPlanGenerationEvent({ workBlockId: effectiveWorkBlockId,
+            await recordPlanGenerationEvent({
+              workBlockId: effectiveWorkBlockId,
               type: "failed",
               task,
               generationId,
@@ -474,7 +477,8 @@ export async function* generateTaskPlanManualStream(input: {
             phase: "streaming",
             message: `${getToolDisplayName(event.tool)} completed.`,
           };
-          await recordPlanGenerationStatus({ workBlockId: effectiveWorkBlockId,
+          await recordPlanGenerationStatus({
+            workBlockId: effectiveWorkBlockId,
             task,
             generationId,
             phase: statusEvent.phase,
@@ -545,15 +549,14 @@ export async function* generateTaskPlanManualStream(input: {
         break;
     }
 
-  }
+    if (input.signal?.aborted) {
+      const event: GeneratePlanSSEEvent = { type: "cancelled" };
+      await recordPlanGenerationEvent({ workBlockId: effectiveWorkBlockId, type: "cancelled", task, generationId, dedupeSuffix: "after_provider" });
+      yield event;
+      return;
+    }
 
-  if (input.signal?.aborted) {
-    const event: GeneratePlanSSEEvent = { type: "cancelled" };
-    await recordPlanGenerationEvent({ workBlockId: effectiveWorkBlockId, type: "cancelled", task, generationId, dedupeSuffix: "after_provider" });
-    yield event;
-    return;
+    const doneEvent: GeneratePlanSSEEvent = { type: "done" };
+    yield doneEvent;
   }
-
-  const doneEvent: GeneratePlanSSEEvent = { type: "done" };
-  yield doneEvent;
 }

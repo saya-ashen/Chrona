@@ -187,6 +187,22 @@ describe("MCP routes", () => {
     expect(conditionSelect.inputSchema.properties.idempotencyKey).toBeUndefined();
     expect(conditionSelect.inputSchema.properties.evidence).toBeUndefined();
   });
+  it("exports chrona node output with catalog-based spec schema", async () => {
+    const response = await postRpc(rpc("tools/list"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const nodeOutput = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_node_output",
+    );
+
+    const elements = nodeOutput.inputSchema.properties.spec.properties.elements;
+    const table = elements.items.oneOf.find((entry: { properties: { type: { const: string } } }) => entry.properties.type.const === "Table");
+    expect(elements.type).toBe("array");
+    expect(table.properties.props.required).toEqual(["columns", "rows"]);
+    expect(table.properties.props.properties.columns).toMatchObject({ type: "array" });
+    expect(nodeOutput.inputSchema.properties.mode.enum).toEqual(["append", "replace"]);
+  });
 
   it("does not expose hidden context fields in plan generation schema", async () => {
     const response = await postRpc(rpc("tools/list"));

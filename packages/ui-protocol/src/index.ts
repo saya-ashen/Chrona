@@ -8,6 +8,9 @@ export {
 export { chronaSchema, type ChronaSchema } from "./schema";
 export {
   chronaCatalog,
+  chronaNodeOutputCatalog,
+  chronaNodeOutputSpecJsonSchema,
+  chronaNodeOutputSpecSchema,
   type ChronaCatalog,
   type ChronaComponentName,
 } from "./catalog/components";

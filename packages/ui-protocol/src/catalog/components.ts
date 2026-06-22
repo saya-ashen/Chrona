@@ -66,7 +66,7 @@ const paragraphSchema = z.object({
 const tableComponentDefinition = {
   ...shadcn.Table,
   description:
-    "Data table. columns MUST be a direct JSON string array. rows MUST be a direct JSON 2D string array. Do not wrap arrays in objects such as { item: [...] }. Example: { columns: [\"Repo\", \"Stars\"], rows: [[\"chrona\", \"120\"]] }.",
+    'Data table. columns MUST be a direct JSON string array. rows MUST be a direct JSON 2D string array. Do not wrap arrays in objects such as { item: [...] }. Example: { columns: ["Repo", "Stars"], rows: [["chrona", "120"]] }.',
   example: {
     columns: ["Repo", "Stars"],
     rows: [["chrona", "120"]],
@@ -76,14 +76,13 @@ const tableComponentDefinition = {
 const collapsibleTextComponentDefinition = {
   props: z.object({ text: z.string(), threshold: z.number().optional() }),
   description:
-    "Long text with a show-more collapse. threshold MUST be a JSON number such as 800, not a string such as \"800\".",
+    'Long text with a show-more collapse. threshold MUST be a JSON number such as 800, not a string such as "800".',
   example: { text: "Long output...", threshold: 800 },
 };
 
 const sectionSchema = z.object({
   title: z.string().optional(),
 });
-
 
 const stateBindingSchema = z.object({ $bindState: z.string() });
 
@@ -95,8 +94,12 @@ const toolDetailLabelsSchema = z.object({
   error: z.string(),
 });
 
-const bindableNumberSchema = z.union([z.number(), stateBindingSchema]).optional();
-const bindableStringSchema = z.union([z.string(), stateBindingSchema]).optional();
+const bindableNumberSchema = z
+  .union([z.number(), stateBindingSchema])
+  .optional();
+const bindableStringSchema = z
+  .union([z.string(), stateBindingSchema])
+  .optional();
 
 /**
  * The Chrona workspace catalog: the single trust boundary shared by document
@@ -130,18 +133,19 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     Tabs: shadcn.Tabs,
     Table: tableComponentDefinition,
 
-
     // --- lowercase compatibility aliases for AI-produced json-render specs ---
     heading: shadcn.Heading,
     paragraph: {
       props: paragraphSchema,
-      description: "Compatibility alias for text paragraphs in AI-produced result specs.",
+      description:
+        "Compatibility alias for text paragraphs in AI-produced result specs.",
     },
     table: tableComponentDefinition,
     section: {
       props: sectionSchema,
       slots: ["default"],
-      description: "Compatibility section container for AI-produced result specs.",
+      description:
+        "Compatibility section container for AI-produced result specs.",
     },
     // --- Chrona-custom domain components ---
     WorkspaceOccurrenceCalendar: {
@@ -150,7 +154,8 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         value: z.string(),
         options: z.array(occurrenceOptionSchema),
       }),
-      description: "Compact occurrence calendar picker for recurring task workspace header.",
+      description:
+        "Compact occurrence calendar picker for recurring task workspace header.",
     },
     Markdown: {
       props: z.object({ content: z.string(), title: z.string().optional() }),
@@ -170,7 +175,10 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       description: "Reference to a produced file artifact.",
     },
     ResultSummary: {
-      props: z.object({ text: z.string().optional(), copyText: z.string().optional() }),
+      props: z.object({
+        text: z.string().optional(),
+        copyText: z.string().optional(),
+      }),
       description: "Result summary header with an optional copy affordance.",
     },
     ActivityRow: {
@@ -215,10 +223,13 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         statusLabel: z.string().optional(),
         sourceLabel: z.string().optional(),
         tone: toneSchema,
-        icon: z.enum(["sparkles", "archive", "file", "warning", "check"]).optional(),
+        icon: z
+          .enum(["sparkles", "archive", "file", "warning", "check"])
+          .optional(),
       }),
       slots: ["default"],
-      description: "Compact Chrona workspace summary block with optional nested content.",
+      description:
+        "Compact Chrona workspace summary block with optional nested content.",
     },
     WorkspaceArtifactList: {
       props: z.object({
@@ -228,7 +239,8 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         showFewerLabel: z.string().optional(),
       }),
       slots: ["default"],
-      description: "Collapsible artifact index used by the task workspace command center.",
+      description:
+        "Collapsible artifact index used by the task workspace command center.",
     },
     WorkspaceArtifactItem: {
       props: z.object({
@@ -245,7 +257,8 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         layout: z.enum(["inline", "stack"]).optional(),
       }),
       slots: ["default"],
-      description: "Compact action group used by command center checkpoint controls.",
+      description:
+        "Compact action group used by command center checkpoint controls.",
     },
     WorkspaceActionCard: {
       props: z.object({
@@ -261,17 +274,21 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         confidence: z.string(),
         risks: z.array(z.string()),
         warnings: z.array(z.string()),
-        taskDiffs: z.array(z.object({
-          label: z.string(),
-          key: z.string(),
-          original: z.string(),
-          proposed: z.string(),
-        })),
+        taskDiffs: z.array(
+          z.object({
+            label: z.string(),
+            key: z.string(),
+            original: z.string(),
+            proposed: z.string(),
+          }),
+        ),
         planSummary: z.array(z.string()),
-        addedNodes: z.array(z.object({
-          title: z.string(),
-          estimatedMinutes: z.number().optional(),
-        })),
+        addedNodes: z.array(
+          z.object({
+            title: z.string(),
+            estimatedMinutes: z.number().optional(),
+          }),
+        ),
         deletedNodeIds: z.array(z.string()),
       }),
       description: "Task workspace AI proposal diff preview display.",
@@ -288,11 +305,13 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     },
     [UI_ACTION.regeneratePlan]: {
       params: regeneratePlanPayloadSchema,
-      description: "Regenerate the current generated plan with optional user instruction.",
+      description:
+        "Regenerate the current generated plan with optional user instruction.",
     },
     [UI_ACTION.dispatchExecution]: {
       params: dispatchExecutionPayloadSchema,
-      description: "Dispatch a pre-defined execution action for the current node.",
+      description:
+        "Dispatch a pre-defined execution action for the current node.",
     },
     [UI_ACTION.locateWorkspaceNode]: {
       params: locateWorkspaceNodePayloadSchema,
@@ -300,15 +319,18 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     },
     [UI_ACTION.submitCheckpoint]: {
       params: submitCheckpointPayloadSchema,
-      description: "Submit checkpoint form values (with an optional chosen action).",
+      description:
+        "Submit checkpoint form values (with an optional chosen action).",
     },
     [UI_ACTION.recoveryRetry]: {
       params: recoveryRetryPayloadSchema,
-      description: "Retry the failed plan generation surfaced in the header error banner.",
+      description:
+        "Retry the failed plan generation surfaced in the header error banner.",
     },
     [UI_ACTION.recoveryEditInstruction]: {
       params: recoveryEditInstructionPayloadSchema,
-      description: "Open the plan regeneration instruction editor after a generation failure.",
+      description:
+        "Open the plan regeneration instruction editor after a generation failure.",
     },
     [UI_ACTION.recoveryCancel]: {
       params: recoveryCancelPayloadSchema,
@@ -317,5 +339,127 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
   },
 });
 
+export const chronaNodeOutputCatalog = defineCatalog(chronaSchema, {
+  components: {
+    Stack: shadcn.Stack,
+    Card: shadcn.Card,
+    Separator: shadcn.Separator,
+    Heading: shadcn.Heading,
+    Text: shadcn.Text,
+    Badge: shadcn.Badge,
+    Alert: shadcn.Alert,
+    Table: tableComponentDefinition,
+    Markdown: {
+      props: z.object({ content: z.string(), title: z.string().optional() }),
+      description:
+        "Rendered markdown result content. Use for prose, bullets, checklists, command summaries, and compact technical reports.",
+      example: {
+        title: "Summary",
+        content: "- Completed implementation\n- Ran focused tests",
+      },
+    },
+    JsonView: {
+      props: z.object({ value: z.unknown(), title: z.string().optional() }),
+      description:
+        "Pretty-printed JSON result value. Use for structured output, diagnostics, API payloads, or machine-readable results.",
+      example: { title: "Result", value: { status: "ok" } },
+    },
+    FileRef: {
+      props: z.object({
+        path: z.string(),
+        title: z.string().optional(),
+        language: z.string().optional(),
+        description: z.string().optional(),
+      }),
+      description:
+        "Reference to a produced or changed file artifact. path must be a repo-relative path when possible.",
+      example: {
+        path: "packages/ui-protocol/src/catalog/components.ts",
+        title: "Updated catalog",
+        language: "ts",
+      },
+    },
+    ResultSummary: {
+      props: z.object({
+        text: z.string().optional(),
+        copyText: z.string().optional(),
+      }),
+      description:
+        "Compact result summary header with optional copy text. Use once near the top of node output.",
+      example: { text: "Implementation complete; focused tests passed." },
+    },
+    CollapsibleText: collapsibleTextComponentDefinition,
+  },
+  actions: {},
+});
+
+const nodeOutputComponentPropsJsonSchemas = {
+  Stack: {
+    type: "object",
+    properties: {
+      direction: { type: "string", enum: ["horizontal", "vertical"] },
+      gap: { type: "string", enum: ["none", "sm", "md", "lg", "xl"] },
+      align: { type: "string", enum: ["start", "center", "end", "stretch"] },
+      justify: { type: "string", enum: ["start", "center", "end", "between", "around"] },
+      className: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  Card: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      description: { type: "string" },
+      maxWidth: { type: "string", enum: ["sm", "md", "lg", "full"] },
+      centered: { type: "boolean" },
+      className: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  Separator: { type: "object", properties: { orientation: { type: "string", enum: ["horizontal", "vertical"] } }, additionalProperties: false },
+  Heading: { type: "object", properties: { text: { type: "string" }, level: { type: "string", enum: ["h1", "h2", "h3", "h4"] } }, required: ["text"], additionalProperties: false },
+  Text: { type: "object", properties: { text: { type: "string" }, variant: { type: "string", enum: ["default", "muted", "lead", "code"] } }, required: ["text"], additionalProperties: false },
+  Badge: { type: "object", properties: { text: { type: "string" }, variant: { type: "string", enum: ["default", "secondary", "destructive", "outline"] } }, required: ["text"], additionalProperties: false },
+  Alert: { type: "object", properties: { title: { type: "string" }, message: { type: "string" }, type: { type: "string", enum: ["info", "success", "warning", "error"] } }, required: ["title"], additionalProperties: false },
+  Table: { type: "object", properties: { columns: { type: "array", items: { type: "string" } }, rows: { type: "array", items: { type: "array", items: { type: "string" } } }, caption: { type: "string" } }, required: ["columns", "rows"], additionalProperties: false },
+  Markdown: { type: "object", properties: { content: { type: "string" }, title: { type: "string" } }, required: ["content"], additionalProperties: false },
+  JsonView: { type: "object", properties: { value: {}, title: { type: "string" } }, required: ["value"], additionalProperties: false },
+  FileRef: { type: "object", properties: { path: { type: "string" }, title: { type: "string" }, language: { type: "string" }, description: { type: "string" } }, required: ["path"], additionalProperties: false },
+  ResultSummary: { type: "object", properties: { text: { type: "string" }, copyText: { type: "string" } }, additionalProperties: false },
+  CollapsibleText: { type: "object", properties: { text: { type: "string" }, threshold: { type: "number" } }, required: ["text"], additionalProperties: false },
+} as const;
+
+function nodeOutputJsonSchema() {
+  const componentSchemas = Object.entries(nodeOutputComponentPropsJsonSchemas).map(([name, props]) => ({
+    type: "object",
+    properties: {
+      id: { type: "string" },
+      type: { const: name },
+      props,
+      children: { type: "array", items: { type: "string" } },
+      visible: {},
+    },
+    required: ["id", "type", "props", "children"],
+    additionalProperties: false,
+  }));
+
+  return {
+    type: "object",
+    properties: {
+      root: { type: "string" },
+      elements: { type: "array", items: { oneOf: componentSchemas }, minItems: 1 },
+      state: { type: "object", additionalProperties: true },
+    },
+    required: ["root", "elements"],
+    additionalProperties: false,
+  };
+}
+
+export const chronaNodeOutputSpecJsonSchema = nodeOutputJsonSchema();
+export const chronaNodeOutputSpecSchema = chronaNodeOutputCatalog.zodSchema();
+
+export type ChronaNodeOutputCatalog = typeof chronaNodeOutputCatalog;
+export type ChronaNodeOutputComponentName =
+  keyof typeof chronaNodeOutputCatalog.data.components;
 export type ChronaCatalog = typeof chronaCatalog;
 export type ChronaComponentName = keyof typeof chronaCatalog.data.components;

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
+import { chronaNodeOutputCatalog } from "@chrona/ui-protocol";
 import {
   agentControlActionBodySchema,
   agentControlActionPayloadSchemas,
+  chronaPublicToolPayloadSchemas,
   chronaToolInputSchema,
   chronaToolOperationSchema,
   chronaToolResultSchema,
@@ -210,6 +212,32 @@ describe("MCP task tool contracts", () => {
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No extra ids" })).toThrow();
   });
 
+  it("parses array-form node output payloads into flat specs", () => {
+    expect(parseChronaToolPayload("chrona.node.output", {
+      spec: {
+        root: "root",
+        elements: [
+          { id: "root", type: "Stack", props: {}, children: ["table"] },
+          { id: "table", type: "Table", props: { columns: ["A"], rows: [["A"]] }, children: [] },
+        ],
+      },
+    })).toMatchObject({
+      spec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: {}, children: ["table"] },
+          table: { type: "Table", props: { columns: ["A"], rows: [["A"]] }, children: [] },
+        },
+      },
+    });
+
+    expect(() => parseChronaToolPayload("chrona.node.output", {
+      spec: { root: "missing", elements: [{ id: "root", type: "Stack", props: {}, children: [] }] },
+    })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.node.output", {
+      spec: { root: "root", elements: [{ id: "root", type: "Stack", props: {}, children: ["missing"] }] },
+    })).toThrow();
+  });
   it("defines agent control actions from public MCP payload contracts", () => {
     expect(agentControlActionPayloadSchemas.output).toBeDefined();
     expect(agentControlActionBodySchema.parse({
