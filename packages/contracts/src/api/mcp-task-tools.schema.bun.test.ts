@@ -1,9 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { chronaNodeOutputCatalog } from "@chrona/ui-protocol";
 import {
   agentControlActionBodySchema,
   agentControlActionPayloadSchemas,
-  chronaPublicToolPayloadSchemas,
   chronaToolInputSchema,
   chronaToolOperationSchema,
   chronaToolResultSchema,
