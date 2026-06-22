@@ -2,7 +2,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { db, TaskPriority, TaskStatus } from "@chrona/db";
-import type { CompiledPlan, EffectivePlanGraph, EffectivePlanNode, NodeResult } from "@chrona/contracts/ai";
+import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 import { describeChronaNodeOutputPublicTool, parseChronaToolPayload } from "@chrona/contracts";
 import { validateChronaSpec } from "@chrona/ui-protocol";
 
@@ -49,9 +49,6 @@ function requireManualText(value: string | undefined, label: string): string {
   return normalized;
 }
 
-function titleFromTaskInfo(taskInfo: string): string {
-  return taskInfo.split(/\r?\n/, 1)[0]?.slice(0, 80) || "Manual schema lab task";
-}
 
 
 type ManualModelNodeOutputTestInput = {
