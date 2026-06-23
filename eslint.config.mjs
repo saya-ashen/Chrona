@@ -169,6 +169,7 @@ const eslintConfig = defineConfig([
     // produced thousands of false positives.
     "playwright-report/**",
     "agent-test-runs/**",
+    ".understand-anything/**",
     "packages/db/src/generated/prisma/**",
     ".dependency-cruiser.cjs",
   ]),
