@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chronaNodeOutputSpecSchema } from "@chrona/ui-protocol";
 import { planBlueprintSchema } from "../ai-plan-blueprint";
 import {
   createTaskBodySchema,
@@ -213,7 +214,7 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
   "chrona.node.read": publicReadPayloadSchema,
-  "chrona.node.output": nodeOutputPayloadSchema.omit({ evidence: true }).strict(),
+  "chrona.node.output": publicNodeOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.block": blockPayloadSchema.omit({ evidence: true }).strict(),

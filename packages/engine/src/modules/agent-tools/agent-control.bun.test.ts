@@ -202,7 +202,7 @@ describe("kind -> action mapper", () => {
       body: {
         kind: "output",
         payload: {
-          outputs: [{ root: "root", elements: {} }],
+          spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [], visible: true } } },
         },
       },
     });

@@ -34,6 +34,7 @@ export type ChronaDebugProviderConfig = {
 const PLAN_TOOL = "chrona_plan_generate";
 const NODE_OUTPUT_TOOL = "chrona_node_output";
 const NODE_COMPLETE_TOOL = "chrona_node_complete";
+const CONDITION_SELECT_TOOL = "chrona_condition_select";
 const DEFAULT_DEBUG_PROVIDER_PROFILE: DebugProviderProfile = "deterministic";
 
 type DebugRun = {

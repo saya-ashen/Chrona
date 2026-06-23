@@ -4,7 +4,6 @@ import type {
   NodeRuntimeInput,
 } from "@chrona/contracts/ai";
 import { buildNodeRuntimeInput } from "./node-runtime-refs";
-import { chronaCatalog, CATALOG_VERSION } from "@chrona/ui-protocol";
 
 export const NODE_RUNTIME_TERMINAL_TOOLS = {
   task: ["chrona_node_output", "chrona_node_complete", "chrona_node_block", "chrona_node_fail"],
@@ -88,11 +87,7 @@ export function buildNodeRuntimePrompt(input: {
   });
 
   const catalogSection = input.node.type === "task"
-    ? [
-        "CATALOG_UI_SPEC — json-render Spec schema for Chrona task-node deliverables:",
-        chronaCatalog.prompt(),
-        `catalogVersion: "${CATALOG_VERSION}" — Chrona validates submitted Specs against this catalog version internally; do not include catalogVersion in the Spec.`,
-      ]
+    ? [NODE_OUTPUT_CATALOG_PROMPT]
     : [];
 
   const instructions = [

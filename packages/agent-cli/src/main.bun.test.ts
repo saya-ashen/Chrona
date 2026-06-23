@@ -20,12 +20,12 @@ function jsonFile(name: string, value: unknown) {
 
 describe("buildControlPayload", () => {
   it("maps node output argv to control payload", () => {
-    const output = { root: "card", elements: { card: { type: "Card" } } };
+    const output = { root: "card", elements: { card: { type: "Card", props: {}, children: [], visible: true } } };
     const path = jsonFile("output.json", output);
 
     expect(buildControlPayload(["node", "output", "--outputs-file", path, "--mode", "replace", "--summary", "partial"]).body).toEqual({
       kind: "output",
-      payload: { outputs: [output], mode: "replace", summary: "partial" },
+      payload: { spec: output, mode: "replace", summary: "partial" },
     });
   });
 

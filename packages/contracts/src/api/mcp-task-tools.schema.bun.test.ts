@@ -168,18 +168,16 @@ describe("MCP task tool contracts", () => {
     expect(() => parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "json", value: { foo: "bar" } }] })).toThrow();
     expect(parseChronaToolPayload("chrona.node.output", {
       mode: "replace",
-      outputs: [
-        {
-          root: "root",
-          elements: {
-            root: { type: "Card", props: { title: "Done" }, children: [] },
-          },
-          state: { status: "done" },
-        },
-      ],
+      spec: {
+        root: "root",
+        elements: [
+          { id: "root", type: "Card", props: { title: "Done" }, children: [] },
+        ],
+        state: { status: "done" },
+      },
     })).toMatchObject({
       mode: "replace",
-      outputs: [{ root: "root" }],
+      spec: { root: "root" },
     });
     expect(() => parseChronaToolPayload("chrona.node.output", {
       outputs: [{ kind: "json", title: "Wrong wrapper", value: { root: "root", elements: {} } }],

@@ -10,7 +10,7 @@ import { aiClientRegistry } from "../runtime/client-registry";
 import { saveCompiledPlan } from "../../plan-execution/persistence/compiled-plan-store";
 import { getPlanRun, savePlanRun } from "../../plan-execution/persistence/plan-run-store";
 import { taskPlanExecution } from "../../plan-execution";
-import { buildPlanExecutionTaskSessionId } from "../../execution-runtime";
+import { buildPlanExecutionTaskSessionKey } from "../../execution-runtime";
 
 const DEFAULT_NODE_PROMPT = "Create a small user-visible result for Chrona.";
 const DEFAULT_EXPECTED_OUTPUT = "A json-render Spec with a heading and checklist proving the model used chrona_node_output before completion.";
@@ -215,7 +215,7 @@ async function restoreExecuteTaskNodeBinding(previous: PreviousBinding): Promise
 }
 
 
-async function seedSchemaLabTask(input: { prompt?: string; expectedOutput?: string }): Promise<{ workspaceId: string; taskId: string; sessionId: string; plan: CompiledPlan }> {
+async function seedSchemaLabTask(input: { prompt?: string; expectedOutput?: string }): Promise<{ workspaceId: string; taskId: string; sessionKey: string; plan: CompiledPlan }> {
   const planId = `manual_model_node_output_schema_lab_${Date.now().toString(36)}`;
   const workspace = await db.workspace.create({
     data: { name: `Manual schema lab ${new Date().toISOString()}`, status: "Active", defaultRuntime: RUNTIME_NAME },
@@ -232,7 +232,7 @@ async function seedSchemaLabTask(input: { prompt?: string; expectedOutput?: stri
     },
   });
   const plan = buildCompiledPlan(planId, input);
-  const sessionId = buildPlanExecutionTaskSessionId({ taskId: task.id, planId: plan.editablePlanId });
+  const sessionKey = buildPlanExecutionTaskSessionKey({ taskId: task.id, planId: plan.editablePlanId });
   await saveCompiledPlan({
     workspaceId: workspace.id,
     taskId: task.id,
@@ -244,9 +244,9 @@ async function seedSchemaLabTask(input: { prompt?: string; expectedOutput?: stri
   });
   await savePlanRun({ workspaceId: workspace.id, taskId: task.id, planId: plan.editablePlanId, compiledPlan: plan });
   await db.taskSession.create({
-    data: { taskId: task.id, runtimeName: RUNTIME_NAME, sessionId, label: "Node output schema lab" },
+    data: { taskId: task.id, runtimeName: RUNTIME_NAME, sessionKey, label: "Node output schema lab" },
   });
-  return { workspaceId: workspace.id, taskId: task.id, sessionId, plan };
+  return { workspaceId: workspace.id, taskId: task.id, sessionKey, plan };
 }
 
 
@@ -476,7 +476,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
     const instructions = buildSchemaLabInstructions({ prompt, toolSchema });
     const nodeOutputTool = defaults.nodeOutputTool;
     const ref = await provider.startRun({
-      sessionId: seeded.sessionId,
+      sessionId: seeded.sessionKey,
       instructions,
       input: { type: "text", text: taskInfo },
       stream: true,
@@ -484,7 +484,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
     const calls: Array<{ callId: string | null; input: unknown; result: unknown }> = [];
     const textDeltas: string[] = [];
     const runIds = [ref.runId];
-    for await (const event of provider.streamRun({ runId: ref.runId, sessionId: seeded.sessionId })) {
+    for await (const event of provider.streamRun({ runId: ref.runId, sessionId: seeded.sessionKey })) {
       if (event.type === "text_delta" && event.text.trim()) textDeltas.push(event.text);
       if (event.type === "tool_call" && isNodeOutputTool(event.tool)) {
         calls.push({ callId: event.callId, input: event.input, result: null });
@@ -500,7 +500,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
       passed: evaluation.passed,
       taskId: seeded.taskId,
       workspaceId: seeded.workspaceId,
-      sessionId: seeded.sessionId,
+      sessionId: seeded.sessionKey,
       baseUrl,
       instructions,
       taskInfo,

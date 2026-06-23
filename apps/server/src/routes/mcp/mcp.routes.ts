@@ -8,6 +8,7 @@ import { createLogger } from "@chrona/logging";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
+  CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION,
   chronaPublicToolPayloadSchemas,
   chronaToolInputSchema,
   type ChronaToolName,
@@ -251,7 +252,7 @@ function toChronaInput(
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
   requestSessionId?: string,
 ) {
-  const payload = normalizeExternalPayload(toolName, { ...input });
+  const payload = { ...input };
   for (const key of hiddenContextKeys) {
     delete payload[key];
   }
