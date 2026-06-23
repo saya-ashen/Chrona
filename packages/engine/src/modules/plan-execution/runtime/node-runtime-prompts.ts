@@ -4,7 +4,6 @@ import type {
   NodeRuntimeInput,
 } from "@chrona/contracts/ai";
 import { buildNodeRuntimeInput } from "./node-runtime-refs";
-import { chronaCatalog, CATALOG_VERSION } from "@chrona/ui-protocol";
 
 export const NODE_RUNTIME_TERMINAL_TOOLS = {
   task: ["chrona_node_output", "chrona_node_complete", "chrona_node_block", "chrona_node_fail"],
@@ -29,15 +28,39 @@ When you call chrona_node_block you must include a reason and an actionForm that
 After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
 `.trim();
 
+const NODE_OUTPUT_CATALOG_PROMPT = `
+CATALOG_UI_SPEC — use this catalog only inside chrona_node_output.spec.
+
+Spec shape for chrona_node_output tool arguments: { root: string, elements: Array<{ id: string, type: string, props: object, children: string[], visible?: unknown }>, state?: object }.
+Submit the complete Spec as the chrona_node_output tool argument: { spec, mode: "replace", summary }. Chrona converts this array form to the internal flat json-render element record before rendering.
+Do not output JSONL, RFC 6902 patches, markdown outside the tool call, or catalogVersion.
+
+Available components:
+- Stack props: { direction?: "horizontal" | "vertical", gap?: "none" | "sm" | "md" | "lg" | "xl", align?: "start" | "center" | "end" | "stretch", justify?: "start" | "center" | "end" | "between" | "around", className?: string }.
+- Card props: { title?: string, description?: string, maxWidth?: "sm" | "md" | "lg" | "full", centered?: boolean, className?: string }.
+- Separator props: { orientation?: "horizontal" | "vertical" }.
+- Heading props: { text: string, level?: "h1" | "h2" | "h3" | "h4" }.
+- Text props: { text: string, variant?: "default" | "muted" | "lead" | "code" }.
+- Badge props: { text: string, variant?: "default" | "secondary" | "destructive" | "outline" }.
+- Alert props: { title: string, message?: string, type?: "info" | "success" | "warning" | "error" }.
+- Table props: { columns: string[], rows: string[][], caption?: string }. columns and rows must be direct JSON arrays, not wrapper objects.
+- Markdown props: { content: string, title?: string }.
+- JsonView props: { value: unknown, title?: string }.
+- FileRef props: { path: string, title?: string, language?: string, description?: string }.
+- ResultSummary props: { text?: string, copyText?: string }. Use once near the top when helpful.
+- CollapsibleText props: { text: string, threshold?: number }. threshold must be a JSON number, not a string.
+`.trim();
+
 function nodeTypeInstructions(node: EffectivePlanNode): string {
   switch (node.type) {
     case "task":
-      return `When the current task-node has user-visible deliverables, call chrona_node_output with those outputs before completion. Submit one json-render Spec using the Chrona workspace catalog (see CATALOG_UI_SPEC below). chrona_node_output may be called multiple times to replace the prior output with mode "replace". Call chrona_node_complete only when the current task-node objective is fully satisfied and required outputs have already been submitted. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_node_complete. Call chrona_node_fail for unrecoverable errors.
+      return `When the current task-node has user-visible deliverables, call chrona_node_output with a complete json-render Spec before completion. Generate UI using only the Chrona node-output catalog (see CATALOG_UI_SPEC below). chrona_node_output may be called multiple times to replace the prior output with mode "replace". Call chrona_node_complete only when the current task-node objective is fully satisfied and required outputs have already been submitted. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_node_complete. Call chrona_node_fail for unrecoverable errors.
 
-For user-visible deliverables, chrona_node_output takes outputs as a JSON-encoded string containing an array of complete json-render Specs. Almost always submit exactly ONE Spec. Each Spec is { "root": "rootElementId", "elements": { ...all elements... }, "state": {} }. Multi-element example:
-Tool argument example: { outputs: JSON.stringify([{ root: "root", elements: { root: { type: "Stack", props: { direction: "vertical" }, children: ["title", "body"] }, title: { type: "Heading", props: { text: "Result", level: "h3" }, children: [] }, body: { type: "Text", props: { text: "details" }, children: [] } }, state: {} }]), mode: "replace" }
+      For user-visible deliverables, pass "spec" as one complete json-render Spec using array-form elements. Do NOT submit patches, JSONL, nested element trees, markdown-only text, legacy output fields, or flat elements records. Tool argument example: { spec: { root: "root", elements: [{ id: "root", type: "Stack", props: { direction: "vertical", gap: "md" }, children: ["title", "body"] }, { id: "title", type: "Heading", props: { text: "Result", level: "h3" }, children: [] }, { id: "body", type: "Markdown", props: { content: "details" }, children: [] }] }, mode: "replace", summary: "Submitted result UI" }
 
-The Spec is the official json-render flat element tree (root key plus an elements map; each element is { "type", "props", "children" }). Hard rules, all enforced by validation: (1) Every element goes into the single "elements" object keyed by its own id — NEVER put elements as separate items in the "outputs" array; "outputs" holds whole Specs, not elements. (2) "children" MUST be a flat array of child element-id strings like ["a", "b"]; for leaf elements with no children use the empty array []. NEVER use an object such as { "item": [...] } and NEVER use a string such as "". (3) The catalog has no list/repeat directive: to render a list, create one element per item and list their ids in the parent's children array. (4) Array and number props are literal JSON only: never wrap any array prop in { "item": ... } or any other object. Table.props.columns is ["Repo", "Stars"]. Table.props.rows is [["chrona", "120"]]. CollapsibleText.props.threshold is 800, not "800". (5) Never emit a bare {} or a trailing empty object in elements or outputs. Use component/action names and props exactly as listed in the catalog prompt. Never submit a json-render Spec as kind "json", kind "ui", or under another wrapper key.`;
+      The submitted spec must be self-contained and closed: every child id referenced in any children array must exist as an element id, root must reference an existing element id, every element id must be unique, and no element may be omitted as a "summary", "meta", or "file" child placeholder unless that element is also declared in elements. Do not rely on later repair passes to add missing elements.
+
+      Spec hard rules, all enforced by validation: (1) root MUST equal one element id. (2) Every element MUST include id, type, props, and children. Leaf elements use children: []. (3) children contains child element-id strings only, never inline objects or values like ["[]"]. (4) Every child id MUST exist in elements. (5) No element may include itself or create a cycle. (6) Component type MUST be from CATALOG_UI_SPEC. (7) props MUST match that component schema exactly. (8) visible is an element-level field, not a prop. (9) The node-output catalog is intentionally small: use Stack/Card/Heading/Text/Markdown/Table/Badge/Alert/FileRef/JsonView/ResultSummary/CollapsibleText/Separator only.`
     case "condition":
       return `Evaluate exactly one listed branch and call chrona_condition_select with branchRef. Do not use labels, nextNodeId, default branches, natural-language conclusions, or incomplete JSON as routing authority. If no explicit branchRef is safe, call chrona_node_block.`;
     case "checkpoint":
@@ -64,11 +87,7 @@ export function buildNodeRuntimePrompt(input: {
   });
 
   const catalogSection = input.node.type === "task"
-    ? [
-        "CATALOG_UI_SPEC — json-render Spec schema for Chrona task-node deliverables:",
-        chronaCatalog.prompt(),
-        `catalogVersion: "${CATALOG_VERSION}" — Chrona validates submitted Specs against this catalog version internally; do not include catalogVersion in the Spec.`,
-      ]
+    ? [NODE_OUTPUT_CATALOG_PROMPT]
     : [];
 
   const instructions = [

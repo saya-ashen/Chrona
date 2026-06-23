@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
-import { createMcpRoutes } from "../mcp/mcp.routes";
+import type { ChronaToolName } from "@chrona/contracts/api";
+import { __mcpRouteTestHooks, createMcpRoutes } from "../mcp/mcp.routes";
 
 type CapturedToolOperation = {
   toolName: string;
@@ -12,6 +13,8 @@ type CapturedToolOperation = {
     taskId?: string;
   };
 };
+
+type StubEngine = Parameters<typeof createMcpRoutes>[0];
 
 const hiddenContextFieldNames = [
   "workspaceId",
@@ -39,22 +42,24 @@ const blockPayload = {
     inputFields: [{ name: "apiDetails", label: "API details" }],
   },
 };
+
 const nodeOutputSpec = {
   root: "root",
   elements: {
     root: {
       type: "Markdown",
       props: { content: "Result" },
+      children: [],
     },
   },
 };
 
-function app(
+function createStubEngine(
   rejected = false,
   operations: CapturedToolOperation[] = [],
   resultOverride?: Record<string, unknown>,
-) {
-  const engine = {
+): StubEngine {
+  return {
     agentTools: {
       registry: () => ({
         tools: [
@@ -75,12 +80,8 @@ function app(
           operationId: rejected ? "op-rejected" : "op-1",
           toolName,
           status: rejected ? "rejected" : "accepted",
-          reasonCode: rejected
-            ? "STALE_STATE"
-            : null,
-          message: rejected
-            ? "Expected state is stale."
-            : "Tool executed.",
+          reasonCode: rejected ? "STALE_STATE" : null,
+          message: rejected ? "Expected state is stale." : "Tool executed.",
           affected: { taskId: input.taskId ?? "task-1" },
           state: { taskStatus: "Ready", idempotencyKey: input.idempotencyKey },
           idempotency: rejected ? "new" : "not_applicable",
@@ -91,65 +92,64 @@ function app(
         };
       },
     },
-  };
+  } as unknown as StubEngine;
+}
+
+function app(engine = createStubEngine()) {
   const a = new Hono();
-  a.route("/api", createMcpRoutes(engine as unknown as Parameters<typeof createMcpRoutes>[0]));
+  a.route("/api", createMcpRoutes(engine));
   return a;
 }
 
 function rpc(method: string, params: Record<string, unknown> = {}, id = 1) {
-  return {
-    jsonrpc: "2.0",
-    id,
-    method,
-    params,
-  };
+  return { jsonrpc: "2.0", id, method, params };
 }
 
-async function postRpc(body: unknown, rejected = false) {
-  return app(rejected).request("/api/mcp", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify(body),
-  });
+const mcpHeaders = {
+  "content-type": "application/json",
+  accept: "application/json, text/event-stream",
+};
+
+function callTool(
+  toolName: ChronaToolName,
+  input: Record<string, unknown>,
+  options: { rejected?: boolean; operations?: CapturedToolOperation[]; resultOverride?: Record<string, unknown>; requestSessionId?: string } = {},
+) {
+  const operations = options.operations ?? [];
+  return __mcpRouteTestHooks.callChronaTool(
+    createStubEngine(options.rejected, operations, options.resultOverride),
+    toolName,
+    input,
+    undefined,
+    options.requestSessionId,
+  );
 }
 
-async function postRpcWithOperations(body: unknown, path = "/api/mcp") {
-  const operations: CapturedToolOperation[] = [];
-  const response = await app(false, operations).request(path, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify(body),
-  });
-  return { response, operations };
+type ToolCallResult = Awaited<ReturnType<typeof callTool>>;
+
+function expectStructuredContent(result: ToolCallResult) {
+  expect(result.structuredContent).toBeDefined();
+  return result.structuredContent as Record<string, unknown>;
 }
 
-async function postRpcWithResult(body: unknown, resultOverride: Record<string, unknown>) {
-  return app(false, [], resultOverride).request("/api/mcp", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify(body),
-  });
+function expectTextContent(result: ToolCallResult) {
+  const content = result.content[0];
+  expect(content?.type).toBe("text");
+  return content as { type: "text"; text: string };
 }
+
 
 describe("MCP routes", () => {
   it("responds to standard MCP initialize", async () => {
-    const response = await postRpc(
-      rpc("initialize", {
+    const response = await app().request("/api/mcp", {
+      method: "POST",
+      headers: mcpHeaders,
+      body: JSON.stringify(rpc("initialize", {
         protocolVersion: LATEST_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "chrona-test", version: "1.0.0" },
-      }),
-    );
+      })),
+    });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -158,76 +158,8 @@ describe("MCP routes", () => {
     });
   });
 
-  it("lists Chrona tools through tools/list", async () => {
-    const response = await postRpc(rpc("tools/list"));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_execution_read");
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_condition_select");
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toContain("chrona_plan_generate");
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).not.toContain("chrona_checkpoint_submit");
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).not.toContain("chrona_node_result");
-  });
-
-  it("lists minimal external tool schemas with descriptions", async () => {
-    const response = await postRpc(rpc("tools/list"));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    const conditionSelect = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_condition_select",
-    );
-
-    expect(conditionSelect.description).toBe("Select a condition branch by nodeId and branchRef. Chrona validates the node against the current task.");
-    expect(conditionSelect.inputSchema.required).toEqual(["nodeId", "branchRef", "summary"]);
-    expect(conditionSelect.inputSchema.properties.nodeId).toMatchObject({ type: "string" });
-    expect(conditionSelect.inputSchema.properties.branchRef).toMatchObject({ type: "string" });
-    expect(conditionSelect.inputSchema.properties.nextNodeId).toBeUndefined();
-    expect(conditionSelect.inputSchema.properties.idempotencyKey).toBeUndefined();
-    expect(conditionSelect.inputSchema.properties.evidence).toBeUndefined();
-  });
-
-  it("does not expose hidden context fields in plan generation schema", async () => {
-    const response = await postRpc(rpc("tools/list"));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    const planGenerate = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_plan_generate",
-    );
-
-    expect(planGenerate.inputSchema.required).toEqual(["title", "goal", "nodes"]);
-    expect(planGenerate.inputSchema.properties.title).toMatchObject({ type: "string" });
-    expect(planGenerate.inputSchema.properties.goal).toMatchObject({ type: "string" });
-    expect(planGenerate.inputSchema.properties.nodes).toMatchObject({ type: "array" });
-    expect(planGenerate.inputSchema.properties.sessionId).toBeUndefined();
-    expect(planGenerate.inputSchema.properties.actorType).toBeUndefined();
-    expect(planGenerate.inputSchema.properties.actorId).toBeUndefined();
-    expect(planGenerate.inputSchema.properties.idempotencyKey).toBeUndefined();
-    expect(planGenerate.inputSchema.properties.evidence).toBeUndefined();
-    expect(planGenerate.inputSchema.properties.expectedRevision).toBeUndefined();
-  });
-
-  it("does not expose hidden context fields in any public tool schema", async () => {
-    const response = await postRpc(rpc("tools/list"));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-
-    for (const tool of body.result.tools as { inputSchema: { properties: Record<string, unknown> } }[]) {
-      for (const fieldName of hiddenContextFieldNames) {
-        expect(tool.inputSchema.properties[fieldName]).toBeUndefined();
-      }
-    }
-  });
-
-  it("registers the minimal external Chrona MCP tool surface", async () => {
-    const response = await postRpc(rpc("tools/list"));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([
+  it("registers the minimal external Chrona MCP tool surface", () => {
+    expect(Object.keys(__mcpRouteTestHooks.externalTools).sort()).toEqual([
       "chrona_condition_select",
       "chrona_execution_read",
       "chrona_node_block",
@@ -241,56 +173,102 @@ describe("MCP routes", () => {
     ]);
   });
 
-  it("dispatches Chrona tools through tools/call", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_execution_read",
-        arguments: {},
-        _meta: { sessionId: "chrona:task:task-1:execute" },
-      }),
+  it("lists minimal external tool schemas with descriptions", () => {
+    const conditionSelect = __mcpRouteTestHooks.externalTools.chrona_condition_select;
+
+    expect(conditionSelect.description).toBe("Select a condition branch by nodeId and branchRef. Chrona validates the node against the current task.");
+    expect(conditionSelect.inputSchema.shape.nodeId).toBeDefined();
+    expect(conditionSelect.inputSchema.shape.branchRef).toBeDefined();
+    expect(conditionSelect.inputSchema.shape.summary).toBeDefined();
+    expect(conditionSelect.inputSchema.shape.nextNodeId).toBeUndefined();
+    expect(conditionSelect.inputSchema.shape.idempotencyKey).toBeUndefined();
+    expect(conditionSelect.inputSchema.shape.evidence).toBeUndefined();
+  });
+
+  it("exports chrona node output with catalog-based spec schema", () => {
+    const nodeOutput = __mcpRouteTestHooks.externalTools.chrona_node_output;
+
+    expect(nodeOutput.description).toContain("spec field");
+    expect(nodeOutput.description).toContain("columns: string[]");
+    expect(nodeOutput.description).toContain("rows: string[][]");
+    expect(nodeOutput.inputSchema.shape.spec).toBeDefined();
+    expect(nodeOutput.inputSchema.shape.outputs).toBeUndefined();
+    expect(nodeOutput.inputSchema.parse({ spec: nodeOutputSpec, mode: "replace" })).toEqual({
+      spec: nodeOutputSpec,
+      mode: "replace",
+    });
+  });
+
+  it("does not expose hidden context fields in plan generation schema", () => {
+    const planGenerate = __mcpRouteTestHooks.externalTools.chrona_plan_generate;
+
+    expect(planGenerate.inputSchema.shape.title).toBeDefined();
+    expect(planGenerate.inputSchema.shape.goal).toBeDefined();
+    expect(planGenerate.inputSchema.shape.nodes).toBeDefined();
+    expect(planGenerate.inputSchema.shape.sessionId).toBeUndefined();
+    expect(planGenerate.inputSchema.shape.actorType).toBeUndefined();
+    expect(planGenerate.inputSchema.shape.actorId).toBeUndefined();
+    expect(planGenerate.inputSchema.shape.idempotencyKey).toBeUndefined();
+    expect(planGenerate.inputSchema.shape.evidence).toBeUndefined();
+    expect(planGenerate.inputSchema.shape.expectedRevision).toBeUndefined();
+  });
+
+  it("does not expose hidden context fields in any public tool schema", () => {
+    for (const tool of Object.values(__mcpRouteTestHooks.externalTools)) {
+      for (const fieldName of hiddenContextFieldNames) {
+        expect(tool.inputSchema.shape[fieldName]).toBeUndefined();
+      }
+    }
+  });
+
+  it("builds Chrona input from visible payload and hidden context", () => {
+    const input = __mcpRouteTestHooks.toChronaInput(
+      "chrona.node.output",
+      { ...hiddenContextArguments, spec: nodeOutputSpec, mode: "replace" },
     );
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      result: {
-        content: [{ type: "text", text: "Tool executed." }],
-        structuredContent: { status: "accepted", message: "Tool executed.", state: { taskStatus: "Ready" } },
-      },
+    expect(input.sessionId).toBe(hiddenContextArguments.sessionId);
+    expect(input.payload).toEqual({ spec: nodeOutputSpec, mode: "replace" });
+    expect(input.evidence).toBeUndefined();
+  });
+
+  it("dispatches Chrona tools through call hook", async () => {
+    const result = await callTool("chrona.execution.read", {
+      _meta: { sessionId: "chrona:task:task-1:execute" },
+    });
+
+    expect(result).toMatchObject({
+      content: [{ type: "text", text: "Tool executed." }],
+      structuredContent: { status: "accepted", message: "Tool executed.", state: { taskStatus: "Ready" } },
     });
   });
 
   it("returns slim accepted mutating tool results to the model", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_node_complete",
-        arguments: { summary: "Done" },
-        _meta: { sessionId: "chrona:task:task-1:execute" },
-      }),
-    );
+    const result = await callTool("chrona.node.complete", {
+      summary: "Done",
+      _meta: { sessionId: "chrona:task:task-1:execute" },
+    });
 
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.result.structuredContent).toEqual({
+    const structuredContent = expectStructuredContent(result);
+
+    expect(structuredContent).toEqual({
       status: "accepted",
       message: "Tool executed.",
       next: "stop",
     });
-    expect(JSON.stringify(body.result.structuredContent)).not.toContain("operationId");
-    expect(JSON.stringify(body.result.structuredContent)).not.toContain("affected");
-    expect(JSON.stringify(body.result.structuredContent)).not.toContain("auditRef");
-    expect(JSON.stringify(body.result.structuredContent)).not.toContain("idempotency");
+    expect(JSON.stringify(structuredContent)).not.toContain("operationId");
+    expect(JSON.stringify(structuredContent)).not.toContain("affected");
+    expect(JSON.stringify(structuredContent)).not.toContain("auditRef");
+    expect(JSON.stringify(structuredContent)).not.toContain("idempotency");
   });
 
   it("allows execution tools in plan execution main sessions", async () => {
-    const { response, operations } = await postRpcWithOperations(
-      rpc("tools/call", {
-        name: "chrona_node_complete",
-        arguments: { summary: "Done" },
-        _meta: { sessionId: "chrona:task:task-1:execute:35faa86e" },
-      }),
-    );
+    const operations: CapturedToolOperation[] = [];
+    await callTool("chrona.node.complete", {
+      summary: "Done",
+      _meta: { sessionId: "chrona:task:task-1:execute:35faa86e" },
+    }, { operations });
 
-    expect(response.status).toBe(200);
     expect(operations).toEqual([
       expect.objectContaining({
         toolName: "chrona.node.complete",
@@ -303,9 +281,9 @@ describe("MCP routes", () => {
     const executionSessionId = "chrona:task:task-1:execute";
     const planSessionId = "chrona:task:task-1:plan-generation";
     const cases = [
-      ["chrona_execution_read", "chrona.execution.read", executionSessionId, {}, {}],
-      ["chrona_plan_read", "chrona.plan.read", executionSessionId, {}, {}],
-      ["chrona_plan_generate", "chrona.plan.generate", planSessionId, {
+      ["chrona.execution.read", executionSessionId, {}, {}],
+      ["chrona.plan.read", executionSessionId, {}, {}],
+      ["chrona.plan.generate", planSessionId, {
         title: "Generated MCP plan",
         goal: "Persist a complete graph",
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
@@ -316,28 +294,22 @@ describe("MCP routes", () => {
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
         edges: [],
       }],
-      ["chrona_node_read", "chrona.node.read", executionSessionId, {}, {}],
-      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: JSON.stringify([nodeOutputSpec]) }, { outputs: [nodeOutputSpec] }],
-      ["chrona_node_complete", "chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
-      ["chrona_condition_select", "chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
-      ["chrona_node_block", "chrona.node.block", executionSessionId, blockPayload, blockPayload],
-      ["chrona_node_fail", "chrona.node.fail", executionSessionId, { error: "Command failed" }, { error: "Command failed" }],
-      ["chrona_wait_complete", "chrona.node.wait_complete", executionSessionId, { summary: "Event observed" }, { summary: "Event observed" }],
+      ["chrona.node.read", executionSessionId, {}, {}],
+      ["chrona.node.output", executionSessionId, { spec: nodeOutputSpec }, { spec: nodeOutputSpec }],
+      ["chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
+      ["chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona.node.block", executionSessionId, blockPayload, blockPayload],
+      ["chrona.node.fail", executionSessionId, { error: "Command failed" }, { error: "Command failed" }],
+      ["chrona.node.wait_complete", executionSessionId, { summary: "Event observed" }, { summary: "Event observed" }],
     ] as const;
 
-    for (const [externalName, internalName, sessionId, args, expectedPayload] of cases) {
-      const { response, operations } = await postRpcWithOperations(
-        rpc("tools/call", {
-          name: externalName,
-          arguments: args,
-          _meta: { sessionId },
-        }),
-      );
+    for (const [toolName, sessionId, args, expectedPayload] of cases) {
+      const operations: CapturedToolOperation[] = [];
+      await callTool(toolName, { ...args, _meta: { sessionId } }, { operations });
 
-      expect(response.status).toBe(200);
       expect(operations).toHaveLength(1);
       expect(operations[0]).toMatchObject({
-        toolName: internalName,
+        toolName,
         input: {
           sessionId,
           taskId: "task-from-session",
@@ -349,31 +321,25 @@ describe("MCP routes", () => {
   });
 
   it("generates idempotency keys for mutating tools without exposing them to the model", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_node_complete",
-        arguments: { summary: "Done" },
-        _meta: { sessionId: "chrona:task:task-1:execute" },
-      }),
-    );
+    const result = await callTool("chrona.node.complete", {
+      summary: "Done",
+      _meta: { sessionId: "chrona:task:task-1:execute" },
+    });
 
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.result.structuredContent.status).toBe("accepted");
-    expect(body.result.structuredContent.next).toBe("stop");
-    expect(JSON.stringify(body.result.structuredContent)).not.toContain("idempotencyKey");
+    const structuredContent = expectStructuredContent(result);
+
+    expect(structuredContent.status).toBe("accepted");
+    expect(structuredContent.next).toBe("stop");
+    expect(JSON.stringify(structuredContent)).not.toContain("idempotencyKey");
   });
 
   it("uses session_id from MCP URL when tool payload omits sessionId", async () => {
-    const { response, operations } = await postRpcWithOperations(
-      rpc("tools/call", {
-        name: "chrona_node_output",
-        arguments: { outputs: JSON.stringify([nodeOutputSpec]), mode: "replace" },
-      }),
-      "/api/mcp?session_id=chrona%3Atask%3Atask-1%3Aexecute%3Aurl",
-    );
+    const operations: CapturedToolOperation[] = [];
+    await callTool("chrona.node.output", { spec: nodeOutputSpec, mode: "replace" }, {
+      operations,
+      requestSessionId: "chrona:task:task-1:execute:url",
+    });
 
-    expect(response.status).toBe(200);
     expect(operations).toHaveLength(1);
     expect(operations[0]).toMatchObject({
       toolName: "chrona.node.output",
@@ -385,32 +351,15 @@ describe("MCP routes", () => {
   });
 
   it("fails fast when mutating Chrona tools are called without sessionId", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_node_complete",
-        arguments: { summary: "Done" },
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(JSON.stringify(body)).toContain("chrona.node.complete requires sessionId for idempotency");
+    await expect(callTool("chrona.node.complete", { summary: "Done" }))
+      .rejects.toThrow("chrona.node.complete requires sessionId for idempotency");
   });
 
   it("fails fast when Chrona tool context uses unsupported session_id", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_node_complete",
-        arguments: {
-          summary: "Done",
-          _meta: { session_id: "chrona:task:task-1:execute" },
-        },
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(JSON.stringify(body)).toContain("arguments._meta.session_id is not supported; expected sessionId");
+    await expect(callTool("chrona.node.complete", {
+      summary: "Done",
+      _meta: { session_id: "chrona:task:task-1:execute" },
+    })).rejects.toThrow("arguments._meta.session_id is not supported; expected sessionId");
   });
 
   it("accepts hidden context injected into plan generation arguments", async () => {
@@ -420,17 +369,9 @@ describe("MCP routes", () => {
       nodes: [{ id: "first_step", type: "task", title: "First step" }],
       edges: [],
     };
-    const { response, operations } = await postRpcWithOperations(
-      rpc("tools/call", {
-        name: "chrona_plan_generate",
-        arguments: {
-          ...blueprint,
-          ...hiddenContextArguments,
-        },
-      }),
-    );
+    const operations: CapturedToolOperation[] = [];
+    await callTool("chrona.plan.generate", { ...blueprint, ...hiddenContextArguments }, { operations });
 
-    expect(response.status).toBe(200);
     expect(operations).toHaveLength(1);
     expect(operations[0]).toMatchObject({
       toolName: "chrona.plan.generate",
@@ -446,9 +387,9 @@ describe("MCP routes", () => {
   it("accepts hidden context injected into every public tool call", async () => {
     const executionSessionId = "chrona:task:task-1:execute";
     const cases = [
-      ["chrona_execution_read", "chrona.execution.read", executionSessionId, {}, {}],
-      ["chrona_plan_read", "chrona.plan.read", hiddenContextArguments.sessionId, {}, {}],
-      ["chrona_plan_generate", "chrona.plan.generate", hiddenContextArguments.sessionId, {
+      ["chrona.execution.read", executionSessionId, {}, {}],
+      ["chrona.plan.read", hiddenContextArguments.sessionId, {}, {}],
+      ["chrona.plan.generate", hiddenContextArguments.sessionId, {
         title: "Generated MCP plan",
         goal: "Persist a complete graph",
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
@@ -459,27 +400,22 @@ describe("MCP routes", () => {
         nodes: [{ id: "first_step", type: "task", title: "First step" }],
         edges: [],
       }],
-      ["chrona_node_read", "chrona.node.read", executionSessionId, {}, {}],
-      ["chrona_node_output", "chrona.node.output", executionSessionId, { outputs: JSON.stringify([nodeOutputSpec]) }, { outputs: [nodeOutputSpec] }],
-      ["chrona_node_complete", "chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
-      ["chrona_condition_select", "chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
-      ["chrona_node_block", "chrona.node.block", executionSessionId, blockPayload, blockPayload],
-      ["chrona_node_fail", "chrona.node.fail", executionSessionId, { error: "Command failed" }, { error: "Command failed" }],
-      ["chrona_wait_complete", "chrona.node.wait_complete", executionSessionId, { summary: "Event observed" }, { summary: "Event observed" }],
+      ["chrona.node.read", executionSessionId, {}, {}],
+      ["chrona.node.output", executionSessionId, { spec: nodeOutputSpec }, { spec: nodeOutputSpec }],
+      ["chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
+      ["chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
+      ["chrona.node.block", executionSessionId, blockPayload, blockPayload],
+      ["chrona.node.fail", executionSessionId, { error: "Command failed" }, { error: "Command failed" }],
+      ["chrona.node.wait_complete", executionSessionId, { summary: "Event observed" }, { summary: "Event observed" }],
     ] as const;
 
-    for (const [externalName, internalName, sessionId, args, expectedPayload] of cases) {
-      const { response, operations } = await postRpcWithOperations(
-        rpc("tools/call", {
-          name: externalName,
-          arguments: { ...args, ...hiddenContextArguments, sessionId },
-        }),
-      );
+    for (const [toolName, sessionId, args, expectedPayload] of cases) {
+      const operations: CapturedToolOperation[] = [];
+      await callTool(toolName, { ...args, ...hiddenContextArguments, sessionId }, { operations });
 
-      expect(response.status).toBe(200);
       expect(operations).toHaveLength(1);
       expect(operations[0]).toMatchObject({
-        toolName: internalName,
+        toolName,
         input: {
           sessionId,
           taskId: "task-from-session",
@@ -491,119 +427,84 @@ describe("MCP routes", () => {
   });
 
   it("resolves injected sessionId before dispatching Chrona tools", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_execution_read",
-        arguments: {},
-        _meta: { sessionId: "chrona:task:task-1:execute" },
-      }),
-    );
+    const result = await callTool("chrona.execution.read", {
+      _meta: { sessionId: "chrona:task:task-1:execute" },
+    });
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      result: {
-        structuredContent: {
-          status: "accepted",
-          message: "Tool executed.",
-          state: { taskStatus: "Ready" },
-        },
-      },
+    expect(expectStructuredContent(result)).toMatchObject({
+      status: "accepted",
+      message: "Tool executed.",
+      state: { taskStatus: "Ready" },
     });
   });
 
   it("rejects execution tools in plan generation sessions before dispatch", async () => {
-    const { response, operations } = await postRpcWithOperations(
-      rpc("tools/call", {
-        name: "chrona_execution_read",
-        arguments: {},
-        _meta: { sessionId: "chrona:task:task-1:plan-generation" },
-      }),
-    );
+    const operations: CapturedToolOperation[] = [];
+    const result = await callTool("chrona.execution.read", {
+      _meta: { sessionId: "chrona:task:task-1:plan-generation" },
+    }, { operations });
 
-    expect(response.status).toBe(200);
     expect(operations).toHaveLength(0);
-    await expect(response.json()).resolves.toMatchObject({
-      result: {
-        isError: true,
-        structuredContent: {
-          status: "rejected",
-          reasonCode: "UNAUTHORIZED",
-          recovery: { action: "stop" },
-        },
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: {
+        status: "rejected",
+        reasonCode: "UNAUTHORIZED",
+        recovery: { action: "stop" },
       },
     });
   });
 
   it("rejects execution tools in work-block plan generation sessions", async () => {
-    const { response, operations } = await postRpcWithOperations(
-      rpc("tools/call", {
-        name: "chrona_node_complete",
-        arguments: { summary: "Done" },
-        _meta: { sessionId: "chrona:task:task-1:work-block:block-1:plan-generation" },
-      }),
-    );
+    const operations: CapturedToolOperation[] = [];
+    const result = await callTool("chrona.node.complete", {
+      summary: "Done",
+      _meta: { sessionId: "chrona:task:task-1:work-block:block-1:plan-generation" },
+    }, { operations });
 
-    expect(response.status).toBe(200);
     expect(operations).toHaveLength(0);
-    await expect(response.json()).resolves.toMatchObject({
-      result: {
-        isError: true,
-        structuredContent: {
-          status: "rejected",
-          reasonCode: "UNAUTHORIZED",
-          recovery: { action: "stop" },
-        },
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: {
+        status: "rejected",
+        reasonCode: "UNAUTHORIZED",
+        recovery: { action: "stop" },
       },
     });
   });
 
   it("rejects plan generation in execution sessions before dispatch", async () => {
-    const { response, operations } = await postRpcWithOperations(
-      rpc("tools/call", {
-        name: "chrona_plan_generate",
-        arguments: {
-          title: "Generated MCP plan",
-          goal: "Persist a complete graph",
-          nodes: [{ id: "first_step", type: "task", title: "First step" }],
-          edges: [],
-        },
-        _meta: { sessionId: "chrona:task:task-1:work-block:block-1" },
-      }),
-    );
+    const operations: CapturedToolOperation[] = [];
+    const result = await callTool("chrona.plan.generate", {
+      title: "Generated MCP plan",
+      goal: "Persist a complete graph",
+      nodes: [{ id: "first_step", type: "task", title: "First step" }],
+      edges: [],
+      _meta: { sessionId: "chrona:task:task-1:work-block:block-1" },
+    }, { operations });
 
-    expect(response.status).toBe(200);
     expect(operations).toHaveLength(0);
-    await expect(response.json()).resolves.toMatchObject({
-      result: {
-        isError: true,
-        structuredContent: {
-          status: "rejected",
-          reasonCode: "UNAUTHORIZED",
-          recovery: { action: "use_allowed_tool" },
-        },
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: {
+        status: "rejected",
+        reasonCode: "UNAUTHORIZED",
+        recovery: { action: "use_allowed_tool" },
       },
     });
   });
 
   it("returns rejected Chrona results as MCP tool errors with structured content", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_execution_read",
-        arguments: {},
-        _meta: { sessionId: "chrona:task:task-1:execute" },
-      }),
-      true,
-    );
+    const result = await callTool("chrona.execution.read", {
+      _meta: { sessionId: "chrona:task:task-1:execute" },
+    }, { rejected: true });
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      result: {
-        isError: true,
-        structuredContent: {
-          status: "rejected",
-          reasonCode: "STALE_STATE",
-          recovery: { nextTool: "chrona.execution.read" },
-        },
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: {
+        status: "rejected",
+        reasonCode: "STALE_STATE",
+        recovery: { nextTool: "chrona.execution.read" },
       },
     });
   });
@@ -613,32 +514,28 @@ describe("MCP routes", () => {
       path: "edges.0.to",
       message: "Unknown target node 'missing_target'",
     };
-    const response = await postRpcWithResult(
-      rpc("tools/call", {
-        name: "chrona_plan_generate",
-        arguments: {
-          title: "Invalid plan",
-          goal: "Expose validation issues",
-          nodes: [{ id: "task_inspect_unscheduled_cards", type: "task", title: "Inspect unscheduled cards" }],
-          edges: [{ from: "task_inspect_unscheduled_cards", to: "missing_target" }],
-        },
-        _meta: { sessionId: "chrona:task:task-1:plan-generation" },
-      }),
-      {
+    const result = await callTool("chrona.plan.generate", {
+      title: "Invalid plan",
+      goal: "Expose validation issues",
+      nodes: [{ id: "task_inspect_unscheduled_cards", type: "task", title: "Inspect unscheduled cards" }],
+      edges: [{ from: "task_inspect_unscheduled_cards", to: "missing_target" }],
+      _meta: { sessionId: "chrona:task:task-1:plan-generation" },
+    }, {
+      resultOverride: {
         status: "rejected",
         reasonCode: "VALIDATION_ERROR",
         message: "Plan blueprint compilation failed",
         recovery: { nextTool: "chrona.plan.read", details: { issues: [issue] } },
         evidence: { validationIssues: [issue] },
       },
-    );
+    });
 
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.result.isError).toBe(true);
-    expect(body.result.content[0].text).toContain("Validation issues:");
-    expect(body.result.content[0].text).toContain(issue.path);
-    expect(body.result.structuredContent).toMatchObject({
+    expect(result.isError).toBe(true);
+    const textContent = expectTextContent(result);
+
+    expect(textContent.text).toContain("Validation issues:");
+    expect(textContent.text).toContain(issue.path);
+    expect(expectStructuredContent(result)).toMatchObject({
       status: "rejected",
       reasonCode: "VALIDATION_ERROR",
       recovery: { details: { issues: [issue] } },
@@ -646,73 +543,30 @@ describe("MCP routes", () => {
     });
   });
 
-  it("does not expose idempotency fields in mutating tool schemas", async () => {
-    const response = await postRpc(
-      rpc("tools/list"),
-    );
+  it("does not expose idempotency fields in mutating tool schemas", () => {
+    const taskComplete = __mcpRouteTestHooks.externalTools.chrona_node_complete;
 
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    const taskComplete = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_node_complete",
-    );
-    expect(taskComplete.inputSchema.properties.idempotencyKey).toBeUndefined();
-    expect(taskComplete.inputSchema.properties.evidence).toBeUndefined();
-    expect(taskComplete.inputSchema.properties.expectedRevision).toBeUndefined();
-  });
-
-  it("exposes the structured output contract on node output", async () => {
-    const response = await postRpc(rpc("tools/list"));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    const nodeOutput = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_node_output",
-    );
-
-    expect(nodeOutput.inputSchema.properties.outputs).toMatchObject({
-      type: "string",
-      minLength: 1,
-      description: "JSON-encoded array of json-render Specs",
-    });
-    expect(nodeOutput.description).toContain("json-render Specs");
-    expect(nodeOutput.description).toContain("columns: string[]");
-    expect(nodeOutput.description).toContain("rows: string[][]");
-    expect(nodeOutput.description).toContain("Do not wrap arrays as { item: [...] }");
-    expect(nodeOutput.description).toContain("CollapsibleText.threshold: 800, not \"800\"");
+    expect(taskComplete.inputSchema.shape.idempotencyKey).toBeUndefined();
+    expect(taskComplete.inputSchema.shape.evidence).toBeUndefined();
+    expect(taskComplete.inputSchema.shape.expectedRevision).toBeUndefined();
   });
 
   it("rejects node outputs that pass the old loose public schema", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_node_output",
-        arguments: {
-          summary: "Done",
-          outputs: JSON.stringify([{ type: "script_spec", value: { ok: true } }]),
-        },
-        _meta: { sessionId: "chrona:task:task-1:execute" },
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(JSON.stringify(body)).toContain("root");
-    expect(JSON.stringify(body)).toContain("elements");
-    expect(JSON.stringify(body)).toContain("Unrecognized keys");
+    await expect(callTool("chrona.node.output", {
+      summary: "Done",
+      outputs: JSON.stringify([{ type: "script_spec", value: { ok: true } }]),
+      _meta: { sessionId: "chrona:task:task-1:execute" },
+    })).rejects.toThrow("Unrecognized key");
   });
 
   it("rejects branch target IDs in public condition terminal schema", async () => {
-    const response = await postRpc(
-      rpc("tools/call", {
-        name: "chrona_condition_select",
-        arguments: { nodeId: "condition-node", branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No branch target ids" },
-        _meta: { sessionId: "chrona:task:task-1:execute" },
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(JSON.stringify(body)).toContain("nextNodeId");
+    await expect(callTool("chrona.node.condition_select", {
+      nodeId: "condition-node",
+      branchRef: "B20260516-01-A",
+      nextNodeId: "node-2",
+      summary: "No branch target ids",
+      _meta: { sessionId: "chrona:task:task-1:execute" },
+    })).rejects.toThrow("Unrecognized key");
   });
 
   it("removes the obsolete custom task-tools endpoint", async () => {

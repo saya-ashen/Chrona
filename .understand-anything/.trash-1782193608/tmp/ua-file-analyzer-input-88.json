@@ -1,0 +1,155 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/ui-protocol/src/catalog/index.ts",
+      "language": "typescript",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "playwright.config.ts",
+      "language": "typescript",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "postcss.config.mjs",
+      "language": "javascript",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "prisma.config.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "prisma/migrations/0001_initial/migration.sql",
+      "language": "sql",
+      "sizeLines": 689,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0002_add_task_auto_plan_generation/migration.sql",
+      "language": "sql",
+      "sizeLines": 1,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0003_external_calendar/migration.sql",
+      "language": "sql",
+      "sizeLines": 44,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0004_calendar_events_as_tasks/migration.sql",
+      "language": "sql",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0005_calendar_event_descriptions/migration.sql",
+      "language": "sql",
+      "sizeLines": 1,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0006_calendar_sync_policy/migration.sql",
+      "language": "sql",
+      "sizeLines": 1,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0007_calendar_automation_policy/migration.sql",
+      "language": "sql",
+      "sizeLines": 1,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0008_calendar_blocked_network_confirmation/migration.sql",
+      "language": "sql",
+      "sizeLines": 1,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0009_add_task_automation_timing/migration.sql",
+      "language": "sql",
+      "sizeLines": 2,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0010_recurring_task_series/migration.sql",
+      "language": "sql",
+      "sizeLines": 15,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0011_recurring_plan_occurrence_scope/migration.sql",
+      "language": "sql",
+      "sizeLines": 10,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/0012_single_entry_recurring_tasks/migration.sql",
+      "language": "sql",
+      "sizeLines": 7,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/20260603111647_workblock_id_on_events_timeline/migration.sql",
+      "language": "sql",
+      "sizeLines": 826,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/20260603130000_task_plan_provider_approvals/migration.sql",
+      "language": "sql",
+      "sizeLines": 48,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/20260605144500_workblock_session_scope/migration.sql",
+      "language": "sql",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/20260606155000_single_state_authority/migration.sql",
+      "language": "sql",
+      "sizeLines": 53,
+      "fileCategory": "data"
+    },
+    {
+      "path": "prisma/migrations/migration_lock.toml",
+      "language": "toml",
+      "sizeLines": 3,
+      "fileCategory": "config"
+    },
+    {
+      "path": "prisma/schema.prisma",
+      "language": "prisma",
+      "sizeLines": 1132,
+      "fileCategory": "data"
+    },
+    {
+      "path": "scripts/build-binaries.ts",
+      "language": "typescript",
+      "sizeLines": 212,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/check-ui-foundation.mjs",
+      "language": "javascript",
+      "sizeLines": 140,
+      "fileCategory": "code"
+    },
+    {
+      "path": "scripts/check-web-page-reachability.ts",
+      "language": "typescript",
+      "sizeLines": 141,
+      "fileCategory": "code"
+    }
+  ]
+}

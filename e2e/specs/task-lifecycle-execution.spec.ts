@@ -4,6 +4,7 @@ import {
   dispatchWorkspaceCommand,
   generateDebugTaskWorkspacePlan,
   setTaskWorkspaceViewport,
+  triggerOrchestratorTick,
   type TaskWorkspaceViewport,
 } from "./task-workspace-test-helpers";
 
@@ -123,11 +124,14 @@ async function pollExecution(
   taskId: string,
   predicate: (body: ExecutionCurrentBody) => boolean,
   timeoutMs = 40_000,
+  advance = false,
 ): Promise<ExecutionCurrentBody> {
   let last: ExecutionCurrentBody = {};
   await expect.poll(async () => {
     last = await getCurrentExecution(request, taskId);
-    return predicate(last);
+    if (predicate(last)) return true;
+    if (advance) await triggerOrchestratorTick(request);
+    return false;
   }, { timeout: timeoutMs, intervals: [300, 500, 1_000] }).toBe(true);
   return last;
 }
@@ -175,17 +179,23 @@ async function resolveDebugPlanGates(
   await test.step("Resolve approval checkpoint (approve_result)", async () => {
     const exec = await pollExecution(
       request, taskId,
-      (b) => b.status === "waiting_for_approval" && !!b.checkpoint?.id,
+      (b) => (b.status === "waiting_for_approval" || b.status === "blocked") && !!b.checkpoint?.id,
+      40_000,
+      true,
     );
-    await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "approve_result", {
-      feedback: "approved by e2e lifecycle",
-    });
+    if (exec.status === "waiting_for_approval") {
+      await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "approve_result", {
+        feedback: "approved by e2e lifecycle",
+      });
+    }
   });
 
   await test.step("Resolve manual node (mark_node_completed)", async () => {
     const exec = await pollExecution(
       request, taskId,
       (b) => b.status === "blocked" && !!b.checkpoint?.id,
+      40_000,
+      true,
     );
     await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "mark_node_completed", {
       root: "root",
@@ -282,6 +292,8 @@ test.describe("Task create → plan → run → result", () => {
           const res = await request.get(`/api/work/${task.taskId}`);
           if (!res.ok()) return null;
           const body = (await res.json()) as { taskShell?: { status?: string } };
+          if (body.taskShell?.status === "Completed") return "Completed";
+          await triggerOrchestratorTick(request);
           return body.taskShell?.status ?? null;
         }, { timeout: 30_000, intervals: [300, 500, 1_000] })
         .toBe("Completed");

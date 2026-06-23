@@ -1,0 +1,417 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 8,
+  "filesSkipped": [
+    ".claude/settings.json",
+    ".claude/skills/playwright-cli/SKILL.md",
+    ".claude/skills/speckit-git-commit/SKILL.md",
+    ".claude/skills/speckit-git-feature/SKILL.md",
+    ".claude/skills/speckit-git-initialize/SKILL.md",
+    ".claude/skills/speckit-git-remote/SKILL.md",
+    ".claude/skills/speckit-git-validate/SKILL.md",
+    ".impeccable/design.json",
+    ".impeccable/live/config.json",
+    ".omc/state/agent-replay-f1f8cc0a-2a04-4f29-ac7c-a72acc4ecb1d.jsonl",
+    ".omc/state/sessions/2d485152-d7d2-4768-b417-d46867f55247/hud-state.json",
+    ".omc/state/sessions/2fda4cdf-0fde-4b70-ae8c-f723914d0a54/hud-state.json",
+    ".omc/state/sessions/301b72f9-6d80-424b-859a-94e7b14fb709/hud-state.json",
+    ".omc/state/sessions/32fae9fe-243e-40f0-aab0-b85c278a5a19/hud-state.json",
+    ".omc/state/sessions/3a3f028b-b54a-4df9-9829-ca8e3ceb65ba/hud-state.json",
+    ".omc/state/sessions/3a98b1d5-cc7e-4202-8ee4-926b47f99161/hud-state.json",
+    ".omc/state/sessions/3efd8ed2-89a0-4661-a1ec-0f723be9d05c/hud-state.json"
+  ],
+  "results": [
+    {
+      "path": ".agents/skills/core/SKILL.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 265,
+      "nonEmptyLines": 201,
+      "sections": [
+        {
+          "heading": "@json-render/core",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "Key Concepts",
+          "level": 2,
+          "line": 10
+        },
+        {
+          "heading": "Defining a Schema",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "Creating a Catalog",
+          "level": 2,
+          "line": 37
+        },
+        {
+          "heading": "Generating AI Prompts",
+          "level": 2,
+          "line": 57
+        },
+        {
+          "heading": "SpecStream Utilities",
+          "level": 2,
+          "line": 64
+        },
+        {
+          "heading": "Dynamic Prop Expressions",
+          "level": 2,
+          "line": 80
+        },
+        {
+          "heading": "State Watchers",
+          "level": 2,
+          "line": 119
+        },
+        {
+          "heading": "Validation",
+          "level": 2,
+          "line": 136
+        },
+        {
+          "heading": "User Prompt Builder",
+          "level": 2,
+          "line": 152
+        },
+        {
+          "heading": "Spec Validation",
+          "level": 2,
+          "line": 171
+        },
+        {
+          "heading": "Visibility Conditions",
+          "level": 2,
+          "line": 182
+        },
+        {
+          "heading": "Built-in Actions in Schema",
+          "level": 2,
+          "line": 205
+        },
+        {
+          "heading": "StateStore",
+          "level": 2,
+          "line": 219
+        },
+        {
+          "heading": "Key Exports",
+          "level": 2,
+          "line": 239
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 15
+      }
+    },
+    {
+      "path": ".agents/skills/shadcn/SKILL.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 159,
+      "nonEmptyLines": 130,
+      "sections": [
+        {
+          "heading": "@json-render/shadcn",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "Two Entry Points",
+          "level": 2,
+          "line": 10
+        },
+        {
+          "heading": "Usage Pattern",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "Extending with Custom Components",
+          "level": 2,
+          "line": 54
+        },
+        {
+          "heading": "Available Components",
+          "level": 2,
+          "line": 87
+        },
+        {
+          "heading": "Layout",
+          "level": 3,
+          "line": 89
+        },
+        {
+          "heading": "Navigation",
+          "level": 3,
+          "line": 95
+        },
+        {
+          "heading": "Overlay",
+          "level": 3,
+          "line": 101
+        },
+        {
+          "heading": "Content",
+          "level": 3,
+          "line": 108
+        },
+        {
+          "heading": "Feedback",
+          "level": 3,
+          "line": 118
+        },
+        {
+          "heading": "Input",
+          "level": 3,
+          "line": 123
+        },
+        {
+          "heading": "Built-in Actions (from `@json-render/react`)",
+          "level": 2,
+          "line": 137
+        },
+        {
+          "heading": "Validation Timing (`validateOn`)",
+          "level": 2,
+          "line": 146
+        },
+        {
+          "heading": "Important Notes",
+          "level": 2,
+          "line": 153
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 14
+      }
+    },
+    {
+      "path": ".dependency-cruiser.cjs",
+      "language": "javascript",
+      "fileCategory": "code",
+      "totalLines": 207,
+      "nonEmptyLines": 195,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": ".npmignore",
+      "language": "unknown",
+      "fileCategory": "code",
+      "totalLines": 13,
+      "nonEmptyLines": 13,
+      "metrics": {}
+    },
+    {
+      "path": ".omc/notepad.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 38,
+      "nonEmptyLines": 31,
+      "sections": [
+        {
+          "heading": "Notepad",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Priority Context",
+          "level": 2,
+          "line": 4
+        },
+        {
+          "heading": "Working Memory",
+          "level": 2,
+          "line": 8
+        },
+        {
+          "heading": "2026-06-13 11:15",
+          "level": 3,
+          "line": 10
+        },
+        {
+          "heading": "2026-06-14 15:08",
+          "level": 3,
+          "line": 20
+        },
+        {
+          "heading": "2026-06-13 11:15",
+          "level": 2,
+          "line": 24
+        },
+        {
+          "heading": "MANUAL",
+          "level": 2,
+          "line": 36
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": ".omc/project-memory.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 603,
+      "nonEmptyLines": 603,
+      "sections": [
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "lastScanned",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "projectRoot",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "techStack",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "build",
+          "level": 1,
+          "line": 48
+        },
+        {
+          "heading": "conventions",
+          "level": 1,
+          "line": 93
+        },
+        {
+          "heading": "structure",
+          "level": 1,
+          "line": 99
+        },
+        {
+          "heading": "customNotes",
+          "level": 1,
+          "line": 117
+        },
+        {
+          "heading": "directoryMap",
+          "level": 1,
+          "line": 118
+        },
+        {
+          "heading": "hotPaths",
+          "level": 1,
+          "line": 300
+        },
+        {
+          "heading": "userDirectives",
+          "level": 1,
+          "line": 602
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 11
+      }
+    },
+    {
+      "path": ".omc/state/sessions/13061a0d-b89a-4dbd-be91-aa088fbc364a/hud-state.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "sections": [
+        {
+          "heading": "timestamp",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "backgroundTasks",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "sessionStartTimestamp",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "sessionId",
+          "level": 1,
+          "line": 5
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 4
+      }
+    },
+    {
+      "path": ".omc/state/sessions/39109f98-de88-4e75-bbd9-80322cc7df6d/hud-state.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "sections": [
+        {
+          "heading": "timestamp",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "backgroundTasks",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "sessionStartTimestamp",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "sessionId",
+          "level": 1,
+          "line": 5
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 4
+      }
+    }
+  ]
+}

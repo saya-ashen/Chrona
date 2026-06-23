@@ -1,0 +1,3171 @@
+{
+  "nodes": [
+    {
+      "id": "file:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "type": "file",
+      "name": "mcp-routes.bun.test.ts",
+      "filePath": "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 765,
+      "nonEmptyLines": 692
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:app",
+      "type": "function",
+      "name": "app",
+      "filePath": "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "summary": "函数 app，接受 rejected, operations, resultOverride 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 52,
+      "endLine": 98
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:initializeMcp",
+      "type": "function",
+      "name": "initializeMcp",
+      "filePath": "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "summary": "函数 initializeMcp，接受 application 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 120,
+      "endLine": 135
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:postRpc",
+      "type": "function",
+      "name": "postRpc",
+      "filePath": "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "summary": "函数 postRpc，接受 body, rejected 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 137,
+      "endLine": 147
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:postRpcWithOperations",
+      "type": "function",
+      "name": "postRpcWithOperations",
+      "filePath": "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "summary": "函数 postRpcWithOperations，接受 body, path 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 149,
+      "endLine": 159
+    },
+    {
+      "id": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "type": "file",
+      "name": "plan-operations.bun.test.ts",
+      "filePath": "apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 260,
+      "nonEmptyLines": 240
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/plan-operations.bun.test.ts:resetDb",
+      "type": "function",
+      "name": "resetDb",
+      "filePath": "apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "summary": "函数 resetDb。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 16,
+      "endLine": 34
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/plan-operations.bun.test.ts:seedPlan",
+      "type": "function",
+      "name": "seedPlan",
+      "filePath": "apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "summary": "函数 seedPlan。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 135
+    },
+    {
+      "id": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "type": "file",
+      "name": "work-commands-spec-patch.bun.test.ts",
+      "filePath": "apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 210,
+      "nonEmptyLines": 188
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts:makeFakeEngine",
+      "type": "function",
+      "name": "makeFakeEngine",
+      "filePath": "apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "summary": "函数 makeFakeEngine。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 119
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts:waitForEventMatching",
+      "type": "function",
+      "name": "waitForEventMatching",
+      "filePath": "apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "summary": "函数 waitForEventMatching，接受 taskId, predicate 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 131,
+      "endLine": 145
+    },
+    {
+      "id": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "type": "file",
+      "name": "work-events-state.bun.test.ts",
+      "filePath": "apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 701,
+      "nonEmptyLines": 637
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/work-events-state.bun.test.ts:makeFakeEngine",
+      "type": "function",
+      "name": "makeFakeEngine",
+      "filePath": "apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "summary": "函数 makeFakeEngine。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 141
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/work-events-state.bun.test.ts:readSseUntil",
+      "type": "function",
+      "name": "readSseUntil",
+      "filePath": "apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "summary": "函数 readSseUntil，接受 reader, predicate 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 145,
+      "endLine": 172
+    },
+    {
+      "id": "function:apps/server/src/routes/__tests__/work-events-state.bun.test.ts:waitForEventsMatching",
+      "type": "function",
+      "name": "waitForEventsMatching",
+      "filePath": "apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "summary": "函数 waitForEventsMatching，接受 taskId, predicate 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 182,
+      "endLine": 200
+    },
+    {
+      "id": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "type": "file",
+      "name": "clients.routes.ts",
+      "filePath": "apps/server/src/routes/ai/clients.routes.ts",
+      "summary": "包含 redactClientConfig、serializeClient、createClientsRoutes 函数，属于 \"ai\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 216,
+      "nonEmptyLines": 200
+    },
+    {
+      "id": "function:apps/server/src/routes/ai/clients.routes.ts:serializeClient",
+      "type": "function",
+      "name": "serializeClient",
+      "filePath": "apps/server/src/routes/ai/clients.routes.ts",
+      "summary": "函数 serializeClient，接受 client 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 44,
+      "endLine": 57
+    },
+    {
+      "id": "function:apps/server/src/routes/ai/clients.routes.ts:createClientsRoutes",
+      "type": "function",
+      "name": "createClientsRoutes",
+      "filePath": "apps/server/src/routes/ai/clients.routes.ts",
+      "summary": "函数 createClientsRoutes，接受 engine 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 59,
+      "endLine": 216
+    },
+    {
+      "id": "file:apps/server/src/routes/api.ts",
+      "type": "file",
+      "name": "api.ts",
+      "filePath": "apps/server/src/routes/api.ts",
+      "summary": "包含 createApiRouter 函数，属于 \"routes\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 51,
+      "nonEmptyLines": 44
+    },
+    {
+      "id": "function:apps/server/src/routes/api.ts:createApiRouter",
+      "type": "function",
+      "name": "createApiRouter",
+      "filePath": "apps/server/src/routes/api.ts",
+      "summary": "函数 createApiRouter，接受 engine, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 22,
+      "endLine": 43
+    },
+    {
+      "id": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "type": "file",
+      "name": "assistant-surface.routes.ts",
+      "filePath": "apps/server/src/routes/assistant-surface.routes.ts",
+      "summary": "包含 parsePageType、createAssistantSurfaceRoutes 函数，属于 \"routes\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 26,
+      "nonEmptyLines": 23
+    },
+    {
+      "id": "function:apps/server/src/routes/assistant-surface.routes.ts:createAssistantSurfaceRoutes",
+      "type": "function",
+      "name": "createAssistantSurfaceRoutes",
+      "filePath": "apps/server/src/routes/assistant-surface.routes.ts",
+      "summary": "函数 createAssistantSurfaceRoutes，接受 _engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 14,
+      "endLine": 26
+    },
+    {
+      "id": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "type": "file",
+      "name": "calendar-sources.routes.ts",
+      "filePath": "apps/server/src/routes/calendar-sources.routes.ts",
+      "summary": "包含 parseDate、createE2eCalendarFixtureTransport、defaultRouteTransport等 函数，属于 \"routes\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 159,
+      "nonEmptyLines": 150
+    },
+    {
+      "id": "function:apps/server/src/routes/calendar-sources.routes.ts:createE2eCalendarFixtureTransport",
+      "type": "function",
+      "name": "createE2eCalendarFixtureTransport",
+      "filePath": "apps/server/src/routes/calendar-sources.routes.ts",
+      "summary": "函数 createE2eCalendarFixtureTransport。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 37,
+      "endLine": 54
+    },
+    {
+      "id": "function:apps/server/src/routes/calendar-sources.routes.ts:createCalendarSourceRoutes",
+      "type": "function",
+      "name": "createCalendarSourceRoutes",
+      "filePath": "apps/server/src/routes/calendar-sources.routes.ts",
+      "summary": "函数 createCalendarSourceRoutes，接受 options 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 62,
+      "endLine": 159
+    },
+    {
+      "id": "file:apps/server/src/routes/helpers.ts",
+      "type": "file",
+      "name": "helpers.ts",
+      "filePath": "apps/server/src/routes/helpers.ts",
+      "summary": "包含 toDateOrNull、isInvalidDate、ensureValidDateFields等 函数，属于 \"routes\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 43,
+      "nonEmptyLines": 37
+    },
+    {
+      "id": "function:apps/server/src/routes/helpers.ts:toDateOrNull",
+      "type": "function",
+      "name": "toDateOrNull",
+      "filePath": "apps/server/src/routes/helpers.ts",
+      "summary": "函数 toDateOrNull，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 16,
+      "endLine": 18
+    },
+    {
+      "id": "function:apps/server/src/routes/helpers.ts:ensureValidDateFields",
+      "type": "function",
+      "name": "ensureValidDateFields",
+      "filePath": "apps/server/src/routes/helpers.ts",
+      "summary": "函数 ensureValidDateFields，接受 fields, locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 24,
+      "endLine": 34
+    },
+    {
+      "id": "function:apps/server/src/routes/helpers.ts:planGenerationConflictBody",
+      "type": "function",
+      "name": "planGenerationConflictBody",
+      "filePath": "apps/server/src/routes/helpers.ts",
+      "summary": "函数 planGenerationConflictBody，接受 taskId, locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 43
+    },
+    {
+      "id": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "type": "file",
+      "name": "hermes.routes.ts",
+      "filePath": "apps/server/src/routes/integrations/hermes.routes.ts",
+      "summary": "包含 createHermesIntegrationRoutes 函数，属于 \"integrations\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 94,
+      "nonEmptyLines": 90
+    },
+    {
+      "id": "function:apps/server/src/routes/integrations/hermes.routes.ts:createHermesIntegrationRoutes",
+      "type": "function",
+      "name": "createHermesIntegrationRoutes",
+      "filePath": "apps/server/src/routes/integrations/hermes.routes.ts",
+      "summary": "函数 createHermesIntegrationRoutes。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 94
+    },
+    {
+      "id": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "type": "file",
+      "name": "mcp.routes.ts",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "包含 publicToolSchema、publicNodeOutputSchema、sessionIdFrom等 函数，属于 \"mcp\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 433,
+      "nonEmptyLines": 403
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:publicToolSchema",
+      "type": "function",
+      "name": "publicToolSchema",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 publicToolSchema，接受 schema 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 51
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:publicNodeOutputSchema",
+      "type": "function",
+      "name": "publicNodeOutputSchema",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 publicNodeOutputSchema。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 53,
+      "endLine": 66
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:sessionIdFrom",
+      "type": "function",
+      "name": "sessionIdFrom",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 sessionIdFrom，接受 input, extra, requestSessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 136,
+      "endLine": 155
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:stableJson",
+      "type": "function",
+      "name": "stableJson",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 stableJson，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 180,
+      "endLine": 191
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:idempotencyKeyFrom",
+      "type": "function",
+      "name": "idempotencyKeyFrom",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 idempotencyKeyFrom，接受 input, toolName, payload, extra, requestSessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 193,
+      "endLine": 211
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:aiVisibleToolResult",
+      "type": "function",
+      "name": "aiVisibleToolResult",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 aiVisibleToolResult，接受 toolName, result 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 213,
+      "endLine": 227
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:aiVisibleToolText",
+      "type": "function",
+      "name": "aiVisibleToolText",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 aiVisibleToolText，接受 result 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 229,
+      "endLine": 247
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:toChronaInput",
+      "type": "function",
+      "name": "toChronaInput",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 toChronaInput，接受 toolName, input, extra, requestSessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 249,
+      "endLine": 275
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:toolSessionPurpose",
+      "type": "function",
+      "name": "toolSessionPurpose",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 toolSessionPurpose，接受 sessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 294,
+      "endLine": 312
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:toolNotAllowedResult",
+      "type": "function",
+      "name": "toolNotAllowedResult",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 toolNotAllowedResult，接受 toolName, sessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 321,
+      "endLine": 334
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:callChronaTool",
+      "type": "function",
+      "name": "callChronaTool",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 callChronaTool，接受 engine, toolName, input, extra, requestSessionId 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 336,
+      "endLine": 393
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:createChronaMcpServer",
+      "type": "function",
+      "name": "createChronaMcpServer",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 createChronaMcpServer，接受 engine, requestSessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 395,
+      "endLine": 421
+    },
+    {
+      "id": "function:apps/server/src/routes/mcp/mcp.routes.ts:createMcpRoutes",
+      "type": "function",
+      "name": "createMcpRoutes",
+      "filePath": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "summary": "函数 createMcpRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 423,
+      "endLine": 433
+    },
+    {
+      "id": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "type": "file",
+      "name": "inbox.routes.ts",
+      "filePath": "apps/server/src/routes/pages/inbox.routes.ts",
+      "summary": "包含 createInboxRoutes 函数，属于 \"pages\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 27,
+      "nonEmptyLines": 25
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/inbox.routes.ts:createInboxRoutes",
+      "type": "function",
+      "name": "createInboxRoutes",
+      "filePath": "apps/server/src/routes/pages/inbox.routes.ts",
+      "summary": "函数 createInboxRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 27
+    },
+    {
+      "id": "file:apps/server/src/routes/pages/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "apps/server/src/routes/pages/index.ts",
+      "summary": "包含 createPageRoutes 函数，属于 \"pages\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 17,
+      "nonEmptyLines": 15
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/index.ts:createPageRoutes",
+      "type": "function",
+      "name": "createPageRoutes",
+      "filePath": "apps/server/src/routes/pages/index.ts",
+      "summary": "函数 createPageRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 17
+    },
+    {
+      "id": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "type": "file",
+      "name": "memory.routes.ts",
+      "filePath": "apps/server/src/routes/pages/memory.routes.ts",
+      "summary": "包含 createMemoryRoutes 函数，属于 \"pages\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 27,
+      "nonEmptyLines": 25
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/memory.routes.ts:createMemoryRoutes",
+      "type": "function",
+      "name": "createMemoryRoutes",
+      "filePath": "apps/server/src/routes/pages/memory.routes.ts",
+      "summary": "函数 createMemoryRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 27
+    },
+    {
+      "id": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "type": "file",
+      "name": "schedule.routes.ts",
+      "filePath": "apps/server/src/routes/pages/schedule.routes.ts",
+      "summary": "包含 createScheduleRoutes 函数，属于 \"pages\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 27,
+      "nonEmptyLines": 25
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/schedule.routes.ts:createScheduleRoutes",
+      "type": "function",
+      "name": "createScheduleRoutes",
+      "filePath": "apps/server/src/routes/pages/schedule.routes.ts",
+      "summary": "函数 createScheduleRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 27
+    },
+    {
+      "id": "file:apps/server/src/routes/pages/work.routes.ts",
+      "type": "file",
+      "name": "work.routes.ts",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "包含 writeWorkEvent、getWorkspaceId、publishCommandEvent等 函数，属于 \"pages\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 623,
+      "nonEmptyLines": 596
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:publishCommandEvent",
+      "type": "function",
+      "name": "publishCommandEvent",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 publishCommandEvent，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 29,
+      "endLine": 47
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:publishWorkspaceTrigger",
+      "type": "function",
+      "name": "publishWorkspaceTrigger",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 publishWorkspaceTrigger，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 54,
+      "endLine": 63
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:resetGeneratePlanActionPatch",
+      "type": "function",
+      "name": "resetGeneratePlanActionPatch",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 resetGeneratePlanActionPatch，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 65,
+      "endLine": 81
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:buildTaskWorkspaceStateSnapshot",
+      "type": "function",
+      "name": "buildTaskWorkspaceStateSnapshot",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 buildTaskWorkspaceStateSnapshot，接受 engine, input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 90,
+      "endLine": 128
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:deriveStartDisabledReason",
+      "type": "function",
+      "name": "deriveStartDisabledReason",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 deriveStartDisabledReason，接受 executionStatus, hasPlan, hasAcceptedPlan 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 138,
+      "endLine": 157
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:buildHeaderExecutionStateUpdate",
+      "type": "function",
+      "name": "buildHeaderExecutionStateUpdate",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 buildHeaderExecutionStateUpdate，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 165,
+      "endLine": 185
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:planGenerationStateUpdate",
+      "type": "function",
+      "name": "planGenerationStateUpdate",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 planGenerationStateUpdate，接受 event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 192,
+      "endLine": 241
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:dispatchWorkspaceCommand",
+      "type": "function",
+      "name": "dispatchWorkspaceCommand",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 dispatchWorkspaceCommand，接受 engine, input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 250,
+      "endLine": 507
+    },
+    {
+      "id": "function:apps/server/src/routes/pages/work.routes.ts:createWorkRoutes",
+      "type": "function",
+      "name": "createWorkRoutes",
+      "filePath": "apps/server/src/routes/pages/work.routes.ts",
+      "summary": "函数 createWorkRoutes，接受 engine 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 509,
+      "endLine": 623
+    },
+    {
+      "id": "file:apps/server/src/routes/runtime.routes.ts",
+      "type": "file",
+      "name": "runtime.routes.ts",
+      "filePath": "apps/server/src/routes/runtime.routes.ts",
+      "summary": "包含 isDebugProviderEnabled、getRuntimeLabel、createRuntimeRoutes 函数，属于 \"routes\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 31,
+      "nonEmptyLines": 27
+    },
+    {
+      "id": "function:apps/server/src/routes/runtime.routes.ts:createRuntimeRoutes",
+      "type": "function",
+      "name": "createRuntimeRoutes",
+      "filePath": "apps/server/src/routes/runtime.routes.ts",
+      "summary": "函数 createRuntimeRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 20,
+      "endLine": 31
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "type": "file",
+      "name": "crud.routes.ts",
+      "filePath": "apps/server/src/routes/tasks/crud.routes.ts",
+      "summary": "包含 taskContextResponse、createTasksRoutes 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 293,
+      "nonEmptyLines": 285
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/crud.routes.ts:taskContextResponse",
+      "type": "function",
+      "name": "taskContextResponse",
+      "filePath": "apps/server/src/routes/tasks/crud.routes.ts",
+      "summary": "函数 taskContextResponse，接受 c, contextName, load 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 18,
+      "endLine": 32
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/crud.routes.ts:createTasksRoutes",
+      "type": "function",
+      "name": "createTasksRoutes",
+      "filePath": "apps/server/src/routes/tasks/crud.routes.ts",
+      "summary": "函数 createTasksRoutes，接受 engine 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 33,
+      "endLine": 293
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "type": "file",
+      "name": "execution.routes.ts",
+      "filePath": "apps/server/src/routes/tasks/execution.routes.ts",
+      "summary": "包含 toJsonInput、reconcileTimedOutProviderApprovals、summarizeGraphEvent等 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 402,
+      "nonEmptyLines": 379
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/execution.routes.ts:reconcileTimedOutProviderApprovals",
+      "type": "function",
+      "name": "reconcileTimedOutProviderApprovals",
+      "filePath": "apps/server/src/routes/tasks/execution.routes.ts",
+      "summary": "函数 reconcileTimedOutProviderApprovals，接受 taskId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 34,
+      "endLine": 83
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/execution.routes.ts:summarizeGraphEvent",
+      "type": "function",
+      "name": "summarizeGraphEvent",
+      "filePath": "apps/server/src/routes/tasks/execution.routes.ts",
+      "summary": "函数 summarizeGraphEvent，接受 event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 86,
+      "endLine": 107
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/execution.routes.ts:createExecutionRoutes",
+      "type": "function",
+      "name": "createExecutionRoutes",
+      "filePath": "apps/server/src/routes/tasks/execution.routes.ts",
+      "summary": "函数 createExecutionRoutes，接受 engine 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 113,
+      "endLine": 371
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/execution.routes.ts:toApprovalReadModel",
+      "type": "function",
+      "name": "toApprovalReadModel",
+      "filePath": "apps/server/src/routes/tasks/execution.routes.ts",
+      "summary": "函数 toApprovalReadModel，接受 approval 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 375,
+      "endLine": 402
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "apps/server/src/routes/tasks/index.ts",
+      "summary": "包含 createTaskRoutes 函数，属于 \"tasks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 19,
+      "nonEmptyLines": 17
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/index.ts:createTaskRoutes",
+      "type": "function",
+      "name": "createTaskRoutes",
+      "filePath": "apps/server/src/routes/tasks/index.ts",
+      "summary": "函数 createTaskRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 19
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "type": "file",
+      "name": "lifecycle.routes.ts",
+      "filePath": "apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "summary": "包含 createTaskLifecycleRoutes 函数，属于 \"tasks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 45,
+      "nonEmptyLines": 43
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/lifecycle.routes.ts:createTaskLifecycleRoutes",
+      "type": "function",
+      "name": "createTaskLifecycleRoutes",
+      "filePath": "apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "summary": "函数 createTaskLifecycleRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 45
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "type": "file",
+      "name": "plan.routes.ts",
+      "filePath": "apps/server/src/routes/tasks/plan.routes.ts",
+      "summary": "包含 writePlanGenerationEvent、createPlansRoutes 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 396,
+      "nonEmptyLines": 367
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/plan.routes.ts:writePlanGenerationEvent",
+      "type": "function",
+      "name": "writePlanGenerationEvent",
+      "filePath": "apps/server/src/routes/tasks/plan.routes.ts",
+      "summary": "函数 writePlanGenerationEvent，接受 stream, event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 22,
+      "endLine": 56
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/plan.routes.ts:createPlansRoutes",
+      "type": "function",
+      "name": "createPlansRoutes",
+      "filePath": "apps/server/src/routes/tasks/plan.routes.ts",
+      "summary": "函数 createPlansRoutes，接受 engine 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 60,
+      "endLine": 396
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "type": "file",
+      "name": "result.routes.ts",
+      "filePath": "apps/server/src/routes/tasks/result.routes.ts",
+      "summary": "包含 createTaskResultRoutes 函数，属于 \"tasks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 25,
+      "nonEmptyLines": 23
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/result.routes.ts:createTaskResultRoutes",
+      "type": "function",
+      "name": "createTaskResultRoutes",
+      "filePath": "apps/server/src/routes/tasks/result.routes.ts",
+      "summary": "函数 createTaskResultRoutes，接受 engine 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 8,
+      "endLine": 25
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "type": "file",
+      "name": "runtime-event-summary.ts",
+      "filePath": "apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "summary": "包含 toolLabel、summarizeRuntimeEvent、checkpointActionToExecutionAction等 函数，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 128,
+      "nonEmptyLines": 122
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:toolLabel",
+      "type": "function",
+      "name": "toolLabel",
+      "filePath": "apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "summary": "函数 toolLabel，接受 toolName 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 8,
+      "endLine": 23
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:summarizeRuntimeEvent",
+      "type": "function",
+      "name": "summarizeRuntimeEvent",
+      "filePath": "apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "summary": "函数 summarizeRuntimeEvent，接受 action, event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 46
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:checkpointActionToExecutionAction",
+      "type": "function",
+      "name": "checkpointActionToExecutionAction",
+      "filePath": "apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "summary": "函数 checkpointActionToExecutionAction，接受 action 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 48,
+      "endLine": 71
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:summarizeProviderRuntimePayload",
+      "type": "function",
+      "name": "summarizeProviderRuntimePayload",
+      "filePath": "apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "summary": "函数 summarizeProviderRuntimePayload，接受 providerEvent 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 73,
+      "endLine": 128
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "type": "file",
+      "name": "schedule.routes.ts",
+      "filePath": "apps/server/src/routes/tasks/schedule.routes.ts",
+      "summary": "包含 createTaskScheduleRoutes 函数，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 171,
+      "nonEmptyLines": 163
+    },
+    {
+      "id": "function:apps/server/src/routes/tasks/schedule.routes.ts:createTaskScheduleRoutes",
+      "type": "function",
+      "name": "createTaskScheduleRoutes",
+      "filePath": "apps/server/src/routes/tasks/schedule.routes.ts",
+      "summary": "函数 createTaskScheduleRoutes，接受 engine 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 18,
+      "endLine": 171
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:app",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:initializeMcp",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:postRpc",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts:postRpcWithOperations",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "target": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/plan-operations.bun.test.ts:resetDb",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/plan-operations.bun.test.ts:seedPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts:makeFakeEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts:waitForEventMatching",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "target": "file:apps/server/src/routes/pages/work.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/work-events-state.bun.test.ts:makeFakeEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/work-events-state.bun.test.ts:readSseUntil",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "function:apps/server/src/routes/__tests__/work-events-state.bun.test.ts:waitForEventsMatching",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "file:apps/server/src/routes/pages/work.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "function:apps/server/src/routes/ai/clients.routes.ts:serializeClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "function:apps/server/src/routes/ai/clients.routes.ts:createClientsRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "function:apps/server/src/routes/ai/clients.routes.ts:createClientsRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "file:apps/server/src/routes/helpers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "function:apps/server/src/routes/api.ts:createApiRouter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "function:apps/server/src/routes/api.ts:createApiRouter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/ai/clients.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/pages/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/runtime.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/tasks/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/workspaces.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/routes/workspaces.routes.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/external-calendar-events.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/external-calendar-source-management.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/external-calendar-sources.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/external-task-edit-roundtrip.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/plan-execution-module.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/real-router-smoke.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/task-workspace-activity.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/__tests__/api/task-workspace-console.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/api.ts",
+      "target": "file:apps/server/src/app.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "function:apps/server/src/routes/assistant-surface.routes.ts:createAssistantSurfaceRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "function:apps/server/src/routes/assistant-surface.routes.ts:createAssistantSurfaceRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:apps/server/src/services/assistant-surface.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:apps/server/src/services/assistant-surface.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "function:apps/server/src/routes/calendar-sources.routes.ts:createE2eCalendarFixtureTransport",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "function:apps/server/src/routes/calendar-sources.routes.ts:createCalendarSourceRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "function:apps/server/src/routes/calendar-sources.routes.ts:createCalendarSourceRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:apps/server/src/services/external-calendar-service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:packages/integrations/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:apps/server/src/services/external-calendar-service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "target": "file:packages/integrations/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "function:apps/server/src/routes/helpers.ts:toDateOrNull",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "function:apps/server/src/routes/helpers.ts:toDateOrNull",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "function:apps/server/src/routes/helpers.ts:ensureValidDateFields",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "function:apps/server/src/routes/helpers.ts:ensureValidDateFields",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "function:apps/server/src/routes/helpers.ts:planGenerationConflictBody",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "function:apps/server/src/routes/helpers.ts:planGenerationConflictBody",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/helpers.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "target": "function:apps/server/src/routes/integrations/hermes.routes.ts:createHermesIntegrationRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "target": "function:apps/server/src/routes/integrations/hermes.routes.ts:createHermesIntegrationRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "target": "file:packages/integrations/src/hermes/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/integrations/hermes.routes.ts",
+      "target": "file:packages/integrations/src/hermes/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:publicToolSchema",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:publicNodeOutputSchema",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:sessionIdFrom",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:stableJson",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:idempotencyKeyFrom",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:aiVisibleToolResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:aiVisibleToolText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:toChronaInput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:toolSessionPurpose",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:toolNotAllowedResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:callChronaTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:createChronaMcpServer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:createMcpRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "function:apps/server/src/routes/mcp/mcp.routes.ts:createMcpRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/mcp/mcp.routes.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "function:apps/server/src/routes/pages/inbox.routes.ts:createInboxRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "function:apps/server/src/routes/pages/inbox.routes.ts:createInboxRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "function:apps/server/src/routes/pages/index.ts:createPageRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "function:apps/server/src/routes/pages/index.ts:createPageRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "file:apps/server/src/routes/pages/inbox.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "file:apps/server/src/routes/pages/work.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/index.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "function:apps/server/src/routes/pages/memory.routes.ts:createMemoryRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "function:apps/server/src/routes/pages/memory.routes.ts:createMemoryRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/memory.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "function:apps/server/src/routes/pages/schedule.routes.ts:createScheduleRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "function:apps/server/src/routes/pages/schedule.routes.ts:createScheduleRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/schedule.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:publishCommandEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:publishWorkspaceTrigger",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:resetGeneratePlanActionPatch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:buildTaskWorkspaceStateSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:deriveStartDisabledReason",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:buildHeaderExecutionStateUpdate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:planGenerationStateUpdate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:dispatchWorkspaceCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:createWorkRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "function:apps/server/src/routes/pages/work.routes.ts:createWorkRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/pages/work.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/runtime.routes.ts",
+      "target": "function:apps/server/src/routes/runtime.routes.ts:createRuntimeRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/runtime.routes.ts",
+      "target": "function:apps/server/src/routes/runtime.routes.ts:createRuntimeRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/runtime.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/runtime.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/runtime.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/runtime.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/crud.routes.ts:taskContextResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/crud.routes.ts:createTasksRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/crud.routes.ts:createTasksRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/execution.routes.ts:reconcileTimedOutProviderApprovals",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/execution.routes.ts:summarizeGraphEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/execution.routes.ts:createExecutionRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/execution.routes.ts:createExecutionRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/execution.routes.ts:toApprovalReadModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "function:apps/server/src/routes/tasks/index.ts:createTaskRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "function:apps/server/src/routes/tasks/index.ts:createTaskRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:apps/server/src/routes/tasks/crud.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/index.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/lifecycle.routes.ts:createTaskLifecycleRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/lifecycle.routes.ts:createTaskLifecycleRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/plan.routes.ts:writePlanGenerationEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/plan.routes.ts:createPlansRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/plan.routes.ts:createPlansRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:apps/server/src/routes/helpers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/shared/src/debug-dump.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/plan.routes.ts",
+      "target": "file:packages/shared/src/debug-dump.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/result.routes.ts:createTaskResultRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/result.routes.ts:createTaskResultRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/result.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:toolLabel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:summarizeRuntimeEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:summarizeRuntimeEvent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:checkpointActionToExecutionAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:checkpointActionToExecutionAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "function:apps/server/src/routes/tasks/runtime-event-summary.ts:summarizeProviderRuntimePayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/schedule.routes.ts:createTaskScheduleRoutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "function:apps/server/src/routes/tasks/schedule.routes.ts:createTaskScheduleRoutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:apps/server/src/lib/http.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/schedule.routes.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

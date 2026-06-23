@@ -1,0 +1,3859 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "type": "file",
+      "name": "decide-schedule-proposal.ts",
+      "filePath": "packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "summary": "包含 decideScheduleProposal 函数，属于 \"scheduling\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 54,
+      "nonEmptyLines": 47
+    },
+    {
+      "id": "function:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts:decideScheduleProposal",
+      "type": "function",
+      "name": "decideScheduleProposal",
+      "filePath": "packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "summary": "函数 decideScheduleProposal，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 54
+    },
+    {
+      "id": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "type": "file",
+      "name": "move-work-block.ts",
+      "filePath": "packages/engine/src/modules/scheduling/move-work-block.ts",
+      "summary": "包含 moveWorkBlock 函数，属于 \"scheduling\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 75,
+      "nonEmptyLines": 68
+    },
+    {
+      "id": "function:packages/engine/src/modules/scheduling/move-work-block.ts:moveWorkBlock",
+      "type": "function",
+      "name": "moveWorkBlock",
+      "filePath": "packages/engine/src/modules/scheduling/move-work-block.ts",
+      "summary": "函数 moveWorkBlock，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 75
+    },
+    {
+      "id": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "type": "file",
+      "name": "propose-schedule.ts",
+      "filePath": "packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "summary": "包含 proposeSchedule 函数，属于 \"scheduling\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 58,
+      "nonEmptyLines": 53
+    },
+    {
+      "id": "function:packages/engine/src/modules/scheduling/propose-schedule.ts:proposeSchedule",
+      "type": "function",
+      "name": "proposeSchedule",
+      "filePath": "packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "summary": "函数 proposeSchedule，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 58
+    },
+    {
+      "id": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "type": "file",
+      "name": "task-scheduling.ts",
+      "filePath": "packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "summary": "定义了 TaskScheduling 类，属于 \"scheduling\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 38,
+      "nonEmptyLines": 31
+    },
+    {
+      "id": "class:packages/engine/src/modules/scheduling/task-scheduling.ts:TaskScheduling",
+      "type": "class",
+      "name": "TaskScheduling",
+      "filePath": "packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "summary": "类 TaskScheduling，定义了 7 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 9,
+      "endLine": 36
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "type": "file",
+      "name": "command-chain.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 406,
+      "nonEmptyLines": 361
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts:makeAcceptedPlan",
+      "type": "function",
+      "name": "makeAcceptedPlan",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "summary": "函数 makeAcceptedPlan，接受 planId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 25
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts:seedAcceptedPlan",
+      "type": "function",
+      "name": "seedAcceptedPlan",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "summary": "函数 seedAcceptedPlan，接受 workspaceId, taskId, planId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 27,
+      "endLine": 37
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts:resetDb",
+      "type": "function",
+      "name": "resetDb",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "summary": "函数 resetDb。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 39,
+      "endLine": 54
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+      "type": "file",
+      "name": "external-task-description-echo.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 89,
+      "nonEmptyLines": 80
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts:seedExternalTask",
+      "type": "function",
+      "name": "seedExternalTask",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+      "summary": "函数 seedExternalTask，接受 taskDescription, eventDescription 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 15,
+      "endLine": 56
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "type": "file",
+      "name": "accept-task-result.ts",
+      "filePath": "packages/engine/src/modules/tasks/accept-task-result.ts",
+      "summary": "包含 acceptTaskResult 函数，属于 \"tasks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 53,
+      "nonEmptyLines": 47
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/accept-task-result.ts:acceptTaskResult",
+      "type": "function",
+      "name": "acceptTaskResult",
+      "filePath": "packages/engine/src/modules/tasks/accept-task-result.ts",
+      "summary": "函数 acceptTaskResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 53
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "type": "file",
+      "name": "create-task-no-auto-plan.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "summary": "测试文件，覆盖 \"tasks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 201,
+      "nonEmptyLines": 173
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts:resetDb",
+      "type": "function",
+      "name": "resetDb",
+      "filePath": "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "summary": "函数 resetDb。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 28
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "type": "file",
+      "name": "create-task.ts",
+      "filePath": "packages/engine/src/modules/tasks/create-task.ts",
+      "summary": "包含 normalizeExecutionConfig、createTask 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 248,
+      "nonEmptyLines": 225
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/create-task.ts:normalizeExecutionConfig",
+      "type": "function",
+      "name": "normalizeExecutionConfig",
+      "filePath": "packages/engine/src/modules/tasks/create-task.ts",
+      "summary": "函数 normalizeExecutionConfig，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 16,
+      "endLine": 31
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/create-task.ts:createTask",
+      "type": "function",
+      "name": "createTask",
+      "filePath": "packages/engine/src/modules/tasks/create-task.ts",
+      "summary": "函数 createTask，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 33,
+      "endLine": 248
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+      "type": "file",
+      "name": "delete-task.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+      "summary": "测试文件，覆盖 \"tasks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 115,
+      "nonEmptyLines": 109
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/delete-task.bun.test.ts:resetDb",
+      "type": "function",
+      "name": "resetDb",
+      "filePath": "packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+      "summary": "函数 resetDb。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 5,
+      "endLine": 32
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "type": "file",
+      "name": "delete-task.ts",
+      "filePath": "packages/engine/src/modules/tasks/delete-task.ts",
+      "summary": "包含 deleteTask 函数，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 88,
+      "nonEmptyLines": 77
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/delete-task.ts:deleteTask",
+      "type": "function",
+      "name": "deleteTask",
+      "filePath": "packages/engine/src/modules/tasks/delete-task.ts",
+      "summary": "函数 deleteTask，接受 taskId 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 88
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "type": "file",
+      "name": "get-task-bootstrap.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "summary": "包含 readBlockReason、pickTaskPageWorkBlock、getTaskBootstrap 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 277,
+      "nonEmptyLines": 259
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-bootstrap.ts:readBlockReason",
+      "type": "function",
+      "name": "readBlockReason",
+      "filePath": "packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "summary": "函数 readBlockReason，接受 task 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 28,
+      "endLine": 67
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-bootstrap.ts:pickTaskPageWorkBlock",
+      "type": "function",
+      "name": "pickTaskPageWorkBlock",
+      "filePath": "packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "summary": "函数 pickTaskPageWorkBlock，接受 workBlocks, selectedWorkBlockId, now 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 69,
+      "endLine": 97
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-bootstrap.ts:getTaskBootstrap",
+      "type": "function",
+      "name": "getTaskBootstrap",
+      "filePath": "packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "summary": "函数 getTaskBootstrap，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 99,
+      "endLine": 277
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "type": "file",
+      "name": "get-task-command-center.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "summary": "包含 nowTone、nowTitle、getTaskCommandCenter 函数，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 105,
+      "nonEmptyLines": 101
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-command-center.ts:nowTitle",
+      "type": "function",
+      "name": "nowTitle",
+      "filePath": "packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "summary": "函数 nowTitle，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 19,
+      "endLine": 28
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-command-center.ts:getTaskCommandCenter",
+      "type": "function",
+      "name": "getTaskCommandCenter",
+      "filePath": "packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "summary": "函数 getTaskCommandCenter，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 38,
+      "endLine": 105
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-header.bun.test.ts",
+      "type": "file",
+      "name": "get-task-header.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.bun.test.ts",
+      "summary": "测试文件，覆盖 \"tasks\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 276,
+      "nonEmptyLines": 263
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "type": "file",
+      "name": "get-task-header.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "包含 loadHeaderTaskView、taskStatusLabel、isActiveExecutionStatus等 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 353,
+      "nonEmptyLines": 331
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:loadHeaderTaskView",
+      "type": "function",
+      "name": "loadHeaderTaskView",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 loadHeaderTaskView，接受 taskId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 37
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:taskHeaderStatus",
+      "type": "function",
+      "name": "taskHeaderStatus",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 taskHeaderStatus，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 56,
+      "endLine": 76
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:pickHeaderWorkBlock",
+      "type": "function",
+      "name": "pickHeaderWorkBlock",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 pickHeaderWorkBlock，接受 workBlocks, selectedWorkBlockId, now 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 104,
+      "endLine": 115
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:resolveHeaderExecutionState",
+      "type": "function",
+      "name": "resolveHeaderExecutionState",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 resolveHeaderExecutionState，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 140,
+      "endLine": 168
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:headerExecutionStateToStatePaths",
+      "type": "function",
+      "name": "headerExecutionStateToStatePaths",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 headerExecutionStateToStatePaths，接受 state 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 178,
+      "endLine": 192
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:headerActions",
+      "type": "function",
+      "name": "headerActions",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 headerActions，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 194,
+      "endLine": 204
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:resolveTaskHeaderViewModel",
+      "type": "function",
+      "name": "resolveTaskHeaderViewModel",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 resolveTaskHeaderViewModel，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 218,
+      "endLine": 296
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:buildHeaderSpecFromTask",
+      "type": "function",
+      "name": "buildHeaderSpecFromTask",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 buildHeaderSpecFromTask，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 299,
+      "endLine": 301
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:loadRecurrenceSeriesTasks",
+      "type": "function",
+      "name": "loadRecurrenceSeriesTasks",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 loadRecurrenceSeriesTasks，接受 task 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 303,
+      "endLine": 326
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-header.ts:getTaskHeaderSpec",
+      "type": "function",
+      "name": "getTaskHeaderSpec",
+      "filePath": "packages/engine/src/modules/tasks/get-task-header.ts",
+      "summary": "函数 getTaskHeaderSpec，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 334,
+      "endLine": 353
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "type": "file",
+      "name": "get-task-page-orchestrator.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "summary": "测试文件，覆盖 \"tasks\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 786,
+      "nonEmptyLines": 738
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:resetDb",
+      "type": "function",
+      "name": "resetDb",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "summary": "函数 resetDb。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 21
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:seedTask",
+      "type": "function",
+      "name": "seedTask",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "summary": "函数 seedTask，接受 title 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 43
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:makeCompiledPlan",
+      "type": "function",
+      "name": "makeCompiledPlan",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "summary": "函数 makeCompiledPlan。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 45,
+      "endLine": 87
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:definitionLayerId",
+      "type": "function",
+      "name": "definitionLayerId",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "summary": "函数 definitionLayerId，接受 graph, nodeId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 89,
+      "endLine": 99
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "type": "file",
+      "name": "get-task-page.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page.ts",
+      "summary": "包含 readBlockReason、pickTaskPageWorkBlock、getTaskPage 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 353,
+      "nonEmptyLines": 334
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-page.ts:readBlockReason",
+      "type": "function",
+      "name": "readBlockReason",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page.ts",
+      "summary": "函数 readBlockReason，接受 task 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 33,
+      "endLine": 72
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-page.ts:pickTaskPageWorkBlock",
+      "type": "function",
+      "name": "pickTaskPageWorkBlock",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page.ts",
+      "summary": "函数 pickTaskPageWorkBlock，接受 workBlocks, selectedWorkBlockId, now 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 82,
+      "endLine": 100
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-page.ts:getTaskPage",
+      "type": "function",
+      "name": "getTaskPage",
+      "filePath": "packages/engine/src/modules/tasks/get-task-page.ts",
+      "summary": "函数 getTaskPage，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 102,
+      "endLine": 353
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "type": "file",
+      "name": "get-task-review-context.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "summary": "包含 getTaskReviewContext 函数，属于 \"tasks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 50,
+      "nonEmptyLines": 47
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-review-context.ts:getTaskReviewContext",
+      "type": "function",
+      "name": "getTaskReviewContext",
+      "filePath": "packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "summary": "函数 getTaskReviewContext，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 50
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "type": "file",
+      "name": "get-task-runtime-context.ts",
+      "filePath": "packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "summary": "包含 getTaskRuntimeContext 函数，属于 \"tasks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 22,
+      "nonEmptyLines": 20
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/get-task-runtime-context.ts:getTaskRuntimeContext",
+      "type": "function",
+      "name": "getTaskRuntimeContext",
+      "filePath": "packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "summary": "函数 getTaskRuntimeContext，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 5,
+      "endLine": 22
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "type": "file",
+      "name": "list-tasks.ts",
+      "filePath": "packages/engine/src/modules/tasks/list-tasks.ts",
+      "summary": "包含 resolveStatusFilter、buildWhere、computeCounts等 函数，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 144,
+      "nonEmptyLines": 128
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/list-tasks.ts:buildWhere",
+      "type": "function",
+      "name": "buildWhere",
+      "filePath": "packages/engine/src/modules/tasks/list-tasks.ts",
+      "summary": "函数 buildWhere，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 35,
+      "endLine": 49
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/list-tasks.ts:computeCounts",
+      "type": "function",
+      "name": "computeCounts",
+      "filePath": "packages/engine/src/modules/tasks/list-tasks.ts",
+      "summary": "函数 computeCounts，接受 workspaceId, baseSearch 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 51,
+      "endLine": 85
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/list-tasks.ts:listTasksByWorkspace",
+      "type": "function",
+      "name": "listTasksByWorkspace",
+      "filePath": "packages/engine/src/modules/tasks/list-tasks.ts",
+      "summary": "函数 listTasksByWorkspace，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 87,
+      "endLine": 144
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "type": "file",
+      "name": "mark-task-done.ts",
+      "filePath": "packages/engine/src/modules/tasks/mark-task-done.ts",
+      "summary": "包含 markTaskDone 函数，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 61,
+      "nonEmptyLines": 53
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/mark-task-done.ts:markTaskDone",
+      "type": "function",
+      "name": "markTaskDone",
+      "filePath": "packages/engine/src/modules/tasks/mark-task-done.ts",
+      "summary": "函数 markTaskDone，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 61
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "type": "file",
+      "name": "reopen-task.ts",
+      "filePath": "packages/engine/src/modules/tasks/reopen-task.ts",
+      "summary": "包含 reopenTask 函数，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 57,
+      "nonEmptyLines": 52
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/reopen-task.ts:reopenTask",
+      "type": "function",
+      "name": "reopenTask",
+      "filePath": "packages/engine/src/modules/tasks/reopen-task.ts",
+      "summary": "函数 reopenTask，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 57
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "type": "file",
+      "name": "task-activity.ts",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "包含 stringPayloadValue、runtimePayloadEvent、arrayPayloadValue等 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 522,
+      "nonEmptyLines": 472
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:providerActivityDescription",
+      "type": "function",
+      "name": "providerActivityDescription",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 providerActivityDescription，接受 event, fallback 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 119,
+      "endLine": 130
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:providerActivityMergeKey",
+      "type": "function",
+      "name": "providerActivityMergeKey",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 providerActivityMergeKey，接受 event, eventType 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 166,
+      "endLine": 175
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:mapProviderEventToActivity",
+      "type": "function",
+      "name": "mapProviderEventToActivity",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 mapProviderEventToActivity，接受 event 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 181,
+      "endLine": 232
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:mapTaskEventToActivity",
+      "type": "function",
+      "name": "mapTaskEventToActivity",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 mapTaskEventToActivity，接受 event 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 242,
+      "endLine": 342
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:buildActivityTimeline",
+      "type": "function",
+      "name": "buildActivityTimeline",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 buildActivityTimeline，接受 events 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 344,
+      "endLine": 382
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:orderActivityNewestFirst",
+      "type": "function",
+      "name": "orderActivityNewestFirst",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 orderActivityNewestFirst，接受 items 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 388,
+      "endLine": 394
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:mapTimelineItemToActivity",
+      "type": "function",
+      "name": "mapTimelineItemToActivity",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 mapTimelineItemToActivity，接受 item 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 404,
+      "endLine": 415
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:resolveActivityCursor",
+      "type": "function",
+      "name": "resolveActivityCursor",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 resolveActivityCursor，接受 cursor 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 417,
+      "endLine": 433
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:timelineCursorWhere",
+      "type": "function",
+      "name": "timelineCursorWhere",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 timelineCursorWhere，接受 where, cursor 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 435,
+      "endLine": 445
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:eventCursorWhere",
+      "type": "function",
+      "name": "eventCursorWhere",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 eventCursorWhere，接受 where, cursor 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 447,
+      "endLine": 460
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:getMergedActivity",
+      "type": "function",
+      "name": "getMergedActivity",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 getMergedActivity，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 462,
+      "endLine": 495
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-activity.ts:getTaskActivityPage",
+      "type": "function",
+      "name": "getTaskActivityPage",
+      "filePath": "packages/engine/src/modules/tasks/task-activity.ts",
+      "summary": "函数 getTaskActivityPage，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 496,
+      "endLine": 522
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/task-by-id.ts",
+      "type": "file",
+      "name": "task-by-id.ts",
+      "filePath": "packages/engine/src/modules/tasks/task-by-id.ts",
+      "summary": "包含 ensureTaskInWorkspace 函数，属于 \"tasks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 18,
+      "nonEmptyLines": 14
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/task-by-id.ts:ensureTaskInWorkspace",
+      "type": "function",
+      "name": "ensureTaskInWorkspace",
+      "filePath": "packages/engine/src/modules/tasks/task-by-id.ts",
+      "summary": "函数 ensureTaskInWorkspace，接受 taskId, workspaceId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 18
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "type": "file",
+      "name": "tasks.ts",
+      "filePath": "packages/engine/src/modules/tasks/tasks.ts",
+      "summary": "定义了 Tasks 类，属于 \"tasks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 82,
+      "nonEmptyLines": 67
+    },
+    {
+      "id": "class:packages/engine/src/modules/tasks/tasks.ts:Tasks",
+      "type": "class",
+      "name": "Tasks",
+      "filePath": "packages/engine/src/modules/tasks/tasks.ts",
+      "summary": "类 Tasks，定义了 14 个方法。",
+      "complexity": "moderate",
+      "tags": [
+        "class"
+      ],
+      "startLine": 16,
+      "endLine": 80
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "type": "file",
+      "name": "update-task.ts",
+      "filePath": "packages/engine/src/modules/tasks/update-task.ts",
+      "summary": "包含 normalizeRequiredUpdateTextField、normalizeExecutionConfig、mergeSessionStrategyIntoExecutionConfig等 函数，属于 \"tasks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 367,
+      "nonEmptyLines": 339
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/update-task.ts:normalizeRequiredUpdateTextField",
+      "type": "function",
+      "name": "normalizeRequiredUpdateTextField",
+      "filePath": "packages/engine/src/modules/tasks/update-task.ts",
+      "summary": "函数 normalizeRequiredUpdateTextField，接受 value, field 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 17,
+      "endLine": 32
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/update-task.ts:normalizeExecutionConfig",
+      "type": "function",
+      "name": "normalizeExecutionConfig",
+      "filePath": "packages/engine/src/modules/tasks/update-task.ts",
+      "summary": "函数 normalizeExecutionConfig，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 34,
+      "endLine": 49
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/update-task.ts:mergeSessionStrategyIntoExecutionConfig",
+      "type": "function",
+      "name": "mergeSessionStrategyIntoExecutionConfig",
+      "filePath": "packages/engine/src/modules/tasks/update-task.ts",
+      "summary": "函数 mergeSessionStrategyIntoExecutionConfig，接受 executionConfig, sessionStrategy 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 51,
+      "endLine": 67
+    },
+    {
+      "id": "function:packages/engine/src/modules/tasks/update-task.ts:updateTask",
+      "type": "function",
+      "name": "updateTask",
+      "filePath": "packages/engine/src/modules/tasks/update-task.ts",
+      "summary": "函数 updateTask，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 69,
+      "endLine": 367
+    },
+    {
+      "id": "file:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "type": "file",
+      "name": "get-default-workspace.bun.test.ts",
+      "filePath": "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 117,
+      "nonEmptyLines": 100
+    },
+    {
+      "id": "function:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts:resetDb",
+      "type": "function",
+      "name": "resetDb",
+      "filePath": "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "summary": "函数 resetDb。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 24
+    },
+    {
+      "id": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "type": "file",
+      "name": "get-default-workspace.ts",
+      "filePath": "packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "summary": "定义了 DefaultWorkspaceError 类，包含 getDefaultWorkspace 函数，属于 \"workspaces\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 81,
+      "nonEmptyLines": 68
+    },
+    {
+      "id": "function:packages/engine/src/modules/workspaces/get-default-workspace.ts:getDefaultWorkspace",
+      "type": "function",
+      "name": "getDefaultWorkspace",
+      "filePath": "packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "summary": "函数 getDefaultWorkspace。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 81
+    },
+    {
+      "id": "class:packages/engine/src/modules/workspaces/get-default-workspace.ts:DefaultWorkspaceError",
+      "type": "class",
+      "name": "DefaultWorkspaceError",
+      "filePath": "packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "summary": "类 DefaultWorkspaceError，包含属性 cause，定义了 1 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 15,
+      "endLine": 26
+    },
+    {
+      "id": "file:packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "type": "file",
+      "name": "get-workspace-overview.ts",
+      "filePath": "packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "summary": "包含 getWorkspaceOverview 函数，属于 \"workspaces\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 75,
+      "nonEmptyLines": 73
+    },
+    {
+      "id": "function:packages/engine/src/modules/workspaces/get-workspace-overview.ts:getWorkspaceOverview",
+      "type": "function",
+      "name": "getWorkspaceOverview",
+      "filePath": "packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "summary": "函数 getWorkspaceOverview，接受 workspaceId 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 75
+    },
+    {
+      "id": "file:packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "type": "file",
+      "name": "get-workspaces.ts",
+      "filePath": "packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "summary": "包含 getWorkspaces 函数，属于 \"workspaces\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 12,
+      "nonEmptyLines": 11
+    },
+    {
+      "id": "function:packages/engine/src/modules/workspaces/get-workspaces.ts:getWorkspaces",
+      "type": "function",
+      "name": "getWorkspaces",
+      "filePath": "packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "summary": "函数 getWorkspaces。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 12
+    },
+    {
+      "id": "file:packages/engine/src/modules/workspaces/workspace-query.ts",
+      "type": "file",
+      "name": "workspace-query.ts",
+      "filePath": "packages/engine/src/modules/workspaces/workspace-query.ts",
+      "summary": "定义了 WorkspaceQuery 类，属于 \"workspaces\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 19,
+      "nonEmptyLines": 15
+    },
+    {
+      "id": "class:packages/engine/src/modules/workspaces/workspace-query.ts:WorkspaceQuery",
+      "type": "class",
+      "name": "WorkspaceQuery",
+      "filePath": "packages/engine/src/modules/workspaces/workspace-query.ts",
+      "summary": "类 WorkspaceQuery，定义了 3 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 5,
+      "endLine": 17
+    },
+    {
+      "id": "file:prisma/seed.ts",
+      "type": "file",
+      "name": "seed.ts",
+      "filePath": "prisma/seed.ts",
+      "summary": "包含 main 函数，属于 \"\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 486,
+      "nonEmptyLines": 462
+    },
+    {
+      "id": "function:prisma/seed.ts:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "prisma/seed.ts",
+      "summary": "函数 main。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 477
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "function:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts:decideScheduleProposal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "function:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts:decideScheduleProposal",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:packages/engine/src/modules/scheduling/apply-schedule.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:packages/engine/src/modules/scheduling/apply-schedule.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:apps/server/src/__tests__/api/schedule-proposal-conflict-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:apps/server/src/__tests__/api/schedule-proposal-regression.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:apps/server/src/__tests__/api/schedule-proposal-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "target": "file:packages/engine/src/modules/scheduling/__tests__/schedule-commands.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "function:packages/engine/src/modules/scheduling/move-work-block.ts:moveWorkBlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "function:packages/engine/src/modules/scheduling/move-work-block.ts:moveWorkBlock",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "function:packages/engine/src/modules/scheduling/propose-schedule.ts:proposeSchedule",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "function:packages/engine/src/modules/scheduling/propose-schedule.ts:proposeSchedule",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:apps/server/src/__tests__/api/schedule-proposal-conflict-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:apps/server/src/__tests__/api/schedule-proposal-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "target": "file:packages/engine/src/modules/scheduling/__tests__/schedule-commands.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "class:packages/engine/src/modules/scheduling/task-scheduling.ts:TaskScheduling",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "class:packages/engine/src/modules/scheduling/task-scheduling.ts:TaskScheduling",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/apply-schedule.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-runner.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/clear-schedule.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/decide-schedule-proposal.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/move-work-block.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/propose-schedule.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/apply-schedule.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-runner.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/clear-schedule.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/task-scheduling.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts:makeAcceptedPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts:seedAcceptedPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts:resetDb",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts:seedExternalTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "function:packages/engine/src/modules/tasks/accept-task-result.ts:acceptTaskResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "function:packages/engine/src/modules/tasks/accept-task-result.ts:acceptTaskResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "file:packages/engine/src/modules/projections/task-projection-events.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "file:packages/engine/src/modules/projections/task-projection-events.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "target": "file:apps/server/src/routes/__tests__/task-execution-closure.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts:resetDb",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/create-task.ts:normalizeExecutionConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/create-task.ts:createTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/create-task.ts:createTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/plans/auto-generate-task-plan.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/integrations/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/plans/auto-generate-task-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/integrations/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:apps/server/src/__tests__/api/task-validation-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:apps/server/src/__tests__/api/task-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/delete-task.bun.test.ts:resetDb",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/delete-task.ts:deleteTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/delete-task.ts:deleteTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-bootstrap.ts:readBlockReason",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-bootstrap.ts:pickTaskPageWorkBlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-bootstrap.ts:getTaskBootstrap",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-bootstrap.ts:getTaskBootstrap",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-generation-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-generation-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-command-center.ts:nowTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-command-center.ts:getTaskCommandCenter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-command-center.ts:getTaskCommandCenter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:loadHeaderTaskView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:taskHeaderStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:taskHeaderStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:pickHeaderWorkBlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:resolveHeaderExecutionState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:resolveHeaderExecutionState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:headerExecutionStateToStatePaths",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:headerExecutionStateToStatePaths",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:headerActions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:resolveTaskHeaderViewModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:resolveTaskHeaderViewModel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:buildHeaderSpecFromTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:buildHeaderSpecFromTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:loadRecurrenceSeriesTasks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:getTaskHeaderSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-header.ts:getTaskHeaderSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:resetDb",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:seedTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:makeCompiledPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts:definitionLayerId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page.ts:readBlockReason",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page.ts:pickTaskPageWorkBlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page.ts:getTaskPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-page.ts:getTaskPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-generation-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-generation-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "target": "file:apps/server/src/__tests__/api/task-workspace-console.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-review-context.ts:getTaskReviewContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-review-context.ts:getTaskReviewContext",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-runtime-context.ts:getTaskRuntimeContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "function:packages/engine/src/modules/tasks/get-task-runtime-context.ts:getTaskRuntimeContext",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "function:packages/engine/src/modules/tasks/list-tasks.ts:buildWhere",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "function:packages/engine/src/modules/tasks/list-tasks.ts:computeCounts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "function:packages/engine/src/modules/tasks/list-tasks.ts:listTasksByWorkspace",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "function:packages/engine/src/modules/tasks/list-tasks.ts:listTasksByWorkspace",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "file:packages/contracts/src/api/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "function:packages/engine/src/modules/tasks/mark-task-done.ts:markTaskDone",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "function:packages/engine/src/modules/tasks/mark-task-done.ts:markTaskDone",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "target": "file:apps/server/src/routes/__tests__/task-execution-closure.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/reopen-task.ts:reopenTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/reopen-task.ts:reopenTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "target": "file:apps/server/src/routes/__tests__/task-execution-closure.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:providerActivityDescription",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:providerActivityMergeKey",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:mapProviderEventToActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:mapTaskEventToActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:buildActivityTimeline",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:buildActivityTimeline",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:orderActivityNewestFirst",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:orderActivityNewestFirst",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:mapTimelineItemToActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:mapTimelineItemToActivity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:resolveActivityCursor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:timelineCursorWhere",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:eventCursorWhere",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:getMergedActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:getTaskActivityPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-activity.ts:getTaskActivityPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-by-id.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-by-id.ts:ensureTaskInWorkspace",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-by-id.ts",
+      "target": "function:packages/engine/src/modules/tasks/task-by-id.ts:ensureTaskInWorkspace",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-by-id.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-by-id.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/task-by-id.ts",
+      "target": "file:packages/engine/src/modules/plans/task-planning.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "class:packages/engine/src/modules/tasks/tasks.ts:Tasks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "class:packages/engine/src/modules/tasks/tasks.ts:Tasks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/accept-task-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/delete-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/list-tasks.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/mark-task-done.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/reopen-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/task-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/task-by-id.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/tasks.ts",
+      "target": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/update-task.ts:normalizeRequiredUpdateTextField",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/update-task.ts:normalizeExecutionConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/update-task.ts:mergeSessionStrategyIntoExecutionConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/update-task.ts:updateTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "function:packages/engine/src/modules/tasks/update-task.ts:updateTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/plans/auto-generate-task-plan.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/integrations/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/plans/auto-generate-task-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:packages/integrations/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:apps/server/src/__tests__/api/task-validation-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "target": "file:apps/server/src/__tests__/api/task-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "target": "function:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts:resetDb",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "target": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "function:packages/engine/src/modules/workspaces/get-default-workspace.ts:getDefaultWorkspace",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "function:packages/engine/src/modules/workspaces/get-default-workspace.ts:getDefaultWorkspace",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "class:packages/engine/src/modules/workspaces/get-default-workspace.ts:DefaultWorkspaceError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "class:packages/engine/src/modules/workspaces/get-default-workspace.ts:DefaultWorkspaceError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "target": "function:packages/engine/src/modules/workspaces/get-workspace-overview.ts:getWorkspaceOverview",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "target": "function:packages/engine/src/modules/workspaces/get-workspace-overview.ts:getWorkspaceOverview",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "target": "function:packages/engine/src/modules/workspaces/get-workspaces.ts:getWorkspaces",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "target": "function:packages/engine/src/modules/workspaces/get-workspaces.ts:getWorkspaces",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/workspace-query.ts",
+      "target": "class:packages/engine/src/modules/workspaces/workspace-query.ts:WorkspaceQuery",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/workspace-query.ts",
+      "target": "class:packages/engine/src/modules/workspaces/workspace-query.ts:WorkspaceQuery",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/workspace-query.ts",
+      "target": "file:packages/engine/src/modules/workspaces/get-default-workspace.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/workspace-query.ts",
+      "target": "file:packages/engine/src/modules/workspaces/get-workspace-overview.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/workspace-query.ts",
+      "target": "file:packages/engine/src/modules/workspaces/get-workspaces.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:prisma/seed.ts",
+      "target": "function:prisma/seed.ts:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:prisma/seed.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:prisma/seed.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

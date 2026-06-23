@@ -59,11 +59,16 @@ function optionalObject(value: unknown, label: string): JsonObject | undefined {
   return value as JsonObject;
 }
 
+function specFromFile(path: string | undefined, label: string) {
+  return readJsonFile(requireString(path, label), label);
+}
+
 function outputsFromFile(path: string | undefined, label: string) {
   if (!path) return undefined;
   const parsed = readJsonFile(path, label);
   return Array.isArray(parsed) ? parsed : [parsed];
 }
+
 
 export function buildControlPayload(argv: string[]): ParseResult {
   const [domain, command, ...rest] = argv;
@@ -96,7 +101,7 @@ export function buildControlPayload(argv: string[]): ParseResult {
         body: {
           kind: "output",
           payload: {
-            outputs: outputsFromFile(requireString(outputsFile, "--outputs-file"), "--outputs-file") as never[],
+            spec: specFromFile(outputsFile, "--outputs-file") as never,
             ...(mode ? { mode } : {}),
             ...(summary ? { summary } : {}),
           },

@@ -1,22 +1,3 @@
-/**
- * Spec 019 — Workspace rerender after accept (test F).
- *
- * Verifies the end-to-end rerender contract: when a user accepts a plan,
- * the workspace page re-derives its "Current operation" `WorkspaceSummaryCard`
- * from the post-accept `TaskWorkspacePlanFlowState` ("accepted" variant) on
- * the very next render.
- *
- * Approach: drive the real `useTaskWorkspacePlanState` via a stubbed
- * `global.fetch` (matching the pattern in the page-state tests — the hook
- * calls `fetchTaskPlanState` and `dispatchWorkspaceCommand`, both of which
- * route through `fetch` or `@/lib/rpc-client` respectively). After the hook
- * resolves `acceptPlanById`, recompute the command-center "Now" spec via
- * `buildCommandCenterNowSpec` exactly the way `<TaskWorkspacePage>` does.
- * Assert the `status-card` props flip from the waiting_acceptance variant
- * to the accepted variant — proving the page rerender contract.
- *
- * Plan: specs/019-plan-card-and-accept-tests/plan.md §3 (test F).
- */
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
@@ -60,7 +41,10 @@ vi.mock("@/lib/rpc-client", () => ({
               mocks.planStateResponse.aiPlanGenerationStatus = "accepted";
               mocks.planStateResponse.savedPlan.status = "accepted";
             }
-            return { ok: true, json: async () => ({ commandId: "c-1", taskId: args.param.taskId, acceptedAt: "2026-06-10T00:00:00.000Z" }) };
+            return {
+              ok: true,
+              json: async () => ({ commandId: "c-1", taskId: args.param.taskId, acceptedAt: "2026-06-10T00:00:00.000Z" }),
+            };
           }),
         },
       },
@@ -71,29 +55,35 @@ vi.mock("@/lib/rpc-client", () => ({
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input.toString();
   const method = init?.method;
+
   if (url.includes("/plan/generations/active")) {
     return new Response(JSON.stringify({ generationSession: null }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }
+
   if (url.match(/\/api\/tasks\/[^/]+\/plan(\?|$)/)) {
     return new Response(JSON.stringify(mocks.planStateResponse), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }
+
   if (url.match(/\/api\/tasks\/[^/]+\/execution\/current(\?|$)/)) {
     return new Response(JSON.stringify(mocks.currentExecution), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }
+
   if (method === "POST" || method === "DELETE") {
     return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
   }
+
   return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
 });
+
 vi.stubGlobal("fetch", fetchMock);
 
 function derivePlanFlow(planFlowStatus: string, plan: { id: string; status: string } | null): TaskWorkspacePlanFlowState | null {
@@ -148,11 +138,8 @@ afterEach(async () => {
 });
 
 describe("F. Workspace rerender after accept", () => {
-  it("re-derives the 'Current operation' card from waiting_acceptance → accepted after Accept", async () => {
+  it("shows accepted status after Accept", async () => {
     const initialPage = taskWorkspacePlanStateFixtures.planWaitingAcceptance.pageData as TaskPageData;
-    // Strip `task.savedPlan` so the hook's reconciliation pipeline relies
-    // on the plan-state query alone (the page query's snapshot is not
-    // mutated by the server on accept).
     const taskWithoutPagePlan = { ...initialPage.task, savedPlan: null } as TaskPageData["task"];
     const refreshWorkspace = vi.fn(async () => undefined);
 
@@ -161,18 +148,14 @@ describe("F. Workspace rerender after accept", () => {
       { wrapper },
     );
 
-    // Let the plan-state query fetch resolve so the hook sees the
-    // `waiting_acceptance` snapshot from the (mocked) server.
     await act(async () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
     });
 
-    // Pre-accept: hook reports waiting_acceptance + draft plan.
     expect(result.current.planFlowStatus).toBe("waiting_acceptance");
     expect(result.current.plan?.status).toBe("draft");
 
-    // Compute the command-center spec the way the page does.
     const preSpec = buildCommandCenterNowSpec({
       primaryAction: null,
       readiness: { id: "fallback", title: "fallback", description: "", tone: "info" },
@@ -182,32 +165,24 @@ describe("F. Workspace rerender after accept", () => {
       planFlow: derivePlanFlow(result.current.planFlowStatus, result.current.plan),
       planSummary: mocks.planStateResponse.savedPlan?.summary ?? null,
     });
-    const preStatusCard = (preSpec.elements["status-card"]?.props ?? {}) as {
-      title?: string;
-      statusLabel?: string;
-      tone?: string;
-      icon?: string;
-    };
-    expect(preStatusCard.title).toBe("Plan ready for review");
-    expect(preStatusCard.statusLabel).toBe("Waiting for acceptance");
-    expect(preStatusCard.tone).toBe("info");
-    expect(preStatusCard.icon).toBe("sparkles");
+    const preStatusCard = preSpec.elements["status-card"]?.props;
+    if (!preStatusCard || typeof preStatusCard !== "object") {
+      throw new Error("status-card missing before accept");
+    }
+    const preProps = preStatusCard as Record<string, unknown>;
+    expect(preProps.title).toBe("Plan ready for review");
+    expect(preProps.statusLabel).toBe("Waiting for acceptance");
+    expect(preProps.tone).toBe("info");
+    expect(preProps.icon).toBe("sparkles");
 
-    // Fire Accept.
     await act(async () => {
       await result.current.handleAcceptPlan();
     });
 
-    // Dispatch fired once with the right body.
     expect(mocks.commandCalls).toHaveLength(1);
     expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.accept", planId: "plan-1" });
-
-    // Post-accept: the hook's `planFlowStatus` MUST land on "accepted"
-    // so the page-level `buildCommandCenterNowSpec` rerender produces
-    // the accepted-variant `status-card`.
     expect(result.current.planFlowStatus).toBe("accepted");
 
-    // Recompute the spec with the post-accept flow.
     const postSpec = buildCommandCenterNowSpec({
       primaryAction: null,
       readiness: { id: "fallback", title: "fallback", description: "", tone: "info" },
@@ -217,15 +192,14 @@ describe("F. Workspace rerender after accept", () => {
       planFlow: derivePlanFlow(result.current.planFlowStatus, result.current.plan),
       planSummary: mocks.planStateResponse.savedPlan?.summary ?? null,
     });
-    const postStatusCard = (postSpec.elements["status-card"]?.props ?? {}) as {
-      title?: string;
-      statusLabel?: string;
-      tone?: string;
-      icon?: string;
-    };
-    expect(postStatusCard.title).toBe("Plan accepted");
-    expect(postStatusCard.statusLabel).toBe("Accepted");
-    expect(postStatusCard.tone).toBe("success");
-    expect(postStatusCard.icon).toBe("check");
+    const postStatusCard = postSpec.elements["status-card"]?.props;
+    if (!postStatusCard || typeof postStatusCard !== "object") {
+      throw new Error("status-card missing after accept");
+    }
+    const postProps = postStatusCard as Record<string, unknown>;
+    expect(postProps.title).toBe("Plan accepted");
+    expect(postProps.statusLabel).toBe("Accepted");
+    expect(postProps.tone).toBe("success");
+    expect(postProps.icon).toBe("check");
   });
 });

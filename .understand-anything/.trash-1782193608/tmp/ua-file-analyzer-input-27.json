@@ -1,0 +1,95 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/ui-protocol/src/actions/actions.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 155,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-action-spec.ts",
+      "language": "typescript",
+      "sizeLines": 194,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 92,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "language": "typescript",
+      "sizeLines": 120,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "language": "typescript",
+      "sizeLines": 270,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-result-spec.ts",
+      "language": "typescript",
+      "sizeLines": 113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "language": "typescript",
+      "sizeLines": 242,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/catalog/components.ts",
+      "language": "typescript",
+      "sizeLines": 307,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/document/document.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/document/validate.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 94,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/document/validate.ts",
+      "language": "typescript",
+      "sizeLines": 112,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/schema.ts",
+      "language": "typescript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    }
+  ]
+}

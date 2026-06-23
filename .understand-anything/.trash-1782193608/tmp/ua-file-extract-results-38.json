@@ -1,0 +1,343 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 7,
+  "filesSkipped": [
+    ".omc/sessions/0de8a22f-cf62-4ae9-b9a2-bdc0fc8d0245.json",
+    ".omc/sessions/2d485152-d7d2-4768-b417-d46867f55247.json",
+    ".omc/sessions/2fda4cdf-0fde-4b70-ae8c-f723914d0a54.json",
+    ".omc/sessions/301b72f9-6d80-424b-859a-94e7b14fb709.json",
+    ".omc/sessions/32fae9fe-243e-40f0-aab0-b85c278a5a19.json",
+    ".omc/sessions/3a3f028b-b54a-4df9-9829-ca8e3ceb65ba.json",
+    ".omc/sessions/3a98b1d5-cc7e-4202-8ee4-926b47f99161.json",
+    ".omc/sessions/3efd8ed2-89a0-4661-a1ec-0f723be9d05c.json",
+    ".omc/sessions/3fe69ad6-1e12-48c8-8b04-4f1bded3600f.json",
+    ".omc/sessions/940c45ce-53d3-497c-b39d-cbfe00e3ec5d.json",
+    ".omc/sessions/a2898124-13bd-4486-bee4-14957fdd383a.json",
+    ".omc/sessions/a492d153-e4fc-47e3-b9cc-a39a68c57029.json",
+    ".omc/sessions/a4a64f35-f1ee-40a8-8682-970f88108f5c.json"
+  ],
+  "results": [
+    {
+      "path": ".omc/sessions/13061a0d-b89a-4dbd-be91-aa088fbc364a.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "sections": [
+        {
+          "heading": "session_id",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ended_at",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "reason",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "agents_spawned",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "agents_completed",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "modes_used",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": ".omc/sessions/1a9f0184-017b-44a5-9ba7-ff3f155ab621.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "sections": [
+        {
+          "heading": "session_id",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ended_at",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "reason",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "agents_spawned",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "agents_completed",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "modes_used",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": ".omc/sessions/39109f98-de88-4e75-bbd9-80322cc7df6d.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "sections": [
+        {
+          "heading": "session_id",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ended_at",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "reason",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "agents_spawned",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "agents_completed",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "modes_used",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": ".omc/sessions/4b5073cd-35c5-4072-8810-ef5c15fa842c.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "sections": [
+        {
+          "heading": "session_id",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ended_at",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "reason",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "agents_spawned",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "agents_completed",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "modes_used",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": ".omc/sessions/5f0ff4d5-4a22-4de9-91af-3f74c4b06d7f.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "sections": [
+        {
+          "heading": "session_id",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ended_at",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "reason",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "agents_spawned",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "agents_completed",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "modes_used",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": ".omc/sessions/8beedcea-8296-4396-b915-8521ed15073e.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "sections": [
+        {
+          "heading": "session_id",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ended_at",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "reason",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "agents_spawned",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "agents_completed",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "modes_used",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": ".omc/sessions/a1da5bd2-24e9-42cd-ae82-25cb6a90a8d7.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "sections": [
+        {
+          "heading": "session_id",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ended_at",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "reason",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "agents_spawned",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "agents_completed",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "modes_used",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    }
+  ]
+}

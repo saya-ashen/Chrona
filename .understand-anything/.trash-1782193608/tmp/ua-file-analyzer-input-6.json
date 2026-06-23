@@ -1,0 +1,209 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/task-execution-store.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 646,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.approval.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 245,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.concurrency.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 221,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 325,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.external-results.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 705,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.fixtures.ts",
+      "language": "typescript",
+      "sizeLines": 479,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.full-chain.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 138,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.interruption.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 215,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/plan-runner.task-executor.runtime-events.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/reconcile-stale-runtime-runs.ts",
+      "language": "typescript",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/apply-plan-patch-command.ts",
+      "language": "typescript",
+      "sizeLines": 315,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/auto-generate-task-plan.ts",
+      "language": "typescript",
+      "sizeLines": 54,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/generate-task-plan-for-task.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 655,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
+      "language": "typescript",
+      "sizeLines": 653,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/materialize-generated-task-plan.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 184,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/materialize-generated-task-plan.ts",
+      "language": "typescript",
+      "sizeLines": 134,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/plan-in-workspace.ts",
+      "language": "typescript",
+      "sizeLines": 22,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/task-plan-generation-registry.ts",
+      "language": "typescript",
+      "sizeLines": 211,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/task-plan-graph.ts",
+      "language": "typescript",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "language": "typescript",
+      "sizeLines": 264,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plans/task-planning.ts",
+      "language": "typescript",
+      "sizeLines": 147,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/projections/__tests__/rebuild-task-projection.occurrence-isolation.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 200,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/projections/__tests__/task-state.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "language": "typescript",
+      "sizeLines": 266,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/projections/task-projection-events.ts",
+      "language": "typescript",
+      "sizeLines": 197,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/__tests__/schedule-commands.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 500,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/apply-schedule.ts",
+      "language": "typescript",
+      "sizeLines": 133,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 194,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.ts",
+      "language": "typescript",
+      "sizeLines": 143,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/auto-start-runner.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 647,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts",
+      "language": "typescript",
+      "sizeLines": 131,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/clear-schedule.ts",
+      "language": "typescript",
+      "sizeLines": 51,
+      "fileCategory": "code"
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/db/src/generated/prisma/commonInputTypes.ts",
+      "language": "typescript",
+      "sizeLines": 1347,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/enums.ts",
+      "language": "typescript",
+      "sizeLines": 255,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/internal/class.ts",
+      "language": "typescript",
+      "sizeLines": 534,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/internal/prismaNamespace.ts",
+      "language": "typescript",
+      "sizeLines": 4203,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models.ts",
+      "language": "typescript",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/AiClient.ts",
+      "language": "typescript",
+      "sizeLines": 1421,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/AiFeatureBinding.ts",
+      "language": "typescript",
+      "sizeLines": 1310,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Approval.ts",
+      "language": "typescript",
+      "sizeLines": 2001,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Artifact.ts",
+      "language": "typescript",
+      "sizeLines": 1813,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/CalendarSource.ts",
+      "language": "typescript",
+      "sizeLines": 2148,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ConversationEntry.ts",
+      "language": "typescript",
+      "sizeLines": 1491,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Event.ts",
+      "language": "typescript",
+      "sizeLines": 3668,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ExecutionSession.ts",
+      "language": "typescript",
+      "sizeLines": 2264,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/GraphMutationRecord.ts",
+      "language": "typescript",
+      "sizeLines": 1778,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/GraphVersion.ts",
+      "language": "typescript",
+      "sizeLines": 1587,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ImportedCalendarEvent.ts",
+      "language": "typescript",
+      "sizeLines": 2335,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Memory.ts",
+      "language": "typescript",
+      "sizeLines": 1831,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/RawEventLog.ts",
+      "language": "typescript",
+      "sizeLines": 3520,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ReconciliationEvent.ts",
+      "language": "typescript",
+      "sizeLines": 1657,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Run.ts",
+      "language": "typescript",
+      "sizeLines": 4311,
+      "fileCategory": "code"
+    }
+  ]
+}

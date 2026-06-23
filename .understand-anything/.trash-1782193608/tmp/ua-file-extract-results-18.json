@@ -1,0 +1,4302 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 27,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-plan-flow-machine.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 93,
+      "nonEmptyLines": 81,
+      "functions": [
+        {
+          "name": "createPlanFlowFromSnapshot",
+          "startLine": 16,
+          "endLine": 21,
+          "params": [
+            "planState"
+          ]
+        },
+        {
+          "name": "startPlanAccept",
+          "startLine": 23,
+          "endLine": 32,
+          "params": [
+            "state",
+            "planId"
+          ]
+        },
+        {
+          "name": "completePlanAccept",
+          "startLine": 34,
+          "endLine": 41,
+          "params": [
+            "savedPlan"
+          ]
+        },
+        {
+          "name": "failPlanAccept",
+          "startLine": 43,
+          "endLine": 54,
+          "params": [
+            "state",
+            "planId",
+            "error"
+          ]
+        },
+        {
+          "name": "clearPlanFlowError",
+          "startLine": 56,
+          "endLine": 65,
+          "params": [
+            "state"
+          ]
+        },
+        {
+          "name": "getPlanGenerationStatusFromFlow",
+          "startLine": 67,
+          "endLine": 81,
+          "params": [
+            "state"
+          ]
+        },
+        {
+          "name": "canAcceptPlanFromFlow",
+          "startLine": 83,
+          "endLine": 85,
+          "params": [
+            "state"
+          ]
+        },
+        {
+          "name": "isAcceptingPlanFromFlow",
+          "startLine": 87,
+          "endLine": 89,
+          "params": [
+            "state"
+          ]
+        },
+        {
+          "name": "getAcceptPlanErrorFromFlow",
+          "startLine": 91,
+          "endLine": 93,
+          "params": [
+            "state"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createPlanFlowFromSnapshot",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "startPlanAccept",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "completePlanAccept",
+          "line": 34,
+          "isDefault": false
+        },
+        {
+          "name": "failPlanAccept",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "clearPlanFlowError",
+          "line": 56,
+          "isDefault": false
+        },
+        {
+          "name": "getPlanGenerationStatusFromFlow",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "canAcceptPlanFromFlow",
+          "line": 83,
+          "isDefault": false
+        },
+        {
+          "name": "isAcceptingPlanFromFlow",
+          "line": 87,
+          "isDefault": false
+        },
+        {
+          "name": "getAcceptPlanErrorFromFlow",
+          "line": 91,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "canAcceptPlanFromFlow",
+          "callee": "Boolean",
+          "lineNumber": 84
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 9,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-proposal-flow-machine.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 61,
+      "nonEmptyLines": 51,
+      "functions": [
+        {
+          "name": "createProposalPreviewState",
+          "startLine": 11,
+          "endLine": 22,
+          "params": [
+            "proposal",
+            "originalTask"
+          ]
+        },
+        {
+          "name": "startProposalApply",
+          "startLine": 24,
+          "endLine": 33,
+          "params": [
+            "state"
+          ]
+        },
+        {
+          "name": "failProposalApply",
+          "startLine": 35,
+          "endLine": 45,
+          "params": [
+            "state",
+            "error"
+          ]
+        },
+        {
+          "name": "settleProposalApply",
+          "startLine": 47,
+          "endLine": 49,
+          "params": []
+        },
+        {
+          "name": "resetProposalFlow",
+          "startLine": 51,
+          "endLine": 53,
+          "params": []
+        },
+        {
+          "name": "getCurrentProposalFromFlow",
+          "startLine": 55,
+          "endLine": 61,
+          "params": [
+            "state"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createProposalPreviewState",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "startProposalApply",
+          "line": 24,
+          "isDefault": false
+        },
+        {
+          "name": "failProposalApply",
+          "line": 35,
+          "isDefault": false
+        },
+        {
+          "name": "settleProposalApply",
+          "line": 47,
+          "isDefault": false
+        },
+        {
+          "name": "resetProposalFlow",
+          "line": 51,
+          "isDefault": false
+        },
+        {
+          "name": "getCurrentProposalFromFlow",
+          "line": 55,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 6,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-query.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 819,
+      "nonEmptyLines": 763,
+      "functions": [
+        {
+          "name": "node",
+          "startLine": 12,
+          "endLine": 30,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "graph",
+          "startLine": 32,
+          "endLine": 53,
+          "params": [
+            "nodes",
+            "currentStepId"
+          ]
+        },
+        {
+          "name": "pageData",
+          "startLine": 55,
+          "endLine": 88,
+          "params": [
+            "overrides"
+          ]
+        },
+        {
+          "name": "savedPlan",
+          "startLine": 90,
+          "endLine": 103,
+          "params": [
+            "status"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 692,
+      "nonEmptyLines": 629,
+      "functions": [
+        {
+          "name": "resolveExecutionConsoleCopy",
+          "startLine": 139,
+          "endLine": 141,
+          "params": [
+            "copy"
+          ]
+        },
+        {
+          "name": "fillTemplate",
+          "startLine": 143,
+          "endLine": 148,
+          "params": [
+            "template",
+            "values"
+          ]
+        },
+        {
+          "name": "isDoneStatus",
+          "startLine": 162,
+          "endLine": 164,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "isAttentionStatus",
+          "startLine": 166,
+          "endLine": 173,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "isCheckpointStatus",
+          "startLine": 175,
+          "endLine": 177,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "deriveTaskStatusFromGraph",
+          "startLine": 179,
+          "endLine": 206,
+          "params": [
+            "task",
+            "graphPlan"
+          ]
+        },
+        {
+          "name": "mapTaskWorkspaceStatus",
+          "startLine": 208,
+          "endLine": 214,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "isTaskWorkspaceAttentionStatus",
+          "startLine": 216,
+          "endLine": 218,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "overviewToneForNode",
+          "startLine": 220,
+          "endLine": 227,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "buildProgressSummary",
+          "startLine": 229,
+          "endLine": 245,
+          "params": [
+            "graphPlan",
+            "copyInput"
+          ]
+        },
+        {
+          "name": "pickWorkspaceCurrentNode",
+          "startLine": 247,
+          "endLine": 259,
+          "params": [
+            "graphPlan",
+            "selectedNode"
+          ]
+        },
+        {
+          "name": "nodeResultSummary",
+          "startLine": 261,
+          "endLine": 265,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "hasSpecResultOutput",
+          "startLine": 267,
+          "endLine": 269,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "pickLatestResultNode",
+          "startLine": 271,
+          "endLine": 276,
+          "params": [
+            "graphPlan"
+          ]
+        },
+        {
+          "name": "buildLatestResultCard",
+          "startLine": 278,
+          "endLine": 318,
+          "params": [
+            "pageData",
+            "graphPlan",
+            "copy"
+          ]
+        },
+        {
+          "name": "buildAttentionCard",
+          "startLine": 320,
+          "endLine": 385,
+          "params": [
+            "pageData",
+            "currentNode",
+            "copy"
+          ]
+        },
+        {
+          "name": "buildReadinessCard",
+          "startLine": 387,
+          "endLine": 434,
+          "params": [
+            "pageData",
+            "currentNode",
+            "copy"
+          ]
+        },
+        {
+          "name": "buildArtifactItems",
+          "startLine": 436,
+          "endLine": 443,
+          "params": [
+            "pageData",
+            "_graphPlan"
+          ]
+        },
+        {
+          "name": "buildActivity",
+          "startLine": 445,
+          "endLine": 447,
+          "params": [
+            "pageData"
+          ]
+        },
+        {
+          "name": "buildTaskHeaderView",
+          "startLine": 449,
+          "endLine": 503,
+          "params": [
+            "pageData",
+            "progress",
+            "currentNode",
+            "copy"
+          ]
+        },
+        {
+          "name": "createTaskWorkspaceExecutionConsoleView",
+          "startLine": 505,
+          "endLine": 576,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "taskScopedQuery",
+          "startLine": 578,
+          "endLine": 580,
+          "params": [
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "fetchTaskWorkspacePage",
+          "startLine": 582,
+          "endLine": 598,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "fetchTaskCommandCenter",
+          "startLine": 605,
+          "endLine": 608,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "fetchTaskPlanState",
+          "startLine": 611,
+          "endLine": 633,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "fetchCurrentTaskExecution",
+          "startLine": 635,
+          "endLine": 645,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "dispatchTaskExecutionAction",
+          "startLine": 647,
+          "endLine": 665,
+          "params": [
+            "taskId",
+            "action",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "submitTaskCheckpointAction",
+          "startLine": 667,
+          "endLine": 692,
+          "params": [
+            "taskId",
+            "action",
+            "workBlockId"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "DEFAULT_TASK_WORKSPACE_EXECUTION_CONSOLE_COPY",
+          "line": 83,
+          "isDefault": false
+        },
+        {
+          "name": "taskWorkspaceQueryKeys",
+          "line": 150,
+          "isDefault": false
+        },
+        {
+          "name": "commandCenterQueryKeys",
+          "line": 157,
+          "isDefault": false
+        },
+        {
+          "name": "mapTaskWorkspaceStatus",
+          "line": 208,
+          "isDefault": false
+        },
+        {
+          "name": "isTaskWorkspaceAttentionStatus",
+          "line": 216,
+          "isDefault": false
+        },
+        {
+          "name": "buildProgressSummary",
+          "line": 229,
+          "isDefault": false
+        },
+        {
+          "name": "pickWorkspaceCurrentNode",
+          "line": 247,
+          "isDefault": false
+        },
+        {
+          "name": "createTaskWorkspaceExecutionConsoleView",
+          "line": 505,
+          "isDefault": false
+        },
+        {
+          "name": "fetchTaskWorkspacePage",
+          "line": 582,
+          "isDefault": false
+        },
+        {
+          "name": "fetchTaskCommandCenter",
+          "line": 605,
+          "isDefault": false
+        },
+        {
+          "name": "fetchTaskPlanState",
+          "line": 611,
+          "isDefault": false
+        },
+        {
+          "name": "fetchCurrentTaskExecution",
+          "line": 635,
+          "isDefault": false
+        },
+        {
+          "name": "dispatchTaskExecutionAction",
+          "line": 647,
+          "isDefault": false
+        },
+        {
+          "name": "submitTaskCheckpointAction",
+          "line": 667,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "fillTemplate",
+          "callee": "Object.entries(values).reduce",
+          "lineNumber": 144
+        },
+        {
+          "caller": "fillTemplate",
+          "callee": "Object.entries",
+          "lineNumber": 144
+        },
+        {
+          "caller": "fillTemplate",
+          "callee": "result.replace",
+          "lineNumber": 145
+        },
+        {
+          "caller": "fillTemplate",
+          "callee": "String",
+          "lineNumber": 145
+        },
+        {
+          "caller": "deriveTaskStatusFromGraph",
+          "callee": "nodes.some",
+          "lineNumber": 189
+        },
+        {
+          "caller": "deriveTaskStatusFromGraph",
+          "callee": "nodes.some",
+          "lineNumber": 193
+        },
+        {
+          "caller": "deriveTaskStatusFromGraph",
+          "callee": "nodes.some",
+          "lineNumber": 197
+        },
+        {
+          "caller": "deriveTaskStatusFromGraph",
+          "callee": "nodes.every",
+          "lineNumber": 201
+        },
+        {
+          "caller": "deriveTaskStatusFromGraph",
+          "callee": "isDoneStatus",
+          "lineNumber": 201
+        },
+        {
+          "caller": "mapTaskWorkspaceStatus",
+          "callee": "[\"done\", \"completed\", \"skipped\", \"cancelled\", \"invalidated\", \"Done\", \"Completed\", \"Cancelled\"].includes",
+          "lineNumber": 209
+        },
+        {
+          "caller": "mapTaskWorkspaceStatus",
+          "callee": "[\"active\", \"in_progress\", \"running\", \"Running\"].includes",
+          "lineNumber": 210
+        },
+        {
+          "caller": "mapTaskWorkspaceStatus",
+          "callee": "[\"waiting_for_user\", \"waiting_for_approval\", \"WaitingForInput\", \"WaitingForApproval\"].includes",
+          "lineNumber": 211
+        },
+        {
+          "caller": "mapTaskWorkspaceStatus",
+          "callee": "[\"blocked\", \"failed\", \"degraded\", \"Blocked\", \"Failed\", \"Degraded\"].includes",
+          "lineNumber": 212
+        },
+        {
+          "caller": "isTaskWorkspaceAttentionStatus",
+          "callee": "isAttentionStatus",
+          "lineNumber": 217
+        },
+        {
+          "caller": "overviewToneForNode",
+          "callee": "isAttentionStatus",
+          "lineNumber": 223
+        },
+        {
+          "caller": "overviewToneForNode",
+          "callee": "isDoneStatus",
+          "lineNumber": 224
+        },
+        {
+          "caller": "buildProgressSummary",
+          "callee": "resolveExecutionConsoleCopy",
+          "lineNumber": 233
+        },
+        {
+          "caller": "buildProgressSummary",
+          "callee": "nodes.filter",
+          "lineNumber": 236
+        },
+        {
+          "caller": "buildProgressSummary",
+          "callee": "isDoneStatus",
+          "lineNumber": 236
+        },
+        {
+          "caller": "buildProgressSummary",
+          "callee": "Math.round",
+          "lineNumber": 237
+        },
+        {
+          "caller": "buildProgressSummary",
+          "callee": "fillTemplate",
+          "lineNumber": 243
+        },
+        {
+          "caller": "pickWorkspaceCurrentNode",
+          "callee": "nodes.find",
+          "lineNumber": 253
+        },
+        {
+          "caller": "pickWorkspaceCurrentNode",
+          "callee": "nodes.find",
+          "lineNumber": 254
+        },
+        {
+          "caller": "pickWorkspaceCurrentNode",
+          "callee": "nodes.find",
+          "lineNumber": 255
+        },
+        {
+          "caller": "pickWorkspaceCurrentNode",
+          "callee": "isAttentionStatus",
+          "lineNumber": 255
+        },
+        {
+          "caller": "pickWorkspaceCurrentNode",
+          "callee": "nodes.find",
+          "lineNumber": 256
+        },
+        {
+          "caller": "hasSpecResultOutput",
+          "callee": "Boolean",
+          "lineNumber": 268
+        },
+        {
+          "caller": "pickLatestResultNode",
+          "callee": "[...(graphPlan?.steps ?? graphPlan?.nodes ?? [])]\n    .reverse()\n    .find",
+          "lineNumber": 272
+        },
+        {
+          "caller": "pickLatestResultNode",
+          "callee": "[...(graphPlan?.steps ?? graphPlan?.nodes ?? [])]\n    .reverse",
+          "lineNumber": 272
+        },
+        {
+          "caller": "pickLatestResultNode",
+          "callee": "nodeResultSummary",
+          "lineNumber": 274
+        },
+        {
+          "caller": "pickLatestResultNode",
+          "callee": "hasSpecResultOutput",
+          "lineNumber": 274
+        },
+        {
+          "caller": "buildLatestResultCard",
+          "callee": "pickLatestResultNode",
+          "lineNumber": 283
+        },
+        {
+          "caller": "buildLatestResultCard",
+          "callee": "nodeResultSummary",
+          "lineNumber": 284
+        },
+        {
+          "caller": "buildLatestResultCard",
+          "callee": "overviewToneForNode",
+          "lineNumber": 293
+        },
+        {
+          "caller": "buildLatestResultCard",
+          "callee": "fillTemplate",
+          "lineNumber": 305
+        },
+        {
+          "caller": "buildAttentionCard",
+          "callee": "pageData.approvals.find",
+          "lineNumber": 325
+        },
+        {
+          "caller": "buildAttentionCard",
+          "callee": "isCheckpointStatus",
+          "lineNumber": 338
+        },
+        {
+          "caller": "buildAttentionCard",
+          "callee": "overviewToneForNode",
+          "lineNumber": 344
+        },
+        {
+          "caller": "buildAttentionCard",
+          "callee": "graphNodeIdForTaskAction",
+          "lineNumber": 351
+        },
+        {
+          "caller": "buildAttentionCard",
+          "callee": "isAttentionStatus",
+          "lineNumber": 372
+        },
+        {
+          "caller": "buildAttentionCard",
+          "callee": "overviewToneForNode",
+          "lineNumber": 378
+        },
+        {
+          "caller": "buildReadinessCard",
+          "callee": "pageData.scheduleProposals.find",
+          "lineNumber": 392
+        },
+        {
+          "caller": "buildReadinessCard",
+          "callee": "overviewToneForNode",
+          "lineNumber": 419
+        },
+        {
+          "caller": "buildArtifactItems",
+          "callee": "pageData.artifacts.map",
+          "lineNumber": 437
+        },
+        {
+          "caller": "buildActivity",
+          "callee": "mergeWorkspaceActivity",
+          "lineNumber": 446
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "isAttentionStatus",
+          "lineNumber": 456
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "mapTaskWorkspaceStatus",
+          "lineNumber": 457
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "mapTaskWorkspaceStatus",
+          "lineNumber": 460
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "mapTaskWorkspaceStatus",
+          "lineNumber": 461
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "Boolean",
+          "lineNumber": 462
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "Boolean",
+          "lineNumber": 463
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "Boolean",
+          "lineNumber": 494
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "Boolean",
+          "lineNumber": 495
+        },
+        {
+          "caller": "buildTaskHeaderView",
+          "callee": "Boolean",
+          "lineNumber": 496
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "resolveExecutionConsoleCopy",
+          "lineNumber": 511
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "appendTaskPrimaryNodeAction",
+          "lineNumber": 512
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "deriveTaskStatusFromGraph",
+          "lineNumber": 515
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "graphPlan?.nodes.find",
+          "lineNumber": 519
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "pickWorkspaceCurrentNode",
+          "lineNumber": 521
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildProgressSummary",
+          "lineNumber": 522
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildAttentionCard",
+          "lineNumber": 523
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "pickLatestResultNode",
+          "lineNumber": 524
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildActivity",
+          "lineNumber": 528
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildTaskHeaderView",
+          "lineNumber": 532
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "mapTaskWorkspaceStatus",
+          "lineNumber": 540
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "(graphPlan?.nodes ?? []).findIndex",
+          "lineNumber": 541
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "[\"running\", \"approval-needed\"].includes",
+          "lineNumber": 542
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "mapTaskWorkspaceStatus",
+          "lineNumber": 542
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "Boolean",
+          "lineNumber": 545
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildReadinessCard",
+          "lineNumber": 552
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildLatestResultCard",
+          "lineNumber": 553
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildArtifactItems",
+          "lineNumber": 556
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "buildWorkspaceStateTreatment",
+          "lineNumber": 563
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "Boolean",
+          "lineNumber": 566
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "Boolean",
+          "lineNumber": 566
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "graphPlan?.nodes.every",
+          "lineNumber": 566
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "isDoneStatus",
+          "lineNumber": 566
+        },
+        {
+          "caller": "createTaskWorkspaceExecutionConsoleView",
+          "callee": "Boolean",
+          "lineNumber": 567
+        },
+        {
+          "caller": "taskScopedQuery",
+          "callee": "encodeURIComponent",
+          "lineNumber": 579
+        },
+        {
+          "caller": "fetchTaskWorkspacePage",
+          "callee": "encodeURIComponent",
+          "lineNumber": 583
+        },
+        {
+          "caller": "fetchTaskWorkspacePage",
+          "callee": "taskScopedQuery",
+          "lineNumber": 584
+        },
+        {
+          "caller": "fetchTaskWorkspacePage",
+          "callee": "Promise.all",
+          "lineNumber": 585
+        },
+        {
+          "caller": "fetchTaskWorkspacePage",
+          "callee": "apiJson",
+          "lineNumber": 586
+        },
+        {
+          "caller": "fetchTaskWorkspacePage",
+          "callee": "apiJson",
+          "lineNumber": 587
+        },
+        {
+          "caller": "fetchTaskWorkspacePage",
+          "callee": "apiJson",
+          "lineNumber": 588
+        },
+        {
+          "caller": "fetchTaskCommandCenter",
+          "callee": "taskScopedQuery",
+          "lineNumber": 606
+        },
+        {
+          "caller": "fetchTaskCommandCenter",
+          "callee": "apiJson",
+          "lineNumber": 607
+        },
+        {
+          "caller": "fetchTaskCommandCenter",
+          "callee": "encodeURIComponent",
+          "lineNumber": 607
+        },
+        {
+          "caller": "fetchTaskPlanState",
+          "callee": "encodeURIComponent",
+          "lineNumber": 612
+        },
+        {
+          "caller": "fetchTaskPlanState",
+          "callee": "fetch",
+          "lineNumber": 613
+        },
+        {
+          "caller": "fetchTaskPlanState",
+          "callee": "encodeURIComponent",
+          "lineNumber": 613
+        },
+        {
+          "caller": "fetchTaskPlanState",
+          "callee": "response.json().catch",
+          "lineNumber": 616
+        },
+        {
+          "caller": "fetchTaskPlanState",
+          "callee": "response.json",
+          "lineNumber": 616
+        },
+        {
+          "caller": "fetchTaskPlanState",
+          "callee": "response.json",
+          "lineNumber": 620
+        },
+        {
+          "caller": "fetchCurrentTaskExecution",
+          "callee": "encodeURIComponent",
+          "lineNumber": 636
+        },
+        {
+          "caller": "fetchCurrentTaskExecution",
+          "callee": "fetch",
+          "lineNumber": 637
+        },
+        {
+          "caller": "fetchCurrentTaskExecution",
+          "callee": "encodeURIComponent",
+          "lineNumber": 637
+        },
+        {
+          "caller": "fetchCurrentTaskExecution",
+          "callee": "response.json().catch",
+          "lineNumber": 640
+        },
+        {
+          "caller": "fetchCurrentTaskExecution",
+          "callee": "response.json",
+          "lineNumber": 640
+        },
+        {
+          "caller": "fetchCurrentTaskExecution",
+          "callee": "response.json",
+          "lineNumber": 644
+        },
+        {
+          "caller": "dispatchTaskExecutionAction",
+          "callee": "api.work[\":taskId\"].commands.$post",
+          "lineNumber": 653
+        },
+        {
+          "caller": "dispatchTaskExecutionAction",
+          "callee": "response.json().catch",
+          "lineNumber": 659
+        },
+        {
+          "caller": "dispatchTaskExecutionAction",
+          "callee": "response.json",
+          "lineNumber": 659
+        },
+        {
+          "caller": "dispatchTaskExecutionAction",
+          "callee": "response.json",
+          "lineNumber": 663
+        },
+        {
+          "caller": "submitTaskCheckpointAction",
+          "callee": "api.work[\":taskId\"].commands.$post",
+          "lineNumber": 673
+        },
+        {
+          "caller": "submitTaskCheckpointAction",
+          "callee": "response.json().catch",
+          "lineNumber": 686
+        },
+        {
+          "caller": "submitTaskCheckpointAction",
+          "callee": "response.json",
+          "lineNumber": 686
+        },
+        {
+          "caller": "submitTaskCheckpointAction",
+          "callee": "response.json",
+          "lineNumber": 690
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 14,
+        "functionCount": 28,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 326,
+      "nonEmptyLines": 298,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-header-card.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 154,
+      "nonEmptyLines": 140,
+      "functions": [
+        {
+          "name": "renderHeader",
+          "startLine": 50,
+          "endLine": 78,
+          "params": [
+            "spec",
+            "state"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "renderHeader",
+          "callee": "createHeaderSpecFixture",
+          "lineNumber": 50
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "createStateStore",
+          "lineNumber": 57
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "store.update",
+          "lineNumber": 58
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "render",
+          "lineNumber": 59
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 64
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 65
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 66
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 67
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 70
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 71
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 72
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 73
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 74
+        },
+        {
+          "caller": "renderHeader",
+          "callee": "vi.fn",
+          "lineNumber": 75
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-header-card.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 195,
+      "nonEmptyLines": 187,
+      "functions": [
+        {
+          "name": "findActionLabel",
+          "startLine": 38,
+          "endLine": 42,
+          "params": [
+            "spec",
+            "actionId"
+          ]
+        },
+        {
+          "name": "TaskWorkspaceHeaderCard",
+          "startLine": 44,
+          "endLine": 195,
+          "params": [
+            "{\n  task,\n  spec,\n  store,\n  onAction,\n  onAcceptPlan,\n  onGeneratePlan,\n  onEdit,\n  showDeleteConfirm,\n  isDeleting,\n  onStartDeleteConfirm,\n  onCancelDeleteConfirm,\n  onDelete,\n  onRecoveryRetry,\n  onRecoveryEditInstruction,\n  onRecoveryCancel,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TaskWorkspaceHeaderCard",
+          "line": 44,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "useI18n",
+          "lineNumber": 61
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "useState",
+          "lineNumber": 63
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "useState",
+          "lineNumber": 64
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "useRef",
+          "lineNumber": 69
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "useMemo",
+          "lineNumber": 99
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onEdit",
+          "lineNumber": 101
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onStartDeleteConfirm",
+          "lineNumber": 104
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onEdit",
+          "lineNumber": 109
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.store.set",
+          "lineNumber": 110
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onStartDeleteConfirm",
+          "lineNumber": 114
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.store.set",
+          "lineNumber": 115
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "Promise.resolve",
+          "lineNumber": 119
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onAcceptPlan",
+          "lineNumber": 119
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "Promise.resolve",
+          "lineNumber": 122
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onGeneratePlan",
+          "lineNumber": 122
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "findActionLabel",
+          "lineNumber": 129
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "setPendingActionId",
+          "lineNumber": 130
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "setActionStatus",
+          "lineNumber": 131
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "currentOnAction",
+          "lineNumber": 133
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "setActionStatus",
+          "lineNumber": 134
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "setActionStatus",
+          "lineNumber": 136
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "label.toLowerCase",
+          "lineNumber": 136
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "setPendingActionId",
+          "lineNumber": 138
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "Promise.resolve",
+          "lineNumber": 142
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onRecoveryRetry",
+          "lineNumber": 142
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "Promise.resolve",
+          "lineNumber": 145
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onRecoveryEditInstruction",
+          "lineNumber": 145
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "ref.current.onRecoveryCancel",
+          "lineNumber": 148
+        },
+        {
+          "caller": "TaskWorkspaceHeaderCard",
+          "callee": "onCancelDeleteConfirm",
+          "lineNumber": 163
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-msw.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 130,
+      "nonEmptyLines": 116,
+      "functions": [
+        {
+          "name": "wrapper",
+          "startLine": 28,
+          "endLine": 30,
+          "params": [
+            "{ children }"
+          ]
+        },
+        {
+          "name": "splitWorkspaceHandlers",
+          "startLine": 32,
+          "endLine": 54,
+          "params": [
+            "data",
+            "onPageRequest"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "wrapper",
+          "callee": "createTestQueryClient",
+          "lineNumber": 29
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "http.get",
+          "lineNumber": 34
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "onPageRequest",
+          "lineNumber": 35
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "HttpResponse.json",
+          "lineNumber": 36
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "http.get",
+          "lineNumber": 38
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "HttpResponse.json",
+          "lineNumber": 38
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "http.get",
+          "lineNumber": 42
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "HttpResponse.json",
+          "lineNumber": 42
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "http.get",
+          "lineNumber": 47
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "HttpResponse.json",
+          "lineNumber": 47
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "http.get",
+          "lineNumber": 50
+        },
+        {
+          "caller": "splitWorkspaceHandlers",
+          "callee": "HttpResponse.json",
+          "lineNumber": 50
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-page.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 690,
+      "nonEmptyLines": 615,
+      "functions": [
+        {
+          "name": "testCommandCenter",
+          "startLine": 232,
+          "endLine": 240,
+          "params": []
+        },
+        {
+          "name": "testHeader",
+          "startLine": 242,
+          "endLine": 246,
+          "params": [
+            "title"
+          ]
+        },
+        {
+          "name": "taskData",
+          "startLine": 248,
+          "endLine": 282,
+          "params": []
+        },
+        {
+          "name": "graphPlan",
+          "startLine": 284,
+          "endLine": 323,
+          "params": [
+            "status"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isActionVisible",
+          "callee": "Boolean",
+          "lineNumber": 147
+        },
+        {
+          "caller": "isActionVisible",
+          "callee": "store?.get",
+          "lineNumber": 147
+        },
+        {
+          "caller": "testHeader",
+          "callee": "createHeaderSpecFixture",
+          "lineNumber": 244
+        },
+        {
+          "caller": "taskData",
+          "callee": "testCommandCenter",
+          "lineNumber": 279
+        },
+        {
+          "caller": "taskData",
+          "callee": "testHeader",
+          "lineNumber": 280
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 343,
+      "nonEmptyLines": 329,
+      "functions": [
+        {
+          "name": "getLatestPersistedActivitySummary",
+          "startLine": 19,
+          "endLine": 22,
+          "params": [
+            "pageData"
+          ]
+        },
+        {
+          "name": "TaskWorkspaceHeaderEditor",
+          "startLine": 85,
+          "endLine": 130,
+          "params": [
+            "{\n  task,\n  spec,\n  store,\n  onAction,\n  onAcceptPlan,\n  onGeneratePlan,\n  onRecoveryRetry,\n  onRecoveryEditInstruction,\n  onRecoveryCancel,\n  isEditExpanded,\n  onToggleEditExpanded,\n  showDeleteConfirm,\n  isDeleting,\n  onStartDeleteConfirm,\n  onCancelDeleteConfirm,\n  onDelete,\n  editSectionProps,\n}"
+          ]
+        },
+        {
+          "name": "acceptHeaderPlan",
+          "startLine": 132,
+          "endLine": 136,
+          "params": [
+            "{ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById }"
+          ]
+        },
+        {
+          "name": "TaskWorkspacePage",
+          "startLine": 140,
+          "endLine": 343,
+          "params": [
+            "{ data, copy: copyProp }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TaskWorkspacePage",
+          "line": 140,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getLatestPersistedActivitySummary",
+          "callee": "pageData.activityTimeline?.at",
+          "lineNumber": 20
+        },
+        {
+          "caller": "acceptHeaderPlan",
+          "callee": "setAcceptPlanError",
+          "lineNumber": 134
+        },
+        {
+          "caller": "acceptHeaderPlan",
+          "callee": "acceptPlanById",
+          "lineNumber": 135
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useI18n",
+          "lineNumber": 142
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useAssistantSurface",
+          "lineNumber": 144
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useTaskWorkspacePageState",
+          "lineNumber": 145
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useState",
+          "lineNumber": 147
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useCallback",
+          "lineNumber": 148
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setIsEditExpanded",
+          "lineNumber": 149
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useTaskWorkspaceEditorState",
+          "lineNumber": 163
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useTaskWorkspacePlanState",
+          "lineNumber": 183
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useMemo",
+          "lineNumber": 184
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "createTaskWorkspaceExecutionConsoleView",
+          "lineNumber": 185
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "getLatestPersistedActivitySummary",
+          "lineNumber": 188
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useTaskWorkspaceProposalFlow",
+          "lineNumber": 194
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useTaskWorkspaceDeleteFlow",
+          "lineNumber": 204
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useMemo",
+          "lineNumber": 208
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "createTaskAiSidebarContext",
+          "lineNumber": 208
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "useEffect",
+          "lineNumber": 223
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setPageContext",
+          "lineNumber": 225
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "registerHandlers",
+          "lineNumber": 226
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "handleApplyProposal",
+          "lineNumber": 228
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "acceptHeaderPlan",
+          "lineNumber": 245
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "dispatchExecutionAction",
+          "lineNumber": 249
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "dispatchExecutionAction",
+          "lineNumber": 252
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "dispatchExecutionAction",
+          "lineNumber": 255
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 263
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 264
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 265
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 266
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 267
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "handleGeneratePlanFromHeader",
+          "lineNumber": 268
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 271
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 272
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 273
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 274
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 275
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setAcceptPlanError",
+          "lineNumber": 276
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setSaveError",
+          "lineNumber": 277
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setIsEditExpanded",
+          "lineNumber": 278
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 281
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 282
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 283
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 284
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "headerStore.set",
+          "lineNumber": 285
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setShowDeleteConfirm",
+          "lineNumber": 291
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setShowDeleteConfirm",
+          "lineNumber": 292
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "handleDelete",
+          "lineNumber": 293
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "setAcceptPlanError",
+          "lineNumber": 335
+        },
+        {
+          "caller": "TaskWorkspacePage",
+          "callee": "acceptPlanById",
+          "lineNumber": 336
+        }
+      ],
+      "metrics": {
+        "importCount": 11,
+        "exportCount": 1,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/sections/task-workspace-plan-content.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 86,
+      "nonEmptyLines": 83,
+      "functions": [
+        {
+          "name": "TaskWorkspacePlanContent",
+          "startLine": 21,
+          "endLine": 86,
+          "params": [
+            "{\n  label,\n  graphPlan,\n  isGraphPlanPending,\n  plan,\n  acceptPlanError,\n  planGenerationStatus,\n  onGeneratePlan,\n  onSelectedNodeChange,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TaskWorkspacePlanContent",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "TaskWorkspacePlanContent",
+          "callee": "useI18n",
+          "lineNumber": 31
+        },
+        {
+          "caller": "TaskWorkspacePlanContent",
+          "callee": "graphPlan.nodes.reduce",
+          "lineNumber": 34
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 406,
+      "nonEmptyLines": 392,
+      "functions": [
+        {
+          "name": "isCompletedGraphNode",
+          "startLine": 37,
+          "endLine": 39,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "isSyntheticStartingNodeWithoutExecutionEvidence",
+          "startLine": 41,
+          "endLine": 43,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "hasStartedGraphExecution",
+          "startLine": 45,
+          "endLine": 50,
+          "params": [
+            "graphPlan"
+          ]
+        },
+        {
+          "name": "hasNodeActionPayload",
+          "startLine": 52,
+          "endLine": 58,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "isCompletedTaskStatus",
+          "startLine": 60,
+          "endLine": 63,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "hasCompletedGraphExecution",
+          "startLine": 65,
+          "endLine": 68,
+          "params": [
+            "graphPlan"
+          ]
+        },
+        {
+          "name": "graphNodeIdForAction",
+          "startLine": 70,
+          "endLine": 76,
+          "params": [
+            "action",
+            "pageData",
+            "graphPlan"
+          ]
+        },
+        {
+          "name": "TaskWorkspacePlanSection",
+          "startLine": 103,
+          "endLine": 406,
+          "params": [
+            "{\n  label,\n  commandCenterCopy,\n  graphPlan,\n  isGraphPlanPending,\n  pageData,\n  commandCenter,\n  plan,\n  planGenerationStatus,\n  canAcceptPlan,\n  acceptPlanError,\n  generationUserInstruction,\n  runtimeEvents,\n  liveActivity = [],\n  currentExecution,\n  onGeneratePlan,\n  onApplyPlan,\n  onDispatchExecutionAction,\n  onSubmitCheckpointAction,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TaskWorkspacePlanSection",
+          "line": 103,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "hasStartedGraphExecution",
+          "callee": "(graphPlan?.nodes ?? []).some",
+          "lineNumber": 46
+        },
+        {
+          "caller": "hasStartedGraphExecution",
+          "callee": "isSyntheticStartingNodeWithoutExecutionEvidence",
+          "lineNumber": 47
+        },
+        {
+          "caller": "hasNodeActionPayload",
+          "callee": "Object.values(node.inputFields).some",
+          "lineNumber": 56
+        },
+        {
+          "caller": "hasNodeActionPayload",
+          "callee": "Object.values",
+          "lineNumber": 56
+        },
+        {
+          "caller": "hasNodeActionPayload",
+          "callee": "value.trim",
+          "lineNumber": 56
+        },
+        {
+          "caller": "isCompletedTaskStatus",
+          "callee": "status?.toLowerCase",
+          "lineNumber": 61
+        },
+        {
+          "caller": "hasCompletedGraphExecution",
+          "callee": "nodes.every",
+          "lineNumber": 67
+        },
+        {
+          "caller": "hasCompletedGraphExecution",
+          "callee": "isCompletedGraphNode",
+          "lineNumber": 67
+        },
+        {
+          "caller": "graphNodeIdForAction",
+          "callee": "graphPlan?.nodes.find",
+          "lineNumber": 74
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useState",
+          "lineNumber": 123
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useState",
+          "lineNumber": 124
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useTaskWorkspacePlanSectionState",
+          "lineNumber": 126
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useI18n",
+          "lineNumber": 127
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useMemo",
+          "lineNumber": 129
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "createTaskWorkspaceExecutionConsoleView",
+          "lineNumber": 130
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useMemo",
+          "lineNumber": 138
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "createTaskWorkspaceExecutionConsoleView",
+          "lineNumber": 139
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "pageData.reconciliation?.issues.find",
+          "lineNumber": 159
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 163
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "hasStartedGraphExecution",
+          "lineNumber": 164
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "isCompletedTaskStatus",
+          "lineNumber": 165
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "hasCompletedGraphExecution",
+          "lineNumber": 165
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "graphNodeIdForAction",
+          "lineNumber": 169
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "dispatchInputForPrimaryAction",
+          "lineNumber": 171
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 173
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useQuery",
+          "lineNumber": 180
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "loadNodeWorkspaceActivityPage",
+          "lineNumber": 182
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 187
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 187
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "runtimeEvents.filter",
+          "lineNumber": 193
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 195
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "hasNodeActionPayload",
+          "lineNumber": 195
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 196
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "plan?.prompt?.trim",
+          "lineNumber": 197
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "generationUserInstruction?.trim",
+          "lineNumber": 197
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useActionSpecRenderConfig",
+          "lineNumber": 199
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useMemo",
+          "lineNumber": 206
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "buildAcceptOrRegenerateSpec",
+          "lineNumber": 208
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useMemo",
+          "lineNumber": 217
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "onApplyPlan",
+          "lineNumber": 219
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "onGeneratePlan",
+          "lineNumber": 223
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useMemo",
+          "lineNumber": 226
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Object.fromEntries",
+          "lineNumber": 235
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Object.entries(rawValues).filter",
+          "lineNumber": 236
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Object.entries",
+          "lineNumber": 236
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "value.trim",
+          "lineNumber": 236
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Object.values",
+          "lineNumber": 238
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "onSubmitCheckpointAction",
+          "lineNumber": 239
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useCallback",
+          "lineNumber": 246
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "changes.find",
+          "lineNumber": 247
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "setRegenerationInstruction",
+          "lineNumber": 249
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "resolveCommandCenterPrimaryAction",
+          "lineNumber": 252
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 253
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "Boolean",
+          "lineNumber": 262
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "onGeneratePlan",
+          "lineNumber": 275
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "onDispatchExecutionAction",
+          "lineNumber": 278
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "onDispatchExecutionAction",
+          "lineNumber": 281
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useCallback",
+          "lineNumber": 298
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "handleSelectedPlanNodeChange",
+          "lineNumber": 302
+        },
+        {
+          "caller": "focusNodeActions",
+          "callee": "graphPlan.nodes.find",
+          "lineNumber": 307
+        },
+        {
+          "caller": "focusNodeActions",
+          "callee": "handleSelectedPlanNodeChange",
+          "lineNumber": 309
+        },
+        {
+          "caller": "focusNodeActions",
+          "callee": "setPreferredNodeDetailTab",
+          "lineNumber": 312
+        },
+        {
+          "caller": "focusNodeActions",
+          "callee": "document.getElementById",
+          "lineNumber": 314
+        },
+        {
+          "caller": "focusNodeActions",
+          "callee": "actionsPanel.scrollIntoView",
+          "lineNumber": 316
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "useCallback",
+          "lineNumber": 319
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "handleSelectedPlanNodeChange",
+          "lineNumber": 320
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "recoveryActions.map",
+          "lineNumber": 346
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "focusNodeActions",
+          "lineNumber": 354
+        },
+        {
+          "caller": "TaskWorkspacePlanSection",
+          "callee": "setPreferredNodeDetailTab",
+          "lineNumber": 398
+        }
+      ],
+      "metrics": {
+        "importCount": 11,
+        "exportCount": 1,
+        "functionCount": 8,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 381,
+      "nonEmptyLines": 370,
+      "functions": [
+        {
+          "name": "createTaskWorkspaceFixtureNode",
+          "startLine": 10,
+          "endLine": 47,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "createTaskWorkspaceFixtureGraph",
+          "startLine": 49,
+          "endLine": 78,
+          "params": [
+            "nodes",
+            "currentStepId"
+          ]
+        },
+        {
+          "name": "createFixtureCommandCenter",
+          "startLine": 80,
+          "endLine": 88,
+          "params": []
+        },
+        {
+          "name": "createHeaderSpecFixture",
+          "startLine": 95,
+          "endLine": 120,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "createFixtureHeader",
+          "startLine": 122,
+          "endLine": 137,
+          "params": [
+            "task"
+          ]
+        },
+        {
+          "name": "createTaskWorkspaceFixturePageData",
+          "startLine": 138,
+          "endLine": 177,
+          "params": [
+            "overrides"
+          ]
+        },
+        {
+          "name": "makeSavedPlanFixture",
+          "startLine": 317,
+          "endLine": 338,
+          "params": [
+            "status",
+            "summary"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createTaskWorkspaceFixtureNode",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "createTaskWorkspaceFixtureGraph",
+          "line": 49,
+          "isDefault": false
+        },
+        {
+          "name": "createHeaderSpecFixture",
+          "line": 95,
+          "isDefault": false
+        },
+        {
+          "name": "createTaskWorkspaceFixturePageData",
+          "line": 138,
+          "isDefault": false
+        },
+        {
+          "name": "taskWorkspaceStateFixtures",
+          "line": 179,
+          "isDefault": false
+        },
+        {
+          "name": "taskWorkspacePlanStateFixtures",
+          "line": 340,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.slice(1).map",
+          "lineNumber": 56
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.slice",
+          "lineNumber": 56
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.at",
+          "lineNumber": 66
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.at",
+          "lineNumber": 66
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.filter((node) => node.status === \"active\" || node.status === \"in_progress\").map",
+          "lineNumber": 67
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 67
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.map",
+          "lineNumber": 69
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.filter((node) => node.status === \"waiting_for_user\" || node.status === \"blocked\").map",
+          "lineNumber": 70
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 70
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.filter((node) => node.status === \"blocked\").map",
+          "lineNumber": 71
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 71
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "Object.fromEntries",
+          "lineNumber": 72
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.map",
+          "lineNumber": 72
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "Object.fromEntries",
+          "lineNumber": 73
+        },
+        {
+          "caller": "createTaskWorkspaceFixtureGraph",
+          "callee": "nodes.map",
+          "lineNumber": 73
+        },
+        {
+          "caller": "createHeaderSpecFixture",
+          "callee": "status.charAt(0).toUpperCase",
+          "lineNumber": 105
+        },
+        {
+          "caller": "createHeaderSpecFixture",
+          "callee": "status.charAt",
+          "lineNumber": 105
+        },
+        {
+          "caller": "createHeaderSpecFixture",
+          "callee": "status.slice",
+          "lineNumber": 105
+        },
+        {
+          "caller": "createHeaderSpecFixture",
+          "callee": "buildTaskHeaderSpec",
+          "lineNumber": 106
+        },
+        {
+          "caller": "createFixtureHeader",
+          "callee": "createHeaderSpecFixture",
+          "lineNumber": 126
+        },
+        {
+          "caller": "createTaskWorkspaceFixturePageData",
+          "callee": "createFixtureCommandCenter",
+          "lineNumber": 173
+        },
+        {
+          "caller": "createTaskWorkspaceFixturePageData",
+          "callee": "createFixtureHeader",
+          "lineNumber": 174
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 6,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/test/task-workspace-ui-fixtures.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 46,
+      "nonEmptyLines": 42,
+      "functions": [
+        {
+          "name": "createTaskWorkspaceUiFixture",
+          "startLine": 23,
+          "endLine": 42,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "renderTaskWorkspaceUi",
+          "startLine": 44,
+          "endLine": 46,
+          "params": [
+            "element"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "taskWorkspaceUiScenarios",
+          "line": 9,
+          "isDefault": false
+        },
+        {
+          "name": "createTaskWorkspaceUiFixture",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "renderTaskWorkspaceUi",
+          "line": 44,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createTaskWorkspaceUiFixture",
+          "callee": "createTaskWorkspaceFixturePageData",
+          "lineNumber": 27
+        },
+        {
+          "caller": "createTaskWorkspaceUiFixture",
+          "callee": "createTaskWorkspaceFixtureGraph",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createTaskWorkspaceUiFixture",
+          "callee": "createTaskWorkspaceFixtureNode",
+          "lineNumber": 34
+        },
+        {
+          "caller": "renderTaskWorkspaceUi",
+          "callee": "render",
+          "lineNumber": 45
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 3,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/ui/tabs.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 88,
+      "nonEmptyLines": 81,
+      "functions": [
+        {
+          "name": "Tabs",
+          "startLine": 7,
+          "endLine": 23,
+          "params": [
+            "{\n  className,\n  orientation = \"horizontal\",\n  ...props\n}"
+          ]
+        },
+        {
+          "name": "TabsList",
+          "startLine": 40,
+          "endLine": 54,
+          "params": [
+            "{\n  className,\n  variant = \"default\",\n  ...props\n}"
+          ]
+        },
+        {
+          "name": "TabsTrigger",
+          "startLine": 56,
+          "endLine": 73,
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ]
+        },
+        {
+          "name": "TabsContent",
+          "startLine": 75,
+          "endLine": 86,
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "Tabs",
+          "line": 88,
+          "isDefault": false
+        },
+        {
+          "name": "TabsList",
+          "line": 88,
+          "isDefault": false
+        },
+        {
+          "name": "TabsTrigger",
+          "line": 88,
+          "isDefault": false
+        },
+        {
+          "name": "TabsContent",
+          "line": 88,
+          "isDefault": false
+        },
+        {
+          "name": "tabsListVariants",
+          "line": 88,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "Tabs",
+          "callee": "cn",
+          "lineNumber": 16
+        },
+        {
+          "caller": "TabsList",
+          "callee": "cn",
+          "lineNumber": 50
+        },
+        {
+          "caller": "TabsList",
+          "callee": "tabsListVariants",
+          "lineNumber": 50
+        },
+        {
+          "caller": "TabsTrigger",
+          "callee": "cn",
+          "lineNumber": 63
+        },
+        {
+          "caller": "TabsContent",
+          "callee": "cn",
+          "lineNumber": 82
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 5,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/work/work-inspector.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 208,
+      "nonEmptyLines": 197,
+      "functions": [
+        {
+          "name": "testPlan",
+          "startLine": 29,
+          "endLine": 47,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.slice(0, 1).map",
+          "lineNumber": 34
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.slice",
+          "lineNumber": 34
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.slice(-1).map",
+          "lineNumber": 35
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.slice",
+          "lineNumber": 35
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.filter((node) => node.status === \"active\" || node.status === \"in_progress\").map",
+          "lineNumber": 36
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.filter",
+          "lineNumber": 36
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.map",
+          "lineNumber": 37
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.map",
+          "lineNumber": 38
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.filter((node) => node.status === \"waiting\" || node.status === \"waiting_for_user\").map",
+          "lineNumber": 39
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.filter",
+          "lineNumber": 39
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.filter((node) => node.status === \"blocked\").map",
+          "lineNumber": 40
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.filter",
+          "lineNumber": 40
+        },
+        {
+          "caller": "testPlan",
+          "callee": "Object.fromEntries",
+          "lineNumber": 41
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.map",
+          "lineNumber": 41
+        },
+        {
+          "caller": "testPlan",
+          "callee": "Object.fromEntries",
+          "lineNumber": 42
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.map",
+          "lineNumber": 42
+        },
+        {
+          "caller": "testPlan",
+          "callee": "Object.fromEntries",
+          "lineNumber": 43
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.map",
+          "lineNumber": 43
+        },
+        {
+          "caller": "testPlan",
+          "callee": "Object.fromEntries",
+          "lineNumber": 44
+        },
+        {
+          "caller": "testPlan",
+          "callee": "input.steps.map",
+          "lineNumber": 44
+        },
+        {
+          "caller": "observe",
+          "callee": "Number.parseInt",
+          "lineNumber": 53
+        },
+        {
+          "caller": "observe",
+          "callee": "Object.defineProperty",
+          "lineNumber": 54
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/work/work-inspector.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 114,
+      "nonEmptyLines": 109,
+      "functions": [
+        {
+          "name": "WorkInspector",
+          "startLine": 71,
+          "endLine": 114,
+          "params": [
+            "{\n  plan,\n  currentAction = null,\n  currentException = null,\n  approvals,\n  artifacts,\n  toolCalls,\n  context,\n  labels,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "WorkInspector",
+          "line": 71,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "WorkInspector",
+          "callee": "useState",
+          "lineNumber": 81
+        },
+        {
+          "caller": "WorkInspector",
+          "callee": "setActiveSection",
+          "lineNumber": 87
+        },
+        {
+          "caller": "WorkInspector",
+          "callee": "sections.map",
+          "lineNumber": 89
+        },
+        {
+          "caller": "WorkInspector",
+          "callee": "setActiveSection",
+          "lineNumber": 90
+        },
+        {
+          "caller": "WorkInspector",
+          "callee": "sections.map",
+          "lineNumber": 96
+        },
+        {
+          "caller": "WorkInspector",
+          "callee": "renderWorkInspectorSectionPanel",
+          "lineNumber": 98
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/hooks/ai/task-plan-generation-session-store.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 59,
+      "nonEmptyLines": 49,
+      "functions": [
+        {
+          "name": "sse",
+          "startLine": 12,
+          "endLine": 22,
+          "params": [
+            "events"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "start",
+          "callee": "controller.enqueue",
+          "lineNumber": 17
+        },
+        {
+          "caller": "start",
+          "callee": "encoder.encode",
+          "lineNumber": 17
+        },
+        {
+          "caller": "start",
+          "callee": "JSON.stringify",
+          "lineNumber": 17
+        },
+        {
+          "caller": "start",
+          "callee": "controller.close",
+          "lineNumber": 19
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 507,
+      "nonEmptyLines": 469,
+      "functions": [
+        {
+          "name": "sessionKey",
+          "startLine": 50,
+          "endLine": 52,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "workBlockQuery",
+          "startLine": 54,
+          "endLine": 56,
+          "params": [
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "createIdleState",
+          "startLine": 58,
+          "endLine": 77,
+          "params": [
+            "taskId"
+          ]
+        },
+        {
+          "name": "getEntry",
+          "startLine": 81,
+          "endLine": 94,
+          "params": [
+            "key"
+          ]
+        },
+        {
+          "name": "emit",
+          "startLine": 96,
+          "endLine": 100,
+          "params": [
+            "entry"
+          ]
+        },
+        {
+          "name": "patchState",
+          "startLine": 102,
+          "endLine": 106,
+          "params": [
+            "key",
+            "updater"
+          ]
+        },
+        {
+          "name": "applySessionSnapshot",
+          "startLine": 108,
+          "endLine": 139,
+          "params": [
+            "key",
+            "snapshot"
+          ]
+        },
+        {
+          "name": "applyStreamEvent",
+          "startLine": 141,
+          "endLine": 265,
+          "params": [
+            "key",
+            "event",
+            "data"
+          ]
+        },
+        {
+          "name": "fetchActiveSnapshot",
+          "startLine": 267,
+          "endLine": 285,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "ensureHydrated",
+          "startLine": 287,
+          "endLine": 300,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "bindTaskPlanSessionToStateStore",
+          "startLine": 316,
+          "endLine": 340,
+          "params": [
+            "taskId",
+            "workBlockId",
+            "store"
+          ]
+        },
+        {
+          "name": "applyStateSnapshotToSession",
+          "startLine": 344,
+          "endLine": 377,
+          "params": [
+            "key",
+            "snapshot"
+          ]
+        },
+        {
+          "name": "hydrateTaskPlanGenerationSession",
+          "startLine": 379,
+          "endLine": 381,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "startTaskPlanGenerationSession",
+          "startLine": 383,
+          "endLine": 453,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "stopTaskPlanGenerationSession",
+          "startLine": 455,
+          "endLine": 478,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "useTaskPlanGenerationSession",
+          "startLine": 480,
+          "endLine": 507,
+          "params": [
+            "taskId",
+            "workBlockIdOrOptions",
+            "maybeOptions"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "bindTaskPlanSessionToStateStore",
+          "line": 316,
+          "isDefault": false
+        },
+        {
+          "name": "hydrateTaskPlanGenerationSession",
+          "line": 379,
+          "isDefault": false
+        },
+        {
+          "name": "startTaskPlanGenerationSession",
+          "line": 383,
+          "isDefault": false
+        },
+        {
+          "name": "stopTaskPlanGenerationSession",
+          "line": 455,
+          "isDefault": false
+        },
+        {
+          "name": "useTaskPlanGenerationSession",
+          "line": 480,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "workBlockQuery",
+          "callee": "encodeURIComponent",
+          "lineNumber": 55
+        },
+        {
+          "caller": "getEntry",
+          "callee": "sessions.get",
+          "lineNumber": 82
+        },
+        {
+          "caller": "getEntry",
+          "callee": "createIdleState",
+          "lineNumber": 85
+        },
+        {
+          "caller": "getEntry",
+          "callee": "sessions.set",
+          "lineNumber": 91
+        },
+        {
+          "caller": "emit",
+          "callee": "listener",
+          "lineNumber": 98
+        },
+        {
+          "caller": "patchState",
+          "callee": "getEntry",
+          "lineNumber": 103
+        },
+        {
+          "caller": "patchState",
+          "callee": "updater",
+          "lineNumber": 104
+        },
+        {
+          "caller": "patchState",
+          "callee": "emit",
+          "lineNumber": 105
+        },
+        {
+          "caller": "applySessionSnapshot",
+          "callee": "patchState",
+          "lineNumber": 109
+        },
+        {
+          "caller": "applyStreamEvent",
+          "callee": "patchState",
+          "lineNumber": 142
+        },
+        {
+          "caller": "applyStreamEvent",
+          "callee": "JSON.stringify",
+          "lineNumber": 208
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "sessionKey",
+          "lineNumber": 268
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "fetch",
+          "lineNumber": 269
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "workBlockQuery",
+          "lineNumber": 269
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "buildAccessKeyHeaders",
+          "lineNumber": 270
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "handleUnauthorizedResponse",
+          "lineNumber": 272
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "applySessionSnapshot",
+          "lineNumber": 275
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "response.json",
+          "lineNumber": 281
+        },
+        {
+          "caller": "fetchActiveSnapshot",
+          "callee": "applySessionSnapshot",
+          "lineNumber": 284
+        },
+        {
+          "caller": "ensureHydrated",
+          "callee": "sessionKey",
+          "lineNumber": 288
+        },
+        {
+          "caller": "ensureHydrated",
+          "callee": "getEntry",
+          "lineNumber": 289
+        },
+        {
+          "caller": "ensureHydrated",
+          "callee": "fetchActiveSnapshot(taskId, workBlockId).finally",
+          "lineNumber": 296
+        },
+        {
+          "caller": "ensureHydrated",
+          "callee": "fetchActiveSnapshot",
+          "lineNumber": 296
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "import",
+          "lineNumber": 319
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "sessionKey",
+          "lineNumber": 321
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "storeBindingsByKey.get",
+          "lineNumber": 322
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "existing?.unsubscribe",
+          "lineNumber": 323
+        },
+        {
+          "caller": "listener",
+          "callee": "store.getSnapshot",
+          "lineNumber": 325
+        },
+        {
+          "caller": "listener",
+          "callee": "applyStateSnapshotToSession",
+          "lineNumber": 326
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "store.subscribe",
+          "lineNumber": 328
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "listener",
+          "lineNumber": 330
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "storeBindingsByKey.set",
+          "lineNumber": 332
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "storeBindingsByKey.get",
+          "lineNumber": 334
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "current.unsubscribe",
+          "lineNumber": 336
+        },
+        {
+          "caller": "bindTaskPlanSessionToStateStore",
+          "callee": "storeBindingsByKey.delete",
+          "lineNumber": 337
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 346
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 347
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 348
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 349
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 350
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 351
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 352
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "get",
+          "lineNumber": 353
+        },
+        {
+          "caller": "applyStateSnapshotToSession",
+          "callee": "patchState",
+          "lineNumber": 355
+        },
+        {
+          "caller": "hydrateTaskPlanGenerationSession",
+          "callee": "ensureHydrated",
+          "lineNumber": 380
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "sessionKey",
+          "lineNumber": 390
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "input.userInstruction?.trim",
+          "lineNumber": 391
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "getEntry",
+          "lineNumber": 392
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "entry.streamController?.abort",
+          "lineNumber": 393
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "entry.activeSubscriptionController?.abort",
+          "lineNumber": 394
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "patchState",
+          "lineNumber": 400
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "createIdleState",
+          "lineNumber": 401
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "fetchJsonEventSource",
+          "lineNumber": 412
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "JSON.stringify",
+          "lineNumber": 418
+        },
+        {
+          "caller": "onEvent",
+          "callee": "applyStreamEvent",
+          "lineNumber": 424
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "patchState",
+          "lineNumber": 430
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "getEntry",
+          "lineNumber": 440
+        },
+        {
+          "caller": "startTaskPlanGenerationSession",
+          "callee": "fetchActiveSnapshot",
+          "lineNumber": 447
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "sessionKey",
+          "lineNumber": 456
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "getEntry",
+          "lineNumber": 457
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "entry.streamController?.abort",
+          "lineNumber": 458
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "entry.activeSubscriptionController?.abort",
+          "lineNumber": 459
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "patchState",
+          "lineNumber": 463
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "fetch",
+          "lineNumber": 469
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "workBlockQuery",
+          "lineNumber": 469
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "buildAccessKeyHeaders",
+          "lineNumber": 471
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "handleUnauthorizedResponse",
+          "lineNumber": 473
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "response.json().catch",
+          "lineNumber": 475
+        },
+        {
+          "caller": "stopTaskPlanGenerationSession",
+          "callee": "response.json",
+          "lineNumber": 475
+        },
+        {
+          "caller": "useTaskPlanGenerationSession",
+          "callee": "sessionKey",
+          "lineNumber": 483
+        },
+        {
+          "caller": "subscribe",
+          "callee": "getEntry",
+          "lineNumber": 488
+        },
+        {
+          "caller": "subscribe",
+          "callee": "entry.listeners.add",
+          "lineNumber": 489
+        },
+        {
+          "caller": "subscribe",
+          "callee": "entry.listeners.delete",
+          "lineNumber": 491
+        },
+        {
+          "caller": "getSnapshot",
+          "callee": "getEntry",
+          "lineNumber": 495
+        },
+        {
+          "caller": "getSnapshot",
+          "callee": "createIdleState",
+          "lineNumber": 495
+        },
+        {
+          "caller": "useTaskPlanGenerationSession",
+          "callee": "useSyncExternalStore",
+          "lineNumber": 497
+        },
+        {
+          "caller": "useTaskPlanGenerationSession",
+          "callee": "useEffect",
+          "lineNumber": 499
+        },
+        {
+          "caller": "useTaskPlanGenerationSession",
+          "callee": "hydrateTaskPlanGenerationSession",
+          "lineNumber": 503
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 5,
+        "functionCount": 16,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/lib/access-key.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 80,
+      "nonEmptyLines": 67,
+      "functions": [
+        {
+          "name": "readStoredAccessKey",
+          "startLine": 9,
+          "endLine": 12,
+          "params": []
+        },
+        {
+          "name": "emitChange",
+          "startLine": 14,
+          "endLine": 18,
+          "params": []
+        },
+        {
+          "name": "getAccessKey",
+          "startLine": 20,
+          "endLine": 22,
+          "params": []
+        },
+        {
+          "name": "isAccessLocked",
+          "startLine": 24,
+          "endLine": 26,
+          "params": []
+        },
+        {
+          "name": "setAccessKey",
+          "startLine": 28,
+          "endLine": 39,
+          "params": [
+            "key",
+            "remember"
+          ]
+        },
+        {
+          "name": "clearAccessKey",
+          "startLine": 41,
+          "endLine": 47,
+          "params": []
+        },
+        {
+          "name": "buildAccessKeyHeaders",
+          "startLine": 49,
+          "endLine": 56,
+          "params": [
+            "initHeaders"
+          ]
+        },
+        {
+          "name": "buildAccessKeyHeaderRecord",
+          "startLine": 58,
+          "endLine": 65,
+          "params": [
+            "initHeaders"
+          ]
+        },
+        {
+          "name": "handleUnauthorizedResponse",
+          "startLine": 67,
+          "endLine": 73,
+          "params": [
+            "response"
+          ]
+        },
+        {
+          "name": "subscribeAccessKey",
+          "startLine": 75,
+          "endLine": 80,
+          "params": [
+            "listener"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getAccessKey",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "isAccessLocked",
+          "line": 24,
+          "isDefault": false
+        },
+        {
+          "name": "setAccessKey",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "clearAccessKey",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "buildAccessKeyHeaders",
+          "line": 49,
+          "isDefault": false
+        },
+        {
+          "name": "buildAccessKeyHeaderRecord",
+          "line": 58,
+          "isDefault": false
+        },
+        {
+          "name": "handleUnauthorizedResponse",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "subscribeAccessKey",
+          "line": 75,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readStoredAccessKey",
+          "callee": "window.localStorage.getItem",
+          "lineNumber": 11
+        },
+        {
+          "caller": "emitChange",
+          "callee": "listener",
+          "lineNumber": 16
+        },
+        {
+          "caller": "setAccessKey",
+          "callee": "window.localStorage.setItem",
+          "lineNumber": 33
+        },
+        {
+          "caller": "setAccessKey",
+          "callee": "window.localStorage.removeItem",
+          "lineNumber": 35
+        },
+        {
+          "caller": "setAccessKey",
+          "callee": "emitChange",
+          "lineNumber": 38
+        },
+        {
+          "caller": "clearAccessKey",
+          "callee": "window.localStorage.removeItem",
+          "lineNumber": 44
+        },
+        {
+          "caller": "clearAccessKey",
+          "callee": "emitChange",
+          "lineNumber": 46
+        },
+        {
+          "caller": "buildAccessKeyHeaders",
+          "callee": "getAccessKey",
+          "lineNumber": 51
+        },
+        {
+          "caller": "buildAccessKeyHeaders",
+          "callee": "headers.has",
+          "lineNumber": 52
+        },
+        {
+          "caller": "buildAccessKeyHeaders",
+          "callee": "headers.set",
+          "lineNumber": 53
+        },
+        {
+          "caller": "buildAccessKeyHeaderRecord",
+          "callee": "getAccessKey",
+          "lineNumber": 59
+        },
+        {
+          "caller": "buildAccessKeyHeaderRecord",
+          "callee": "Array.isArray",
+          "lineNumber": 60
+        },
+        {
+          "caller": "buildAccessKeyHeaderRecord",
+          "callee": "Object.fromEntries",
+          "lineNumber": 64
+        },
+        {
+          "caller": "buildAccessKeyHeaderRecord",
+          "callee": "buildAccessKeyHeaders(initHeaders).entries",
+          "lineNumber": 64
+        },
+        {
+          "caller": "buildAccessKeyHeaderRecord",
+          "callee": "buildAccessKeyHeaders",
+          "lineNumber": 64
+        },
+        {
+          "caller": "handleUnauthorizedResponse",
+          "callee": "clearAccessKey",
+          "lineNumber": 69
+        },
+        {
+          "caller": "handleUnauthorizedResponse",
+          "callee": "emitChange",
+          "lineNumber": 71
+        },
+        {
+          "caller": "subscribeAccessKey",
+          "callee": "listeners.add",
+          "lineNumber": 76
+        },
+        {
+          "caller": "subscribeAccessKey",
+          "callee": "listeners.delete",
+          "lineNumber": 78
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 8,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/lib/fetch-json-event-source.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 88,
+      "functions": [
+        {
+          "name": "toErrorMessage",
+          "startLine": 32,
+          "endLine": 38,
+          "params": [
+            "response"
+          ]
+        },
+        {
+          "name": "fetchJsonEventSource",
+          "startLine": 40,
+          "endLine": 99,
+          "params": [
+            "input",
+            "{ onEvent, onInvalidMessage, onNonStreamResponse, ...init }"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "NonStreamResponseHandled",
+          "startLine": 26,
+          "endLine": 30,
+          "methods": [
+            "constructor"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "fetchJsonEventSource",
+          "line": 40,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 28
+        },
+        {
+          "caller": "toErrorMessage",
+          "callee": "response.clone().json().catch",
+          "lineNumber": 33
+        },
+        {
+          "caller": "toErrorMessage",
+          "callee": "response.clone().json",
+          "lineNumber": 33
+        },
+        {
+          "caller": "toErrorMessage",
+          "callee": "response.clone",
+          "lineNumber": 33
+        },
+        {
+          "caller": "fetchJsonEventSource",
+          "callee": "buildAccessKeyHeaderRecord",
+          "lineNumber": 45
+        },
+        {
+          "caller": "fetchJsonEventSource",
+          "callee": "fetchEventSource",
+          "lineNumber": 46
+        },
+        {
+          "caller": "onopen",
+          "callee": "handleUnauthorizedResponse",
+          "lineNumber": 52
+        },
+        {
+          "caller": "onopen",
+          "callee": "toErrorMessage",
+          "lineNumber": 53
+        },
+        {
+          "caller": "onopen",
+          "callee": "response.headers.get",
+          "lineNumber": 56
+        },
+        {
+          "caller": "onopen",
+          "callee": "contentType.includes",
+          "lineNumber": 57
+        },
+        {
+          "caller": "onopen",
+          "callee": "onNonStreamResponse",
+          "lineNumber": 59
+        },
+        {
+          "caller": "onmessage",
+          "callee": "onEvent",
+          "lineNumber": 70
+        },
+        {
+          "caller": "onmessage",
+          "callee": "onEvent",
+          "lineNumber": 79
+        },
+        {
+          "caller": "onmessage",
+          "callee": "JSON.parse",
+          "lineNumber": 81
+        },
+        {
+          "caller": "onmessage",
+          "callee": "onInvalidMessage",
+          "lineNumber": 85
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "apps/web/src/lib/http-client.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 70,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "parseResponse",
+          "startLine": 15,
+          "endLine": 23,
+          "params": [
+            "response"
+          ]
+        },
+        {
+          "name": "requestJson",
+          "startLine": 25,
+          "endLine": 46,
+          "params": [
+            "input",
+            "init"
+          ]
+        },
+        {
+          "name": "postJson",
+          "startLine": 48,
+          "endLine": 54,
+          "params": [
+            "input",
+            "body",
+            "init"
+          ]
+        },
+        {
+          "name": "patchJson",
+          "startLine": 56,
+          "endLine": 62,
+          "params": [
+            "input",
+            "body",
+            "init"
+          ]
+        },
+        {
+          "name": "deleteJson",
+          "startLine": 64,
+          "endLine": 70,
+          "params": [
+            "input",
+            "body",
+            "init"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "HttpError",
+          "startLine": 3,
+          "endLine": 13,
+          "methods": [
+            "constructor"
+          ],
+          "properties": [
+            "status",
+            "data"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "postJson",
+          "line": 48,
+          "isDefault": false
+        },
+        {
+          "name": "patchJson",
+          "line": 56,
+          "isDefault": false
+        },
+        {
+          "name": "deleteJson",
+          "line": 64,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 8
+        },
+        {
+          "caller": "parseResponse",
+          "callee": "response.headers.get",
+          "lineNumber": 16
+        },
+        {
+          "caller": "parseResponse",
+          "callee": "contentType.includes",
+          "lineNumber": 17
+        },
+        {
+          "caller": "parseResponse",
+          "callee": "response.json",
+          "lineNumber": 18
+        },
+        {
+          "caller": "parseResponse",
+          "callee": "response.text",
+          "lineNumber": 21
+        },
+        {
+          "caller": "requestJson",
+          "callee": "buildAccessKeyHeaders",
+          "lineNumber": 26
+        },
+        {
+          "caller": "requestJson",
+          "callee": "headers.set",
+          "lineNumber": 27
+        },
+        {
+          "caller": "requestJson",
+          "callee": "fetch",
+          "lineNumber": 29
+        },
+        {
+          "caller": "requestJson",
+          "callee": "parseResponse",
+          "lineNumber": 34
+        },
+        {
+          "caller": "requestJson",
+          "callee": "handleUnauthorizedResponse",
+          "lineNumber": 37
+        },
+        {
+          "caller": "postJson",
+          "callee": "requestJson",
+          "lineNumber": 49
+        },
+        {
+          "caller": "postJson",
+          "callee": "JSON.stringify",
+          "lineNumber": 51
+        },
+        {
+          "caller": "patchJson",
+          "callee": "requestJson",
+          "lineNumber": 57
+        },
+        {
+          "caller": "patchJson",
+          "callee": "JSON.stringify",
+          "lineNumber": 59
+        },
+        {
+          "caller": "deleteJson",
+          "callee": "requestJson",
+          "lineNumber": 65
+        },
+        {
+          "caller": "deleteJson",
+          "callee": "JSON.stringify",
+          "lineNumber": 67
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 5,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "apps/web/src/lib/rpc-client.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 30,
+      "nonEmptyLines": 27,
+      "exports": [
+        {
+          "name": "api",
+          "line": 18,
+          "isDefault": false
+        },
+        {
+          "name": "ApiType",
+          "line": 30,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/test/fixtures.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 27,
+      "nonEmptyLines": 21,
+      "functions": [
+        {
+          "name": "QueryClientProbe",
+          "startLine": 6,
+          "endLine": 11,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "QueryClientProbe",
+          "callee": "useQueryClient",
+          "lineNumber": 7
+        },
+        {
+          "caller": "QueryClientProbe",
+          "callee": "queryClient.setQueryData",
+          "lineNumber": 8
+        },
+        {
+          "caller": "QueryClientProbe",
+          "callee": "queryClient.getQueryData",
+          "lineNumber": 10
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/test/fixtures.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 24,
+      "nonEmptyLines": 21,
+      "functions": [
+        {
+          "name": "createTestQueryClient",
+          "startLine": 5,
+          "endLine": 12,
+          "params": []
+        },
+        {
+          "name": "renderWithQueryClient",
+          "startLine": 14,
+          "endLine": 24,
+          "params": [
+            "ui",
+            "options"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createTestQueryClient",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "renderWithQueryClient",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "renderWithQueryClient",
+          "callee": "createTestQueryClient",
+          "lineNumber": 15
+        },
+        {
+          "caller": "renderWithQueryClient",
+          "callee": "render",
+          "lineNumber": 19
+        },
+        {
+          "caller": "renderWithQueryClient",
+          "callee": "createElement",
+          "lineNumber": 20
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/test/msw/handlers.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "exports": [
+        {
+          "name": "handlers",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/test/msw/server.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 4,
+      "nonEmptyLines": 3,
+      "exports": [
+        {
+          "name": "server",
+          "line": 4,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

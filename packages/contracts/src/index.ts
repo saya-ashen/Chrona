@@ -170,6 +170,7 @@ export {
   chronaToolResultSchema,
   chronaToolStatusSchema,
   isChronaToolMutating,
+  describeChronaNodeOutputPublicTool,
   parseChronaToolPayload,
 } from "./api/mcp-task-tools.schema";
 

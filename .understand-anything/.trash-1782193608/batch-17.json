@@ -1,0 +1,3729 @@
+{
+  "nodes": [
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "type": "file",
+      "name": "provider-approval-banner.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "summary": "包含 approvalQueryKey、asSubject、choiceLabel等 函数，属于 \"execution\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 134,
+      "nonEmptyLines": 122
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx:choiceLabel",
+      "type": "function",
+      "name": "choiceLabel",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "summary": "函数 choiceLabel，接受 choice 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 47,
+      "endLine": 58
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx:ProviderApprovalBanner",
+      "type": "function",
+      "name": "ProviderApprovalBanner",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "summary": "函数 ProviderApprovalBanner，接受 { taskId } 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 60,
+      "endLine": 134
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "type": "file",
+      "name": "task-workspace-execution-overview.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "summary": "测试文件，覆盖 \"execution\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 231,
+      "nonEmptyLines": 201
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx:renderOverview",
+      "type": "function",
+      "name": "renderOverview",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "summary": "函数 renderOverview，接受 view, extra 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 33
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx:nowDocument",
+      "type": "function",
+      "name": "nowDocument",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "summary": "函数 nowDocument，接受 title 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 35,
+      "endLine": 53
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "type": "file",
+      "name": "task-workspace-execution-overview.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "summary": "包含 commandCenterTrailItems、buildNodeResultContentSpec、TaskWorkspaceExecutionOverview 函数，属于 \"execution\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 240,
+      "nonEmptyLines": 223
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx:buildNodeResultContentSpec",
+      "type": "function",
+      "name": "buildNodeResultContentSpec",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "summary": "函数 buildNodeResultContentSpec，接受 node, emptyMessage 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 59,
+      "endLine": 72
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx:TaskWorkspaceExecutionOverview",
+      "type": "function",
+      "name": "TaskWorkspaceExecutionOverview",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "summary": "函数 TaskWorkspaceExecutionOverview，接受 {\n  progress,\n  readiness,\n  attention,\n  latestCompletedNode,\n  artifacts,\n  activity,\n  runtimeEvents = [],\n  liveActivity = [],\n  primaryAction,\n  copy: copyProp,\n  commandCenter,\n  onAction,\n} 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 74,
+      "endLine": 240
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "type": "file",
+      "name": "task-workspace-inspector.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "summary": "包含 TaskWorkspaceInspector 函数，属于 \"execution\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 187,
+      "nonEmptyLines": 181
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx:TaskWorkspaceInspector",
+      "type": "function",
+      "name": "TaskWorkspaceInspector",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "summary": "函数 TaskWorkspaceInspector，接受 {\n  taskId,\n  scope,\n  consoleView,\n  primaryAction,\n  commandCenter,\n  commandCenterActionHandlers,\n  runtimeEvents,\n  liveActivity,\n  commandCenterCopy,\n  copy,\n  selectedNodes,\n  selectedNodeRuntimeEvents,\n  nodeActivity,\n  isNodeActivityLoading,\n  preferredNodeDetailTab,\n  onPreferredNodeDetailTabApplied,\n  onAction,\n  onBackToTask,\n} 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 187
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "type": "file",
+      "name": "task-workspace-node-detail-panel.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "summary": "测试文件，覆盖 \"execution\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 255,
+      "nonEmptyLines": 218
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx:detail",
+      "type": "function",
+      "name": "detail",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "summary": "函数 detail，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 8,
+      "endLine": 23
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "type": "file",
+      "name": "task-workspace-node-detail-panel.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "summary": "包含 useTaskWorkspaceCopy、statusTone、EmptyDetailState等 函数，属于 \"execution\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 274,
+      "nonEmptyLines": 247
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:EmptyDetailState",
+      "type": "function",
+      "name": "EmptyDetailState",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "summary": "函数 EmptyDetailState。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 38,
+      "endLine": 56
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:ResultTab",
+      "type": "function",
+      "name": "ResultTab",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "summary": "函数 ResultTab，接受 { node } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 58,
+      "endLine": 91
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:AutoRefreshIndicator",
+      "type": "function",
+      "name": "AutoRefreshIndicator",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "summary": "函数 AutoRefreshIndicator，接受 { enabled } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 94,
+      "endLine": 113
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:ConfigurationTab",
+      "type": "function",
+      "name": "ConfigurationTab",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "summary": "函数 ConfigurationTab，接受 {\n  node,\n  nodes,\n} 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 140,
+      "endLine": 157
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:TaskWorkspaceNodeDetailPanel",
+      "type": "function",
+      "name": "TaskWorkspaceNodeDetailPanel",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "summary": "函数 TaskWorkspaceNodeDetailPanel，接受 {\n  detail,\n  activity,\n  runtimeEvents = [],\n  isActivityLoading,\n  selectedNodes,\n  preferredTab,\n  onPreferredTabApplied,\n} 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 159,
+      "endLine": 274
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "type": "file",
+      "name": "workspace-activity-feed.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "summary": "测试文件，覆盖 \"execution\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 180,
+      "nonEmptyLines": 156
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx:activity",
+      "type": "function",
+      "name": "activity",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "summary": "函数 activity，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 16
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "type": "file",
+      "name": "workspace-activity-feed.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "summary": "包含 ActivityFeedHeader、ActivityEmptyState、LoadOlderActivityButton等 函数，属于 \"execution\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 111,
+      "nonEmptyLines": 105
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx:ActivityFeedHeader",
+      "type": "function",
+      "name": "ActivityFeedHeader",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "summary": "函数 ActivityFeedHeader，接受 {\n  title,\n  shownCount,\n  liveCount,\n  savedCount,\n  provider,\n} 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 43
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx:LoadOlderActivityButton",
+      "type": "function",
+      "name": "LoadOlderActivityButton",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "summary": "函数 LoadOlderActivityButton，接受 {\n  visible,\n  loading,\n  onClick,\n} 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 54,
+      "endLine": 70
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx:WorkspaceActivityFeed",
+      "type": "function",
+      "name": "WorkspaceActivityFeed",
+      "filePath": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "summary": "函数 WorkspaceActivityFeed，接受 {\n  activity,\n  runtimeEvents = [],\n  title = taskWorkspaceActivityMessages.taskTitle,\n  emptyMessage = taskWorkspaceActivityMessages.taskEmpty,\n  limit = 30,\n  hasOlderActivity = false,\n  isLoadingOlder = false,\n  onLoadOlder,\n  density = \"detailed\",\n} 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 72,
+      "endLine": 111
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "type": "file",
+      "name": "use-task-workspace-delete-flow.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "summary": "包含 useTaskWorkspaceDeleteFlow 函数，属于 \"hooks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 37,
+      "nonEmptyLines": 32
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts:useTaskWorkspaceDeleteFlow",
+      "type": "function",
+      "name": "useTaskWorkspaceDeleteFlow",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "summary": "函数 useTaskWorkspaceDeleteFlow，接受 { taskId, setSaveError } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 37
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "type": "file",
+      "name": "use-task-workspace-editor-state.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "summary": "包含 useTaskWorkspaceEditorState 函数，属于 \"hooks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 176,
+      "nonEmptyLines": 162
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts:useTaskWorkspaceEditorState",
+      "type": "function",
+      "name": "useTaskWorkspaceEditorState",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "summary": "函数 useTaskWorkspaceEditorState，接受 task, setTask 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 15,
+      "endLine": 176
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-execution-state-store.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 222,
+      "nonEmptyLines": 202
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx:buildExecutionStateDrivenHeaderSpec",
+      "type": "function",
+      "name": "buildExecutionStateDrivenHeaderSpec",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "summary": "函数 buildExecutionStateDrivenHeaderSpec。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 77,
+      "endLine": 109
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 210,
+      "nonEmptyLines": 187
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx:buildPageData",
+      "type": "function",
+      "name": "buildPageData",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "summary": "函数 buildPageData，接受 workBlockId, headerTitle 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 56,
+      "endLine": 77
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-page-state.spec-patch.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 161,
+      "nonEmptyLines": 142
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-page-state.state-events.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 299,
+      "nonEmptyLines": 260
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "file",
+      "name": "use-task-workspace-page-state.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "summary": "包含 shouldRefreshWorkspacePageForEvent、isWorkspaceActive、isHeaderSpecPatchEvent等 函数，属于 \"hooks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 431,
+      "nonEmptyLines": 396
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:shouldRefreshWorkspacePageForEvent",
+      "type": "function",
+      "name": "shouldRefreshWorkspacePageForEvent",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "summary": "函数 shouldRefreshWorkspacePageForEvent，接受 event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 76,
+      "endLine": 85
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:isWorkspaceActive",
+      "type": "function",
+      "name": "isWorkspaceActive",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "summary": "函数 isWorkspaceActive，接受 pageData 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 87,
+      "endLine": 109
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:applyStateEventToStore",
+      "type": "function",
+      "name": "applyStateEventToStore",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "summary": "函数 applyStateEventToStore，接受 store, event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 134,
+      "endLine": 157
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:collectPointerPaths",
+      "type": "function",
+      "name": "collectPointerPaths",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "summary": "函数 collectPointerPaths，接受 node, prefix 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 165,
+      "endLine": 179
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:useTaskWorkspaceEventStream",
+      "type": "function",
+      "name": "useTaskWorkspaceEventStream",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "summary": "函数 useTaskWorkspaceEventStream，接受 taskId, refreshQueries, onWorkspaceEvent, applyStateEvent, workBlockId 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 181,
+      "endLine": 276
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:useTaskWorkspacePageState",
+      "type": "function",
+      "name": "useTaskWorkspacePageState",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "summary": "函数 useTaskWorkspacePageState，接受 initialData 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 278,
+      "endLine": 431
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 129,
+      "nonEmptyLines": 115
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx:makeTask",
+      "type": "function",
+      "name": "makeTask",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "summary": "函数 makeTask，接受 aiPlanGenerationStatus 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 65,
+      "endLine": 74
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-plan-section-state.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 49,
+      "nonEmptyLines": 45
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "type": "file",
+      "name": "use-task-workspace-plan-section-state.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "summary": "包含 useTaskWorkspacePlanSectionState 函数，属于 \"hooks\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 43,
+      "nonEmptyLines": 36
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts:useTaskWorkspacePlanSectionState",
+      "type": "function",
+      "name": "useTaskWorkspacePlanSectionState",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "summary": "函数 useTaskWorkspacePlanSectionState，接受 graphPlan 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 43
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 201,
+      "nonEmptyLines": 187
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-plan-state.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 42,
+      "nonEmptyLines": 34
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx:runtimeTextEvent",
+      "type": "function",
+      "name": "runtimeTextEvent",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx",
+      "summary": "函数 runtimeTextEvent，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 5,
+      "endLine": 19
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "file",
+      "name": "use-task-workspace-plan-state.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "包含 compactActivityText、getRuntimeActivity、isRuntimeTextDelta等 函数，属于 \"hooks\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 680,
+      "nonEmptyLines": 606
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:getRuntimeActivity",
+      "type": "function",
+      "name": "getRuntimeActivity",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 getRuntimeActivity，接受 event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 37,
+      "endLine": 56
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:runtimeTextMergeKey",
+      "type": "function",
+      "name": "runtimeTextMergeKey",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 runtimeTextMergeKey，接受 event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 62,
+      "endLine": 71
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:appendRuntimeEvent",
+      "type": "function",
+      "name": "appendRuntimeEvent",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 appendRuntimeEvent，接受 events, event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 73,
+      "endLine": 91
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:isFullRuntimeSseEvent",
+      "type": "function",
+      "name": "isFullRuntimeSseEvent",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 isFullRuntimeSseEvent，接受 event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 93,
+      "endLine": 102
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:activitySummaryFromPhase",
+      "type": "function",
+      "name": "activitySummaryFromPhase",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 activitySummaryFromPhase，接受 phase 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 112,
+      "endLine": 131
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:derivePlanStatus",
+      "type": "function",
+      "name": "derivePlanStatus",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 derivePlanStatus，接受 savedPlan, isGenerationRunning 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 133,
+      "endLine": 143
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:selectWorkspacePlan",
+      "type": "function",
+      "name": "selectWorkspacePlan",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 selectWorkspacePlan，接受 pagePlan, planStatePlan, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 177,
+      "endLine": 195
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:checkpointFormFields",
+      "type": "function",
+      "name": "checkpointFormFields",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 checkpointFormFields，接受 checkpoint 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 210,
+      "endLine": 219
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:withCanonicalExecutionActions",
+      "type": "function",
+      "name": "withCanonicalExecutionActions",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 withCanonicalExecutionActions，接受 graphPlan, checkpoint 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 221,
+      "endLine": 267
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:withStartingReadyNode",
+      "type": "function",
+      "name": "withStartingReadyNode",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 withStartingReadyNode，接受 graphPlan, currentExecution 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 273,
+      "endLine": 319
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:samePlanFlowSnapshot",
+      "type": "function",
+      "name": "samePlanFlowSnapshot",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 samePlanFlowSnapshot，接受 left, right 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 321,
+      "endLine": 338
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:dispatchWorkspaceCommand",
+      "type": "function",
+      "name": "dispatchWorkspaceCommand",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 dispatchWorkspaceCommand，接受 taskId, body 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 346,
+      "endLine": 358
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:useTaskWorkspacePlanState",
+      "type": "function",
+      "name": "useTaskWorkspacePlanState",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "summary": "函数 useTaskWorkspacePlanState，接受 task, refreshWorkspace, workspaceEvents 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 364,
+      "endLine": 680
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "type": "file",
+      "name": "use-task-workspace-proposal-flow.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "summary": "包含 useTaskWorkspaceProposalFlow 函数，属于 \"hooks\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 165,
+      "nonEmptyLines": 149
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts:useTaskWorkspaceProposalFlow",
+      "type": "function",
+      "name": "useTaskWorkspaceProposalFlow",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "summary": "函数 useTaskWorkspaceProposalFlow，接受 {\n  task,\n  plan,\n  draftEditableTask,\n  setTask,\n  setSaveError,\n  fetchPlan,\n  refreshWorkspace,\n} 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 26,
+      "endLine": 165
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-sse-refresh.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 212,
+      "nonEmptyLines": 190
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx:buildPageData",
+      "type": "function",
+      "name": "buildPageData",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "summary": "函数 buildPageData，接受 workBlockId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 98,
+      "endLine": 114
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "type": "file",
+      "name": "use-task-workspace-sync.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "summary": "测试文件，覆盖 \"hooks\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component",
+        "hook"
+      ],
+      "language": "typescript",
+      "sizeLines": 1163,
+      "nonEmptyLines": 1027
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:createQueryWrapper",
+      "type": "function",
+      "name": "createQueryWrapper",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "summary": "函数 createQueryWrapper。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 140,
+      "endLine": 151
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:planReadModel",
+      "type": "function",
+      "name": "planReadModel",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "summary": "函数 planReadModel，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 153,
+      "endLine": 217
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:pageData",
+      "type": "function",
+      "name": "pageData",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "summary": "函数 pageData，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 219,
+      "endLine": 275
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:recurringPageData",
+      "type": "function",
+      "name": "recurringPageData",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "summary": "函数 recurringPageData，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 277,
+      "endLine": 291
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:executionResult",
+      "type": "function",
+      "name": "executionResult",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "summary": "函数 executionResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 293,
+      "endLine": 307
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:emitWorkspaceEvent",
+      "type": "function",
+      "name": "emitWorkspaceEvent",
+      "filePath": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "summary": "函数 emitWorkspaceEvent，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 309,
+      "endLine": 320
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "type": "file",
+      "name": "task-workspace-actions.test.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "summary": "测试文件，覆盖 \"model\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 230,
+      "nonEmptyLines": 205
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts:node",
+      "type": "function",
+      "name": "node",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "summary": "函数 node，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 28,
+      "endLine": 38
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "type": "file",
+      "name": "task-workspace-actions.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "包含 loadWorkspaceActivityPage、loadNodeWorkspaceActivityPage、resolveStateTreatmentCopy等 函数，属于 \"model\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 383,
+      "nonEmptyLines": 327
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:loadWorkspaceActivityPage",
+      "type": "function",
+      "name": "loadWorkspaceActivityPage",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 loadWorkspaceActivityPage，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 20,
+      "endLine": 35
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:loadNodeWorkspaceActivityPage",
+      "type": "function",
+      "name": "loadNodeWorkspaceActivityPage",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 loadNodeWorkspaceActivityPage，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 37,
+      "endLine": 52
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildWorkspaceStateTreatment",
+      "type": "function",
+      "name": "buildWorkspaceStateTreatment",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 buildWorkspaceStateTreatment，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 136,
+      "endLine": 224
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildDefaultWorkspaceActionFields",
+      "type": "function",
+      "name": "buildDefaultWorkspaceActionFields",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 buildDefaultWorkspaceActionFields，接受 fields 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 226,
+      "endLine": 230
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:pickDefaultWorkspaceAction",
+      "type": "function",
+      "name": "pickDefaultWorkspaceAction",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 pickDefaultWorkspaceAction，接受 node 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 232,
+      "endLine": 239
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:getMissingWorkspaceActionFields",
+      "type": "function",
+      "name": "getMissingWorkspaceActionFields",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 getMissingWorkspaceActionFields，接受 fields, values 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 241,
+      "endLine": 243
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:getWorkspaceActionDisabledReason",
+      "type": "function",
+      "name": "getWorkspaceActionDisabledReason",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 getWorkspaceActionDisabledReason，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 245,
+      "endLine": 264
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildWorkspaceCheckpointActionInput",
+      "type": "function",
+      "name": "buildWorkspaceCheckpointActionInput",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 buildWorkspaceCheckpointActionInput，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 266,
+      "endLine": 296
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:actionKindForNode",
+      "type": "function",
+      "name": "actionKindForNode",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 actionKindForNode，接受 node, selectedAction 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 298,
+      "endLine": 322
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildCheckpointActionPayload",
+      "type": "function",
+      "name": "buildCheckpointActionPayload",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "summary": "函数 buildCheckpointActionPayload，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 324,
+      "endLine": 365
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "type": "file",
+      "name": "task-workspace-activity.test.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "summary": "测试文件，覆盖 \"model\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 192,
+      "nonEmptyLines": 177
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts:runtimeEvent",
+      "type": "function",
+      "name": "runtimeEvent",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "summary": "函数 runtimeEvent，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 35
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "type": "file",
+      "name": "task-workspace-activity.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "包含 normalizeText、truncateText、stringValue等 函数，属于 \"model\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 356,
+      "nonEmptyLines": 316
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:planGenerationTitle",
+      "type": "function",
+      "name": "planGenerationTitle",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 planGenerationTitle，接受 kind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 55,
+      "endLine": 64
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:workspaceEventToWorkspaceActivity",
+      "type": "function",
+      "name": "workspaceEventToWorkspaceActivity",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 workspaceEventToWorkspaceActivity，接受 event, index 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 73,
+      "endLine": 163
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:getWorkspaceActivityIdentity",
+      "type": "function",
+      "name": "getWorkspaceActivityIdentity",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 getWorkspaceActivityIdentity，接受 item 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 169,
+      "endLine": 180
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:orderWorkspaceActivity",
+      "type": "function",
+      "name": "orderWorkspaceActivity",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 orderWorkspaceActivity，接受 items 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 188,
+      "endLine": 194
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:mergeAssistantActivity",
+      "type": "function",
+      "name": "mergeAssistantActivity",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 mergeAssistantActivity，接受 left, right 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 206,
+      "endLine": 221
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:mergeWorkspaceActivity",
+      "type": "function",
+      "name": "mergeWorkspaceActivity",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 mergeWorkspaceActivity，接受 items, limit 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 223,
+      "endLine": 242
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:compactWorkspaceActivityText",
+      "type": "function",
+      "name": "compactWorkspaceActivityText",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 compactWorkspaceActivityText，接受 value, limit 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 244,
+      "endLine": 246
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:runtimeEventToWorkspaceActivity",
+      "type": "function",
+      "name": "runtimeEventToWorkspaceActivity",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 runtimeEventToWorkspaceActivity，接受 event, index 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 248,
+      "endLine": 352
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:runtimeEventsToWorkspaceActivity",
+      "type": "function",
+      "name": "runtimeEventsToWorkspaceActivity",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "summary": "函数 runtimeEventsToWorkspaceActivity，接受 events, limit 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 354,
+      "endLine": 356
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "type": "file",
+      "name": "task-workspace-editor-view-model.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "summary": "包含 taskToEditableTask、dateToIsoStringOrNull、taskToTaskConfigInitialValues等 函数，属于 \"model\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 102,
+      "nonEmptyLines": 93
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskToEditableTask",
+      "type": "function",
+      "name": "taskToEditableTask",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "summary": "函数 taskToEditableTask，接受 task 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 19
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:dateToIsoStringOrNull",
+      "type": "function",
+      "name": "dateToIsoStringOrNull",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "summary": "函数 dateToIsoStringOrNull，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 21,
+      "endLine": 23
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskToTaskConfigInitialValues",
+      "type": "function",
+      "name": "taskToTaskConfigInitialValues",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "summary": "函数 taskToTaskConfigInitialValues，接受 task 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 41
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskConfigInputToEditableTask",
+      "type": "function",
+      "name": "taskConfigInputToEditableTask",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "summary": "函数 taskConfigInputToEditableTask，接受 input, scheduleStatus 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 43,
+      "endLine": 58
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:editableTaskToPlanningDraft",
+      "type": "function",
+      "name": "editableTaskToPlanningDraft",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "summary": "函数 editableTaskToPlanningDraft，接受 task 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 60,
+      "endLine": 69
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:editableTaskToEditSummary",
+      "type": "function",
+      "name": "editableTaskToEditSummary",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "summary": "函数 editableTaskToEditSummary，接受 task 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 85,
+      "endLine": 102
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx:choiceLabel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx:ProviderApprovalBanner",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx:ProviderApprovalBanner",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "file:apps/web/src/api.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "file:apps/web/src/components/ui/card.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "file:apps/web/src/api.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "file:apps/web/src/components/ui/card.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/action-rail.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx:renderOverview",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx:nowDocument",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx:buildNodeResultContentSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx:TaskWorkspaceExecutionOverview",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx:TaskWorkspaceExecutionOverview",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/catalog/spec-renderer.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/build-execution-overview-spec.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/ui/tabs.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/lib/i18n/messages.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/catalog/spec-renderer.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/build-execution-overview-spec.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/ui/tabs.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/lib/i18n/messages.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/action-rail.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx:TaskWorkspaceInspector",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx:TaskWorkspaceInspector",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx:detail",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:EmptyDetailState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:ResultTab",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:AutoRefreshIndicator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:ConfigurationTab",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:TaskWorkspaceNodeDetailPanel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx:TaskWorkspaceNodeDetailPanel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/constants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/inspector-details.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/inspector-run-panel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/catalog/spec-renderer.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/ui/badge.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/ui/tabs.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/lib/i18n/messages.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/constants.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/inspector-details.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/inspector-run-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/catalog/spec-renderer.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/ui/badge.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/components/ui/tabs.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/lib/i18n/messages.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx:activity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx:ActivityFeedHeader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx:LoadOlderActivityButton",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx:WorkspaceActivityFeed",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx:WorkspaceActivityFeed",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/activity-timeline.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/lib/i18n/messages.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/activity-timeline.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "target": "file:apps/web/src/lib/i18n/messages.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts:useTaskWorkspaceDeleteFlow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts:useTaskWorkspaceDeleteFlow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts:useTaskWorkspaceEditorState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts:useTaskWorkspaceEditorState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx:buildExecutionStateDrivenHeaderSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx:buildPageData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:shouldRefreshWorkspacePageForEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:isWorkspaceActive",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:applyStateEventToStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:collectPointerPaths",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:useTaskWorkspaceEventStream",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:useTaskWorkspacePageState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts:useTaskWorkspacePageState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/lib/fetch-json-event-source.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/lib/fetch-json-event-source.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/page/task-workspace-msw.test.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx:makeTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts:useTaskWorkspacePlanSectionState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts:useTaskWorkspacePlanSectionState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx:runtimeTextEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:getRuntimeActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:runtimeTextMergeKey",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:appendRuntimeEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:appendRuntimeEvent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:isFullRuntimeSseEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:activitySummaryFromPhase",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:derivePlanStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:selectWorkspacePlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:checkpointFormFields",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:withCanonicalExecutionActions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:withStartingReadyNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:samePlanFlowSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:dispatchWorkspaceCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:useTaskWorkspacePlanState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts:useTaskWorkspacePlanState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-view-model.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-plan-flow-machine.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-view-model.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-plan-flow-machine.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/action-rail.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/build-execution-overview-spec.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts:useTaskWorkspaceProposalFlow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts:useTaskWorkspaceProposalFlow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-proposal-flow-machine.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-proposal-flow-machine.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx:buildPageData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:createQueryWrapper",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:planReadModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:pageData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:recurringPageData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:executionResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx:emitWorkspaceEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts:node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:loadWorkspaceActivityPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:loadWorkspaceActivityPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:loadNodeWorkspaceActivityPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:loadNodeWorkspaceActivityPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildWorkspaceStateTreatment",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildWorkspaceStateTreatment",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildDefaultWorkspaceActionFields",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildDefaultWorkspaceActionFields",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:pickDefaultWorkspaceAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:pickDefaultWorkspaceAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:getMissingWorkspaceActionFields",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:getMissingWorkspaceActionFields",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:getWorkspaceActionDisabledReason",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:getWorkspaceActionDisabledReason",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildWorkspaceCheckpointActionInput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildWorkspaceCheckpointActionInput",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:actionKindForNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:actionKindForNode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts:buildCheckpointActionPayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/lib/rpc-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/inspector-run-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/action-tab.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts:runtimeEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:planGenerationTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:workspaceEventToWorkspaceActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:workspaceEventToWorkspaceActivity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:getWorkspaceActivityIdentity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:getWorkspaceActivityIdentity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:orderWorkspaceActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:orderWorkspaceActivity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:mergeAssistantActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:mergeWorkspaceActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:mergeWorkspaceActivity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:compactWorkspaceActivityText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:compactWorkspaceActivityText",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:runtimeEventToWorkspaceActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:runtimeEventToWorkspaceActivity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:runtimeEventsToWorkspaceActivity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts:runtimeEventsToWorkspaceActivity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/build-execution-overview-spec.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskToEditableTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskToEditableTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:dateToIsoStringOrNull",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:dateToIsoStringOrNull",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskToTaskConfigInitialValues",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskToTaskConfigInitialValues",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskConfigInputToEditableTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:taskConfigInputToEditableTask",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:editableTaskToPlanningDraft",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:editableTaskToPlanningDraft",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:editableTaskToEditSummary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts:editableTaskToEditSummary",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "file:apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "file:apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

@@ -8,11 +8,13 @@ import { createLogger } from "@chrona/logging";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
+  CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION,
   chronaPublicToolPayloadSchemas,
   chronaToolInputSchema,
   type ChronaToolName,
   type ChronaToolResult,
 } from "@chrona/contracts/api";
+import { chronaNodeOutputSpecJsonSchema } from "@chrona/ui-protocol";
 
 type ExternalChronaToolName = keyof typeof externalTools;
 
@@ -48,30 +50,20 @@ function publicToolSchema(schema: z.ZodObject) {
   });
 }
 
-const jsonEncodedOutputsSchema = z.string().min(1).describe("JSON-encoded array of json-render Specs");
-
 function publicNodeOutputSchema() {
-  return publicToolSchema(
-    chronaPublicToolPayloadSchemas["chrona.node.output"].extend({
-      outputs: jsonEncodedOutputsSchema,
-    }),
-  );
+  const schema = publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.output"]);
+  schema._zod.toJSONSchema = () => ({
+    type: "object",
+    properties: {
+      spec: chronaNodeOutputSpecJsonSchema,
+      mode: { type: "string", enum: ["append", "replace"] },
+      summary: { type: "string", minLength: 1 },
+    },
+    required: ["spec"],
+    additionalProperties: false,
+  });
+  return schema;
 }
-
-function normalizeExternalPayload(toolName: ChronaToolName, payload: Record<string, unknown>) {
-  if (toolName !== "chrona.node.output" || typeof payload.outputs !== "string") return payload;
-  return {
-    ...payload,
-    outputs: JSON.parse(payload.outputs) as unknown,
-  };
-}
-const NODE_OUTPUT_DESCRIPTION = [
-  "Append or replace user-visible outputs for the current execution node. May be called multiple times before completion.",
-  "Submit outputs as complete json-render Specs: { root: string, elements: { [id]: { type, props, children } }, state? }.",
-  "Every children value must be a direct string array of element IDs.",
-  "Component props must match the Chrona catalog exactly. For Table, use columns: string[] and rows: string[][]. Do not wrap arrays as { item: [...] }.",
-  "Numeric props must be JSON numbers, not strings; e.g. CollapsibleText.threshold: 800, not \"800\".",
-].join(" ");
 
 const externalTools = {
   chrona_execution_read: {
@@ -101,7 +93,7 @@ const externalTools = {
   chrona_node_output: {
     internalName: "chrona.node.output",
     title: "Chrona Node Output",
-    description: NODE_OUTPUT_DESCRIPTION,
+    description: CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION,
     inputSchema: publicNodeOutputSchema(),
   },
   chrona_node_complete: {
@@ -260,7 +252,7 @@ function toChronaInput(
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
   requestSessionId?: string,
 ) {
-  const payload = normalizeExternalPayload(toolName, { ...input });
+  const payload = { ...input };
   for (const key of hiddenContextKeys) {
     delete payload[key];
   }
@@ -427,6 +419,14 @@ function createChronaMcpServer(engine: ChronaEngine, requestSessionId?: string) 
 
   return server;
 }
+
+export const __mcpRouteTestHooks = {
+  externalTools,
+  callChronaTool,
+  createChronaMcpServer,
+  sessionIdFrom,
+  toChronaInput,
+};
 
 export function createMcpRoutes(engine: ChronaEngine) {
   return new Hono().all("/mcp", async (c) => {

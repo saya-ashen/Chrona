@@ -1,0 +1,155 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/integrations/src/calendar/fixtures/cancelled.ics",
+      "language": "ics",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/duplicate.ics",
+      "language": "ics",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/empty.ics",
+      "language": "ics",
+      "sizeLines": 5,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/malformed.ics",
+      "language": "ics",
+      "sizeLines": 7,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/oversized.ics",
+      "language": "ics",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/README.md",
+      "language": "markdown",
+      "sizeLines": 13,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/recurring.ics",
+      "language": "ics",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/timezone.ics",
+      "language": "ics",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/valid.ics",
+      "language": "ics",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/parse-feed.ts",
+      "language": "typescript",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/recurrence.ts",
+      "language": "typescript",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/providers/debug/package.json",
+      "language": "json",
+      "sizeLines": 12,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/providers/foundation/package.json",
+      "language": "json",
+      "sizeLines": 12,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/providers/foundation/src/contracts/provider.ts",
+      "language": "typescript",
+      "sizeLines": 515,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/providers/foundation/src/ProviderClient.ts",
+      "language": "typescript",
+      "sizeLines": 71,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/providers/foundation/src/replay.ts",
+      "language": "typescript",
+      "sizeLines": 170,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/providers/hermes/package.json",
+      "language": "json",
+      "sizeLines": 12,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/runtime-core/package.json",
+      "language": "json",
+      "sizeLines": 12,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/runtime-core/src/config-spec.ts",
+      "language": "typescript",
+      "sizeLines": 261,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/runtime-core/src/contracts.ts",
+      "language": "typescript",
+      "sizeLines": 59,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/runtime-core/src/types.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/shared/package.json",
+      "language": "json",
+      "sizeLines": 16,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/ui-protocol/package.json",
+      "language": "json",
+      "sizeLines": 16,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/ui-protocol/src/builders/index.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/ui-protocol/src/catalog/catalog-version.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    }
+  ]
+}

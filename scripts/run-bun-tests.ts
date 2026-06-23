@@ -8,6 +8,7 @@ const ignoredSegments = new Set(["node_modules", ".direnv", ".git", ".worktrees"
 const rootDir = process.cwd();
 const tempDir = resolve(rootDir, ".tmp");
 const requestedFiles = process.argv.slice(2);
+const concurrency = Math.max(1, Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"));
 
 function shouldInclude(path: string) {
   return !path.split("/").some((segment) => ignoredSegments.has(segment));
@@ -20,6 +21,36 @@ function resolveRequestedFiles(paths: string[]) {
     process.exit(1);
   }
   return paths;
+}
+
+async function runWithFreshDatabase(file: string, fileDbPath: string): Promise<number> {
+  if (existsSync(fileDbPath)) {
+    rmSync(fileDbPath, { force: true });
+  }
+
+  const initProc = Bun.spawn([
+    "bun",
+    "run",
+    "scripts/init-sqlite-db.ts",
+    "--reset",
+    fileDbPath,
+  ], {
+    cwd: rootDir,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  const initCode = await initProc.exited;
+  if (initCode !== 0) {
+    return initCode;
+  }
+
+  const proc = Bun.spawn(["bun", "test", file], {
+    cwd: rootDir,
+    env: { ...process.env, DATABASE_URL: `file:${fileDbPath}`, NODE_ENV: "test" },
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  return await proc.exited;
 }
 
 const files = requestedFiles.length > 0
@@ -36,50 +67,34 @@ mkdirSync(tempDir, { recursive: true });
 
 let exitCode = 0;
 const failedFiles: Array<{ file: string; code: number }> = [];
+const pending = files.map((file, index) => ({ file, fileDbPath: resolve(tempDir, `bun-test-${index}.db`) }));
 
-console.log(`Running ${files.length} Bun test file${files.length === 1 ? "" : "s"} sequentially...`);
-
-async function runWithFreshDatabase(file: string, fileDbPath: string): Promise<number> {
-  if (existsSync(fileDbPath)) {
-    rmSync(fileDbPath, { force: true });
-  }
-  const initProc = Bun.spawn([
-    "bun",
-    "run",
-    "scripts/init-sqlite-db.ts",
-    "--reset",
-    fileDbPath,
-  ], {
-    cwd: rootDir,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const initCode = await initProc.exited;
-  if (initCode !== 0) {
-    return initCode;
-  }
-  const proc = Bun.spawn(["bun", "test", file], {
-    cwd: rootDir,
-    env: { ...process.env, DATABASE_URL: `file:${fileDbPath}`, NODE_ENV: "test" },
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  return await proc.exited;
-}
+console.log(`Running ${files.length} Bun test file${files.length === 1 ? "" : "s"} with concurrency ${concurrency}...`);
 
 try {
-  for (let index = 0; index < files.length; index += 1) {
-    const file = files[index];
-    const fileDbPath = resolve(tempDir, `bun-test-${index}.db`);
-    const code = await runWithFreshDatabase(file, fileDbPath);
-    if (code !== 0) {
-      exitCode = code;
-      failedFiles.push({ file, code });
+  const active = new Set<Promise<void>>();
+  const launch = (file: string, fileDbPath: string) => {
+    const job = (async () => {
+      const code = await runWithFreshDatabase(file, fileDbPath);
+      if (code !== 0) {
+        exitCode = code;
+        failedFiles.push({ file, code });
+      }
+    })();
+    active.add(job);
+    job.finally(() => active.delete(job));
+  };
+
+  for (const item of pending) {
+    while (active.size >= concurrency) {
+      await Promise.race(active);
     }
+    launch(item.file, item.fileDbPath);
   }
+
+  await Promise.all(active);
 } finally {
-  for (let index = 0; index < files.length; index += 1) {
-    const fileDbPath = resolve(tempDir, `bun-test-${index}.db`);
+  for (const { fileDbPath } of pending) {
     if (existsSync(fileDbPath)) {
       rmSync(fileDbPath, { force: true });
     }

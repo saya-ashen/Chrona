@@ -1,0 +1,215 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 774,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 194,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "language": "typescript",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "language": "typescript",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "language": "typescript",
+      "sizeLines": 299,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "language": "typescript",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "language": "typescript",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "language": "typescript",
+      "sizeLines": 29,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts",
+      "language": "typescript",
+      "sizeLines": 162,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "language": "typescript",
+      "sizeLines": 171,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "language": "typescript",
+      "sizeLines": 390,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/ai-sidebar/proposal-state.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/ai-sidebar/proposal-state.ts",
+      "language": "typescript",
+      "sizeLines": 31,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/ai-sidebar/summarize-context.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/ai-sidebar/summarize-context.ts",
+      "language": "typescript",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/assistant-surface/action-mapping.ts",
+      "language": "typescript",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/assistant-surface/proposal-routing.ts",
+      "language": "typescript",
+      "sizeLines": 28,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/assistant-surface/summary-priority.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/calendar/planning-busy-blocks.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 97,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/calendar/planning-busy-blocks.ts",
+      "language": "typescript",
+      "sizeLines": 53,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/task/derive-task-static-state.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 100,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/task/derive-task-static-state.ts",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 64,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/engine.ts",
+      "language": "typescript",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/errors.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/audit.ts",
+      "language": "typescript",
+      "sizeLines": 392,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/dispatch.ts",
+      "language": "typescript",
+      "sizeLines": 238,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/index.ts",
+      "language": "typescript",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/input-guards.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 862,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/operations.ts",
+      "language": "typescript",
+      "sizeLines": 388,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/state-summary.ts",
+      "language": "typescript",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/tool-result.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 38,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    }
+  ]
+}

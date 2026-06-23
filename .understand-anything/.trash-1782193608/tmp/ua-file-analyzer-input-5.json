@@ -1,0 +1,209 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/engine/src/modules/orchestration/graph-version-repository.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/orchestrator-config.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/orchestrator-restart-recovery.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 240,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/recurring-work-block-expansion-worker.ts",
+      "language": "typescript",
+      "sizeLines": 114,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/restart-recovery-worker.ts",
+      "language": "typescript",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-event-repository.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 117,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-event-repository.ts",
+      "language": "typescript",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-events.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-lease-repository.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 115,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-lease-repository.ts",
+      "language": "typescript",
+      "sizeLines": 66,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 50,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 195,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/task-orchestrator.ts",
+      "language": "typescript",
+      "sizeLines": 190,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-inbox.ts",
+      "language": "typescript",
+      "sizeLines": 149,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-memory-console.ts",
+      "language": "typescript",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-schedule-page-runnable-state.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 161,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-schedule-page.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 665,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-schedule-page.ts",
+      "language": "typescript",
+      "sizeLines": 622,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/page-query.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/builders.ts",
+      "language": "typescript",
+      "sizeLines": 678,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/get-work-page.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 740,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/get-work-page.ts",
+      "language": "typescript",
+      "sizeLines": 400,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/helpers.ts",
+      "language": "typescript",
+      "sizeLines": 103,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/index.ts",
+      "language": "typescript",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/types.ts",
+      "language": "typescript",
+      "sizeLines": 164,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/__tests__/duplicate-execution-regression.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/__tests__/serial-branch-result-regression.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/__tests__/stop-pause-regression.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 107,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/facade/task-plan-execution.facade.ts",
+      "language": "typescript",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/execute-command.smoke.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "language": "typescript",
+      "sizeLines": 220,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/execution-scope.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 176,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "language": "typescript",
+      "sizeLines": 148,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts",
+      "language": "typescript",
+      "sizeLines": 341,
+      "fileCategory": "code"
+    }
+  ]
+}

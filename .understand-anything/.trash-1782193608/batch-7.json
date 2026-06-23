@@ -1,0 +1,4428 @@
+{
+  "nodes": [
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/automation-suggestion-panel.test.tsx",
+      "type": "file",
+      "name": "automation-suggestion-panel.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/automation-suggestion-panel.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 12,
+      "nonEmptyLines": 11
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "type": "file",
+      "name": "timeslot-suggestion-panel.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 132,
+      "nonEmptyLines": 108
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx:makeSuggestions",
+      "type": "function",
+      "name": "makeSuggestions",
+      "filePath": "apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "summary": "函数 makeSuggestions。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 21
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "type": "file",
+      "name": "automation-suggestion-panel.tsx",
+      "filePath": "apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "summary": "包含 AutomationSuggestionPanel 函数，属于 \"panels\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 12,
+      "nonEmptyLines": 10
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx:AutomationSuggestionPanel",
+      "type": "function",
+      "name": "AutomationSuggestionPanel",
+      "filePath": "apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "summary": "函数 AutomationSuggestionPanel，接受 _props 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 5,
+      "endLine": 12
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "type": "file",
+      "name": "timeslot-suggestion-panel.tsx",
+      "filePath": "apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "summary": "包含 formatTimeRange、TimeslotSuggestionPanel 函数，属于 \"panels\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 109,
+      "nonEmptyLines": 102
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx:TimeslotSuggestionPanel",
+      "type": "function",
+      "name": "TimeslotSuggestionPanel",
+      "filePath": "apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "summary": "函数 TimeslotSuggestionPanel，接受 {\n  taskId,\n  title,\n  priority,\n  estimatedMinutes,\n  dueAt,\n  currentSchedule,\n  onSchedule,\n} 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 24,
+      "endLine": 109
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts",
+      "type": "file",
+      "name": "result-output-format.ts",
+      "filePath": "apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts",
+      "summary": "包含 stringifyResultOutput 函数，属于 \"task-plan-graph\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 5,
+      "nonEmptyLines": 4
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts:stringifyResultOutput",
+      "type": "function",
+      "name": "stringifyResultOutput",
+      "filePath": "apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts",
+      "summary": "函数 stringifyResultOutput，接受 _output 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 5
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "type": "file",
+      "name": "build-task-workspace-diff-preview-spec.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "summary": "包含 formatText、computeTaskDiff、computePlanSummary等 函数，属于 \"assistant\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 112,
+      "nonEmptyLines": 106
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:computeTaskDiff",
+      "type": "function",
+      "name": "computeTaskDiff",
+      "filePath": "apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "summary": "函数 computeTaskDiff，接受 taskPatch, originalTask 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 53
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:computePlanSummary",
+      "type": "function",
+      "name": "computePlanSummary",
+      "filePath": "apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "summary": "函数 computePlanSummary，接受 planPatch 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 55,
+      "endLine": 70
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:highRiskChanges",
+      "type": "function",
+      "name": "highRiskChanges",
+      "filePath": "apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "summary": "函数 highRiskChanges，接受 proposal 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 72,
+      "endLine": 86
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:buildTaskWorkspaceDiffPreviewSpec",
+      "type": "function",
+      "name": "buildTaskWorkspaceDiffPreviewSpec",
+      "filePath": "apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "summary": "函数 buildTaskWorkspaceDiffPreviewSpec，接受 proposal, originalTask 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 88,
+      "endLine": 112
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "type": "file",
+      "name": "task-workspace-plan-section.test.tsx",
+      "filePath": "apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "summary": "测试文件，覆盖 \"sections\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 749,
+      "nonEmptyLines": 675
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx:renderWithQueryClient",
+      "type": "function",
+      "name": "renderWithQueryClient",
+      "filePath": "apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "summary": "函数 renderWithQueryClient，接受 ui 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 59,
+      "endLine": 71
+    },
+    {
+      "id": "file:packages/contracts/src/ai-feature-specs.bun.test.ts",
+      "type": "file",
+      "name": "ai-feature-specs.bun.test.ts",
+      "filePath": "packages/contracts/src/ai-feature-specs.bun.test.ts",
+      "summary": "测试文件，覆盖 \"src\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 122,
+      "nonEmptyLines": 104
+    },
+    {
+      "id": "file:packages/contracts/src/ai.ts",
+      "type": "file",
+      "name": "ai.ts",
+      "filePath": "packages/contracts/src/ai.ts",
+      "summary": "实现 \"src\" 模块的 ai 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 4,
+      "nonEmptyLines": 4
+    },
+    {
+      "id": "file:packages/domain/src/plan/compile.ts",
+      "type": "file",
+      "name": "compile.ts",
+      "filePath": "packages/domain/src/plan/compile.ts",
+      "summary": "包含 generateCompiledId、rewriteConditionTarget、buildNodeConfig等 函数，属于 \"plan\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 307,
+      "nonEmptyLines": 282
+    },
+    {
+      "id": "function:packages/domain/src/plan/compile.ts:rewriteConditionTarget",
+      "type": "function",
+      "name": "rewriteConditionTarget",
+      "filePath": "packages/domain/src/plan/compile.ts",
+      "summary": "函数 rewriteConditionTarget，接受 nodeId, targetNodeId, localToCompiled 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 38
+    },
+    {
+      "id": "function:packages/domain/src/plan/compile.ts:buildNodeConfig",
+      "type": "function",
+      "name": "buildNodeConfig",
+      "filePath": "packages/domain/src/plan/compile.ts",
+      "summary": "函数 buildNodeConfig，接受 node, localToCompiled 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 40,
+      "endLine": 88
+    },
+    {
+      "id": "function:packages/domain/src/plan/compile.ts:buildCompiledNode",
+      "type": "function",
+      "name": "buildCompiledNode",
+      "filePath": "packages/domain/src/plan/compile.ts",
+      "summary": "函数 buildCompiledNode，接受 node, compiledId, localToCompiled 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 90,
+      "endLine": 115
+    },
+    {
+      "id": "function:packages/domain/src/plan/compile.ts:compileEditablePlan",
+      "type": "function",
+      "name": "compileEditablePlan",
+      "filePath": "packages/domain/src/plan/compile.ts",
+      "summary": "函数 compileEditablePlan，接受 plan 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 135,
+      "endLine": 273
+    },
+    {
+      "id": "function:packages/domain/src/plan/compile.ts:computeTopologicalOrder",
+      "type": "function",
+      "name": "computeTopologicalOrder",
+      "filePath": "packages/domain/src/plan/compile.ts",
+      "summary": "函数 computeTopologicalOrder，接受 nodeIds, edges 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 275,
+      "endLine": 307
+    },
+    {
+      "id": "file:packages/domain/src/plan/patch.ts",
+      "type": "file",
+      "name": "patch.ts",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "包含 applyPlanPatch、applyOperation、applyUpdatePlan等 函数，属于 \"plan\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 389,
+      "nonEmptyLines": 353
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyPlanPatch",
+      "type": "function",
+      "name": "applyPlanPatch",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyPlanPatch，接受 plan, patch 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 86
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyOperation",
+      "type": "function",
+      "name": "applyOperation",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyOperation，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 98,
+      "endLine": 131
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyUpdatePlan",
+      "type": "function",
+      "name": "applyUpdatePlan",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyUpdatePlan，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 133,
+      "endLine": 147
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyAddNode",
+      "type": "function",
+      "name": "applyAddNode",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyAddNode，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 149,
+      "endLine": 177
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyUpdateNode",
+      "type": "function",
+      "name": "applyUpdateNode",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyUpdateNode，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 179,
+      "endLine": 226
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyDeleteNode",
+      "type": "function",
+      "name": "applyDeleteNode",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyDeleteNode，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 228,
+      "endLine": 261
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyAddEdge",
+      "type": "function",
+      "name": "applyAddEdge",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyAddEdge，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 263,
+      "endLine": 299
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyDeleteEdge",
+      "type": "function",
+      "name": "applyDeleteEdge",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyDeleteEdge，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 301,
+      "endLine": 333
+    },
+    {
+      "id": "function:packages/domain/src/plan/patch.ts:applyReplaceSubgraph",
+      "type": "function",
+      "name": "applyReplaceSubgraph",
+      "filePath": "packages/domain/src/plan/patch.ts",
+      "summary": "函数 applyReplaceSubgraph，接受 nodes, edges, title, goal, assumptions, op 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 335,
+      "endLine": 389
+    },
+    {
+      "id": "file:packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "type": "file",
+      "name": "plan-state-boundaries.bun.test.ts",
+      "filePath": "packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "summary": "测试文件，覆盖 \"plan\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 55,
+      "nonEmptyLines": 48
+    },
+    {
+      "id": "function:packages/domain/src/plan/plan-state-boundaries.bun.test.ts:task",
+      "type": "function",
+      "name": "task",
+      "filePath": "packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "summary": "函数 task，接受 id, title 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 16
+    },
+    {
+      "id": "function:packages/domain/src/plan/plan-state-boundaries.bun.test.ts:plan",
+      "type": "function",
+      "name": "plan",
+      "filePath": "packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "summary": "函数 plan，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 18,
+      "endLine": 29
+    },
+    {
+      "id": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "type": "file",
+      "name": "plan.bun.test.ts",
+      "filePath": "packages/domain/src/plan/plan.bun.test.ts",
+      "summary": "测试文件，覆盖 \"plan\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 878,
+      "nonEmptyLines": 778
+    },
+    {
+      "id": "function:packages/domain/src/plan/plan.bun.test.ts:makeTask",
+      "type": "function",
+      "name": "makeTask",
+      "filePath": "packages/domain/src/plan/plan.bun.test.ts",
+      "summary": "函数 makeTask，接受 id, overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 22,
+      "endLine": 34
+    },
+    {
+      "id": "function:packages/domain/src/plan/plan.bun.test.ts:makeCheckpoint",
+      "type": "function",
+      "name": "makeCheckpoint",
+      "filePath": "packages/domain/src/plan/plan.bun.test.ts",
+      "summary": "函数 makeCheckpoint，接受 id, overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 49
+    },
+    {
+      "id": "function:packages/domain/src/plan/plan.bun.test.ts:makeCondition",
+      "type": "function",
+      "name": "makeCondition",
+      "filePath": "packages/domain/src/plan/plan.bun.test.ts",
+      "summary": "函数 makeCondition，接受 id, branches, overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 51,
+      "endLine": 65
+    },
+    {
+      "id": "function:packages/domain/src/plan/plan.bun.test.ts:makeWait",
+      "type": "function",
+      "name": "makeWait",
+      "filePath": "packages/domain/src/plan/plan.bun.test.ts",
+      "summary": "函数 makeWait，接受 id, overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 67,
+      "endLine": 78
+    },
+    {
+      "id": "function:packages/domain/src/plan/plan.bun.test.ts:makePlan",
+      "type": "function",
+      "name": "makePlan",
+      "filePath": "packages/domain/src/plan/plan.bun.test.ts",
+      "summary": "函数 makePlan，接受 id, nodes, edges, overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 80,
+      "endLine": 95
+    },
+    {
+      "id": "file:packages/domain/src/plan/validate.ts",
+      "type": "file",
+      "name": "validate.ts",
+      "filePath": "packages/domain/src/plan/validate.ts",
+      "summary": "包含 uniqueEdges、semanticEdges、terminalNodeIds等 函数，属于 \"plan\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 282,
+      "nonEmptyLines": 257
+    },
+    {
+      "id": "function:packages/domain/src/plan/validate.ts:uniqueEdges",
+      "type": "function",
+      "name": "uniqueEdges",
+      "filePath": "packages/domain/src/plan/validate.ts",
+      "summary": "函数 uniqueEdges，接受 edges 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 15,
+      "endLine": 25
+    },
+    {
+      "id": "function:packages/domain/src/plan/validate.ts:semanticEdges",
+      "type": "function",
+      "name": "semanticEdges",
+      "filePath": "packages/domain/src/plan/validate.ts",
+      "summary": "函数 semanticEdges，接受 plan, nodeIds 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 27,
+      "endLine": 46
+    },
+    {
+      "id": "function:packages/domain/src/plan/validate.ts:isDag",
+      "type": "function",
+      "name": "isDag",
+      "filePath": "packages/domain/src/plan/validate.ts",
+      "summary": "函数 isDag，接受 nodeIds, edges 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 56,
+      "endLine": 78
+    },
+    {
+      "id": "function:packages/domain/src/plan/validate.ts:validateEditablePlan",
+      "type": "function",
+      "name": "validateEditablePlan",
+      "filePath": "packages/domain/src/plan/validate.ts",
+      "summary": "函数 validateEditablePlan，接受 plan 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 84,
+      "endLine": 218
+    },
+    {
+      "id": "function:packages/domain/src/plan/validate.ts:validateNodeSpecific",
+      "type": "function",
+      "name": "validateNodeSpecific",
+      "filePath": "packages/domain/src/plan/validate.ts",
+      "summary": "函数 validateNodeSpecific，接受 node, index, errors 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 220,
+      "endLine": 282
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "type": "file",
+      "name": "ai-execution-view.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "summary": "包含 effectivePlanFrom、currentNodeFromEffective、readAiExecutionView等 函数，属于 \"agent-tools\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 99,
+      "nonEmptyLines": 94
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/ai-execution-view.ts:effectivePlanFrom",
+      "type": "function",
+      "name": "effectivePlanFrom",
+      "filePath": "packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "summary": "函数 effectivePlanFrom，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 15
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/ai-execution-view.ts:currentNodeFromEffective",
+      "type": "function",
+      "name": "currentNodeFromEffective",
+      "filePath": "packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "summary": "函数 currentNodeFromEffective，接受 plan 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 17,
+      "endLine": 27
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/ai-execution-view.ts:readAiExecutionView",
+      "type": "function",
+      "name": "readAiExecutionView",
+      "filePath": "packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "summary": "函数 readAiExecutionView，接受 value 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 29,
+      "endLine": 89
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/__tests__/conflict-detector.bun.test.ts",
+      "type": "file",
+      "name": "conflict-detector.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/__tests__/conflict-detector.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 295,
+      "nonEmptyLines": 268
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/__tests__/timeslot-suggester.bun.test.ts",
+      "type": "file",
+      "name": "timeslot-suggester.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/__tests__/timeslot-suggester.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 395,
+      "nonEmptyLines": 333
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "type": "file",
+      "name": "conflict-detector.ts",
+      "filePath": "packages/engine/src/modules/ai/conflict-detector.ts",
+      "summary": "包含 minutesBetween、severityForMinutes、dayKey等 函数，属于 \"ai\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 110,
+      "nonEmptyLines": 90
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectTimeOverlaps",
+      "type": "function",
+      "name": "detectTimeOverlaps",
+      "filePath": "packages/engine/src/modules/ai/conflict-detector.ts",
+      "summary": "函数 detectTimeOverlaps，接受 tasks 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 17,
+      "endLine": 46
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectOverload",
+      "type": "function",
+      "name": "detectOverload",
+      "filePath": "packages/engine/src/modules/ai/conflict-detector.ts",
+      "summary": "函数 detectOverload，接受 tasks 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 48,
+      "endLine": 72
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectFragmentation",
+      "type": "function",
+      "name": "detectFragmentation",
+      "filePath": "packages/engine/src/modules/ai/conflict-detector.ts",
+      "summary": "函数 detectFragmentation，接受 tasks 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 74,
+      "endLine": 88
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectDependencyConflicts",
+      "type": "function",
+      "name": "detectDependencyConflicts",
+      "filePath": "packages/engine/src/modules/ai/conflict-detector.ts",
+      "summary": "函数 detectDependencyConflicts，接受 tasks 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 90,
+      "endLine": 110
+    },
+    {
+      "id": "file:packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "type": "file",
+      "name": "reconcile-impossible-state.bun.test.ts",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "summary": "测试文件，覆盖 \"orchestration\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 71,
+      "nonEmptyLines": 66
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts:node",
+      "type": "function",
+      "name": "node",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "summary": "函数 node，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 27
+    },
+    {
+      "id": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "type": "file",
+      "name": "reconcile-invariants.ts",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "summary": "包含 detectReconciliationIssues、deriveRepairActions、isTerminalStatus 函数，属于 \"orchestration\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 34,
+      "nonEmptyLines": 30
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-invariants.ts:detectReconciliationIssues",
+      "type": "function",
+      "name": "detectReconciliationIssues",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "summary": "函数 detectReconciliationIssues，接受 graph 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 24
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-invariants.ts:deriveRepairActions",
+      "type": "function",
+      "name": "deriveRepairActions",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "summary": "函数 deriveRepairActions，接受 issues 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 26,
+      "endLine": 30
+    },
+    {
+      "id": "file:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "type": "file",
+      "name": "reconcile-task-state.bun.test.ts",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "summary": "测试文件，覆盖 \"orchestration\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 229,
+      "nonEmptyLines": 206
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts:makeNode",
+      "type": "function",
+      "name": "makeNode",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "summary": "函数 makeNode，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 34
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts:makeGraph",
+      "type": "function",
+      "name": "makeGraph",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "summary": "函数 makeGraph，接受 nodes, overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 61
+    },
+    {
+      "id": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "file",
+      "name": "reconcile-task-state.ts",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "包含 reconcileTaskState、deriveExecutionState、pickCurrentNode等 函数，属于 \"orchestration\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 273,
+      "nonEmptyLines": 250
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:reconcileTaskState",
+      "type": "function",
+      "name": "reconcileTaskState",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 reconcileTaskState，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 37,
+      "endLine": 84
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:deriveExecutionState",
+      "type": "function",
+      "name": "deriveExecutionState",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 deriveExecutionState，接受 graph, blockReason, taskStatus 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 86,
+      "endLine": 103
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:pickCurrentNode",
+      "type": "function",
+      "name": "pickCurrentNode",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 pickCurrentNode，接受 graph, blockReason 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 105,
+      "endLine": 118
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:derivePrimaryAction",
+      "type": "function",
+      "name": "derivePrimaryAction",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 derivePrimaryAction，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 120,
+      "endLine": 150
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:executionStateFromTaskBlock",
+      "type": "function",
+      "name": "executionStateFromTaskBlock",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 executionStateFromTaskBlock，接受 blockReason, taskStatus 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 152,
+      "endLine": 181
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:derivePrimaryActionFromTaskBlock",
+      "type": "function",
+      "name": "derivePrimaryActionFromTaskBlock",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 derivePrimaryActionFromTaskBlock，接受 blockReason, targetNodeId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 183,
+      "endLine": 211
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:deriveProgress",
+      "type": "function",
+      "name": "deriveProgress",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 deriveProgress，接受 graph 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 217,
+      "endLine": 227
+    },
+    {
+      "id": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:toGraphNodeState",
+      "type": "function",
+      "name": "toGraphNodeState",
+      "filePath": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "summary": "函数 toGraphNodeState，接受 node, currentNodeId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 229,
+      "endLine": 243
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "type": "file",
+      "name": "execution-state-invariants.bun.test.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 82,
+      "nonEmptyLines": 76
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts:node",
+      "type": "function",
+      "name": "node",
+      "filePath": "packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "summary": "函数 node，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 5,
+      "endLine": 32
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts:graph",
+      "type": "function",
+      "name": "graph",
+      "filePath": "packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "summary": "函数 graph，接受 nodes 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 34,
+      "endLine": 58
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "type": "file",
+      "name": "ai-runtime-invoker.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "定义了 IncompleteRunStreamError、AiRuntimeInvoker 类，包含 toStartRunInput、runProviderRequest、reconcileInterruptedRun等 函数，属于 \"plan-execution\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 1033,
+      "nonEmptyLines": 972
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:toStartRunInput",
+      "type": "function",
+      "name": "toStartRunInput",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 toStartRunInput，接受 request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 253,
+      "endLine": 268
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:runProviderRequest",
+      "type": "function",
+      "name": "runProviderRequest",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 runProviderRequest，接受 providerClient, request, options 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 270,
+      "endLine": 349
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:reconcileInterruptedRun",
+      "type": "function",
+      "name": "reconcileInterruptedRun",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 reconcileInterruptedRun，接受 providerClient, run, signal 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 351,
+      "endLine": 375
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:ensureProviderRunRecord",
+      "type": "function",
+      "name": "ensureProviderRunRecord",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 ensureProviderRunRecord，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 377,
+      "endLine": 442
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:updateProviderRunRecord",
+      "type": "function",
+      "name": "updateProviderRunRecord",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 updateProviderRunRecord，接受 providerRunRecordId, data 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 450,
+      "endLine": 470
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistRuntimeRunRef",
+      "type": "function",
+      "name": "persistRuntimeRunRef",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 persistRuntimeRunRef，接受 runId, run 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 472,
+      "endLine": 488
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:readTaskSessionProviderRef",
+      "type": "function",
+      "name": "readTaskSessionProviderRef",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 readTaskSessionProviderRef，接受 taskSessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 500,
+      "endLine": 509
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistTaskSessionProviderRef",
+      "type": "function",
+      "name": "persistTaskSessionProviderRef",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 persistTaskSessionProviderRef，接受 taskSessionId, providerSessionRef 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 511,
+      "endLine": 520
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:collectProviderRunSnapshot",
+      "type": "function",
+      "name": "collectProviderRunSnapshot",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 collectProviderRunSnapshot，接受 provider, events, fallbackSessionId, fallbackRun, options 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 544,
+      "endLine": 606
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistProviderRuntimeEvent",
+      "type": "function",
+      "name": "persistProviderRuntimeEvent",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 persistProviderRuntimeEvent，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 625,
+      "endLine": 727
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:reconcilePendingProviderApprovals",
+      "type": "function",
+      "name": "reconcilePendingProviderApprovals",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 reconcilePendingProviderApprovals，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 731,
+      "endLine": 783
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistProviderApproval",
+      "type": "function",
+      "name": "persistProviderApproval",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 persistProviderApproval，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 785,
+      "endLine": 842
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:updateProviderRunAuditRefs",
+      "type": "function",
+      "name": "updateProviderRunAuditRefs",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 updateProviderRunAuditRefs，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 844,
+      "endLine": 871
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:buildExecutionGatewayRequest",
+      "type": "function",
+      "name": "buildExecutionGatewayRequest",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 buildExecutionGatewayRequest，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 890,
+      "endLine": 928
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:buildExecutionAiInput",
+      "type": "function",
+      "name": "buildExecutionAiInput",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 buildExecutionAiInput，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 930,
+      "endLine": 954
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistRuntimeHistory",
+      "type": "function",
+      "name": "persistRuntimeHistory",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 persistRuntimeHistory，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 956,
+      "endLine": 1000
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:extractAssistantContent",
+      "type": "function",
+      "name": "extractAssistantContent",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "函数 extractAssistantContent，接受 response 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 1002,
+      "endLine": 1023
+    },
+    {
+      "id": "class:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:AiRuntimeInvoker",
+      "type": "class",
+      "name": "AiRuntimeInvoker",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "summary": "类 AiRuntimeInvoker，定义了 1 个方法。",
+      "complexity": "moderate",
+      "tags": [
+        "class"
+      ],
+      "startLine": 100,
+      "endLine": 251
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "type": "file",
+      "name": "execution-actions.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "summary": "包含 resolveCheckpointAction、checkpointPayloadFields、checkpointPayloadText等 函数，属于 \"plan-execution\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 72,
+      "nonEmptyLines": 65
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:resolveCheckpointAction",
+      "type": "function",
+      "name": "resolveCheckpointAction",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "summary": "函数 resolveCheckpointAction，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 26,
+      "endLine": 36
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:checkpointPayloadFields",
+      "type": "function",
+      "name": "checkpointPayloadFields",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "summary": "函数 checkpointPayloadFields，接受 payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 38,
+      "endLine": 49
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:checkpointPayloadText",
+      "type": "function",
+      "name": "checkpointPayloadText",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "summary": "函数 checkpointPayloadText，接受 payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 51,
+      "endLine": 53
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:payloadText",
+      "type": "function",
+      "name": "payloadText",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "summary": "函数 payloadText，接受 payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 55,
+      "endLine": 64
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "type": "file",
+      "name": "execution-checkpoint.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "包含 deriveExecutionCheckpoint、checkpointId、isCheckpointStatus等 函数，属于 \"plan-execution\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 244,
+      "nonEmptyLines": 228
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:deriveExecutionCheckpoint",
+      "type": "function",
+      "name": "deriveExecutionCheckpoint",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "函数 deriveExecutionCheckpoint，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 86,
+      "endLine": 108
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointId",
+      "type": "function",
+      "name": "checkpointId",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "函数 checkpointId，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 110,
+      "endLine": 116
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:findCheckpointNode",
+      "type": "function",
+      "name": "findCheckpointNode",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "函数 findCheckpointNode，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 125,
+      "endLine": 136
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointKind",
+      "type": "function",
+      "name": "checkpointKind",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "函数 checkpointKind，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 138,
+      "endLine": 148
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointTitle",
+      "type": "function",
+      "name": "checkpointTitle",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "函数 checkpointTitle，接受 kind, node 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 162,
+      "endLine": 182
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointMessage",
+      "type": "function",
+      "name": "checkpointMessage",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "函数 checkpointMessage，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 184,
+      "endLine": 196
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointActions",
+      "type": "function",
+      "name": "checkpointActions",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "summary": "函数 checkpointActions，接受 kind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 216,
+      "endLine": 244
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "type": "file",
+      "name": "execution-state-machine.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "包含 executionStatusFromEffectiveGraph、executionStatusFromWaitKind、executionStatusFromGraphOutcome等 函数，属于 \"plan-execution\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 173,
+      "nonEmptyLines": 162
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromEffectiveGraph",
+      "type": "function",
+      "name": "executionStatusFromEffectiveGraph",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 executionStatusFromEffectiveGraph，接受 effective 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 20,
+      "endLine": 48
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromWaitKind",
+      "type": "function",
+      "name": "executionStatusFromWaitKind",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 executionStatusFromWaitKind，接受 waitKind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 49,
+      "endLine": 63
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromGraphOutcome",
+      "type": "function",
+      "name": "executionStatusFromGraphOutcome",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 executionStatusFromGraphOutcome，接受 outcome 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 65,
+      "endLine": 78
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:pauseReasonFromExecutionStatus",
+      "type": "function",
+      "name": "pauseReasonFromExecutionStatus",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 pauseReasonFromExecutionStatus，接受 status, waitKind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 80,
+      "endLine": 101
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:planRunStatusForExecutionStatus",
+      "type": "function",
+      "name": "planRunStatusForExecutionStatus",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 planRunStatusForExecutionStatus，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 103,
+      "endLine": 121
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:graphStatusForExecutionStatus",
+      "type": "function",
+      "name": "graphStatusForExecutionStatus",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 graphStatusForExecutionStatus，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 123,
+      "endLine": 139
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionTransition",
+      "type": "function",
+      "name": "executionTransition",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 executionTransition，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 141,
+      "endLine": 153
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:sessionStatusForExecutionStatus",
+      "type": "function",
+      "name": "sessionStatusForExecutionStatus",
+      "filePath": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "summary": "函数 sessionStatusForExecutionStatus，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 155,
+      "endLine": 173
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "type": "file",
+      "name": "execute-command.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "包含 eventCommandType、noPlanResponse、formatInputFields等 函数，属于 \"kernel\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 604,
+      "nonEmptyLines": 567
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:eventCommandType",
+      "type": "function",
+      "name": "eventCommandType",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 eventCommandType，接受 command 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 60,
+      "endLine": 81
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:noPlanResponse",
+      "type": "function",
+      "name": "noPlanResponse",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 noPlanResponse，接受 taskId, sessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 85,
+      "endLine": 98
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:currentNode",
+      "type": "function",
+      "name": "currentNode",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 currentNode，接受 effective 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 115,
+      "endLine": 126
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:resolveSubmitNodeId",
+      "type": "function",
+      "name": "resolveSubmitNodeId",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 resolveSubmitNodeId，接受 command, state, effective 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 135,
+      "endLine": 157
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:toSubmittedNodeResult",
+      "type": "function",
+      "name": "toSubmittedNodeResult",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 toSubmittedNodeResult，接受 nodeId, result, effective 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 159,
+      "endLine": 210
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:buildGraphCommand",
+      "type": "function",
+      "name": "buildGraphCommand",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 buildGraphCommand，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 212,
+      "endLine": 321
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:finalizeOutcome",
+      "type": "function",
+      "name": "finalizeOutcome",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 finalizeOutcome，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 323,
+      "endLine": 402
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:executeCommand",
+      "type": "function",
+      "name": "executeCommand",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "summary": "函数 executeCommand，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 410,
+      "endLine": 604
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "type": "file",
+      "name": "graph-callbacks.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "summary": "包含 createKernelGraphCallbacks 函数，属于 \"kernel\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 120,
+      "nonEmptyLines": 116
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts:createKernelGraphCallbacks",
+      "type": "function",
+      "name": "createKernelGraphCallbacks",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "summary": "函数 createKernelGraphCallbacks，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 22,
+      "endLine": 120
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "type": "file",
+      "name": "kernel-types.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "summary": "定义了 ExecutionConflictError 类，属于 \"kernel\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 52,
+      "nonEmptyLines": 46
+    },
+    {
+      "id": "class:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts:ExecutionConflictError",
+      "type": "class",
+      "name": "ExecutionConflictError",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "summary": "类 ExecutionConflictError，定义了 1 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 47,
+      "endLine": 52
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "type": "file",
+      "name": "sync-runtime-result.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "summary": "包含 syncPlanRunRuntimeResult 函数，属于 \"kernel\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 57,
+      "nonEmptyLines": 54
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts:syncPlanRunRuntimeResult",
+      "type": "function",
+      "name": "syncPlanRunRuntimeResult",
+      "filePath": "packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "summary": "函数 syncPlanRunRuntimeResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 14,
+      "endLine": 57
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "type": "file",
+      "name": "node-ai-capabilities.bun.test.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "summary": "测试文件，覆盖 \"plan-execution\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 603,
+      "nonEmptyLines": 574
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeTaskNode",
+      "type": "function",
+      "name": "makeTaskNode",
+      "filePath": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "summary": "函数 makeTaskNode。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 8,
+      "endLine": 33
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeConditionNode",
+      "type": "function",
+      "name": "makeConditionNode",
+      "filePath": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "summary": "函数 makeConditionNode。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 35,
+      "endLine": 58
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeDownstreamNode",
+      "type": "function",
+      "name": "makeDownstreamNode",
+      "filePath": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "summary": "函数 makeDownstreamNode，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 60,
+      "endLine": 77
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makePlan",
+      "type": "function",
+      "name": "makePlan",
+      "filePath": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "summary": "函数 makePlan，接受 node 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 79,
+      "endLine": 103
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeConditionPlan",
+      "type": "function",
+      "name": "makeConditionPlan",
+      "filePath": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "summary": "函数 makeConditionPlan，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 105,
+      "endLine": 120
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeAttempt",
+      "type": "function",
+      "name": "makeAttempt",
+      "filePath": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "summary": "函数 makeAttempt，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 122,
+      "endLine": 135
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/automation-suggestion-panel.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx:makeSuggestions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "target": "function:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx:AutomationSuggestionPanel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "target": "function:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx:AutomationSuggestionPanel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "target": "function:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx:TimeslotSuggestionPanel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "target": "function:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx:TimeslotSuggestionPanel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/schedule-page-panels.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts",
+      "target": "function:apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts:stringifyResultOutput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts",
+      "target": "function:apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts:stringifyResultOutput",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:computeTaskDiff",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:computePlanSummary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:highRiskChanges",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:buildTaskWorkspaceDiffPreviewSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts:buildTaskWorkspaceDiffPreviewSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/assistant/task-workspace-diff-preview.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "target": "function:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx:renderWithQueryClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/plan-runner.task-executor.fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/schedule/panels/schedule-page-panels.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/inspector-run-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/ai/task-plan-generation-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/pages/get-schedule-page.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/node-executors/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/resolve-checkpoint-transition.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/schedule/panels/selected-block-sheet/selected-block-main-column.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/__tests__/api/plan-execution-module.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/routes/pages/work.routes.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/work/work-page/work-page-main-tabs.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-plan-graph/inspector.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/plan-runner.task-executor.external-results.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/projection/execution-graph-selectors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/assistant/task-workspace-diff-preview.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-edit-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/pages/work-page/get-work-page.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:packages/engine/src/modules/plans/apply-plan-patch-command.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/__tests__/api/plan-lifecycle-edge-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/__tests__/api/real-router-smoke.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/schedule/panels/selected-block-sheet/use-selected-block-plan-state.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/panels/task-ai-plan-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/ai.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/execution/action-tab.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "function:packages/domain/src/plan/compile.ts:rewriteConditionTarget",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "function:packages/domain/src/plan/compile.ts:buildNodeConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "function:packages/domain/src/plan/compile.ts:buildCompiledNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "function:packages/domain/src/plan/compile.ts:compileEditablePlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "function:packages/domain/src/plan/compile.ts:compileEditablePlan",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "function:packages/domain/src/plan/compile.ts:computeTopologicalOrder",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/compile.ts",
+      "target": "file:packages/domain/src/plan/validate.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyPlanPatch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyPlanPatch",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyOperation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyUpdatePlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyAddNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyUpdateNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyDeleteNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyAddEdge",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyDeleteEdge",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "function:packages/domain/src/plan/patch.ts:applyReplaceSubgraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/patch.ts",
+      "target": "file:packages/domain/src/plan/validate.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "target": "function:packages/domain/src/plan/plan-state-boundaries.bun.test.ts:task",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "target": "function:packages/domain/src/plan/plan-state-boundaries.bun.test.ts:plan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "target": "file:packages/domain/src/plan/compile.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "target": "file:packages/domain/src/plan/validate.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "function:packages/domain/src/plan/plan.bun.test.ts:makeTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "function:packages/domain/src/plan/plan.bun.test.ts:makeCheckpoint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "function:packages/domain/src/plan/plan.bun.test.ts:makeCondition",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "function:packages/domain/src/plan/plan.bun.test.ts:makeWait",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "function:packages/domain/src/plan/plan.bun.test.ts:makePlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "file:packages/domain/src/plan/compile.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "file:packages/domain/src/plan/patch.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/plan.bun.test.ts",
+      "target": "file:packages/domain/src/plan/validate.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/plan/validate.ts",
+      "target": "function:packages/domain/src/plan/validate.ts:uniqueEdges",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/validate.ts",
+      "target": "function:packages/domain/src/plan/validate.ts:semanticEdges",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/validate.ts",
+      "target": "function:packages/domain/src/plan/validate.ts:isDag",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/validate.ts",
+      "target": "function:packages/domain/src/plan/validate.ts:validateEditablePlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/validate.ts",
+      "target": "function:packages/domain/src/plan/validate.ts:validateEditablePlan",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/plan/validate.ts",
+      "target": "function:packages/domain/src/plan/validate.ts:validateNodeSpecific",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/plan/validate.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/ai-execution-view.ts:effectivePlanFrom",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/ai-execution-view.ts:currentNodeFromEffective",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/ai-execution-view.ts:readAiExecutionView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/ai-execution-view.ts:readAiExecutionView",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/conflict-detector.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/conflict-detector.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/timeslot-suggester.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/timeslot-suggester.bun.test.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/timeslot-suggester.bun.test.ts",
+      "target": "file:packages/shared/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectTimeOverlaps",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectTimeOverlaps",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectOverload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectOverload",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectFragmentation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectFragmentation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectDependencyConflicts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-detector.ts:detectDependencyConflicts",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "target": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts:node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-invariants.ts:detectReconciliationIssues",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-invariants.ts:detectReconciliationIssues",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-invariants.ts:deriveRepairActions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-invariants.ts:deriveRepairActions",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts:makeNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts:makeGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:reconcileTaskState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:reconcileTaskState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:deriveExecutionState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:pickCurrentNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:derivePrimaryAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:executionStateFromTaskBlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:derivePrimaryActionFromTaskBlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:deriveProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "function:packages/engine/src/modules/orchestration/reconcile-task-state.ts:toGraphNodeState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/engine/src/modules/pages/work-page/get-work-page.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts:node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts:graph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/session-policy.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/session-policy.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:toStartRunInput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:runProviderRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:runProviderRequest",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:reconcileInterruptedRun",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:ensureProviderRunRecord",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:updateProviderRunRecord",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistRuntimeRunRef",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:readTaskSessionProviderRef",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistTaskSessionProviderRef",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:collectProviderRunSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistProviderRuntimeEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:reconcilePendingProviderApprovals",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistProviderApproval",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:updateProviderRunAuditRefs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:buildExecutionGatewayRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:buildExecutionAiInput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:persistRuntimeHistory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:extractAssistantContent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "class:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:AiRuntimeInvoker",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "class:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts:AiRuntimeInvoker",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/ai/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/ai/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/node-executors/checkpoint-executor.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/node-executors/condition-executor.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/node-executors/condition-executor.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/node-executors/task-executor.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-executor-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:resolveCheckpointAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:resolveCheckpointAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:checkpointPayloadFields",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:checkpointPayloadFields",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:checkpointPayloadText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:checkpointPayloadText",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-actions.ts:payloadText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/dispatch-action.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/resolve-checkpoint-transition.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/resume-current-node.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:deriveExecutionCheckpoint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:deriveExecutionCheckpoint",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointId",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:findCheckpointNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointKind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointMessage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-checkpoint.ts:checkpointActions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/projection/execution-response.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromEffectiveGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromEffectiveGraph",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromWaitKind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromWaitKind",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromGraphOutcome",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionStatusFromGraphOutcome",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:pauseReasonFromExecutionStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:pauseReasonFromExecutionStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:planRunStatusForExecutionStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:planRunStatusForExecutionStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:graphStatusForExecutionStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:graphStatusForExecutionStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionTransition",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:executionTransition",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/execution-state-machine.ts:sessionStatusForExecutionStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:eventCommandType",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:noPlanResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:currentNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:resolveSubmitNodeId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:toSubmittedNodeResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:buildGraphCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:finalizeOutcome",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:executeCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/execute-command.ts:executeCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-state-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/runtime-event-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/task-execution-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/work-block-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/projection/execution-graph-selectors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/projection/execution-response.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/graph-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/runtime-outcome.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-state-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/runtime-event-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/task-execution-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/work-block-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/projection/execution-graph-selectors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/projection/execution-response.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/graph-state.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/runtime-outcome.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/projections/rebuild-task-projection.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.smoke.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts:createKernelGraphCallbacks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts:createKernelGraphCallbacks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/task-execution-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/committed-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-executor-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/task-execution-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/committed-state.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-executor-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "class:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts:ExecutionConflictError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "class:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts:ExecutionConflictError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "file:packages/graph-runtime/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts:syncPlanRunRuntimeResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts:syncPlanRunRuntimeResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/reconcile-stale-runtime-runs.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeTaskNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeConditionNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeDownstreamNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makePlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeConditionPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts:makeAttempt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

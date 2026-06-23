@@ -1,0 +1,2910 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/graph-runtime/src/builtin-nodes.ts",
+      "type": "file",
+      "name": "builtin-nodes.ts",
+      "filePath": "packages/graph-runtime/src/builtin-nodes.ts",
+      "summary": "包含 normalizeBranchToken、pickUserBranch、buildUserPrompt等 函数，属于 \"src\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 103,
+      "nonEmptyLines": 90
+    },
+    {
+      "id": "function:packages/graph-runtime/src/builtin-nodes.ts:pickUserBranch",
+      "type": "function",
+      "name": "pickUserBranch",
+      "filePath": "packages/graph-runtime/src/builtin-nodes.ts",
+      "summary": "函数 pickUserBranch，接受 input, config 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 12,
+      "endLine": 46
+    },
+    {
+      "id": "function:packages/graph-runtime/src/builtin-nodes.ts:executeBuiltinGraphNode",
+      "type": "function",
+      "name": "executeBuiltinGraphNode",
+      "filePath": "packages/graph-runtime/src/builtin-nodes.ts",
+      "summary": "函数 executeBuiltinGraphNode，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 57,
+      "endLine": 103
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "type": "file",
+      "name": "apply-mutation.ts",
+      "filePath": "packages/graph-runtime/src/commands/apply-mutation.ts",
+      "summary": "包含 applyMutationCommand 函数，属于 \"commands\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 50,
+      "nonEmptyLines": 49
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/apply-mutation.ts:applyMutationCommand",
+      "type": "function",
+      "name": "applyMutationCommand",
+      "filePath": "packages/graph-runtime/src/commands/apply-mutation.ts",
+      "summary": "函数 applyMutationCommand，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 50
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "type": "file",
+      "name": "approve-current-node.ts",
+      "filePath": "packages/graph-runtime/src/commands/approve-current-node.ts",
+      "summary": "包含 approveCurrentNodeCommand 函数，属于 \"commands\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 51,
+      "nonEmptyLines": 49
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/approve-current-node.ts:approveCurrentNodeCommand",
+      "type": "function",
+      "name": "approveCurrentNodeCommand",
+      "filePath": "packages/graph-runtime/src/commands/approve-current-node.ts",
+      "summary": "函数 approveCurrentNodeCommand，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 51
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "type": "file",
+      "name": "cancel-session.ts",
+      "filePath": "packages/graph-runtime/src/commands/cancel-session.ts",
+      "summary": "包含 cancelSessionCommand 函数，属于 \"commands\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 25,
+      "nonEmptyLines": 24
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/cancel-session.ts:cancelSessionCommand",
+      "type": "function",
+      "name": "cancelSessionCommand",
+      "filePath": "packages/graph-runtime/src/commands/cancel-session.ts",
+      "summary": "函数 cancelSessionCommand，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 25
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/pause-session.ts",
+      "type": "file",
+      "name": "pause-session.ts",
+      "filePath": "packages/graph-runtime/src/commands/pause-session.ts",
+      "summary": "包含 pauseSessionCommand 函数，属于 \"commands\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 26,
+      "nonEmptyLines": 24
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/pause-session.ts:pauseSessionCommand",
+      "type": "function",
+      "name": "pauseSessionCommand",
+      "filePath": "packages/graph-runtime/src/commands/pause-session.ts",
+      "summary": "函数 pauseSessionCommand，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 26
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "type": "file",
+      "name": "retry-node.ts",
+      "filePath": "packages/graph-runtime/src/commands/retry-node.ts",
+      "summary": "包含 retryNodeCommand 函数，属于 \"commands\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 50,
+      "nonEmptyLines": 48
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/retry-node.ts:retryNodeCommand",
+      "type": "function",
+      "name": "retryNodeCommand",
+      "filePath": "packages/graph-runtime/src/commands/retry-node.ts",
+      "summary": "函数 retryNodeCommand，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 50
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "type": "file",
+      "name": "state-updates.ts",
+      "filePath": "packages/graph-runtime/src/commands/state-updates.ts",
+      "summary": "包含 approveCurrentNodeResult、retryNodeState、cancelSessionState等 函数，属于 \"commands\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 293,
+      "nonEmptyLines": 285
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/state-updates.ts:approveCurrentNodeResult",
+      "type": "function",
+      "name": "approveCurrentNodeResult",
+      "filePath": "packages/graph-runtime/src/commands/state-updates.ts",
+      "summary": "函数 approveCurrentNodeResult，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 8,
+      "endLine": 60
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/state-updates.ts:retryNodeState",
+      "type": "function",
+      "name": "retryNodeState",
+      "filePath": "packages/graph-runtime/src/commands/state-updates.ts",
+      "summary": "函数 retryNodeState，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 62,
+      "endLine": 86
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/state-updates.ts:cancelSessionState",
+      "type": "function",
+      "name": "cancelSessionState",
+      "filePath": "packages/graph-runtime/src/commands/state-updates.ts",
+      "summary": "函数 cancelSessionState，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 88,
+      "endLine": 122
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/state-updates.ts:submitNodeResultState",
+      "type": "function",
+      "name": "submitNodeResultState",
+      "filePath": "packages/graph-runtime/src/commands/state-updates.ts",
+      "summary": "函数 submitNodeResultState，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 124,
+      "endLine": 293
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "type": "file",
+      "name": "submit-node-result.ts",
+      "filePath": "packages/graph-runtime/src/commands/submit-node-result.ts",
+      "summary": "包含 submitNodeResultCommand 函数，属于 \"commands\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 72,
+      "nonEmptyLines": 71
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/submit-node-result.ts:submitNodeResultCommand",
+      "type": "function",
+      "name": "submitNodeResultCommand",
+      "filePath": "packages/graph-runtime/src/commands/submit-node-result.ts",
+      "summary": "函数 submitNodeResultCommand，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 8,
+      "endLine": 72
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "packages/graph-runtime/src/commands/types.ts",
+      "summary": "实现 \"commands\" 模块的 types 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 121,
+      "nonEmptyLines": 115
+    },
+    {
+      "id": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "type": "file",
+      "name": "validate-command.ts",
+      "filePath": "packages/graph-runtime/src/commands/validate-command.ts",
+      "summary": "包含 validationFailureOutcome、validateCommandGraphState 函数，属于 \"commands\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 47,
+      "nonEmptyLines": 44
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/validate-command.ts:validationFailureOutcome",
+      "type": "function",
+      "name": "validationFailureOutcome",
+      "filePath": "packages/graph-runtime/src/commands/validate-command.ts",
+      "summary": "函数 validationFailureOutcome，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 28
+    },
+    {
+      "id": "function:packages/graph-runtime/src/commands/validate-command.ts:validateCommandGraphState",
+      "type": "function",
+      "name": "validateCommandGraphState",
+      "filePath": "packages/graph-runtime/src/commands/validate-command.ts",
+      "summary": "函数 validateCommandGraphState，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 47
+    },
+    {
+      "id": "file:packages/graph-runtime/src/evidence.ts",
+      "type": "file",
+      "name": "evidence.ts",
+      "filePath": "packages/graph-runtime/src/evidence.ts",
+      "summary": "包含 normalizeResultEvidence 函数，属于 \"src\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 28,
+      "nonEmptyLines": 26
+    },
+    {
+      "id": "function:packages/graph-runtime/src/evidence.ts:normalizeResultEvidence",
+      "type": "function",
+      "name": "normalizeResultEvidence",
+      "filePath": "packages/graph-runtime/src/evidence.ts",
+      "summary": "函数 normalizeResultEvidence，接受 evidence 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 14,
+      "endLine": 28
+    },
+    {
+      "id": "file:packages/graph-runtime/src/execution-state.ts",
+      "type": "file",
+      "name": "execution-state.ts",
+      "filePath": "packages/graph-runtime/src/execution-state.ts",
+      "summary": "包含 pickNextNodeId、markNodeResults、appendCurrentResult等 函数，属于 \"src\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 121,
+      "nonEmptyLines": 115
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution-state.ts:pickNextNodeId",
+      "type": "function",
+      "name": "pickNextNodeId",
+      "filePath": "packages/graph-runtime/src/execution-state.ts",
+      "summary": "函数 pickNextNodeId，接受 effective, forcedNodeId, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 26
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution-state.ts:markNodeResults",
+      "type": "function",
+      "name": "markNodeResults",
+      "filePath": "packages/graph-runtime/src/execution-state.ts",
+      "summary": "函数 markNodeResults，接受 results, nodeId, nextStatus 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 28,
+      "endLine": 38
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution-state.ts:appendCurrentResult",
+      "type": "function",
+      "name": "appendCurrentResult",
+      "filePath": "packages/graph-runtime/src/execution-state.ts",
+      "summary": "函数 appendCurrentResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 40,
+      "endLine": 52
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution-state.ts:updateAttemptStatus",
+      "type": "function",
+      "name": "updateAttemptStatus",
+      "filePath": "packages/graph-runtime/src/execution-state.ts",
+      "summary": "函数 updateAttemptStatus，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 54,
+      "endLine": 73
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution-state.ts:cancelActiveAttempt",
+      "type": "function",
+      "name": "cancelActiveAttempt",
+      "filePath": "packages/graph-runtime/src/execution-state.ts",
+      "summary": "函数 cancelActiveAttempt，接受 attempts, nodeId, reason 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 75,
+      "endLine": 94
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution-state.ts:createExecutionContextSnapshot",
+      "type": "function",
+      "name": "createExecutionContextSnapshot",
+      "filePath": "packages/graph-runtime/src/execution-state.ts",
+      "summary": "函数 createExecutionContextSnapshot，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 96,
+      "endLine": 121
+    },
+    {
+      "id": "file:packages/graph-runtime/src/execution/guards.ts",
+      "type": "file",
+      "name": "guards.ts",
+      "filePath": "packages/graph-runtime/src/execution/guards.ts",
+      "summary": "包含 explainNodeExecutionBlock、findEffectiveGraphInvariantViolation、normalizeNodeResult 函数，属于 \"execution\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 68,
+      "nonEmptyLines": 57
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/guards.ts:explainNodeExecutionBlock",
+      "type": "function",
+      "name": "explainNodeExecutionBlock",
+      "filePath": "packages/graph-runtime/src/execution/guards.ts",
+      "summary": "函数 explainNodeExecutionBlock，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 29
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/guards.ts:findEffectiveGraphInvariantViolation",
+      "type": "function",
+      "name": "findEffectiveGraphInvariantViolation",
+      "filePath": "packages/graph-runtime/src/execution/guards.ts",
+      "summary": "函数 findEffectiveGraphInvariantViolation，接受 effective 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 31,
+      "endLine": 49
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/guards.ts:normalizeNodeResult",
+      "type": "function",
+      "name": "normalizeNodeResult",
+      "filePath": "packages/graph-runtime/src/execution/guards.ts",
+      "summary": "函数 normalizeNodeResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 51,
+      "endLine": 68
+    },
+    {
+      "id": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "type": "file",
+      "name": "result-normalization.ts",
+      "filePath": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "summary": "包含 appendCapabilityUnavailableResult、appendExecutionResult、isRecord等 函数，属于 \"execution\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 222,
+      "nonEmptyLines": 212
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/result-normalization.ts:appendCapabilityUnavailableResult",
+      "type": "function",
+      "name": "appendCapabilityUnavailableResult",
+      "filePath": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "summary": "函数 appendCapabilityUnavailableResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 29
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/result-normalization.ts:appendExecutionResult",
+      "type": "function",
+      "name": "appendExecutionResult",
+      "filePath": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "summary": "函数 appendExecutionResult，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 31,
+      "endLine": 141
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/result-normalization.ts:normalizeResultOutputs",
+      "type": "function",
+      "name": "normalizeResultOutputs",
+      "filePath": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "summary": "函数 normalizeResultOutputs，接受 output 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 163,
+      "endLine": 165
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/result-normalization.ts:getPauseKind",
+      "type": "function",
+      "name": "getPauseKind",
+      "filePath": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "summary": "函数 getPauseKind，接受 result 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 167,
+      "endLine": 184
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/result-normalization.ts:getResultMessage",
+      "type": "function",
+      "name": "getResultMessage",
+      "filePath": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "summary": "函数 getResultMessage，接受 result 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 186,
+      "endLine": 200
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/result-normalization.ts:getEventType",
+      "type": "function",
+      "name": "getEventType",
+      "filePath": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "summary": "函数 getEventType，接受 result 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 202,
+      "endLine": 222
+    },
+    {
+      "id": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "type": "file",
+      "name": "run-graph-execution.ts",
+      "filePath": "packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "summary": "包含 throwIfAborted、runGraphExecution 函数，属于 \"execution\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 399,
+      "nonEmptyLines": 376
+    },
+    {
+      "id": "function:packages/graph-runtime/src/execution/run-graph-execution.ts:runGraphExecution",
+      "type": "function",
+      "name": "runGraphExecution",
+      "filePath": "packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "summary": "函数 runGraphExecution，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 34,
+      "endLine": 399
+    },
+    {
+      "id": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "packages/graph-runtime/src/execution/types.ts",
+      "summary": "实现 \"execution\" 模块的 types 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 77,
+      "nonEmptyLines": 74
+    },
+    {
+      "id": "file:packages/graph-runtime/src/graph-builder.ts",
+      "type": "file",
+      "name": "graph-builder.ts",
+      "filePath": "packages/graph-runtime/src/graph-builder.ts",
+      "summary": "包含 toNodeObjective、createNodeDefinitionFromCompiledNode、createPlanGraphFromCompiledPlan 函数，属于 \"src\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 88,
+      "nonEmptyLines": 84
+    },
+    {
+      "id": "function:packages/graph-runtime/src/graph-builder.ts:toNodeObjective",
+      "type": "function",
+      "name": "toNodeObjective",
+      "filePath": "packages/graph-runtime/src/graph-builder.ts",
+      "summary": "函数 toNodeObjective，接受 node 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 12,
+      "endLine": 23
+    },
+    {
+      "id": "function:packages/graph-runtime/src/graph-builder.ts:createNodeDefinitionFromCompiledNode",
+      "type": "function",
+      "name": "createNodeDefinitionFromCompiledNode",
+      "filePath": "packages/graph-runtime/src/graph-builder.ts",
+      "summary": "函数 createNodeDefinitionFromCompiledNode，接受 node, linkedTaskId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 44
+    },
+    {
+      "id": "function:packages/graph-runtime/src/graph-builder.ts:createPlanGraphFromCompiledPlan",
+      "type": "function",
+      "name": "createPlanGraphFromCompiledPlan",
+      "filePath": "packages/graph-runtime/src/graph-builder.ts",
+      "summary": "函数 createPlanGraphFromCompiledPlan，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 46,
+      "endLine": 88
+    },
+    {
+      "id": "file:packages/graph-runtime/src/invalidation.ts",
+      "type": "file",
+      "name": "invalidation.ts",
+      "filePath": "packages/graph-runtime/src/invalidation.ts",
+      "summary": "包含 planDownstreamInvalidation、applyDownstreamInvalidation 函数，属于 \"src\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 95,
+      "nonEmptyLines": 90
+    },
+    {
+      "id": "function:packages/graph-runtime/src/invalidation.ts:planDownstreamInvalidation",
+      "type": "function",
+      "name": "planDownstreamInvalidation",
+      "filePath": "packages/graph-runtime/src/invalidation.ts",
+      "summary": "函数 planDownstreamInvalidation，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 20,
+      "endLine": 31
+    },
+    {
+      "id": "function:packages/graph-runtime/src/invalidation.ts:applyDownstreamInvalidation",
+      "type": "function",
+      "name": "applyDownstreamInvalidation",
+      "filePath": "packages/graph-runtime/src/invalidation.ts",
+      "summary": "函数 applyDownstreamInvalidation，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 33,
+      "endLine": 95
+    },
+    {
+      "id": "file:packages/graph-runtime/src/mutations.ts",
+      "type": "file",
+      "name": "mutations.ts",
+      "filePath": "packages/graph-runtime/src/mutations.ts",
+      "summary": "定义了 GraphMutationValidationError 类，包含 validateGraphMutationOperation、validateGraphMutation、applyOperation等 函数，属于 \"src\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 347,
+      "nonEmptyLines": 331
+    },
+    {
+      "id": "function:packages/graph-runtime/src/mutations.ts:validateGraphMutationOperation",
+      "type": "function",
+      "name": "validateGraphMutationOperation",
+      "filePath": "packages/graph-runtime/src/mutations.ts",
+      "summary": "函数 validateGraphMutationOperation，接受 graph, operation, operationIndex 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 44,
+      "endLine": 182
+    },
+    {
+      "id": "function:packages/graph-runtime/src/mutations.ts:validateGraphMutation",
+      "type": "function",
+      "name": "validateGraphMutation",
+      "filePath": "packages/graph-runtime/src/mutations.ts",
+      "summary": "函数 validateGraphMutation，接受 graph, operations 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 184,
+      "endLine": 198
+    },
+    {
+      "id": "function:packages/graph-runtime/src/mutations.ts:applyOperation",
+      "type": "function",
+      "name": "applyOperation",
+      "filePath": "packages/graph-runtime/src/mutations.ts",
+      "summary": "函数 applyOperation，接受 graph, operation, now 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 200,
+      "endLine": 285
+    },
+    {
+      "id": "function:packages/graph-runtime/src/mutations.ts:getAffectedNodeIds",
+      "type": "function",
+      "name": "getAffectedNodeIds",
+      "filePath": "packages/graph-runtime/src/mutations.ts",
+      "summary": "函数 getAffectedNodeIds，接受 operations 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 287,
+      "endLine": 314
+    },
+    {
+      "id": "function:packages/graph-runtime/src/mutations.ts:applyGraphMutation",
+      "type": "function",
+      "name": "applyGraphMutation",
+      "filePath": "packages/graph-runtime/src/mutations.ts",
+      "summary": "函数 applyGraphMutation，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 316,
+      "endLine": 347
+    },
+    {
+      "id": "class:packages/graph-runtime/src/mutations.ts:GraphMutationValidationError",
+      "type": "class",
+      "name": "GraphMutationValidationError",
+      "filePath": "packages/graph-runtime/src/mutations.ts",
+      "summary": "类 GraphMutationValidationError，包含属性 issues，定义了 1 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 34,
+      "endLine": 42
+    },
+    {
+      "id": "file:packages/graph-runtime/src/registry/executor-registry.ts",
+      "type": "file",
+      "name": "executor-registry.ts",
+      "filePath": "packages/graph-runtime/src/registry/executor-registry.ts",
+      "summary": "包含 getExecutorName、createRegistryExecutor 函数，属于 \"registry\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 23,
+      "nonEmptyLines": 21
+    },
+    {
+      "id": "function:packages/graph-runtime/src/registry/executor-registry.ts:createRegistryExecutor",
+      "type": "function",
+      "name": "createRegistryExecutor",
+      "filePath": "packages/graph-runtime/src/registry/executor-registry.ts",
+      "summary": "函数 createRegistryExecutor，接受 options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 12,
+      "endLine": 23
+    },
+    {
+      "id": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "file",
+      "name": "resolve.ts",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "包含 resolveEffectivePlanGraph、buildEffectiveGraphSummary、markUnreachableNodesSkipped等 函数，属于 \"src\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 495,
+      "nonEmptyLines": 455
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:resolveEffectivePlanGraph",
+      "type": "function",
+      "name": "resolveEffectivePlanGraph",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 resolveEffectivePlanGraph，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 18,
+      "endLine": 57
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:buildEffectiveGraphSummary",
+      "type": "function",
+      "name": "buildEffectiveGraphSummary",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 buildEffectiveGraphSummary，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 59,
+      "endLine": 187
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:markUnreachableNodesSkipped",
+      "type": "function",
+      "name": "markUnreachableNodesSkipped",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 markUnreachableNodesSkipped，接受 nodeMap, reachableNodeIds 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 189,
+      "endLine": 199
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:buildEffectiveNodeFromGraphNode",
+      "type": "function",
+      "name": "buildEffectiveNodeFromGraphNode",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 buildEffectiveNodeFromGraphNode，接受 node, attempts, results 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 201,
+      "endLine": 277
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:isFailedSubmissionNodeResult",
+      "type": "function",
+      "name": "isFailedSubmissionNodeResult",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 isFailedSubmissionNodeResult，接受 result 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 298,
+      "endLine": 308
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:attemptStatusPriority",
+      "type": "function",
+      "name": "attemptStatusPriority",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 attemptStatusPriority，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 321,
+      "endLine": 332
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:deriveNodeStatus",
+      "type": "function",
+      "name": "deriveNodeStatus",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 deriveNodeStatus，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 349,
+      "endLine": 387
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:mapWaitKindToNodeStatus",
+      "type": "function",
+      "name": "mapWaitKindToNodeStatus",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 mapWaitKindToNodeStatus，接受 waitKind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 389,
+      "endLine": 404
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:computeGraphEntryNodeIds",
+      "type": "function",
+      "name": "computeGraphEntryNodeIds",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 computeGraphEntryNodeIds，接受 nodeMap, edgeMap 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 406,
+      "endLine": 420
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:rebuildDependencies",
+      "type": "function",
+      "name": "rebuildDependencies",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 rebuildDependencies，接受 nodeMap, edgeMap, reachableNodeIds 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 422,
+      "endLine": 446
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:applyConditionBranchSelections",
+      "type": "function",
+      "name": "applyConditionBranchSelections",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 applyConditionBranchSelections，接受 nodeMap, edgeMap, graphEdges 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 448,
+      "endLine": 469
+    },
+    {
+      "id": "function:packages/graph-runtime/src/resolve.ts:computeReachableNodeIds",
+      "type": "function",
+      "name": "computeReachableNodeIds",
+      "filePath": "packages/graph-runtime/src/resolve.ts",
+      "summary": "函数 computeReachableNodeIds，接受 entryNodeIds, edgeMap 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 471,
+      "endLine": 495
+    },
+    {
+      "id": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "type": "file",
+      "name": "create-graph-runtime.ts",
+      "filePath": "packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "summary": "包含 createGraphRuntime 函数，属于 \"runtime\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 107,
+      "nonEmptyLines": 105
+    },
+    {
+      "id": "function:packages/graph-runtime/src/runtime/create-graph-runtime.ts:createGraphRuntime",
+      "type": "function",
+      "name": "createGraphRuntime",
+      "filePath": "packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "summary": "函数 createGraphRuntime，接受 options 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 107
+    },
+    {
+      "id": "file:packages/graph-runtime/src/status.ts",
+      "type": "file",
+      "name": "status.ts",
+      "filePath": "packages/graph-runtime/src/status.ts",
+      "summary": "包含 mapWaitKindToGraphStatus、mapTerminalReasonToGraphStatus 函数，属于 \"src\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 27,
+      "nonEmptyLines": 24
+    },
+    {
+      "id": "function:packages/graph-runtime/src/status.ts:mapWaitKindToGraphStatus",
+      "type": "function",
+      "name": "mapWaitKindToGraphStatus",
+      "filePath": "packages/graph-runtime/src/status.ts",
+      "summary": "函数 mapWaitKindToGraphStatus，接受 waitKind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 17,
+      "endLine": 21
+    },
+    {
+      "id": "function:packages/graph-runtime/src/status.ts:mapTerminalReasonToGraphStatus",
+      "type": "function",
+      "name": "mapTerminalReasonToGraphStatus",
+      "filePath": "packages/graph-runtime/src/status.ts",
+      "summary": "函数 mapTerminalReasonToGraphStatus，接受 effective 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 27
+    },
+    {
+      "id": "file:packages/graph-runtime/src/transitions.ts",
+      "type": "file",
+      "name": "transitions.ts",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "包含 resolveEdgeSemantics、resolveGraphEdgeSemantics、traverseDependencies等 函数，属于 \"src\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 230,
+      "nonEmptyLines": 214
+    },
+    {
+      "id": "function:packages/graph-runtime/src/transitions.ts:resolveEdgeSemantics",
+      "type": "function",
+      "name": "resolveEdgeSemantics",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "函数 resolveEdgeSemantics，接受 edge 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 66
+    },
+    {
+      "id": "function:packages/graph-runtime/src/transitions.ts:resolveGraphEdgeSemantics",
+      "type": "function",
+      "name": "resolveGraphEdgeSemantics",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "函数 resolveGraphEdgeSemantics，接受 graph 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 68,
+      "endLine": 70
+    },
+    {
+      "id": "function:packages/graph-runtime/src/transitions.ts:traverseDependencies",
+      "type": "function",
+      "name": "traverseDependencies",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "函数 traverseDependencies，接受 graph, startNodeIds, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 72,
+      "endLine": 107
+    },
+    {
+      "id": "function:packages/graph-runtime/src/transitions.ts:getDownstreamNodeIds",
+      "type": "function",
+      "name": "getDownstreamNodeIds",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "函数 getDownstreamNodeIds，接受 graph, nodeIds, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 109,
+      "endLine": 116
+    },
+    {
+      "id": "function:packages/graph-runtime/src/transitions.ts:getUpstreamNodeIds",
+      "type": "function",
+      "name": "getUpstreamNodeIds",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "函数 getUpstreamNodeIds，接受 graph, nodeIds, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 118,
+      "endLine": 125
+    },
+    {
+      "id": "function:packages/graph-runtime/src/transitions.ts:selectReadyNodeIds",
+      "type": "function",
+      "name": "selectReadyNodeIds",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "函数 selectReadyNodeIds，接受 graph, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 127,
+      "endLine": 148
+    },
+    {
+      "id": "function:packages/graph-runtime/src/transitions.ts:analyzeStructuralChangeImpact",
+      "type": "function",
+      "name": "analyzeStructuralChangeImpact",
+      "filePath": "packages/graph-runtime/src/transitions.ts",
+      "summary": "函数 analyzeStructuralChangeImpact，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 150,
+      "endLine": 230
+    },
+    {
+      "id": "file:packages/graph-runtime/src/types/execution.ts",
+      "type": "file",
+      "name": "execution.ts",
+      "filePath": "packages/graph-runtime/src/types/execution.ts",
+      "summary": "实现 \"types\" 模块的 execution 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 21,
+      "nonEmptyLines": 17
+    },
+    {
+      "id": "file:packages/graph-runtime/src/types/graph.ts",
+      "type": "file",
+      "name": "graph.ts",
+      "filePath": "packages/graph-runtime/src/types/graph.ts",
+      "summary": "实现 \"types\" 模块的 graph 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 75,
+      "nonEmptyLines": 66
+    },
+    {
+      "id": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/graph-runtime/src/types/index.ts",
+      "summary": "聚合导出\"types\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 6,
+      "nonEmptyLines": 6
+    },
+    {
+      "id": "file:packages/graph-runtime/src/types/runtime.ts",
+      "type": "file",
+      "name": "runtime.ts",
+      "filePath": "packages/graph-runtime/src/types/runtime.ts",
+      "summary": "包含 runtimeProgressStatusForWaitKind、runtimeProgressStatusForNodes 函数，属于 \"types\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 90,
+      "nonEmptyLines": 81
+    },
+    {
+      "id": "function:packages/graph-runtime/src/types/runtime.ts:runtimeProgressStatusForWaitKind",
+      "type": "function",
+      "name": "runtimeProgressStatusForWaitKind",
+      "filePath": "packages/graph-runtime/src/types/runtime.ts",
+      "summary": "函数 runtimeProgressStatusForWaitKind，接受 waitKind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 53
+    },
+    {
+      "id": "function:packages/graph-runtime/src/types/runtime.ts:runtimeProgressStatusForNodes",
+      "type": "function",
+      "name": "runtimeProgressStatusForNodes",
+      "filePath": "packages/graph-runtime/src/types/runtime.ts",
+      "summary": "函数 runtimeProgressStatusForNodes，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 55,
+      "endLine": 90
+    },
+    {
+      "id": "file:packages/graph-runtime/src/types/transitions.ts",
+      "type": "file",
+      "name": "transitions.ts",
+      "filePath": "packages/graph-runtime/src/types/transitions.ts",
+      "summary": "实现 \"types\" 模块的 transitions 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 76,
+      "nonEmptyLines": 64
+    },
+    {
+      "id": "file:packages/graph-runtime/src/validation.ts",
+      "type": "file",
+      "name": "validation.ts",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "包含 pushIssue、isRecord、getConditionConfig等 函数，属于 \"src\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 291,
+      "nonEmptyLines": 260
+    },
+    {
+      "id": "function:packages/graph-runtime/src/validation.ts:getConditionConfig",
+      "type": "function",
+      "name": "getConditionConfig",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "函数 getConditionConfig，接受 definition 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 29,
+      "endLine": 44
+    },
+    {
+      "id": "function:packages/graph-runtime/src/validation.ts:validateConditionBranchTargets",
+      "type": "function",
+      "name": "validateConditionBranchTargets",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "函数 validateConditionBranchTargets，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 46,
+      "endLine": 92
+    },
+    {
+      "id": "function:packages/graph-runtime/src/validation.ts:validatePlanGraph",
+      "type": "function",
+      "name": "validatePlanGraph",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "函数 validatePlanGraph，接受 graph 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 94,
+      "endLine": 167
+    },
+    {
+      "id": "function:packages/graph-runtime/src/validation.ts:validateReachability",
+      "type": "function",
+      "name": "validateReachability",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "函数 validateReachability，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 175,
+      "endLine": 214
+    },
+    {
+      "id": "function:packages/graph-runtime/src/validation.ts:validateAcyclicDependencies",
+      "type": "function",
+      "name": "validateAcyclicDependencies",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "函数 validateAcyclicDependencies，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 216,
+      "endLine": 257
+    },
+    {
+      "id": "function:packages/graph-runtime/src/validation.ts:validateEffectivePlanGraph",
+      "type": "function",
+      "name": "validateEffectivePlanGraph",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "函数 validateEffectivePlanGraph，接受 effective 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 259,
+      "endLine": 284
+    },
+    {
+      "id": "function:packages/graph-runtime/src/validation.ts:assertValidPlanGraph",
+      "type": "function",
+      "name": "assertValidPlanGraph",
+      "filePath": "packages/graph-runtime/src/validation.ts",
+      "summary": "函数 assertValidPlanGraph，接受 graph 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 286,
+      "endLine": 291
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/graph-runtime/src/builtin-nodes.ts",
+      "target": "function:packages/graph-runtime/src/builtin-nodes.ts:pickUserBranch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/builtin-nodes.ts",
+      "target": "function:packages/graph-runtime/src/builtin-nodes.ts:executeBuiltinGraphNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/builtin-nodes.ts",
+      "target": "function:packages/graph-runtime/src/builtin-nodes.ts:executeBuiltinGraphNode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/builtin-nodes.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/builtin-nodes.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "function:packages/graph-runtime/src/commands/apply-mutation.ts:applyMutationCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "function:packages/graph-runtime/src/commands/apply-mutation.ts:applyMutationCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "file:packages/graph-runtime/src/invalidation.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "file:packages/graph-runtime/src/mutations.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "target": "file:packages/graph-runtime/src/status.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "target": "function:packages/graph-runtime/src/commands/approve-current-node.ts:approveCurrentNodeCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "target": "function:packages/graph-runtime/src/commands/approve-current-node.ts:approveCurrentNodeCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "target": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "target": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "target": "function:packages/graph-runtime/src/commands/cancel-session.ts:cancelSessionCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "target": "function:packages/graph-runtime/src/commands/cancel-session.ts:cancelSessionCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "target": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/pause-session.ts",
+      "target": "function:packages/graph-runtime/src/commands/pause-session.ts:pauseSessionCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/pause-session.ts",
+      "target": "function:packages/graph-runtime/src/commands/pause-session.ts:pauseSessionCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/pause-session.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/pause-session.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/pause-session.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "target": "function:packages/graph-runtime/src/commands/retry-node.ts:retryNodeCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "target": "function:packages/graph-runtime/src/commands/retry-node.ts:retryNodeCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "target": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "target": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:approveCurrentNodeResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:approveCurrentNodeResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:retryNodeState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:retryNodeState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:cancelSessionState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:cancelSessionState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:submitNodeResultState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "function:packages/graph-runtime/src/commands/state-updates.ts:submitNodeResultState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "file:packages/graph-runtime/src/evidence.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "file:packages/graph-runtime/src/execution-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "function:packages/graph-runtime/src/commands/submit-node-result.ts:submitNodeResultCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "function:packages/graph-runtime/src/commands/submit-node-result.ts:submitNodeResultCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "file:packages/graph-runtime/src/commands/state-updates.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "target": "file:packages/graph-runtime/src/status.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/types.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/types.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "target": "function:packages/graph-runtime/src/commands/validate-command.ts:validationFailureOutcome",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "target": "function:packages/graph-runtime/src/commands/validate-command.ts:validateCommandGraphState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "target": "function:packages/graph-runtime/src/commands/validate-command.ts:validateCommandGraphState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "target": "file:packages/graph-runtime/src/validation.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/evidence.ts",
+      "target": "function:packages/graph-runtime/src/evidence.ts:normalizeResultEvidence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/evidence.ts",
+      "target": "function:packages/graph-runtime/src/evidence.ts:normalizeResultEvidence",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/evidence.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:pickNextNodeId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:pickNextNodeId",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:markNodeResults",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:markNodeResults",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:appendCurrentResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:appendCurrentResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:updateAttemptStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:updateAttemptStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:cancelActiveAttempt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:cancelActiveAttempt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:createExecutionContextSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "function:packages/graph-runtime/src/execution-state.ts:createExecutionContextSnapshot",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "file:packages/graph-runtime/src/execution/guards.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution-state.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "function:packages/graph-runtime/src/execution/guards.ts:explainNodeExecutionBlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "function:packages/graph-runtime/src/execution/guards.ts:explainNodeExecutionBlock",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "function:packages/graph-runtime/src/execution/guards.ts:findEffectiveGraphInvariantViolation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "function:packages/graph-runtime/src/execution/guards.ts:findEffectiveGraphInvariantViolation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "function:packages/graph-runtime/src/execution/guards.ts:normalizeNodeResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "function:packages/graph-runtime/src/execution/guards.ts:normalizeNodeResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/guards.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:appendCapabilityUnavailableResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:appendCapabilityUnavailableResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:appendExecutionResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:appendExecutionResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:normalizeResultOutputs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:normalizeResultOutputs",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:getPauseKind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:getPauseKind",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:getResultMessage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:getResultMessage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:getEventType",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "function:packages/graph-runtime/src/execution/result-normalization.ts:getEventType",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "file:packages/graph-runtime/src/evidence.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "file:packages/graph-runtime/src/execution-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "function:packages/graph-runtime/src/execution/run-graph-execution.ts:runGraphExecution",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "function:packages/graph-runtime/src/execution/run-graph-execution.ts:runGraphExecution",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "file:packages/graph-runtime/src/execution-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "file:packages/graph-runtime/src/execution/guards.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "file:packages/graph-runtime/src/execution/result-normalization.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "file:packages/graph-runtime/src/resolve.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "file:packages/graph-runtime/src/status.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/types.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/types.ts",
+      "target": "file:packages/graph-runtime/src/evidence.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/types.ts",
+      "target": "file:packages/graph-runtime/src/status.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/execution/types.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/graph-builder.ts",
+      "target": "function:packages/graph-runtime/src/graph-builder.ts:toNodeObjective",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/graph-builder.ts",
+      "target": "function:packages/graph-runtime/src/graph-builder.ts:createNodeDefinitionFromCompiledNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/graph-builder.ts",
+      "target": "function:packages/graph-runtime/src/graph-builder.ts:createNodeDefinitionFromCompiledNode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/graph-builder.ts",
+      "target": "function:packages/graph-runtime/src/graph-builder.ts:createPlanGraphFromCompiledPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/graph-builder.ts",
+      "target": "function:packages/graph-runtime/src/graph-builder.ts:createPlanGraphFromCompiledPlan",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/graph-builder.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/invalidation.ts",
+      "target": "function:packages/graph-runtime/src/invalidation.ts:planDownstreamInvalidation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/invalidation.ts",
+      "target": "function:packages/graph-runtime/src/invalidation.ts:planDownstreamInvalidation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/invalidation.ts",
+      "target": "function:packages/graph-runtime/src/invalidation.ts:applyDownstreamInvalidation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/invalidation.ts",
+      "target": "function:packages/graph-runtime/src/invalidation.ts:applyDownstreamInvalidation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/invalidation.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/invalidation.ts",
+      "target": "file:packages/graph-runtime/src/transitions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/invalidation.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "function:packages/graph-runtime/src/mutations.ts:validateGraphMutationOperation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "function:packages/graph-runtime/src/mutations.ts:validateGraphMutation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "function:packages/graph-runtime/src/mutations.ts:validateGraphMutation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "function:packages/graph-runtime/src/mutations.ts:applyOperation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "function:packages/graph-runtime/src/mutations.ts:getAffectedNodeIds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "function:packages/graph-runtime/src/mutations.ts:applyGraphMutation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "function:packages/graph-runtime/src/mutations.ts:applyGraphMutation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "class:packages/graph-runtime/src/mutations.ts:GraphMutationValidationError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "class:packages/graph-runtime/src/mutations.ts:GraphMutationValidationError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/mutations.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/registry/executor-registry.ts",
+      "target": "function:packages/graph-runtime/src/registry/executor-registry.ts:createRegistryExecutor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/registry/executor-registry.ts",
+      "target": "function:packages/graph-runtime/src/registry/executor-registry.ts:createRegistryExecutor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/registry/executor-registry.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/registry/executor-registry.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/registry/executor-registry.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:resolveEffectivePlanGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:resolveEffectivePlanGraph",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:buildEffectiveGraphSummary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:markUnreachableNodesSkipped",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:buildEffectiveNodeFromGraphNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:isFailedSubmissionNodeResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:attemptStatusPriority",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:deriveNodeStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:mapWaitKindToNodeStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:computeGraphEntryNodeIds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:rebuildDependencies",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:applyConditionBranchSelections",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "function:packages/graph-runtime/src/resolve.ts:computeReachableNodeIds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/resolve.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "function:packages/graph-runtime/src/runtime/create-graph-runtime.ts:createGraphRuntime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "function:packages/graph-runtime/src/runtime/create-graph-runtime.ts:createGraphRuntime",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/apply-mutation.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/approve-current-node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/cancel-session.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/pause-session.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/retry-node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/submit-node-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/commands/validate-command.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/execution/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "target": "file:packages/graph-runtime/src/registry/executor-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/status.ts",
+      "target": "function:packages/graph-runtime/src/status.ts:mapWaitKindToGraphStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/status.ts",
+      "target": "function:packages/graph-runtime/src/status.ts:mapWaitKindToGraphStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/status.ts",
+      "target": "function:packages/graph-runtime/src/status.ts:mapTerminalReasonToGraphStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/status.ts",
+      "target": "function:packages/graph-runtime/src/status.ts:mapTerminalReasonToGraphStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/status.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/status.ts",
+      "target": "file:packages/graph-runtime/src/types/runtime.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:resolveEdgeSemantics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:resolveEdgeSemantics",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:resolveGraphEdgeSemantics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:resolveGraphEdgeSemantics",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:traverseDependencies",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:traverseDependencies",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:getDownstreamNodeIds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:getDownstreamNodeIds",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:getUpstreamNodeIds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:getUpstreamNodeIds",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:selectReadyNodeIds",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:selectReadyNodeIds",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:analyzeStructuralChangeImpact",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "function:packages/graph-runtime/src/transitions.ts:analyzeStructuralChangeImpact",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/transitions.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/types/execution.ts",
+      "target": "file:packages/graph-runtime/src/types/runtime.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/types/runtime.ts",
+      "target": "function:packages/graph-runtime/src/types/runtime.ts:runtimeProgressStatusForWaitKind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/types/runtime.ts",
+      "target": "function:packages/graph-runtime/src/types/runtime.ts:runtimeProgressStatusForWaitKind",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/types/runtime.ts",
+      "target": "function:packages/graph-runtime/src/types/runtime.ts:runtimeProgressStatusForNodes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/types/runtime.ts",
+      "target": "function:packages/graph-runtime/src/types/runtime.ts:runtimeProgressStatusForNodes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/types/transitions.ts",
+      "target": "file:packages/graph-runtime/src/types/graph.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/types/transitions.ts",
+      "target": "file:packages/graph-runtime/src/types/runtime.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:getConditionConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:validateConditionBranchTargets",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:validatePlanGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:validatePlanGraph",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:validateReachability",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:validateAcyclicDependencies",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:validateEffectivePlanGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:validateEffectivePlanGraph",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:assertValidPlanGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "function:packages/graph-runtime/src/validation.ts:assertValidPlanGraph",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/graph-runtime/src/validation.ts",
+      "target": "file:packages/graph-runtime/src/types/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    }
+  ]
+}
