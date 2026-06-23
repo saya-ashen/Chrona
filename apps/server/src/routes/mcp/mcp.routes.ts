@@ -5,7 +5,7 @@ import type { CallToolResult, ServerNotification, ServerRequest } from "@modelco
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { ChronaEngine } from "@chrona/engine";
 import { createLogger } from "@chrona/logging";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
   CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION,
@@ -50,19 +50,13 @@ function publicToolSchema(schema: z.ZodObject) {
   });
 }
 
+
 function publicNodeOutputSchema() {
-  const schema = publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.output"]);
-  schema._zod.toJSONSchema = () => ({
-    type: "object",
-    properties: {
-      spec: chronaNodeOutputSpecJsonSchema,
-      mode: { type: "string", enum: ["append", "replace"] },
-      summary: { type: "string", minLength: 1 },
-    },
-    required: ["spec"],
-    additionalProperties: false,
-  });
-  return schema;
+  return z.object({
+    spec: z.fromJSONSchema(chronaNodeOutputSpecJsonSchema).describe("Catalog UI spec to render as this node's output."),
+    mode: z.enum(["append", "replace"]).optional(),
+    summary: z.string().min(1).optional(),
+  }).passthrough();
 }
 
 const externalTools = {
@@ -429,11 +423,29 @@ export const __mcpRouteTestHooks = {
 };
 
 export function createMcpRoutes(engine: ChronaEngine) {
+  const transports = new Map<string, WebStandardStreamableHTTPServerTransport>();
+
   return new Hono().all("/mcp", async (c) => {
+    const mcpSessionId = c.req.header("mcp-session-id");
+    const existingTransport = mcpSessionId ? transports.get(mcpSessionId) : undefined;
+    if (existingTransport) {
+      return existingTransport.handleRequest(c.req.raw);
+    }
+
     const requestSessionId = c.req.query("session_id") ?? c.req.query("sessionId") ?? undefined;
     const transport = new WebStandardStreamableHTTPServerTransport({
       enableJsonResponse: true,
+      sessionIdGenerator: randomUUID,
+      onsessioninitialized: (sessionId) => {
+        transports.set(sessionId, transport);
+      },
+      onsessionclosed: (sessionId) => {
+        if (sessionId) transports.delete(sessionId);
+      },
     });
+    transport.onclose = () => {
+      if (transport.sessionId) transports.delete(transport.sessionId);
+    };
     const server = createChronaMcpServer(engine, requestSessionId);
     await server.connect(transport);
     return transport.handleRequest(c.req.raw);

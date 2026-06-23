@@ -43,6 +43,18 @@ const blockPayload = {
   },
 };
 
+const nodeOutputPublicSpec = {
+  root: "root",
+  elements: [
+    {
+      id: "root",
+      type: "Markdown",
+      props: { content: "Result" },
+      children: [],
+    },
+  ],
+};
+
 const nodeOutputSpec = {
   root: "root",
   elements: {
@@ -158,6 +170,56 @@ describe("MCP routes", () => {
     });
   });
 
+  it("lists tools after MCP initialize", async () => {
+    const testApp = app();
+    const initResponse = await testApp.request("/api/mcp", {
+      method: "POST",
+      headers: mcpHeaders,
+      body: JSON.stringify(rpc("initialize", {
+        protocolVersion: LATEST_PROTOCOL_VERSION,
+        capabilities: {},
+        clientInfo: { name: "chrona-test", version: "1.0.0" },
+      })),
+    });
+    const sessionId = initResponse.headers.get("mcp-session-id");
+
+    const response = await testApp.request("/api/mcp", {
+      method: "POST",
+      headers: {
+        ...mcpHeaders,
+        ...(sessionId ? { "mcp-session-id": sessionId } : {}),
+      },
+      body: JSON.stringify(rpc("tools/list", {}, 2)),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ jsonrpc: "2.0" });
+    expect(body.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([
+      "chrona_condition_select",
+      "chrona_execution_read",
+      "chrona_node_block",
+      "chrona_node_complete",
+      "chrona_node_fail",
+      "chrona_node_output",
+      "chrona_node_read",
+      "chrona_plan_generate",
+      "chrona_plan_read",
+      "chrona_wait_complete",
+    ]);
+    const nodeOutputTool = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_node_output",
+    );
+    const elements = nodeOutputTool.inputSchema.properties.spec.properties.elements;
+    const table = elements.items.oneOf.find(
+      (entry: { properties: { type: { const: string } } }) => entry.properties.type.const === "Table",
+    );
+    expect(elements.type).toBe("array");
+    expect(table.properties.props.required).toEqual(["columns", "rows"]);
+    expect(table.properties.props.properties.columns).toMatchObject({ type: "array" });
+    expect(nodeOutputTool.inputSchema.properties.mode.enum).toEqual(["append", "replace"]);
+  });
+
   it("registers the minimal external Chrona MCP tool surface", () => {
     expect(Object.keys(__mcpRouteTestHooks.externalTools).sort()).toEqual([
       "chrona_condition_select",
@@ -191,10 +253,11 @@ describe("MCP routes", () => {
     expect(nodeOutput.description).toContain("spec field");
     expect(nodeOutput.description).toContain("columns: string[]");
     expect(nodeOutput.description).toContain("rows: string[][]");
-    expect(nodeOutput.inputSchema.shape.spec).toBeDefined();
-    expect(nodeOutput.inputSchema.shape.outputs).toBeUndefined();
-    expect(nodeOutput.inputSchema.parse({ spec: nodeOutputSpec, mode: "replace" })).toEqual({
-      spec: nodeOutputSpec,
+    const nodeOutputShape = nodeOutput.inputSchema.shape as Record<string, unknown>;
+    expect(nodeOutputShape.spec).toBeDefined();
+    expect(nodeOutputShape.outputs).toBeUndefined();
+    expect(nodeOutput.inputSchema.parse({ spec: nodeOutputPublicSpec, mode: "replace" })).toEqual({
+      spec: nodeOutputPublicSpec,
       mode: "replace",
     });
   });
@@ -215,8 +278,9 @@ describe("MCP routes", () => {
 
   it("does not expose hidden context fields in any public tool schema", () => {
     for (const tool of Object.values(__mcpRouteTestHooks.externalTools)) {
+      const shape = tool.inputSchema.shape as Record<string, unknown>;
       for (const fieldName of hiddenContextFieldNames) {
-        expect(tool.inputSchema.shape[fieldName]).toBeUndefined();
+        expect(shape[fieldName]).toBeUndefined();
       }
     }
   });

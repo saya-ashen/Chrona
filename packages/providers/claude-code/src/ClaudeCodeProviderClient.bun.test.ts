@@ -12,12 +12,14 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Hono } from "hono";
+import { createMcpRoutes } from "../../../../apps/server/src/routes/mcp/mcp.routes";
 
 import { terminalSnapshotFromEvents } from "@chrona/providers-foundation";
 
 import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
 import { mapClaudeCodeStreamItems, createNormalizerContext } from "./normalizers";
-import { createReplayRunner, type ClaudeCodeRunHandle, type ClaudeCodeRunner } from "./runner";
+import { createReplayRunner, probeMcpServer, type ClaudeCodeRunHandle, type ClaudeCodeRunner } from "./runner";
 
 const FIXTURES_DIR = fileURLToPath(new URL("../fixtures", import.meta.url));
 
@@ -40,6 +42,32 @@ async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
   for await (const x of iter) out.push(x);
   return out;
 }
+
+describe("ClaudeCodeProviderClient — MCP preflight", () => {
+  test("probeMcpServer sees Chrona tools from server route", async () => {
+    const engine = {
+      agentTools: {
+        registry: () => ({ tools: [], execute: async () => ({ status: "accepted", message: "ok" }) }),
+      },
+    };
+    const mcpApp = new Hono().route("/api", createMcpRoutes(engine as never));
+    const server = Bun.serve({ port: 0, fetch: mcpApp.fetch });
+
+    try {
+      const result = await probeMcpServer({
+        baseUrl: `http://127.0.0.1:${server.port}`,
+        token: "",
+        runId: "probe-test",
+      });
+
+      expect(result.toolNames).toContain("chrona_node_output");
+      expect(result.toolNames).toContain("chrona_node_complete");
+      expect(result.toolNames.length).toBeGreaterThan(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+});
 
 describe("ClaudeCodeProviderClient — happy path", () => {
   test("stream emits the recorded events in order", async () => {
