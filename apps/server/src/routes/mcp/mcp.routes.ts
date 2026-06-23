@@ -420,6 +420,14 @@ function createChronaMcpServer(engine: ChronaEngine, requestSessionId?: string) 
   return server;
 }
 
+export const __mcpRouteTestHooks = {
+  externalTools,
+  callChronaTool,
+  createChronaMcpServer,
+  sessionIdFrom,
+  toChronaInput,
+};
+
 export function createMcpRoutes(engine: ChronaEngine) {
   return new Hono().all("/mcp", async (c) => {
     const requestSessionId = c.req.query("session_id") ?? c.req.query("sessionId") ?? undefined;

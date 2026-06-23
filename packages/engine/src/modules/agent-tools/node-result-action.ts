@@ -10,11 +10,11 @@ export function submitNodeResultActionFromTool(input: {
 }): SubmitNodeResultAction | null {
   switch (input.toolName) {
     case "chrona.node.output": {
-      const body = input.payload as { outputs: unknown; mode?: "append" | "replace"; summary?: string };
+      const body = input.payload as { spec: unknown; mode?: "append" | "replace"; summary?: string };
       return {
         action: "submit_node_output",
         sessionId: input.sessionId,
-        outputs: body.outputs,
+        outputs: [body.spec],
         mode: body.mode,
         summary: body.summary,
       };

@@ -1,0 +1,5576 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 31,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "apps/web/src/components/schedule/adapters/schedule-ai-sidebar-adapter.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 73,
+      "nonEmptyLines": 70,
+      "functions": [
+        {
+          "name": "createScheduleAiSidebarContext",
+          "startLine": 4,
+          "endLine": 73,
+          "params": [
+            "{\n  workspaceId,\n  data,\n  selectedDate,\n  activeView,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createScheduleAiSidebarContext",
+          "line": 4,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createScheduleAiSidebarContext",
+          "callee": "Math.max",
+          "lineNumber": 15
+        },
+        {
+          "caller": "createScheduleAiSidebarContext",
+          "callee": "[\n    workspaceId,\n    selectedDate,\n    activeView,\n    data.summary.unscheduledCount,\n    data.planningSummary.largestIdleWindowMinutes,\n  ].join",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createScheduleAiSidebarContext",
+          "callee": "String",
+          "lineNumber": 40
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/calendar-source-actions.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 206,
+      "nonEmptyLines": 190,
+      "functions": [
+        {
+          "name": "CalendarSourceActions",
+          "startLine": 29,
+          "endLine": 206,
+          "params": [
+            "{\n  workspaceId,\n  source,\n  syncStatus,\n  onBlockedNetworkRefresh,\n  onSourceChange,\n  onSourceRemove,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "CalendarSourceActions",
+          "line": 29,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "useState",
+          "lineNumber": 37
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "useState",
+          "lineNumber": 38
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "useState",
+          "lineNumber": 39
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "useState",
+          "lineNumber": 40
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "useState",
+          "lineNumber": 41
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "useState",
+          "lineNumber": 42
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "useState",
+          "lineNumber": 43
+        },
+        {
+          "caller": "run",
+          "callee": "setErrorMessage",
+          "lineNumber": 49
+        },
+        {
+          "caller": "run",
+          "callee": "setPendingAction",
+          "lineNumber": 50
+        },
+        {
+          "caller": "run",
+          "callee": "operation",
+          "lineNumber": 52
+        },
+        {
+          "caller": "run",
+          "callee": "window.dispatchEvent",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "setErrorMessage",
+          "lineNumber": 55
+        },
+        {
+          "caller": "run",
+          "callee": "getExternalCalendarErrorMessage",
+          "lineNumber": 55
+        },
+        {
+          "caller": "run",
+          "callee": "setPendingAction",
+          "lineNumber": 57
+        },
+        {
+          "caller": "handleSave",
+          "callee": "run",
+          "lineNumber": 62
+        },
+        {
+          "caller": "handleSave",
+          "callee": "updateExternalCalendarSource",
+          "lineNumber": 63
+        },
+        {
+          "caller": "handleSave",
+          "callee": "name.trim",
+          "lineNumber": 64
+        },
+        {
+          "caller": "handleSave",
+          "callee": "onSourceChange",
+          "lineNumber": 69
+        },
+        {
+          "caller": "handleToggleEnabled",
+          "callee": "run",
+          "lineNumber": 74
+        },
+        {
+          "caller": "handleToggleEnabled",
+          "callee": "updateExternalCalendarSource",
+          "lineNumber": 75
+        },
+        {
+          "caller": "handleToggleEnabled",
+          "callee": "onSourceChange",
+          "lineNumber": 76
+        },
+        {
+          "caller": "handleRefresh",
+          "callee": "run",
+          "lineNumber": 81
+        },
+        {
+          "caller": "handleRefresh",
+          "callee": "refreshExternalCalendarSource",
+          "lineNumber": 82
+        },
+        {
+          "caller": "handleRefresh",
+          "callee": "onSourceChange",
+          "lineNumber": 87
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "setErrorMessage",
+          "lineNumber": 92
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "setPendingAction",
+          "lineNumber": 93
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "refreshExternalCalendarSource",
+          "lineNumber": 95
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "onSourceChange",
+          "lineNumber": 96
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "onBlockedNetworkRefresh",
+          "lineNumber": 98
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "handleRefresh",
+          "lineNumber": 98
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "setErrorMessage",
+          "lineNumber": 99
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "window.dispatchEvent",
+          "lineNumber": 102
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "isBlockedNetworkCalendarError",
+          "lineNumber": 104
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "onBlockedNetworkRefresh",
+          "lineNumber": 104
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "handleRefresh",
+          "lineNumber": 104
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "setErrorMessage",
+          "lineNumber": 105
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "getExternalCalendarErrorMessage",
+          "lineNumber": 105
+        },
+        {
+          "caller": "handleRefreshClick",
+          "callee": "setPendingAction",
+          "lineNumber": 107
+        },
+        {
+          "caller": "handleRemove",
+          "callee": "setConfirmingRemove",
+          "lineNumber": 113
+        },
+        {
+          "caller": "handleRemove",
+          "callee": "run",
+          "lineNumber": 116
+        },
+        {
+          "caller": "handleRemove",
+          "callee": "deleteExternalCalendarSource",
+          "lineNumber": 117
+        },
+        {
+          "caller": "handleRemove",
+          "callee": "onSourceRemove",
+          "lineNumber": 118
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "setName",
+          "lineNumber": 136
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "setColor",
+          "lineNumber": 145
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "color.toUpperCase",
+          "lineNumber": 148
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "setSyncPolicy",
+          "lineNumber": 155
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "setAutomationPolicy",
+          "lineNumber": 168
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "name.trim",
+          "lineNumber": 182
+        },
+        {
+          "caller": "CalendarSourceActions",
+          "callee": "handleRefreshClick",
+          "lineNumber": 185
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/calendar-source-list.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 167,
+      "nonEmptyLines": 141,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/calendar-source-list.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 230,
+      "nonEmptyLines": 205,
+      "functions": [
+        {
+          "name": "CalendarSourceList",
+          "startLine": 33,
+          "endLine": 152,
+          "params": [
+            "{ workspaceId, createdSources = EMPTY_CREATED_SOURCES }"
+          ]
+        },
+        {
+          "name": "CalendarSourceRow",
+          "startLine": 160,
+          "endLine": 184,
+          "params": [
+            "{ source, syncStatus, onManage }"
+          ]
+        },
+        {
+          "name": "SourceMetaGrid",
+          "startLine": 186,
+          "endLine": 197,
+          "params": [
+            "{ source, syncStatus }"
+          ]
+        },
+        {
+          "name": "formatSyncPolicy",
+          "startLine": 199,
+          "endLine": 203,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "formatAutomationPolicy",
+          "startLine": 205,
+          "endLine": 209,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "mergeSources",
+          "startLine": 211,
+          "endLine": 216,
+          "params": [
+            "incoming",
+            "current"
+          ]
+        },
+        {
+          "name": "formatDate",
+          "startLine": 218,
+          "endLine": 221,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "SourceMeta",
+          "startLine": 223,
+          "endLine": 230,
+          "params": [
+            "{ label, value }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "CalendarSourceList",
+          "line": 33,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "CalendarSourceList",
+          "callee": "useState",
+          "lineNumber": 34
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "useState",
+          "lineNumber": 35
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "useState",
+          "lineNumber": 36
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "useState",
+          "lineNumber": 37
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "useEffect",
+          "lineNumber": 39
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "listExternalCalendarSources(workspaceId)\n      .then((result) => {\n        if (!cancelled) setSources((current) => mergeSources(result.sources.map((source) => ({ source })), current));\n      })\n      .catch",
+          "lineNumber": 41
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "listExternalCalendarSources(workspaceId)\n      .then",
+          "lineNumber": 41
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "listExternalCalendarSources",
+          "lineNumber": 41
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "setSources",
+          "lineNumber": 43
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "mergeSources",
+          "lineNumber": 43
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "result.sources.map",
+          "lineNumber": 43
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "setErrorMessage",
+          "lineNumber": 46
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "useEffect",
+          "lineNumber": 53
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "setSources",
+          "lineNumber": 54
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "mergeSources",
+          "lineNumber": 54
+        },
+        {
+          "caller": "updateSource",
+          "callee": "setSources",
+          "lineNumber": 58
+        },
+        {
+          "caller": "updateSource",
+          "callee": "current.map",
+          "lineNumber": 58
+        },
+        {
+          "caller": "removeSource",
+          "callee": "setSources",
+          "lineNumber": 62
+        },
+        {
+          "caller": "removeSource",
+          "callee": "current.filter",
+          "lineNumber": 62
+        },
+        {
+          "caller": "removeSource",
+          "callee": "setManagedId",
+          "lineNumber": 63
+        },
+        {
+          "caller": "confirmBlockedNetworkRefresh",
+          "callee": "setBlockedNetworkRefresh",
+          "lineNumber": 67
+        },
+        {
+          "caller": "handleBlockedNetworkConfirm",
+          "callee": "blockedNetworkRefresh",
+          "lineNumber": 71
+        },
+        {
+          "caller": "handleBlockedNetworkConfirm",
+          "callee": "setBlockedNetworkRefresh",
+          "lineNumber": 72
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "sources.find",
+          "lineNumber": 74
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "sources.map",
+          "lineNumber": 95
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "setManagedId",
+          "lineNumber": 100
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "setManagedId",
+          "lineNumber": 106
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "setBlockedNetworkRefresh",
+          "lineNumber": 134
+        },
+        {
+          "caller": "CalendarSourceList",
+          "callee": "setBlockedNetworkRefresh",
+          "lineNumber": 141
+        },
+        {
+          "caller": "SourceMetaGrid",
+          "callee": "formatDate",
+          "lineNumber": 189
+        },
+        {
+          "caller": "SourceMetaGrid",
+          "callee": "formatDate",
+          "lineNumber": 190
+        },
+        {
+          "caller": "SourceMetaGrid",
+          "callee": "formatSyncPolicy",
+          "lineNumber": 191
+        },
+        {
+          "caller": "SourceMetaGrid",
+          "callee": "formatAutomationPolicy",
+          "lineNumber": 192
+        },
+        {
+          "caller": "SourceMetaGrid",
+          "callee": "String",
+          "lineNumber": 194
+        },
+        {
+          "caller": "mergeSources",
+          "callee": "byId.set",
+          "lineNumber": 213
+        },
+        {
+          "caller": "mergeSources",
+          "callee": "byId.set",
+          "lineNumber": 214
+        },
+        {
+          "caller": "mergeSources",
+          "callee": "byId.get",
+          "lineNumber": 214
+        },
+        {
+          "caller": "mergeSources",
+          "callee": "Array.from(byId.values()).sort",
+          "lineNumber": 215
+        },
+        {
+          "caller": "mergeSources",
+          "callee": "Array.from",
+          "lineNumber": 215
+        },
+        {
+          "caller": "mergeSources",
+          "callee": "byId.values",
+          "lineNumber": 215
+        },
+        {
+          "caller": "mergeSources",
+          "callee": "a.source.name.localeCompare",
+          "lineNumber": 215
+        },
+        {
+          "caller": "formatDate",
+          "callee": "new Intl.DateTimeFormat(undefined, { dateStyle: \"medium\", timeStyle: \"short\" }).format",
+          "lineNumber": 220
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 8,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/calendar-source-setup.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 167,
+      "nonEmptyLines": 143,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/calendar-source-setup.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 319,
+      "nonEmptyLines": 294,
+      "functions": [
+        {
+          "name": "CalendarSourceSetup",
+          "startLine": 40,
+          "endLine": 76,
+          "params": [
+            "{ workspaceId }"
+          ]
+        },
+        {
+          "name": "ConnectCalendarDialog",
+          "startLine": 85,
+          "endLine": 270,
+          "params": [
+            "{ workspaceId, open, onOpenChange, onConnected }"
+          ]
+        },
+        {
+          "name": "BlockedNetworkConfirmationDialog",
+          "startLine": 272,
+          "endLine": 299,
+          "params": [
+            "{\n  open,\n  onOpenChange,\n  onConfirm,\n}"
+          ]
+        },
+        {
+          "name": "ValidationResult",
+          "startLine": 301,
+          "endLine": 319,
+          "params": [
+            "{ validation }"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "CalendarSourceSetup",
+          "line": 40,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "CalendarSourceSetup",
+          "callee": "useState",
+          "lineNumber": 41
+        },
+        {
+          "caller": "CalendarSourceSetup",
+          "callee": "useState",
+          "lineNumber": 42
+        },
+        {
+          "caller": "handleConnected",
+          "callee": "setConnectedSources",
+          "lineNumber": 45
+        },
+        {
+          "caller": "handleConnected",
+          "callee": "current.filter",
+          "lineNumber": 45
+        },
+        {
+          "caller": "handleConnected",
+          "callee": "window.dispatchEvent",
+          "lineNumber": 46
+        },
+        {
+          "caller": "CalendarSourceSetup",
+          "callee": "setIsConnectOpen",
+          "lineNumber": 61
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 86
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 87
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 88
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 89
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 90
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 91
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 92
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 93
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 94
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "useState",
+          "lineNumber": 95
+        },
+        {
+          "caller": "reset",
+          "callee": "setName",
+          "lineNumber": 98
+        },
+        {
+          "caller": "reset",
+          "callee": "setUrl",
+          "lineNumber": 99
+        },
+        {
+          "caller": "reset",
+          "callee": "setColor",
+          "lineNumber": 100
+        },
+        {
+          "caller": "reset",
+          "callee": "setSyncPolicy",
+          "lineNumber": 101
+        },
+        {
+          "caller": "reset",
+          "callee": "setAutomationPolicy",
+          "lineNumber": 102
+        },
+        {
+          "caller": "reset",
+          "callee": "setValidation",
+          "lineNumber": 103
+        },
+        {
+          "caller": "reset",
+          "callee": "setErrorMessage",
+          "lineNumber": 104
+        },
+        {
+          "caller": "reset",
+          "callee": "setBlockedNetworkAction",
+          "lineNumber": 105
+        },
+        {
+          "caller": "validateSource",
+          "callee": "setErrorMessage",
+          "lineNumber": 109
+        },
+        {
+          "caller": "validateSource",
+          "callee": "setValidation",
+          "lineNumber": 110
+        },
+        {
+          "caller": "validateSource",
+          "callee": "setIsValidating",
+          "lineNumber": 111
+        },
+        {
+          "caller": "validateSource",
+          "callee": "validateCalendarSource",
+          "lineNumber": 113
+        },
+        {
+          "caller": "validateSource",
+          "callee": "url.trim",
+          "lineNumber": 113
+        },
+        {
+          "caller": "validateSource",
+          "callee": "setValidation",
+          "lineNumber": 114
+        },
+        {
+          "caller": "validateSource",
+          "callee": "setBlockedNetworkAction",
+          "lineNumber": 115
+        },
+        {
+          "caller": "validateSource",
+          "callee": "setErrorMessage",
+          "lineNumber": 117
+        },
+        {
+          "caller": "validateSource",
+          "callee": "getExternalCalendarErrorMessage",
+          "lineNumber": 117
+        },
+        {
+          "caller": "validateSource",
+          "callee": "setIsValidating",
+          "lineNumber": 119
+        },
+        {
+          "caller": "handleValidate",
+          "callee": "validateSource",
+          "lineNumber": 124
+        },
+        {
+          "caller": "submitSource",
+          "callee": "setErrorMessage",
+          "lineNumber": 128
+        },
+        {
+          "caller": "submitSource",
+          "callee": "setIsSubmitting",
+          "lineNumber": 129
+        },
+        {
+          "caller": "submitSource",
+          "callee": "createExternalCalendarSource",
+          "lineNumber": 131
+        },
+        {
+          "caller": "submitSource",
+          "callee": "name.trim",
+          "lineNumber": 132
+        },
+        {
+          "caller": "submitSource",
+          "callee": "url.trim",
+          "lineNumber": 133
+        },
+        {
+          "caller": "submitSource",
+          "callee": "onConnected",
+          "lineNumber": 140
+        },
+        {
+          "caller": "submitSource",
+          "callee": "reset",
+          "lineNumber": 141
+        },
+        {
+          "caller": "submitSource",
+          "callee": "onOpenChange",
+          "lineNumber": 142
+        },
+        {
+          "caller": "submitSource",
+          "callee": "isBlockedNetworkCalendarError",
+          "lineNumber": 145
+        },
+        {
+          "caller": "submitSource",
+          "callee": "setBlockedNetworkAction",
+          "lineNumber": 145
+        },
+        {
+          "caller": "submitSource",
+          "callee": "setErrorMessage",
+          "lineNumber": 146
+        },
+        {
+          "caller": "submitSource",
+          "callee": "getExternalCalendarErrorMessage",
+          "lineNumber": 146
+        },
+        {
+          "caller": "submitSource",
+          "callee": "setIsSubmitting",
+          "lineNumber": 148
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "event.preventDefault",
+          "lineNumber": 153
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "submitSource",
+          "lineNumber": 154
+        },
+        {
+          "caller": "handleBlockedNetworkConfirm",
+          "callee": "setBlockedNetworkAction",
+          "lineNumber": 159
+        },
+        {
+          "caller": "handleBlockedNetworkConfirm",
+          "callee": "validateSource",
+          "lineNumber": 160
+        },
+        {
+          "caller": "handleBlockedNetworkConfirm",
+          "callee": "submitSource",
+          "lineNumber": 161
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "url.trim",
+          "lineNumber": 164
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "Boolean",
+          "lineNumber": 165
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "Boolean",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "name.trim",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "Boolean",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "reset",
+          "lineNumber": 172
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "onOpenChange",
+          "lineNumber": 173
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "setName",
+          "lineNumber": 192
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "setUrl",
+          "lineNumber": 202
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "setColor",
+          "lineNumber": 215
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "color.toUpperCase",
+          "lineNumber": 218
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "setSyncPolicy",
+          "lineNumber": 223
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "setAutomationPolicy",
+          "lineNumber": 236
+        },
+        {
+          "caller": "ConnectCalendarDialog",
+          "callee": "setBlockedNetworkAction",
+          "lineNumber": 265
+        },
+        {
+          "caller": "BlockedNetworkConfirmationDialog",
+          "callee": "onOpenChange",
+          "lineNumber": 289
+        },
+        {
+          "caller": "ValidationResult",
+          "callee": "validation.warnings.map",
+          "lineNumber": 314
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/dialogs/schedule-page-dialogs.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 84,
+      "nonEmptyLines": 81,
+      "functions": [
+        {
+          "name": "SchedulePageDialogs",
+          "startLine": 9,
+          "endLine": 84,
+          "params": [
+            "{\n  showQuickAddDialog,\n  isPending,\n  dialogDefaults,\n  data,\n  viewModel,\n  activeView,\n  workspaceId,\n  routerPush,\n  locale,\n  localizeHref,\n  buildScheduleViewHref,\n  actionFailedMessage,\n  onCloseQuickAdd,\n  handleCreateTaskBlock,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SchedulePageDialogs",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SchedulePageDialogs",
+          "callee": "new Date().setHours",
+          "lineNumber": 58
+        },
+        {
+          "caller": "SchedulePageDialogs",
+          "callee": "new Date().setHours",
+          "lineNumber": 59
+        },
+        {
+          "caller": "SchedulePageDialogs",
+          "callee": "handleCreateTaskBlock",
+          "lineNumber": 63
+        },
+        {
+          "caller": "SchedulePageDialogs",
+          "callee": "onCloseQuickAdd",
+          "lineNumber": 80
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 670,
+      "nonEmptyLines": 626,
+      "functions": [
+        {
+          "name": "TaskCreateDialog",
+          "startLine": 122,
+          "endLine": 670,
+          "params": [
+            "{\n  isOpen,\n  initialTitle = \"\",\n  initialStartAt,\n  initialEndAt,\n  isPending,\n  onClose,\n  onSubmit,\n  autoSuggestionsEnabled,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TaskCreateDialog",
+          "line": 122,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useScheduleAiPreferences",
+          "lineNumber": 132
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 136
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useI18n",
+          "lineNumber": 137
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 147
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 148
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 149
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 150
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 151
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 152
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 153
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 154
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 155
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 156
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 157
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 158
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 161
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useState",
+          "lineNumber": 162
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useRef",
+          "lineNumber": 163
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useRef",
+          "lineNumber": 165
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useAutoComplete",
+          "lineNumber": 174
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "title.trim",
+          "lineNumber": 175
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "title.trim",
+          "lineNumber": 175
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "title.trim",
+          "lineNumber": 183
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "useEffect",
+          "lineNumber": 192
+        },
+        {
+          "caller": "formatDate",
+          "callee": "date.getFullYear",
+          "lineNumber": 195
+        },
+        {
+          "caller": "formatDate",
+          "callee": "String(date.getMonth() + 1).padStart",
+          "lineNumber": 196
+        },
+        {
+          "caller": "formatDate",
+          "callee": "String",
+          "lineNumber": 196
+        },
+        {
+          "caller": "formatDate",
+          "callee": "date.getMonth",
+          "lineNumber": 196
+        },
+        {
+          "caller": "formatDate",
+          "callee": "String(date.getDate()).padStart",
+          "lineNumber": 197
+        },
+        {
+          "caller": "formatDate",
+          "callee": "String",
+          "lineNumber": 197
+        },
+        {
+          "caller": "formatDate",
+          "callee": "date.getDate",
+          "lineNumber": 197
+        },
+        {
+          "caller": "formatTime",
+          "callee": "String(date.getHours()).padStart",
+          "lineNumber": 202
+        },
+        {
+          "caller": "formatTime",
+          "callee": "String",
+          "lineNumber": 202
+        },
+        {
+          "caller": "formatTime",
+          "callee": "date.getHours",
+          "lineNumber": 202
+        },
+        {
+          "caller": "formatTime",
+          "callee": "String(date.getMinutes()).padStart",
+          "lineNumber": 203
+        },
+        {
+          "caller": "formatTime",
+          "callee": "String",
+          "lineNumber": 203
+        },
+        {
+          "caller": "formatTime",
+          "callee": "date.getMinutes",
+          "lineNumber": 203
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setStartDate",
+          "lineNumber": 207
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "formatDate",
+          "lineNumber": 207
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setStartTime",
+          "lineNumber": 208
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "formatTime",
+          "lineNumber": 208
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setEndTime",
+          "lineNumber": 209
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "formatTime",
+          "lineNumber": 209
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setTitle",
+          "lineNumber": 210
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setDescription",
+          "lineNumber": 211
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setPriority",
+          "lineNumber": 212
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoExecute",
+          "lineNumber": 213
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoPlanGenerationEnabled",
+          "lineNumber": 214
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoPlanGenerationTiming",
+          "lineNumber": 215
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoExecuteTiming",
+          "lineNumber": 216
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setRecurrenceMode",
+          "lineNumber": 217
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setCustomRRULE",
+          "lineNumber": 218
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setRepeatEnabled",
+          "lineNumber": 219
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setShowAutoComplete",
+          "lineNumber": 220
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "title.trim",
+          "lineNumber": 226
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "startTime.split(\":\").map",
+          "lineNumber": 228
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "startTime.split",
+          "lineNumber": 228
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "endTime.split(\":\").map",
+          "lineNumber": 229
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "endTime.split",
+          "lineNumber": 229
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "scheduledStartAt.setHours",
+          "lineNumber": 232
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "scheduledEndAt.setHours",
+          "lineNumber": 235
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "recurrenceRuleFromState",
+          "lineNumber": 237
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onSubmit",
+          "lineNumber": 239
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "title.trim",
+          "lineNumber": 240
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "description.trim",
+          "lineNumber": 241
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "scheduledStartAt.toISOString",
+          "lineNumber": 251
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "scheduledEndAt.toISOString",
+          "lineNumber": 252
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onClose",
+          "lineNumber": 255
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "value.getFullYear",
+          "lineNumber": 259
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "String(value.getMonth() + 1).padStart",
+          "lineNumber": 259
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "String",
+          "lineNumber": 259
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "value.getMonth",
+          "lineNumber": 259
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "String(value.getDate()).padStart",
+          "lineNumber": 259
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "String",
+          "lineNumber": 259
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "value.getDate",
+          "lineNumber": 259
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "value.split(\"-\").map",
+          "lineNumber": 264
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "value.split",
+          "lineNumber": 264
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "[year, month, day].some",
+          "lineNumber": 265
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "Number.isFinite",
+          "lineNumber": 265
+        },
+        {
+          "caller": "formatLocalDateLabel",
+          "callee": "value.toLocaleDateString",
+          "lineNumber": 270
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "AUTOMATION_TIMING_PRESETS.map",
+          "lineNumber": 273
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "parseLocalDateInput",
+          "lineNumber": 278
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "onClose",
+          "lineNumber": 282
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setTitle",
+          "lineNumber": 311
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setShowAutoComplete",
+          "lineNumber": 313
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setIsComposing",
+          "lineNumber": 317
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setShowAutoComplete",
+          "lineNumber": 318
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setIsComposing",
+          "lineNumber": 321
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setTitle",
+          "lineNumber": 323
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "e.currentTarget.value.trim",
+          "lineNumber": 324
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setShowAutoComplete",
+          "lineNumber": 325
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setShowAutoComplete",
+          "lineNumber": 330
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setTimeout",
+          "lineNumber": 334
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setShowAutoComplete",
+          "lineNumber": 335
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "toolCalls.map",
+          "lineNumber": 365
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "autoCompleteSuggestions.slice(0, 5).map",
+          "lineNumber": 374
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "autoCompleteSuggestions.slice",
+          "lineNumber": 374
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "e.preventDefault",
+          "lineNumber": 380
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "clearTimeout",
+          "lineNumber": 384
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setTitle",
+          "lineNumber": 388
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setDescription",
+          "lineNumber": 390
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setPriority",
+          "lineNumber": 392
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setShowAutoComplete",
+          "lineNumber": 393
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "cn",
+          "lineNumber": 401
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setDescription",
+          "lineNumber": 436
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "formatLocalDateLabel",
+          "lineNumber": 455
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setStartDate",
+          "lineNumber": 462
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "formatLocalDateInput",
+          "lineNumber": 462
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setStartTime",
+          "lineNumber": 472
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setEndTime",
+          "lineNumber": 481
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "([\"Low\", \"Medium\", \"High\", \"Urgent\"] as const).map",
+          "lineNumber": 494
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setPriority",
+          "lineNumber": 501
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setRepeatEnabled",
+          "lineNumber": 515
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "RECURRENCE_UI_PRESETS.map",
+          "lineNumber": 529
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setRecurrenceMode",
+          "lineNumber": 536
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setCustomRRULE",
+          "lineNumber": 547
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoPlanGenerationEnabled",
+          "lineNumber": 569
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoPlanGenerationTiming",
+          "lineNumber": 586
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 586
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "timingOptions.map",
+          "lineNumber": 593
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoExecute",
+          "lineNumber": 609
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoPlanGenerationEnabled",
+          "lineNumber": 610
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "setAutoExecuteTiming",
+          "lineNumber": 628
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 628
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "timingOptions.map",
+          "lineNumber": 635
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "handleSubmit",
+          "lineNumber": 658
+        },
+        {
+          "caller": "TaskCreateDialog",
+          "callee": "title.trim",
+          "lineNumber": 659
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/external-calendar-event-block.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 46,
+      "nonEmptyLines": 44,
+      "functions": [
+        {
+          "name": "ExternalCalendarEventBlock",
+          "startLine": 7,
+          "endLine": 46,
+          "params": [
+            "{\n  event,\n  timeRange,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ExternalCalendarEventBlock",
+          "line": 7,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ExternalCalendarEventBlock",
+          "callee": "cn",
+          "lineNumber": 16
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/external-calendar-events.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 129,
+      "nonEmptyLines": 118,
+      "functions": [
+        {
+          "name": "createScheduledItem",
+          "startLine": 13,
+          "endLine": 43,
+          "params": [
+            "overrides"
+          ]
+        },
+        {
+          "name": "renderTimeline",
+          "startLine": 45,
+          "endLine": 62,
+          "params": [
+            "externalEvents"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "renderTimeline",
+          "callee": "render",
+          "lineNumber": 46
+        },
+        {
+          "caller": "renderTimeline",
+          "callee": "createScheduledItem",
+          "lineNumber": 48
+        },
+        {
+          "caller": "renderTimeline",
+          "callee": "vi.fn().mockResolvedValue",
+          "lineNumber": 56
+        },
+        {
+          "caller": "renderTimeline",
+          "callee": "vi.fn",
+          "lineNumber": 56
+        },
+        {
+          "caller": "renderTimeline",
+          "callee": "vi.fn().mockResolvedValue",
+          "lineNumber": 57
+        },
+        {
+          "caller": "renderTimeline",
+          "callee": "vi.fn",
+          "lineNumber": 57
+        },
+        {
+          "caller": "renderTimeline",
+          "callee": "vi.fn",
+          "lineNumber": 58
+        },
+        {
+          "caller": "renderTimeline",
+          "callee": "vi.fn",
+          "lineNumber": 59
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/forms/schedule-editor-form.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 178,
+      "nonEmptyLines": 161,
+      "functions": [
+        {
+          "name": "formatDateTimeInput",
+          "startLine": 40,
+          "endLine": 42,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "parseDateTime",
+          "startLine": 44,
+          "endLine": 50,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "ScheduleEditorForm",
+          "startLine": 52,
+          "endLine": 178,
+          "params": [
+            "{\n  taskId,\n  dueAt,\n  scheduledStartAt,\n  scheduledEndAt,\n  scheduleSource = \"human\",\n  submitLabel = \"Apply Schedule\",\n  allowClear = true,\n  onMutatedAction,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ScheduleEditorForm",
+          "line": 52,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "formatDateTimeInput",
+          "callee": "value.toISOString().slice",
+          "lineNumber": 41
+        },
+        {
+          "caller": "formatDateTimeInput",
+          "callee": "value.toISOString",
+          "lineNumber": 41
+        },
+        {
+          "caller": "parseDateTime",
+          "callee": "value.trim",
+          "lineNumber": 45
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "useI18n",
+          "lineNumber": 62
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "useState",
+          "lineNumber": 64
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "useState",
+          "lineNumber": 65
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "useMemo",
+          "lineNumber": 66
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "formatDateTimeInput",
+          "lineNumber": 67
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "formatDateTimeInput",
+          "lineNumber": 68
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "formatDateTimeInput",
+          "lineNumber": 69
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "useForm",
+          "lineNumber": 71
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "useEffect",
+          "lineNumber": 76
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "form.reset",
+          "lineNumber": 77
+        },
+        {
+          "caller": "runAction",
+          "callee": "setIsPending",
+          "lineNumber": 82
+        },
+        {
+          "caller": "runAction",
+          "callee": "setErrorMessage",
+          "lineNumber": 83
+        },
+        {
+          "caller": "runAction",
+          "callee": "action",
+          "lineNumber": 84
+        },
+        {
+          "caller": "runAction",
+          "callee": "onMutatedAction",
+          "lineNumber": 85
+        },
+        {
+          "caller": "runAction",
+          "callee": "setErrorMessage",
+          "lineNumber": 87
+        },
+        {
+          "caller": "runAction",
+          "callee": "setIsPending",
+          "lineNumber": 89
+        },
+        {
+          "caller": "handleScheduleSubmit",
+          "callee": "parseDateTime",
+          "lineNumber": 94
+        },
+        {
+          "caller": "handleScheduleSubmit",
+          "callee": "parseDateTime",
+          "lineNumber": 95
+        },
+        {
+          "caller": "handleScheduleSubmit",
+          "callee": "parseDateTime",
+          "lineNumber": 96
+        },
+        {
+          "caller": "handleScheduleSubmit",
+          "callee": "setErrorMessage",
+          "lineNumber": 99
+        },
+        {
+          "caller": "handleScheduleSubmit",
+          "callee": "runAction",
+          "lineNumber": 103
+        },
+        {
+          "caller": "handleScheduleSubmit",
+          "callee": "applySchedule",
+          "lineNumber": 104
+        },
+        {
+          "caller": "handleClearSubmit",
+          "callee": "runAction",
+          "lineNumber": 115
+        },
+        {
+          "caller": "handleClearSubmit",
+          "callee": "clearSchedule",
+          "lineNumber": 116
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "form.handleSubmit(handleScheduleSubmit)",
+          "lineNumber": 124
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "form.handleSubmit",
+          "lineNumber": 124
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "event.preventDefault",
+          "lineNumber": 170
+        },
+        {
+          "caller": "ScheduleEditorForm",
+          "callee": "handleClearSubmit",
+          "lineNumber": 170
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/forms/schedule-inline-quick-create.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 218,
+      "nonEmptyLines": 206,
+      "functions": [
+        {
+          "name": "ScheduleInlineQuickCreate",
+          "startLine": 9,
+          "endLine": 218,
+          "params": [
+            "{\n  mode,\n  selectedDay,\n  initialTitle = \"\",\n  initialPriority = \"Medium\",\n  initialStartAt,\n  initialDurationMinutes = 60,\n  isPending,\n  submitLabel,\n  hint,\n  onCancel,\n  onSubmit,\n  compact = false,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ScheduleInlineQuickCreate",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "initialStartAt?.getHours",
+          "lineNumber": 43
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "initialStartAt?.getMinutes",
+          "lineNumber": 44
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "useState",
+          "lineNumber": 45
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "useState",
+          "lineNumber": 46
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "useState",
+          "lineNumber": 47
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "useState",
+          "lineNumber": 48
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "String(initialHour).padStart",
+          "lineNumber": 49
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "String",
+          "lineNumber": 49
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "String(initialMinute).padStart",
+          "lineNumber": 49
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "String",
+          "lineNumber": 49
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "useState",
+          "lineNumber": 51
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "title.trim",
+          "lineNumber": 54
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onSubmit",
+          "lineNumber": 60
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setTitle",
+          "lineNumber": 68
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "timeValue.split",
+          "lineNumber": 72
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "hoursText.padStart",
+          "lineNumber": 73
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "minutesText.padStart",
+          "lineNumber": 73
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "startAt.getTime",
+          "lineNumber": 74
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "onSubmit",
+          "lineNumber": 76
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setTitle",
+          "lineNumber": 84
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "setExpanded",
+          "lineNumber": 91
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "setExpanded",
+          "lineNumber": 120
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "setTitle",
+          "lineNumber": 135
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "event.preventDefault",
+          "lineNumber": 138
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "onCancel",
+          "lineNumber": 139
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "setExpanded",
+          "lineNumber": 141
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "event.preventDefault",
+          "lineNumber": 145
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "handleSubmit",
+          "lineNumber": 146
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "setTimeValue",
+          "lineNumber": 160
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "String",
+          "lineNumber": 166
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "setDurationMinutes",
+          "lineNumber": 168
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "Number",
+          "lineNumber": 168
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "([\"Low\", \"Medium\", \"High\", \"Urgent\"] as const).map",
+          "lineNumber": 179
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "setPriority",
+          "lineNumber": 184
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "cn",
+          "lineNumber": 185
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "title.trim",
+          "lineNumber": 205
+        },
+        {
+          "caller": "ScheduleInlineQuickCreate",
+          "callee": "handleSubmit",
+          "lineNumber": 207
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1604,
+      "nonEmptyLines": 1461,
+      "functions": [
+        {
+          "name": "TaskConfigField",
+          "startLine": 133,
+          "endLine": 167,
+          "params": [
+            "{\n  label,\n  hint,\n  tooltip,\n  titleClassName,\n  hideTitle,\n  htmlFor,\n  invalid,\n  error,\n  className,\n  children,\n}"
+          ]
+        },
+        {
+          "name": "InfoPopover",
+          "startLine": 169,
+          "endLine": 193,
+          "params": [
+            "{ label, content }"
+          ]
+        },
+        {
+          "name": "TaskConfigSection",
+          "startLine": 195,
+          "endLine": 220,
+          "params": [
+            "{\n  title,\n  info,\n  actions,\n  compact = false,\n  children,\n}"
+          ]
+        },
+        {
+          "name": "TaskConfigSelect",
+          "startLine": 222,
+          "endLine": 272,
+          "params": [
+            "{\n  name,\n  id,\n  value,\n  placeholder = \"-\",\n  options,\n  disabled,\n  onValueChange,\n}"
+          ]
+        },
+        {
+          "name": "TaskConfigDatePicker",
+          "startLine": 274,
+          "endLine": 314,
+          "params": [
+            "{\n  name,\n  value,\n  placeholder,\n  disabled,\n  onValueChange,\n}"
+          ]
+        },
+        {
+          "name": "TaskAutomationOption",
+          "startLine": 316,
+          "endLine": 346,
+          "params": [
+            "{\n  label,\n  description,\n  checked,\n  disabled,\n  name,\n  onCheckedChange,\n}"
+          ]
+        },
+        {
+          "name": "TaskAutomationSection",
+          "startLine": 348,
+          "endLine": 432,
+          "params": [
+            "{\n  copy,\n  autoPlanGeneration,\n  autoExecute,\n  autoPlanGenerationTiming,\n  autoExecuteTiming,\n  onAutoPlanGenerationChange,\n  onAutoExecuteChange,\n  onAutoPlanGenerationTimingChange,\n  onAutoExecuteTimingChange,\n  compact = false,\n}"
+          ]
+        },
+        {
+          "name": "TaskAutomationTimingSelect",
+          "startLine": 434,
+          "endLine": 458,
+          "params": [
+            "{\n  name,\n  label,\n  value,\n  options,\n  onValueChange,\n}"
+          ]
+        },
+        {
+          "name": "formatDateTimeInput",
+          "startLine": 522,
+          "endLine": 524,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "padDatePart",
+          "startLine": 526,
+          "endLine": 528,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "formatLocalDateInput",
+          "startLine": 530,
+          "endLine": 533,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "parseLocalDateInput",
+          "startLine": 535,
+          "endLine": 540,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "formatLocalDateLabel",
+          "startLine": 542,
+          "endLine": 548,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "formatLocalTimeInput",
+          "startLine": 550,
+          "endLine": 553,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "buildDateTimeFromLocalParts",
+          "startLine": 555,
+          "endLine": 564,
+          "params": [
+            "dateValue",
+            "timeValue"
+          ]
+        },
+        {
+          "name": "formatDurationLabel",
+          "startLine": 566,
+          "endLine": 573,
+          "params": [
+            "startAt",
+            "endAt"
+          ]
+        },
+        {
+          "name": "isRuntimeInputObject",
+          "startLine": 582,
+          "endLine": 584,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "formatRuntimeConfig",
+          "startLine": 586,
+          "endLine": 592,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "parseRuntimeConfig",
+          "startLine": 594,
+          "endLine": 617,
+          "params": [
+            "value",
+            "copy"
+          ]
+        },
+        {
+          "name": "cloneRuntimeInput",
+          "startLine": 619,
+          "endLine": 621,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "resolveExecutionRuntime",
+          "startLine": 623,
+          "endLine": 643,
+          "params": [
+            "executionRuntimes",
+            "executionRuntime",
+            "defaultExecutionRuntime"
+          ]
+        },
+        {
+          "name": "pickSpecFieldRuntimeInput",
+          "startLine": 645,
+          "endLine": 657,
+          "params": [
+            "spec",
+            "runtimeInput"
+          ]
+        },
+        {
+          "name": "pickExtraRuntimeInput",
+          "startLine": 659,
+          "endLine": 667,
+          "params": [
+            "spec",
+            "runtimeInput"
+          ]
+        },
+        {
+          "name": "areRuntimeFieldValuesEqual",
+          "startLine": 669,
+          "endLine": 671,
+          "params": [
+            "left",
+            "right"
+          ]
+        },
+        {
+          "name": "stripDefaultRuntimeFieldValues",
+          "startLine": 673,
+          "endLine": 689,
+          "params": [
+            "spec",
+            "runtimeInput"
+          ]
+        },
+        {
+          "name": "buildInitialRuntimeState",
+          "startLine": 691,
+          "endLine": 713,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "toFormState",
+          "startLine": 715,
+          "endLine": 745,
+          "params": [
+            "initialValues",
+            "executionRuntimes",
+            "defaultExecutionRuntime"
+          ]
+        },
+        {
+          "name": "buildTaskConfigFormInput",
+          "startLine": 747,
+          "endLine": 807,
+          "params": [
+            "formState",
+            "executionRuntimes",
+            "copy",
+            "options"
+          ]
+        },
+        {
+          "name": "applyRuntimeAdapterChange",
+          "startLine": 809,
+          "endLine": 833,
+          "params": [
+            "current",
+            "runtime"
+          ]
+        },
+        {
+          "name": "applyPresetValues",
+          "startLine": 835,
+          "endLine": 902,
+          "params": [
+            "current",
+            "values",
+            "executionRuntimes",
+            "defaultExecutionRuntime"
+          ]
+        },
+        {
+          "name": "readDisplayedFieldValue",
+          "startLine": 904,
+          "endLine": 907,
+          "params": [
+            "field",
+            "runtimeInput"
+          ]
+        },
+        {
+          "name": "isFieldVisible",
+          "startLine": 909,
+          "endLine": 927,
+          "params": [
+            "field",
+            "runtimeInput"
+          ]
+        },
+        {
+          "name": "renderFieldValue",
+          "startLine": 929,
+          "endLine": 947,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "TaskConfigForm",
+          "startLine": 949,
+          "endLine": 1604,
+          "params": [
+            "{\n  executionRuntimes,\n  defaultExecutionRuntime,\n  compact = false,\n  initialValues,\n  lockedFields = [],\n  lockedFieldsHint,\n  sourceDescription,\n  sourceDescriptionLabel,\n  submitLabel,\n  pendingLabel,\n  isPending = false,\n  presets,\n  footerActions,\n  onDraftStateChange,\n  onSubmitAction,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TaskConfigField",
+          "line": 133,
+          "isDefault": false
+        },
+        {
+          "name": "InfoPopover",
+          "line": 169,
+          "isDefault": false
+        },
+        {
+          "name": "TaskConfigSection",
+          "line": 195,
+          "isDefault": false
+        },
+        {
+          "name": "TaskConfigSelect",
+          "line": 222,
+          "isDefault": false
+        },
+        {
+          "name": "TaskConfigDatePicker",
+          "line": 274,
+          "isDefault": false
+        },
+        {
+          "name": "TaskConfigForm",
+          "line": 949,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "TaskConfigField",
+          "callee": "cn",
+          "lineNumber": 158
+        },
+        {
+          "caller": "InfoPopover",
+          "callee": "useState",
+          "lineNumber": 170
+        },
+        {
+          "caller": "InfoPopover",
+          "callee": "setOpen",
+          "lineNumber": 178
+        },
+        {
+          "caller": "TaskConfigSection",
+          "callee": "cn",
+          "lineNumber": 209
+        },
+        {
+          "caller": "TaskConfigSelect",
+          "callee": "name.replace",
+          "lineNumber": 239
+        },
+        {
+          "caller": "TaskConfigSelect",
+          "callee": "useState",
+          "lineNumber": 240
+        },
+        {
+          "caller": "TaskConfigSelect",
+          "callee": "options.find",
+          "lineNumber": 241
+        },
+        {
+          "caller": "TaskConfigSelect",
+          "callee": "setIsOpen",
+          "lineNumber": 249
+        },
+        {
+          "caller": "TaskConfigSelect",
+          "callee": "options.map",
+          "lineNumber": 261
+        },
+        {
+          "caller": "TaskConfigDatePicker",
+          "callee": "parseLocalDateInput",
+          "lineNumber": 287
+        },
+        {
+          "caller": "TaskConfigDatePicker",
+          "callee": "formatLocalDateLabel",
+          "lineNumber": 301
+        },
+        {
+          "caller": "TaskConfigDatePicker",
+          "callee": "onValueChange",
+          "lineNumber": 308
+        },
+        {
+          "caller": "TaskConfigDatePicker",
+          "callee": "formatLocalDateInput",
+          "lineNumber": 308
+        },
+        {
+          "caller": "TaskAutomationOption",
+          "callee": "onCheckedChange",
+          "lineNumber": 337
+        },
+        {
+          "caller": "TaskAutomationSection",
+          "callee": "AUTOMATION_TIMING_PRESETS.map",
+          "lineNumber": 380
+        },
+        {
+          "caller": "TaskAutomationTimingSelect",
+          "callee": "onValueChange",
+          "lineNumber": 454
+        },
+        {
+          "caller": "TaskAutomationTimingSelect",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 454
+        },
+        {
+          "caller": "formatDateTimeInput",
+          "callee": "value.toISOString().slice",
+          "lineNumber": 523
+        },
+        {
+          "caller": "formatDateTimeInput",
+          "callee": "value.toISOString",
+          "lineNumber": 523
+        },
+        {
+          "caller": "padDatePart",
+          "callee": "String(value).padStart",
+          "lineNumber": 527
+        },
+        {
+          "caller": "padDatePart",
+          "callee": "String",
+          "lineNumber": 527
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "value.getFullYear",
+          "lineNumber": 532
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "padDatePart",
+          "lineNumber": 532
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "value.getMonth",
+          "lineNumber": 532
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "padDatePart",
+          "lineNumber": 532
+        },
+        {
+          "caller": "formatLocalDateInput",
+          "callee": "value.getDate",
+          "lineNumber": 532
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "value.split(\"-\").map",
+          "lineNumber": 537
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "value.split",
+          "lineNumber": 537
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "[year, month, day].some",
+          "lineNumber": 538
+        },
+        {
+          "caller": "parseLocalDateInput",
+          "callee": "Number.isFinite",
+          "lineNumber": 538
+        },
+        {
+          "caller": "formatLocalDateLabel",
+          "callee": "value.toLocaleDateString",
+          "lineNumber": 543
+        },
+        {
+          "caller": "formatLocalTimeInput",
+          "callee": "padDatePart",
+          "lineNumber": 552
+        },
+        {
+          "caller": "formatLocalTimeInput",
+          "callee": "value.getHours",
+          "lineNumber": 552
+        },
+        {
+          "caller": "formatLocalTimeInput",
+          "callee": "padDatePart",
+          "lineNumber": 552
+        },
+        {
+          "caller": "formatLocalTimeInput",
+          "callee": "value.getMinutes",
+          "lineNumber": 552
+        },
+        {
+          "caller": "buildDateTimeFromLocalParts",
+          "callee": "dateValue.split(\"-\").map",
+          "lineNumber": 557
+        },
+        {
+          "caller": "buildDateTimeFromLocalParts",
+          "callee": "dateValue.split",
+          "lineNumber": 557
+        },
+        {
+          "caller": "buildDateTimeFromLocalParts",
+          "callee": "timeValue.split(\":\").map",
+          "lineNumber": 558
+        },
+        {
+          "caller": "buildDateTimeFromLocalParts",
+          "callee": "timeValue.split",
+          "lineNumber": 558
+        },
+        {
+          "caller": "buildDateTimeFromLocalParts",
+          "callee": "[year, month, day, hours, minutes].some",
+          "lineNumber": 559
+        },
+        {
+          "caller": "buildDateTimeFromLocalParts",
+          "callee": "Number.isFinite",
+          "lineNumber": 559
+        },
+        {
+          "caller": "formatDurationLabel",
+          "callee": "Math.round",
+          "lineNumber": 568
+        },
+        {
+          "caller": "formatDurationLabel",
+          "callee": "endAt.getTime",
+          "lineNumber": 568
+        },
+        {
+          "caller": "formatDurationLabel",
+          "callee": "startAt.getTime",
+          "lineNumber": 568
+        },
+        {
+          "caller": "formatDurationLabel",
+          "callee": "Math.floor",
+          "lineNumber": 571
+        },
+        {
+          "caller": "isRuntimeInputObject",
+          "callee": "Array.isArray",
+          "lineNumber": 583
+        },
+        {
+          "caller": "formatRuntimeConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 587
+        },
+        {
+          "caller": "formatRuntimeConfig",
+          "callee": "JSON.stringify",
+          "lineNumber": 591
+        },
+        {
+          "caller": "parseRuntimeConfig",
+          "callee": "value.trim",
+          "lineNumber": 598
+        },
+        {
+          "caller": "parseRuntimeConfig",
+          "callee": "JSON.parse",
+          "lineNumber": 607
+        },
+        {
+          "caller": "parseRuntimeConfig",
+          "callee": "Array.isArray",
+          "lineNumber": 612
+        },
+        {
+          "caller": "cloneRuntimeInput",
+          "callee": "structuredClone",
+          "lineNumber": 620
+        },
+        {
+          "caller": "resolveExecutionRuntime",
+          "callee": "executionRuntime?.trim",
+          "lineNumber": 628
+        },
+        {
+          "caller": "resolveExecutionRuntime",
+          "callee": "executionRuntimes.find",
+          "lineNumber": 631
+        },
+        {
+          "caller": "pickSpecFieldRuntimeInput",
+          "callee": "getValueAtPath",
+          "lineNumber": 649
+        },
+        {
+          "caller": "pickSpecFieldRuntimeInput",
+          "callee": "setValueAtPath",
+          "lineNumber": 652
+        },
+        {
+          "caller": "pickSpecFieldRuntimeInput",
+          "callee": "structuredClone",
+          "lineNumber": 652
+        },
+        {
+          "caller": "pickExtraRuntimeInput",
+          "callee": "cloneRuntimeInput",
+          "lineNumber": 660
+        },
+        {
+          "caller": "pickExtraRuntimeInput",
+          "callee": "deleteValueAtPath",
+          "lineNumber": 663
+        },
+        {
+          "caller": "pickExtraRuntimeInput",
+          "callee": "Object.keys",
+          "lineNumber": 666
+        },
+        {
+          "caller": "areRuntimeFieldValuesEqual",
+          "callee": "JSON.stringify",
+          "lineNumber": 670
+        },
+        {
+          "caller": "areRuntimeFieldValuesEqual",
+          "callee": "JSON.stringify",
+          "lineNumber": 670
+        },
+        {
+          "caller": "stripDefaultRuntimeFieldValues",
+          "callee": "cloneRuntimeInput",
+          "lineNumber": 674
+        },
+        {
+          "caller": "stripDefaultRuntimeFieldValues",
+          "callee": "getValueAtPath",
+          "lineNumber": 681
+        },
+        {
+          "caller": "stripDefaultRuntimeFieldValues",
+          "callee": "areRuntimeFieldValuesEqual",
+          "lineNumber": 683
+        },
+        {
+          "caller": "stripDefaultRuntimeFieldValues",
+          "callee": "deleteValueAtPath",
+          "lineNumber": 684
+        },
+        {
+          "caller": "buildInitialRuntimeState",
+          "callee": "resolveExecutionRuntime",
+          "lineNumber": 697
+        },
+        {
+          "caller": "buildInitialRuntimeState",
+          "callee": "isRuntimeInputObject",
+          "lineNumber": 702
+        },
+        {
+          "caller": "buildInitialRuntimeState",
+          "callee": "validateTaskConfigAgainstSpec",
+          "lineNumber": 703
+        },
+        {
+          "caller": "buildInitialRuntimeState",
+          "callee": "stripDefaultRuntimeFieldValues",
+          "lineNumber": 706
+        },
+        {
+          "caller": "buildInitialRuntimeState",
+          "callee": "pickSpecFieldRuntimeInput",
+          "lineNumber": 710
+        },
+        {
+          "caller": "buildInitialRuntimeState",
+          "callee": "formatRuntimeConfig",
+          "lineNumber": 711
+        },
+        {
+          "caller": "buildInitialRuntimeState",
+          "callee": "pickExtraRuntimeInput",
+          "lineNumber": 711
+        },
+        {
+          "caller": "toFormState",
+          "callee": "buildInitialRuntimeState",
+          "lineNumber": 720
+        },
+        {
+          "caller": "toFormState",
+          "callee": "formatDateTimeInput",
+          "lineNumber": 731
+        },
+        {
+          "caller": "toFormState",
+          "callee": "formatLocalDateInput",
+          "lineNumber": 732
+        },
+        {
+          "caller": "toFormState",
+          "callee": "formatLocalTimeInput",
+          "lineNumber": 733
+        },
+        {
+          "caller": "toFormState",
+          "callee": "formatLocalTimeInput",
+          "lineNumber": 734
+        },
+        {
+          "caller": "toFormState",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 737
+        },
+        {
+          "caller": "toFormState",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 738
+        },
+        {
+          "caller": "toFormState",
+          "callee": "recurrencePresetFromRule",
+          "lineNumber": 739
+        },
+        {
+          "caller": "toFormState",
+          "callee": "recurrencePresetFromRule",
+          "lineNumber": 740
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "resolveExecutionRuntime",
+          "lineNumber": 753
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "parseRuntimeConfig",
+          "lineNumber": 756
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "cloneRuntimeInput",
+          "lineNumber": 764
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "validateTaskConfigAgainstSpec",
+          "lineNumber": 767
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "buildDateTimeFromLocalParts",
+          "lineNumber": 771
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "buildDateTimeFromLocalParts",
+          "lineNumber": 772
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "recurrenceRuleFromState",
+          "lineNumber": 788
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 801
+        },
+        {
+          "caller": "buildTaskConfigFormInput",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 802
+        },
+        {
+          "caller": "applyRuntimeAdapterChange",
+          "callee": "getValueAtPath",
+          "lineNumber": 816
+        },
+        {
+          "caller": "applyRuntimeAdapterChange",
+          "callee": "setValueAtPath",
+          "lineNumber": 819
+        },
+        {
+          "caller": "applyRuntimeAdapterChange",
+          "callee": "structuredClone",
+          "lineNumber": 819
+        },
+        {
+          "caller": "applyRuntimeAdapterChange",
+          "callee": "validateTaskConfigAgainstSpec",
+          "lineNumber": 823
+        },
+        {
+          "caller": "applyRuntimeAdapterChange",
+          "callee": "pickSpecFieldRuntimeInput",
+          "lineNumber": 830
+        },
+        {
+          "caller": "applyPresetValues",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 863
+        },
+        {
+          "caller": "applyPresetValues",
+          "callee": "normalizeAutomationTiming",
+          "lineNumber": 867
+        },
+        {
+          "caller": "applyPresetValues",
+          "callee": "formatDateTimeInput",
+          "lineNumber": 875
+        },
+        {
+          "caller": "applyPresetValues",
+          "callee": "formatLocalDateInput",
+          "lineNumber": 879
+        },
+        {
+          "caller": "applyPresetValues",
+          "callee": "formatLocalTimeInput",
+          "lineNumber": 880
+        },
+        {
+          "caller": "applyPresetValues",
+          "callee": "formatLocalTimeInput",
+          "lineNumber": 881
+        },
+        {
+          "caller": "applyPresetValues",
+          "callee": "buildInitialRuntimeState",
+          "lineNumber": 888
+        },
+        {
+          "caller": "readDisplayedFieldValue",
+          "callee": "getValueAtPath",
+          "lineNumber": 905
+        },
+        {
+          "caller": "isFieldVisible",
+          "callee": "field.visibleWhen.every",
+          "lineNumber": 914
+        },
+        {
+          "caller": "isFieldVisible",
+          "callee": "getValueAtPath",
+          "lineNumber": 915
+        },
+        {
+          "caller": "isFieldVisible",
+          "callee": "Array.isArray",
+          "lineNumber": 922
+        },
+        {
+          "caller": "isFieldVisible",
+          "callee": "rule.value.includes",
+          "lineNumber": 922
+        },
+        {
+          "caller": "renderFieldValue",
+          "callee": "String",
+          "lineNumber": 939
+        },
+        {
+          "caller": "renderFieldValue",
+          "callee": "JSON.stringify",
+          "lineNumber": 946
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useI18n",
+          "lineNumber": 966
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useMemo",
+          "lineNumber": 968
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useState",
+          "lineNumber": 984
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useMemo",
+          "lineNumber": 985
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "lockedFieldSet.has",
+          "lineNumber": 986
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "lockedFieldSet.has",
+          "lineNumber": 987
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "lockedFieldSet.has",
+          "lineNumber": 987
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "sourceDescription?.trim",
+          "lineNumber": 988
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useMemo",
+          "lineNumber": 1005
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "toFormState",
+          "lineNumber": 1007
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useForm",
+          "lineNumber": 1051
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useWatch",
+          "lineNumber": 1054
+        },
+        {
+          "caller": "replaceFormState",
+          "callee": "reset",
+          "lineNumber": 1057
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useEffect",
+          "lineNumber": 1060
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "reset",
+          "lineNumber": 1061
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useEffect",
+          "lineNumber": 1064
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "buildTaskConfigFormInput",
+          "lineNumber": 1069
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "onDraftStateChange",
+          "lineNumber": 1074
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useMemo",
+          "lineNumber": 1080
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "resolveExecutionRuntime",
+          "lineNumber": 1081
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "useMemo",
+          "lineNumber": 1084
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "selectedExecutionRuntime.spec.fields.reduce",
+          "lineNumber": 1086
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "readDisplayedFieldValue",
+          "lineNumber": 1087
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValueAtPath",
+          "lineNumber": 1090
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "cloneRuntimeInput",
+          "lineNumber": 1094
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "selectedExecutionRuntime.spec.fields.filter",
+          "lineNumber": 1097
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "isFieldVisible",
+          "lineNumber": 1098
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "buildDateTimeFromLocalParts",
+          "lineNumber": 1100
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "buildDateTimeFromLocalParts",
+          "lineNumber": 1101
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "formatDurationLabel",
+          "lineNumber": 1102
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "visibleStandardFields.filter",
+          "lineNumber": 1103
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "selectedExecutionRuntime.spec.runnability.requiredPaths.includes",
+          "lineNumber": 1104
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "visibleStandardFields.filter",
+          "lineNumber": 1106
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "selectedExecutionRuntime.spec.runnability.requiredPaths.includes",
+          "lineNumber": 1107
+        },
+        {
+          "caller": "updateRuntimeField",
+          "callee": "cloneRuntimeInput",
+          "lineNumber": 1111
+        },
+        {
+          "caller": "updateRuntimeField",
+          "callee": "getValues",
+          "lineNumber": 1111
+        },
+        {
+          "caller": "updateRuntimeField",
+          "callee": "deleteValueAtPath",
+          "lineNumber": 1114
+        },
+        {
+          "caller": "updateRuntimeField",
+          "callee": "setValueAtPath",
+          "lineNumber": 1116
+        },
+        {
+          "caller": "updateRuntimeField",
+          "callee": "setValue",
+          "lineNumber": 1119
+        },
+        {
+          "caller": "submitForm",
+          "callee": "setLocalErrorMessage",
+          "lineNumber": 1123
+        },
+        {
+          "caller": "submitForm",
+          "callee": "buildTaskConfigFormInput",
+          "lineNumber": 1126
+        },
+        {
+          "caller": "submitForm",
+          "callee": "onSubmitAction",
+          "lineNumber": 1128
+        },
+        {
+          "caller": "submitForm",
+          "callee": "setLocalErrorMessage",
+          "lineNumber": 1131
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "presets.map",
+          "lineNumber": 1145
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "replaceFormState",
+          "lineNumber": 1151
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "applyPresetValues",
+          "lineNumber": 1152
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "getValues",
+          "lineNumber": 1152
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "handleSubmit(submitForm)",
+          "lineNumber": 1165
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "handleSubmit",
+          "lineNumber": 1165
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "([\"Low\", \"Medium\", \"High\", \"Urgent\"] as const).map",
+          "lineNumber": 1197
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1201
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1263
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "TIME_OPTIONS.map",
+          "lineNumber": 1273
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1276
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "TIME_OPTIONS.map",
+          "lineNumber": 1286
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1289
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "RECURRENCE_PRESETS.map",
+          "lineNumber": 1300
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1303
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1315
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1330
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1332
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1334
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1337
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1338
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "(compact ? requiredRuntimeFields : visibleStandardFields).map",
+          "lineNumber": 1345
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "readDisplayedFieldValue",
+          "lineNumber": 1346
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1354
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1355
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1367
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "(field.options ?? []).map",
+          "lineNumber": 1368
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1369
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1381
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1382
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "Boolean",
+          "lineNumber": 1397
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1398
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "formatRuntimeConfig",
+          "lineNumber": 1412
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1413
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1423
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1424
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "executionRuntimes.map",
+          "lineNumber": 1444
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "replaceFormState",
+          "lineNumber": 1446
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "applyRuntimeAdapterChange",
+          "lineNumber": 1447
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "getValues",
+          "lineNumber": 1448
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "resolveExecutionRuntime",
+          "lineNumber": 1449
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1494
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1496
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1498
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1501
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "setValue",
+          "lineNumber": 1502
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "optionalRuntimeFields.map",
+          "lineNumber": 1506
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "readDisplayedFieldValue",
+          "lineNumber": 1507
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1515
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1516
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1528
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "(field.options ?? []).map",
+          "lineNumber": 1529
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1530
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1542
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1543
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "Boolean",
+          "lineNumber": 1558
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1559
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "formatRuntimeConfig",
+          "lineNumber": 1573
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1574
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "renderFieldValue",
+          "lineNumber": 1584
+        },
+        {
+          "caller": "TaskConfigForm",
+          "callee": "updateRuntimeField",
+          "lineNumber": 1585
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 6,
+        "functionCount": 34,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/ai-insights-panel.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 83,
+      "nonEmptyLines": 77,
+      "functions": [
+        {
+          "name": "toCompactPlan",
+          "startLine": 9,
+          "endLine": 26,
+          "params": [
+            "planResult"
+          ]
+        },
+        {
+          "name": "AiInsightsPanel",
+          "startLine": 28,
+          "endLine": 83,
+          "params": [
+            "{\n  item,\n  planResult,\n  onPlanLoaded,\n  onApplyDecomposition,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AiInsightsPanel",
+          "line": 28,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "toCompactPlan",
+          "callee": "nodes.map",
+          "lineNumber": 20
+        },
+        {
+          "caller": "AiInsightsPanel",
+          "callee": "toCompactPlan",
+          "lineNumber": 39
+        },
+        {
+          "caller": "AiInsightsPanel",
+          "callee": "compactNodes.map",
+          "lineNumber": 55
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/conflict-card.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 153,
+      "nonEmptyLines": 143,
+      "functions": [
+        {
+          "name": "getCopy",
+          "startLine": 37,
+          "endLine": 50,
+          "params": [
+            "messages"
+          ]
+        },
+        {
+          "name": "ConflictCard",
+          "startLine": 52,
+          "endLine": 153,
+          "params": [
+            "{\n  conflict,\n  suggestions,\n  onApplySuggestion,\n  isPending,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ConflictCard",
+          "line": 52,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ConflictCard",
+          "callee": "useI18n",
+          "lineNumber": 58
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "getCopy",
+          "lineNumber": 59
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "suggestions.filter",
+          "lineNumber": 68
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "conflict.severity.toUpperCase",
+          "lineNumber": 78
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "conflict.timeRange.start.toLocaleTimeString",
+          "lineNumber": 93
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "conflict.timeRange.end.toLocaleTimeString",
+          "lineNumber": 98
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "conflictSuggestions.map",
+          "lineNumber": 110
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "copy.resolvedConflicts.replace",
+          "lineNumber": 132
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "String",
+          "lineNumber": 132
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "copy.movedTasks.replace",
+          "lineNumber": 134
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "String",
+          "lineNumber": 134
+        },
+        {
+          "caller": "ConflictCard",
+          "callee": "onApplySuggestion",
+          "lineNumber": 139
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/planning-header.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 178,
+      "nonEmptyLines": 169,
+      "functions": [
+        {
+          "name": "PlanningHeader",
+          "startLine": 17,
+          "endLine": 178,
+          "params": [
+            "{\n  ariaLabel,\n  title,\n  activeDayLabel,\n  summary,\n  dayLinks,\n  metrics,\n  actions,\n  activeView,\n  timelineHref,\n  listHref,\n  timelineLabel,\n  listLabel,\n  onNavigate,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "PlanningHeader",
+          "line": 17,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "PlanningHeader",
+          "callee": "metrics.slice",
+          "lineNumber": 50
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "dayLinks.map",
+          "lineNumber": 70
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "onNavigate",
+          "lineNumber": 74
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "cn",
+          "lineNumber": 76
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "onNavigate",
+          "lineNumber": 92
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "cn",
+          "lineNumber": 94
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "onNavigate",
+          "lineNumber": 106
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "cn",
+          "lineNumber": 108
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "keyMetrics.map",
+          "lineNumber": 128
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "cn",
+          "lineNumber": 136
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "actions.map",
+          "lineNumber": 149
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "action.onClick",
+          "lineNumber": 158
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "onNavigate",
+          "lineNumber": 161
+        },
+        {
+          "caller": "PlanningHeader",
+          "callee": "cn",
+          "lineNumber": 163
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/preparation-checklist.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 109,
+      "nonEmptyLines": 101,
+      "functions": [
+        {
+          "name": "PreparationChecklist",
+          "startLine": 15,
+          "endLine": 109,
+          "params": [
+            "{\n  steps,\n  title = \"Preparation\",\n  emptyMessage = \"No preparation steps identified.\",\n  onToggle,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "PreparationChecklist",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "PreparationChecklist",
+          "callee": "useState",
+          "lineNumber": 26
+        },
+        {
+          "caller": "handleToggle",
+          "callee": "setLocalSteps",
+          "lineNumber": 29
+        },
+        {
+          "caller": "handleToggle",
+          "callee": "current.map",
+          "lineNumber": 30
+        },
+        {
+          "caller": "handleToggle",
+          "callee": "localSteps.find",
+          "lineNumber": 34
+        },
+        {
+          "caller": "handleToggle",
+          "callee": "onToggle",
+          "lineNumber": 36
+        },
+        {
+          "caller": "PreparationChecklist",
+          "callee": "localSteps.filter",
+          "lineNumber": 40
+        },
+        {
+          "caller": "PreparationChecklist",
+          "callee": "Math.round",
+          "lineNumber": 41
+        },
+        {
+          "caller": "PreparationChecklist",
+          "callee": "localSteps.map",
+          "lineNumber": 74
+        },
+        {
+          "caller": "PreparationChecklist",
+          "callee": "handleToggle",
+          "lineNumber": 78
+        },
+        {
+          "caller": "PreparationChecklist",
+          "callee": "cn",
+          "lineNumber": 88
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/schedule-page-panels.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 148,
+      "nonEmptyLines": 137,
+      "functions": [
+        {
+          "name": "getQueueSuggestedDuration",
+          "startLine": 23,
+          "endLine": 33,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "QueueCard",
+          "startLine": 35,
+          "endLine": 148,
+          "params": [
+            "{\n  item,\n  isDragging,\n  isPending,\n  currentSchedule,\n  onScheduleSlot,\n  onOpenTaskDetails,\n  onDragStart,\n  onDragEnd,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "DayTimelineSummary",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "SelectedBlockSheet",
+          "line": 21,
+          "isDefault": false
+        },
+        {
+          "name": "QueueCard",
+          "line": 35,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getQueueSuggestedDuration",
+          "callee": "Number.isFinite",
+          "lineNumber": 28
+        },
+        {
+          "caller": "getQueueSuggestedDuration",
+          "callee": "Math.max",
+          "lineNumber": 32
+        },
+        {
+          "caller": "getQueueSuggestedDuration",
+          "callee": "Math.round",
+          "lineNumber": 32
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "useLocale",
+          "lineNumber": 54
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "useI18n",
+          "lineNumber": 55
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "getSchedulePageCopy",
+          "lineNumber": 56
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "getQueueSuggestedDuration",
+          "lineNumber": 57
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "useState",
+          "lineNumber": 58
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "getPriorityAccent",
+          "lineNumber": 59
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "cn",
+          "lineNumber": 64
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "onDragStart",
+          "lineNumber": 72
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "cn",
+          "lineNumber": 74
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "getPriorityTone",
+          "lineNumber": 93
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "formatDateTime",
+          "lineNumber": 96
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "e.stopPropagation",
+          "lineNumber": 107
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "setShowTimeslots",
+          "lineNumber": 108
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "onOpenTaskDetails",
+          "lineNumber": 120
+        },
+        {
+          "caller": "QueueCard",
+          "callee": "onScheduleSlot",
+          "lineNumber": 140
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/schedule-page-sidebar.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 137,
+      "nonEmptyLines": 131,
+      "functions": [
+        {
+          "name": "ScheduleLeftSidebar",
+          "startLine": 23,
+          "endLine": 83,
+          "params": [
+            "{\n  copy,\n  locale,\n  activeView,\n  viewModel,\n  localizeHref,\n  buildScheduleViewHref,\n}"
+          ]
+        },
+        {
+          "name": "ScheduleRightSidebar",
+          "startLine": 85,
+          "endLine": 137,
+          "params": [
+            "{\n  copy,\n  viewData,\n  draggedTask,\n  isPending,\n  handleQueueDragStart,\n  handleQueueDragEnd,\n  onOpenTaskDetails,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ScheduleLeftSidebar",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "ScheduleRightSidebar",
+          "line": 85,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "ScheduleLeftSidebar",
+          "callee": "viewModel.calendarDays.find",
+          "lineNumber": 42
+        },
+        {
+          "caller": "ScheduleLeftSidebar",
+          "callee": "viewModel.calendarDays.map",
+          "lineNumber": 48
+        },
+        {
+          "caller": "ScheduleLeftSidebar",
+          "callee": "localizeHref",
+          "lineNumber": 50
+        },
+        {
+          "caller": "ScheduleLeftSidebar",
+          "callee": "buildScheduleViewHref",
+          "lineNumber": 52
+        },
+        {
+          "caller": "ScheduleRightSidebar",
+          "callee": "viewData.unscheduled.map",
+          "lineNumber": 117
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/schedule-panel-primitives.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 53,
+      "nonEmptyLines": 47,
+      "functions": [
+        {
+          "name": "EmptyState",
+          "startLine": 12,
+          "endLine": 18,
+          "params": [
+            "{ children }"
+          ]
+        },
+        {
+          "name": "DayTimelineSummary",
+          "startLine": 20,
+          "endLine": 53,
+          "params": [
+            "{\n  items,\n  dayDate,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "EmptyState",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "DayTimelineSummary",
+          "line": 20,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "useLocale",
+          "lineNumber": 27
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "useI18n",
+          "lineNumber": 28
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "getSchedulePageCopy",
+          "lineNumber": 29
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "items\n    .map((item) => toTimestamp(item.scheduledStartAt))\n    .filter",
+          "lineNumber": 30
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "items\n    .map",
+          "lineNumber": 30
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "toTimestamp",
+          "lineNumber": 31
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "items\n    .map((item) => toTimestamp(item.scheduledEndAt))\n    .filter",
+          "lineNumber": 33
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "items\n    .map",
+          "lineNumber": 33
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "toTimestamp",
+          "lineNumber": 34
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "formatShortDay",
+          "lineNumber": 40
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "Math.min",
+          "lineNumber": 45
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "Math.max",
+          "lineNumber": 46
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "formatTime",
+          "lineNumber": 50
+        },
+        {
+          "caller": "DayTimelineSummary",
+          "callee": "formatTime",
+          "lineNumber": 50
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/selected-block-main-column.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 129,
+      "nonEmptyLines": 125,
+      "functions": [
+        {
+          "name": "SelectedBlockMainColumn",
+          "startLine": 21,
+          "endLine": 129,
+          "params": [
+            "{\n  item,\n  copy,\n  executionRuntimes,\n  defaultExecutionRuntime,\n  isPending,\n  planningTaskDraft,\n  savedPlan,\n  generationStatus,\n  acceptedPlan,\n  hasUnsavedConfigChanges,\n  unsavedConfigDraft,\n  onDeleteTask,\n  onTaskConfigDraftStateChange,\n  onSaveTaskConfig,\n  onPlanLoaded,\n  onApplyPlan,\n  onSaveConfigBeforeRegenerate,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SelectedBlockMainColumn",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SelectedBlockMainColumn",
+          "callee": "useState",
+          "lineNumber": 58
+        },
+        {
+          "caller": "SelectedBlockMainColumn",
+          "callee": "toTaskConfigInitialValues",
+          "lineNumber": 71
+        },
+        {
+          "caller": "SelectedBlockMainColumn",
+          "callee": "onDeleteTask",
+          "lineNumber": 83
+        },
+        {
+          "caller": "SelectedBlockMainColumn",
+          "callee": "setShowDeleteConfirm",
+          "lineNumber": 90
+        },
+        {
+          "caller": "SelectedBlockMainColumn",
+          "callee": "setShowDeleteConfirm",
+          "lineNumber": 99
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/selected-block-sheet-header.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 61,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "SelectedBlockSheetHeader",
+          "startLine": 9,
+          "endLine": 61,
+          "params": [
+            "{\n  item,\n  locale,\n  copy,\n  onClose,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SelectedBlockSheetHeader",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SelectedBlockSheetHeader",
+          "callee": "formatTimeRange",
+          "lineNumber": 20
+        },
+        {
+          "caller": "SelectedBlockSheetHeader",
+          "callee": "formatDateTime",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/selected-block-sheet-regression.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 159,
+      "nonEmptyLines": 144,
+      "functions": [
+        {
+          "name": "item",
+          "startLine": 95,
+          "endLine": 126,
+          "params": [
+            "overrides"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/selected-block-sheet.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 95,
+      "nonEmptyLines": 91,
+      "functions": [
+        {
+          "name": "SelectedBlockSheet",
+          "startLine": 17,
+          "endLine": 95,
+          "params": [
+            "{\n  item,\n  selectedDay: _selectedDay,\n  executionRuntimes,\n  defaultExecutionRuntime,\n  isPending,\n  onClose,\n  onSaveTaskConfigAction,\n  onDeleteTask,\n  onMutatedAction,\n  buildScheduleHref: _buildScheduleHref,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SelectedBlockSheet",
+          "line": 17,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "SelectedBlockSheet",
+          "callee": "useLocale",
+          "lineNumber": 29
+        },
+        {
+          "caller": "SelectedBlockSheet",
+          "callee": "useI18n",
+          "lineNumber": 30
+        },
+        {
+          "caller": "SelectedBlockSheet",
+          "callee": "getSchedulePageCopy",
+          "lineNumber": 31
+        },
+        {
+          "caller": "SelectedBlockSheet",
+          "callee": "useSelectedBlockPlanState",
+          "lineNumber": 38
+        },
+        {
+          "caller": "SelectedBlockSheet",
+          "callee": "useSelectedBlockConfigState",
+          "lineNumber": 45
+        },
+        {
+          "caller": "SelectedBlockSheet",
+          "callee": "onClose",
+          "lineNumber": 51
+        },
+        {
+          "caller": "SelectedBlockSheet",
+          "callee": "Boolean",
+          "lineNumber": 80
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/use-selected-block-config-state.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 102,
+      "nonEmptyLines": 90,
+      "functions": [
+        {
+          "name": "normalizePriority",
+          "startLine": 11,
+          "endLine": 21,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "toPlanningTaskDraft",
+          "startLine": 23,
+          "endLine": 34,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "serializeTaskConfigDraftState",
+          "startLine": 36,
+          "endLine": 44,
+          "params": [
+            "state"
+          ]
+        },
+        {
+          "name": "useSelectedBlockConfigState",
+          "startLine": 46,
+          "endLine": 102,
+          "params": [
+            "{\n  item,\n  onSaveTaskConfigAction,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useSelectedBlockConfigState",
+          "line": 46,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "toPlanningTaskDraft",
+          "callee": "normalizePriority",
+          "lineNumber": 29
+        },
+        {
+          "caller": "serializeTaskConfigDraftState",
+          "callee": "JSON.stringify",
+          "lineNumber": 37
+        },
+        {
+          "caller": "serializeTaskConfigDraftState",
+          "callee": "state.values.dueAt?.toISOString",
+          "lineNumber": 41
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "useState",
+          "lineNumber": 53
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "toPlanningTaskDraft",
+          "lineNumber": 53
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "useState",
+          "lineNumber": 54
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "useRef",
+          "lineNumber": 55
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "useEffect",
+          "lineNumber": 57
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "toPlanningTaskDraft",
+          "lineNumber": 58
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "setPlanningTaskDraft",
+          "lineNumber": 59
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "setTaskConfigDraftState",
+          "lineNumber": 60
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "useCallback",
+          "lineNumber": 64
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "serializeTaskConfigDraftState",
+          "lineNumber": 65
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "setTaskConfigDraftState",
+          "lineNumber": 71
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "useCallback",
+          "lineNumber": 74
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "onSaveTaskConfigAction",
+          "lineNumber": 75
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "setPlanningTaskDraft",
+          "lineNumber": 76
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "setTaskConfigDraftState",
+          "lineNumber": 84
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "useCallback",
+          "lineNumber": 87
+        },
+        {
+          "caller": "useSelectedBlockConfigState",
+          "callee": "saveTaskConfig",
+          "lineNumber": 92
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/use-selected-block-plan-state.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 234,
+      "nonEmptyLines": 201,
+      "functions": [
+        {
+          "name": "hasFullPlan",
+          "startLine": 19,
+          "endLine": 21,
+          "params": [
+            "saved"
+          ]
+        },
+        {
+          "name": "savedPlanKey",
+          "startLine": 23,
+          "endLine": 25,
+          "params": [
+            "saved"
+          ]
+        },
+        {
+          "name": "acceptedResponseFromSavedPlan",
+          "startLine": 27,
+          "endLine": 33,
+          "params": [
+            "saved"
+          ]
+        },
+        {
+          "name": "deriveGenerationStatus",
+          "startLine": 35,
+          "endLine": 48,
+          "params": [
+            "savedPlan",
+            "sessionStatus"
+          ]
+        },
+        {
+          "name": "useSelectedBlockPlanState",
+          "startLine": 50,
+          "endLine": 234,
+          "params": [
+            "{\n  item,\n  onMutatedAction,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "useSelectedBlockPlanState",
+          "line": 50,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "hasFullPlan",
+          "callee": "Boolean",
+          "lineNumber": 20
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useTaskPlanGenerationSession",
+          "lineNumber": 57
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useState",
+          "lineNumber": 58
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "hasFullPlan",
+          "lineNumber": 58
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useState",
+          "lineNumber": 59
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useState",
+          "lineNumber": 60
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "hasFullPlan",
+          "lineNumber": 60
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "acceptedResponseFromSavedPlan",
+          "lineNumber": 60
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useState",
+          "lineNumber": 61
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useRef",
+          "lineNumber": 62
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "savedPlanKey",
+          "lineNumber": 62
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useRef",
+          "lineNumber": 63
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useCallback",
+          "lineNumber": 65
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "savedPlanKey",
+          "lineNumber": 70
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setGenerationStatus",
+          "lineNumber": 74
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setGenerationStatus",
+          "lineNumber": 80
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "hasFullPlan",
+          "lineNumber": 82
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setDisplayedSavedPlan",
+          "lineNumber": 87
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "hasFullPlan",
+          "lineNumber": 87
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "hasFullPlan",
+          "lineNumber": 89
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "acceptedResponseFromSavedPlan",
+          "lineNumber": 89
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setAcceptedPlan",
+          "lineNumber": 91
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useEffect",
+          "lineNumber": 106
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "applyPlanStateSnapshot",
+          "lineNumber": 108
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useEffect",
+          "lineNumber": 114
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "savedPlanKey",
+          "lineNumber": 115
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useEffect",
+          "lineNumber": 118
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "hasFullPlan",
+          "lineNumber": 122
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "(async () => {\n      const response = await fetch(\n        `/api/tasks/${item.taskId}/plan${item.workBlockId ? `?workBlockId=${encodeURIComponent(item.workBlockId)}` : \"\"}`,\n      );\n      if (!response.ok || cancelled) {\n        return;\n      }\n\n      const payload = await response.json() as {\n        savedPlan?: TaskPlanReadModel | null;\n        aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;\n      };\n      if (cancelled) {\n        return;\n      }\n\n      applyPlanStateSnapshot({\n        savedPlan: payload.savedPlan ?? null,\n        aiPlanGenerationStatus: payload.aiPlanGenerationStatus ?? deriveGenerationStatus(payload.savedPlan ?? snapshot, generationSession.sessionStatus),\n      });\n    })",
+          "lineNumber": 130
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "fetch",
+          "lineNumber": 131
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "encodeURIComponent",
+          "lineNumber": 132
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "response.json",
+          "lineNumber": 138
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "applyPlanStateSnapshot",
+          "lineNumber": 146
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "deriveGenerationStatus",
+          "lineNumber": 148
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useEffect",
+          "lineNumber": 157
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "deriveGenerationStatus",
+          "lineNumber": 161
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "applyPlanStateSnapshot",
+          "lineNumber": 163
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useCallback",
+          "lineNumber": 172
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "savedPlanKey",
+          "lineNumber": 173
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setDisplayedSavedPlan",
+          "lineNumber": 176
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "deriveGenerationStatus",
+          "lineNumber": 177
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setGenerationStatus",
+          "lineNumber": 179
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "acceptedResponseFromSavedPlan",
+          "lineNumber": 182
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setAcceptedPlan",
+          "lineNumber": 187
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "useCallback",
+          "lineNumber": 201
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setIsApplying",
+          "lineNumber": 203
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "api.tasks[\":taskId\"].plan.accept.$post",
+          "lineNumber": 205
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "res.json",
+          "lineNumber": 210
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setAcceptedPlan",
+          "lineNumber": 212
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setDisplayedSavedPlan",
+          "lineNumber": 213
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setGenerationStatus",
+          "lineNumber": 215
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "savedPlanKey",
+          "lineNumber": 216
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "onMutatedAction",
+          "lineNumber": 218
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "logger.error",
+          "lineNumber": 220
+        },
+        {
+          "caller": "useSelectedBlockPlanState",
+          "callee": "setIsApplying",
+          "lineNumber": 222
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/planning-header.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 44,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-command-bar.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 106,
+      "nonEmptyLines": 89,
+      "functions": [
+        {
+          "name": "hookValue",
+          "startLine": 17,
+          "endLine": 29,
+          "params": [
+            "overrides"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-command-bar.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 406,
+      "nonEmptyLines": 385,
+      "functions": [
+        {
+          "name": "newTrace",
+          "startLine": 41,
+          "endLine": 58,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "AiProcessPanel",
+          "startLine": 60,
+          "endLine": 115,
+          "params": [
+            "{ trace }"
+          ]
+        },
+        {
+          "name": "ScheduleCommandBar",
+          "startLine": 117,
+          "endLine": 406,
+          "params": [
+            "{\n  id,\n  selectedDay,\n  isPending,\n  onSubmit,\n  autoSuggestionsEnabled,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ScheduleCommandBar",
+          "line": 117,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "newTrace",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 43
+        },
+        {
+          "caller": "AiProcessPanel",
+          "callee": "trace.toolCalls.map",
+          "lineNumber": 82
+        },
+        {
+          "caller": "AiProcessPanel",
+          "callee": "trace.toolResults.map",
+          "lineNumber": 93
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useI18n",
+          "lineNumber": 130
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useScheduleAiPreferences",
+          "lineNumber": 131
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useMemo",
+          "lineNumber": 133
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "getSchedulePageCopy",
+          "lineNumber": 133
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useState",
+          "lineNumber": 138
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useState",
+          "lineNumber": 139
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useState",
+          "lineNumber": 140
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useState",
+          "lineNumber": 141
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useState",
+          "lineNumber": 142
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useState",
+          "lineNumber": 143
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useRef",
+          "lineNumber": 144
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useRef",
+          "lineNumber": 145
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "value.trim",
+          "lineNumber": 147
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "useAutoComplete",
+          "lineNumber": 149
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "Boolean",
+          "lineNumber": 154
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "value.trim",
+          "lineNumber": 158
+        },
+        {
+          "caller": "submitDraft",
+          "callee": "setTrace",
+          "lineNumber": 172
+        },
+        {
+          "caller": "submitDraft",
+          "callee": "onSubmit",
+          "lineNumber": 173
+        },
+        {
+          "caller": "submitDraft",
+          "callee": "setValue",
+          "lineNumber": 174
+        },
+        {
+          "caller": "buildDraftFromSuggestion",
+          "callee": "toDateForDay",
+          "lineNumber": 179
+        },
+        {
+          "caller": "buildDraftFromSuggestion",
+          "callee": "now.getHours",
+          "lineNumber": 179
+        },
+        {
+          "caller": "buildDraftFromSuggestion",
+          "callee": "now.getMinutes",
+          "lineNumber": 179
+        },
+        {
+          "caller": "buildDraftFromSuggestion",
+          "callee": "buildQuickCreateDraft",
+          "lineNumber": 180
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "value.trim",
+          "lineNumber": 196
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "newTrace",
+          "lineNumber": 197
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "logger.info",
+          "lineNumber": 204
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "summarizeText",
+          "lineNumber": 206
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "summarizeText",
+          "lineNumber": 207
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "setSubmitError",
+          "lineNumber": 213
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "setTrace",
+          "lineNumber": 214
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "setValue",
+          "lineNumber": 224
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "setShowSuggestions",
+          "lineNumber": 225
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "onSubmit",
+          "lineNumber": 226
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "buildDraftFromSuggestion",
+          "lineNumber": 226
+        },
+        {
+          "caller": "handleSelectSuggestion",
+          "callee": "setValue",
+          "lineNumber": 227
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "rawInput.trim",
+          "lineNumber": 232
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "newTrace",
+          "lineNumber": 235
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setTrace",
+          "lineNumber": 236
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setSubmitError",
+          "lineNumber": 246
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setIsResolving",
+          "lineNumber": 247
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "logger.info",
+          "lineNumber": 248
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "summarizeText",
+          "lineNumber": 250
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "summarizeText",
+          "lineNumber": 251
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "buildDraftFromSuggestion",
+          "lineNumber": 269
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "logger.info",
+          "lineNumber": 270
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "submitDraft",
+          "lineNumber": 275
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setSubmitError",
+          "lineNumber": 278
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setTrace",
+          "lineNumber": 279
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "logger.error",
+          "lineNumber": 280
+        },
+        {
+          "caller": "handleSubmit",
+          "callee": "setIsResolving",
+          "lineNumber": 285
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setValue",
+          "lineNumber": 298
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setSubmitError",
+          "lineNumber": 299
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setShowSuggestions",
+          "lineNumber": 300
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "logger.debug",
+          "lineNumber": 301
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "summarizeText",
+          "lineNumber": 302
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "summarizeText",
+          "lineNumber": 303
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "event.target.value.trim",
+          "lineNumber": 303
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setIsComposing",
+          "lineNumber": 307
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setShowSuggestions",
+          "lineNumber": 308
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setIsComposing",
+          "lineNumber": 311
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setValue",
+          "lineNumber": 313
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "event.currentTarget.value.trim",
+          "lineNumber": 314
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setShowSuggestions",
+          "lineNumber": 314
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setShowSuggestions",
+          "lineNumber": 317
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setTimeout",
+          "lineNumber": 320
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setShowSuggestions",
+          "lineNumber": 320
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "event.preventDefault",
+          "lineNumber": 329
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "handleSubmit",
+          "lineNumber": 330
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "setShowSuggestions",
+          "lineNumber": 332
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "toolCalls.map",
+          "lineNumber": 353
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "(structuredSuggestions ?? []).slice(0, 5).map",
+          "lineNumber": 361
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "(structuredSuggestions ?? []).slice",
+          "lineNumber": 361
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "e.preventDefault",
+          "lineNumber": 367
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "handleSelectSuggestion",
+          "lineNumber": 368
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "cn",
+          "lineNumber": 377
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "value.trim",
+          "lineNumber": 392
+        },
+        {
+          "caller": "ScheduleCommandBar",
+          "callee": "handleSubmit",
+          "lineNumber": 393
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-inline-quick-create.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 94,
+      "nonEmptyLines": 78,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

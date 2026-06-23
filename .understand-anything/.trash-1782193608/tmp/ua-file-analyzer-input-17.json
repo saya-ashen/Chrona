@@ -1,0 +1,179 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/provider-approval-banner.tsx",
+      "language": "typescript",
+      "sizeLines": 134,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.test.tsx",
+      "language": "typescript",
+      "sizeLines": 231,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/task-workspace-execution-overview.tsx",
+      "language": "typescript",
+      "sizeLines": 240,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/task-workspace-inspector.tsx",
+      "language": "typescript",
+      "sizeLines": 176,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.test.tsx",
+      "language": "typescript",
+      "sizeLines": 255,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/task-workspace-node-detail-panel.tsx",
+      "language": "typescript",
+      "sizeLines": 274,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.test.tsx",
+      "language": "typescript",
+      "sizeLines": 180,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/execution/workspace-activity-feed.tsx",
+      "language": "typescript",
+      "sizeLines": 111,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-delete-flow.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-editor-state.ts",
+      "language": "typescript",
+      "sizeLines": 176,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-execution-state-store.test.tsx",
+      "language": "typescript",
+      "sizeLines": 222,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.occurrence-switch.test.tsx",
+      "language": "typescript",
+      "sizeLines": 210,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.spec-patch.test.tsx",
+      "language": "typescript",
+      "sizeLines": 161,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.state-events.test.tsx",
+      "language": "typescript",
+      "sizeLines": 162,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-page-state.ts",
+      "language": "typescript",
+      "sizeLines": 428,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-generation-survives-refresh.test.tsx",
+      "language": "typescript",
+      "sizeLines": 129,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.test.tsx",
+      "language": "typescript",
+      "sizeLines": 49,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-section-state.ts",
+      "language": "typescript",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.accept-refresh.test.tsx",
+      "language": "typescript",
+      "sizeLines": 176,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.test.tsx",
+      "language": "typescript",
+      "sizeLines": 42,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-plan-state.ts",
+      "language": "typescript",
+      "sizeLines": 673,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-proposal-flow.ts",
+      "language": "typescript",
+      "sizeLines": 165,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sse-refresh.test.tsx",
+      "language": "typescript",
+      "sizeLines": 212,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/hooks/use-task-workspace-sync.test.tsx",
+      "language": "typescript",
+      "sizeLines": 1113,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.test.ts",
+      "language": "typescript",
+      "sizeLines": 230,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-actions.ts",
+      "language": "typescript",
+      "sizeLines": 383,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.test.ts",
+      "language": "typescript",
+      "sizeLines": 192,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-activity.ts",
+      "language": "typescript",
+      "sizeLines": 356,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-editor-view-model.ts",
+      "language": "typescript",
+      "sizeLines": 102,
+      "fileCategory": "code"
+    }
+  ]
+}

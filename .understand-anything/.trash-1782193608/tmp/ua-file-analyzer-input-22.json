@@ -1,0 +1,155 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 704,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 260,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 210,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 466,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/ai/clients.routes.ts",
+      "language": "typescript",
+      "sizeLines": 216,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/api.ts",
+      "language": "typescript",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/assistant-surface.routes.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/calendar-sources.routes.ts",
+      "language": "typescript",
+      "sizeLines": 154,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/helpers.ts",
+      "language": "typescript",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/integrations/hermes.routes.ts",
+      "language": "typescript",
+      "sizeLines": 94,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/mcp/mcp.routes.ts",
+      "language": "typescript",
+      "sizeLines": 404,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/pages/inbox.routes.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/pages/index.ts",
+      "language": "typescript",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/pages/memory.routes.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/pages/schedule.routes.ts",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/pages/work.routes.ts",
+      "language": "typescript",
+      "sizeLines": 574,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/runtime.routes.ts",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/crud.routes.ts",
+      "language": "typescript",
+      "sizeLines": 293,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/execution.routes.ts",
+      "language": "typescript",
+      "sizeLines": 410,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/index.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/lifecycle.routes.ts",
+      "language": "typescript",
+      "sizeLines": 45,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/plan.routes.ts",
+      "language": "typescript",
+      "sizeLines": 531,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/result.routes.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "language": "typescript",
+      "sizeLines": 126,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/server/src/routes/tasks/schedule.routes.ts",
+      "language": "typescript",
+      "sizeLines": 171,
+      "fileCategory": "code"
+    }
+  ]
+}

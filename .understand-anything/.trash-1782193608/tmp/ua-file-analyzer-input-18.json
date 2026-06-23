@@ -1,0 +1,167 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-plan-flow-machine.ts",
+      "language": "typescript",
+      "sizeLines": 89,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-proposal-flow-machine.ts",
+      "language": "typescript",
+      "sizeLines": 61,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-query.test.ts",
+      "language": "typescript",
+      "sizeLines": 819,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-query.ts",
+      "language": "typescript",
+      "sizeLines": 692,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "language": "typescript",
+      "sizeLines": 326,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-header-card.test.tsx",
+      "language": "typescript",
+      "sizeLines": 106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-header-card.tsx",
+      "language": "typescript",
+      "sizeLines": 195,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-msw.test.tsx",
+      "language": "typescript",
+      "sizeLines": 130,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-page.test.tsx",
+      "language": "typescript",
+      "sizeLines": 690,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "language": "typescript",
+      "sizeLines": 343,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/sections/task-workspace-plan-content.tsx",
+      "language": "typescript",
+      "sizeLines": 86,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "language": "typescript",
+      "sizeLines": 406,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures.ts",
+      "language": "typescript",
+      "sizeLines": 301,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/test/task-workspace-ui-fixtures.tsx",
+      "language": "typescript",
+      "sizeLines": 46,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/ui/tabs.tsx",
+      "language": "typescript",
+      "sizeLines": 88,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/work/work-inspector.test.tsx",
+      "language": "typescript",
+      "sizeLines": 208,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/work/work-inspector.tsx",
+      "language": "typescript",
+      "sizeLines": 114,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/hooks/ai/task-plan-generation-session-store.test.ts",
+      "language": "typescript",
+      "sizeLines": 59,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "language": "typescript",
+      "sizeLines": 507,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/lib/access-key.ts",
+      "language": "typescript",
+      "sizeLines": 80,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/lib/fetch-json-event-source.ts",
+      "language": "typescript",
+      "sizeLines": 99,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/lib/http-client.ts",
+      "language": "typescript",
+      "sizeLines": 70,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/lib/rpc-client.ts",
+      "language": "typescript",
+      "sizeLines": 30,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/test/fixtures.test.tsx",
+      "language": "typescript",
+      "sizeLines": 27,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/test/fixtures.ts",
+      "language": "typescript",
+      "sizeLines": 24,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/test/msw/handlers.ts",
+      "language": "typescript",
+      "sizeLines": 5,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/test/msw/server.ts",
+      "language": "typescript",
+      "sizeLines": 4,
+      "fileCategory": "code"
+    }
+  ]
+}

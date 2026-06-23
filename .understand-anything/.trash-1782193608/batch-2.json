@@ -1,0 +1,3069 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/types.ts",
+      "summary": "实现 \"agent-tools\" 模块的 types 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 39,
+      "nonEmptyLines": 36
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "type": "file",
+      "name": "conflict-analyzer-smart.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 564,
+      "nonEmptyLines": 489
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts:makeTask",
+      "type": "function",
+      "name": "makeTask",
+      "filePath": "packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "summary": "函数 makeTask，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 17,
+      "endLine": 30
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "type": "file",
+      "name": "provider-fixture-replay-regression.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 69,
+      "nonEmptyLines": 62
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts:snapshot",
+      "type": "function",
+      "name": "snapshot",
+      "filePath": "packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "summary": "函数 snapshot，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 36
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "type": "file",
+      "name": "provider-response-parsing.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 136,
+      "nonEmptyLines": 125
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts:providerSnapshot",
+      "type": "function",
+      "name": "providerSnapshot",
+      "filePath": "packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "summary": "函数 providerSnapshot，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 20
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts:client",
+      "type": "function",
+      "name": "client",
+      "filePath": "packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "summary": "函数 client，接受 snapshot 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 22,
+      "endLine": 67
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts:clientWithStreamFailure",
+      "type": "function",
+      "name": "clientWithStreamFailure",
+      "filePath": "packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "summary": "函数 clientWithStreamFailure，接受 error 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 69,
+      "endLine": 107
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
+      "type": "file",
+      "name": "streaming.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 219,
+      "nonEmptyLines": 201
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "type": "file",
+      "name": "conflict-analyzer.ts",
+      "filePath": "packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "summary": "包含 summarize、buildRuleSuggestion、normalizeLlmSuggestions等 函数，属于 \"ai\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 113,
+      "nonEmptyLines": 99
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:summarize",
+      "type": "function",
+      "name": "summarize",
+      "filePath": "packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "summary": "函数 summarize，接受 conflicts 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 20
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:buildRuleSuggestion",
+      "type": "function",
+      "name": "buildRuleSuggestion",
+      "filePath": "packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "summary": "函数 buildRuleSuggestion，接受 conflict, index 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 22,
+      "endLine": 39
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:normalizeLlmSuggestions",
+      "type": "function",
+      "name": "normalizeLlmSuggestions",
+      "filePath": "packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "summary": "函数 normalizeLlmSuggestions，接受 value, conflicts 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 41,
+      "endLine": 72
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:analyzeConflicts",
+      "type": "function",
+      "name": "analyzeConflicts",
+      "filePath": "packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "summary": "函数 analyzeConflicts，接受 tasks 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 78,
+      "endLine": 91
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:analyzeConflictsSmart",
+      "type": "function",
+      "name": "analyzeConflictsSmart",
+      "filePath": "packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "summary": "函数 analyzeConflictsSmart，接受 tasks 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 93,
+      "endLine": 113
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "type": "file",
+      "name": "feature-normalizers.ts",
+      "filePath": "packages/engine/src/modules/ai/feature-normalizers.ts",
+      "summary": "包含 trimTrailingSlashes、ensureObject、normalizeSuggestResponse等 函数，属于 \"ai\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 157,
+      "nonEmptyLines": 142
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/feature-normalizers.ts:ensureObject",
+      "type": "function",
+      "name": "ensureObject",
+      "filePath": "packages/engine/src/modules/ai/feature-normalizers.ts",
+      "summary": "函数 ensureObject，接受 value, context 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 37
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/feature-normalizers.ts:normalizeSuggestResponse",
+      "type": "function",
+      "name": "normalizeSuggestResponse",
+      "filePath": "packages/engine/src/modules/ai/feature-normalizers.ts",
+      "summary": "函数 normalizeSuggestResponse，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 39,
+      "endLine": 62
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/feature-normalizers.ts:chat",
+      "type": "function",
+      "name": "chat",
+      "filePath": "packages/engine/src/modules/ai/feature-normalizers.ts",
+      "summary": "函数 chat，接受 client, request 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 64,
+      "endLine": 157
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "type": "file",
+      "name": "generate-plan.ts",
+      "filePath": "packages/engine/src/modules/ai/features/generate-plan.ts",
+      "summary": "包含 asciiSlug、buildGeneratePlanScope 函数，属于 \"features\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 60,
+      "nonEmptyLines": 56
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/features/generate-plan.ts:asciiSlug",
+      "type": "function",
+      "name": "asciiSlug",
+      "filePath": "packages/engine/src/modules/ai/features/generate-plan.ts",
+      "summary": "函数 asciiSlug，接受 value, maxLength 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 14,
+      "endLine": 25
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/features/generate-plan.ts:buildGeneratePlanScope",
+      "type": "function",
+      "name": "buildGeneratePlanScope",
+      "filePath": "packages/engine/src/modules/ai/features/generate-plan.ts",
+      "summary": "函数 buildGeneratePlanScope，接受 request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 27,
+      "endLine": 44
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/ai/index.ts",
+      "summary": "聚合导出\"ai\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 23,
+      "nonEmptyLines": 23
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/providers.bun.test.ts",
+      "type": "file",
+      "name": "providers.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/providers.bun.test.ts",
+      "summary": "测试文件，覆盖 \"ai\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 270,
+      "nonEmptyLines": 243
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/providers.ts",
+      "type": "file",
+      "name": "providers.ts",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "包含 trimTrailingSlashes、unknownRecord、getHermesCapabilityFeatures等 函数，属于 \"ai\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 577,
+      "nonEmptyLines": 523
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:checkClientHealth",
+      "type": "function",
+      "name": "checkClientHealth",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 checkClientHealth，接受 client 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 69,
+      "endLine": 161
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:testAiClientAvailability",
+      "type": "function",
+      "name": "testAiClientAvailability",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 testAiClientAvailability，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 163,
+      "endLine": 175
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:extractJSON",
+      "type": "function",
+      "name": "extractJSON",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 extractJSON，接受 text 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 177,
+      "endLine": 205
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:providerFeaturePayload",
+      "type": "function",
+      "name": "providerFeaturePayload",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 providerFeaturePayload，接受 client, request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 218,
+      "endLine": 228
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:toStartRunInput",
+      "type": "function",
+      "name": "toStartRunInput",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 toStartRunInput，接受 request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 230,
+      "endLine": 243
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:runProviderRequest",
+      "type": "function",
+      "name": "runProviderRequest",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 runProviderRequest，接受 providerClient, request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 245,
+      "endLine": 274
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:providerRunCompletedSnapshot",
+      "type": "function",
+      "name": "providerRunCompletedSnapshot",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 providerRunCompletedSnapshot，接受 provider, event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 276,
+      "endLine": 292
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:providerRunFailedSnapshot",
+      "type": "function",
+      "name": "providerRunFailedSnapshot",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 providerRunFailedSnapshot，接受 provider, request, event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 294,
+      "endLine": 308
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:llmFeaturePayload",
+      "type": "function",
+      "name": "llmFeaturePayload",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 llmFeaturePayload，接受 client, systemPrompt, userMessage, options 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 310,
+      "endLine": 360
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:providerCall",
+      "type": "function",
+      "name": "providerCall",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 providerCall，接受 client, request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 362,
+      "endLine": 367
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:llmCall",
+      "type": "function",
+      "name": "llmCall",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 llmCall，接受 config, systemPrompt, userMessage, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 369,
+      "endLine": 381
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:buildPreparedFeatureRequest",
+      "type": "function",
+      "name": "buildPreparedFeatureRequest",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 buildPreparedFeatureRequest，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 383,
+      "endLine": 402
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:buildProviderFeatureRequest",
+      "type": "function",
+      "name": "buildProviderFeatureRequest",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 buildProviderFeatureRequest，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 404,
+      "endLine": 431
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:providerFeaturePayloadFull",
+      "type": "function",
+      "name": "providerFeaturePayloadFull",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 providerFeaturePayloadFull，接受 client, feature, request, featureSpec 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 443,
+      "endLine": 499
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:dispatch",
+      "type": "function",
+      "name": "dispatch",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 dispatch，接受 client, feature, input, scope 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 521,
+      "endLine": 545
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/providers.ts:dispatchFeaturePayload",
+      "type": "function",
+      "name": "dispatchFeaturePayload",
+      "filePath": "packages/engine/src/modules/ai/providers.ts",
+      "summary": "函数 dispatchFeaturePayload，接受 client, feature, input, scope 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 547,
+      "endLine": 577
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "type": "file",
+      "name": "ai-service.ts",
+      "filePath": "packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "summary": "包含 aiChat 函数，属于 \"runtime\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 44,
+      "nonEmptyLines": 39
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/ai-service.ts:aiChat",
+      "type": "function",
+      "name": "aiChat",
+      "filePath": "packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "summary": "函数 aiChat，接受 request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 17,
+      "endLine": 23
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/runtime/client-registry.bun.test.ts",
+      "type": "file",
+      "name": "client-registry.bun.test.ts",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.bun.test.ts",
+      "summary": "测试文件，覆盖 \"runtime\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 12,
+      "nonEmptyLines": 11
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "file",
+      "name": "client-registry.ts",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "定义了 AiClientRegistry 类，包含 toAiClientRecord、engineBaseUrl、readEnv等 函数，属于 \"runtime\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 245,
+      "nonEmptyLines": 207
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:toAiClientRecord",
+      "type": "function",
+      "name": "toAiClientRecord",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 toAiClientRecord，接受 client 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 72,
+      "endLine": 81
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:engineBaseUrl",
+      "type": "function",
+      "name": "engineBaseUrl",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 engineBaseUrl。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 83,
+      "endLine": 95
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:getProviderBaseUrl",
+      "type": "function",
+      "name": "getProviderBaseUrl",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 getProviderBaseUrl，接受 config 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 106,
+      "endLine": 114
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:createProviderClient",
+      "type": "function",
+      "name": "createProviderClient",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 createProviderClient，接受 record 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 116,
+      "endLine": 151
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:refreshAiClientRegistry",
+      "type": "function",
+      "name": "refreshAiClientRegistry",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 refreshAiClientRegistry。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 153,
+      "endLine": 174
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:getAiClient",
+      "type": "function",
+      "name": "getAiClient",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 getAiClient，接受 clientId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 182,
+      "endLine": 192
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:requireProviderClient",
+      "type": "function",
+      "name": "requireProviderClient",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 requireProviderClient，接受 client 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 194,
+      "endLine": 204
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:requireLlmClient",
+      "type": "function",
+      "name": "requireLlmClient",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "函数 requireLlmClient，接受 client 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 206,
+      "endLine": 216
+    },
+    {
+      "id": "class:packages/engine/src/modules/ai/runtime/client-registry.ts:AiClientRegistry",
+      "type": "class",
+      "name": "AiClientRegistry",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "summary": "类 AiClientRegistry，定义了 5 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 223,
+      "endLine": 243
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "type": "file",
+      "name": "client-resolution.ts",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "summary": "包含 getAiClient、requireAiClient 函数，属于 \"runtime\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 19,
+      "nonEmptyLines": 17
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-resolution.ts:getAiClient",
+      "type": "function",
+      "name": "getAiClient",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "summary": "函数 getAiClient，接受 clientId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 8
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/runtime/client-resolution.ts:requireAiClient",
+      "type": "function",
+      "name": "requireAiClient",
+      "filePath": "packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "summary": "函数 requireAiClient，接受 clientId, message 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 19
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/session.ts",
+      "type": "file",
+      "name": "session.ts",
+      "filePath": "packages/engine/src/modules/ai/session.ts",
+      "summary": "包含 sanitizeSessionPart、timestampSessionPart、buildSessionIdentity 函数，属于 \"ai\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 46,
+      "nonEmptyLines": 42
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/session.ts:timestampSessionPart",
+      "type": "function",
+      "name": "timestampSessionPart",
+      "filePath": "packages/engine/src/modules/ai/session.ts",
+      "summary": "函数 timestampSessionPart，接受 date 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 15,
+      "endLine": 26
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/session.ts:buildSessionIdentity",
+      "type": "function",
+      "name": "buildSessionIdentity",
+      "filePath": "packages/engine/src/modules/ai/session.ts",
+      "summary": "函数 buildSessionIdentity，接受 feature, scope 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 28,
+      "endLine": 46
+    },
+    {
+      "id": "file:packages/engine/src/modules/ai/streaming.ts",
+      "type": "file",
+      "name": "streaming.ts",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "包含 trimTrailingSlashes、summarizeText、prepareStreamInput等 函数，属于 \"ai\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 533,
+      "nonEmptyLines": 487
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:prepareStreamInput",
+      "type": "function",
+      "name": "prepareStreamInput",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 prepareStreamInput，接受 scope, input, featureSpec 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 57,
+      "endLine": 82
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:toLlmStreamRequest",
+      "type": "function",
+      "name": "toLlmStreamRequest",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 toLlmStreamRequest，接受 feature, input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 84,
+      "endLine": 97
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:convertProviderEvent",
+      "type": "function",
+      "name": "convertProviderEvent",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 convertProviderEvent，接受 evt 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 105,
+      "endLine": 156
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:previewLogValue",
+      "type": "function",
+      "name": "previewLogValue",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 previewLogValue，接受 value, maxLength 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 170,
+      "endLine": 188
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:summarizeStreamEvent",
+      "type": "function",
+      "name": "summarizeStreamEvent",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 summarizeStreamEvent，接受 event 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 190,
+      "endLine": 225
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:dispatchStream",
+      "type": "function",
+      "name": "dispatchStream",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 dispatchStream，接受 client, feature, input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 425,
+      "endLine": 442
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:asciiSlug",
+      "type": "function",
+      "name": "asciiSlug",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 asciiSlug，接受 value, maxLength 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 444,
+      "endLine": 455
+    },
+    {
+      "id": "function:packages/engine/src/modules/ai/streaming.ts:buildSuggestScope",
+      "type": "function",
+      "name": "buildSuggestScope",
+      "filePath": "packages/engine/src/modules/ai/streaming.ts",
+      "summary": "函数 buildSuggestScope，接受 request 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 457,
+      "endLine": 473
+    },
+    {
+      "id": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "type": "file",
+      "name": "registry.ts",
+      "filePath": "packages/engine/src/modules/execution-runtime/registry.ts",
+      "summary": "包含 getRuntimeAdapterDefinition、isKnownExecutionRuntime、resolveExecutionRuntime等 函数，属于 \"execution-runtime\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 124,
+      "nonEmptyLines": 108
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/registry.ts:getRuntimeAdapterDefinition",
+      "type": "function",
+      "name": "getRuntimeAdapterDefinition",
+      "filePath": "packages/engine/src/modules/execution-runtime/registry.ts",
+      "summary": "函数 getRuntimeAdapterDefinition，接受 key 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 66,
+      "endLine": 83
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/registry.ts:isKnownExecutionRuntime",
+      "type": "function",
+      "name": "isKnownExecutionRuntime",
+      "filePath": "packages/engine/src/modules/execution-runtime/registry.ts",
+      "summary": "函数 isKnownExecutionRuntime，接受 key 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 85,
+      "endLine": 88
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/registry.ts:resolveExecutionRuntime",
+      "type": "function",
+      "name": "resolveExecutionRuntime",
+      "filePath": "packages/engine/src/modules/execution-runtime/registry.ts",
+      "summary": "函数 resolveExecutionRuntime，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 90,
+      "endLine": 105
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/registry.ts:getRuntimeTaskConfigSpec",
+      "type": "function",
+      "name": "getRuntimeTaskConfigSpec",
+      "filePath": "packages/engine/src/modules/execution-runtime/registry.ts",
+      "summary": "函数 getRuntimeTaskConfigSpec，接受 key 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 107,
+      "endLine": 109
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/registry.ts:validateRuntimeTaskConfig",
+      "type": "function",
+      "name": "validateRuntimeTaskConfig",
+      "filePath": "packages/engine/src/modules/execution-runtime/registry.ts",
+      "summary": "函数 validateRuntimeTaskConfig，接受 key, input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 111,
+      "endLine": 116
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/registry.ts:listExecutionRuntimes",
+      "type": "function",
+      "name": "listExecutionRuntimes",
+      "filePath": "packages/engine/src/modules/execution-runtime/registry.ts",
+      "summary": "函数 listExecutionRuntimes。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 118,
+      "endLine": 124
+    },
+    {
+      "id": "file:packages/engine/src/modules/execution-runtime/task-config.ts",
+      "type": "file",
+      "name": "task-config.ts",
+      "filePath": "packages/engine/src/modules/execution-runtime/task-config.ts",
+      "summary": "包含 isRuntimeInput、resolveTaskRuntimeConfig、validateTaskRuntimeConfig 函数，属于 \"execution-runtime\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 45,
+      "nonEmptyLines": 40
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/task-config.ts:resolveTaskRuntimeConfig",
+      "type": "function",
+      "name": "resolveTaskRuntimeConfig",
+      "filePath": "packages/engine/src/modules/execution-runtime/task-config.ts",
+      "summary": "函数 resolveTaskRuntimeConfig，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 28
+    },
+    {
+      "id": "function:packages/engine/src/modules/execution-runtime/task-config.ts:validateTaskRuntimeConfig",
+      "type": "function",
+      "name": "validateTaskRuntimeConfig",
+      "filePath": "packages/engine/src/modules/execution-runtime/task-config.ts",
+      "summary": "函数 validateTaskRuntimeConfig，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 45
+    },
+    {
+      "id": "file:packages/engine/src/modules/orchestration/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/orchestration/index.ts",
+      "summary": "聚合导出\"orchestration\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel"
+      ],
+      "language": "typescript",
+      "sizeLines": 50,
+      "nonEmptyLines": 50
+    },
+    {
+      "id": "file:packages/engine/src/modules/pages/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/pages/index.ts",
+      "summary": "聚合导出\"pages\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 2,
+      "nonEmptyLines": 2
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "type": "file",
+      "name": "ai-runtime-invoker.bun.test.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "summary": "测试文件，覆盖 \"plan-execution\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 259,
+      "nonEmptyLines": 226
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts:seedRunPair",
+      "type": "function",
+      "name": "seedRunPair",
+      "filePath": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "summary": "函数 seedRunPair。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 43,
+      "endLine": 57
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/index.ts",
+      "summary": "聚合导出\"plan-execution\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 28,
+      "nonEmptyLines": 23
+    },
+    {
+      "id": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "type": "file",
+      "name": "task-runtime-store.ts",
+      "filePath": "packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "summary": "包含 getRuntimeName 函数，属于 \"persistence\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 10,
+      "nonEmptyLines": 9
+    },
+    {
+      "id": "function:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts:getRuntimeName",
+      "type": "function",
+      "name": "getRuntimeName",
+      "filePath": "packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "summary": "函数 getRuntimeName，接受 taskId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 10
+    },
+    {
+      "id": "file:packages/engine/src/modules/plans/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/plans/index.ts",
+      "summary": "聚合导出\"plans\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 2,
+      "nonEmptyLines": 2
+    },
+    {
+      "id": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.bun.test.ts",
+      "type": "file",
+      "name": "derive-auto-start-eligibility.bun.test.ts",
+      "filePath": "packages/engine/src/modules/scheduling/derive-auto-start-eligibility.bun.test.ts",
+      "summary": "测试文件，覆盖 \"scheduling\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 127,
+      "nonEmptyLines": 112
+    },
+    {
+      "id": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "type": "file",
+      "name": "derive-auto-start-eligibility.ts",
+      "filePath": "packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "summary": "包含 deriveAutoStartEligibility 函数，属于 \"scheduling\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 84,
+      "nonEmptyLines": 70
+    },
+    {
+      "id": "function:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts:deriveAutoStartEligibility",
+      "type": "function",
+      "name": "deriveAutoStartEligibility",
+      "filePath": "packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "summary": "函数 deriveAutoStartEligibility，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 41,
+      "endLine": 84
+    },
+    {
+      "id": "file:packages/engine/src/modules/scheduling/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/scheduling/index.ts",
+      "summary": "聚合导出\"scheduling\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 1,
+      "nonEmptyLines": 1
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/__tests__/derive-auto-start-eligibility.bun.test.ts",
+      "type": "file",
+      "name": "derive-auto-start-eligibility.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/derive-auto-start-eligibility.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 228,
+      "nonEmptyLines": 206
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/__tests__/dispatch-task-decision-parser.bun.test.ts",
+      "type": "file",
+      "name": "dispatch-task-decision-parser.bun.test.ts",
+      "filePath": "packages/engine/src/modules/tasks/__tests__/dispatch-task-decision-parser.bun.test.ts",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 106,
+      "nonEmptyLines": 97
+    },
+    {
+      "id": "file:packages/engine/src/modules/tasks/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/tasks/index.ts",
+      "summary": "聚合导出\"tasks\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 1,
+      "nonEmptyLines": 1
+    },
+    {
+      "id": "file:packages/engine/src/modules/workspaces/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/workspaces/index.ts",
+      "summary": "聚合导出\"workspaces\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 2,
+      "nonEmptyLines": 2
+    },
+    {
+      "id": "file:packages/engine/src/ports.ts",
+      "type": "file",
+      "name": "ports.ts",
+      "filePath": "packages/engine/src/ports.ts",
+      "summary": "实现 \"src\" 模块的 ports 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 12,
+      "nonEmptyLines": 11
+    },
+    {
+      "id": "file:packages/engine/src/services/ai-clients.service.ts",
+      "type": "file",
+      "name": "ai-clients.service.ts",
+      "filePath": "packages/engine/src/services/ai-clients.service.ts",
+      "summary": "包含 createAiClientsService 函数，属于 \"services\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 47,
+      "nonEmptyLines": 45
+    },
+    {
+      "id": "function:packages/engine/src/services/ai-clients.service.ts:createAiClientsService",
+      "type": "function",
+      "name": "createAiClientsService",
+      "filePath": "packages/engine/src/services/ai-clients.service.ts",
+      "summary": "函数 createAiClientsService。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 6,
+      "endLine": 47
+    },
+    {
+      "id": "file:packages/engine/src/services/pages.service.ts",
+      "type": "file",
+      "name": "pages.service.ts",
+      "filePath": "packages/engine/src/services/pages.service.ts",
+      "summary": "包含 createPagesService 函数，属于 \"services\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 45,
+      "nonEmptyLines": 44
+    },
+    {
+      "id": "function:packages/engine/src/services/pages.service.ts:createPagesService",
+      "type": "function",
+      "name": "createPagesService",
+      "filePath": "packages/engine/src/services/pages.service.ts",
+      "summary": "函数 createPagesService。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 45
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/task-execution.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/task-plan.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/task-schedule.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/tasks.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/task-execution.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/task-plan.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/task-schedule.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/services/tasks.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "target": "function:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts:makeTask",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "target": "function:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts:snapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/providers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "target": "file:packages/engine/src/test/llm-fixture-recorder.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "target": "file:packages/engine/src/test/llm-fixture-recorder.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "function:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts:providerSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "function:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts:client",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "function:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts:clientWithStreamFailure",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:summarize",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:buildRuleSuggestion",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:normalizeLlmSuggestions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:analyzeConflicts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:analyzeConflicts",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:analyzeConflictsSmart",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "function:packages/engine/src/modules/ai/conflict-analyzer.ts:analyzeConflictsSmart",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/conflict-analyzer.ts",
+      "target": "file:packages/engine/src/modules/ai/conflict-detector.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "function:packages/engine/src/modules/ai/feature-normalizers.ts:ensureObject",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "function:packages/engine/src/modules/ai/feature-normalizers.ts:normalizeSuggestResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "function:packages/engine/src/modules/ai/feature-normalizers.ts:normalizeSuggestResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "function:packages/engine/src/modules/ai/feature-normalizers.ts:chat",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "function:packages/engine/src/modules/ai/feature-normalizers.ts:chat",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "file:packages/engine/src/modules/ai/providers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "function:packages/engine/src/modules/ai/features/generate-plan.ts:asciiSlug",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "function:packages/engine/src/modules/ai/features/generate-plan.ts:buildGeneratePlanScope",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "function:packages/engine/src/modules/ai/features/generate-plan.ts:buildGeneratePlanScope",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "file:packages/engine/src/modules/ai/streaming.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "file:packages/shared/src/debug-dump.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "target": "file:packages/shared/src/debug-dump.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/index.ts",
+      "target": "file:packages/engine/src/engine.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/index.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/index.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/reconcile-stale-runtime-runs.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/index.ts",
+      "target": "file:packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/index.ts",
+      "target": "file:packages/engine/src/test/llm-fixture-recorder.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/providers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:checkClientHealth",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:testAiClientAvailability",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:testAiClientAvailability",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:extractJSON",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:extractJSON",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:providerFeaturePayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:toStartRunInput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:runProviderRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:providerRunCompletedSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:providerRunFailedSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:llmFeaturePayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:providerCall",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:providerCall",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:llmCall",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:llmCall",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:buildPreparedFeatureRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:buildPreparedFeatureRequest",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:buildProviderFeatureRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:buildProviderFeatureRequest",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:providerFeaturePayloadFull",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:dispatch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:dispatch",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:dispatchFeaturePayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "function:packages/engine/src/modules/ai/providers.ts:dispatchFeaturePayload",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/providers/debug/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/providers/debug/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/engine/src/modules/ai/__tests__/plan-generation.integration.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/engine/src/modules/ai/management/ai-client-management.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:packages/engine/src/test/llm-fixture-recorder.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/providers.ts",
+      "target": "file:scripts/record-llm-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/ai-service.ts:aiChat",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/ai-service.ts:aiChat",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "target": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "target": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:toAiClientRecord",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:engineBaseUrl",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:getProviderBaseUrl",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:getProviderBaseUrl",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:createProviderClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:refreshAiClientRegistry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:getAiClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:requireProviderClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-registry.ts:requireLlmClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "class:packages/engine/src/modules/ai/runtime/client-registry.ts:AiClientRegistry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "class:packages/engine/src/modules/ai/runtime/client-registry.ts:AiClientRegistry",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/providers/debug/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/providers/debug/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:apps/server/src/__tests__/api/plan-execution-module.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "target": "file:packages/engine/src/modules/ai/management/ai-client-management.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-resolution.ts:getAiClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-resolution.ts:getAiClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-resolution.ts:requireAiClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "target": "function:packages/engine/src/modules/ai/runtime/client-resolution.ts:requireAiClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/runtime/client-resolution.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/session.ts",
+      "target": "function:packages/engine/src/modules/ai/session.ts:timestampSessionPart",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/session.ts",
+      "target": "function:packages/engine/src/modules/ai/session.ts:buildSessionIdentity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/session.ts",
+      "target": "function:packages/engine/src/modules/ai/session.ts:buildSessionIdentity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/session.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/session.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:prepareStreamInput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:prepareStreamInput",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:toLlmStreamRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:convertProviderEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:previewLogValue",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:summarizeStreamEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:summarizeStreamEvent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:dispatchStream",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:dispatchStream",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:asciiSlug",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "function:packages/engine/src/modules/ai/streaming.ts:buildSuggestScope",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/engine/src/modules/ai/providers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/engine/src/modules/ai/session.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/shared/src/debug-dump.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/shared/src/debug-dump.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/ai/streaming.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:getRuntimeAdapterDefinition",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:getRuntimeAdapterDefinition",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:isKnownExecutionRuntime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:isKnownExecutionRuntime",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:resolveExecutionRuntime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:resolveExecutionRuntime",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:getRuntimeTaskConfigSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:getRuntimeTaskConfigSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:validateRuntimeTaskConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:validateRuntimeTaskConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:listExecutionRuntimes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/registry.ts:listExecutionRuntimes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "file:packages/providers/debug/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "file:packages/runtime-core/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "file:packages/providers/debug/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "target": "file:packages/runtime-core/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/task-config.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/task-config.ts:resolveTaskRuntimeConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/task-config.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/task-config.ts:validateTaskRuntimeConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/task-config.ts",
+      "target": "function:packages/engine/src/modules/execution-runtime/task-config.ts:validateTaskRuntimeConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/task-config.ts",
+      "target": "file:packages/engine/src/modules/execution-runtime/registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/task-config.ts",
+      "target": "file:packages/runtime-core/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/execution-runtime/task-config.ts",
+      "target": "file:packages/runtime-core/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/orchestration/index.ts",
+      "target": "file:packages/engine/src/services/runtime.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts:seedRunPair",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "target": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "target": "file:packages/engine/src/services/task-execution.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts:getRuntimeName",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "target": "function:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts:getRuntimeName",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "target": "file:packages/providers/hermes/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/plans/index.ts",
+      "target": "file:packages/engine/src/services/task-plan.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.bun.test.ts",
+      "target": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "target": "function:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts:deriveAutoStartEligibility",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "target": "function:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts:deriveAutoStartEligibility",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/scheduling/index.ts",
+      "target": "file:packages/engine/src/services/task-schedule.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/derive-auto-start-eligibility.bun.test.ts",
+      "target": "file:packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/dispatch-task-decision-parser.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/__tests__/dispatch-task-decision-parser.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/index.ts",
+      "target": "file:packages/engine/src/services/task-lifecycle.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/index.ts",
+      "target": "file:packages/engine/src/services/task-result.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/tasks/index.ts",
+      "target": "file:packages/engine/src/services/tasks.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/index.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/workspaces/index.ts",
+      "target": "file:packages/engine/src/services/workspaces.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/ports.ts",
+      "target": "file:packages/engine/src/engine.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/services/ai-clients.service.ts",
+      "target": "function:packages/engine/src/services/ai-clients.service.ts:createAiClientsService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/services/ai-clients.service.ts",
+      "target": "function:packages/engine/src/services/ai-clients.service.ts:createAiClientsService",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/services/ai-clients.service.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/services/ai-clients.service.ts",
+      "target": "file:packages/engine/src/modules/ai/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/services/ai-clients.service.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/services/ai-clients.service.ts",
+      "target": "file:packages/engine/src/engine.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/services/pages.service.ts",
+      "target": "function:packages/engine/src/services/pages.service.ts:createPagesService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/services/pages.service.ts",
+      "target": "function:packages/engine/src/services/pages.service.ts:createPagesService",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/services/pages.service.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/services/pages.service.ts",
+      "target": "file:packages/engine/src/modules/pages/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/services/pages.service.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/services/pages.service.ts",
+      "target": "file:packages/engine/src/engine.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

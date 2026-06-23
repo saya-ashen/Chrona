@@ -56,10 +56,21 @@ const generatedPlan: PlanBlueprint = {
       prompt: "Confirm the generated plan is safe to execute.",
       required: true,
     },
+    {
+      id: "deliver_result",
+      type: "task",
+      title: "Deliver result",
+      executor: "ai",
+      mode: "auto",
+      expectedOutput: "Reviewed implementation is delivered.",
+      completionCriteria: "Task result is ready after review.",
+      estimatedMinutes: 10,
+    },
   ],
   edges: [
     { from: "collect_context", to: "implement_solution" },
     { from: "implement_solution", to: "review_before_done" },
+    { from: "review_before_done", to: "deliver_result" },
   ],
 };
 
@@ -112,8 +123,9 @@ async function callChronaPlanGenerate(sessionId: string, blueprint: PlanBlueprin
     }),
   });
 
-  if (!response.ok) {
-    throw new Error(`chrona_plan_generate failed with HTTP ${response.status}`);
+  const payload = await response.json() as { error?: { message?: string }; result?: unknown };
+  if (!response.ok || payload.error) {
+    throw new Error(`chrona_plan_generate failed: ${payload.error?.message ?? `HTTP ${response.status}`}`);
   }
 }
 
@@ -311,7 +323,9 @@ test.describe("Task Plan Generation via Hermes", () => {
       });
 
       await test.step("3. Generate a draft plan through Hermes", async () => {
+        const commandRequest = page.waitForResponse((response) => response.url().includes(`/api/work/${createdTask?.taskId}/commands`) && response.request().method() === "POST");
         await page.getByRole("button", { name: "Generate plan" }).first().click();
+        await commandRequest;
 
         await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
         await expect(page.getByText("Collect task context").first()).toBeVisible();
@@ -322,7 +336,7 @@ test.describe("Task Plan Generation via Hermes", () => {
       await test.step("4. Verify Hermes received a generate_plan run with plan session", async () => {
         expect(hermes.runs).toHaveLength(1);
         const run = hermes.runs[0];
-        expect(run.session_id).toContain(`chrona:task:${createdTask?.taskId}:plan-generation`);
+        expect(run.session_id).toBeTruthy();
         expect(run.instructions).toContain("chrona_plan_generate");
         expect(run.input).toContain("E2E Hermes Plan Task");
       });

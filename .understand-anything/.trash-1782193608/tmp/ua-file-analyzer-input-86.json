@@ -1,0 +1,155 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/db/src/generated/prisma/internal/prismaNamespaceBrowser.ts",
+      "language": "typescript",
+      "sizeLines": 891,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/package.json",
+      "language": "json",
+      "sizeLines": 14,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/domain/src/assistant-surface/assistant-surface.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/assistant-surface/index.ts",
+      "language": "typescript",
+      "sizeLines": 3,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/calendar/normalize-imported-events.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/plan/index.ts",
+      "language": "typescript",
+      "sizeLines": 4,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/task/derive-schedule-state.ts",
+      "language": "typescript",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/domain/src/task/validate-schedule-window.ts",
+      "language": "typescript",
+      "sizeLines": 14,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/.omc/state/agent-replay-13061a0d-b89a-4dbd-be91-aa088fbc364a.jsonl",
+      "language": "jsonl",
+      "sizeLines": 15,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/.understand-anything/.understandignore",
+      "language": "unknown",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/.understand-anything/config.json",
+      "language": "json",
+      "sizeLines": 2,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/engine/package.json",
+      "language": "json",
+      "sizeLines": 22,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/engine/README.md",
+      "language": "markdown",
+      "sizeLines": 174,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "packages/engine/src/modules/ai/management/index.ts",
+      "language": "typescript",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/execution-events.ts",
+      "language": "typescript",
+      "sizeLines": 9,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/projections/index.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 43,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/test/llm-fixtures/debug/chat/valid-small-chat.json",
+      "language": "json",
+      "sizeLines": 1,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/graph-runtime/src/types/layers.ts",
+      "language": "typescript",
+      "sizeLines": 8,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/i18n/package.json",
+      "language": "json",
+      "sizeLines": 10,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/i18n/src/messages/en.json",
+      "language": "json",
+      "sizeLines": 1516,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/i18n/src/messages/zh.json",
+      "language": "json",
+      "sizeLines": 1516,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/integrations/package.json",
+      "language": "json",
+      "sizeLines": 13,
+      "fileCategory": "config"
+    },
+    {
+      "path": "packages/integrations/src/calendar/feed-client.ts",
+      "language": "typescript",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/all-day.ics",
+      "language": "ics",
+      "sizeLines": 12,
+      "fileCategory": "code"
+    }
+  ]
+}

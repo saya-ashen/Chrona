@@ -1,0 +1,155 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": ".agents/skills/core/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 265,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".agents/skills/shadcn/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 159,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".claude/settings.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".claude/skills/playwright-cli/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 278,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".claude/skills/speckit-git-commit/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 52,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".claude/skills/speckit-git-feature/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 71,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".claude/skills/speckit-git-initialize/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 53,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".claude/skills/speckit-git-remote/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 49,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".claude/skills/speckit-git-validate/SKILL.md",
+      "language": "markdown",
+      "sizeLines": 53,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".dependency-cruiser.cjs",
+      "language": "javascript",
+      "sizeLines": 207,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".impeccable/design.json",
+      "language": "json",
+      "sizeLines": 120,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".impeccable/live/config.json",
+      "language": "json",
+      "sizeLines": 6,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".npmignore",
+      "language": "unknown",
+      "sizeLines": 13,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".omc/notepad.md",
+      "language": "markdown",
+      "sizeLines": 15,
+      "fileCategory": "docs"
+    },
+    {
+      "path": ".omc/project-memory.json",
+      "language": "json",
+      "sizeLines": 620,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/agent-replay-f1f8cc0a-2a04-4f29-ac7c-a72acc4ecb1d.jsonl",
+      "language": "jsonl",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    },
+    {
+      "path": ".omc/state/sessions/13061a0d-b89a-4dbd-be91-aa088fbc364a/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/2d485152-d7d2-4768-b417-d46867f55247/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/2fda4cdf-0fde-4b70-ae8c-f723914d0a54/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/301b72f9-6d80-424b-859a-94e7b14fb709/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/32fae9fe-243e-40f0-aab0-b85c278a5a19/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/39109f98-de88-4e75-bbd9-80322cc7df6d/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/3a3f028b-b54a-4df9-9829-ca8e3ceb65ba/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/3a98b1d5-cc7e-4202-8ee4-926b47f99161/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    },
+    {
+      "path": ".omc/state/sessions/3efd8ed2-89a0-4661-a1ec-0f723be9d05c/hud-state.json",
+      "language": "json",
+      "sizeLines": 5,
+      "fileCategory": "config"
+    }
+  ]
+}

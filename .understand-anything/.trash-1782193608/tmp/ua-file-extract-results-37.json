@@ -1,0 +1,1219 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 20,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": ".dependency-cruiser-known-violations.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 0
+      }
+    },
+    {
+      "path": ".env.example",
+      "language": "config",
+      "fileCategory": "config",
+      "totalLines": 18,
+      "nonEmptyLines": 15,
+      "definitions": [
+        {
+          "name": "DATABASE_URL",
+          "kind": "variable",
+          "fields": [],
+          "startLine": 2,
+          "endLine": 2
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "AGENTS.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 261,
+      "nonEmptyLines": 198,
+      "sections": [
+        {
+          "heading": "Chrona — AI agent coding rules",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Tech stack",
+          "level": 2,
+          "line": 6
+        },
+        {
+          "heading": "Understand the codebase — read these first",
+          "level": 2,
+          "line": 15
+        },
+        {
+          "heading": "context-mode — MANDATORY routing rules",
+          "level": 1,
+          "line": 35
+        },
+        {
+          "heading": "Think in Code — MANDATORY",
+          "level": 2,
+          "line": 40
+        },
+        {
+          "heading": "BLOCKED — do NOT attempt",
+          "level": 2,
+          "line": 48
+        },
+        {
+          "heading": "curl / wget — BLOCKED",
+          "level": 3,
+          "line": 50
+        },
+        {
+          "heading": "Inline HTTP — BLOCKED",
+          "level": 3,
+          "line": 56
+        },
+        {
+          "heading": "Direct web fetching — BLOCKED",
+          "level": 3,
+          "line": 62
+        },
+        {
+          "heading": "REDIRECTED — use sandbox",
+          "level": 2,
+          "line": 67
+        },
+        {
+          "heading": "Shell (>20 lines output)",
+          "level": 3,
+          "line": 69
+        },
+        {
+          "heading": "File reading (for analysis)",
+          "level": 3,
+          "line": 75
+        },
+        {
+          "heading": "grep / search (large results)",
+          "level": 3,
+          "line": 80
+        },
+        {
+          "heading": "Tool selection",
+          "level": 2,
+          "line": 84
+        },
+        {
+          "heading": "Parallel I/O batches",
+          "level": 2,
+          "line": 101
+        },
+        {
+          "heading": "Output",
+          "level": 2,
+          "line": 117
+        },
+        {
+          "heading": "Frontend SSE standard",
+          "level": 2,
+          "line": 126
+        },
+        {
+          "heading": "Frontend UI foundation",
+          "level": 2,
+          "line": 136
+        },
+        {
+          "heading": "Frontend development principles",
+          "level": 2,
+          "line": 155
+        },
+        {
+          "heading": "Session Continuity",
+          "level": 2,
+          "line": 170
+        },
+        {
+          "heading": "Memory",
+          "level": 2,
+          "line": 175
+        },
+        {
+          "heading": "ctx commands",
+          "level": 2,
+          "line": 188
+        },
+        {
+          "heading": "CodeGraph",
+          "level": 2,
+          "line": 210
+        },
+        {
+          "heading": "When to prefer codegraph over native search",
+          "level": 3,
+          "line": 216
+        },
+        {
+          "heading": "Rules of thumb",
+          "level": 3,
+          "line": 235
+        },
+        {
+          "heading": "If `.codegraph/` doesn't exist",
+          "level": 3,
+          "line": 255
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 26
+      }
+    },
+    {
+      "path": "CHANGELOG.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 98,
+      "nonEmptyLines": 78,
+      "sections": [
+        {
+          "heading": "Changelog",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "0.1.4-rc.1 — First MVP release candidate",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Status",
+          "level": 3,
+          "line": 7
+        },
+        {
+          "heading": "Highlights",
+          "level": 3,
+          "line": 12
+        },
+        {
+          "heading": "Known limitations",
+          "level": 3,
+          "line": 19
+        },
+        {
+          "heading": "0.1.4",
+          "level": 2,
+          "line": 24
+        },
+        {
+          "heading": "Breaking changes",
+          "level": 3,
+          "line": 26
+        },
+        {
+          "heading": "Features",
+          "level": 3,
+          "line": 29
+        },
+        {
+          "heading": "Fixes",
+          "level": 3,
+          "line": 36
+        },
+        {
+          "heading": "Internal",
+          "level": 3,
+          "line": 44
+        },
+        {
+          "heading": "0.1.3",
+          "level": 2,
+          "line": 49
+        },
+        {
+          "heading": "Features",
+          "level": 3,
+          "line": 51
+        },
+        {
+          "heading": "Fixes",
+          "level": 3,
+          "line": 57
+        },
+        {
+          "heading": "Internal",
+          "level": 3,
+          "line": 63
+        },
+        {
+          "heading": "0.1.2",
+          "level": 2,
+          "line": 67
+        },
+        {
+          "heading": "Features",
+          "level": 3,
+          "line": 69
+        },
+        {
+          "heading": "Fixes",
+          "level": 3,
+          "line": 77
+        },
+        {
+          "heading": "0.1.0 — Initial release",
+          "level": 2,
+          "line": 82
+        },
+        {
+          "heading": "Features",
+          "level": 3,
+          "line": 84
+        },
+        {
+          "heading": "Tech Stack",
+          "level": 3,
+          "line": 94
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 20
+      }
+    },
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 11,
+      "nonEmptyLines": 9,
+      "sections": [
+        {
+          "heading": "Chrona",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 1
+      }
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 168,
+      "nonEmptyLines": 126,
+      "sections": [
+        {
+          "heading": "Contributing to Chrona",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Development Setup",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Build & Package",
+          "level": 2,
+          "line": 32
+        },
+        {
+          "heading": "Project Architecture",
+          "level": 2,
+          "line": 47
+        },
+        {
+          "heading": "Code Style",
+          "level": 2,
+          "line": 66
+        },
+        {
+          "heading": "Making Changes",
+          "level": 2,
+          "line": 73
+        },
+        {
+          "heading": "Boundary Discipline",
+          "level": 2,
+          "line": 94
+        },
+        {
+          "heading": "Schema-First Contracts",
+          "level": 2,
+          "line": 104
+        },
+        {
+          "heading": "Testing",
+          "level": 2,
+          "line": 128
+        },
+        {
+          "heading": "E2E test layout",
+          "level": 3,
+          "line": 137
+        },
+        {
+          "heading": "Adding an AI Runtime Adapter",
+          "level": 2,
+          "line": 159
+        },
+        {
+          "heading": "License",
+          "level": 2,
+          "line": 166
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 12
+      }
+    },
+    {
+      "path": "DESIGN.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 219,
+      "nonEmptyLines": 179,
+      "sections": [
+        {
+          "heading": "Design System: Chrona",
+          "level": 1,
+          "line": 87
+        },
+        {
+          "heading": "1. Overview",
+          "level": 2,
+          "line": 89
+        },
+        {
+          "heading": "2. Colors",
+          "level": 2,
+          "line": 106
+        },
+        {
+          "heading": "Primary",
+          "level": 3,
+          "line": 110
+        },
+        {
+          "heading": "Secondary",
+          "level": 3,
+          "line": 115
+        },
+        {
+          "heading": "Tertiary",
+          "level": 3,
+          "line": 119
+        },
+        {
+          "heading": "Neutral",
+          "level": 3,
+          "line": 125
+        },
+        {
+          "heading": "Named Rules",
+          "level": 3,
+          "line": 132
+        },
+        {
+          "heading": "3. Typography",
+          "level": 2,
+          "line": 138
+        },
+        {
+          "heading": "Hierarchy",
+          "level": 3,
+          "line": 146
+        },
+        {
+          "heading": "Named Rules",
+          "level": 3,
+          "line": 153
+        },
+        {
+          "heading": "4. Elevation",
+          "level": 2,
+          "line": 159
+        },
+        {
+          "heading": "Shadow Vocabulary",
+          "level": 3,
+          "line": 163
+        },
+        {
+          "heading": "Named Rules",
+          "level": 3,
+          "line": 168
+        },
+        {
+          "heading": "5. Components",
+          "level": 2,
+          "line": 172
+        },
+        {
+          "heading": "Buttons",
+          "level": 3,
+          "line": 176
+        },
+        {
+          "heading": "Chips",
+          "level": 3,
+          "line": 182
+        },
+        {
+          "heading": "Cards / Containers",
+          "level": 3,
+          "line": 186
+        },
+        {
+          "heading": "Inputs / Fields",
+          "level": 3,
+          "line": 193
+        },
+        {
+          "heading": "Navigation",
+          "level": 3,
+          "line": 198
+        },
+        {
+          "heading": "Work Header Card",
+          "level": 3,
+          "line": 201
+        },
+        {
+          "heading": "6. Do's and Don'ts",
+          "level": 2,
+          "line": 205
+        },
+        {
+          "heading": "Do:",
+          "level": 3,
+          "line": 207
+        },
+        {
+          "heading": "Don't:",
+          "level": 3,
+          "line": 214
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 24
+      }
+    },
+    {
+      "path": "PRODUCT.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 33,
+      "nonEmptyLines": 19,
+      "sections": [
+        {
+          "heading": "Product",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Register",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Users",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Product Purpose",
+          "level": 2,
+          "line": 11
+        },
+        {
+          "heading": "Brand Personality",
+          "level": 2,
+          "line": 15
+        },
+        {
+          "heading": "Anti-references",
+          "level": 2,
+          "line": 19
+        },
+        {
+          "heading": "Design Principles",
+          "level": 2,
+          "line": 23
+        },
+        {
+          "heading": "Accessibility & Inclusion",
+          "level": 2,
+          "line": 31
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 8
+      }
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 351,
+      "nonEmptyLines": 266,
+      "sections": [
+        {
+          "heading": "Project Status",
+          "level": 2,
+          "line": 54
+        },
+        {
+          "heading": "Why Chrona",
+          "level": 2,
+          "line": 61
+        },
+        {
+          "heading": "Quick Start",
+          "level": 2,
+          "line": 74
+        },
+        {
+          "heading": "Download a release",
+          "level": 3,
+          "line": 79
+        },
+        {
+          "heading": "Run from source",
+          "level": 3,
+          "line": 112
+        },
+        {
+          "heading": "First Run",
+          "level": 2,
+          "line": 126
+        },
+        {
+          "heading": "Providers",
+          "level": 2,
+          "line": 147
+        },
+        {
+          "heading": "Hermes Setup",
+          "level": 3,
+          "line": 157
+        },
+        {
+          "heading": "What You Can Do",
+          "level": 2,
+          "line": 196
+        },
+        {
+          "heading": "Build a real schedule",
+          "level": 3,
+          "line": 198
+        },
+        {
+          "heading": "Generate editable plans",
+          "level": 3,
+          "line": 203
+        },
+        {
+          "heading": "Execute graph-based work",
+          "level": 3,
+          "line": 208
+        },
+        {
+          "heading": "Move scheduled work forward",
+          "level": 3,
+          "line": 214
+        },
+        {
+          "heading": "Keep AI execution observable",
+          "level": 3,
+          "line": 220
+        },
+        {
+          "heading": "Resume with context",
+          "level": 3,
+          "line": 231
+        },
+        {
+          "heading": "Roadmap",
+          "level": 2,
+          "line": 237
+        },
+        {
+          "heading": "Architecture",
+          "level": 2,
+          "line": 256
+        },
+        {
+          "heading": "Configuration",
+          "level": 2,
+          "line": 286
+        },
+        {
+          "heading": "Development",
+          "level": 2,
+          "line": 303
+        },
+        {
+          "heading": "Documentation",
+          "level": 2,
+          "line": 329
+        },
+        {
+          "heading": "Contributing",
+          "level": 2,
+          "line": 343
+        },
+        {
+          "heading": "License",
+          "level": 2,
+          "line": 349
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 22
+      }
+    },
+    {
+      "path": "README.zh.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 333,
+      "nonEmptyLines": 248,
+      "sections": [
+        {
+          "heading": "项目状态",
+          "level": 2,
+          "line": 54
+        },
+        {
+          "heading": "为什么需要 Chrona",
+          "level": 2,
+          "line": 60
+        },
+        {
+          "heading": "快速开始",
+          "level": 2,
+          "line": 72
+        },
+        {
+          "heading": "下载发行版",
+          "level": 3,
+          "line": 77
+        },
+        {
+          "heading": "从源码运行",
+          "level": 3,
+          "line": 110
+        },
+        {
+          "heading": "首次运行",
+          "level": 2,
+          "line": 124
+        },
+        {
+          "heading": "Providers",
+          "level": 2,
+          "line": 140
+        },
+        {
+          "heading": "Hermes 配置",
+          "level": 3,
+          "line": 150
+        },
+        {
+          "heading": "你可以做什么",
+          "level": 2,
+          "line": 188
+        },
+        {
+          "heading": "构建真实日程",
+          "level": 3,
+          "line": 190
+        },
+        {
+          "heading": "生成可编辑计划",
+          "level": 3,
+          "line": 194
+        },
+        {
+          "heading": "执行图结构工作",
+          "level": 3,
+          "line": 199
+        },
+        {
+          "heading": "推进日程上的工作",
+          "level": 3,
+          "line": 204
+        },
+        {
+          "heading": "保持 AI 执行可观测",
+          "level": 3,
+          "line": 209
+        },
+        {
+          "heading": "带着上下文恢复工作",
+          "level": 3,
+          "line": 219
+        },
+        {
+          "heading": "路线图",
+          "level": 2,
+          "line": 224
+        },
+        {
+          "heading": "架构",
+          "level": 2,
+          "line": 242
+        },
+        {
+          "heading": "配置",
+          "level": 2,
+          "line": 269
+        },
+        {
+          "heading": "开发",
+          "level": 2,
+          "line": 286
+        },
+        {
+          "heading": "文档",
+          "level": 2,
+          "line": 312
+        },
+        {
+          "heading": "贡献",
+          "level": 2,
+          "line": 326
+        },
+        {
+          "heading": "License",
+          "level": 2,
+          "line": 331
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 22
+      }
+    },
+    {
+      "path": "components.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 25,
+      "nonEmptyLines": 25,
+      "sections": [
+        {
+          "heading": "$schema",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "style",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "rsc",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "tsx",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "tailwind",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "iconLibrary",
+          "level": 1,
+          "line": 13
+        },
+        {
+          "heading": "rtl",
+          "level": 1,
+          "line": 14
+        },
+        {
+          "heading": "aliases",
+          "level": 1,
+          "line": 15
+        },
+        {
+          "heading": "menuColor",
+          "level": 1,
+          "line": 22
+        },
+        {
+          "heading": "menuAccent",
+          "level": 1,
+          "line": 23
+        },
+        {
+          "heading": "registries",
+          "level": 1,
+          "line": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 11
+      }
+    },
+    {
+      "path": "knip.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 62,
+      "nonEmptyLines": 62,
+      "sections": [
+        {
+          "heading": "$schema",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "ignore",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "workspaces",
+          "level": 1,
+          "line": 8
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "opencode.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 101,
+      "nonEmptyLines": 101,
+      "sections": [
+        {
+          "heading": "$schema",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "mcp",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "tools",
+          "level": 1,
+          "line": 14
+        },
+        {
+          "heading": "agent",
+          "level": 1,
+          "line": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 4
+      }
+    },
+    {
+      "path": "opencode.jsonc",
+      "language": "jsonc",
+      "fileCategory": "config",
+      "totalLines": 14,
+      "nonEmptyLines": 14,
+      "sections": [
+        {
+          "heading": "$schema",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "mcp",
+          "level": 1,
+          "line": 3
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": "package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 123,
+      "nonEmptyLines": 123,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "description",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "license",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "type",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "repository",
+          "level": 1,
+          "line": 7
+        },
+        {
+          "heading": "keywords",
+          "level": 1,
+          "line": 11
+        },
+        {
+          "heading": "packageManager",
+          "level": 1,
+          "line": 20
+        },
+        {
+          "heading": "engines",
+          "level": 1,
+          "line": 21
+        },
+        {
+          "heading": "scripts",
+          "level": 1,
+          "line": 24
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 52
+        },
+        {
+          "heading": "devDependencies",
+          "level": 1,
+          "line": 68
+        },
+        {
+          "heading": "ignoreScripts",
+          "level": 1,
+          "line": 106
+        },
+        {
+          "heading": "trustedDependencies",
+          "level": 1,
+          "line": 110
+        },
+        {
+          "heading": "workspaces",
+          "level": 1,
+          "line": 117
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 15
+      }
+    },
+    {
+      "path": "skills-lock.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 23,
+      "nonEmptyLines": 23,
+      "sections": [
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "skills",
+          "level": 1,
+          "line": 3
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": "sonar-project.properties",
+      "language": "properties",
+      "fileCategory": "config",
+      "totalLines": 6,
+      "nonEmptyLines": 5,
+      "metrics": {}
+    },
+    {
+      "path": "task-workspace-smoke.yaml",
+      "language": "yaml",
+      "fileCategory": "config",
+      "totalLines": 258,
+      "nonEmptyLines": 258,
+      "sections": [
+        {
+          "heading": "[0]",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 1
+      }
+    },
+    {
+      "path": "tsconfig.ai-features-validation.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 17,
+      "nonEmptyLines": 17,
+      "sections": [
+        {
+          "heading": "extends",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "compilerOptions",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "include",
+          "level": 1,
+          "line": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "tsconfig.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 69,
+      "nonEmptyLines": 69,
+      "sections": [
+        {
+          "heading": "compilerOptions",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "include",
+          "level": 1,
+          "line": 63
+        },
+        {
+          "heading": "exclude",
+          "level": 1,
+          "line": 68
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    }
+  ]
+}

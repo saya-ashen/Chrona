@@ -1,0 +1,4333 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 30,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "packages/graph-runtime/src/builtin-nodes.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 103,
+      "nonEmptyLines": 90,
+      "functions": [
+        {
+          "name": "normalizeBranchToken",
+          "startLine": 8,
+          "endLine": 10,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "pickUserBranch",
+          "startLine": 12,
+          "endLine": 46,
+          "params": [
+            "input",
+            "config"
+          ]
+        },
+        {
+          "name": "buildUserPrompt",
+          "startLine": 48,
+          "endLine": 51,
+          "params": [
+            "node",
+            "config"
+          ]
+        },
+        {
+          "name": "toEffectiveBranchTarget",
+          "startLine": 53,
+          "endLine": 55,
+          "params": [
+            "plan",
+            "nextNodeId"
+          ]
+        },
+        {
+          "name": "executeBuiltinGraphNode",
+          "startLine": 57,
+          "endLine": 103,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "executeBuiltinGraphNode",
+          "line": 57,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "normalizeBranchToken",
+          "callee": "value.trim().toLowerCase",
+          "lineNumber": 9
+        },
+        {
+          "caller": "normalizeBranchToken",
+          "callee": "value.trim",
+          "lineNumber": 9
+        },
+        {
+          "caller": "pickUserBranch",
+          "callee": "normalizeBranchToken",
+          "lineNumber": 15
+        },
+        {
+          "caller": "pickUserBranch",
+          "callee": "config.branches.find",
+          "lineNumber": 16
+        },
+        {
+          "caller": "pickUserBranch",
+          "callee": "normalizeBranchToken",
+          "lineNumber": 17
+        },
+        {
+          "caller": "pickUserBranch",
+          "callee": "normalizeBranchToken",
+          "lineNumber": 18
+        },
+        {
+          "caller": "pickUserBranch",
+          "callee": "normalizedInput.includes",
+          "lineNumber": 22
+        },
+        {
+          "caller": "pickUserBranch",
+          "callee": "[\"default\", \"fallback\", \"other\"].some",
+          "lineNumber": 36
+        },
+        {
+          "caller": "pickUserBranch",
+          "callee": "normalizedInput.includes",
+          "lineNumber": 36
+        },
+        {
+          "caller": "buildUserPrompt",
+          "callee": "config.branches.map((branch) => branch.label).join",
+          "lineNumber": 49
+        },
+        {
+          "caller": "buildUserPrompt",
+          "callee": "config.branches.map",
+          "lineNumber": 49
+        },
+        {
+          "caller": "toEffectiveBranchTarget",
+          "callee": "plan.nodes.find",
+          "lineNumber": 54
+        },
+        {
+          "caller": "executeBuiltinGraphNode",
+          "callee": "pickUserBranch",
+          "lineNumber": 77
+        },
+        {
+          "caller": "executeBuiltinGraphNode",
+          "callee": "buildUserPrompt",
+          "lineNumber": 81
+        },
+        {
+          "caller": "executeBuiltinGraphNode",
+          "callee": "toEffectiveBranchTarget",
+          "lineNumber": 93
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/apply-mutation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 50,
+      "nonEmptyLines": 49,
+      "functions": [
+        {
+          "name": "applyMutationCommand",
+          "startLine": 11,
+          "endLine": 50,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "applyMutationCommand",
+          "line": 11,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "applyMutationCommand",
+          "callee": "applyGraphMutation",
+          "lineNumber": 16
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "new Date(input.options.now?.() ?? Date.now()).toISOString",
+          "lineNumber": 20
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "input.options.now",
+          "lineNumber": 20
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "Date.now",
+          "lineNumber": 20
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "input.events.push",
+          "lineNumber": 22
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "applyDownstreamInvalidation",
+          "lineNumber": 29
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "planDownstreamInvalidation",
+          "lineNumber": 32
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 40
+        },
+        {
+          "caller": "applyMutationCommand",
+          "callee": "mapTerminalReasonToGraphStatus",
+          "lineNumber": 42
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/approve-current-node.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 51,
+      "nonEmptyLines": 49,
+      "functions": [
+        {
+          "name": "approveCurrentNodeCommand",
+          "startLine": 7,
+          "endLine": 51,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "approveCurrentNodeCommand",
+          "line": 7,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "approveCurrentNodeCommand",
+          "callee": "new Date(\n    input.options.now?.() ?? Date.now(),\n  ).toISOString",
+          "lineNumber": 13
+        },
+        {
+          "caller": "approveCurrentNodeCommand",
+          "callee": "input.options.now",
+          "lineNumber": 14
+        },
+        {
+          "caller": "approveCurrentNodeCommand",
+          "callee": "Date.now",
+          "lineNumber": 14
+        },
+        {
+          "caller": "approveCurrentNodeCommand",
+          "callee": "approveCurrentNodeResult",
+          "lineNumber": 16
+        },
+        {
+          "caller": "approveCurrentNodeCommand",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 24
+        },
+        {
+          "caller": "approveCurrentNodeCommand",
+          "callee": "runGraphExecution",
+          "lineNumber": 37
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/cancel-session.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 24,
+      "functions": [
+        {
+          "name": "cancelSessionCommand",
+          "startLine": 6,
+          "endLine": 25,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "cancelSessionCommand",
+          "line": 6,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "cancelSessionCommand",
+          "callee": "cancelSessionState",
+          "lineNumber": 11
+        },
+        {
+          "caller": "cancelSessionCommand",
+          "callee": "new Date(input.options.now?.() ?? Date.now()).toISOString",
+          "lineNumber": 14
+        },
+        {
+          "caller": "cancelSessionCommand",
+          "callee": "input.options.now",
+          "lineNumber": 14
+        },
+        {
+          "caller": "cancelSessionCommand",
+          "callee": "Date.now",
+          "lineNumber": 14
+        },
+        {
+          "caller": "cancelSessionCommand",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 20
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/pause-session.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 26,
+      "nonEmptyLines": 24,
+      "functions": [
+        {
+          "name": "pauseSessionCommand",
+          "startLine": 9,
+          "endLine": 26,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "pauseSessionCommand",
+          "line": 9,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "pauseSessionCommand",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 14
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/retry-node.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 50,
+      "nonEmptyLines": 48,
+      "functions": [
+        {
+          "name": "retryNodeCommand",
+          "startLine": 7,
+          "endLine": 50,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "retryNodeCommand",
+          "line": 7,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "retryNodeCommand",
+          "callee": "input.command.state.attempts.filter",
+          "lineNumber": 14
+        },
+        {
+          "caller": "retryNodeCommand",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 18
+        },
+        {
+          "caller": "retryNodeCommand",
+          "callee": "retryNodeState",
+          "lineNumber": 30
+        },
+        {
+          "caller": "retryNodeCommand",
+          "callee": "new Date(input.options.now?.() ?? Date.now()).toISOString",
+          "lineNumber": 34
+        },
+        {
+          "caller": "retryNodeCommand",
+          "callee": "input.options.now",
+          "lineNumber": 34
+        },
+        {
+          "caller": "retryNodeCommand",
+          "callee": "Date.now",
+          "lineNumber": 34
+        },
+        {
+          "caller": "retryNodeCommand",
+          "callee": "runGraphExecution",
+          "lineNumber": 36
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/state-updates.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 293,
+      "nonEmptyLines": 285,
+      "functions": [
+        {
+          "name": "approveCurrentNodeResult",
+          "startLine": 8,
+          "endLine": 60,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "retryNodeState",
+          "startLine": 62,
+          "endLine": 86,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "cancelSessionState",
+          "startLine": 88,
+          "endLine": 122,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "submitNodeResultState",
+          "startLine": 124,
+          "endLine": 293,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "approveCurrentNodeResult",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "retryNodeState",
+          "line": 62,
+          "isDefault": false
+        },
+        {
+          "name": "cancelSessionState",
+          "line": 88,
+          "isDefault": false
+        },
+        {
+          "name": "submitNodeResultState",
+          "line": 124,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "approveCurrentNodeResult",
+          "callee": "nextResults.push",
+          "lineNumber": 18
+        },
+        {
+          "caller": "approveCurrentNodeResult",
+          "callee": "nextResults.push",
+          "lineNumber": 22
+        },
+        {
+          "caller": "approveCurrentNodeResult",
+          "callee": "nextResults.push",
+          "lineNumber": 37
+        },
+        {
+          "caller": "approveCurrentNodeResult",
+          "callee": "nextResults.push",
+          "lineNumber": 39
+        },
+        {
+          "caller": "approveCurrentNodeResult",
+          "callee": "input.state.attempts.map",
+          "lineNumber": 52
+        },
+        {
+          "caller": "retryNodeState",
+          "callee": "input.state.attempts.map",
+          "lineNumber": 70
+        },
+        {
+          "caller": "retryNodeState",
+          "callee": "input.state.results.map",
+          "lineNumber": 80
+        },
+        {
+          "caller": "cancelSessionState",
+          "callee": "input.state.attempts\n      .filter((attempt) => attempt.status === \"running\")\n      .flatMap",
+          "lineNumber": 94
+        },
+        {
+          "caller": "cancelSessionState",
+          "callee": "input.state.attempts\n      .filter",
+          "lineNumber": 94
+        },
+        {
+          "caller": "cancelSessionState",
+          "callee": "input.state.attempts.map",
+          "lineNumber": 106
+        },
+        {
+          "caller": "cancelSessionState",
+          "callee": "input.state.results.map",
+          "lineNumber": 116
+        },
+        {
+          "caller": "cancelSessionState",
+          "callee": "runningNodeIds.has",
+          "lineNumber": 117
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 130
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "effective.nodes.find",
+          "lineNumber": 131
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "[...input.state.results]\n    .reverse()\n    .find",
+          "lineNumber": 138
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "[...input.state.results]\n    .reverse",
+          "lineNumber": 138
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "normalizeResultOutputs",
+          "lineNumber": 152
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "[...input.state.attempts]\n    .reverse()\n    .find",
+          "lineNumber": 159
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "[...input.state.attempts]\n    .reverse",
+          "lineNumber": 159
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "normalizeResultEvidence",
+          "lineNumber": 187
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "normalizeResultEvidence",
+          "lineNumber": 203
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "updateAttemptStatus",
+          "lineNumber": 281
+        },
+        {
+          "caller": "submitNodeResultState",
+          "callee": "appendCurrentResult",
+          "lineNumber": 288
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 4,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/submit-node-result.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 72,
+      "nonEmptyLines": 71,
+      "functions": [
+        {
+          "name": "submitNodeResultCommand",
+          "startLine": 8,
+          "endLine": 72,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "submitNodeResultCommand",
+          "line": 8,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "new Date(\n    input.options.now?.() ?? Date.now(),\n  ).toISOString",
+          "lineNumber": 14
+        },
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "input.options.now",
+          "lineNumber": 15
+        },
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "Date.now",
+          "lineNumber": 15
+        },
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "submitNodeResultState",
+          "lineNumber": 17
+        },
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "input.events.push",
+          "lineNumber": 23
+        },
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 29
+        },
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "mapTerminalReasonToGraphStatus",
+          "lineNumber": 34
+        },
+        {
+          "caller": "submitNodeResultCommand",
+          "callee": "runGraphExecution",
+          "lineNumber": 60
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 121,
+      "nonEmptyLines": 115,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/commands/validate-command.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 44,
+      "functions": [
+        {
+          "name": "validationFailureOutcome",
+          "startLine": 6,
+          "endLine": 28,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "validateCommandGraphState",
+          "startLine": 30,
+          "endLine": 47,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "validateCommandGraphState",
+          "line": 30,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "validationFailureOutcome",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 16
+        },
+        {
+          "caller": "validationFailureOutcome",
+          "callee": "input.issues.join",
+          "lineNumber": 26
+        },
+        {
+          "caller": "validateCommandGraphState",
+          "callee": "validatePlanGraph",
+          "lineNumber": 35
+        },
+        {
+          "caller": "validateCommandGraphState",
+          "callee": "result.issues.filter",
+          "lineNumber": 36
+        },
+        {
+          "caller": "validateCommandGraphState",
+          "callee": "validationFailureOutcome",
+          "lineNumber": 41
+        },
+        {
+          "caller": "validateCommandGraphState",
+          "callee": "errors.map",
+          "lineNumber": 45
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/evidence.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 28,
+      "nonEmptyLines": 26,
+      "functions": [
+        {
+          "name": "normalizeResultEvidence",
+          "startLine": 14,
+          "endLine": 28,
+          "params": [
+            "evidence"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "normalizeResultEvidence",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/execution-state.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 121,
+      "nonEmptyLines": 115,
+      "functions": [
+        {
+          "name": "pickNextNodeId",
+          "startLine": 9,
+          "endLine": 26,
+          "params": [
+            "effective",
+            "forcedNodeId",
+            "options"
+          ]
+        },
+        {
+          "name": "markNodeResults",
+          "startLine": 28,
+          "endLine": 38,
+          "params": [
+            "results",
+            "nodeId",
+            "nextStatus"
+          ]
+        },
+        {
+          "name": "appendCurrentResult",
+          "startLine": 40,
+          "endLine": 52,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "updateAttemptStatus",
+          "startLine": 54,
+          "endLine": 73,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "cancelActiveAttempt",
+          "startLine": 75,
+          "endLine": 94,
+          "params": [
+            "attempts",
+            "nodeId",
+            "reason"
+          ]
+        },
+        {
+          "name": "createExecutionContextSnapshot",
+          "startLine": 96,
+          "endLine": 121,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "pickNextNodeId",
+          "line": 9,
+          "isDefault": false
+        },
+        {
+          "name": "markNodeResults",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "appendCurrentResult",
+          "line": 40,
+          "isDefault": false
+        },
+        {
+          "name": "updateAttemptStatus",
+          "line": 54,
+          "isDefault": false
+        },
+        {
+          "name": "cancelActiveAttempt",
+          "line": 75,
+          "isDefault": false
+        },
+        {
+          "name": "createExecutionContextSnapshot",
+          "line": 96,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "pickNextNodeId",
+          "callee": "effective.nodes.find",
+          "lineNumber": 15
+        },
+        {
+          "caller": "pickNextNodeId",
+          "callee": "explainNodeExecutionBlock",
+          "lineNumber": 17
+        },
+        {
+          "caller": "markNodeResults",
+          "callee": "results.map",
+          "lineNumber": 33
+        },
+        {
+          "caller": "appendCurrentResult",
+          "callee": "markNodeResults",
+          "lineNumber": 45
+        },
+        {
+          "caller": "appendCurrentResult",
+          "callee": "nextResults.push",
+          "lineNumber": 50
+        },
+        {
+          "caller": "updateAttemptStatus",
+          "callee": "input.attempts.map",
+          "lineNumber": 62
+        },
+        {
+          "caller": "cancelActiveAttempt",
+          "callee": "new Date().toISOString",
+          "lineNumber": 80
+        },
+        {
+          "caller": "cancelActiveAttempt",
+          "callee": "attempts.map",
+          "lineNumber": 81
+        },
+        {
+          "caller": "createExecutionContextSnapshot",
+          "callee": "Date.now",
+          "lineNumber": 106
+        },
+        {
+          "caller": "createExecutionContextSnapshot",
+          "callee": "new Date(now).toISOString",
+          "lineNumber": 107
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 6,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/execution/guards.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 68,
+      "nonEmptyLines": 57,
+      "functions": [
+        {
+          "name": "explainNodeExecutionBlock",
+          "startLine": 4,
+          "endLine": 29,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "findEffectiveGraphInvariantViolation",
+          "startLine": 31,
+          "endLine": 49,
+          "params": [
+            "effective"
+          ]
+        },
+        {
+          "name": "normalizeNodeResult",
+          "startLine": 51,
+          "endLine": 68,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "explainNodeExecutionBlock",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "findEffectiveGraphInvariantViolation",
+          "line": 31,
+          "isDefault": false
+        },
+        {
+          "name": "normalizeNodeResult",
+          "line": 51,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "explainNodeExecutionBlock",
+          "callee": "input.node.dependencies.join",
+          "lineNumber": 25
+        },
+        {
+          "caller": "findEffectiveGraphInvariantViolation",
+          "callee": "node.dependencies.find",
+          "lineNumber": 39
+        },
+        {
+          "caller": "findEffectiveGraphInvariantViolation",
+          "callee": "effective.nodes.find",
+          "lineNumber": 40
+        },
+        {
+          "caller": "findEffectiveGraphInvariantViolation",
+          "callee": "[\"completed\", \"skipped\", \"invalidated\"].includes",
+          "lineNumber": 41
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 3,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/execution/result-normalization.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 222,
+      "nonEmptyLines": 212,
+      "functions": [
+        {
+          "name": "appendCapabilityUnavailableResult",
+          "startLine": 10,
+          "endLine": 29,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "appendExecutionResult",
+          "startLine": 31,
+          "endLine": 141,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "isRecord",
+          "startLine": 143,
+          "endLine": 145,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "isNodeResultOutput",
+          "startLine": 147,
+          "endLine": 151,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "assertResultOutputs",
+          "startLine": 153,
+          "endLine": 161,
+          "params": [
+            "output"
+          ]
+        },
+        {
+          "name": "normalizeResultOutputs",
+          "startLine": 163,
+          "endLine": 165,
+          "params": [
+            "output"
+          ]
+        },
+        {
+          "name": "getPauseKind",
+          "startLine": 167,
+          "endLine": 184,
+          "params": [
+            "result"
+          ]
+        },
+        {
+          "name": "getResultMessage",
+          "startLine": 186,
+          "endLine": 200,
+          "params": [
+            "result"
+          ]
+        },
+        {
+          "name": "getEventType",
+          "startLine": 202,
+          "endLine": 222,
+          "params": [
+            "result"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "appendCapabilityUnavailableResult",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "appendExecutionResult",
+          "line": 31,
+          "isDefault": false
+        },
+        {
+          "name": "normalizeResultOutputs",
+          "line": 163,
+          "isDefault": false
+        },
+        {
+          "name": "getPauseKind",
+          "line": 167,
+          "isDefault": false
+        },
+        {
+          "name": "getResultMessage",
+          "line": 186,
+          "isDefault": false
+        },
+        {
+          "name": "getEventType",
+          "line": 202,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "appendCapabilityUnavailableResult",
+          "callee": "appendCurrentResult",
+          "lineNumber": 16
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "normalizeResultEvidence",
+          "lineNumber": 47
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "input.state.results.findLast",
+          "lineNumber": 56
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "normalizeResultOutputs",
+          "lineNumber": 60
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "appendCurrentResult",
+          "lineNumber": 62
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "appendCurrentResult",
+          "lineNumber": 78
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "appendCurrentResult",
+          "lineNumber": 90
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "appendCurrentResult",
+          "lineNumber": 102
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "appendCurrentResult",
+          "lineNumber": 114
+        },
+        {
+          "caller": "appendExecutionResult",
+          "callee": "appendCurrentResult",
+          "lineNumber": 125
+        },
+        {
+          "caller": "isRecord",
+          "callee": "Boolean",
+          "lineNumber": 144
+        },
+        {
+          "caller": "isRecord",
+          "callee": "Array.isArray",
+          "lineNumber": 144
+        },
+        {
+          "caller": "isNodeResultOutput",
+          "callee": "isRecord",
+          "lineNumber": 148
+        },
+        {
+          "caller": "isNodeResultOutput",
+          "callee": "isRecord",
+          "lineNumber": 149
+        },
+        {
+          "caller": "assertResultOutputs",
+          "callee": "Array.isArray",
+          "lineNumber": 155
+        },
+        {
+          "caller": "assertResultOutputs",
+          "callee": "output.every",
+          "lineNumber": 155
+        },
+        {
+          "caller": "assertResultOutputs",
+          "callee": "isRecord",
+          "lineNumber": 156
+        },
+        {
+          "caller": "assertResultOutputs",
+          "callee": "Array.isArray",
+          "lineNumber": 156
+        },
+        {
+          "caller": "assertResultOutputs",
+          "callee": "output.outputs.every",
+          "lineNumber": 156
+        },
+        {
+          "caller": "assertResultOutputs",
+          "callee": "isNodeResultOutput",
+          "lineNumber": 159
+        },
+        {
+          "caller": "normalizeResultOutputs",
+          "callee": "assertResultOutputs",
+          "lineNumber": 164
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 6,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/execution/run-graph-execution.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 399,
+      "nonEmptyLines": 376,
+      "functions": [
+        {
+          "name": "throwIfAborted",
+          "startLine": 29,
+          "endLine": 32,
+          "params": [
+            "signal"
+          ]
+        },
+        {
+          "name": "runGraphExecution",
+          "startLine": 34,
+          "endLine": 399,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "runGraphExecution",
+          "line": 34,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "runGraphExecution",
+          "callee": "Math.max",
+          "lineNumber": 38
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "structuredClone",
+          "lineNumber": 40
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "throwIfAborted",
+          "lineNumber": 45
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 46
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.onEvent",
+          "lineNumber": 47
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "findEffectiveGraphInvariantViolation",
+          "lineNumber": 52
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "mapTerminalReasonToGraphStatus",
+          "lineNumber": 66
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "pickNextNodeId",
+          "lineNumber": 78
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "Boolean",
+          "lineNumber": 79
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "effective.nodes.find",
+          "lineNumber": 83
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "explainNodeExecutionBlock",
+          "lineNumber": 92
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "Boolean",
+          "lineNumber": 94
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "effective.readyNodeIds.slice",
+          "lineNumber": 101
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "effective.nodes.find",
+          "lineNumber": 114
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "explainNodeExecutionBlock",
+          "lineNumber": 122
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "Boolean",
+          "lineNumber": 124
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "state.attempts.find",
+          "lineNumber": 137
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "state.results.map",
+          "lineNumber": 158
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.now",
+          "lineNumber": 166
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "Date.now",
+          "lineNumber": 166
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "createExecutionContextSnapshot",
+          "lineNumber": 167
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "state.attempts.filter",
+          "lineNumber": 188
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.onEvent",
+          "lineNumber": 201
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.onStateChange",
+          "lineNumber": 202
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.executeNode",
+          "lineNumber": 204
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "throwIfAborted",
+          "lineNumber": 215
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.resolveSubmittedNodeState",
+          "lineNumber": 217
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 224
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "mapTerminalReasonToGraphStatus",
+          "lineNumber": 225
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "executedNodeIds.push",
+          "lineNumber": 230
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "new Date(input.now?.() ?? Date.now()).toISOString",
+          "lineNumber": 244
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.now",
+          "lineNumber": 244
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "Date.now",
+          "lineNumber": 244
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "updateAttemptStatus",
+          "lineNumber": 248
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "appendCapabilityUnavailableResult",
+          "lineNumber": 258
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.onStateChange",
+          "lineNumber": 265
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 266
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "normalizeNodeResult",
+          "lineNumber": 278
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "updateAttemptStatus",
+          "lineNumber": 283
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.onStateChange",
+          "lineNumber": 294
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 295
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "updateAttemptStatus",
+          "lineNumber": 308
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "appendExecutionResult",
+          "lineNumber": 327
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "getEventType",
+          "lineNumber": 337
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.onEvent",
+          "lineNumber": 339
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.callbacks.onStateChange",
+          "lineNumber": 345
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 348
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "getPauseKind",
+          "lineNumber": 359
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 361
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "mapWaitKindToGraphStatus",
+          "lineNumber": 363
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "getResultMessage",
+          "lineNumber": 369
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "executedNodeIds.push",
+          "lineNumber": 373
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "input.control?.shouldPause",
+          "lineNumber": 375
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 376
+        },
+        {
+          "caller": "runGraphExecution",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 390
+        }
+      ],
+      "metrics": {
+        "importCount": 7,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/execution/types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 77,
+      "nonEmptyLines": 74,
+      "exports": [
+        {
+          "name": "GraphExecutionTrigger",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphNodeExecutionResult",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphSubmittedNodeResult",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphExecutionState",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphNodeExecutorInput",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphExecutionCallbacks",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphExecutionControl",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphNodeExecutor",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphExecutorRegistry",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "GraphExecutionOutcome",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "RunGraphExecutionInput",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 11,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/graph-builder.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 88,
+      "nonEmptyLines": 84,
+      "functions": [
+        {
+          "name": "toNodeObjective",
+          "startLine": 12,
+          "endLine": 23,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "createNodeDefinitionFromCompiledNode",
+          "startLine": 25,
+          "endLine": 44,
+          "params": [
+            "node",
+            "linkedTaskId"
+          ]
+        },
+        {
+          "name": "createPlanGraphFromCompiledPlan",
+          "startLine": 46,
+          "endLine": 88,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createNodeDefinitionFromCompiledNode",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "createPlanGraphFromCompiledPlan",
+          "line": 46,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createNodeDefinitionFromCompiledNode",
+          "callee": "toNodeObjective",
+          "lineNumber": 31
+        },
+        {
+          "caller": "createNodeDefinitionFromCompiledNode",
+          "callee": "structuredClone",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createNodeDefinitionFromCompiledNode",
+          "callee": "structuredClone",
+          "lineNumber": 42
+        },
+        {
+          "caller": "createPlanGraphFromCompiledPlan",
+          "callee": "new Date().toISOString",
+          "lineNumber": 52
+        },
+        {
+          "caller": "createPlanGraphFromCompiledPlan",
+          "callee": "input.compiledPlan.nodes.map",
+          "lineNumber": 58
+        },
+        {
+          "caller": "createPlanGraphFromCompiledPlan",
+          "callee": "createNodeDefinitionFromCompiledNode",
+          "lineNumber": 68
+        },
+        {
+          "caller": "createPlanGraphFromCompiledPlan",
+          "callee": "input.compiledPlan.edges.map",
+          "lineNumber": 74
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/invalidation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 95,
+      "nonEmptyLines": 90,
+      "functions": [
+        {
+          "name": "planDownstreamInvalidation",
+          "startLine": 20,
+          "endLine": 31,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "applyDownstreamInvalidation",
+          "startLine": 33,
+          "endLine": 95,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "planDownstreamInvalidation",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "applyDownstreamInvalidation",
+          "line": 33,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "planDownstreamInvalidation",
+          "callee": "getDownstreamNodeIds",
+          "lineNumber": 23
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "new Date().toISOString",
+          "lineNumber": 36
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "input.state.graph.nodes.map",
+          "lineNumber": 44
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "invalidated.has",
+          "lineNumber": 45
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "input.state.attempts.find",
+          "lineNumber": 55
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "input.state.attempts.map",
+          "lineNumber": 79
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "invalidated.has",
+          "lineNumber": 80
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "input.state.results.map",
+          "lineNumber": 89
+        },
+        {
+          "caller": "applyDownstreamInvalidation",
+          "callee": "invalidated.has",
+          "lineNumber": 90
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/mutations.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 347,
+      "nonEmptyLines": 331,
+      "functions": [
+        {
+          "name": "validateGraphMutationOperation",
+          "startLine": 44,
+          "endLine": 182,
+          "params": [
+            "graph",
+            "operation",
+            "operationIndex"
+          ]
+        },
+        {
+          "name": "validateGraphMutation",
+          "startLine": 184,
+          "endLine": 198,
+          "params": [
+            "graph",
+            "operations"
+          ]
+        },
+        {
+          "name": "applyOperation",
+          "startLine": 200,
+          "endLine": 285,
+          "params": [
+            "graph",
+            "operation",
+            "now"
+          ]
+        },
+        {
+          "name": "getAffectedNodeIds",
+          "startLine": 287,
+          "endLine": 314,
+          "params": [
+            "operations"
+          ]
+        },
+        {
+          "name": "applyGraphMutation",
+          "startLine": 316,
+          "endLine": 347,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "GraphMutationValidationError",
+          "startLine": 34,
+          "endLine": 42,
+          "methods": [
+            "constructor"
+          ],
+          "properties": [
+            "issues"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "GraphMutationValidationError",
+          "line": 34,
+          "isDefault": false
+        },
+        {
+          "name": "validateGraphMutation",
+          "line": 184,
+          "isDefault": false
+        },
+        {
+          "name": "applyGraphMutation",
+          "line": 316,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 38
+        },
+        {
+          "caller": "constructor",
+          "callee": "issues.map((issue) => issue.message).join",
+          "lineNumber": 38
+        },
+        {
+          "caller": "constructor",
+          "callee": "issues.map",
+          "lineNumber": 38
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "graph.nodes.map",
+          "lineNumber": 50
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "graph.edges.map",
+          "lineNumber": 51
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nodeIds.has",
+          "lineNumber": 55
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 56
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 63
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nodeIds.has",
+          "lineNumber": 71
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 72
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 79
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "edgeIds.has",
+          "lineNumber": 87
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 88
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nodeIds.has",
+          "lineNumber": 94
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nodeIds.has",
+          "lineNumber": 94
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 95
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "edgeIds.has",
+          "lineNumber": 104
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 105
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nodeIds.has",
+          "lineNumber": 113
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 114
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nodeIds.has",
+          "lineNumber": 123
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 124
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "newNodeIds.has",
+          "lineNumber": 134
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 135
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "newNodeIds.add",
+          "lineNumber": 141
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 143
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nodeIds.has",
+          "lineNumber": 149
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "replacingNodeIds.has",
+          "lineNumber": 149
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 150
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "[...nodeIds].filter",
+          "lineNumber": 157
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "replacingNodeIds.has",
+          "lineNumber": 157
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nextNodeIds.add",
+          "lineNumber": 158
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "edgeIds.has",
+          "lineNumber": 161
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "newEdgeIds.has",
+          "lineNumber": 161
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 162
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "newEdgeIds.add",
+          "lineNumber": 168
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nextNodeIds.has",
+          "lineNumber": 169
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "nextNodeIds.has",
+          "lineNumber": 169
+        },
+        {
+          "caller": "validateGraphMutationOperation",
+          "callee": "issues.push",
+          "lineNumber": 170
+        },
+        {
+          "caller": "validateGraphMutation",
+          "callee": "operations.forEach",
+          "lineNumber": 190
+        },
+        {
+          "caller": "validateGraphMutation",
+          "callee": "validateGraphMutationOperation",
+          "lineNumber": 191
+        },
+        {
+          "caller": "validateGraphMutation",
+          "callee": "issues.push",
+          "lineNumber": 192
+        },
+        {
+          "caller": "validateGraphMutation",
+          "callee": "applyOperation",
+          "lineNumber": 194
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "graph.nodes.map",
+          "lineNumber": 219
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "graph.edges.map",
+          "lineNumber": 234
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "graph.edges.map",
+          "lineNumber": 243
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "graph.nodes.filter",
+          "lineNumber": 252
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "graph.edges.map",
+          "lineNumber": 253
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "operation.nodes.map",
+          "lineNumber": 261
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "graph.nodes.filter",
+          "lineNumber": 271
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "removeNodeIds.has",
+          "lineNumber": 271
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "graph.edges.map",
+          "lineNumber": 275
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "removeNodeIds.has",
+          "lineNumber": 276
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "removeNodeIds.has",
+          "lineNumber": 276
+        },
+        {
+          "caller": "getAffectedNodeIds",
+          "callee": "nodeIds.add",
+          "lineNumber": 294
+        },
+        {
+          "caller": "getAffectedNodeIds",
+          "callee": "nodeIds.add",
+          "lineNumber": 297
+        },
+        {
+          "caller": "getAffectedNodeIds",
+          "callee": "nodeIds.add",
+          "lineNumber": 298
+        },
+        {
+          "caller": "getAffectedNodeIds",
+          "callee": "nodeIds.add",
+          "lineNumber": 300
+        },
+        {
+          "caller": "getAffectedNodeIds",
+          "callee": "nodeIds.add",
+          "lineNumber": 301
+        },
+        {
+          "caller": "getAffectedNodeIds",
+          "callee": "nodeIds.add",
+          "lineNumber": 305
+        },
+        {
+          "caller": "getAffectedNodeIds",
+          "callee": "nodeIds.add",
+          "lineNumber": 306
+        },
+        {
+          "caller": "applyGraphMutation",
+          "callee": "validateGraphMutation",
+          "lineNumber": 317
+        },
+        {
+          "caller": "applyGraphMutation",
+          "callee": "new Date().toISOString",
+          "lineNumber": 320
+        },
+        {
+          "caller": "applyGraphMutation",
+          "callee": "getAffectedNodeIds",
+          "lineNumber": 328
+        },
+        {
+          "caller": "applyGraphMutation",
+          "callee": "input.operations.reduce",
+          "lineNumber": 332
+        },
+        {
+          "caller": "applyGraphMutation",
+          "callee": "applyOperation",
+          "lineNumber": 333
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 3,
+        "functionCount": 5,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/registry/executor-registry.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 23,
+      "nonEmptyLines": 21,
+      "functions": [
+        {
+          "name": "getExecutorName",
+          "startLine": 5,
+          "endLine": 10,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "createRegistryExecutor",
+          "startLine": 12,
+          "endLine": 23,
+          "params": [
+            "options"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createRegistryExecutor",
+          "line": 12,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createRegistryExecutor",
+          "callee": "getExecutorName",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createRegistryExecutor",
+          "callee": "executor",
+          "lineNumber": 20
+        },
+        {
+          "caller": "createRegistryExecutor",
+          "callee": "options.callbacks?.executeNode",
+          "lineNumber": 21
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/resolve.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 495,
+      "nonEmptyLines": 455,
+      "functions": [
+        {
+          "name": "resolveEffectivePlanGraph",
+          "startLine": 18,
+          "endLine": 57,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "buildEffectiveGraphSummary",
+          "startLine": 59,
+          "endLine": 187,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "markUnreachableNodesSkipped",
+          "startLine": 189,
+          "endLine": 199,
+          "params": [
+            "nodeMap",
+            "reachableNodeIds"
+          ]
+        },
+        {
+          "name": "buildEffectiveNodeFromGraphNode",
+          "startLine": 201,
+          "endLine": 277,
+          "params": [
+            "node",
+            "attempts",
+            "results"
+          ]
+        },
+        {
+          "name": "nodeConfigFromDefinition",
+          "startLine": 279,
+          "endLine": 286,
+          "params": [
+            "definition"
+          ]
+        },
+        {
+          "name": "isRecord",
+          "startLine": 288,
+          "endLine": 290,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "isFailedSubmissionNodeResult",
+          "startLine": 298,
+          "endLine": 308,
+          "params": [
+            "result"
+          ]
+        },
+        {
+          "name": "nodeResultOutputText",
+          "startLine": 310,
+          "endLine": 312,
+          "params": [
+            "_output"
+          ]
+        },
+        {
+          "name": "compareAttemptsForEffectiveState",
+          "startLine": 315,
+          "endLine": 319,
+          "params": [
+            "a",
+            "b"
+          ]
+        },
+        {
+          "name": "attemptStatusPriority",
+          "startLine": 321,
+          "endLine": 332,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "getActiveDefinitionLayer",
+          "startLine": 334,
+          "endLine": 338,
+          "params": [
+            "layers"
+          ]
+        },
+        {
+          "name": "getLatestLayer",
+          "startLine": 340,
+          "endLine": 347,
+          "params": [
+            "layers",
+            "type"
+          ]
+        },
+        {
+          "name": "deriveNodeStatus",
+          "startLine": 349,
+          "endLine": 387,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "mapWaitKindToNodeStatus",
+          "startLine": 389,
+          "endLine": 404,
+          "params": [
+            "waitKind"
+          ]
+        },
+        {
+          "name": "computeGraphEntryNodeIds",
+          "startLine": 406,
+          "endLine": 420,
+          "params": [
+            "nodeMap",
+            "edgeMap"
+          ]
+        },
+        {
+          "name": "rebuildDependencies",
+          "startLine": 422,
+          "endLine": 446,
+          "params": [
+            "nodeMap",
+            "edgeMap",
+            "reachableNodeIds"
+          ]
+        },
+        {
+          "name": "applyConditionBranchSelections",
+          "startLine": 448,
+          "endLine": 469,
+          "params": [
+            "nodeMap",
+            "edgeMap",
+            "graphEdges"
+          ]
+        },
+        {
+          "name": "computeReachableNodeIds",
+          "startLine": 471,
+          "endLine": 495,
+          "params": [
+            "entryNodeIds",
+            "edgeMap"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "resolveEffectivePlanGraph",
+          "line": 18,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "edgeMap.set",
+          "lineNumber": 26
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "buildEffectiveNodeFromGraphNode",
+          "lineNumber": 36
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "nodeMap.set",
+          "lineNumber": 38
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "applyConditionBranchSelections",
+          "lineNumber": 42
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "computeGraphEntryNodeIds",
+          "lineNumber": 43
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "computeReachableNodeIds",
+          "lineNumber": 44
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "markUnreachableNodesSkipped",
+          "lineNumber": 45
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "rebuildDependencies",
+          "lineNumber": 46
+        },
+        {
+          "caller": "resolveEffectivePlanGraph",
+          "callee": "buildEffectiveGraphSummary",
+          "lineNumber": 48
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "[...input.edgeMap.values()].some",
+          "lineNumber": 84
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "input.edgeMap.values",
+          "lineNumber": 84
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "input.reachableNodeIds.has",
+          "lineNumber": 87
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "terminalNodeIds.push",
+          "lineNumber": 90
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "node.dependencies.every",
+          "lineNumber": 93
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "input.nodeMap.get",
+          "lineNumber": 94
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "[...input.nodeMap.values()].some",
+          "lineNumber": 103
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "input.nodeMap.values",
+          "lineNumber": 103
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "readyNodeIds.push",
+          "lineNumber": 114
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "completedNodeIds.push",
+          "lineNumber": 119
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "skippedNodeIds.push",
+          "lineNumber": 122
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "completedNodeIds.push",
+          "lineNumber": 123
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "runningNodeIds.push",
+          "lineNumber": 126
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "degradedNodeIds.push",
+          "lineNumber": 129
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "invalidatedNodeIds.push",
+          "lineNumber": 132
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "waitingNodeIds.push",
+          "lineNumber": 135
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "waitingNodeIds.push",
+          "lineNumber": 138
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "waitingForUserNodeIds.push",
+          "lineNumber": 139
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "waitingNodeIds.push",
+          "lineNumber": 142
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "waitingForApprovalNodeIds.push",
+          "lineNumber": 143
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "blockedNodeIds.push",
+          "lineNumber": 146
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "failedNodeIds.push",
+          "lineNumber": 149
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "cancelledNodeIds.push",
+          "lineNumber": 152
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "pendingNodeIds.push",
+          "lineNumber": 158
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "new Date().toISOString",
+          "lineNumber": 167
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "input.nodeMap.values",
+          "lineNumber": 169
+        },
+        {
+          "caller": "buildEffectiveGraphSummary",
+          "callee": "input.edgeMap.values",
+          "lineNumber": 170
+        },
+        {
+          "caller": "markUnreachableNodesSkipped",
+          "callee": "reachableNodeIds.has",
+          "lineNumber": 194
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "getActiveDefinitionLayer",
+          "lineNumber": 206
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "getLatestLayer",
+          "lineNumber": 211
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "getLatestLayer",
+          "lineNumber": 212
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "results.filter",
+          "lineNumber": 213
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "isFailedSubmissionNodeResult",
+          "lineNumber": 214
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "[...nodeResults]\n    .reverse()\n    .filter",
+          "lineNumber": 216
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "[...nodeResults]\n    .reverse",
+          "lineNumber": 216
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "activeLayerResults.find",
+          "lineNumber": 220
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "activeLayerResults.find",
+          "lineNumber": 221
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "activeLayerResults.find",
+          "lineNumber": 224
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "[...attempts]\n    .filter(\n      (attempt) =>\n        attempt.nodeId === node.id && attempt.nodeLayerId === activeDefinitionLayer.id,\n    )\n    .sort",
+          "lineNumber": 225
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "[...attempts]\n    .filter",
+          "lineNumber": 225
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "deriveNodeStatus",
+          "lineNumber": 233
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "Boolean",
+          "lineNumber": 234
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "Boolean",
+          "lineNumber": 235
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "Boolean",
+          "lineNumber": 246
+        },
+        {
+          "caller": "buildEffectiveNodeFromGraphNode",
+          "callee": "nodeConfigFromDefinition",
+          "lineNumber": 256
+        },
+        {
+          "caller": "nodeConfigFromDefinition",
+          "callee": "isRecord",
+          "lineNumber": 280
+        },
+        {
+          "caller": "nodeConfigFromDefinition",
+          "callee": "isRecord",
+          "lineNumber": 281
+        },
+        {
+          "caller": "nodeConfigFromDefinition",
+          "callee": "isRecord",
+          "lineNumber": 282
+        },
+        {
+          "caller": "nodeConfigFromDefinition",
+          "callee": "isRecord",
+          "lineNumber": 283
+        },
+        {
+          "caller": "isRecord",
+          "callee": "Array.isArray",
+          "lineNumber": 289
+        },
+        {
+          "caller": "isFailedSubmissionNodeResult",
+          "callee": "[\n    result.outputSummary,\n    result.error,\n    ...(result.outputs ?? []).map(nodeResultOutputText),\n  ]\n    .filter((value): value is string => Boolean(value))\n    .join",
+          "lineNumber": 299
+        },
+        {
+          "caller": "isFailedSubmissionNodeResult",
+          "callee": "[\n    result.outputSummary,\n    result.error,\n    ...(result.outputs ?? []).map(nodeResultOutputText),\n  ]\n    .filter",
+          "lineNumber": 299
+        },
+        {
+          "caller": "isFailedSubmissionNodeResult",
+          "callee": "(result.outputs ?? []).map",
+          "lineNumber": 302
+        },
+        {
+          "caller": "isFailedSubmissionNodeResult",
+          "callee": "Boolean",
+          "lineNumber": 304
+        },
+        {
+          "caller": "isFailedSubmissionNodeResult",
+          "callee": "FAILED_SUBMISSION_RESULT_PATTERNS.some",
+          "lineNumber": 307
+        },
+        {
+          "caller": "isFailedSubmissionNodeResult",
+          "callee": "pattern.test",
+          "lineNumber": 307
+        },
+        {
+          "caller": "compareAttemptsForEffectiveState",
+          "callee": "attemptStatusPriority",
+          "lineNumber": 316
+        },
+        {
+          "caller": "compareAttemptsForEffectiveState",
+          "callee": "attemptStatusPriority",
+          "lineNumber": 316
+        },
+        {
+          "caller": "getActiveDefinitionLayer",
+          "callee": "[...layers]\n    .reverse()\n    .find",
+          "lineNumber": 335
+        },
+        {
+          "caller": "getActiveDefinitionLayer",
+          "callee": "[...layers]\n    .reverse",
+          "lineNumber": 335
+        },
+        {
+          "caller": "getLatestLayer",
+          "callee": "[...layers]\n    .reverse()\n    .find",
+          "lineNumber": 344
+        },
+        {
+          "caller": "getLatestLayer",
+          "callee": "[...layers]\n    .reverse",
+          "lineNumber": 344
+        },
+        {
+          "caller": "deriveNodeStatus",
+          "callee": "mapWaitKindToNodeStatus",
+          "lineNumber": 362
+        },
+        {
+          "caller": "computeGraphEntryNodeIds",
+          "callee": "nodeMap.keys",
+          "lineNumber": 411
+        },
+        {
+          "caller": "computeGraphEntryNodeIds",
+          "callee": "[...edgeMap.values()].some",
+          "lineNumber": 412
+        },
+        {
+          "caller": "computeGraphEntryNodeIds",
+          "callee": "edgeMap.values",
+          "lineNumber": 412
+        },
+        {
+          "caller": "computeGraphEntryNodeIds",
+          "callee": "entryNodeIds.push",
+          "lineNumber": 416
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "nodeMap.values",
+          "lineNumber": 427
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "edgeMap.values",
+          "lineNumber": 432
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "nodeMap.get",
+          "lineNumber": 434
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "nodeMap.get",
+          "lineNumber": 435
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "reachableNodeIds.has",
+          "lineNumber": 437
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "reachableNodeIds.has",
+          "lineNumber": 437
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "fromNode.dependents.includes",
+          "lineNumber": 439
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "fromNode.dependents.push",
+          "lineNumber": 440
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "toNode.dependencies.includes",
+          "lineNumber": 442
+        },
+        {
+          "caller": "rebuildDependencies",
+          "callee": "toNode.dependencies.push",
+          "lineNumber": 443
+        },
+        {
+          "caller": "applyConditionBranchSelections",
+          "callee": "nodeMap.values",
+          "lineNumber": 453
+        },
+        {
+          "caller": "applyConditionBranchSelections",
+          "callee": "graphEdges\n        .filter((edge) => edge.fromNodeId === node.id && edge.type === \"branch\")\n        .map",
+          "lineNumber": 458
+        },
+        {
+          "caller": "applyConditionBranchSelections",
+          "callee": "graphEdges\n        .filter",
+          "lineNumber": 458
+        },
+        {
+          "caller": "applyConditionBranchSelections",
+          "callee": "[...edgeMap.values()].filter",
+          "lineNumber": 462
+        },
+        {
+          "caller": "applyConditionBranchSelections",
+          "callee": "edgeMap.values",
+          "lineNumber": 462
+        },
+        {
+          "caller": "applyConditionBranchSelections",
+          "callee": "branchEdgeIds.has",
+          "lineNumber": 462
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "edgeMap.values",
+          "lineNumber": 476
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "adjacency.get",
+          "lineNumber": 478
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "next.push",
+          "lineNumber": 479
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "adjacency.set",
+          "lineNumber": 480
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "queue.shift",
+          "lineNumber": 486
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "reachable.has",
+          "lineNumber": 487
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "reachable.add",
+          "lineNumber": 488
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "adjacency.get",
+          "lineNumber": 489
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "reachable.has",
+          "lineNumber": 490
+        },
+        {
+          "caller": "computeReachableNodeIds",
+          "callee": "queue.push",
+          "lineNumber": 490
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 18,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/runtime/create-graph-runtime.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 107,
+      "nonEmptyLines": 105,
+      "functions": [
+        {
+          "name": "createGraphRuntime",
+          "startLine": 13,
+          "endLine": 107,
+          "params": [
+            "options"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createGraphRuntime",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "dispatch",
+          "callee": "validateCommandGraphState",
+          "lineNumber": 22
+        },
+        {
+          "caller": "dispatch",
+          "callee": "createRegistryExecutor",
+          "lineNumber": 32
+        },
+        {
+          "caller": "dispatch",
+          "callee": "events.push",
+          "lineNumber": 36
+        },
+        {
+          "caller": "dispatch",
+          "callee": "options.callbacks?.onEvent",
+          "lineNumber": 37
+        },
+        {
+          "caller": "dispatch",
+          "callee": "runGraphExecution",
+          "lineNumber": 43
+        },
+        {
+          "caller": "dispatch",
+          "callee": "runGraphExecution",
+          "lineNumber": 58
+        },
+        {
+          "caller": "dispatch",
+          "callee": "runGraphExecution",
+          "lineNumber": 77
+        },
+        {
+          "caller": "dispatch",
+          "callee": "approveCurrentNodeCommand",
+          "lineNumber": 93
+        },
+        {
+          "caller": "dispatch",
+          "callee": "retryNodeCommand",
+          "lineNumber": 95
+        },
+        {
+          "caller": "dispatch",
+          "callee": "cancelSessionCommand",
+          "lineNumber": 97
+        },
+        {
+          "caller": "dispatch",
+          "callee": "pauseSessionCommand",
+          "lineNumber": 99
+        },
+        {
+          "caller": "dispatch",
+          "callee": "applyMutationCommand",
+          "lineNumber": 101
+        },
+        {
+          "caller": "dispatch",
+          "callee": "submitNodeResultCommand",
+          "lineNumber": 103
+        }
+      ],
+      "metrics": {
+        "importCount": 11,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/status.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 27,
+      "nonEmptyLines": 24,
+      "functions": [
+        {
+          "name": "mapWaitKindToGraphStatus",
+          "startLine": 17,
+          "endLine": 21,
+          "params": [
+            "waitKind"
+          ]
+        },
+        {
+          "name": "mapTerminalReasonToGraphStatus",
+          "startLine": 23,
+          "endLine": 27,
+          "params": [
+            "effective"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "mapWaitKindToGraphStatus",
+          "line": 17,
+          "isDefault": false
+        },
+        {
+          "name": "mapTerminalReasonToGraphStatus",
+          "line": 23,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "mapWaitKindToGraphStatus",
+          "callee": "runtimeProgressStatusForWaitKind",
+          "lineNumber": 20
+        },
+        {
+          "caller": "mapTerminalReasonToGraphStatus",
+          "callee": "runtimeProgressStatusForNodes",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/transitions.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 230,
+      "nonEmptyLines": 214,
+      "functions": [
+        {
+          "name": "resolveEdgeSemantics",
+          "startLine": 23,
+          "endLine": 66,
+          "params": [
+            "edge"
+          ]
+        },
+        {
+          "name": "resolveGraphEdgeSemantics",
+          "startLine": 68,
+          "endLine": 70,
+          "params": [
+            "graph"
+          ]
+        },
+        {
+          "name": "traverseDependencies",
+          "startLine": 72,
+          "endLine": 107,
+          "params": [
+            "graph",
+            "startNodeIds",
+            "options"
+          ]
+        },
+        {
+          "name": "getDownstreamNodeIds",
+          "startLine": 109,
+          "endLine": 116,
+          "params": [
+            "graph",
+            "nodeIds",
+            "options"
+          ]
+        },
+        {
+          "name": "getUpstreamNodeIds",
+          "startLine": 118,
+          "endLine": 125,
+          "params": [
+            "graph",
+            "nodeIds",
+            "options"
+          ]
+        },
+        {
+          "name": "selectReadyNodeIds",
+          "startLine": 127,
+          "endLine": 148,
+          "params": [
+            "graph",
+            "options"
+          ]
+        },
+        {
+          "name": "analyzeStructuralChangeImpact",
+          "startLine": 150,
+          "endLine": 230,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "resolveEdgeSemantics",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "resolveGraphEdgeSemantics",
+          "line": 68,
+          "isDefault": false
+        },
+        {
+          "name": "traverseDependencies",
+          "line": 72,
+          "isDefault": false
+        },
+        {
+          "name": "getDownstreamNodeIds",
+          "line": 109,
+          "isDefault": false
+        },
+        {
+          "name": "getUpstreamNodeIds",
+          "line": 118,
+          "isDefault": false
+        },
+        {
+          "name": "selectReadyNodeIds",
+          "line": 127,
+          "isDefault": false
+        },
+        {
+          "name": "analyzeStructuralChangeImpact",
+          "line": 150,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resolveGraphEdgeSemantics",
+          "callee": "graph.edges.map",
+          "lineNumber": 69
+        },
+        {
+          "caller": "resolveGraphEdgeSemantics",
+          "callee": "resolveEdgeSemantics",
+          "lineNumber": 69
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "startNodeIds.map",
+          "lineNumber": 82
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "queue.shift",
+          "lineNumber": 85
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "graph.edges.filter",
+          "lineNumber": 88
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "edgeTypes.has",
+          "lineNumber": 90
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "traversedEdgeIds.push",
+          "lineNumber": 98
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "seen.has",
+          "lineNumber": 99
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "seen.add",
+          "lineNumber": 100
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "visitedNodeIds.push",
+          "lineNumber": 101
+        },
+        {
+          "caller": "traverseDependencies",
+          "callee": "queue.push",
+          "lineNumber": 102
+        },
+        {
+          "caller": "getDownstreamNodeIds",
+          "callee": "traverseDependencies",
+          "lineNumber": 114
+        },
+        {
+          "caller": "getUpstreamNodeIds",
+          "callee": "traverseDependencies",
+          "lineNumber": 123
+        },
+        {
+          "caller": "selectReadyNodeIds",
+          "callee": "graph.nodes.find",
+          "lineNumber": 135
+        },
+        {
+          "caller": "selectReadyNodeIds",
+          "callee": "selectedNodeIds.push",
+          "lineNumber": 139
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "addedNodeIds.add",
+          "lineNumber": 162
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 163
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 166
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "invalidationRootNodeIds.add",
+          "lineNumber": 167
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "removedNodeIds.add",
+          "lineNumber": 170
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 171
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "invalidationRootNodeIds.add",
+          "lineNumber": 172
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "removedNodeIds.add",
+          "lineNumber": 176
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 177
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "invalidationRootNodeIds.add",
+          "lineNumber": 178
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "addedNodeIds.add",
+          "lineNumber": 181
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 182
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "changedEdgeIds.add",
+          "lineNumber": 185
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 186
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 187
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "invalidationRootNodeIds.add",
+          "lineNumber": 188
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "changedEdgeIds.add",
+          "lineNumber": 192
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 193
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 194
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "invalidationRootNodeIds.add",
+          "lineNumber": 195
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "changedEdgeIds.add",
+          "lineNumber": 198
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "input.graph.edges.find",
+          "lineNumber": 199
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 201
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 202
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "invalidationRootNodeIds.add",
+          "lineNumber": 203
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "changedEdgeIds.add",
+          "lineNumber": 208
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "input.graph.edges.find",
+          "lineNumber": 209
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 211
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "affectedNodeIds.add",
+          "lineNumber": 212
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "invalidationRootNodeIds.add",
+          "lineNumber": 213
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "[...invalidationRootNodeIds].filter",
+          "lineNumber": 220
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "addedNodeIds.has",
+          "lineNumber": 220
+        },
+        {
+          "caller": "analyzeStructuralChangeImpact",
+          "callee": "getDownstreamNodeIds",
+          "lineNumber": 223
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/types/execution.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 17,
+      "exports": [
+        {
+          "name": "NodeAttempt",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "ExecutionContextSnapshot",
+          "line": 2,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/types/graph.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 75,
+      "nonEmptyLines": 66,
+      "exports": [
+        {
+          "name": "TaskPriority",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "TaskConfig",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "CheckpointConfig",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "ConditionConfig",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "WaitConfig",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "NodeConfig",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "WaitKind",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "NodeDefinition",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "NodeDefinitionLayer",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "NodeInvalidationLayer",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "NodeCancellationLayer",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "NodeLayer",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "NodeLayerType",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "LayerSource",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNode",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "PlanEdge",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "PlanEdgeType",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "PlanGraph",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "PlanGraphStatus",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "GraphMutation",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "GraphMutationOperation",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "CompiledNode",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "CompiledEdge",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "EffectivePlanNode",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "EffectivePlanEdge",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "EffectivePlanGraph",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "ResolveEffectivePlanGraphInput",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "TaskExecutor",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "TaskMode",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 29,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/types/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/types/runtime.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 90,
+      "nonEmptyLines": 81,
+      "functions": [
+        {
+          "name": "runtimeProgressStatusForWaitKind",
+          "startLine": 36,
+          "endLine": 53,
+          "params": [
+            "waitKind"
+          ]
+        },
+        {
+          "name": "runtimeProgressStatusForNodes",
+          "startLine": 55,
+          "endLine": 90,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "NodeResult",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "NodeResultOutput",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "NodeResultEvidence",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "NodeActionForm",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "NodeActionFormField",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "ArtifactRef",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "CheckpointResponse",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "NodeRuntimeStatus",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "NodeRuntimeState",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "PlanRunStatus",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "RuntimeProgressStatus",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "runtimeProgressStatusForWaitKind",
+          "line": 36,
+          "isDefault": false
+        },
+        {
+          "name": "runtimeProgressStatusForNodes",
+          "line": 55,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.nodes.some",
+          "lineNumber": 66
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.nodes.some",
+          "lineNumber": 69
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.nodes.filter",
+          "lineNumber": 79
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "reachableNodes.every",
+          "lineNumber": 82
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.completedNodeIds.includes",
+          "lineNumber": 83
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 13,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/types/transitions.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 76,
+      "nonEmptyLines": 64,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/validation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 291,
+      "nonEmptyLines": 260,
+      "functions": [
+        {
+          "name": "pushIssue",
+          "startLine": 18,
+          "endLine": 23,
+          "params": [
+            "issues",
+            "issue"
+          ]
+        },
+        {
+          "name": "isRecord",
+          "startLine": 25,
+          "endLine": 27,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "getConditionConfig",
+          "startLine": 29,
+          "endLine": 44,
+          "params": [
+            "definition"
+          ]
+        },
+        {
+          "name": "validateConditionBranchTargets",
+          "startLine": 46,
+          "endLine": 92,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "validatePlanGraph",
+          "startLine": 94,
+          "endLine": 167,
+          "params": [
+            "graph"
+          ]
+        },
+        {
+          "name": "getActiveOutgoingTargets",
+          "startLine": 169,
+          "endLine": 173,
+          "params": [
+            "graph",
+            "fromNodeId"
+          ]
+        },
+        {
+          "name": "validateReachability",
+          "startLine": 175,
+          "endLine": 214,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "validateAcyclicDependencies",
+          "startLine": 216,
+          "endLine": 257,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "validateEffectivePlanGraph",
+          "startLine": 259,
+          "endLine": 284,
+          "params": [
+            "effective"
+          ]
+        },
+        {
+          "name": "assertValidPlanGraph",
+          "startLine": 286,
+          "endLine": 291,
+          "params": [
+            "graph"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "validatePlanGraph",
+          "line": 94,
+          "isDefault": false
+        },
+        {
+          "name": "validateEffectivePlanGraph",
+          "line": 259,
+          "isDefault": false
+        },
+        {
+          "name": "assertValidPlanGraph",
+          "line": 286,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "pushIssue",
+          "callee": "issues.push",
+          "lineNumber": 22
+        },
+        {
+          "caller": "isRecord",
+          "callee": "Array.isArray",
+          "lineNumber": 26
+        },
+        {
+          "caller": "getConditionConfig",
+          "callee": "isRecord",
+          "lineNumber": 34
+        },
+        {
+          "caller": "getConditionConfig",
+          "callee": "isRecord",
+          "lineNumber": 35
+        },
+        {
+          "caller": "getConditionConfig",
+          "callee": "isRecord",
+          "lineNumber": 38
+        },
+        {
+          "caller": "getConditionConfig",
+          "callee": "isRecord",
+          "lineNumber": 39
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "getConditionConfig",
+          "lineNumber": 52
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "Array.isArray",
+          "lineNumber": 57
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "pushIssue",
+          "lineNumber": 58
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "pushIssue",
+          "lineNumber": 68
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "input.nodeIds.has",
+          "lineNumber": 76
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "pushIssue",
+          "lineNumber": 77
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "input.nodeIds.has",
+          "lineNumber": 85
+        },
+        {
+          "caller": "validateConditionBranchTargets",
+          "callee": "pushIssue",
+          "lineNumber": 86
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "nodeIds.has",
+          "lineNumber": 100
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 101
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "nodeIds.add",
+          "lineNumber": 107
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "node.layers.filter",
+          "lineNumber": 111
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 113
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 121
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "validateConditionBranchTargets",
+          "lineNumber": 128
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "edgeIds.has",
+          "lineNumber": 139
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 140
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "edgeIds.add",
+          "lineNumber": 146
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "nodeIds.has",
+          "lineNumber": 147
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 148
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "nodeIds.has",
+          "lineNumber": 154
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 155
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "validateReachability",
+          "lineNumber": 163
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "validateAcyclicDependencies",
+          "lineNumber": 164
+        },
+        {
+          "caller": "validatePlanGraph",
+          "callee": "issues.every",
+          "lineNumber": 166
+        },
+        {
+          "caller": "getActiveOutgoingTargets",
+          "callee": "graph.edges\n    .filter((edge) => edge.active && edge.fromNodeId === fromNodeId)\n    .map",
+          "lineNumber": 170
+        },
+        {
+          "caller": "getActiveOutgoingTargets",
+          "callee": "graph.edges\n    .filter",
+          "lineNumber": 170
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "input.graph.edges\n      .filter((edge) => edge.active && input.nodeIds.has(edge.fromNodeId) && input.nodeIds.has(edge.toNodeId))\n      .map",
+          "lineNumber": 181
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "input.graph.edges\n      .filter",
+          "lineNumber": 181
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "input.nodeIds.has",
+          "lineNumber": 182
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "input.nodeIds.has",
+          "lineNumber": 182
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "input.graph.nodes\n    .map((node) => node.id)\n    .filter",
+          "lineNumber": 185
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "input.graph.nodes\n    .map",
+          "lineNumber": 185
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "incomingTargets.has",
+          "lineNumber": 187
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "queue.shift",
+          "lineNumber": 192
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "visited.has",
+          "lineNumber": 193
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "visited.add",
+          "lineNumber": 196
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "getActiveOutgoingTargets",
+          "lineNumber": 197
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "input.nodeIds.has",
+          "lineNumber": 198
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "visited.has",
+          "lineNumber": 198
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "queue.push",
+          "lineNumber": 199
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "visited.has",
+          "lineNumber": 205
+        },
+        {
+          "caller": "validateReachability",
+          "callee": "pushIssue",
+          "lineNumber": 206
+        },
+        {
+          "caller": "visit",
+          "callee": "visiting.has",
+          "lineNumber": 226
+        },
+        {
+          "caller": "visit",
+          "callee": "path.indexOf",
+          "lineNumber": 227
+        },
+        {
+          "caller": "visit",
+          "callee": "path.slice",
+          "lineNumber": 228
+        },
+        {
+          "caller": "visit",
+          "callee": "Math.max",
+          "lineNumber": 228
+        },
+        {
+          "caller": "visit",
+          "callee": "cyclePath.join",
+          "lineNumber": 229
+        },
+        {
+          "caller": "visit",
+          "callee": "reported.has",
+          "lineNumber": 230
+        },
+        {
+          "caller": "visit",
+          "callee": "reported.add",
+          "lineNumber": 231
+        },
+        {
+          "caller": "visit",
+          "callee": "pushIssue",
+          "lineNumber": 232
+        },
+        {
+          "caller": "visit",
+          "callee": "visited.has",
+          "lineNumber": 240
+        },
+        {
+          "caller": "visit",
+          "callee": "visiting.add",
+          "lineNumber": 244
+        },
+        {
+          "caller": "visit",
+          "callee": "getActiveOutgoingTargets",
+          "lineNumber": 245
+        },
+        {
+          "caller": "visit",
+          "callee": "input.nodeIds.has",
+          "lineNumber": 246
+        },
+        {
+          "caller": "visit",
+          "callee": "visit",
+          "lineNumber": 247
+        },
+        {
+          "caller": "visit",
+          "callee": "visiting.delete",
+          "lineNumber": 250
+        },
+        {
+          "caller": "visit",
+          "callee": "visited.add",
+          "lineNumber": 251
+        },
+        {
+          "caller": "validateAcyclicDependencies",
+          "callee": "visit",
+          "lineNumber": 255
+        },
+        {
+          "caller": "validateEffectivePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 265
+        },
+        {
+          "caller": "validateEffectivePlanGraph",
+          "callee": "currentResultNodeIds.has",
+          "lineNumber": 272
+        },
+        {
+          "caller": "validateEffectivePlanGraph",
+          "callee": "pushIssue",
+          "lineNumber": 273
+        },
+        {
+          "caller": "validateEffectivePlanGraph",
+          "callee": "currentResultNodeIds.add",
+          "lineNumber": 279
+        },
+        {
+          "caller": "validateEffectivePlanGraph",
+          "callee": "issues.every",
+          "lineNumber": 283
+        },
+        {
+          "caller": "assertValidPlanGraph",
+          "callee": "validatePlanGraph",
+          "lineNumber": 287
+        },
+        {
+          "caller": "assertValidPlanGraph",
+          "callee": "result.issues.map((issue) => issue.message).join",
+          "lineNumber": 289
+        },
+        {
+          "caller": "assertValidPlanGraph",
+          "callee": "result.issues.map",
+          "lineNumber": 289
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 3,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    }
+  ]
+}

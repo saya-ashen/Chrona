@@ -1,0 +1,197 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-executors/checkpoint-executor.ts",
+      "language": "typescript",
+      "sizeLines": 138,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-executors/condition-executor.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 183,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-executors/condition-executor.ts",
+      "language": "typescript",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-executors/task-executor.ts",
+      "language": "typescript",
+      "sizeLines": 63,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-executors/types.ts",
+      "language": "typescript",
+      "sizeLines": 89,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-executors/wait-executor.ts",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-runtime-refs.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 251,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts",
+      "language": "typescript",
+      "sizeLines": 135,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts",
+      "language": "typescript",
+      "sizeLines": 334,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/plan-state-store.ts",
+      "language": "typescript",
+      "sizeLines": 259,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/runtime-event-store.ts",
+      "language": "typescript",
+      "sizeLines": 159,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/work-block-store.ts",
+      "language": "typescript",
+      "sizeLines": 34,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/projection/execution-graph-selectors.ts",
+      "language": "typescript",
+      "sizeLines": 86,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/projection/execution-response.ts",
+      "language": "typescript",
+      "sizeLines": 60,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/command-envelope.ts",
+      "language": "typescript",
+      "sizeLines": 56,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/committed-state.ts",
+      "language": "typescript",
+      "sizeLines": 75,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/execution-control-registry.ts",
+      "language": "typescript",
+      "sizeLines": 39,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/graph-state.ts",
+      "language": "typescript",
+      "sizeLines": 19,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts",
+      "language": "typescript",
+      "sizeLines": 425,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/node-executor-registry.ts",
+      "language": "typescript",
+      "sizeLines": 21,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/node-runtime-prompts.ts",
+      "language": "typescript",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts",
+      "language": "typescript",
+      "sizeLines": 257,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/runtime-outcome.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/terminal-command.ts",
+      "language": "typescript",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/session-policy.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 135,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/session-policy.ts",
+      "language": "typescript",
+      "sizeLines": 62,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/task-plan-execution.ts",
+      "language": "typescript",
+      "sizeLines": 323,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/types.ts",
+      "language": "typescript",
+      "sizeLines": 145,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/cancel-session.ts",
+      "language": "typescript",
+      "sizeLines": 20,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/continue-next-ready.ts",
+      "language": "typescript",
+      "sizeLines": 17,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/dispatch-action.ts",
+      "language": "typescript",
+      "sizeLines": 26,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/fail-task.ts",
+      "language": "typescript",
+      "sizeLines": 25,
+      "fileCategory": "code"
+    }
+  ]
+}

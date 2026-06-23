@@ -1,0 +1,254 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 19,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "packages/db/src/generated/prisma/models/RuntimeCursor.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1357,
+      "nonEmptyLines": 1261,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ScheduleProposal.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1797,
+      "nonEmptyLines": 1678,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/SchedulerEvent.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1630,
+      "nonEmptyLines": 1506,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/SchedulerLease.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1197,
+      "nonEmptyLines": 1113,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Task.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 11583,
+      "nonEmptyLines": 11154,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskAssistantMessage.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1526,
+      "nonEmptyLines": 1418,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskDependency.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1637,
+      "nonEmptyLines": 1503,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlan.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 2401,
+      "nonEmptyLines": 2234,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanLayer.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1806,
+      "nonEmptyLines": 1668,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanNodeAttempt.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3330,
+      "nonEmptyLines": 3153,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanProviderApproval.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3636,
+      "nonEmptyLines": 3472,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanProviderRun.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 2703,
+      "nonEmptyLines": 2540,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanRun.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 2765,
+      "nonEmptyLines": 2572,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskProjection.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 2341,
+      "nonEmptyLines": 2221,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskSession.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1931,
+      "nonEmptyLines": 1803,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskTimelineItem.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 2917,
+      "nonEmptyLines": 2736,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ToolInvocation.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 2781,
+      "nonEmptyLines": 2646,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/WorkBlock.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3331,
+      "nonEmptyLines": 3118,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Workspace.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 7177,
+      "nonEmptyLines": 6787,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,515 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/ui-protocol/src/catalog/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/ui-protocol/src/catalog/index.ts",
+      "summary": "聚合导出\"catalog\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 3,
+      "nonEmptyLines": 3
+    },
+    {
+      "id": "file:playwright.config.ts",
+      "type": "file",
+      "name": "playwright.config.ts",
+      "filePath": "playwright.config.ts",
+      "summary": "实现 \"\" 模块的 playwright.config 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 61,
+      "nonEmptyLines": 58
+    },
+    {
+      "id": "file:postcss.config.mjs",
+      "type": "file",
+      "name": "postcss.config.mjs",
+      "filePath": "postcss.config.mjs",
+      "summary": "实现 \"\" 模块的 postcss.config 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "javascript",
+      "sizeLines": 7,
+      "nonEmptyLines": 6
+    },
+    {
+      "id": "file:prisma.config.ts",
+      "type": "file",
+      "name": "prisma.config.ts",
+      "filePath": "prisma.config.ts",
+      "summary": "实现 \"\" 模块的 prisma.config 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 12,
+      "nonEmptyLines": 11
+    },
+    {
+      "id": "table:prisma/migrations/0001_initial/migration.sql",
+      "type": "table",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0001_initial/migration.sql",
+      "summary": "数据/模式定义文件 \"migration.sql\"。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "sql",
+      "sizeLines": 833,
+      "nonEmptyLines": 832
+    },
+    {
+      "id": "config:prisma/migrations/migration_lock.toml",
+      "type": "config",
+      "name": "migration_lock.toml",
+      "filePath": "prisma/migrations/migration_lock.toml",
+      "summary": "配置文件 \"migration_lock.toml\"。",
+      "complexity": "simple",
+      "tags": [
+        "configuration"
+      ],
+      "language": "toml",
+      "sizeLines": 3,
+      "nonEmptyLines": 3
+    },
+    {
+      "id": "schema:prisma/schema.prisma",
+      "type": "schema",
+      "name": "schema.prisma",
+      "filePath": "prisma/schema.prisma",
+      "summary": "数据/模式定义文件 \"schema.prisma\"。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "prisma",
+      "sizeLines": 1187,
+      "nonEmptyLines": 1087
+    },
+    {
+      "id": "file:scripts/build-binaries.ts",
+      "type": "file",
+      "name": "build-binaries.ts",
+      "filePath": "scripts/build-binaries.ts",
+      "summary": "包含 log、bunRun、createTarGz等 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 212,
+      "nonEmptyLines": 178
+    },
+    {
+      "id": "function:scripts/build-binaries.ts:createTarGz",
+      "type": "function",
+      "name": "createTarGz",
+      "filePath": "scripts/build-binaries.ts",
+      "summary": "函数 createTarGz，接受 sourceDir, outFile 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 54,
+      "endLine": 64
+    },
+    {
+      "id": "function:scripts/build-binaries.ts:buildBinary",
+      "type": "function",
+      "name": "buildBinary",
+      "filePath": "scripts/build-binaries.ts",
+      "summary": "函数 buildBinary，接受 target 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 68,
+      "endLine": 184
+    },
+    {
+      "id": "function:scripts/build-binaries.ts:parseTarget",
+      "type": "function",
+      "name": "parseTarget",
+      "filePath": "scripts/build-binaries.ts",
+      "summary": "函数 parseTarget。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 188,
+      "endLine": 202
+    },
+    {
+      "id": "file:scripts/check-ui-foundation.mjs",
+      "type": "file",
+      "name": "check-ui-foundation.mjs",
+      "filePath": "scripts/check-ui-foundation.mjs",
+      "summary": "包含 parseRoot、shouldSkipDirectory、collectSourceFiles等 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "javascript",
+      "sizeLines": 140,
+      "nonEmptyLines": 120
+    },
+    {
+      "id": "function:scripts/check-ui-foundation.mjs:collectSourceFiles",
+      "type": "function",
+      "name": "collectSourceFiles",
+      "filePath": "scripts/check-ui-foundation.mjs",
+      "summary": "函数 collectSourceFiles，接受 directory 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 65,
+      "endLine": 84
+    },
+    {
+      "id": "function:scripts/check-ui-foundation.mjs:findUiFoundationViolations",
+      "type": "function",
+      "name": "findUiFoundationViolations",
+      "filePath": "scripts/check-ui-foundation.mjs",
+      "summary": "函数 findUiFoundationViolations。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 86,
+      "endLine": 120
+    },
+    {
+      "id": "function:scripts/check-ui-foundation.mjs:formatViolations",
+      "type": "function",
+      "name": "formatViolations",
+      "filePath": "scripts/check-ui-foundation.mjs",
+      "summary": "函数 formatViolations，接受 violations 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 122,
+      "endLine": 134
+    },
+    {
+      "id": "file:scripts/check-web-page-reachability.ts",
+      "type": "file",
+      "name": "check-web-page-reachability.ts",
+      "filePath": "scripts/check-web-page-reachability.ts",
+      "summary": "包含 walk、isTestFile、isPageLikeFile等 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 141,
+      "nonEmptyLines": 114
+    },
+    {
+      "id": "function:scripts/check-web-page-reachability.ts:walk",
+      "type": "function",
+      "name": "walk",
+      "filePath": "scripts/check-web-page-reachability.ts",
+      "summary": "函数 walk，接受 dir, into 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 25
+    },
+    {
+      "id": "function:scripts/check-web-page-reachability.ts:resolveImport",
+      "type": "function",
+      "name": "resolveImport",
+      "filePath": "scripts/check-web-page-reachability.ts",
+      "summary": "函数 resolveImport，接受 fromFile, specifier 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 41,
+      "endLine": 61
+    },
+    {
+      "id": "function:scripts/check-web-page-reachability.ts:resolveSimpleReExportTargets",
+      "type": "function",
+      "name": "resolveSimpleReExportTargets",
+      "filePath": "scripts/check-web-page-reachability.ts",
+      "summary": "函数 resolveSimpleReExportTargets，接受 fromFile, text 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 63,
+      "endLine": 76
+    },
+    {
+      "id": "file:prisma/migrations/0002_add_task_auto_plan_generation/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0002_add_task_auto_plan_generation/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0003_external_calendar/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0003_external_calendar/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0004_calendar_events_as_tasks/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0004_calendar_events_as_tasks/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0005_calendar_event_descriptions/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0005_calendar_event_descriptions/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0006_calendar_sync_policy/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0006_calendar_sync_policy/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0007_calendar_automation_policy/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0007_calendar_automation_policy/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0008_calendar_blocked_network_confirmation/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0008_calendar_blocked_network_confirmation/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0009_add_task_automation_timing/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0009_add_task_automation_timing/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0010_recurring_task_series/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0010_recurring_task_series/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0011_recurring_plan_occurrence_scope/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0011_recurring_plan_occurrence_scope/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/0012_single_entry_recurring_tasks/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/0012_single_entry_recurring_tasks/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/20260603111647_workblock_id_on_events_timeline/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/20260603111647_workblock_id_on_events_timeline/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/20260603130000_task_plan_provider_approvals/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/20260603130000_task_plan_provider_approvals/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/20260605144500_workblock_session_scope/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/20260605144500_workblock_session_scope/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    },
+    {
+      "id": "file:prisma/migrations/20260606155000_single_state_authority/migration.sql",
+      "type": "file",
+      "name": "migration.sql",
+      "filePath": "prisma/migrations/20260606155000_single_state_authority/migration.sql",
+      "summary": "二进制/不可解析文件。",
+      "complexity": "simple",
+      "tags": [
+        "binary"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:scripts/build-binaries.ts",
+      "target": "function:scripts/build-binaries.ts:createTarGz",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/build-binaries.ts",
+      "target": "function:scripts/build-binaries.ts:buildBinary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/build-binaries.ts",
+      "target": "function:scripts/build-binaries.ts:parseTarget",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/check-ui-foundation.mjs",
+      "target": "function:scripts/check-ui-foundation.mjs:collectSourceFiles",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/check-ui-foundation.mjs",
+      "target": "function:scripts/check-ui-foundation.mjs:findUiFoundationViolations",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/check-ui-foundation.mjs",
+      "target": "function:scripts/check-ui-foundation.mjs:findUiFoundationViolations",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/check-ui-foundation.mjs",
+      "target": "function:scripts/check-ui-foundation.mjs:formatViolations",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/check-ui-foundation.mjs",
+      "target": "function:scripts/check-ui-foundation.mjs:formatViolations",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/check-ui-foundation.mjs",
+      "target": "file:apps/web/src/test/ui-foundation-guard.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:scripts/check-web-page-reachability.ts",
+      "target": "function:scripts/check-web-page-reachability.ts:walk",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/check-web-page-reachability.ts",
+      "target": "function:scripts/check-web-page-reachability.ts:resolveImport",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/check-web-page-reachability.ts",
+      "target": "function:scripts/check-web-page-reachability.ts:resolveSimpleReExportTargets",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    }
+  ]
+}

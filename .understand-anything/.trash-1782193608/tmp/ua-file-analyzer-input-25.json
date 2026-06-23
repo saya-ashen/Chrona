@@ -1,0 +1,119 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "packages/db/src/generated/prisma/models/RuntimeCursor.ts",
+      "language": "typescript",
+      "sizeLines": 1357,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ScheduleProposal.ts",
+      "language": "typescript",
+      "sizeLines": 1797,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/SchedulerEvent.ts",
+      "language": "typescript",
+      "sizeLines": 1630,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/SchedulerLease.ts",
+      "language": "typescript",
+      "sizeLines": 1197,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Task.ts",
+      "language": "typescript",
+      "sizeLines": 10723,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskAssistantMessage.ts",
+      "language": "typescript",
+      "sizeLines": 1526,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskDependency.ts",
+      "language": "typescript",
+      "sizeLines": 1637,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlan.ts",
+      "language": "typescript",
+      "sizeLines": 2401,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanLayer.ts",
+      "language": "typescript",
+      "sizeLines": 1806,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanNodeAttempt.ts",
+      "language": "typescript",
+      "sizeLines": 3106,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanProviderApproval.ts",
+      "language": "typescript",
+      "sizeLines": 3636,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanProviderRun.ts",
+      "language": "typescript",
+      "sizeLines": 2703,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskPlanRun.ts",
+      "language": "typescript",
+      "sizeLines": 2765,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskProjection.ts",
+      "language": "typescript",
+      "sizeLines": 2341,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskSession.ts",
+      "language": "typescript",
+      "sizeLines": 1888,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/TaskTimelineItem.ts",
+      "language": "typescript",
+      "sizeLines": 2917,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/ToolInvocation.ts",
+      "language": "typescript",
+      "sizeLines": 2781,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/WorkBlock.ts",
+      "language": "typescript",
+      "sizeLines": 3331,
+      "fileCategory": "code"
+    },
+    {
+      "path": "packages/db/src/generated/prisma/models/Workspace.ts",
+      "language": "typescript",
+      "sizeLines": 6541,
+      "fileCategory": "code"
+    }
+  ]
+}
