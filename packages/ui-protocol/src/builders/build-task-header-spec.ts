@@ -144,6 +144,28 @@ function appendOccurrence(elements: MutableElements, children: string[], input: 
   appendBadge(elements, children, input.occurrenceLabel ? { id: "occurrence", label: input.occurrenceLabel, tone: "neutral" } : null);
 }
 
+function appendSummary(elements: MutableElements, children: string[], text: string) {
+  elements.summary = {
+    type: "Text",
+    props: {
+      text,
+      className: "min-w-0 truncate text-xs text-muted-foreground",
+    },
+  };
+  children.push("summary");
+}
+
+function appendGuidance(elements: MutableElements, children: string[], text: string) {
+  elements.guidance = {
+    type: "Text",
+    props: {
+      text,
+      className: "min-w-0 truncate text-xs text-muted-foreground",
+    },
+  };
+  children.push("guidance");
+}
+
 export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   const elements: MutableElements = {};
   const statusChildren: string[] = [];
@@ -156,6 +178,10 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
 
   appendOccurrence(elements, metaChildren, input);
   appendBadge(elements, metaChildren, input.sourceLabel ? { id: "source", label: input.sourceLabel, tone: "neutral" } : null);
+  appendSummary(elements, metaChildren, input.progressLabel);
+  if (input.workspaceStateGuidance) {
+    appendGuidance(elements, metaChildren, input.workspaceStateGuidance);
+  }
 
   // Always materialise the five execution-flow action elements so the
   // server can toggle their visibility/disabled through the
@@ -185,7 +211,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   elements.identity = { type: "Stack", props: { gap: "sm", className: "min-w-0 flex-1" }, children: ["title-row", "meta-row"] };
   elements["title-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: ["title", ...statusChildren] };
   elements.title = { type: "Heading", props: { text: input.title, level: "h1", className: "min-w-0 break-words text-base font-semibold leading-tight tracking-tight text-foreground lg:max-w-[42vw]" } };
-  elements["meta-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: ["summary", ...metaChildren, ...(input.workspaceStateGuidance ? ["guidance"] : [])] };
+  elements["meta-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: [...metaChildren] };
   elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "w-full flex-wrap sm:w-auto" }, children: actionChildren };
 
   // Inline error banner. Visibility + content are driven by `state.update`

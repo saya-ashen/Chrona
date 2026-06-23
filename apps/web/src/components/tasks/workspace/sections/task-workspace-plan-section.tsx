@@ -122,6 +122,7 @@ export function TaskWorkspacePlanSection({
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"result" | null>(null);
+  const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
     useTaskWorkspacePlanSectionState(graphPlan);
   const { messages } = useI18n();
@@ -361,45 +362,47 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : null}
 
-      <div className="relative flex min-h-[680px] flex-1 flex-col gap-2 xl:min-h-0">
-        <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1.18fr)_minmax(30rem,0.82fr)]">
-          <section
-            aria-label={copy.executionFlow ?? "Execution flow"}
-            className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/55 shadow-sm"
-          >
-            <TaskWorkspacePlanContent
-              label={label}
-              graphPlan={graphPlan}
-              isGraphPlanPending={isGraphPlanPending}
-              plan={plan}
-              acceptPlanError={acceptPlanError}
-              planGenerationStatus={planGenerationStatus}
-              onGeneratePlan={onGeneratePlan}
-              onSelectedNodeChange={handlePlanNodeChange}
-            />
-          </section>
-          <TaskWorkspaceInspector
-            key={commandCenterScopeKey}
-            taskId={pageData.task.id}
-            scope={inspectorScope}
-            consoleView={consoleView}
-            primaryAction={primaryAction}
-            commandCenter={commandCenter ?? null}
-            commandCenterActionHandlers={commandCenterActionHandlers}
-            runtimeEvents={runtimeEvents}
-            liveActivity={liveActivity}
-            commandCenterCopy={commandCenterCopy}
-            copy={copy}
-            selectedNodes={selectedPlanNodes}
-            selectedNodeRuntimeEvents={selectedNodeRuntimeEvents}
-            nodeActivity={nodeActivityQuery.data?.items ?? []}
-            isNodeActivityLoading={nodeActivityQuery.isLoading || nodeActivityQuery.isFetching}
-            preferredNodeDetailTab={preferredNodeDetailTab}
-            onPreferredNodeDetailTabApplied={() => setPreferredNodeDetailTab(null)}
-            onAction={focusNodeActions}
-            onBackToTask={handleBackToTask}
+      <div className={graphMode === "compact"
+        ? "grid min-h-[680px] flex-1 gap-2 xl:min-h-0 xl:grid-cols-[minmax(0,0.44fr)_minmax(36rem,1.56fr)]"
+        : "grid min-h-[680px] flex-1 gap-2 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]"}>
+        <section
+          aria-label={copy.executionFlow ?? "Execution flow"}
+          className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/55 shadow-sm"
+        >
+          <TaskWorkspacePlanContent
+            label={label}
+            graphPlan={graphPlan}
+            isGraphPlanPending={isGraphPlanPending}
+            plan={plan}
+            acceptPlanError={acceptPlanError}
+            planGenerationStatus={planGenerationStatus}
+            graphMode={graphMode}
+            onGraphModeChange={setGraphMode}
+            onGeneratePlan={onGeneratePlan}
+            onSelectedNodeChange={handlePlanNodeChange}
           />
-        </div>
+        </section>
+        <TaskWorkspaceInspector
+          key={commandCenterScopeKey}
+          taskId={pageData.task.id}
+          scope={inspectorScope}
+          consoleView={consoleView}
+          primaryAction={primaryAction}
+          commandCenter={commandCenter ?? null}
+          commandCenterActionHandlers={commandCenterActionHandlers}
+          runtimeEvents={runtimeEvents}
+          liveActivity={liveActivity}
+          commandCenterCopy={commandCenterCopy}
+          copy={copy}
+          selectedNodes={selectedPlanNodes}
+          selectedNodeRuntimeEvents={selectedNodeRuntimeEvents}
+          nodeActivity={nodeActivityQuery.data?.items ?? []}
+          isNodeActivityLoading={nodeActivityQuery.isLoading || nodeActivityQuery.isFetching}
+          preferredNodeDetailTab={preferredNodeDetailTab}
+          onPreferredNodeDetailTabApplied={() => setPreferredNodeDetailTab(null)}
+          onAction={focusNodeActions}
+          onBackToTask={handleBackToTask}
+        />
       </div>
     </section>
   );

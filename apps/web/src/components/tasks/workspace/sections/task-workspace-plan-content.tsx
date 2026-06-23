@@ -1,4 +1,4 @@
-import { Loader2, Sparkles } from "lucide-react";
+import { GitBranch, Loader2, Minimize2, Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
@@ -6,6 +6,19 @@ import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/
 import { Button } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { TaskPlanGenerationStatus } from "../model/task-workspace-types";
+const DEFAULT_COPY = {
+  generatePlan: "Generate plan",
+  regeneratePlan: "Regenerate plan",
+  generating: "Generating...",
+  preparingPlanGraph: "Preparing plan graph...",
+  planGraphPlaceholder: "The plan graph will appear here once AI generates a plan.",
+  graphModeLabel: "Graph display mode",
+  graphFullMode: "Full graph",
+  graphCompactMode: "Focus map",
+  graphFullHint: "Dependencies and all paths",
+  graphCompactHint: "Current path and blockers",
+};
+
 
 type TaskWorkspacePlanContentProps = {
   label: string;
@@ -14,6 +27,8 @@ type TaskWorkspacePlanContentProps = {
   plan: TaskPlanReadModel | null;
   acceptPlanError: string | null;
   planGenerationStatus: TaskPlanGenerationStatus;
+  graphMode: "full" | "compact";
+  onGraphModeChange: (mode: "full" | "compact") => void;
   onGeneratePlan: () => void;
   onSelectedNodeChange: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
 };
@@ -25,15 +40,51 @@ export function TaskWorkspacePlanContent({
   plan,
   acceptPlanError,
   planGenerationStatus,
+  graphMode,
+  onGraphModeChange,
   onGeneratePlan,
   onSelectedNodeChange,
 }: TaskWorkspacePlanContentProps) {
   const { messages } = useI18n();
-  const copy = messages.components?.taskWorkspace ?? {};
+  const copy = { ...DEFAULT_COPY, ...(messages.components?.taskWorkspace ?? {}) };
   const planSummary = graphPlan && plan
     ? `${plan.status} / ${graphPlan.nodes.length} steps / ${graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`
     : null;
   const isGeneratingPlan = planGenerationStatus === "generating";
+  const graphModeControls = (
+    <div className="flex shrink-0 rounded-2xl border border-border bg-background/80 p-1 shadow-sm" role="group" aria-label={copy.graphModeLabel}>
+      <Button
+        type="button"
+        variant={graphMode === "full" ? "default" : "ghost"}
+        size="sm"
+        className="h-9 rounded-xl px-3 text-xs"
+        onClick={() => onGraphModeChange("full")}
+        aria-pressed={graphMode === "full"}
+        title={copy.graphFullHint}
+      >
+        <GitBranch className="size-3.5" />
+        <span className="flex flex-col items-start leading-none">
+          <span>{copy.graphFullMode}</span>
+          <span className="hidden text-[10px] font-normal opacity-75 md:inline">{copy.graphFullHint}</span>
+        </span>
+      </Button>
+      <Button
+        type="button"
+        variant={graphMode === "compact" ? "default" : "ghost"}
+        size="sm"
+        className="h-9 rounded-xl px-3 text-xs"
+        onClick={() => onGraphModeChange("compact")}
+        aria-pressed={graphMode === "compact"}
+        title={copy.graphCompactHint}
+      >
+        <Minimize2 className="size-3.5" />
+        <span className="flex flex-col items-start leading-none">
+          <span>{copy.graphCompactMode}</span>
+          <span className="hidden text-[10px] font-normal opacity-75 md:inline">{copy.graphCompactHint}</span>
+        </span>
+      </Button>
+    </div>
+  );
   const generatePlanButton = (
     <Button
       type="button"
@@ -43,27 +94,36 @@ export function TaskWorkspacePlanContent({
     >
       {isGeneratingPlan ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
       {isGeneratingPlan
-        ? (copy.generating ?? "Generating...")
+        ? copy.generating
         : plan
-          ? (copy.regeneratePlan ?? "Regenerate plan")
-          : (copy.generatePlan ?? "Generate plan")}
+          ? copy.regeneratePlan
+          : copy.generatePlan}
     </Button>
   );
 
   return (
-    <div className="h-full min-h-0 space-y-1">
+    <div className="flex h-full min-h-0 flex-col gap-2">
       {graphPlan && plan ? (
         <>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-1 pt-1">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
+              {planSummary ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{planSummary}</p> : null}
+            </div>
+            {graphModeControls}
+          </div>
           <TaskPlanGraphPanel
             label={label}
             plan={graphPlan}
-            mode="full"
+            mode={graphMode}
             summary={planSummary}
-            className="h-[620px] min-w-0 md:h-[760px] xl:h-full"
+            className={graphMode === "compact"
+              ? "min-h-0 min-w-0 w-full flex-1"
+              : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"}
             fillHeight
             inspectorPlacement="none"
             dismissSelectionOnOutsideClick={false}
-            showOverview={false}
+            showOverview={graphMode === "full"}
             onSelectedNodeChange={onSelectedNodeChange}
           />
           {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
@@ -76,8 +136,8 @@ export function TaskWorkspacePlanContent({
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-background/70 px-5 text-center text-sm text-muted-foreground">
             {isGraphPlanPending
-              ? (copy.preparingPlanGraph ?? "Preparing plan graph...")
-              : (copy.planGraphPlaceholder ?? "The plan graph will appear here once AI generates a plan.")}
+              ? copy.preparingPlanGraph
+              : copy.planGraphPlaceholder}
           </div>
         </div>
       )}

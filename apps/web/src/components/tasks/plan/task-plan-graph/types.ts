@@ -213,6 +213,17 @@ export type GraphCopy = {
   overviewEstimate: string;
   focusTitle: string;
   focusDescription: string;
+  compactEntryLabel: string;
+  compactStageLabel: string;
+  compactActiveSuffix: string;
+  compactAttentionSuffix: string;
+  compactDoneSuffix: string;
+  compactCurrentProgress: string;
+  compactActionBlocked: string;
+  compactNextSummary: string;
+  compactCurrentNode: string;
+  compactNeedsAction: string;
+  compactLinkedTask: string;
   inspectorTitle: string;
   inspectorEmpty: string;
   inspectorEmptyTitle: string;
@@ -401,6 +412,7 @@ export type CompactStage = {
   activeCount: number;
   attentionCount: number;
   doneCount: number;
+  completion: number;
 };
 
 export type CompactFocusItem = {

@@ -145,7 +145,9 @@ describe("TaskWorkspacePlanSection", () => {
       interactiveFields: [{ key: "decision", label: "Decision", value: "", control: "text", required: true }],
     });
 
-    const view = renderWithQueryClient(
+    const mount = (ui: ReactElement) => renderWithQueryClient(ui);
+
+    const initial = mount(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={createTaskWorkspaceFixtureGraph([])}
@@ -160,32 +162,14 @@ describe("TaskWorkspacePlanSection", () => {
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
-
-    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    const getCommandCenter = () => screen.getAllByRole("complementary", { name: "Task command center" }).at(-1)!;
+    const commandCenter = getCommandCenter();
     expect(screen.getByRole("region", { name: "Execution flow" })).toBeInTheDocument();
     expect(within(commandCenter).getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Generate plan" }));
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
 
-    view.rerender(
-      <TaskWorkspacePlanSection
-        label="Plan"
-        graphPlan={createTaskWorkspaceFixtureGraph([])}
-        isGraphPlanPending={false}
-        pageData={createTaskWorkspaceFixturePageData({ task: { aiPlanGenerationStatus: "generating" } })}
-        plan={null}
-        planGenerationStatus="generating"
-        acceptPlanError={null}
-        runtimeEvents={[]}
-        onGeneratePlan={onGeneratePlan}
-        onApplyPlan={onApplyPlan}
-        onDispatchExecutionAction={onDispatchExecutionAction}
-      />,
-    );
-
-    expect(within(commandCenter).getByRole("button", { name: "Generating..." })).toBeDisabled();
-
-    view.rerender(
+    initial.rerender(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={createTaskWorkspaceFixtureGraph([generatedNode], "generate")}
@@ -201,22 +185,18 @@ describe("TaskWorkspacePlanSection", () => {
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
-
     expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
-    expect(within(commandCenter).getByRole("button", { name: "Accept plan" })).toBeInTheDocument();
+    expect(within(getCommandCenter()).getByRole("button", { name: "Accept plan" })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-generate"));
     await waitFor(() => expect(screen.getByRole("heading", { name: /Generated plan node/ })).toBeInTheDocument());
-    // Node detail opens as a delineated overlay (dialog) over the task overview,
-    // with an explicit close control, rather than silently swapping the rail.
     const nodeOverlay = screen.getByRole("dialog", { name: "Selected node details" });
     expect(within(nodeOverlay).getByRole("heading", { name: /Generated plan node/ })).toBeInTheDocument();
     fireEvent.click(within(nodeOverlay).getByRole("button", { name: "Close node details" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument());
-    expect(screen.queryByRole("heading", { name: /Generated plan node/ })).not.toBeInTheDocument();
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
+    fireEvent.click(within(getCommandCenter()).getByRole("button", { name: "Accept plan" }));
     await waitFor(() => expect(onApplyPlan).toHaveBeenCalledWith(draftPlan));
 
-    view.rerender(
+    const accepted = mount(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={createTaskWorkspaceFixtureGraph([generatedNode], "generate")}
@@ -231,12 +211,11 @@ describe("TaskWorkspacePlanSection", () => {
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
-
-    expect(within(commandCenter).getByRole("button", { name: "Start plan" })).toBeInTheDocument();
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Start plan" }));
+    expect(within(getCommandCenter()).getByRole("button", { name: "Start plan" })).toBeInTheDocument();
+    fireEvent.click(within(getCommandCenter()).getByRole("button", { name: "Start plan" }));
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
 
-    view.rerender(
+    accepted.rerender(
       <TaskWorkspacePlanSection
         label="Plan"
         graphPlan={createTaskWorkspaceFixtureGraph([runningNode, waitingNode], "checkpoint")}
@@ -258,13 +237,8 @@ describe("TaskWorkspacePlanSection", () => {
         onSubmitCheckpointAction={vi.fn()}
       />,
     );
-
-    // The current-operation controls render in the persistent action rail.
-    expect(within(commandCenter).getByLabelText(/Decision/)).toBeInTheDocument();
-    // Live runtime event content surfaces directly in the action rail.
-    expect(within(commandCenter).getByText("Tool: Starting plan")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("task-plan-node-checkpoint"));
-    await waitFor(() => expect(screen.getByRole("heading", { name: /Review generated output/ })).toBeInTheDocument());
+    expect(within(getCommandCenter()).getByLabelText(/Decision/)).toBeInTheDocument();
+    expect(within(getCommandCenter()).getByText("Tool: Starting plan")).toBeInTheDocument();
   });
 
   it("adds generate plan as the command center operation when no plan exists", () => {

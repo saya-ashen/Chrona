@@ -302,7 +302,7 @@ export function TaskPlanGraph({
   const handleCenterCurrentNode = useCallback(() => adjustScroll(0.5, 0.35), [adjustScroll]);
 
   const { edgeLegend, nodeLegend } = useGraphLegend(graphCopy);
-  const compact = useMemo(() => buildCompactViewModel(plan), [plan]);
+  const compact = useMemo(() => buildCompactViewModel(plan, graphCopy), [graphCopy, plan]);
   const selectedNode =
     plan.nodes.find((node) => node.id === selectedNodeId) ?? null;
 
@@ -535,11 +535,11 @@ export function TaskPlanGraph({
               onDismissOverlay={handleDismissOverlay}
               onCenterCurrentNode={handleCenterCurrentNode}
               onExpandGraph={() => setIsFullDialogOpen(true)}
-            onFitGraph={handleFitGraph}
-            onZoomIn={handleZoomIn}
-            onZoomOut={handleZoomOut}
-            onDispatchExecutionAction={onDispatchExecutionAction}
-            inspectorPlacement={inspectorPlacement}
+              onFitGraph={handleFitGraph}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onDispatchExecutionAction={onDispatchExecutionAction}
+              inspectorPlacement={inspectorPlacement}
               showOverview={showOverview}
               testId="task-plan-graph-full-dialog"
             />
@@ -554,11 +554,14 @@ export function TaskPlanGraph({
       <>
         <div
           ref={containerRef}
-          className={cn("min-w-0 w-full max-w-full", className)}
+          className={cn(
+            "min-w-0 w-full max-w-full",
+            className,
+          )}
         >
           <div
             aria-label={graphCopy.ariaLabel}
-            className="relative overflow-hidden rounded-[28px] border border-border bg-card p-4 text-card-foreground shadow-sm"
+            className="relative overflow-hidden rounded-[24px] border border-border bg-card p-3 text-card-foreground shadow-sm"
             data-graph-mode="compact"
             data-testid="task-plan-graph"
           >
@@ -567,7 +570,7 @@ export function TaskPlanGraph({
                 <p className="text-sm font-semibold text-foreground">
                   {graphCopy.compactTitle}
                 </p>
-                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {graphCopy.compactDescription}
                 </p>
               </div>
@@ -580,38 +583,18 @@ export function TaskPlanGraph({
               </button>
             </div>
 
-            <div className="relative mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-              {overviewItems.map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-[18px] border border-border bg-background px-3 py-2"
-                >
-                  <p className="text-[10px] font-medium text-muted-foreground">
-                    {item.label}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-foreground">
-                    {item.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="relative mt-4 space-y-4">
-              <CompactStageStrip stages={compact.stages} />
+            <div className="relative mt-3 space-y-3">
+              <CompactStageStrip stages={compact.stages} graphCopy={graphCopy} />
               <section className="space-y-2">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {graphCopy.focusTitle}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {graphCopy.focusDescription}
-                  </p>
-                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  {graphCopy.focusTitle}
+                </p>
                 <CompactFocusStack
                   items={compact.focusItems}
                   selectedNodeId={selectedNodeId}
                   onSelect={handleSelectNode}
                   graphCopy={graphCopy}
+                  summary={compact.summary}
                 />
               </section>
             </div>
