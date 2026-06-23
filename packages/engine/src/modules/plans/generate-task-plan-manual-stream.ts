@@ -557,4 +557,7 @@ export async function* generateTaskPlanManualStream(input: {
     }
 
   }
+
+  const doneEvent: GeneratePlanSSEEvent = { type: "done" };
+  yield doneEvent;
 }
