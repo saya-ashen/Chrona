@@ -142,5 +142,5 @@ non-goal: do not weaken E2E).
 - Milestone golden path: [`docs/en/milestone-0.2.md`](../../docs/en/milestone-0.2.md) §1.3
 - Spec acceptance row: [`spec.md`](./spec.md) §8 (the "milestone golden path" bullet)
 - Verification matrix row: [`tasks.md`](./tasks.md) verification matrix → **B5**
-- Agent MCP contract: [`docs/en/architecture.md`](../../docs/en/architecture.md)
-  → "Agent ↔ Chrona contract" (AI-visible refs)
+- Agent MCP contract: [`docs/architecture.md`](../../docs/architecture.md)
+  → "MCP / agent tools" (AI-visible refs)

@@ -232,11 +232,11 @@ history、tool traces 和持久化输出理解并继续长周期工作。
 | 已完成 | 计划生成        | 流式 AI 计划生成、计划持久化、审查/编辑/接受流程，以及 materialize 为图节点。               |
 | 已完成 | 执行 runtime    | 可执行的 `task`、`checkpoint`、`condition`、`wait` 节点，AI-visible refs 和持久化执行状态。 |
 | 已完成 | 审查闭环        | Inbox 中的 pending approvals、日程提案、等待输入、失败/取消 run 入口。                      |
+| 已完成 | 外部日历        | 只读日历订阅、导入忙碌事件、来源管理、刷新状态和日程上下文。                              |
 | 接下来 | 完善现有流程    | 让 Work、Schedule、Inbox、Task Workspace 和执行记录更可靠、更容易理解。                     |
 | 接下来 | 可靠自动执行    | 仅在配置允许且安全时启动到期日程任务，并在执行阻塞或失败时提供清晰恢复路径。                |
 | 接下来 | 更多 provider   | 在保持 provider boundary 清晰的前提下，接入更多执行/provider 集成。                         |
 | 接下来 | 多 session 执行 | 让任务执行在需要时使用多个 session，并明确隔离、复用、恢复和诊断行为。                      |
-| 接下来 | 外部日历        | 接入外部日历软件，让 Chrona 与已有日历系统协调日程任务。                                    |
 | 后续   | 生产就绪        | 改进认证、备份恢复、部署文档、迁移安全、可观测性和运维 runbooks。                           |
 
 ## 架构

@@ -32,6 +32,7 @@ Those decisions belong in `packages/engine`.
 | `packages/providers/foundation` | Provider-neutral contracts and shared adapter shapes |
 | `packages/providers/hermes` | Hermes-specific transport, session, event, and tool-call adaptation |
 | `packages/providers/debug` | Development/debug execution runtime, hidden unless explicitly enabled |
+| `packages/providers/claude-code` | Claude Code CLI transport, session, stream, and tool-call adaptation |
 
 ## Integration packages
 

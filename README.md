@@ -246,11 +246,11 @@ This is a short summary of the project roadmap. See the full
 | Done   | Plan generation         | Streaming AI plan generation, plan persistence, review/edit/accept flows, and materialization into graph nodes.                         |
 | Done   | Execution runtime       | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with AI-visible refs and persisted execution state.                      |
 | Done   | Review loops            | Inbox surfaces for pending approvals, schedule proposals, waiting inputs, and failed/cancelled runs.                                    |
+| Done   | External calendars      | Read-only calendar subscriptions, imported busy events, source management, refresh status, and schedule context.                       |
 | Next   | Polish existing flows   | Make Work, Schedule, Inbox, Task Workspace, and execution records more reliable and easier to understand.                               |
 | Next   | Reliable auto execution | Start due scheduled work only when configured and safe, with clear recovery when execution blocks or fails.                             |
 | Next   | More providers          | Add more execution/provider integrations beyond the current provider set while keeping provider boundaries explicit.                    |
 | Next   | Multi-session execution | Let task execution use multiple sessions where needed, with clear isolation, reuse, recovery, and diagnostics.                          |
-| Next   | External calendars      | Connect external calendar software so Chrona can coordinate scheduled work with existing calendar systems.                              |
 | Later  | Production readiness    | Improve authentication, backup/restore, deployment docs, migration safety, observability, and operational runbooks.                     |
 
 ## Architecture

@@ -1,6 +1,6 @@
 # Chrona 路线图
 
-当前版本：0.1.4
+当前版本：0.1.9
 
 Chrona 正在演进为面向 AI 辅助工作的任务控制面。产品要把四个循环连接起来，并且让每一步都可见、可恢复：任务捕获、图计划、排期安排和运行时执行。
 
@@ -32,6 +32,7 @@ Chrona 正在演进为面向 AI 辅助工作的任务控制面。产品要把四
 | AI clients | 通过 Settings / AI Clients 管理的数据库驱动 AI clients 与 feature bindings。 |
 | 后端 API | 任务 CRUD/lifecycle、计划生成/接受、task-scoped execution、Work/Schedule 页面投影、runtime provider、AI client 等路由。 |
 | MCP / Hermes | 面向 Chrona execution/plan/node 操作的 Streamable HTTP MCP tools，以及用于 agent 式执行的 Hermes provider/plugin 集成。 |
+| 外部日历 | 只读订阅来源、来源校验/管理、导入忙碌事件、刷新状态和日程上下文。 |
 
 ## 近期计划
 
@@ -83,11 +84,11 @@ Chrona 正在演进为面向 AI 辅助工作的任务控制面。产品要把四
 - 在 Work 页面和执行时间线中，让每个 session 的事件可检查。
 - 避免多 session 执行导致节点重复完成或破坏图状态。
 
-### 7. 接入外部日历软件
+### 7. 完成外部日历生态
 
-- 连接外部日历系统，让 Chrona 与用户已有日历协调日程任务。
+- 让当前只读订阅导入在 malformed feeds、被阻止的本地 URL 和刷新失败场景下保持可靠。
+- 只有订阅行为稳定后，再加入 Google/Outlook 等认证 provider 集成。
 - Calendar import/sync 行为应显式、尽可能可回滚，并安全处理冲突。
-- 将外部事件映射到 Chrona work blocks，同时不丢失 Chrona task、plan 和 execution context。
 - 在与原生 Chrona scheduling 相同的 review loop 中暴露日历冲突和日程提案。
 
 ### 8. 让文档与产品状态一致

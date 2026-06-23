@@ -29,6 +29,31 @@ Query parameters:
 | `status` | no | Filter by task status |
 | `limit` | no | Limit result count |
 
+
+### GET /api/tasks/:taskId/activity
+
+Returns task activity/timeline records.
+
+### GET /api/tasks/:taskId/nodes/:nodeId/activity
+
+Returns activity filtered to one plan node.
+
+### GET /api/tasks/:taskId/runtime-context
+
+Returns runtime context used by execution/provider flows.
+
+### GET /api/tasks/:taskId/review-context
+
+Returns review context for approvals, recovery, and result decisions.
+
+### GET /api/tasks/:taskId/command-center
+
+Returns command-center state for task workspace actions.
+
+### GET /api/tasks/:taskId/workspace/header
+
+Returns lightweight task workspace header state.
+
 ### POST /api/tasks
 
 Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `executionRuntime`, `executionConfig`, and `parentTaskId`.
@@ -134,6 +159,15 @@ Submits a checkpoint/input/approval action and streams the resulting execution p
 
 Common checkpoint actions include `submit_input`, `approve_result`, `reject_result`, `request_changes`, `accept_replan`, `reject_replan`, `request_replan`, `retry_node`, `resume_after_unblock`, `mark_node_completed`, `mark_node_skipped`, `fail_task`, and `cancel_session`.
 
+### GET /api/tasks/:taskId/provider-approvals
+
+Lists provider-native approvals associated with the task execution context.
+
+### POST /api/tasks/:taskId/provider-approvals/:approvalId/resolve
+
+Resolves a provider-native approval after user decision.
+
+
 ## Task schedule
 
 ### PUT /api/tasks/:taskId/schedule
@@ -145,6 +179,11 @@ Fields include `scheduledStartAt`, `scheduledEndAt`, `dueAt`, and `scheduleSourc
 ### DELETE /api/tasks/:taskId/schedule
 
 Clears a task schedule.
+
+### PUT /api/work-blocks/:workBlockId/schedule
+
+Updates a concrete work-block schedule.
+
 
 ### POST /api/tasks/:taskId/schedule/proposals
 
@@ -183,6 +222,11 @@ Submits a Work page command asynchronously. Command types include plan generatio
 ### GET /api/work/:taskId/events
 
 Subscribes to Work page projection events over SSE.
+
+### GET /api/dashboard?workspaceId=...
+
+Dashboard projection for workspace-level overview data.
+
 
 ## Workspaces
 
@@ -229,6 +273,39 @@ Tests connectivity for a client config.
 ### PUT /api/ai/clients/:clientId/bindings
 
 Replaces feature bindings for a client. Features include `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task`.
+
+
+## External calendars
+
+External calendar endpoints are workspace-scoped and manage read-only subscription feeds. Source URLs stay server-side after setup; browser responses use redacted URL labels.
+
+### POST /api/workspaces/:workspaceId/calendar-sources/validate
+
+Validates a subscription/webcal URL and returns detected metadata or a validation error.
+
+### POST /api/workspaces/:workspaceId/calendar-sources
+
+Creates a calendar source, stores the private source URL server-side, and performs an initial refresh.
+
+### GET /api/workspaces/:workspaceId/calendar-sources
+
+Lists active calendar sources for the workspace.
+
+### PATCH /api/workspaces/:workspaceId/calendar-sources/:sourceId
+
+Updates source display/configuration fields such as name, color, enabled state, sync policy, and automation policy.
+
+### POST /api/workspaces/:workspaceId/calendar-sources/:sourceId/refresh
+
+Refreshes one source and returns updated source and sync status. Blocked-network refreshes require explicit user confirmation.
+
+### DELETE /api/workspaces/:workspaceId/calendar-sources/:sourceId
+
+Marks a source removed and excludes it from future schedule context.
+
+### GET /api/workspaces/:workspaceId/calendar-events
+
+Lists imported read-only calendar events in a date range. Query fields include `from`, `to`, and optional `sourceId`.
 
 ## Hermes integration
 
@@ -310,6 +387,12 @@ Returns assistant surface state for supported pages such as `schedule`, `task`, 
 
 Requests an assistant action for the current surface.
 
+## Agent control
+
+### POST /api/agent/control
+
+Internal agent-control command endpoint. Use explicit API contracts and feature bindings instead of treating this as a generic chat route.
+
 ## MCP integration
 
 ### POST /api/mcp
@@ -320,15 +403,16 @@ Public tool names:
 
 | Tool | Purpose |
 | --- | --- |
-| `chrona_execution_read` | Read execution session state and next actions |
+| `chrona_execution_read` | Read execution session state and supported next actions |
 | `chrona_plan_read` | Read accepted plan state through AI-visible refs |
-| `chrona_plan_generate` | Generate a draft plan from a complete blueprint |
-| `chrona_node_read` | Read the current node through AI-visible refs |
-| `chrona_task_complete` | Complete the current task node |
-| `chrona_condition_select` | Select the current condition branch by branch ref |
-| `chrona_node_block` | Block the current node with a reason and recovery form |
-| `chrona_node_fail` | Fail the current node |
-| `chrona_wait_complete` | Complete the current wait node |
+| `chrona_plan_generate` | Generate a draft plan for the session task from a complete plan blueprint |
+| `chrona_node_read` | Read current execution node state through AI-visible refs |
+| `chrona_node_output` | Submit a json-render node output spec before completing the current task node |
+| `chrona_node_complete` | Complete the current task node after required outputs have been submitted |
+| `chrona_condition_select` | Select a condition branch by nodeId and branchRef |
+| `chrona_node_block` | Block the current node with a reason and recovery action form |
+| `chrona_node_fail` | Fail the current node with an unrecoverable error |
+| `chrona_wait_complete` | Complete the current wait node when the wait condition is satisfied |
 
 MCP write tools resolve the active Chrona execution context from the session and injected metadata. Agents should not send backend task, plan, node, layer, or graph IDs unless Chrona explicitly provided them as public input.
 

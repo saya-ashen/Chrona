@@ -8,17 +8,21 @@ This document explains where code belongs in Chrona's monorepo.
 | --- | --- |
 | `apps/web` | Browser UI, routing, page composition, frontend hooks/components |
 | `apps/server` | Hono HTTP entrypoints, validation, route wiring, SSE streaming, response shape |
-| `packages/cli` | Thin command-line API client |
+| `packages/cli` | Packaged Chrona launcher and start/build/check/test command entrypoint |
+| `packages/agent-cli` | Agent-facing CLI helpers kept outside the product engine |
 | `packages/contracts` | Shared API schemas, AI feature specs, plan/runtime event types, MCP tool schemas |
 | `packages/domain` | Pure domain rules with no IO, HTTP, Prisma, provider, or React dependency |
 | `packages/db` | Prisma client/bootstrap/repositories and SQLite access |
 | `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
 | `packages/graph-runtime` | Graph construction, resolution, transitions, and execution-command primitives |
 | `packages/providers/*` | External AI/runtime protocol adapters |
+| `packages/integrations` | External calendar parsing/normalization and user-approved local/remote integration helpers |
 | `packages/ui-protocol` | Declarative UI document schema, builders, and action catalog (json-render) shared by server renderers and the web client |
 | `packages/runtime-core` | Runtime support types/utilities shared by engine/providers |
 | `packages/i18n` | Shared localization message infrastructure |
+| `packages/logging` | Shared logging setup and logger utilities |
 | `packages/shared` | Small cross-cutting utilities that are not domain/application logic |
+| `packages/skills` | Chrona skill packages used by agent/runtime integrations |
 | `external-plugins/*` | Integration plugins outside the core app package graph |
 
 ## Dependency direction
