@@ -624,7 +624,7 @@ describe("agent tool operations service", () => {
           sessionId: "session-1",
           actorType: "agent",
           idempotencyKey: "node-output-1",
-          payload: { outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { ok: true } } } } }] },
+          payload: { spec: { root: "root", elements: { root: { type: "JsonView", props: { value: { ok: true } }, children: [] } } } },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
@@ -696,7 +696,7 @@ describe("agent tool operations service", () => {
       {
         action: "submit_node_output",
         sessionId: "session-1",
-        outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { ok: true } } } } }],
+        outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { ok: true } }, children: [] } } }],
       },
       {
         action: "complete_manual_node",

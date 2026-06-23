@@ -1,0 +1,5043 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 32,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "apps/web/src/components/schedule/__tests__/automation-suggestion-panel.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 12,
+      "nonEmptyLines": 11,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/__tests__/timeslot-suggestion-panel.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 132,
+      "nonEmptyLines": 108,
+      "functions": [
+        {
+          "name": "makeSuggestions",
+          "startLine": 6,
+          "endLine": 21,
+          "params": []
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/automation-suggestion-panel.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 12,
+      "nonEmptyLines": 10,
+      "functions": [
+        {
+          "name": "AutomationSuggestionPanel",
+          "startLine": 5,
+          "endLine": 12,
+          "params": [
+            "_props"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AutomationSuggestionPanel",
+          "line": 5,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/timeslot-suggestion-panel.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 109,
+      "nonEmptyLines": 102,
+      "functions": [
+        {
+          "name": "formatTimeRange",
+          "startLine": 14,
+          "endLine": 22,
+          "params": [
+            "startAt",
+            "endAt"
+          ]
+        },
+        {
+          "name": "TimeslotSuggestionPanel",
+          "startLine": 24,
+          "endLine": 109,
+          "params": [
+            "{\n  taskId,\n  title,\n  priority,\n  estimatedMinutes,\n  dueAt,\n  currentSchedule,\n  onSchedule,\n}"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TimeslotSuggestionPanel",
+          "line": 24,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "formatTimeRange",
+          "callee": "startAt.toLocaleTimeString",
+          "lineNumber": 15
+        },
+        {
+          "caller": "formatTimeRange",
+          "callee": "endAt.toLocaleTimeString",
+          "lineNumber": 18
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestTimeslots",
+          "lineNumber": 33
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestions.map",
+          "lineNumber": 55
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "bestMatch?.startAt.getTime",
+          "lineNumber": 57
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestion.startAt.getTime",
+          "lineNumber": 57
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "bestMatch?.endAt.getTime",
+          "lineNumber": 58
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestion.endAt.getTime",
+          "lineNumber": 58
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestion.startAt.toISOString",
+          "lineNumber": 62
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestion.endAt.toISOString",
+          "lineNumber": 62
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "formatTimeRange",
+          "lineNumber": 69
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestion.reasons.map",
+          "lineNumber": 78
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "suggestion.conflicts.map",
+          "lineNumber": 81
+        },
+        {
+          "caller": "TimeslotSuggestionPanel",
+          "callee": "onSchedule",
+          "lineNumber": 95
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/plan/task-plan-graph/result-output-format.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "functions": [
+        {
+          "name": "stringifyResultOutput",
+          "startLine": 3,
+          "endLine": 5,
+          "params": [
+            "_output"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "stringifyResultOutput",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/assistant/build-task-workspace-diff-preview-spec.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 112,
+      "nonEmptyLines": 106,
+      "functions": [
+        {
+          "name": "formatText",
+          "startLine": 16,
+          "endLine": 21,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "computeTaskDiff",
+          "startLine": 23,
+          "endLine": 53,
+          "params": [
+            "taskPatch",
+            "originalTask"
+          ]
+        },
+        {
+          "name": "computePlanSummary",
+          "startLine": 55,
+          "endLine": 70,
+          "params": [
+            "planPatch"
+          ]
+        },
+        {
+          "name": "highRiskChanges",
+          "startLine": 72,
+          "endLine": 86,
+          "params": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "buildTaskWorkspaceDiffPreviewSpec",
+          "startLine": 88,
+          "endLine": 112,
+          "params": [
+            "proposal",
+            "originalTask"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "buildTaskWorkspaceDiffPreviewSpec",
+          "line": 88,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "formatText",
+          "callee": "value.slice",
+          "lineNumber": 18
+        },
+        {
+          "caller": "formatText",
+          "callee": "JSON.stringify(value).slice",
+          "lineNumber": 19
+        },
+        {
+          "caller": "formatText",
+          "callee": "JSON.stringify",
+          "lineNumber": 19
+        },
+        {
+          "caller": "formatText",
+          "callee": "String",
+          "lineNumber": 20
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 26
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 29
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "formatText",
+          "lineNumber": 29
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "formatText",
+          "lineNumber": 29
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 32
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 35
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 38
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 41
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 44
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 47
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "JSON.stringify",
+          "lineNumber": 49
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "JSON.stringify",
+          "lineNumber": 49
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "diffs.push",
+          "lineNumber": 50
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "formatText",
+          "lineNumber": 50
+        },
+        {
+          "caller": "computeTaskDiff",
+          "callee": "formatText",
+          "lineNumber": 50
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 57
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 60
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 61
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 62
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 63
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 64
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 65
+        },
+        {
+          "caller": "computePlanSummary",
+          "callee": "points.push",
+          "lineNumber": 66
+        },
+        {
+          "caller": "highRiskChanges",
+          "callee": "risks.push",
+          "lineNumber": 77
+        },
+        {
+          "caller": "highRiskChanges",
+          "callee": "risks.push",
+          "lineNumber": 78
+        },
+        {
+          "caller": "highRiskChanges",
+          "callee": "risks.push",
+          "lineNumber": 79
+        },
+        {
+          "caller": "highRiskChanges",
+          "callee": "pp.operations.some",
+          "lineNumber": 82
+        },
+        {
+          "caller": "highRiskChanges",
+          "callee": "risks.push",
+          "lineNumber": 82
+        },
+        {
+          "caller": "highRiskChanges",
+          "callee": "pp.operations.some",
+          "lineNumber": 83
+        },
+        {
+          "caller": "highRiskChanges",
+          "callee": "risks.push",
+          "lineNumber": 83
+        },
+        {
+          "caller": "buildTaskWorkspaceDiffPreviewSpec",
+          "callee": "highRiskChanges",
+          "lineNumber": 98
+        },
+        {
+          "caller": "buildTaskWorkspaceDiffPreviewSpec",
+          "callee": "computeTaskDiff",
+          "lineNumber": 100
+        },
+        {
+          "caller": "buildTaskWorkspaceDiffPreviewSpec",
+          "callee": "computePlanSummary",
+          "lineNumber": 101
+        },
+        {
+          "caller": "buildTaskWorkspaceDiffPreviewSpec",
+          "callee": "operations\n            .filter((op) => op.op === \"add_node\")\n            .map",
+          "lineNumber": 102
+        },
+        {
+          "caller": "buildTaskWorkspaceDiffPreviewSpec",
+          "callee": "operations\n            .filter",
+          "lineNumber": 102
+        },
+        {
+          "caller": "buildTaskWorkspaceDiffPreviewSpec",
+          "callee": "operations\n            .filter((op) => op.op === \"delete_node\")\n            .map",
+          "lineNumber": 105
+        },
+        {
+          "caller": "buildTaskWorkspaceDiffPreviewSpec",
+          "callee": "operations\n            .filter",
+          "lineNumber": 105
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.test.tsx",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 749,
+      "nonEmptyLines": 675,
+      "functions": [
+        {
+          "name": "renderWithQueryClient",
+          "startLine": 59,
+          "endLine": 71,
+          "params": [
+            "ui"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "layout",
+          "callee": "Promise.resolve",
+          "lineNumber": 10
+        },
+        {
+          "caller": "renderWithQueryClient",
+          "callee": "render",
+          "lineNumber": 66
+        },
+        {
+          "caller": "observe",
+          "callee": "Object.defineProperty",
+          "lineNumber": 83
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/ai-feature-specs.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 122,
+      "nonEmptyLines": 104,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/ai.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 4,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/plan/compile.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 307,
+      "nonEmptyLines": 282,
+      "functions": [
+        {
+          "name": "generateCompiledId",
+          "startLine": 18,
+          "endLine": 21,
+          "params": []
+        },
+        {
+          "name": "rewriteConditionTarget",
+          "startLine": 23,
+          "endLine": 38,
+          "params": [
+            "nodeId",
+            "targetNodeId",
+            "localToCompiled"
+          ]
+        },
+        {
+          "name": "buildNodeConfig",
+          "startLine": 40,
+          "endLine": 88,
+          "params": [
+            "node",
+            "localToCompiled"
+          ]
+        },
+        {
+          "name": "buildCompiledNode",
+          "startLine": 90,
+          "endLine": 115,
+          "params": [
+            "node",
+            "compiledId",
+            "localToCompiled"
+          ]
+        },
+        {
+          "name": "edgeKey",
+          "startLine": 117,
+          "endLine": 119,
+          "params": [
+            "from",
+            "to"
+          ]
+        },
+        {
+          "name": "compileEditablePlan",
+          "startLine": 135,
+          "endLine": 273,
+          "params": [
+            "plan"
+          ]
+        },
+        {
+          "name": "computeTopologicalOrder",
+          "startLine": 275,
+          "endLine": 307,
+          "params": [
+            "nodeIds",
+            "edges"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "compileEditablePlan",
+          "line": 135,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "generateCompiledId",
+          "callee": "Date.now().toString",
+          "lineNumber": 20
+        },
+        {
+          "caller": "generateCompiledId",
+          "callee": "Date.now",
+          "lineNumber": 20
+        },
+        {
+          "caller": "generateCompiledId",
+          "callee": "idCounter.toString",
+          "lineNumber": 20
+        },
+        {
+          "caller": "rewriteConditionTarget",
+          "callee": "localToCompiled.get",
+          "lineNumber": 28
+        },
+        {
+          "caller": "buildNodeConfig",
+          "callee": "node.branches.map",
+          "lineNumber": 70
+        },
+        {
+          "caller": "buildNodeConfig",
+          "callee": "rewriteConditionTarget",
+          "lineNumber": 72
+        },
+        {
+          "caller": "buildNodeConfig",
+          "callee": "rewriteConditionTarget",
+          "lineNumber": 79
+        },
+        {
+          "caller": "buildCompiledNode",
+          "callee": "buildNodeConfig",
+          "lineNumber": 100
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "validateEditablePlan",
+          "lineNumber": 137
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "validation.errors.map",
+          "lineNumber": 141
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "plan.nodes.map",
+          "lineNumber": 147
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "generateCompiledId",
+          "lineNumber": 149
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "localToCompiled.set",
+          "lineNumber": 152
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledNodeIds.map",
+          "lineNumber": 154
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "buildCompiledNode",
+          "lineNumber": 155
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "localToCompiled.get",
+          "lineNumber": 161
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "localToCompiled.get",
+          "lineNumber": 162
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "generateCompiledId",
+          "lineNumber": 169
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledEdgeMap.set",
+          "lineNumber": 174
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "edgeKey",
+          "lineNumber": 174
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "localToCompiled.get",
+          "lineNumber": 181
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "localToCompiled.get",
+          "lineNumber": 183
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "edgeKey",
+          "lineNumber": 185
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledEdgeMap.get",
+          "lineNumber": 186
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledEdgeMap.set",
+          "lineNumber": 190
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "generateCompiledId",
+          "lineNumber": 191
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "localToCompiled.get",
+          "lineNumber": 200
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "edgeKey",
+          "lineNumber": 202
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledEdgeMap.get",
+          "lineNumber": 203
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledEdgeMap.set",
+          "lineNumber": 208
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "generateCompiledId",
+          "lineNumber": 209
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledEdgeMap.values",
+          "lineNumber": 219
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "indegree.set",
+          "lineNumber": 225
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "outdegree.set",
+          "lineNumber": 226
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "indegree.get(edge.to)?.push",
+          "lineNumber": 229
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "indegree.get",
+          "lineNumber": 229
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "outdegree.get(edge.from)?.push",
+          "lineNumber": 230
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "outdegree.get",
+          "lineNumber": 230
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "indegree.get",
+          "lineNumber": 233
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "outdegree.get",
+          "lineNumber": 234
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledNodes\n    .filter((n) => (indegree.get(n.id)?.length ?? 0) === 0)\n    .map",
+          "lineNumber": 238
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledNodes\n    .filter",
+          "lineNumber": 238
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "indegree.get",
+          "lineNumber": 239
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledNodes\n    .filter((n) => (outdegree.get(n.id)?.length ?? 0) === 0)\n    .map",
+          "lineNumber": 242
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledNodes\n    .filter",
+          "lineNumber": 242
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "outdegree.get",
+          "lineNumber": 243
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "computeTopologicalOrder",
+          "lineNumber": 247
+        },
+        {
+          "caller": "compileEditablePlan",
+          "callee": "compiledNodes.map",
+          "lineNumber": 248
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "indegree.set",
+          "lineNumber": 282
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "adjacency.set",
+          "lineNumber": 283
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "adjacency.get(e.from)?.push",
+          "lineNumber": 286
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "adjacency.get",
+          "lineNumber": 286
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "indegree.set",
+          "lineNumber": 287
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "indegree.get",
+          "lineNumber": 287
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "queue.push",
+          "lineNumber": 292
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "queue.shift",
+          "lineNumber": 297
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "order.push",
+          "lineNumber": 298
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "adjacency.get",
+          "lineNumber": 299
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "indegree.get",
+          "lineNumber": 300
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "indegree.set",
+          "lineNumber": 301
+        },
+        {
+          "caller": "computeTopologicalOrder",
+          "callee": "queue.push",
+          "lineNumber": 302
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/plan/patch.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 389,
+      "nonEmptyLines": 353,
+      "functions": [
+        {
+          "name": "applyPlanPatch",
+          "startLine": 30,
+          "endLine": 86,
+          "params": [
+            "plan",
+            "patch"
+          ]
+        },
+        {
+          "name": "applyOperation",
+          "startLine": 98,
+          "endLine": 131,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        },
+        {
+          "name": "applyUpdatePlan",
+          "startLine": 133,
+          "endLine": 147,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        },
+        {
+          "name": "applyAddNode",
+          "startLine": 149,
+          "endLine": 177,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        },
+        {
+          "name": "applyUpdateNode",
+          "startLine": 179,
+          "endLine": 226,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        },
+        {
+          "name": "applyDeleteNode",
+          "startLine": 228,
+          "endLine": 261,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        },
+        {
+          "name": "applyAddEdge",
+          "startLine": 263,
+          "endLine": 299,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        },
+        {
+          "name": "applyDeleteEdge",
+          "startLine": 301,
+          "endLine": 333,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        },
+        {
+          "name": "applyReplaceSubgraph",
+          "startLine": 335,
+          "endLine": 389,
+          "params": [
+            "nodes",
+            "edges",
+            "title",
+            "goal",
+            "assumptions",
+            "op"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "applyPlanPatch",
+          "line": 30,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "applyPlanPatch",
+          "callee": "applyOperation",
+          "lineNumber": 53
+        },
+        {
+          "caller": "applyPlanPatch",
+          "callee": "validateEditablePlan",
+          "lineNumber": 76
+        },
+        {
+          "caller": "applyPlanPatch",
+          "callee": "validation.errors.map((e) => e.message).join",
+          "lineNumber": 80
+        },
+        {
+          "caller": "applyPlanPatch",
+          "callee": "validation.errors.map",
+          "lineNumber": 80
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "applyUpdatePlan",
+          "lineNumber": 108
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "applyAddNode",
+          "lineNumber": 111
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "applyUpdateNode",
+          "lineNumber": 114
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "applyDeleteNode",
+          "lineNumber": 117
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "applyAddEdge",
+          "lineNumber": 120
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "applyDeleteEdge",
+          "lineNumber": 123
+        },
+        {
+          "caller": "applyOperation",
+          "callee": "applyReplaceSubgraph",
+          "lineNumber": 126
+        },
+        {
+          "caller": "applyAddNode",
+          "callee": "nodes.some",
+          "lineNumber": 158
+        },
+        {
+          "caller": "applyUpdateNode",
+          "callee": "nodes.findIndex",
+          "lineNumber": 187
+        },
+        {
+          "caller": "applyDeleteNode",
+          "callee": "nodes.some",
+          "lineNumber": 236
+        },
+        {
+          "caller": "applyDeleteNode",
+          "callee": "nodes.filter",
+          "lineNumber": 248
+        },
+        {
+          "caller": "applyDeleteNode",
+          "callee": "edges.filter",
+          "lineNumber": 249
+        },
+        {
+          "caller": "applyAddEdge",
+          "callee": "edges.some",
+          "lineNumber": 273
+        },
+        {
+          "caller": "applyDeleteEdge",
+          "callee": "edges.filter",
+          "lineNumber": 309
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "nodes.some",
+          "lineNumber": 347
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "nodes.some",
+          "lineNumber": 362
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "removeSet.has",
+          "lineNumber": 362
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "nodes.filter",
+          "lineNumber": 375
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "removeSet.has",
+          "lineNumber": 375
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "edges.filter",
+          "lineNumber": 377
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "removeSet.has",
+          "lineNumber": 377
+        },
+        {
+          "caller": "applyReplaceSubgraph",
+          "callee": "removeSet.has",
+          "lineNumber": 377
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/plan/plan-state-boundaries.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 55,
+      "nonEmptyLines": 48,
+      "functions": [
+        {
+          "name": "task",
+          "startLine": 7,
+          "endLine": 16,
+          "params": [
+            "id",
+            "title"
+          ]
+        },
+        {
+          "name": "plan",
+          "startLine": 18,
+          "endLine": 29,
+          "params": [
+            "overrides"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "plan",
+          "callee": "task",
+          "lineNumber": 24
+        },
+        {
+          "caller": "plan",
+          "callee": "task",
+          "lineNumber": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/plan/plan.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 878,
+      "nonEmptyLines": 778,
+      "functions": [
+        {
+          "name": "makeTask",
+          "startLine": 22,
+          "endLine": 34,
+          "params": [
+            "id",
+            "overrides"
+          ]
+        },
+        {
+          "name": "makeCheckpoint",
+          "startLine": 36,
+          "endLine": 49,
+          "params": [
+            "id",
+            "overrides"
+          ]
+        },
+        {
+          "name": "makeCondition",
+          "startLine": 51,
+          "endLine": 65,
+          "params": [
+            "id",
+            "branches",
+            "overrides"
+          ]
+        },
+        {
+          "name": "makeWait",
+          "startLine": 67,
+          "endLine": 78,
+          "params": [
+            "id",
+            "overrides"
+          ]
+        },
+        {
+          "name": "makePlan",
+          "startLine": 80,
+          "endLine": 95,
+          "params": [
+            "id",
+            "nodes",
+            "edges",
+            "overrides"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/plan/validate.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 282,
+      "nonEmptyLines": 257,
+      "functions": [
+        {
+          "name": "uniqueEdges",
+          "startLine": 15,
+          "endLine": 25,
+          "params": [
+            "edges"
+          ]
+        },
+        {
+          "name": "semanticEdges",
+          "startLine": 27,
+          "endLine": 46,
+          "params": [
+            "plan",
+            "nodeIds"
+          ]
+        },
+        {
+          "name": "terminalNodeIds",
+          "startLine": 48,
+          "endLine": 54,
+          "params": [
+            "nodeIds",
+            "edges"
+          ]
+        },
+        {
+          "name": "isDag",
+          "startLine": 56,
+          "endLine": 78,
+          "params": [
+            "nodeIds",
+            "edges"
+          ]
+        },
+        {
+          "name": "validateEditablePlan",
+          "startLine": 84,
+          "endLine": 218,
+          "params": [
+            "plan"
+          ]
+        },
+        {
+          "name": "validateNodeSpecific",
+          "startLine": 220,
+          "endLine": 282,
+          "params": [
+            "node",
+            "index",
+            "errors"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "validateEditablePlan",
+          "line": 84,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "uniqueEdges",
+          "callee": "seen.has",
+          "lineNumber": 20
+        },
+        {
+          "caller": "uniqueEdges",
+          "callee": "seen.add",
+          "lineNumber": 21
+        },
+        {
+          "caller": "uniqueEdges",
+          "callee": "result.push",
+          "lineNumber": 22
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "plan.edges\n    .filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to))\n    .map",
+          "lineNumber": 28
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "plan.edges\n    .filter",
+          "lineNumber": 28
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "nodeIds.has",
+          "lineNumber": 29
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "nodeIds.has",
+          "lineNumber": 29
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "nodeIds.has",
+          "lineNumber": 36
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "edges.push",
+          "lineNumber": 37
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "nodeIds.has",
+          "lineNumber": 40
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "edges.push",
+          "lineNumber": 41
+        },
+        {
+          "caller": "semanticEdges",
+          "callee": "uniqueEdges",
+          "lineNumber": 45
+        },
+        {
+          "caller": "terminalNodeIds",
+          "callee": "nodeIds.map",
+          "lineNumber": 49
+        },
+        {
+          "caller": "terminalNodeIds",
+          "callee": "outgoing.set",
+          "lineNumber": 51
+        },
+        {
+          "caller": "terminalNodeIds",
+          "callee": "outgoing.get",
+          "lineNumber": 51
+        },
+        {
+          "caller": "terminalNodeIds",
+          "callee": "nodeIds.filter",
+          "lineNumber": 53
+        },
+        {
+          "caller": "terminalNodeIds",
+          "callee": "outgoing.get",
+          "lineNumber": 53
+        },
+        {
+          "caller": "isDag",
+          "callee": "nodeIds.map",
+          "lineNumber": 57
+        },
+        {
+          "caller": "isDag",
+          "callee": "nodeIds.map",
+          "lineNumber": 58
+        },
+        {
+          "caller": "isDag",
+          "callee": "indegree.set",
+          "lineNumber": 61
+        },
+        {
+          "caller": "isDag",
+          "callee": "indegree.get",
+          "lineNumber": 61
+        },
+        {
+          "caller": "isDag",
+          "callee": "outgoing.get(edge.from)?.push",
+          "lineNumber": 62
+        },
+        {
+          "caller": "isDag",
+          "callee": "outgoing.get",
+          "lineNumber": 62
+        },
+        {
+          "caller": "isDag",
+          "callee": "nodeIds.filter",
+          "lineNumber": 65
+        },
+        {
+          "caller": "isDag",
+          "callee": "indegree.get",
+          "lineNumber": 65
+        },
+        {
+          "caller": "isDag",
+          "callee": "queue.shift",
+          "lineNumber": 68
+        },
+        {
+          "caller": "isDag",
+          "callee": "outgoing.get",
+          "lineNumber": 70
+        },
+        {
+          "caller": "isDag",
+          "callee": "indegree.set",
+          "lineNumber": 71
+        },
+        {
+          "caller": "isDag",
+          "callee": "indegree.get",
+          "lineNumber": 71
+        },
+        {
+          "caller": "isDag",
+          "callee": "indegree.get",
+          "lineNumber": 72
+        },
+        {
+          "caller": "isDag",
+          "callee": "queue.push",
+          "lineNumber": 73
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 90
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "plan.nodes.forEach",
+          "lineNumber": 108
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "VALID_NODE_TYPES.has",
+          "lineNumber": 110
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 111
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "invalidTypes.includes",
+          "lineNumber": 118
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 119
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "STABLE_NODE_ID.test",
+          "lineNumber": 126
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 127
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.has",
+          "lineNumber": 134
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 135
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.set",
+          "lineNumber": 140
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "validateNodeSpecific",
+          "lineNumber": 143
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "plan.edges.forEach",
+          "lineNumber": 147
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.has",
+          "lineNumber": 148
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 149
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.has",
+          "lineNumber": 154
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 155
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "plan.nodes.forEach",
+          "lineNumber": 163
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "conditionNode.branches.forEach",
+          "lineNumber": 167
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.has",
+          "lineNumber": 168
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 169
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.has",
+          "lineNumber": 176
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 177
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.keys",
+          "lineNumber": 187
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "semanticEdges",
+          "lineNumber": 188
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "isDag",
+          "lineNumber": 189
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 190
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "terminalNodeIds",
+          "lineNumber": 196
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 198
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "terminals.join",
+          "lineNumber": 200
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "plan.nodes.find",
+          "lineNumber": 203
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "errors.push",
+          "lineNumber": 205
+        },
+        {
+          "caller": "validateEditablePlan",
+          "callee": "nodeIds.get",
+          "lineNumber": 206
+        },
+        {
+          "caller": "validateNodeSpecific",
+          "callee": "errors.push",
+          "lineNumber": 228
+        },
+        {
+          "caller": "validateNodeSpecific",
+          "callee": "errors.push",
+          "lineNumber": 234
+        },
+        {
+          "caller": "validateNodeSpecific",
+          "callee": "errors.push",
+          "lineNumber": 243
+        },
+        {
+          "caller": "validateNodeSpecific",
+          "callee": "errors.push",
+          "lineNumber": 249
+        },
+        {
+          "caller": "validateNodeSpecific",
+          "callee": "errors.push",
+          "lineNumber": 255
+        },
+        {
+          "caller": "validateNodeSpecific",
+          "callee": "errors.push",
+          "lineNumber": 265
+        },
+        {
+          "caller": "validateNodeSpecific",
+          "callee": "errors.push",
+          "lineNumber": 274
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 94,
+      "functions": [
+        {
+          "name": "effectivePlanFrom",
+          "startLine": 4,
+          "endLine": 15,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "currentNodeFromEffective",
+          "startLine": 17,
+          "endLine": 27,
+          "params": [
+            "plan"
+          ]
+        },
+        {
+          "name": "readAiExecutionView",
+          "startLine": 29,
+          "endLine": 89,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "redactBackendIds",
+          "startLine": 91,
+          "endLine": 99,
+          "params": [
+            "value"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "readAiExecutionView",
+          "line": 29,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "currentNodeFromEffective",
+          "callee": "plan.nodes.find",
+          "lineNumber": 18
+        },
+        {
+          "caller": "currentNodeFromEffective",
+          "callee": "plan.nodes.find",
+          "lineNumber": 19
+        },
+        {
+          "caller": "currentNodeFromEffective",
+          "callee": "plan.nodes.find",
+          "lineNumber": 25
+        },
+        {
+          "caller": "currentNodeFromEffective",
+          "callee": "plan.readyNodeIds.includes",
+          "lineNumber": 25
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "effectivePlanFrom",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "redactBackendIds",
+          "lineNumber": 31
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "buildSemanticRefHistory",
+          "lineNumber": 32
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "currentNodeFromEffective",
+          "lineNumber": 33
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "buildNodeRuntimeInput",
+          "lineNumber": 59
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "plan.readyNodeIds.map",
+          "lineNumber": 64
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "refForNode",
+          "lineNumber": 64
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "plan.runningNodeIds.map",
+          "lineNumber": 65
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "refForNode",
+          "lineNumber": 65
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "plan.blockedNodeIds.map",
+          "lineNumber": 66
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "refForNode",
+          "lineNumber": 66
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "plan.completedNodeIds.map",
+          "lineNumber": 67
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "refForNode",
+          "lineNumber": 67
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "plan.nodes.map",
+          "lineNumber": 69
+        },
+        {
+          "caller": "readAiExecutionView",
+          "callee": "buildNodeRuntimeInput",
+          "lineNumber": 70
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "Array.isArray",
+          "lineNumber": 92
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "value.map",
+          "lineNumber": 92
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "Object.fromEntries",
+          "lineNumber": 94
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "Object.entries(value as Record<string, unknown>)\n      .filter(([key]) => !/^(id|.*Id|.*Ids)$/.test(key))\n      .map",
+          "lineNumber": 95
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "Object.entries(value as Record<string, unknown>)\n      .filter",
+          "lineNumber": 95
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "Object.entries",
+          "lineNumber": 95
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "/^(id|.*Id|.*Ids)$/.test",
+          "lineNumber": 96
+        },
+        {
+          "caller": "redactBackendIds",
+          "callee": "redactBackendIds",
+          "lineNumber": 97
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/ai/__tests__/conflict-detector.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 295,
+      "nonEmptyLines": 268,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/ai/__tests__/timeslot-suggester.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 395,
+      "nonEmptyLines": 333,
+      "functions": [
+        {
+          "name": "d",
+          "startLine": 10,
+          "endLine": 12,
+          "params": [
+            "hour",
+            "minute"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "d",
+          "callee": "String(hour).padStart",
+          "lineNumber": 11
+        },
+        {
+          "caller": "d",
+          "callee": "String",
+          "lineNumber": 11
+        },
+        {
+          "caller": "d",
+          "callee": "String(minute).padStart",
+          "lineNumber": 11
+        },
+        {
+          "caller": "d",
+          "callee": "String",
+          "lineNumber": 11
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/ai/conflict-detector.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 110,
+      "nonEmptyLines": 90,
+      "functions": [
+        {
+          "name": "minutesBetween",
+          "startLine": 3,
+          "endLine": 5,
+          "params": [
+            "start",
+            "end"
+          ]
+        },
+        {
+          "name": "severityForMinutes",
+          "startLine": 7,
+          "endLine": 11,
+          "params": [
+            "minutes"
+          ]
+        },
+        {
+          "name": "dayKey",
+          "startLine": 13,
+          "endLine": 15,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "detectTimeOverlaps",
+          "startLine": 17,
+          "endLine": 46,
+          "params": [
+            "tasks"
+          ]
+        },
+        {
+          "name": "detectOverload",
+          "startLine": 48,
+          "endLine": 72,
+          "params": [
+            "tasks"
+          ]
+        },
+        {
+          "name": "detectFragmentation",
+          "startLine": 74,
+          "endLine": 88,
+          "params": [
+            "tasks"
+          ]
+        },
+        {
+          "name": "detectDependencyConflicts",
+          "startLine": 90,
+          "endLine": 110,
+          "params": [
+            "tasks"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "detectTimeOverlaps",
+          "line": 17,
+          "isDefault": false
+        },
+        {
+          "name": "detectOverload",
+          "line": 48,
+          "isDefault": false
+        },
+        {
+          "name": "detectFragmentation",
+          "line": 74,
+          "isDefault": false
+        },
+        {
+          "name": "detectDependencyConflicts",
+          "line": 90,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "minutesBetween",
+          "callee": "Math.max",
+          "lineNumber": 4
+        },
+        {
+          "caller": "minutesBetween",
+          "callee": "Math.round",
+          "lineNumber": 4
+        },
+        {
+          "caller": "minutesBetween",
+          "callee": "end.getTime",
+          "lineNumber": 4
+        },
+        {
+          "caller": "minutesBetween",
+          "callee": "start.getTime",
+          "lineNumber": 4
+        },
+        {
+          "caller": "dayKey",
+          "callee": "value.toISOString().slice",
+          "lineNumber": 14
+        },
+        {
+          "caller": "dayKey",
+          "callee": "value.toISOString",
+          "lineNumber": 14
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "[...tasks].sort",
+          "lineNumber": 19
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "left.scheduledStartAt.getTime",
+          "lineNumber": 20
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "right.scheduledStartAt.getTime",
+          "lineNumber": 20
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "Math.max",
+          "lineNumber": 27
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "left.scheduledStartAt.getTime",
+          "lineNumber": 27
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "right.scheduledStartAt.getTime",
+          "lineNumber": 27
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "Math.min",
+          "lineNumber": 28
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "left.scheduledEndAt.getTime",
+          "lineNumber": 28
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "right.scheduledEndAt.getTime",
+          "lineNumber": 28
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "minutesBetween",
+          "lineNumber": 29
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "conflicts.push",
+          "lineNumber": 33
+        },
+        {
+          "caller": "detectTimeOverlaps",
+          "callee": "severityForMinutes",
+          "lineNumber": 36
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "byDay.get",
+          "lineNumber": 52
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "dayKey",
+          "lineNumber": 52
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "items.push",
+          "lineNumber": 53
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "byDay.set",
+          "lineNumber": 54
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "dayKey",
+          "lineNumber": 54
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "Array.from(byDay.entries()).flatMap",
+          "lineNumber": 57
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "Array.from",
+          "lineNumber": 57
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "byDay.entries",
+          "lineNumber": 57
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "items.reduce",
+          "lineNumber": 58
+        },
+        {
+          "caller": "detectOverload",
+          "callee": "items.map",
+          "lineNumber": 67
+        },
+        {
+          "caller": "detectFragmentation",
+          "callee": "tasks.filter",
+          "lineNumber": 75
+        },
+        {
+          "caller": "detectFragmentation",
+          "callee": "smallTasks.reduce",
+          "lineNumber": 76
+        },
+        {
+          "caller": "detectFragmentation",
+          "callee": "smallTasks.map((task) => task.taskId).join",
+          "lineNumber": 81
+        },
+        {
+          "caller": "detectFragmentation",
+          "callee": "smallTasks.map",
+          "lineNumber": 81
+        },
+        {
+          "caller": "detectFragmentation",
+          "callee": "smallTasks.map",
+          "lineNumber": 84
+        },
+        {
+          "caller": "detectDependencyConflicts",
+          "callee": "tasks.map",
+          "lineNumber": 91
+        },
+        {
+          "caller": "detectDependencyConflicts",
+          "callee": "byId.get",
+          "lineNumber": 96
+        },
+        {
+          "caller": "detectDependencyConflicts",
+          "callee": "conflicts.push",
+          "lineNumber": 99
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/reconcile-impossible-state.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 71,
+      "nonEmptyLines": 66,
+      "functions": [
+        {
+          "name": "node",
+          "startLine": 6,
+          "endLine": 27,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/reconcile-invariants.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 30,
+      "functions": [
+        {
+          "name": "detectReconciliationIssues",
+          "startLine": 4,
+          "endLine": 24,
+          "params": [
+            "graph"
+          ]
+        },
+        {
+          "name": "deriveRepairActions",
+          "startLine": 26,
+          "endLine": 30,
+          "params": [
+            "issues"
+          ]
+        },
+        {
+          "name": "isTerminalStatus",
+          "startLine": 32,
+          "endLine": 34,
+          "params": [
+            "status"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "detectReconciliationIssues",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "deriveRepairActions",
+          "line": 26,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "detectReconciliationIssues",
+          "callee": "graph.terminalNodeIds.some",
+          "lineNumber": 5
+        },
+        {
+          "caller": "detectReconciliationIssues",
+          "callee": "graph.nodes.find",
+          "lineNumber": 6
+        },
+        {
+          "caller": "detectReconciliationIssues",
+          "callee": "terminal.dependencies.some",
+          "lineNumber": 8
+        },
+        {
+          "caller": "detectReconciliationIssues",
+          "callee": "graph.nodes.find",
+          "lineNumber": 9
+        },
+        {
+          "caller": "detectReconciliationIssues",
+          "callee": "isTerminalStatus",
+          "lineNumber": 10
+        },
+        {
+          "caller": "deriveRepairActions",
+          "callee": "issues.some",
+          "lineNumber": 27
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/reconcile-task-state.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 229,
+      "nonEmptyLines": 206,
+      "functions": [
+        {
+          "name": "makeNode",
+          "startLine": 6,
+          "endLine": 34,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "makeGraph",
+          "startLine": 36,
+          "endLine": 61,
+          "params": [
+            "nodes",
+            "overrides"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.slice(0, 1).map",
+          "lineNumber": 44
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.slice",
+          "lineNumber": 44
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.slice(-1).map",
+          "lineNumber": 45
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.slice",
+          "lineNumber": 45
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"ready\").map",
+          "lineNumber": 46
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 46
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"blocked\").map",
+          "lineNumber": 47
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 47
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"waiting\" || node.status.startsWith(\"waiting_\")).map",
+          "lineNumber": 48
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 48
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "node.status.startsWith",
+          "lineNumber": 48
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"waiting_for_user\").map",
+          "lineNumber": 49
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 49
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"waiting_for_approval\").map",
+          "lineNumber": 50
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 50
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"degraded\").map",
+          "lineNumber": 51
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 51
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"skipped\").map",
+          "lineNumber": 52
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 52
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"cancelled\").map",
+          "lineNumber": 53
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 53
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"completed\" || node.status === \"skipped\").map",
+          "lineNumber": 54
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 54
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"running\").map",
+          "lineNumber": 55
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 55
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"invalidated\").map",
+          "lineNumber": 56
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 56
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"failed\").map",
+          "lineNumber": 57
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 57
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter((node) => node.status === \"pending\").map",
+          "lineNumber": 58
+        },
+        {
+          "caller": "makeGraph",
+          "callee": "nodes.filter",
+          "lineNumber": 58
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 273,
+      "nonEmptyLines": 250,
+      "functions": [
+        {
+          "name": "reconcileTaskState",
+          "startLine": 37,
+          "endLine": 84,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "deriveExecutionState",
+          "startLine": 86,
+          "endLine": 103,
+          "params": [
+            "graph",
+            "blockReason",
+            "taskStatus"
+          ]
+        },
+        {
+          "name": "pickCurrentNode",
+          "startLine": 105,
+          "endLine": 118,
+          "params": [
+            "graph",
+            "blockReason"
+          ]
+        },
+        {
+          "name": "derivePrimaryAction",
+          "startLine": 120,
+          "endLine": 150,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "executionStateFromTaskBlock",
+          "startLine": 152,
+          "endLine": 181,
+          "params": [
+            "blockReason",
+            "taskStatus"
+          ]
+        },
+        {
+          "name": "derivePrimaryActionFromTaskBlock",
+          "startLine": 183,
+          "endLine": 211,
+          "params": [
+            "blockReason",
+            "targetNodeId"
+          ]
+        },
+        {
+          "name": "normalizeBlockType",
+          "startLine": 213,
+          "endLine": 215,
+          "params": [
+            "blockReason"
+          ]
+        },
+        {
+          "name": "deriveProgress",
+          "startLine": 217,
+          "endLine": 227,
+          "params": [
+            "graph"
+          ]
+        },
+        {
+          "name": "toGraphNodeState",
+          "startLine": 229,
+          "endLine": 243,
+          "params": [
+            "node",
+            "currentNodeId"
+          ]
+        },
+        {
+          "name": "toTaskNodeState",
+          "startLine": 245,
+          "endLine": 247,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "firstDegradedReason",
+          "startLine": 249,
+          "endLine": 252,
+          "params": [
+            "graph"
+          ]
+        },
+        {
+          "name": "firstReason",
+          "startLine": 254,
+          "endLine": 262,
+          "params": [
+            "graph",
+            "nodeIds"
+          ]
+        },
+        {
+          "name": "isTerminalStatus",
+          "startLine": 264,
+          "endLine": 266,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "formatStateLabel",
+          "startLine": 268,
+          "endLine": 273,
+          "params": [
+            "state"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "reconcileTaskState",
+          "line": 37,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "reconcileTaskState",
+          "callee": "pickCurrentNode",
+          "lineNumber": 38
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "deriveExecutionState",
+          "lineNumber": 39
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "deriveProgress",
+          "lineNumber": 40
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "derivePrimaryAction",
+          "lineNumber": 41
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "detectReconciliationIssues",
+          "lineNumber": 47
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "deriveRepairActions",
+          "lineNumber": 48
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "formatStateLabel",
+          "lineNumber": 53
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "firstDegradedReason",
+          "lineNumber": 63
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "firstReason",
+          "lineNumber": 64
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "firstReason",
+          "lineNumber": 65
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "input.graph.nodes.map",
+          "lineNumber": 71
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "toGraphNodeState",
+          "lineNumber": 71
+        },
+        {
+          "caller": "reconcileTaskState",
+          "callee": "(input.now ?? new Date()).toISOString",
+          "lineNumber": 81
+        },
+        {
+          "caller": "deriveExecutionState",
+          "callee": "executionStateFromTaskBlock",
+          "lineNumber": 96
+        },
+        {
+          "caller": "deriveExecutionState",
+          "callee": "graph.nodes.every",
+          "lineNumber": 101
+        },
+        {
+          "caller": "deriveExecutionState",
+          "callee": "isTerminalStatus",
+          "lineNumber": 101
+        },
+        {
+          "caller": "pickCurrentNode",
+          "callee": "[\n    blockReason?.nodeId,\n    ...graph.runningNodeIds,\n    ...graph.waitingForApprovalNodeIds,\n    ...graph.waitingForUserNodeIds,\n    ...graph.waitingNodeIds,\n    ...graph.blockedNodeIds,\n    ...graph.degradedNodeIds,\n    ...graph.failedNodeIds,\n    ...graph.readyNodeIds,\n  ].find",
+          "lineNumber": 106
+        },
+        {
+          "caller": "pickCurrentNode",
+          "callee": "Boolean",
+          "lineNumber": 116
+        },
+        {
+          "caller": "pickCurrentNode",
+          "callee": "graph.nodes.find",
+          "lineNumber": 117
+        },
+        {
+          "caller": "derivePrimaryAction",
+          "callee": "derivePrimaryActionFromTaskBlock",
+          "lineNumber": 127
+        },
+        {
+          "caller": "executionStateFromTaskBlock",
+          "callee": "normalizeBlockType",
+          "lineNumber": 158
+        },
+        {
+          "caller": "executionStateFromTaskBlock",
+          "callee": "taskStatus?.toLowerCase",
+          "lineNumber": 165
+        },
+        {
+          "caller": "derivePrimaryActionFromTaskBlock",
+          "callee": "normalizeBlockType",
+          "lineNumber": 187
+        },
+        {
+          "caller": "derivePrimaryActionFromTaskBlock",
+          "callee": "blockReason?.actionRequired?.trim",
+          "lineNumber": 188
+        },
+        {
+          "caller": "normalizeBlockType",
+          "callee": "blockReason?.blockType?.trim().toLowerCase",
+          "lineNumber": 214
+        },
+        {
+          "caller": "normalizeBlockType",
+          "callee": "blockReason?.blockType?.trim",
+          "lineNumber": 214
+        },
+        {
+          "caller": "deriveProgress",
+          "callee": "graph.nodes.filter",
+          "lineNumber": 218
+        },
+        {
+          "caller": "deriveProgress",
+          "callee": "graph.nodes.filter",
+          "lineNumber": 219
+        },
+        {
+          "caller": "deriveProgress",
+          "callee": "Math.round",
+          "lineNumber": 225
+        },
+        {
+          "caller": "toGraphNodeState",
+          "callee": "toTaskNodeState",
+          "lineNumber": 230
+        },
+        {
+          "caller": "toGraphNodeState",
+          "callee": "node.status.startsWith",
+          "lineNumber": 238
+        },
+        {
+          "caller": "firstDegradedReason",
+          "callee": "firstReason",
+          "lineNumber": 250
+        },
+        {
+          "caller": "firstReason",
+          "callee": "graph.nodes.find",
+          "lineNumber": 257
+        },
+        {
+          "caller": "formatStateLabel",
+          "callee": "state\n    .split(\"_\")\n    .map((part) => part[0]!.toUpperCase() + part.slice(1))\n    .join",
+          "lineNumber": 269
+        },
+        {
+          "caller": "formatStateLabel",
+          "callee": "state\n    .split(\"_\")\n    .map",
+          "lineNumber": 269
+        },
+        {
+          "caller": "formatStateLabel",
+          "callee": "state\n    .split",
+          "lineNumber": 269
+        },
+        {
+          "caller": "formatStateLabel",
+          "callee": "part[0]!.toUpperCase",
+          "lineNumber": 271
+        },
+        {
+          "caller": "formatStateLabel",
+          "callee": "part.slice",
+          "lineNumber": 271
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 14,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/__tests__/execution-state-invariants.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 82,
+      "nonEmptyLines": 76,
+      "functions": [
+        {
+          "name": "node",
+          "startLine": 5,
+          "endLine": 32,
+          "params": [
+            "overrides"
+          ]
+        },
+        {
+          "name": "graph",
+          "startLine": 34,
+          "endLine": 58,
+          "params": [
+            "nodes"
+          ]
+        },
+        {
+          "name": "decide",
+          "startLine": 60,
+          "endLine": 63,
+          "params": [
+            "overrides"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "graph",
+          "callee": "nodes.map",
+          "lineNumber": 42
+        },
+        {
+          "caller": "graph",
+          "callee": "nodes.map",
+          "lineNumber": 43
+        },
+        {
+          "caller": "graph",
+          "callee": "nodes.map",
+          "lineNumber": 56
+        },
+        {
+          "caller": "decide",
+          "callee": "node",
+          "lineNumber": 61
+        },
+        {
+          "caller": "decide",
+          "callee": "decideNodeExecutionSession",
+          "lineNumber": 62
+        },
+        {
+          "caller": "decide",
+          "callee": "graph",
+          "lineNumber": 62
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1033,
+      "nonEmptyLines": 972,
+      "functions": [
+        {
+          "name": "toStartRunInput",
+          "startLine": 253,
+          "endLine": 268,
+          "params": [
+            "request"
+          ]
+        },
+        {
+          "name": "runProviderRequest",
+          "startLine": 270,
+          "endLine": 349,
+          "params": [
+            "providerClient",
+            "request",
+            "options"
+          ]
+        },
+        {
+          "name": "reconcileInterruptedRun",
+          "startLine": 351,
+          "endLine": 375,
+          "params": [
+            "providerClient",
+            "run",
+            "signal"
+          ]
+        },
+        {
+          "name": "ensureProviderRunRecord",
+          "startLine": 377,
+          "endLine": 442,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "toJsonInput",
+          "startLine": 444,
+          "endLine": 448,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "updateProviderRunRecord",
+          "startLine": 450,
+          "endLine": 470,
+          "params": [
+            "providerRunRecordId",
+            "data"
+          ]
+        },
+        {
+          "name": "persistRuntimeRunRef",
+          "startLine": 472,
+          "endLine": 488,
+          "params": [
+            "runId",
+            "run"
+          ]
+        },
+        {
+          "name": "uniqueRuntimeRunRef",
+          "startLine": 490,
+          "endLine": 498,
+          "params": [
+            "runId",
+            "providerRunRef"
+          ]
+        },
+        {
+          "name": "readTaskSessionProviderRef",
+          "startLine": 500,
+          "endLine": 509,
+          "params": [
+            "taskSessionId"
+          ]
+        },
+        {
+          "name": "persistTaskSessionProviderRef",
+          "startLine": 511,
+          "endLine": 520,
+          "params": [
+            "taskSessionId",
+            "providerSessionRef"
+          ]
+        },
+        {
+          "name": "requireRuntimeSessionId",
+          "startLine": 522,
+          "endLine": 528,
+          "params": [
+            "value",
+            "source"
+          ]
+        },
+        {
+          "name": "isTransientProviderError",
+          "startLine": 530,
+          "endLine": 538,
+          "params": [
+            "error"
+          ]
+        },
+        {
+          "name": "delay",
+          "startLine": 540,
+          "endLine": 542,
+          "params": [
+            "ms"
+          ]
+        },
+        {
+          "name": "collectProviderRunSnapshot",
+          "startLine": 544,
+          "endLine": 606,
+          "params": [
+            "provider",
+            "events",
+            "fallbackSessionId",
+            "fallbackRun",
+            "options"
+          ]
+        },
+        {
+          "name": "persistProviderRuntimeEvent",
+          "startLine": 625,
+          "endLine": 727,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "reconcilePendingProviderApprovals",
+          "startLine": 731,
+          "endLine": 783,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "persistProviderApproval",
+          "startLine": 785,
+          "endLine": 842,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "updateProviderRunAuditRefs",
+          "startLine": 844,
+          "endLine": 871,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "summaryForProviderEvent",
+          "startLine": 873,
+          "endLine": 880,
+          "params": [
+            "event"
+          ]
+        },
+        {
+          "name": "hasRawProviderPayload",
+          "startLine": 882,
+          "endLine": 884,
+          "params": [
+            "event"
+          ]
+        },
+        {
+          "name": "rawPayloadForProviderEvent",
+          "startLine": 886,
+          "endLine": 888,
+          "params": [
+            "event"
+          ]
+        },
+        {
+          "name": "buildExecutionGatewayRequest",
+          "startLine": 890,
+          "endLine": 928,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "buildExecutionAiInput",
+          "startLine": 930,
+          "endLine": 954,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "persistRuntimeHistory",
+          "startLine": 956,
+          "endLine": 1000,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "extractAssistantContent",
+          "startLine": 1002,
+          "endLine": 1023,
+          "params": [
+            "response"
+          ]
+        },
+        {
+          "name": "extractUserText",
+          "startLine": 1025,
+          "endLine": 1033,
+          "params": [
+            "request"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "IncompleteRunStreamError",
+          "startLine": 90,
+          "endLine": 98,
+          "methods": [
+            "constructor"
+          ],
+          "properties": [
+            "code",
+            "retryable"
+          ]
+        },
+        {
+          "name": "AiRuntimeInvoker",
+          "startLine": 100,
+          "endLine": 251,
+          "methods": [
+            "invoke"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "AiRuntimeInvoker",
+          "line": 100,
+          "isDefault": false
+        },
+        {
+          "name": "runProviderRequest",
+          "line": 270,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 95
+        },
+        {
+          "caller": "invoke",
+          "callee": "db.task.findUniqueOrThrow",
+          "lineNumber": 102
+        },
+        {
+          "caller": "invoke",
+          "callee": "db.run.create",
+          "lineNumber": 106
+        },
+        {
+          "caller": "invoke",
+          "callee": "requireAiClient",
+          "lineNumber": 121
+        },
+        {
+          "caller": "invoke",
+          "callee": "mintRunToken",
+          "lineNumber": 131
+        },
+        {
+          "caller": "invoke",
+          "callee": "readTaskSessionProviderRef",
+          "lineNumber": 145
+        },
+        {
+          "caller": "invoke",
+          "callee": "buildExecutionGatewayRequest",
+          "lineNumber": 148
+        },
+        {
+          "caller": "invoke",
+          "callee": "ensureProviderRunRecord",
+          "lineNumber": 158
+        },
+        {
+          "caller": "invoke",
+          "callee": "runProviderRequest",
+          "lineNumber": 165
+        },
+        {
+          "caller": "invoke",
+          "callee": "requireRuntimeSessionId",
+          "lineNumber": 187
+        },
+        {
+          "caller": "invoke",
+          "callee": "uniqueRuntimeRunRef",
+          "lineNumber": 191
+        },
+        {
+          "caller": "invoke",
+          "callee": "persistRuntimeHistory",
+          "lineNumber": 192
+        },
+        {
+          "caller": "invoke",
+          "callee": "db.run.update",
+          "lineNumber": 198
+        },
+        {
+          "caller": "invoke",
+          "callee": "persistTaskSessionProviderRef",
+          "lineNumber": 213
+        },
+        {
+          "caller": "invoke",
+          "callee": "updateProviderRunRecord",
+          "lineNumber": 215
+        },
+        {
+          "caller": "invoke",
+          "callee": "db.run.update",
+          "lineNumber": 234
+        },
+        {
+          "caller": "invoke",
+          "callee": "db.taskPlanProviderRun.findUnique",
+          "lineNumber": 239
+        },
+        {
+          "caller": "invoke",
+          "callee": "updateProviderRunRecord",
+          "lineNumber": 243
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "toStartRunInput",
+          "lineNumber": 284
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "providerClient.startRun",
+          "lineNumber": 296
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "persistRuntimeRunRef",
+          "lineNumber": 302
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "updateProviderRunRecord",
+          "lineNumber": 303
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "collectProviderRunSnapshot",
+          "lineNumber": 310
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "providerClient.streamRun",
+          "lineNumber": 312
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "isTransientProviderError",
+          "lineNumber": 323
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "delay",
+          "lineNumber": 324
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "collectProviderRunSnapshot",
+          "lineNumber": 327
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "providerClient.streamRun",
+          "lineNumber": 329
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "isTransientProviderError",
+          "lineNumber": 340
+        },
+        {
+          "caller": "runProviderRequest",
+          "callee": "reconcileInterruptedRun",
+          "lineNumber": 347
+        },
+        {
+          "caller": "reconcileInterruptedRun",
+          "callee": "providerClient.getRun",
+          "lineNumber": 357
+        },
+        {
+          "caller": "ensureProviderRunRecord",
+          "callee": "db.taskPlanRun.findFirst",
+          "lineNumber": 386
+        },
+        {
+          "caller": "ensureProviderRunRecord",
+          "callee": "db.taskPlanNodeAttempt.upsert",
+          "lineNumber": 395
+        },
+        {
+          "caller": "ensureProviderRunRecord",
+          "callee": "toJsonInput",
+          "lineNumber": 399
+        },
+        {
+          "caller": "ensureProviderRunRecord",
+          "callee": "toJsonInput",
+          "lineNumber": 403
+        },
+        {
+          "caller": "ensureProviderRunRecord",
+          "callee": "toJsonInput",
+          "lineNumber": 422
+        },
+        {
+          "caller": "ensureProviderRunRecord",
+          "callee": "toJsonInput",
+          "lineNumber": 423
+        },
+        {
+          "caller": "ensureProviderRunRecord",
+          "callee": "db.taskPlanProviderRun.upsert",
+          "lineNumber": 428
+        },
+        {
+          "caller": "toJsonInput",
+          "callee": "JSON.parse",
+          "lineNumber": 447
+        },
+        {
+          "caller": "toJsonInput",
+          "callee": "JSON.stringify",
+          "lineNumber": 447
+        },
+        {
+          "caller": "updateProviderRunRecord",
+          "callee": "db.taskPlanProviderRun.update",
+          "lineNumber": 466
+        },
+        {
+          "caller": "persistRuntimeRunRef",
+          "callee": "requireRuntimeSessionId",
+          "lineNumber": 477
+        },
+        {
+          "caller": "persistRuntimeRunRef",
+          "callee": "uniqueRuntimeRunRef",
+          "lineNumber": 478
+        },
+        {
+          "caller": "persistRuntimeRunRef",
+          "callee": "db.run.update",
+          "lineNumber": 479
+        },
+        {
+          "caller": "uniqueRuntimeRunRef",
+          "callee": "db.run.findUnique",
+          "lineNumber": 492
+        },
+        {
+          "caller": "readTaskSessionProviderRef",
+          "callee": "db.taskSession.findUnique",
+          "lineNumber": 504
+        },
+        {
+          "caller": "readTaskSessionProviderRef",
+          "callee": "session?.providerSessionRef?.trim",
+          "lineNumber": 508
+        },
+        {
+          "caller": "persistTaskSessionProviderRef",
+          "callee": "db.taskSession.update",
+          "lineNumber": 516
+        },
+        {
+          "caller": "requireRuntimeSessionId",
+          "callee": "value?.trim",
+          "lineNumber": 523
+        },
+        {
+          "caller": "isTransientProviderError",
+          "callee": "TRANSIENT_PROVIDER_ERROR_CODES.has",
+          "lineNumber": 537
+        },
+        {
+          "caller": "delay",
+          "callee": "setTimeout",
+          "lineNumber": 541
+        },
+        {
+          "caller": "collectProviderRunSnapshot",
+          "callee": "options.onRuntimeEvent",
+          "lineNumber": 560
+        },
+        {
+          "caller": "collectProviderRunSnapshot",
+          "callee": "persistProviderRuntimeEvent",
+          "lineNumber": 561
+        },
+        {
+          "caller": "collectProviderRunSnapshot",
+          "callee": "requireRuntimeSessionId",
+          "lineNumber": 567
+        },
+        {
+          "caller": "collectProviderRunSnapshot",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 593
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "Number.isNaN",
+          "lineNumber": 638
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "occurredAt.getTime",
+          "lineNumber": 638
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "appendRawEventLog",
+          "lineNumber": 639
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "rawPayloadForProviderEvent",
+          "lineNumber": 654
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "hasRawProviderPayload",
+          "lineNumber": 655
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "appendCanonicalEvent",
+          "lineNumber": 665
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "summaryForProviderEvent",
+          "lineNumber": 691
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "db.task.update({\n      where: { id: context.taskId },\n      data: { latestEventId: event.id, latestRawEventId: rawEvent.id },\n    }).catch",
+          "lineNumber": 695
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "db.task.update",
+          "lineNumber": 695
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "updateProviderRunAuditRefs",
+          "lineNumber": 699
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "persistProviderApproval",
+          "lineNumber": 709
+        },
+        {
+          "caller": "persistProviderRuntimeEvent",
+          "callee": "reconcilePendingProviderApprovals",
+          "lineNumber": 718
+        },
+        {
+          "caller": "reconcilePendingProviderApprovals",
+          "callee": "db.taskPlanProviderApproval.findMany",
+          "lineNumber": 738
+        },
+        {
+          "caller": "reconcilePendingProviderApprovals",
+          "callee": "pendingApprovals\n    .filter((approval) =>\n      isTerminalEvent || input.observedAt.getTime() - approval.requestedAt.getTime() >= HERMES_DEFAULT_APPROVAL_TIMEOUT_MS,\n    )\n    .map",
+          "lineNumber": 754
+        },
+        {
+          "caller": "reconcilePendingProviderApprovals",
+          "callee": "pendingApprovals\n    .filter",
+          "lineNumber": 754
+        },
+        {
+          "caller": "reconcilePendingProviderApprovals",
+          "callee": "input.observedAt.getTime",
+          "lineNumber": 756
+        },
+        {
+          "caller": "reconcilePendingProviderApprovals",
+          "callee": "approval.requestedAt.getTime",
+          "lineNumber": 756
+        },
+        {
+          "caller": "reconcilePendingProviderApprovals",
+          "callee": "db.taskPlanProviderApproval.updateMany",
+          "lineNumber": 761
+        },
+        {
+          "caller": "reconcilePendingProviderApprovals",
+          "callee": "toJsonInput",
+          "lineNumber": 770
+        },
+        {
+          "caller": "persistProviderApproval",
+          "callee": "db.taskPlanProviderApproval.upsert",
+          "lineNumber": 798
+        },
+        {
+          "caller": "persistProviderApproval",
+          "callee": "toJsonInput",
+          "lineNumber": 808
+        },
+        {
+          "caller": "persistProviderApproval",
+          "callee": "toJsonInput",
+          "lineNumber": 832
+        },
+        {
+          "caller": "persistProviderApproval",
+          "callee": "toJsonInput",
+          "lineNumber": 833
+        },
+        {
+          "caller": "persistProviderApproval",
+          "callee": "toJsonInput",
+          "lineNumber": 834
+        },
+        {
+          "caller": "persistProviderApproval",
+          "callee": "toJsonInput",
+          "lineNumber": 835
+        },
+        {
+          "caller": "updateProviderRunAuditRefs",
+          "callee": "db.taskPlanProviderRun.findUnique",
+          "lineNumber": 854
+        },
+        {
+          "caller": "updateProviderRunAuditRefs",
+          "callee": "db.taskPlanProviderRun.update",
+          "lineNumber": 858
+        },
+        {
+          "caller": "rawPayloadForProviderEvent",
+          "callee": "hasRawProviderPayload",
+          "lineNumber": 887
+        },
+        {
+          "caller": "buildExecutionGatewayRequest",
+          "callee": "buildExecutionAiInput",
+          "lineNumber": 899
+        },
+        {
+          "caller": "buildExecutionGatewayRequest",
+          "callee": "parts.push",
+          "lineNumber": 905
+        },
+        {
+          "caller": "buildExecutionGatewayRequest",
+          "callee": "Object.keys",
+          "lineNumber": 906
+        },
+        {
+          "caller": "buildExecutionGatewayRequest",
+          "callee": "parts.push",
+          "lineNumber": 907
+        },
+        {
+          "caller": "buildExecutionGatewayRequest",
+          "callee": "JSON.stringify",
+          "lineNumber": 908
+        },
+        {
+          "caller": "buildExecutionGatewayRequest",
+          "callee": "parts.push",
+          "lineNumber": 911
+        },
+        {
+          "caller": "buildExecutionGatewayRequest",
+          "callee": "parts.join",
+          "lineNumber": 919
+        },
+        {
+          "caller": "persistRuntimeHistory",
+          "callee": "extractAssistantContent",
+          "lineNumber": 962
+        },
+        {
+          "caller": "persistRuntimeHistory",
+          "callee": "extractUserText",
+          "lineNumber": 965
+        },
+        {
+          "caller": "persistRuntimeHistory",
+          "callee": "db.conversationEntry.create",
+          "lineNumber": 983
+        },
+        {
+          "caller": "persistRuntimeHistory",
+          "callee": "conversationEntryIds.push",
+          "lineNumber": 993
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "(response.outputText ?? \"\").trim",
+          "lineNumber": 1003
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "parsed.trim",
+          "lineNumber": 1011
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "Array.isArray",
+          "lineNumber": 1012
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "record.output.trim",
+          "lineNumber": 1015
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "record.output.trim",
+          "lineNumber": 1016
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "record.summary.trim",
+          "lineNumber": 1018
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "record.summary.trim",
+          "lineNumber": 1019
+        },
+        {
+          "caller": "extractAssistantContent",
+          "callee": "JSON.stringify",
+          "lineNumber": 1022
+        },
+        {
+          "caller": "extractUserText",
+          "callee": "segments.push",
+          "lineNumber": 1028
+        },
+        {
+          "caller": "extractUserText",
+          "callee": "JSON.stringify",
+          "lineNumber": 1028
+        },
+        {
+          "caller": "extractUserText",
+          "callee": "segments.push",
+          "lineNumber": 1030
+        },
+        {
+          "caller": "extractUserText",
+          "callee": "String",
+          "lineNumber": 1030
+        },
+        {
+          "caller": "extractUserText",
+          "callee": "segments.filter(Boolean).join",
+          "lineNumber": 1032
+        },
+        {
+          "caller": "extractUserText",
+          "callee": "segments.filter",
+          "lineNumber": 1032
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 26,
+        "classCount": 2
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/execution-actions.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 72,
+      "nonEmptyLines": 65,
+      "functions": [
+        {
+          "name": "resolveCheckpointAction",
+          "startLine": 26,
+          "endLine": 36,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "checkpointPayloadFields",
+          "startLine": 38,
+          "endLine": 49,
+          "params": [
+            "payload"
+          ]
+        },
+        {
+          "name": "checkpointPayloadText",
+          "startLine": 51,
+          "endLine": 53,
+          "params": [
+            "payload"
+          ]
+        },
+        {
+          "name": "payloadText",
+          "startLine": 55,
+          "endLine": 64,
+          "params": [
+            "payload"
+          ]
+        },
+        {
+          "name": "payloadMutationId",
+          "startLine": 66,
+          "endLine": 72,
+          "params": [
+            "payload"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "resolveCheckpointAction",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "checkpointPayloadFields",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "checkpointPayloadText",
+          "line": 51,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resolveCheckpointAction",
+          "callee": "input.checkpoint.availableActions.some",
+          "lineNumber": 31
+        },
+        {
+          "caller": "resolveCheckpointAction",
+          "callee": "TRANSITION_BY_ACTION[input.action]",
+          "lineNumber": 35
+        },
+        {
+          "caller": "checkpointPayloadFields",
+          "callee": "Object.fromEntries",
+          "lineNumber": 44
+        },
+        {
+          "caller": "checkpointPayloadFields",
+          "callee": "Object.entries(source)\n      .filter(([, value]) => typeof value === \"string\")\n      .map",
+          "lineNumber": 45
+        },
+        {
+          "caller": "checkpointPayloadFields",
+          "callee": "Object.entries(source)\n      .filter",
+          "lineNumber": 45
+        },
+        {
+          "caller": "checkpointPayloadFields",
+          "callee": "Object.entries",
+          "lineNumber": 45
+        },
+        {
+          "caller": "checkpointPayloadText",
+          "callee": "payloadText",
+          "lineNumber": 52
+        },
+        {
+          "caller": "payloadText",
+          "callee": "payload.trim",
+          "lineNumber": 56
+        },
+        {
+          "caller": "payloadText",
+          "callee": "value.trim",
+          "lineNumber": 61
+        },
+        {
+          "caller": "payloadText",
+          "callee": "value.trim",
+          "lineNumber": 61
+        },
+        {
+          "caller": "payloadMutationId",
+          "callee": "value.trim",
+          "lineNumber": 69
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/execution-checkpoint.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 244,
+      "nonEmptyLines": 228,
+      "functions": [
+        {
+          "name": "deriveExecutionCheckpoint",
+          "startLine": 86,
+          "endLine": 108,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "checkpointId",
+          "startLine": 110,
+          "endLine": 116,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "isCheckpointStatus",
+          "startLine": 118,
+          "endLine": 123,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "findCheckpointNode",
+          "startLine": 125,
+          "endLine": 136,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "checkpointKind",
+          "startLine": 138,
+          "endLine": 148,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "approvalCheckpointKind",
+          "startLine": 150,
+          "endLine": 154,
+          "params": [
+            "waitKind"
+          ]
+        },
+        {
+          "name": "blockedCheckpointKind",
+          "startLine": 156,
+          "endLine": 160,
+          "params": [
+            "waitKind"
+          ]
+        },
+        {
+          "name": "checkpointTitle",
+          "startLine": 162,
+          "endLine": 182,
+          "params": [
+            "kind",
+            "node"
+          ]
+        },
+        {
+          "name": "checkpointMessage",
+          "startLine": 184,
+          "endLine": 196,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "checkpointSeverity",
+          "startLine": 198,
+          "endLine": 204,
+          "params": [
+            "kind"
+          ]
+        },
+        {
+          "name": "checkpointForm",
+          "startLine": 206,
+          "endLine": 214,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "checkpointActions",
+          "startLine": 216,
+          "endLine": 244,
+          "params": [
+            "kind"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "deriveExecutionCheckpoint",
+          "line": 86,
+          "isDefault": false
+        },
+        {
+          "name": "checkpointId",
+          "line": 110,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "isCheckpointStatus",
+          "lineNumber": 89
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "findCheckpointNode",
+          "lineNumber": 91
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointKind",
+          "lineNumber": 92
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointId",
+          "lineNumber": 95
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointTitle",
+          "lineNumber": 101
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointMessage",
+          "lineNumber": 102
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointSeverity",
+          "lineNumber": 103
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointForm",
+          "lineNumber": 104
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointForm",
+          "lineNumber": 104
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "checkpointActions",
+          "lineNumber": 105
+        },
+        {
+          "caller": "deriveExecutionCheckpoint",
+          "callee": "(input.now ?? new Date()).toISOString",
+          "lineNumber": 106
+        },
+        {
+          "caller": "findCheckpointNode",
+          "callee": "input.effective.nodes.find",
+          "lineNumber": 128
+        },
+        {
+          "caller": "findCheckpointNode",
+          "callee": "input.effective.nodes.find",
+          "lineNumber": 130
+        },
+        {
+          "caller": "findCheckpointNode",
+          "callee": "input.effective.nodes.find",
+          "lineNumber": 131
+        },
+        {
+          "caller": "findCheckpointNode",
+          "callee": "input.effective.nodes.find",
+          "lineNumber": 132
+        },
+        {
+          "caller": "findCheckpointNode",
+          "callee": "input.effective.nodes.find",
+          "lineNumber": 133
+        },
+        {
+          "caller": "checkpointKind",
+          "callee": "approvalCheckpointKind",
+          "lineNumber": 145
+        },
+        {
+          "caller": "checkpointKind",
+          "callee": "blockedCheckpointKind",
+          "lineNumber": 147
+        },
+        {
+          "caller": "checkpointMessage",
+          "callee": "input.message.trim",
+          "lineNumber": 189
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 12,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/execution-state-machine.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 173,
+      "nonEmptyLines": 162,
+      "functions": [
+        {
+          "name": "executionStatusFromEffectiveGraph",
+          "startLine": 20,
+          "endLine": 48,
+          "params": [
+            "effective"
+          ]
+        },
+        {
+          "name": "executionStatusFromWaitKind",
+          "startLine": 49,
+          "endLine": 63,
+          "params": [
+            "waitKind"
+          ]
+        },
+        {
+          "name": "executionStatusFromGraphOutcome",
+          "startLine": 65,
+          "endLine": 78,
+          "params": [
+            "outcome"
+          ]
+        },
+        {
+          "name": "pauseReasonFromExecutionStatus",
+          "startLine": 80,
+          "endLine": 101,
+          "params": [
+            "status",
+            "waitKind"
+          ]
+        },
+        {
+          "name": "planRunStatusForExecutionStatus",
+          "startLine": 103,
+          "endLine": 121,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "graphStatusForExecutionStatus",
+          "startLine": 123,
+          "endLine": 139,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "executionTransition",
+          "startLine": 141,
+          "endLine": 153,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "sessionStatusForExecutionStatus",
+          "startLine": 155,
+          "endLine": 173,
+          "params": [
+            "status"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "executionStatusFromEffectiveGraph",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "executionStatusFromWaitKind",
+          "line": 49,
+          "isDefault": false
+        },
+        {
+          "name": "executionStatusFromGraphOutcome",
+          "line": 65,
+          "isDefault": false
+        },
+        {
+          "name": "pauseReasonFromExecutionStatus",
+          "line": 80,
+          "isDefault": false
+        },
+        {
+          "name": "planRunStatusForExecutionStatus",
+          "line": 103,
+          "isDefault": false
+        },
+        {
+          "name": "graphStatusForExecutionStatus",
+          "line": 123,
+          "isDefault": false
+        },
+        {
+          "name": "executionTransition",
+          "line": 141,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "executionStatusFromEffectiveGraph",
+          "callee": "effective.nodes.some",
+          "lineNumber": 26
+        },
+        {
+          "caller": "executionStatusFromEffectiveGraph",
+          "callee": "effective.nodes.some",
+          "lineNumber": 29
+        },
+        {
+          "caller": "executionStatusFromEffectiveGraph",
+          "callee": "effective.nodes.filter",
+          "lineNumber": 39
+        },
+        {
+          "caller": "executionStatusFromEffectiveGraph",
+          "callee": "reachableNodes.every",
+          "lineNumber": 42
+        },
+        {
+          "caller": "executionStatusFromEffectiveGraph",
+          "callee": "effective.completedNodeIds.includes",
+          "lineNumber": 42
+        },
+        {
+          "caller": "executionTransition",
+          "callee": "pauseReasonFromExecutionStatus",
+          "lineNumber": 145
+        },
+        {
+          "caller": "executionTransition",
+          "callee": "sessionStatusForExecutionStatus",
+          "lineNumber": 148
+        },
+        {
+          "caller": "executionTransition",
+          "callee": "planRunStatusForExecutionStatus",
+          "lineNumber": 149
+        },
+        {
+          "caller": "executionTransition",
+          "callee": "graphStatusForExecutionStatus",
+          "lineNumber": 150
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 7,
+        "functionCount": 8,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/execute-command.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 604,
+      "nonEmptyLines": 567,
+      "functions": [
+        {
+          "name": "eventCommandType",
+          "startLine": 60,
+          "endLine": 81,
+          "params": [
+            "command"
+          ]
+        },
+        {
+          "name": "noPlanResponse",
+          "startLine": 85,
+          "endLine": 98,
+          "params": [
+            "taskId",
+            "sessionId"
+          ]
+        },
+        {
+          "name": "formatInputFields",
+          "startLine": 100,
+          "endLine": 104,
+          "params": [
+            "fields"
+          ]
+        },
+        {
+          "name": "waitingNode",
+          "startLine": 106,
+          "endLine": 113,
+          "params": [
+            "effective"
+          ]
+        },
+        {
+          "name": "currentNode",
+          "startLine": 115,
+          "endLine": 126,
+          "params": [
+            "effective"
+          ]
+        },
+        {
+          "name": "resolveSubmittedNodeRef",
+          "startLine": 128,
+          "endLine": 133,
+          "params": [
+            "nodeId",
+            "effective"
+          ]
+        },
+        {
+          "name": "resolveSubmitNodeId",
+          "startLine": 135,
+          "endLine": 157,
+          "params": [
+            "command",
+            "state",
+            "effective"
+          ]
+        },
+        {
+          "name": "toSubmittedNodeResult",
+          "startLine": 159,
+          "endLine": 210,
+          "params": [
+            "nodeId",
+            "result",
+            "effective"
+          ]
+        },
+        {
+          "name": "buildGraphCommand",
+          "startLine": 212,
+          "endLine": 321,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "finalizeOutcome",
+          "startLine": 323,
+          "endLine": 402,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "executeCommand",
+          "startLine": 410,
+          "endLine": 604,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "executeCommand",
+          "line": 410,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "formatInputFields",
+          "callee": "Object.entries(fields)\n    .map(([key, value]) => `${key}: ${value}`)\n    .join",
+          "lineNumber": 101
+        },
+        {
+          "caller": "formatInputFields",
+          "callee": "Object.entries(fields)\n    .map",
+          "lineNumber": 101
+        },
+        {
+          "caller": "formatInputFields",
+          "callee": "Object.entries",
+          "lineNumber": 101
+        },
+        {
+          "caller": "waitingNode",
+          "callee": "effective.nodes.find",
+          "lineNumber": 107
+        },
+        {
+          "caller": "currentNode",
+          "callee": "effective.nodes.find",
+          "lineNumber": 117
+        },
+        {
+          "caller": "currentNode",
+          "callee": "effective.nodes.find",
+          "lineNumber": 118
+        },
+        {
+          "caller": "resolveSubmittedNodeRef",
+          "callee": "effective.nodes.find",
+          "lineNumber": 129
+        },
+        {
+          "caller": "resolveSubmittedNodeRef",
+          "callee": "buildSemanticRefHistory(effective).nodeRefs.find",
+          "lineNumber": 131
+        },
+        {
+          "caller": "resolveSubmittedNodeRef",
+          "callee": "buildSemanticRefHistory",
+          "lineNumber": 131
+        },
+        {
+          "caller": "resolveSubmitNodeId",
+          "callee": "resolveSubmittedNodeRef",
+          "lineNumber": 140
+        },
+        {
+          "caller": "resolveSubmitNodeId",
+          "callee": "state.results.find",
+          "lineNumber": 142
+        },
+        {
+          "caller": "resolveSubmitNodeId",
+          "callee": "[...state.attempts]\n      .reverse()\n      .find",
+          "lineNumber": 146
+        },
+        {
+          "caller": "resolveSubmitNodeId",
+          "callee": "[...state.attempts]\n      .reverse",
+          "lineNumber": 146
+        },
+        {
+          "caller": "resolveSubmitNodeId",
+          "callee": "effective.nodes.find",
+          "lineNumber": 152
+        },
+        {
+          "caller": "resolveSubmitNodeId",
+          "callee": "waitingNode",
+          "lineNumber": 153
+        },
+        {
+          "caller": "toSubmittedNodeResult",
+          "callee": "effective.nodes.find",
+          "lineNumber": 169
+        },
+        {
+          "caller": "toSubmittedNodeResult",
+          "callee": "branchBindingForRef",
+          "lineNumber": 172
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "waitingNode",
+          "lineNumber": 228
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "formatInputFields",
+          "lineNumber": 235
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "effective.nodes.find",
+          "lineNumber": 245
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "effective.nodes.find",
+          "lineNumber": 261
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "waitingNode",
+          "lineNumber": 262
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "resolveSubmitNodeId",
+          "lineNumber": 266
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "toSubmittedNodeResult",
+          "lineNumber": 271
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "currentNode",
+          "lineNumber": 276
+        },
+        {
+          "caller": "buildGraphCommand",
+          "callee": "currentNode",
+          "lineNumber": 285
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "executionStatusFromGraphOutcome",
+          "lineNumber": 332
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "waitKindFromOutcome",
+          "lineNumber": 340
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "currentNodeFromOutcome",
+          "lineNumber": 343
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "latestStartedNodeId",
+          "lineNumber": 343
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "executionTransition",
+          "lineNumber": 353
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "setExecutionSessionState",
+          "lineNumber": 356
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "outcome.effective.completedNodeIds.filter",
+          "lineNumber": 361
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "outcome.effective.nodes.find",
+          "lineNumber": 362
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "db.task.update",
+          "lineNumber": 368
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "completeActiveRunsForTask",
+          "lineNumber": 372
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "completeWorkBlock",
+          "lineNumber": 373
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "appendMainSessionEvent",
+          "lineNumber": 374
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "releaseWorkBlock",
+          "lineNumber": 383
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "rebuildTaskProjection",
+          "lineNumber": 386
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "buildExecutionResponse",
+          "lineNumber": 388
+        },
+        {
+          "caller": "finalizeOutcome",
+          "callee": "errorDetailsFromOutcome",
+          "lineNumber": 399
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "getActiveExecutionWorkBlockId",
+          "lineNumber": 421
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "ensureNativePlanRun",
+          "lineNumber": 423
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "noPlanResponse",
+          "lineNumber": 424
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "db.executionSession.findUnique",
+          "lineNumber": 429
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "ensureExecutionSession",
+          "lineNumber": 435
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "ensurePlanMainSession",
+          "lineNumber": 443
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "getRuntimeName",
+          "lineNumber": 447
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "activateWorkBlock",
+          "lineNumber": 450
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "appendMainSessionEvent",
+          "lineNumber": 451
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "toGraphExecutionState",
+          "lineNumber": 461
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 462
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "getCurrentExecution",
+          "lineNumber": 476
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "buildGraphCommand",
+          "lineNumber": 479
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "getCurrentExecution",
+          "lineNumber": 490
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "createGraphRuntime",
+          "lineNumber": 500
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "createKernelGraphCallbacks",
+          "lineNumber": 504
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "graphRuntime.dispatch",
+          "lineNumber": 521
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "db.taskPlanRun.findFirst",
+          "lineNumber": 528
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "executionStatusFromGraphOutcome",
+          "lineNumber": 541
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "graphStatusForExecutionStatus",
+          "lineNumber": 547
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "derivePlanRunFromRuntime",
+          "lineNumber": 549
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "savePlanRunGuarded",
+          "lineNumber": 557
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "getCurrentExecution",
+          "lineNumber": 572
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "appendGraphRuntimeEvents",
+          "lineNumber": 575
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "eventCommandType",
+          "lineNumber": 582
+        },
+        {
+          "caller": "executeCommand",
+          "callee": "finalizeOutcome",
+          "lineNumber": 596
+        }
+      ],
+      "metrics": {
+        "importCount": 17,
+        "exportCount": 1,
+        "functionCount": 11,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 120,
+      "nonEmptyLines": 116,
+      "functions": [
+        {
+          "name": "createKernelGraphCallbacks",
+          "startLine": 22,
+          "endLine": 120,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createKernelGraphCallbacks",
+          "line": 22,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "markExecutionNodeActive",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "input.onGraphEvent",
+          "lineNumber": 37
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "committedStateIfRunningNodeAdvanced",
+          "lineNumber": 43
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "input.onStateChange",
+          "lineNumber": 50
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 50
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "persistRuntimeState",
+          "lineNumber": 60
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "input.onStateChange",
+          "lineNumber": 73
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "resolveEffectivePlanGraph",
+          "lineNumber": 73
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "planExecutionNodeExecutors.find",
+          "lineNumber": 76
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "candidate.canExecute",
+          "lineNumber": 77
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "executor.execute",
+          "lineNumber": 80
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "input.onRuntimeEvent",
+          "lineNumber": 94
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "committedStateForSubmittedNode",
+          "lineNumber": 104
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "structuredClone",
+          "lineNumber": 113
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "structuredClone",
+          "lineNumber": 114
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "structuredClone",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createKernelGraphCallbacks",
+          "callee": "structuredClone",
+          "lineNumber": 116
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/kernel-types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 52,
+      "nonEmptyLines": 46,
+      "classes": [
+        {
+          "name": "ExecutionConflictError",
+          "startLine": 47,
+          "endLine": 52,
+          "methods": [
+            "constructor"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "ExecutionConflictError",
+          "line": 47,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 49
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 57,
+      "nonEmptyLines": 54,
+      "functions": [
+        {
+          "name": "syncPlanRunRuntimeResult",
+          "startLine": 14,
+          "endLine": 57,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "syncPlanRunRuntimeResult",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "syncPlanRunRuntimeResult",
+          "callee": "(() => {\n    if (input.status === \"Completed\") {\n      if (input.output !== undefined) {\n        return { kind: \"done\", summary: input.summary ?? undefined, output: input.output };\n      }\n      const message = \"Runtime run completed without a Chrona terminal result action\";\n      return { kind: \"failed\", error: input.summary ? `${message}: ${input.summary}` : message };\n    }\n    return input.status === \"Cancelled\"\n      ? { kind: \"cancelled\", reason: input.summary ?? undefined }\n      : { kind: \"failed\", error: input.error ?? input.summary ?? \"Runtime run failed\" };\n  })",
+          "lineNumber": 17
+        },
+        {
+          "caller": "syncPlanRunRuntimeResult",
+          "callee": "executeCommand",
+          "lineNumber": 31
+        },
+        {
+          "caller": "syncPlanRunRuntimeResult",
+          "callee": "input.status.toLowerCase",
+          "lineNumber": 43
+        },
+        {
+          "caller": "syncPlanRunRuntimeResult",
+          "callee": "logger.warn",
+          "lineNumber": 50
+        },
+        {
+          "caller": "syncPlanRunRuntimeResult",
+          "callee": "String",
+          "lineNumber": 54
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 603,
+      "nonEmptyLines": 574,
+      "functions": [
+        {
+          "name": "makeTaskNode",
+          "startLine": 8,
+          "endLine": 33,
+          "params": []
+        },
+        {
+          "name": "makeConditionNode",
+          "startLine": 35,
+          "endLine": 58,
+          "params": []
+        },
+        {
+          "name": "makeDownstreamNode",
+          "startLine": 60,
+          "endLine": 77,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "makePlan",
+          "startLine": 79,
+          "endLine": 103,
+          "params": [
+            "node"
+          ]
+        },
+        {
+          "name": "makeConditionPlan",
+          "startLine": 105,
+          "endLine": 120,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "makeAttempt",
+          "startLine": 122,
+          "endLine": 135,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "makeConditionNode",
+          "callee": "makeTaskNode",
+          "lineNumber": 37
+        },
+        {
+          "caller": "makeDownstreamNode",
+          "callee": "makeTaskNode",
+          "lineNumber": 62
+        },
+        {
+          "caller": "makeConditionPlan",
+          "callee": "makePlan",
+          "lineNumber": 111
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    }
+  ]
+}

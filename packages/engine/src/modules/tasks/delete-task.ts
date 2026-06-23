@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 
 const logger = createLogger("engine.tasks.delete");
 

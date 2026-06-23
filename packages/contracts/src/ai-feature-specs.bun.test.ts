@@ -27,6 +27,8 @@ describe("generate_plan feature spec", () => {
     expect(spec.instructions).toContain("A plan must NOT end on a checkpoint, approval, confirmation, review, condition, wait, or routing node");
     expect(spec.inputText).toContain("Title: 制作一个汉堡");
     expect(spec.inputText).toContain("Estimated duration: 60 minutes");
+    expect(spec.inputText).toContain("Default to one task node for simple information requests");
+    expect(spec.inputText).not.toContain("most tasks use 3-7 nodes");
   });
 
   it("includes both the editable Chrona note and the read-only calendar source context as distinct sections", () => {

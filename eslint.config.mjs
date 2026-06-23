@@ -2,10 +2,25 @@ import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
 import tseslint from "typescript-eslint";
 import unusedImports from "eslint-plugin-unused-imports";
+import globals from "globals";
 
 const eslintConfig = defineConfig([
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    // TypeScript files: the compiler already checks for undefined identifiers
+    // and redeclarations, so the JS-oriented core rules here only produce
+    // false positives (e.g. `no-undef` on `window`/`fetch`/`setTimeout`).
+    // typescript-eslint explicitly recommends disabling them for TS.
+    files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      "no-undef": "off",
+      "no-redeclare": "off",
+    },
+  },
   {
     files: ["**/*.ts", "**/*.tsx"],
     plugins: {
@@ -97,7 +112,14 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "@typescript-eslint/no-unnecessary-condition": "warn",
-      "@typescript-eslint/switch-exhaustiveness-check": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        // A `default` branch is a deliberate catch-all for the union members
+        // a switch does not handle (these switches map a subset and return
+        // null otherwise). Treat that as exhaustive instead of demanding a
+        // case per member.
+        { considerDefaultExhaustiveForUnions: true },
+      ],
     },
   },
   {
@@ -142,6 +164,12 @@ const eslintConfig = defineConfig([
     "**/coverage/**",
     "**/*.min.js",
     "agent-dashboard-app/**",
+    // Generated Playwright HTML report (minified third-party bundles) and the
+    // throwaway audit scratch dir are not shipped source — linting them only
+    // produced thousands of false positives.
+    "playwright-report/**",
+    "agent-test-runs/**",
+    ".understand-anything/**",
     "packages/db/src/generated/prisma/**",
     ".dependency-cruiser.cjs",
   ]),

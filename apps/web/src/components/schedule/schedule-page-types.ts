@@ -103,6 +103,8 @@ export type ScheduleRecord = {
   } | null;
   savedPlan?: ScheduleTaskPlanSnapshot | null;
   aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
+  autoStartEligible?: boolean;
+  autoStartReason?: string | null;
 } & ScheduleRuntimeFields;
 
 type ScheduleProposal = {
@@ -176,6 +178,8 @@ export type ScheduleCardItem = {
   autoExecute?: boolean;
   savedPlan?: ScheduleTaskPlanSnapshot | null;
   aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
+  autoStartEligible?: boolean;
+  autoStartReason?: string | null;
 };
 
 export type ScheduledItem = SchedulePageData["scheduled"][number];

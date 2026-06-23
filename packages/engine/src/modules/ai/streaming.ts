@@ -16,8 +16,7 @@ import type {
   ChatRequest,
 } from "@chrona/contracts";
 import { buildSuggestFeatureSpec } from "@chrona/contracts";
-import { createDebugDump, previewDebugValue } from "@chrona/shared/debug-dump";
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import type {
   ProviderRunEvent,
   ProviderRunInput,
@@ -168,6 +167,26 @@ function isStructuredDebugInfo(
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function previewLogValue(value: unknown, maxLength = 1200): unknown {
+  if (typeof value === "string") {
+    return value.length > maxLength
+      ? `${value.slice(0, maxLength)}…(${value.length - maxLength} more chars)`
+      : value;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((item) => previewLogValue(item, maxLength));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
+        key,
+        previewLogValue(nested, maxLength),
+      ]),
+    );
+  }
+  return value;
+}
+
 export function summarizeStreamEvent(event: StreamEvent | null) {
   if (!event) return null;
   switch (event.type) {
@@ -175,28 +194,28 @@ export function summarizeStreamEvent(event: StreamEvent | null) {
       return {
         type: event.type,
         textLength: event.text.length,
-        text: previewDebugValue(event.text, 300),
+        text: previewLogValue(event.text, 300),
       };
     case "tool_call":
       return {
         type: event.type,
         tool: event.tool,
-        input: previewDebugValue(event.input, 800),
+        input: previewLogValue(event.input, 800),
       };
     case "tool_result":
       return {
         type: event.type,
         tool: event.tool,
-        result: previewDebugValue(event.result, 800),
+        result: previewLogValue(event.result, 800),
         error: event.error ?? false,
       };
     case "result":
-      return { type: event.type, value: previewDebugValue(event, 1200) };
+      return { type: event.type, value: previewLogValue(event, 1200) };
     case "done":
       return {
         type: event.type,
         textLength: event.text?.length ?? 0,
-        structured: previewDebugValue(event.structured, 1200),
+        structured: previewLogValue(event.structured, 1200),
       };
     case "error":
     case "status":
@@ -235,33 +254,18 @@ async function* agentProviderStream(
 
   const streamableFeatures: AiFeature[] = ["suggest", "generate_plan"];
   if (streamableFeatures.includes(feature)) {
-    const dump = await createDebugDump({
-      enabledEnv: "CHRONA_AI_STREAM_DUMP",
-      directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
-      kind: "ai-stream",
-      label: `${feature}-${input.scope}`,
-      meta: {
-        layer: "engine.agentProviderStream",
-        feature,
-        scope: input.scope,
-        sessionId,
-        sessionKey,
-      },
-    });
     try {
-      await dump?.write({
-        type: "yield",
-        stage: "provider.status",
-        event: { type: "status", message: "AI is thinking..." },
-      });
       yield { type: "status", message: "AI is thinking..." };
       let fullText = "";
 
-      const session = await agentClient.providerClient.createSession({
-        sessionKey,
-      });
+      // Session identity is owned by the provider, not Chrona. Pass the
+      // engine-scoped `sessionId` (from `buildSessionIdentity`) straight to
+      // `startRun`; providers that natively manage sessions (e.g. Claude
+      // Code) capture their own `session_id` from the run and rewrite the
+      // returned ref so both sides converge on the provider's id. We do not
+      // fabricate a separate session ref via `createSession`.
       const run = await agentClient.providerClient.startRun({
-        sessionId: session.sessionId,
+        sessionId,
         sessionKey,
         instructions: input.instructions,
         input: input.input,
@@ -275,27 +279,12 @@ async function* agentProviderStream(
         signal: input.signal,
       })) {
         const parsed = convertProviderEvent(event);
-        await dump?.write({
-          type: "provider_event",
-          providerEvent: previewDebugValue(event, 1200),
-          streamEvent: summarizeStreamEvent(parsed),
-        });
         if (!parsed) continue;
         if (parsed.type === "partial") {
           fullText += parsed.text;
         }
-        await dump?.write({
-          type: "yield",
-          stage: "provider.converted",
-          event: summarizeStreamEvent(parsed),
-        });
         yield parsed;
-        if (parsed.type === "error") {
-          await dump?.close();
-          return;
-        }
-        if (parsed.type === "done") {
-          await dump?.close();
+        if (parsed.type === "error" || parsed.type === "done") {
           return;
         }
       }
@@ -308,21 +297,9 @@ async function* agentProviderStream(
         textLength: fullText.length,
       });
 
-      await dump?.write({
-        type: "yield",
-        stage: "provider.done",
-        event: { type: "done", textLength: fullText.length, structured: null },
-      });
       yield { type: "done", text: fullText, structured: null };
-      await dump?.close();
       return;
     } catch (error) {
-      await dump?.write({
-        type: "error",
-        stage: "provider.catch",
-        message: error instanceof Error ? error.message : String(error),
-      });
-      await dump?.close();
       logger.warn("provider.stream.fallback_to_blocking", {
         feature,
         scope: input.scope,

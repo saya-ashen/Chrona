@@ -1,0 +1,1593 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/contracts/src/ai-dispatch-types.ts",
+      "type": "file",
+      "name": "ai-dispatch-types.ts",
+      "filePath": "packages/contracts/src/ai-dispatch-types.ts",
+      "summary": "包含 hasActionTarget、requiresPlanPatch、parseTaskDispatchDecision等 函数，属于 \"src\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 189,
+      "nonEmptyLines": 173
+    },
+    {
+      "id": "function:packages/contracts/src/ai-dispatch-types.ts:parseTaskDispatchDecision",
+      "type": "function",
+      "name": "parseTaskDispatchDecision",
+      "filePath": "packages/contracts/src/ai-dispatch-types.ts",
+      "summary": "函数 parseTaskDispatchDecision，接受 raw 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 151,
+      "endLine": 164
+    },
+    {
+      "id": "function:packages/contracts/src/ai-dispatch-types.ts:isAutoExecutableDispatchDecision",
+      "type": "function",
+      "name": "isAutoExecutableDispatchDecision",
+      "filePath": "packages/contracts/src/ai-dispatch-types.ts",
+      "summary": "函数 isAutoExecutableDispatchDecision，接受 decision, policy 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 172,
+      "endLine": 189
+    },
+    {
+      "id": "file:packages/contracts/src/ai-feature-specs.ts",
+      "type": "file",
+      "name": "ai-feature-specs.ts",
+      "filePath": "packages/contracts/src/ai-feature-specs.ts",
+      "summary": "包含 toStructuredOutputSchema、buildGeneratePlanFeatureInputText、buildGeneratePlanFeatureSpec等 函数，属于 \"src\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 293,
+      "nonEmptyLines": 258
+    },
+    {
+      "id": "function:packages/contracts/src/ai-feature-specs.ts:buildGeneratePlanFeatureInputText",
+      "type": "function",
+      "name": "buildGeneratePlanFeatureInputText",
+      "filePath": "packages/contracts/src/ai-feature-specs.ts",
+      "summary": "函数 buildGeneratePlanFeatureInputText，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 168,
+      "endLine": 206
+    },
+    {
+      "id": "function:packages/contracts/src/ai-feature-specs.ts:buildGeneratePlanFeatureSpec",
+      "type": "function",
+      "name": "buildGeneratePlanFeatureSpec",
+      "filePath": "packages/contracts/src/ai-feature-specs.ts",
+      "summary": "函数 buildGeneratePlanFeatureSpec，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 208,
+      "endLine": 216
+    },
+    {
+      "id": "function:packages/contracts/src/ai-feature-specs.ts:buildSuggestFeatureSpec",
+      "type": "function",
+      "name": "buildSuggestFeatureSpec",
+      "filePath": "packages/contracts/src/ai-feature-specs.ts",
+      "summary": "函数 buildSuggestFeatureSpec。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 218,
+      "endLine": 226
+    },
+    {
+      "id": "function:packages/contracts/src/ai-feature-specs.ts:validateSuggestPayload",
+      "type": "function",
+      "name": "validateSuggestPayload",
+      "filePath": "packages/contracts/src/ai-feature-specs.ts",
+      "summary": "函数 validateSuggestPayload，接受 payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 232,
+      "endLine": 252
+    },
+    {
+      "id": "function:packages/contracts/src/ai-feature-specs.ts:validatePreparedFeaturePayload",
+      "type": "function",
+      "name": "validatePreparedFeaturePayload",
+      "filePath": "packages/contracts/src/ai-feature-specs.ts",
+      "summary": "函数 validatePreparedFeaturePayload，接受 spec, payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 254,
+      "endLine": 293
+    },
+    {
+      "id": "file:packages/contracts/src/ai-feature-types.ts",
+      "type": "file",
+      "name": "ai-feature-types.ts",
+      "filePath": "packages/contracts/src/ai-feature-types.ts",
+      "summary": "定义了 AiClientError 类，属于 \"src\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 390,
+      "nonEmptyLines": 346
+    },
+    {
+      "id": "class:packages/contracts/src/ai-feature-types.ts:AiClientError",
+      "type": "class",
+      "name": "AiClientError",
+      "filePath": "packages/contracts/src/ai-feature-types.ts",
+      "summary": "类 AiClientError，定义了 1 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 360,
+      "endLine": 374
+    },
+    {
+      "id": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "file",
+      "name": "ai-plan-blueprint.ts",
+      "filePath": "packages/contracts/src/ai-plan-blueprint.ts",
+      "summary": "定义了 PlanCompileError 类，包含 upgradeBlueprintToEditable、upgradeNode 函数，属于 \"src\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 464,
+      "nonEmptyLines": 420
+    },
+    {
+      "id": "function:packages/contracts/src/ai-plan-blueprint.ts:upgradeBlueprintToEditable",
+      "type": "function",
+      "name": "upgradeBlueprintToEditable",
+      "filePath": "packages/contracts/src/ai-plan-blueprint.ts",
+      "summary": "函数 upgradeBlueprintToEditable，接受 blueprint, planId, version 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 46,
+      "endLine": 64
+    },
+    {
+      "id": "function:packages/contracts/src/ai-plan-blueprint.ts:upgradeNode",
+      "type": "function",
+      "name": "upgradeNode",
+      "filePath": "packages/contracts/src/ai-plan-blueprint.ts",
+      "summary": "函数 upgradeNode，接受 node 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 66,
+      "endLine": 101
+    },
+    {
+      "id": "class:packages/contracts/src/ai-plan-blueprint.ts:PlanCompileError",
+      "type": "class",
+      "name": "PlanCompileError",
+      "filePath": "packages/contracts/src/ai-plan-blueprint.ts",
+      "summary": "类 PlanCompileError，包含属性 issues，定义了 1 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 138,
+      "endLine": 146
+    },
+    {
+      "id": "file:packages/contracts/src/ai-plan-runtime-status.bun.test.ts",
+      "type": "file",
+      "name": "ai-plan-runtime-status.bun.test.ts",
+      "filePath": "packages/contracts/src/ai-plan-runtime-status.bun.test.ts",
+      "summary": "测试文件，覆盖 \"src\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 81,
+      "nonEmptyLines": 72
+    },
+    {
+      "id": "file:packages/contracts/src/api/common.ts",
+      "type": "file",
+      "name": "common.ts",
+      "filePath": "packages/contracts/src/api/common.ts",
+      "summary": "包含 successResponse 函数，属于 \"api\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 22,
+      "nonEmptyLines": 15
+    },
+    {
+      "id": "function:packages/contracts/src/api/common.ts:successResponse",
+      "type": "function",
+      "name": "successResponse",
+      "filePath": "packages/contracts/src/api/common.ts",
+      "summary": "函数 successResponse，接受 data 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 19,
+      "endLine": 20
+    },
+    {
+      "id": "file:packages/contracts/src/api/execution.schema.ts",
+      "type": "file",
+      "name": "execution.schema.ts",
+      "filePath": "packages/contracts/src/api/execution.schema.ts",
+      "summary": "实现 \"api\" 模块的 execution.schema 功能。",
+      "complexity": "complex",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 425,
+      "nonEmptyLines": 392
+    },
+    {
+      "id": "file:packages/contracts/src/api/mcp-task-tools.schema.bun.test.ts",
+      "type": "file",
+      "name": "mcp-task-tools.schema.bun.test.ts",
+      "filePath": "packages/contracts/src/api/mcp-task-tools.schema.bun.test.ts",
+      "summary": "测试文件，覆盖 \"api\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 255,
+      "nonEmptyLines": 231
+    },
+    {
+      "id": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "type": "file",
+      "name": "mcp-task-tools.schema.ts",
+      "filePath": "packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "summary": "包含 nodeOutputArrayToFlatSpec、requireSpecRootElement、describeChronaNodeOutputPublicTool等 函数，属于 \"api\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 335,
+      "nonEmptyLines": 292
+    },
+    {
+      "id": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:nodeOutputArrayToFlatSpec",
+      "type": "function",
+      "name": "nodeOutputArrayToFlatSpec",
+      "filePath": "packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "summary": "函数 nodeOutputArrayToFlatSpec，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 117,
+      "endLine": 132
+    },
+    {
+      "id": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:describeChronaNodeOutputPublicTool",
+      "type": "function",
+      "name": "describeChronaNodeOutputPublicTool",
+      "filePath": "packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "summary": "函数 describeChronaNodeOutputPublicTool。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 166,
+      "endLine": 168
+    },
+    {
+      "id": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:chronaToolInputSchemaFor",
+      "type": "function",
+      "name": "chronaToolInputSchemaFor",
+      "filePath": "packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "summary": "函数 chronaToolInputSchemaFor，接受 toolName 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 268,
+      "endLine": 272
+    },
+    {
+      "id": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:isChronaToolMutating",
+      "type": "function",
+      "name": "isChronaToolMutating",
+      "filePath": "packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "summary": "函数 isChronaToolMutating，接受 toolName 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 329,
+      "endLine": 331
+    },
+    {
+      "id": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:parseChronaToolPayload",
+      "type": "function",
+      "name": "parseChronaToolPayload",
+      "filePath": "packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "summary": "函数 parseChronaToolPayload，接受 toolName, payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 333,
+      "endLine": 335
+    },
+    {
+      "id": "file:packages/contracts/src/api/plans.schema.ts",
+      "type": "file",
+      "name": "plans.schema.ts",
+      "filePath": "packages/contracts/src/api/plans.schema.ts",
+      "summary": "实现 \"api\" 模块的 plans.schema 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 54,
+      "nonEmptyLines": 48
+    },
+    {
+      "id": "file:packages/contracts/src/api/projections.schema.ts",
+      "type": "file",
+      "name": "projections.schema.ts",
+      "filePath": "packages/contracts/src/api/projections.schema.ts",
+      "summary": "实现 \"api\" 模块的 projections.schema 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 67,
+      "nonEmptyLines": 57
+    },
+    {
+      "id": "file:packages/contracts/src/api/task-plan-boundaries.bun.test.ts",
+      "type": "file",
+      "name": "task-plan-boundaries.bun.test.ts",
+      "filePath": "packages/contracts/src/api/task-plan-boundaries.bun.test.ts",
+      "summary": "测试文件，覆盖 \"api\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 28,
+      "nonEmptyLines": 24
+    },
+    {
+      "id": "file:packages/contracts/src/api/tasks.schema.bun.test.ts",
+      "type": "file",
+      "name": "tasks.schema.bun.test.ts",
+      "filePath": "packages/contracts/src/api/tasks.schema.bun.test.ts",
+      "summary": "测试文件，覆盖 \"api\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 192,
+      "nonEmptyLines": 177
+    },
+    {
+      "id": "file:packages/contracts/src/api/tasks.schema.ts",
+      "type": "file",
+      "name": "tasks.schema.ts",
+      "filePath": "packages/contracts/src/api/tasks.schema.ts",
+      "summary": "包含 executionRuntimeSchema、createTaskBodySchemaForSupportedRuntimes、updateTaskBodySchemaForSupportedRuntimes等 函数，属于 \"api\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 269,
+      "nonEmptyLines": 242
+    },
+    {
+      "id": "function:packages/contracts/src/api/tasks.schema.ts:executionRuntimeSchema",
+      "type": "function",
+      "name": "executionRuntimeSchema",
+      "filePath": "packages/contracts/src/api/tasks.schema.ts",
+      "summary": "函数 executionRuntimeSchema，接受 supportedRuntimes 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 24
+    },
+    {
+      "id": "function:packages/contracts/src/api/tasks.schema.ts:createTaskBodySchemaForSupportedRuntimes",
+      "type": "function",
+      "name": "createTaskBodySchemaForSupportedRuntimes",
+      "filePath": "packages/contracts/src/api/tasks.schema.ts",
+      "summary": "函数 createTaskBodySchemaForSupportedRuntimes，接受 supportedRuntimes 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 26,
+      "endLine": 34
+    },
+    {
+      "id": "function:packages/contracts/src/api/tasks.schema.ts:updateTaskBodySchemaForSupportedRuntimes",
+      "type": "function",
+      "name": "updateTaskBodySchemaForSupportedRuntimes",
+      "filePath": "packages/contracts/src/api/tasks.schema.ts",
+      "summary": "函数 updateTaskBodySchemaForSupportedRuntimes，接受 supportedRuntimes 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 36,
+      "endLine": 42
+    },
+    {
+      "id": "function:packages/contracts/src/api/tasks.schema.ts:refineRecurrenceAnchors",
+      "type": "function",
+      "name": "refineRecurrenceAnchors",
+      "filePath": "packages/contracts/src/api/tasks.schema.ts",
+      "summary": "函数 refineRecurrenceAnchors，接受 schema 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 136,
+      "endLine": 153
+    },
+    {
+      "id": "file:packages/contracts/src/automation-timing.ts",
+      "type": "file",
+      "name": "automation-timing.ts",
+      "filePath": "packages/contracts/src/automation-timing.ts",
+      "summary": "包含 automationTimingOffsetMs、normalizeAutomationTiming、resolveAutomationTriggerAt 函数，属于 \"src\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 66,
+      "nonEmptyLines": 58
+    },
+    {
+      "id": "function:packages/contracts/src/automation-timing.ts:automationTimingOffsetMs",
+      "type": "function",
+      "name": "automationTimingOffsetMs",
+      "filePath": "packages/contracts/src/automation-timing.ts",
+      "summary": "函数 automationTimingOffsetMs，接受 preset 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 34,
+      "endLine": 36
+    },
+    {
+      "id": "function:packages/contracts/src/automation-timing.ts:normalizeAutomationTiming",
+      "type": "function",
+      "name": "normalizeAutomationTiming",
+      "filePath": "packages/contracts/src/automation-timing.ts",
+      "summary": "函数 normalizeAutomationTiming，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 40,
+      "endLine": 45
+    },
+    {
+      "id": "function:packages/contracts/src/automation-timing.ts:resolveAutomationTriggerAt",
+      "type": "function",
+      "name": "resolveAutomationTriggerAt",
+      "filePath": "packages/contracts/src/automation-timing.ts",
+      "summary": "函数 resolveAutomationTriggerAt，接受 preset, scheduledStartAt 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 55,
+      "endLine": 66
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/attempts.ts",
+      "type": "file",
+      "name": "attempts.ts",
+      "filePath": "packages/contracts/src/plan-runtime/attempts.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 attempts 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 34,
+      "nonEmptyLines": 32
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/checkpoints.ts",
+      "type": "file",
+      "name": "checkpoints.ts",
+      "filePath": "packages/contracts/src/plan-runtime/checkpoints.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 checkpoints 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 36,
+      "nonEmptyLines": 32
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/commands.ts",
+      "type": "file",
+      "name": "commands.ts",
+      "filePath": "packages/contracts/src/plan-runtime/commands.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 commands 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 153,
+      "nonEmptyLines": 147
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/context.ts",
+      "type": "file",
+      "name": "context.ts",
+      "filePath": "packages/contracts/src/plan-runtime/context.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 context 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 71,
+      "nonEmptyLines": 67
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/events.ts",
+      "type": "file",
+      "name": "events.ts",
+      "filePath": "packages/contracts/src/plan-runtime/events.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 events 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 175,
+      "nonEmptyLines": 162
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/execution-command.ts",
+      "type": "file",
+      "name": "execution-command.ts",
+      "filePath": "packages/contracts/src/plan-runtime/execution-command.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 execution-command 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 108,
+      "nonEmptyLines": 100
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "type": "file",
+      "name": "execution-state.ts",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "包含 webPlanNodeStatusForRuntimeStatus、runtimeProgressStatusForWaitKind、runtimeProgressStatusForNodes等 函数，属于 \"plan-runtime\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 366,
+      "nonEmptyLines": 340
+    },
+    {
+      "id": "function:packages/contracts/src/plan-runtime/execution-state.ts:webPlanNodeStatusForRuntimeStatus",
+      "type": "function",
+      "name": "webPlanNodeStatusForRuntimeStatus",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "函数 webPlanNodeStatusForRuntimeStatus，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 72,
+      "endLine": 107
+    },
+    {
+      "id": "function:packages/contracts/src/plan-runtime/execution-state.ts:runtimeProgressStatusForWaitKind",
+      "type": "function",
+      "name": "runtimeProgressStatusForWaitKind",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "函数 runtimeProgressStatusForWaitKind，接受 waitKind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 109,
+      "endLine": 126
+    },
+    {
+      "id": "function:packages/contracts/src/plan-runtime/execution-state.ts:runtimeProgressStatusForNodes",
+      "type": "function",
+      "name": "runtimeProgressStatusForNodes",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "函数 runtimeProgressStatusForNodes，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 128,
+      "endLine": 163
+    },
+    {
+      "id": "function:packages/contracts/src/plan-runtime/execution-state.ts:planRunStatusForRuntimeProgress",
+      "type": "function",
+      "name": "planRunStatusForRuntimeProgress",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "函数 planRunStatusForRuntimeProgress，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 165,
+      "endLine": 182
+    },
+    {
+      "id": "function:packages/contracts/src/plan-runtime/execution-state.ts:planGraphStatusForRuntimeProgress",
+      "type": "function",
+      "name": "planGraphStatusForRuntimeProgress",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "函数 planGraphStatusForRuntimeProgress，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 184,
+      "endLine": 201
+    },
+    {
+      "id": "function:packages/contracts/src/plan-runtime/execution-state.ts:executionSessionStatusForRuntimeProgress",
+      "type": "function",
+      "name": "executionSessionStatusForRuntimeProgress",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "函数 executionSessionStatusForRuntimeProgress，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 203,
+      "endLine": 220
+    },
+    {
+      "id": "function:packages/contracts/src/plan-runtime/execution-state.ts:taskStatusForRuntimeProgress",
+      "type": "function",
+      "name": "taskStatusForRuntimeProgress",
+      "filePath": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "summary": "函数 taskStatusForRuntimeProgress，接受 status 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 222,
+      "endLine": 241
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "type": "file",
+      "name": "graph.ts",
+      "filePath": "packages/contracts/src/plan-runtime/graph.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 graph 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 217,
+      "nonEmptyLines": 195
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/contracts/src/plan-runtime/index.ts",
+      "summary": "聚合导出\"plan-runtime\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 10,
+      "nonEmptyLines": 10
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "type": "file",
+      "name": "node-result.ts",
+      "filePath": "packages/contracts/src/plan-runtime/node-result.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 node-result 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 62,
+      "nonEmptyLines": 58
+    },
+    {
+      "id": "file:packages/contracts/src/plan-runtime/node.ts",
+      "type": "file",
+      "name": "node.ts",
+      "filePath": "packages/contracts/src/plan-runtime/node.ts",
+      "summary": "实现 \"plan-runtime\" 模块的 node 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 166,
+      "nonEmptyLines": 147
+    },
+    {
+      "id": "file:packages/contracts/src/task.ts",
+      "type": "file",
+      "name": "task.ts",
+      "filePath": "packages/contracts/src/task.ts",
+      "summary": "实现 \"src\" 模块的 task 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 99,
+      "nonEmptyLines": 85
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/contracts/src/ai-dispatch-types.ts",
+      "target": "function:packages/contracts/src/ai-dispatch-types.ts:parseTaskDispatchDecision",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-dispatch-types.ts",
+      "target": "function:packages/contracts/src/ai-dispatch-types.ts:parseTaskDispatchDecision",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-dispatch-types.ts",
+      "target": "function:packages/contracts/src/ai-dispatch-types.ts:isAutoExecutableDispatchDecision",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-dispatch-types.ts",
+      "target": "function:packages/contracts/src/ai-dispatch-types.ts:isAutoExecutableDispatchDecision",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-dispatch-types.ts",
+      "target": "file:packages/contracts/src/plan-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:buildGeneratePlanFeatureInputText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:buildGeneratePlanFeatureInputText",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:buildGeneratePlanFeatureSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:buildGeneratePlanFeatureSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:buildSuggestFeatureSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:buildSuggestFeatureSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:validateSuggestPayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:validatePreparedFeaturePayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "function:packages/contracts/src/ai-feature-specs.ts:validatePreparedFeaturePayload",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-specs.ts",
+      "target": "file:packages/contracts/src/plan-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-types.ts",
+      "target": "class:packages/contracts/src/ai-feature-types.ts:AiClientError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-types.ts",
+      "target": "class:packages/contracts/src/ai-feature-types.ts:AiClientError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-types.ts",
+      "target": "file:packages/contracts/src/ai-dispatch-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-types.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/ai-feature-types.ts",
+      "target": "file:packages/contracts/src/plan-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "target": "function:packages/contracts/src/ai-plan-blueprint.ts:upgradeBlueprintToEditable",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "target": "function:packages/contracts/src/ai-plan-blueprint.ts:upgradeBlueprintToEditable",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "target": "function:packages/contracts/src/ai-plan-blueprint.ts:upgradeNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "target": "class:packages/contracts/src/ai-plan-blueprint.ts:PlanCompileError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "target": "class:packages/contracts/src/ai-plan-blueprint.ts:PlanCompileError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/ai-plan-runtime-status.bun.test.ts",
+      "target": "file:packages/contracts/src/plan-runtime/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/common.ts",
+      "target": "function:packages/contracts/src/api/common.ts:successResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/common.ts",
+      "target": "function:packages/contracts/src/api/common.ts:successResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/common.ts",
+      "target": "file:packages/contracts/src/task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/execution.schema.ts",
+      "target": "file:packages/contracts/src/api/common.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.bun.test.ts",
+      "target": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:nodeOutputArrayToFlatSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:describeChronaNodeOutputPublicTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:describeChronaNodeOutputPublicTool",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:chronaToolInputSchemaFor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:chronaToolInputSchemaFor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:isChronaToolMutating",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:isChronaToolMutating",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:parseChronaToolPayload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "function:packages/contracts/src/api/mcp-task-tools.schema.ts:parseChronaToolPayload",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "file:packages/contracts/src/api/execution.schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "target": "file:packages/contracts/src/api/tasks.schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/plans.schema.ts",
+      "target": "file:packages/contracts/src/api/common.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/projections.schema.ts",
+      "target": "file:packages/contracts/src/api/common.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/projections.schema.ts",
+      "target": "file:packages/contracts/src/api/execution.schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/task-plan-boundaries.bun.test.ts",
+      "target": "file:packages/contracts/src/api/plans.schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/task-plan-boundaries.bun.test.ts",
+      "target": "file:packages/contracts/src/api/tasks.schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.bun.test.ts",
+      "target": "file:packages/contracts/src/api/tasks.schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "function:packages/contracts/src/api/tasks.schema.ts:executionRuntimeSchema",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "function:packages/contracts/src/api/tasks.schema.ts:createTaskBodySchemaForSupportedRuntimes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "function:packages/contracts/src/api/tasks.schema.ts:createTaskBodySchemaForSupportedRuntimes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "function:packages/contracts/src/api/tasks.schema.ts:updateTaskBodySchemaForSupportedRuntimes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "function:packages/contracts/src/api/tasks.schema.ts:updateTaskBodySchemaForSupportedRuntimes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "function:packages/contracts/src/api/tasks.schema.ts:refineRecurrenceAnchors",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "function:packages/contracts/src/api/tasks.schema.ts:refineRecurrenceAnchors",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "file:packages/contracts/src/api/common.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "file:packages/contracts/src/automation-timing.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/api/tasks.schema.ts",
+      "target": "file:packages/contracts/src/task.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/automation-timing.ts",
+      "target": "function:packages/contracts/src/automation-timing.ts:automationTimingOffsetMs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/automation-timing.ts",
+      "target": "function:packages/contracts/src/automation-timing.ts:automationTimingOffsetMs",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/automation-timing.ts",
+      "target": "function:packages/contracts/src/automation-timing.ts:normalizeAutomationTiming",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/automation-timing.ts",
+      "target": "function:packages/contracts/src/automation-timing.ts:normalizeAutomationTiming",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/automation-timing.ts",
+      "target": "function:packages/contracts/src/automation-timing.ts:resolveAutomationTriggerAt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/automation-timing.ts",
+      "target": "function:packages/contracts/src/automation-timing.ts:resolveAutomationTriggerAt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/checkpoints.ts",
+      "target": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/checkpoints.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/commands.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/commands.ts",
+      "target": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/commands.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/commands.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/context.ts",
+      "target": "file:packages/contracts/src/plan-runtime/commands.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/events.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/events.ts",
+      "target": "file:packages/contracts/src/plan-runtime/commands.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/events.ts",
+      "target": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/events.ts",
+      "target": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-command.ts",
+      "target": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-command.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-command.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:webPlanNodeStatusForRuntimeStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:webPlanNodeStatusForRuntimeStatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:runtimeProgressStatusForWaitKind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:runtimeProgressStatusForWaitKind",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:runtimeProgressStatusForNodes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:runtimeProgressStatusForNodes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:planRunStatusForRuntimeProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:planRunStatusForRuntimeProgress",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:planGraphStatusForRuntimeProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:planGraphStatusForRuntimeProgress",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:executionSessionStatusForRuntimeProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:executionSessionStatusForRuntimeProgress",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:taskStatusForRuntimeProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "function:packages/contracts/src/plan-runtime/execution-state.ts:taskStatusForRuntimeProgress",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/contracts/src/plan-runtime/attempts.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/contracts/src/plan-runtime/checkpoints.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/contracts/src/plan-runtime/events.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "target": "file:packages/contracts/src/plan-runtime/attempts.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "target": "file:packages/contracts/src/plan-runtime/execution-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/graph.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "target": "file:packages/contracts/src/plan-runtime/checkpoints.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "target": "file:packages/contracts/src/plan-runtime/node.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/node-result.ts",
+      "target": "file:packages/ui-protocol/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/plan-runtime/node.ts",
+      "target": "file:packages/contracts/src/ai-plan-blueprint.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/contracts/src/task.ts",
+      "target": "file:packages/contracts/src/automation-timing.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    }
+  ]
+}

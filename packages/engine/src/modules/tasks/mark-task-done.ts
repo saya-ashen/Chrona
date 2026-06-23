@@ -2,6 +2,7 @@ import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export async function markTaskDone(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
@@ -17,7 +18,10 @@ export async function markTaskDone(input: { taskId: string }) {
   const latestRun = task.runs[0] ?? null;
 
   if (!latestRun || latestRun.status !== "Completed") {
-    throw new Error("Only tasks with a completed run can be marked done.");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Only tasks with a completed run can be marked done.",
+    );
   }
 
   const completedAt = latestRun.endedAt ?? new Date();

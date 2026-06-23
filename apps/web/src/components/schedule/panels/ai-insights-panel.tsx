@@ -7,7 +7,7 @@ import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import { Card } from "@/components/ui/card";
 
 function toCompactPlan(planResult: TaskPlanReadModel | null) {
-  const nodes = planResult?.compiledPlan?.nodes;
+  const nodes = planResult?.compiledPlan.nodes;
   if (!nodes?.length) {
     return [] as Array<{
       id: string;

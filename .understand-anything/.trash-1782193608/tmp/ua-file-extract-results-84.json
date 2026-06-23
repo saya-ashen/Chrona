@@ -1,0 +1,803 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 21,
+  "filesSkipped": [
+    ".specify/integrations/speckit.manifest.json",
+    ".specify/memory/constitution.md",
+    ".specify/workflows/speckit/workflow.yml",
+    ".specify/workflows/workflow-registry.json"
+  ],
+  "results": [
+    {
+      "path": ".understand-anything/.understandignore",
+      "language": "unknown",
+      "fileCategory": "code",
+      "totalLines": 71,
+      "nonEmptyLines": 66,
+      "metrics": {}
+    },
+    {
+      "path": ".understand-anything/config.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "outputLanguage",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 1
+      }
+    },
+    {
+      "path": "apps/server/package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 20,
+      "nonEmptyLines": 20,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "private",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "type",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "exports",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "scripts",
+          "level": 1,
+          "line": 8
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 12
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "apps/server/tsconfig.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 37,
+      "nonEmptyLines": 37,
+      "sections": [
+        {
+          "heading": "extends",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "compilerOptions",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "include",
+          "level": 1,
+          "line": 31
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/panels/selected-block-sheet/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "exports": [
+        {
+          "name": "SelectedBlockSheet",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/schedule/utils/tone.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 68,
+      "nonEmptyLines": 62,
+      "functions": [
+        {
+          "name": "getPriorityAccent",
+          "startLine": 1,
+          "endLine": 12,
+          "params": [
+            "priority"
+          ]
+        },
+        {
+          "name": "getPriorityTone",
+          "startLine": 14,
+          "endLine": 25,
+          "params": [
+            "priority"
+          ]
+        },
+        {
+          "name": "getScheduleTone",
+          "startLine": 27,
+          "endLine": 45,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "getRunTone",
+          "startLine": 47,
+          "endLine": 64,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "getRunnabilityTone",
+          "startLine": 66,
+          "endLine": 68,
+          "params": [
+            "isRunnable"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getPriorityAccent",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getPriorityTone",
+          "line": 14,
+          "isDefault": false
+        },
+        {
+          "name": "getScheduleTone",
+          "line": 27,
+          "isDefault": false
+        },
+        {
+          "name": "getRunTone",
+          "line": 47,
+          "isDefault": false
+        },
+        {
+          "name": "getRunnabilityTone",
+          "line": 66,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getPriorityAccent",
+          "callee": "priority.toLowerCase",
+          "lineNumber": 2
+        },
+        {
+          "caller": "getPriorityTone",
+          "callee": "priority.toLowerCase",
+          "lineNumber": 15
+        },
+        {
+          "caller": "getScheduleTone",
+          "callee": "status.toLowerCase",
+          "lineNumber": 32
+        },
+        {
+          "caller": "getRunTone",
+          "callee": "status.toLowerCase",
+          "lineNumber": 52
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 5,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/ai/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 5,
+      "nonEmptyLines": 5,
+      "exports": [
+        {
+          "name": "TaskPlanEmptyState",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanGenerationPanel",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanGenerationProgress",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanResultPanel",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanSaveBeforeRegenerateDialog",
+          "line": 5,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 5,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 17,
+      "nonEmptyLines": 17,
+      "exports": [
+        {
+          "name": "TaskListPage",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "TaskWorkspacePage",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPageData",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "createTaskWorkspaceExecutionConsoleView",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "dispatchTaskExecutionAction",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "fetchTaskPlanState",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "fetchTaskWorkspacePage",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "isTaskWorkspaceAttentionStatus",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "mapTaskWorkspaceStatus",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "pickWorkspaceCurrentNode",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "taskWorkspaceQueryKeys",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "TaskExecutionDispatchResult",
+          "line": 14,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanState",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 13,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/panels/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3,
+      "nonEmptyLines": 3,
+      "exports": [
+        {
+          "name": "TaskAiPlanPanel",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "TaskEditPanel",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanGraphPanel",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/components/tasks/plan/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 21,
+      "exports": [
+        {
+          "name": "TaskPlanGraph",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "compiledPlanToGraphPlan",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "summarizeCompiledPlan",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "taskPlanReadModelToGraphPlan",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "PlanEdgeDataModel",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanEdgeKind",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanGraphAnalytics",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNodeAction",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNodeDataModel",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNodeField",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNodeIntent",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNodeInteractionType",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNodeKind",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "PlanNodeStatus",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanGraphMode",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanGraphPlan",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanGraphProps",
+          "line": 7,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 17,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/env.d.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/styles/globals.css",
+      "language": "css",
+      "fileCategory": "markup",
+      "totalLines": 341,
+      "nonEmptyLines": 310,
+      "metrics": {}
+    },
+    {
+      "path": "apps/web/src/test/setup.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 25,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/src/test/ui-foundation-guard.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 55,
+      "nonEmptyLines": 45,
+      "functions": [
+        {
+          "name": "createFixture",
+          "startLine": 12,
+          "endLine": 22,
+          "params": [
+            "files"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createFixture",
+          "callee": "mkdtempSync",
+          "lineNumber": 13
+        },
+        {
+          "caller": "createFixture",
+          "callee": "path.join",
+          "lineNumber": 13
+        },
+        {
+          "caller": "createFixture",
+          "callee": "tmpdir",
+          "lineNumber": 13
+        },
+        {
+          "caller": "createFixture",
+          "callee": "Object.entries",
+          "lineNumber": 15
+        },
+        {
+          "caller": "createFixture",
+          "callee": "path.join",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createFixture",
+          "callee": "mkdirSync",
+          "lineNumber": 17
+        },
+        {
+          "caller": "createFixture",
+          "callee": "path.dirname",
+          "lineNumber": 17
+        },
+        {
+          "caller": "createFixture",
+          "callee": "writeFileSync",
+          "lineNumber": 18
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/web/vite.config.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 38,
+      "nonEmptyLines": 36,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "e2e/specs/accessibility-test-helpers.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 14,
+      "functions": [
+        {
+          "name": "scanPageAccessibility",
+          "startLine": 4,
+          "endLine": 8,
+          "params": [
+            "page"
+          ]
+        },
+        {
+          "name": "formatAccessibilityViolations",
+          "startLine": 10,
+          "endLine": 16,
+          "params": [
+            "violations"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "scanPageAccessibility",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "formatAccessibilityViolations",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "scanPageAccessibility",
+          "callee": "new AxeBuilder({ page })\n    .disableRules([\"color-contrast\"])\n    .analyze",
+          "lineNumber": 5
+        },
+        {
+          "caller": "scanPageAccessibility",
+          "callee": "new AxeBuilder({ page })\n    .disableRules",
+          "lineNumber": 5
+        },
+        {
+          "caller": "formatAccessibilityViolations",
+          "callee": "violations.map",
+          "lineNumber": 11
+        },
+        {
+          "caller": "formatAccessibilityViolations",
+          "callee": "violation.nodes.flatMap",
+          "lineNumber": 14
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "e2e/specs/ai-client-settings-flow.spec.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 178,
+      "nonEmptyLines": 148,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "e2e/specs/external-calendar-management.spec.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 37,
+      "functions": [
+        {
+          "name": "fixtureUrl",
+          "startLine": 5,
+          "endLine": 7,
+          "params": [
+            "eventTitle",
+            "key"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "fixtureUrl",
+          "callee": "encodeURIComponent",
+          "lineNumber": 6
+        },
+        {
+          "caller": "fixtureUrl",
+          "callee": "encodeURIComponent",
+          "lineNumber": 6
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "e2e/specs/external-calendar-schedule.spec.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 29,
+      "functions": [
+        {
+          "name": "fixtureUrl",
+          "startLine": 5,
+          "endLine": 7,
+          "params": [
+            "eventTitle",
+            "key"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "fixtureUrl",
+          "callee": "encodeURIComponent",
+          "lineNumber": 6
+        },
+        {
+          "caller": "fixtureUrl",
+          "callee": "encodeURIComponent",
+          "lineNumber": 6
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "e2e/specs/external-calendar-source.spec.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 33,
+      "nonEmptyLines": 27,
+      "functions": [
+        {
+          "name": "fixtureUrl",
+          "startLine": 5,
+          "endLine": 7,
+          "params": [
+            "eventTitle",
+            "key"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "fixtureUrl",
+          "callee": "encodeURIComponent",
+          "lineNumber": 6
+        },
+        {
+          "caller": "fixtureUrl",
+          "callee": "encodeURIComponent",
+          "lineNumber": 6
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "e2e/specs/seed.spec.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 7,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

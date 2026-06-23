@@ -11,13 +11,11 @@ import {
   upgradeBlueprintToEditable,
 } from "@chrona/contracts/ai";
 import { compileEditablePlan } from "@chrona/domain";
+import { createLogger } from "@chrona/logging";
+
+const logger = createLogger("engine.plans.blueprint-compiler");
 
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
-const HIGH_RISK_PATTERNS = [
-  /\b(send|email|message|book|pay|purchase|delete|remove|cancel)\b/i,
-  /\b(modify|update|schedule|reschedule)\b.*\b(calendar|event|meeting|appointment|reservation|booking)\b/i,
-  /\b(calendar|event|meeting|appointment|reservation|booking)\b.*\b(modify|update|schedule|reschedule)\b/i,
-];
 
 function compileIssue(path: string, message: string) {
   return { path, message };
@@ -45,10 +43,6 @@ function branchEdges(nodes: PlanBlueprint["nodes"]): PlanBlueprintEdge[] {
   return result;
 }
 
-function edgeKey(edge: PlanBlueprintEdge) {
-  return `${edge.from}->${edge.to}->${edge.label ?? ""}`;
-}
-
 function assertDag(nodeIds: string[], edges: PlanBlueprintEdge[]) {
   const indegree = new Map(nodeIds.map((id) => [id, 0]));
   const outgoing = new Map(nodeIds.map((id) => [id, [] as string[]]));
@@ -71,44 +65,6 @@ function assertDag(nodeIds: string[], edges: PlanBlueprintEdge[]) {
   }
 
   return visited === nodeIds.length;
-}
-
-function checkHighRiskTasks(
-  nodes: PlanBlueprint["nodes"],
-  edges: PlanBlueprintEdge[],
-) {
-  const issues: Array<{ path: string; message: string }> = [];
-  const incoming = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (!incoming.has(edge.to)) incoming.set(edge.to, []);
-    incoming.get(edge.to)!.push(edge.from);
-  }
-  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-
-  for (const node of nodes) {
-    if (node.type !== "task") continue;
-    const haystack = [node.title, node.expectedOutput, node.completionCriteria]
-      .filter(Boolean)
-      .join(" ");
-    if (!HIGH_RISK_PATTERNS.some((pattern) => pattern.test(haystack))) continue;
-    const predecessors = incoming.get(node.id) ?? [];
-    const hasGate = predecessors.some((candidateId) => {
-      const candidate = nodeMap.get(candidateId);
-      return (
-        candidate?.type === "checkpoint" &&
-        (candidate.checkpointType === "approve" ||
-          candidate.checkpointType === "confirm")
-      );
-    });
-    if (!hasGate) {
-      issues.push({
-        path: `nodes.${node.id}`,
-        message: `High-risk task '${node.id}' must be directly preceded by approve/confirm checkpoint`,
-      });
-    }
-  }
-
-  return issues;
 }
 
 function validateBlueprint(input: { blueprint: PlanBlueprint }) {
@@ -172,19 +128,12 @@ function validateBlueprint(input: { blueprint: PlanBlueprint }) {
     }
   });
 
-  const semanticEdges = branchEdges(input.blueprint.nodes);
-  const uniqueEdges = new Map<string, PlanBlueprintEdge>();
-  [...input.blueprint.edges, ...semanticEdges].forEach((edge) => {
-    uniqueEdges.set(edgeKey(edge), edge);
-  });
-  const allEdges = [...uniqueEdges.values()];
+  const allEdges = [...input.blueprint.edges, ...branchEdges(input.blueprint.nodes)];
 
   if (issues.length === 0 && !assertDag(nodeIds, allEdges)) {
     issues.push(compileIssue("edges", "Plan graph must be a DAG"));
   }
-
-  issues.push(...checkHighRiskTasks(input.blueprint.nodes, allEdges));
-  console.log("Plan blueprint validation completed with", issues, "issues");
+  logger.debug("blueprint.validation_completed", { issueCount: issues.length, issues });
 
   if (issues.length > 0) {
     throw new PlanCompileError("Plan blueprint compilation failed", issues);

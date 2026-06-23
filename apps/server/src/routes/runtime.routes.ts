@@ -12,6 +12,7 @@ function isDebugProviderEnabled() {
 
 function getRuntimeLabel(key: string) {
   if (key === "hermes") return "Hermes";
+  if (key === "claude_code") return "Claude Code";
   if (key === "debug") return "Debug Provider";
   return key;
 }

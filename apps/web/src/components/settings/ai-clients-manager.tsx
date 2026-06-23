@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
 
+const DEFAULT_PROVIDER_IDLE_TIMEOUT_MS = 120 * 1000;
+
 type AiClientType = "llm" | "hermes" | "debug" | (string & {});
 
 interface AiClientInfo {
@@ -45,13 +47,17 @@ type ClientFormValues = {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  model: string;
+  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
+  controlPlane: ControlPlaneMode;
 };
 
 type HermesClientScope = "local" | "remote";
 
 type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
+type ControlPlaneMode = "mcp" | "skill";
 
 const DEBUG_PROVIDER_PROFILES = [
   "deterministic",
@@ -109,6 +115,38 @@ type HermesIntegrationResult = {
   restart?: { ok: boolean; message: string; exitCode: number | null };
 };
 
+function nonEmptyEnvValue(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function buildClaudeCodeConfig(input: {
+  timeoutSeconds: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  binaryPath: string;
+  controlPlane: ControlPlaneMode;
+}): Record<string, unknown> {
+  const model = nonEmptyEnvValue(input.model);
+  const baseUrl = nonEmptyEnvValue(input.baseUrl);
+  const authToken = nonEmptyEnvValue(input.apiKey);
+  const binaryPath = nonEmptyEnvValue(input.binaryPath);
+  const env: Record<string, string> = {};
+
+  if (model) env.ANTHROPIC_MODEL = model;
+  if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl;
+  if (authToken) env.ANTHROPIC_AUTH_TOKEN = authToken;
+
+  return {
+    model,
+    binaryPath,
+    timeoutMs: Number(input.timeoutSeconds) * 1000,
+    controlPlane: input.controlPlane,
+    env: Object.keys(env).length > 0 ? env : undefined,
+  };
+}
+
 function buildClientPayload(input: {
   name: string;
   type: AiClientType;
@@ -116,8 +154,11 @@ function buildClientPayload(input: {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  model: string;
+  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
+  controlPlane: ControlPlaneMode;
 }): ClientFormPayload {
   if (input.type === "debug") {
     return {
@@ -128,10 +169,19 @@ function buildClientPayload(input: {
     };
   }
 
-  return {
+  if (input.type === "claude_code") {
+    return {
       name: input.name,
       type: input.type,
-      config: {
+      config: buildClaudeCodeConfig(input),
+      isDefault: input.isDefault,
+    };
+  }
+
+  return {
+    name: input.name,
+    type: input.type,
+    config: {
       baseUrl: input.baseUrl || (input.hermesScope === "local" ? LOCAL_HERMES_BASE_URL : ""),
       apiKey: input.apiKey,
       timeoutMs: Number(input.timeoutSeconds) * 1000,
@@ -312,12 +362,21 @@ function ClientForm({
     isDefault: initial?.isDefault ?? false,
     timeoutSeconds: String(
       (initial?.config as { timeoutSeconds?: number; timeoutMs?: number })?.timeoutSeconds
-        ?? (((initial?.config as { timeoutMs?: number })?.timeoutMs ?? 120000) / 1000),
+        ?? (((initial?.config as { timeoutMs?: number })?.timeoutMs ?? DEFAULT_PROVIDER_IDLE_TIMEOUT_MS) / 1000),
     ),
-    baseUrl: (initial?.config as { baseUrl?: string })?.baseUrl ?? LOCAL_HERMES_BASE_URL,
-    apiKey: (initial?.config as { apiKey?: string })?.apiKey ?? "",
+    baseUrl: (initial?.config as { baseUrl?: string; env?: Record<string, string> })?.baseUrl
+      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_BASE_URL
+      ?? "",
+    apiKey: (initial?.config as { apiKey?: string; env?: Record<string, string> })?.apiKey
+      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_AUTH_TOKEN
+      ?? "",
+    model: (initial?.config as { model?: string; env?: Record<string, string> })?.model
+      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_MODEL
+      ?? "",
+    binaryPath: (initial?.config as { binaryPath?: string })?.binaryPath ?? "",
     hermesScope: (initial?.config as { scope?: HermesClientScope })?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initial?.config as { profile?: unknown })?.profile),
+    controlPlane: ((initial?.config as { controlPlane?: ControlPlaneMode })?.controlPlane === "skill" ? "skill" : "mcp"),
   }), [fallbackType, initial, providers]);
   const form = useForm<ClientFormValues>({
     defaultValues,
@@ -326,6 +385,7 @@ function ClientForm({
   const values = form.watch();
   const isDebugClient = values.type === "debug";
   const isHermesClient = values.type === "hermes";
+  const isClaudeCodeClient = values.type === "claude_code";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
@@ -427,6 +487,7 @@ function ClientForm({
                   <p className="text-sm text-muted-foreground">
                     {isLocalHermes ? copy.hermesLocalDescription : copy.hermesRemoteDescription}
                   </p>
+                  <p className="text-xs text-muted-foreground">Hermes control plane: MCP only. Skill mode is unsupported for Hermes this milestone.</p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -547,7 +608,7 @@ function ClientForm({
               </Card>
             )}
 
-            {!isDebugClient && (
+            {!isDebugClient && !isClaudeCodeClient && (
               <>
                 <Field>
                   <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
@@ -584,6 +645,85 @@ function ClientForm({
                     {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
                   </Field>
                 </div>
+              </>
+            )}
+            {isClaudeCodeClient && (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-model">ANTHROPIC_MODEL</FieldLabel>
+                    <Input
+                      {...form.register("model")}
+                      id="ai-client-model"
+                      placeholder="optional model override"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-base-url">ANTHROPIC_BASE_URL</FieldLabel>
+                    <Input
+                      {...form.register("baseUrl")}
+                      id="ai-client-base-url"
+                      placeholder="optional custom Anthropic-compatible base URL"
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-api-key">ANTHROPIC_AUTH_TOKEN</FieldLabel>
+                    <Input
+                      {...form.register("apiKey")}
+                      id="ai-client-api-key"
+                      type="password"
+                      placeholder="optional auth token"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-binary-path">Binary path</FieldLabel>
+                    <Input
+                      {...form.register("binaryPath")}
+                      id="ai-client-binary-path"
+                      placeholder="claude"
+                    />
+                  </Field>
+                </div>
+                <Field>
+                  <FieldLabel>Control plane</FieldLabel>
+                  <Controller
+                    name="controlPlane"
+                    control={form.control}
+                    render={({ field, fieldState }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label="Control plane">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="mcp">MCP</SelectItem>
+                            <SelectItem value="skill">Skill</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    {...form.register("timeoutSeconds", {
+                      required: copy.timeoutSeconds,
+                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                    })}
+                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                    id="ai-client-timeout"
+                    type="number"
+                  />
+                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  MCP base URL is set automatically by the engine. Pass an
+                  Anthropic API key for production usage to avoid the SDK
+                  subscription quota (2026-06-15 onward).
+                </p>
               </>
             )}
 

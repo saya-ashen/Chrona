@@ -139,6 +139,41 @@ describe("auto-start-scheduled-plan", () => {
     expect(startMock).not.toHaveBeenCalled();
   });
 
+  it("skips due auto-execute tasks without runtime config", async () => {
+    const workspace = await createWorkspace();
+    const { task } = await createDueTask(workspace.id, { executionRuntime: "" });
+
+    const result = await autoStartScheduledPlanTasks({ now: new Date() });
+
+    expect(result.started).toEqual([]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      taskId: task.id,
+      reason: "no_runtime_config",
+    });
+    expect(startMock).not.toHaveBeenCalled();
+  });
+
+  it("returns not_due for blocks inside the automation look-ahead window but before their trigger time", async () => {
+    const now = new Date("2026-05-28T10:00:00.000Z");
+    const workspace = await createWorkspace();
+    const { task } = await createDueTask(workspace.id, {
+      scheduledStartAt: new Date(now.getTime() + 30 * 60_000),
+      scheduledEndAt: new Date(now.getTime() + 90 * 60_000),
+      autoExecuteTiming: "at_start",
+    });
+
+    const result = await autoStartScheduledPlanTasks({ now });
+
+    expect(result.started).toEqual([]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      taskId: task.id,
+      reason: "not_due",
+    });
+    expect(startMock).not.toHaveBeenCalled();
+  });
+
   it("starts due scheduled parent task and materializes automatic child-task nodes into separate sessions", async () => {
     const workspace = await createWorkspace();
 

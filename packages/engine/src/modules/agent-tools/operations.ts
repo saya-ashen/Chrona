@@ -18,7 +18,7 @@ import {
 } from "./tool-result";
 import { affectedFrom, summarizeUnknownState } from "./state-summary";
 import { ENGINE_ERROR_CODES, isEngineError } from "../../errors";
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import type { AgentToolOperationsDeps } from "./types";
 import { requireTaskId } from "./input-guards";
 import { startToolAudit, finishToolAudit } from "./audit";

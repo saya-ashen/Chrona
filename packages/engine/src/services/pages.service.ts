@@ -17,6 +17,13 @@ export function createPagesService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get inbox");
       }
     },
+    async getDashboard(input: { workspaceId: string }) {
+      try {
+        return await pageQuery.getDashboard(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get dashboard");
+      }
+    },
     async getMemory(input: { workspaceId: string }) {
       try {
         return await pageQuery.getMemory(input);

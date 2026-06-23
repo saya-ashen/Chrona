@@ -1,6 +1,7 @@
 import type { EffectivePlanGraph, EffectivePlanNode, NodeResult } from "@chrona/contracts/ai";
 import { branchBindingForRef } from "./node-runtime-refs";
 import type { AdvanceRuntimeCommand } from "../types";
+import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
 type CompleteManualNodeCommand = Extract<
   AdvanceRuntimeCommand,
@@ -30,7 +31,7 @@ export function selectedBranchForTerminalCommand(input: {
     return input.command.selectedBranch;
   }
   if (!input.command.branchRef) {
-    throw new Error("condition branchRef is required");
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "condition branchRef is required");
   }
   const binding = branchBindingForRef({
     plan: input.plan,
@@ -57,14 +58,20 @@ export function validateTerminalCommand(input: {
   const kind = input.command.terminalKind;
   if (!kind) return;
   if (input.node.type !== kind) {
-    throw new Error(`chrona ${kind} terminal tool cannot complete current ${input.node.type} node`);
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      `chrona ${kind} terminal tool cannot complete current ${input.node.type} node`,
+    );
   }
   if (kind === "task") {
     const expectedOutput = (input.node.config as { expectedOutput?: unknown }).expectedOutput;
     const hasRequiredOutput = typeof expectedOutput === "string" && expectedOutput.trim().length > 0;
     const outputs = input.node.result?.outputs;
     if (hasRequiredOutput && (!outputs || outputs.length === 0)) {
-      throw new Error("chrona task node requires chrona_node_output before completion");
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "chrona task node requires chrona_node_output before completion",
+      );
     }
   }
   if (kind === "condition") {
@@ -72,12 +79,19 @@ export function validateTerminalCommand(input: {
   }
   if (kind === "checkpoint") {
     const decision = input.command.decision;
-    if (!decision) throw new Error("checkpoint decision is required");
+    if (!decision)
+      throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "checkpoint decision is required");
     if (decision === "needs_input" && !input.command.feedback && !input.command.prompt) {
-      throw new Error("checkpoint needs_input requires feedback or prompt");
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "checkpoint needs_input requires feedback or prompt",
+      );
     }
     if (decision === "completed" && !input.command.summary) {
-      throw new Error("checkpoint completed requires summary");
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "checkpoint completed requires summary",
+      );
     }
   }
 }

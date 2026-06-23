@@ -1,0 +1,798 @@
+{
+  "nodes": [
+    {
+      "id": "file:packages/ui-protocol/src/actions/actions.ts",
+      "type": "file",
+      "name": "actions.ts",
+      "filePath": "packages/ui-protocol/src/actions/actions.ts",
+      "summary": "实现 \"actions\" 模块的 actions 功能。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 70,
+      "nonEmptyLines": 60
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
+      "type": "file",
+      "name": "build-action-spec.bun.test.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
+      "summary": "测试文件，覆盖 \"builders\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 155,
+      "nonEmptyLines": 130
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-action-spec.ts",
+      "type": "file",
+      "name": "build-action-spec.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-action-spec.ts",
+      "summary": "包含 primaryAction、buildActionSpec 函数，属于 \"builders\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 194,
+      "nonEmptyLines": 174
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-action-spec.ts:buildActionSpec",
+      "type": "function",
+      "name": "buildActionSpec",
+      "filePath": "packages/ui-protocol/src/builders/build-action-spec.ts",
+      "summary": "函数 buildActionSpec，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 61,
+      "endLine": 194
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
+      "type": "file",
+      "name": "build-activity-spec.bun.test.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
+      "summary": "测试文件，覆盖 \"builders\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 92,
+      "nonEmptyLines": 83
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "type": "file",
+      "name": "build-activity-spec.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "summary": "包含 toolDetailRows、timeLabel、buildActivitySpec 函数，属于 \"builders\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 120,
+      "nonEmptyLines": 108
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-activity-spec.ts:toolDetailRows",
+      "type": "function",
+      "name": "toolDetailRows",
+      "filePath": "packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "summary": "函数 toolDetailRows，接受 tool, labels 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 52,
+      "endLine": 66
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-activity-spec.ts:buildActivitySpec",
+      "type": "function",
+      "name": "buildActivitySpec",
+      "filePath": "packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "summary": "函数 buildActivitySpec，接受 items, toolLabels, options 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 78,
+      "endLine": 120
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
+      "type": "file",
+      "name": "build-command-center-spec.bun.test.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
+      "summary": "测试文件，覆盖 \"builders\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 75,
+      "nonEmptyLines": 71
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "type": "file",
+      "name": "build-command-center-spec.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "summary": "包含 appendDocument、shouldRenderCheckpointAction、actionVariant等 函数，属于 \"builders\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 292,
+      "nonEmptyLines": 268
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:appendDocument",
+      "type": "function",
+      "name": "appendDocument",
+      "filePath": "packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "summary": "函数 appendDocument，接受 target, children, keyPrefix, document 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 40,
+      "endLine": 54
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterNowSpec",
+      "type": "function",
+      "name": "buildCommandCenterNowSpec",
+      "filePath": "packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "summary": "函数 buildCommandCenterNowSpec，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 76,
+      "endLine": 103
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterCheckpointSpec",
+      "type": "function",
+      "name": "buildCommandCenterCheckpointSpec",
+      "filePath": "packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "summary": "函数 buildCommandCenterCheckpointSpec，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 105,
+      "endLine": 211
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterArtifactsSpec",
+      "type": "function",
+      "name": "buildCommandCenterArtifactsSpec",
+      "filePath": "packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "summary": "函数 buildCommandCenterArtifactsSpec，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 213,
+      "endLine": 249
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterTrailSpec",
+      "type": "function",
+      "name": "buildCommandCenterTrailSpec",
+      "filePath": "packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "summary": "函数 buildCommandCenterTrailSpec，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 251,
+      "endLine": 292
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
+      "type": "file",
+      "name": "build-result-spec.bun.test.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
+      "summary": "测试文件，覆盖 \"builders\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 108,
+      "nonEmptyLines": 98
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-result-spec.ts",
+      "type": "file",
+      "name": "build-result-spec.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-result-spec.ts",
+      "summary": "包含 buildResultSpec 函数，属于 \"builders\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 113,
+      "nonEmptyLines": 101
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-result-spec.ts:buildResultSpec",
+      "type": "function",
+      "name": "buildResultSpec",
+      "filePath": "packages/ui-protocol/src/builders/build-result-spec.ts",
+      "summary": "函数 buildResultSpec，接受 outputs, options 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 38,
+      "endLine": 113
+    },
+    {
+      "id": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "type": "file",
+      "name": "build-task-header-spec.ts",
+      "filePath": "packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "summary": "包含 badgeVariant、buttonVariant、actionBinding等 函数，属于 \"builders\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 238,
+      "nonEmptyLines": 215
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendAction",
+      "type": "function",
+      "name": "appendAction",
+      "filePath": "packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "summary": "函数 appendAction，接受 elements, children, actionId, label 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 73,
+      "endLine": 107
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendOverflowMenu",
+      "type": "function",
+      "name": "appendOverflowMenu",
+      "filePath": "packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "summary": "函数 appendOverflowMenu，接受 elements, children, actions 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 109,
+      "endLine": 121
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendOccurrence",
+      "type": "function",
+      "name": "appendOccurrence",
+      "filePath": "packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "summary": "函数 appendOccurrence，接受 elements, children, input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 130,
+      "endLine": 145
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:buildTaskHeaderSpec",
+      "type": "function",
+      "name": "buildTaskHeaderSpec",
+      "filePath": "packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "summary": "函数 buildTaskHeaderSpec，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 147,
+      "endLine": 198
+    },
+    {
+      "id": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendErrorRegion",
+      "type": "function",
+      "name": "appendErrorRegion",
+      "filePath": "packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "summary": "函数 appendErrorRegion，接受 elements 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 200,
+      "endLine": 238
+    },
+    {
+      "id": "file:packages/ui-protocol/src/catalog/components.ts",
+      "type": "file",
+      "name": "components.ts",
+      "filePath": "packages/ui-protocol/src/catalog/components.ts",
+      "summary": "包含 nodeOutputJsonSchema 函数，属于 \"catalog\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 465,
+      "nonEmptyLines": 445
+    },
+    {
+      "id": "function:packages/ui-protocol/src/catalog/components.ts:nodeOutputJsonSchema",
+      "type": "function",
+      "name": "nodeOutputJsonSchema",
+      "filePath": "packages/ui-protocol/src/catalog/components.ts",
+      "summary": "函数 nodeOutputJsonSchema。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 432,
+      "endLine": 456
+    },
+    {
+      "id": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "file",
+      "name": "document.ts",
+      "filePath": "packages/ui-protocol/src/document/document.ts",
+      "summary": "实现 \"document\" 模块的 document 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 15,
+      "nonEmptyLines": 12
+    },
+    {
+      "id": "file:packages/ui-protocol/src/document/validate.bun.test.ts",
+      "type": "file",
+      "name": "validate.bun.test.ts",
+      "filePath": "packages/ui-protocol/src/document/validate.bun.test.ts",
+      "summary": "测试文件，覆盖 \"document\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 169,
+      "nonEmptyLines": 151
+    },
+    {
+      "id": "file:packages/ui-protocol/src/document/validate.ts",
+      "type": "file",
+      "name": "validate.ts",
+      "filePath": "packages/ui-protocol/src/document/validate.ts",
+      "summary": "包含 isSpecLike、isDynamicExpression、stripDynamicExpressions等 函数，属于 \"document\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 169,
+      "nonEmptyLines": 151
+    },
+    {
+      "id": "function:packages/ui-protocol/src/document/validate.ts:stripDynamicExpressions",
+      "type": "function",
+      "name": "stripDynamicExpressions",
+      "filePath": "packages/ui-protocol/src/document/validate.ts",
+      "summary": "函数 stripDynamicExpressions，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 66,
+      "endLine": 82
+    },
+    {
+      "id": "function:packages/ui-protocol/src/document/validate.ts:normalizeChronaSpec",
+      "type": "function",
+      "name": "normalizeChronaSpec",
+      "filePath": "packages/ui-protocol/src/document/validate.ts",
+      "summary": "函数 normalizeChronaSpec，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 89,
+      "endLine": 109
+    },
+    {
+      "id": "function:packages/ui-protocol/src/document/validate.ts:validateChronaSpec",
+      "type": "function",
+      "name": "validateChronaSpec",
+      "filePath": "packages/ui-protocol/src/document/validate.ts",
+      "summary": "函数 validateChronaSpec，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 124,
+      "endLine": 169
+    },
+    {
+      "id": "file:packages/ui-protocol/src/schema.ts",
+      "type": "file",
+      "name": "schema.ts",
+      "filePath": "packages/ui-protocol/src/schema.ts",
+      "summary": "实现 \"src\" 模块的 schema 功能。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 38,
+      "nonEmptyLines": 36
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/builders/build-action-spec.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-action-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-action-spec.ts:buildActionSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-action-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-action-spec.ts:buildActionSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-action-spec.ts",
+      "target": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/document/validate.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-activity-spec.ts:toolDetailRows",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-activity-spec.ts:buildActivitySpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-activity-spec.ts:buildActivitySpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "target": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:appendDocument",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterNowSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterNowSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterCheckpointSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterCheckpointSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterArtifactsSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterArtifactsSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterTrailSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-command-center-spec.ts:buildCommandCenterTrailSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "file:packages/ui-protocol/src/actions/actions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "file:packages/ui-protocol/src/builders/build-activity-spec.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-command-center-spec.ts",
+      "target": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/builders/build-result-spec.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/document/validate.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-result-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-result-spec.ts:buildResultSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-result-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-result-spec.ts:buildResultSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-result-spec.ts",
+      "target": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendOverflowMenu",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendOccurrence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:buildTaskHeaderSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:buildTaskHeaderSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "function:packages/ui-protocol/src/builders/build-task-header-spec.ts:appendErrorRegion",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "file:packages/ui-protocol/src/actions/actions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/builders/build-task-header-spec.ts",
+      "target": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/catalog/components.ts",
+      "target": "function:packages/ui-protocol/src/catalog/components.ts:nodeOutputJsonSchema",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/catalog/components.ts",
+      "target": "file:packages/ui-protocol/src/actions/actions.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/catalog/components.ts",
+      "target": "file:packages/ui-protocol/src/schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/document.ts",
+      "target": "file:packages/ui-protocol/src/catalog/components.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.bun.test.ts",
+      "target": "file:packages/ui-protocol/src/document/validate.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.ts",
+      "target": "function:packages/ui-protocol/src/document/validate.ts:stripDynamicExpressions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.ts",
+      "target": "function:packages/ui-protocol/src/document/validate.ts:normalizeChronaSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.ts",
+      "target": "function:packages/ui-protocol/src/document/validate.ts:normalizeChronaSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.ts",
+      "target": "function:packages/ui-protocol/src/document/validate.ts:validateChronaSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.ts",
+      "target": "function:packages/ui-protocol/src/document/validate.ts:validateChronaSpec",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.ts",
+      "target": "file:packages/ui-protocol/src/catalog/components.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/ui-protocol/src/document/validate.ts",
+      "target": "file:packages/ui-protocol/src/document/document.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    }
+  ]
+}

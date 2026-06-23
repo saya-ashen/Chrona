@@ -25,9 +25,12 @@ export type {
   ProviderStructuredOutputSchema,
   ProviderUsage,
   ResolveProviderApprovalInput,
+  StartRunControlInput,
   StartRunInput,
+  StartRunInputWithControl,
   StreamRunInput,
-} from "./contracts/provider";
+}
+from "./contracts/provider";
 
 export {
   cancelRunInputSchema,

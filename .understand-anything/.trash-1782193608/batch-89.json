@@ -1,0 +1,694 @@
+{
+  "nodes": [
+    {
+      "id": "file:scripts/chrona.bun.test.ts",
+      "type": "file",
+      "name": "chrona.bun.test.ts",
+      "filePath": "scripts/chrona.bun.test.ts",
+      "summary": "测试文件，覆盖 \"\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 41,
+      "nonEmptyLines": 37
+    },
+    {
+      "id": "file:scripts/chrona.ts",
+      "type": "file",
+      "name": "chrona.ts",
+      "filePath": "scripts/chrona.ts",
+      "summary": "包含 printHelp、printGroupHelp、normalizeArgs等 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 219,
+      "nonEmptyLines": 192
+    },
+    {
+      "id": "function:scripts/chrona.ts:printHelp",
+      "type": "function",
+      "name": "printHelp",
+      "filePath": "scripts/chrona.ts",
+      "summary": "函数 printHelp。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 87,
+      "endLine": 112
+    },
+    {
+      "id": "function:scripts/chrona.ts:printGroupHelp",
+      "type": "function",
+      "name": "printGroupHelp",
+      "filePath": "scripts/chrona.ts",
+      "summary": "函数 printGroupHelp，接受 group, commands 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 114,
+      "endLine": 128
+    },
+    {
+      "id": "function:scripts/chrona.ts:normalizeArgs",
+      "type": "function",
+      "name": "normalizeArgs",
+      "filePath": "scripts/chrona.ts",
+      "summary": "函数 normalizeArgs，接受 args 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 130,
+      "endLine": 136
+    },
+    {
+      "id": "function:scripts/chrona.ts:resolveCommand",
+      "type": "function",
+      "name": "resolveCommand",
+      "filePath": "scripts/chrona.ts",
+      "summary": "函数 resolveCommand，接受 commandArgs 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 142,
+      "endLine": 170
+    },
+    {
+      "id": "function:scripts/chrona.ts:runSequence",
+      "type": "function",
+      "name": "runSequence",
+      "filePath": "scripts/chrona.ts",
+      "summary": "函数 runSequence，接受 tokens, passthrough 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 172,
+      "endLine": 199
+    },
+    {
+      "id": "function:scripts/chrona.ts:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/chrona.ts",
+      "summary": "函数 main。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 201,
+      "endLine": 212
+    },
+    {
+      "id": "file:scripts/dev.ts",
+      "type": "file",
+      "name": "dev.ts",
+      "filePath": "scripts/dev.ts",
+      "summary": "包含 assertSafeDevServerBind、spawn、cleanup 函数，属于 \"\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 66,
+      "nonEmptyLines": 49
+    },
+    {
+      "id": "function:scripts/dev.ts:assertSafeDevServerBind",
+      "type": "function",
+      "name": "assertSafeDevServerBind",
+      "filePath": "scripts/dev.ts",
+      "summary": "函数 assertSafeDevServerBind。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 5,
+      "endLine": 31
+    },
+    {
+      "id": "file:scripts/replace-deprecated-plan-types.mjs",
+      "type": "file",
+      "name": "replace-deprecated-plan-types.mjs",
+      "filePath": "scripts/replace-deprecated-plan-types.mjs",
+      "summary": "包含 getLocation、isAliasDeclarationName、replaceAliasReferences等 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "type-definition"
+      ],
+      "language": "javascript",
+      "sizeLines": 133,
+      "nonEmptyLines": 107
+    },
+    {
+      "id": "function:scripts/replace-deprecated-plan-types.mjs:replaceAliasReferences",
+      "type": "function",
+      "name": "replaceAliasReferences",
+      "filePath": "scripts/replace-deprecated-plan-types.mjs",
+      "summary": "函数 replaceAliasReferences，接受 aliasDecl, oldName, newName 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 40,
+      "endLine": 67
+    },
+    {
+      "id": "function:scripts/replace-deprecated-plan-types.mjs:removeDuplicateNamedImports",
+      "type": "function",
+      "name": "removeDuplicateNamedImports",
+      "filePath": "scripts/replace-deprecated-plan-types.mjs",
+      "summary": "函数 removeDuplicateNamedImports。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 69,
+      "endLine": 109
+    },
+    {
+      "id": "file:scripts/run-api-tests.ts",
+      "type": "file",
+      "name": "run-api-tests.ts",
+      "filePath": "scripts/run-api-tests.ts",
+      "summary": "包含 runFile 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 117,
+      "nonEmptyLines": 101
+    },
+    {
+      "id": "function:scripts/run-api-tests.ts:runFile",
+      "type": "function",
+      "name": "runFile",
+      "filePath": "scripts/run-api-tests.ts",
+      "summary": "函数 runFile，接受 path, dbPath 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 33,
+      "endLine": 55
+    },
+    {
+      "id": "file:scripts/run-bun-tests.ts",
+      "type": "file",
+      "name": "run-bun-tests.ts",
+      "filePath": "scripts/run-bun-tests.ts",
+      "summary": "包含 shouldInclude、resolveRequestedFiles、runWithFreshDatabase 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 111,
+      "nonEmptyLines": 94
+    },
+    {
+      "id": "function:scripts/run-bun-tests.ts:runWithFreshDatabase",
+      "type": "function",
+      "name": "runWithFreshDatabase",
+      "filePath": "scripts/run-bun-tests.ts",
+      "summary": "函数 runWithFreshDatabase，接受 file, fileDbPath 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 26,
+      "endLine": 54
+    },
+    {
+      "id": "file:scripts/smoke-test.sh",
+      "type": "file",
+      "name": "smoke-test.sh",
+      "filePath": "scripts/smoke-test.sh",
+      "summary": "脚本文件 \"smoke-test.sh\"。",
+      "complexity": "simple",
+      "tags": [
+        "untagged"
+      ],
+      "language": "shell",
+      "sizeLines": 56,
+      "nonEmptyLines": 45
+    },
+    {
+      "id": "file:scripts/weather.py",
+      "type": "file",
+      "name": "weather.py",
+      "filePath": "scripts/weather.py",
+      "summary": "包含 wind_dir_zh、fetch_weather、main 函数，属于 \"\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "python",
+      "sizeLines": 149,
+      "nonEmptyLines": 129
+    },
+    {
+      "id": "function:scripts/weather.py:wind_dir_zh",
+      "type": "function",
+      "name": "wind_dir_zh",
+      "filePath": "scripts/weather.py",
+      "summary": "函数 wind_dir_zh，接受 degree 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 71,
+      "endLine": 80
+    },
+    {
+      "id": "function:scripts/weather.py:fetch_weather",
+      "type": "function",
+      "name": "fetch_weather",
+      "filePath": "scripts/weather.py",
+      "summary": "函数 fetch_weather，接受 city 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 83,
+      "endLine": 104
+    },
+    {
+      "id": "function:scripts/weather.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "scripts/weather.py",
+      "summary": "函数 main。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 107,
+      "endLine": 145
+    },
+    {
+      "id": "document:specs/001-plan-execution-orchestration/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/001-plan-execution-orchestration/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 35,
+      "nonEmptyLines": 26
+    },
+    {
+      "id": "document:specs/001-plan-execution-orchestration/contracts/current-api-surfaces.md",
+      "type": "document",
+      "name": "current-api-surfaces.md",
+      "filePath": "specs/001-plan-execution-orchestration/contracts/current-api-surfaces.md",
+      "summary": "文档 \"current-api-surfaces.md\"，提供项目相关说明。",
+      "complexity": "moderate",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 167,
+      "nonEmptyLines": 108
+    },
+    {
+      "id": "document:specs/001-plan-execution-orchestration/contracts/task-workspace-execution-console.md",
+      "type": "document",
+      "name": "task-workspace-execution-console.md",
+      "filePath": "specs/001-plan-execution-orchestration/contracts/task-workspace-execution-console.md",
+      "summary": "文档 \"task-workspace-execution-console.md\"，提供项目相关说明。",
+      "complexity": "moderate",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 135,
+      "nonEmptyLines": 101
+    },
+    {
+      "id": "document:specs/002-complexity-reduction-evolution/plan.md",
+      "type": "document",
+      "name": "plan.md",
+      "filePath": "specs/002-complexity-reduction-evolution/plan.md",
+      "summary": "文档 \"plan.md\"，提供项目相关说明。",
+      "complexity": "complex",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 512,
+      "nonEmptyLines": 347
+    },
+    {
+      "id": "document:specs/003-task-workspace-components/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/003-task-workspace-components/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 34,
+      "nonEmptyLines": 25
+    },
+    {
+      "id": "document:specs/003-task-workspace-components/contracts/task-workspace-component-contract.md",
+      "type": "document",
+      "name": "task-workspace-component-contract.md",
+      "filePath": "specs/003-task-workspace-components/contracts/task-workspace-component-contract.md",
+      "summary": "文档 \"task-workspace-component-contract.md\"，提供项目相关说明。",
+      "complexity": "moderate",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 85,
+      "nonEmptyLines": 58
+    },
+    {
+      "id": "document:specs/004-task-workspace-ui/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/004-task-workspace-ui/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 34,
+      "nonEmptyLines": 25
+    },
+    {
+      "id": "document:specs/004-task-workspace-ui/contracts/task-workspace-action-contract.md",
+      "type": "document",
+      "name": "task-workspace-action-contract.md",
+      "filePath": "specs/004-task-workspace-ui/contracts/task-workspace-action-contract.md",
+      "summary": "文档 \"task-workspace-action-contract.md\"，提供项目相关说明。",
+      "complexity": "moderate",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 88,
+      "nonEmptyLines": 60
+    },
+    {
+      "id": "document:specs/005-mcp-task-tools/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/005-mcp-task-tools/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 34,
+      "nonEmptyLines": 25
+    },
+    {
+      "id": "document:specs/005-mcp-task-tools/contracts/chrona-mcp-task-tools.md",
+      "type": "document",
+      "name": "chrona-mcp-task-tools.md",
+      "filePath": "specs/005-mcp-task-tools/contracts/chrona-mcp-task-tools.md",
+      "summary": "文档 \"chrona-mcp-task-tools.md\"，提供项目相关说明。",
+      "complexity": "moderate",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 194,
+      "nonEmptyLines": 129
+    },
+    {
+      "id": "document:specs/006-test-coverage/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/006-test-coverage/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 35,
+      "nonEmptyLines": 26
+    },
+    {
+      "id": "document:specs/006-test-coverage/contracts/test-coverage-contract.md",
+      "type": "document",
+      "name": "test-coverage-contract.md",
+      "filePath": "specs/006-test-coverage/contracts/test-coverage-contract.md",
+      "summary": "文档 \"test-coverage-contract.md\"，提供项目相关说明。",
+      "complexity": "moderate",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 133,
+      "nonEmptyLines": 102
+    },
+    {
+      "id": "document:specs/007-improve-workspace-ux/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/007-improve-workspace-ux/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 34,
+      "nonEmptyLines": 25
+    },
+    {
+      "id": "document:specs/007-improve-workspace-ux/contracts/workspace-ux-contract.md",
+      "type": "document",
+      "name": "workspace-ux-contract.md",
+      "filePath": "specs/007-improve-workspace-ux/contracts/workspace-ux-contract.md",
+      "summary": "文档 \"workspace-ux-contract.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 57,
+      "nonEmptyLines": 42
+    },
+    {
+      "id": "document:specs/008-task-orchestrator/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/008-task-orchestrator/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 35,
+      "nonEmptyLines": 26
+    },
+    {
+      "id": "document:specs/008-task-orchestrator/contracts/task-orchestrator-contract.md",
+      "type": "document",
+      "name": "task-orchestrator-contract.md",
+      "filePath": "specs/008-task-orchestrator/contracts/task-orchestrator-contract.md",
+      "summary": "文档 \"task-orchestrator-contract.md\"，提供项目相关说明。",
+      "complexity": "moderate",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 225,
+      "nonEmptyLines": 174
+    },
+    {
+      "id": "document:specs/009-global-ai-sidebar/checklists/requirements.md",
+      "type": "document",
+      "name": "requirements.md",
+      "filePath": "specs/009-global-ai-sidebar/checklists/requirements.md",
+      "summary": "文档 \"requirements.md\"，提供项目相关说明。",
+      "complexity": "simple",
+      "tags": [
+        "documentation"
+      ],
+      "language": "markdown",
+      "sizeLines": 34,
+      "nonEmptyLines": 25
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:scripts/chrona.bun.test.ts",
+      "target": "file:scripts/chrona.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:printHelp",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:printGroupHelp",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:normalizeArgs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:normalizeArgs",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:resolveCommand",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:resolveCommand",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:runSequence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:runSequence",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/chrona.ts",
+      "target": "function:scripts/chrona.ts:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/dev.ts",
+      "target": "function:scripts/dev.ts:assertSafeDevServerBind",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/replace-deprecated-plan-types.mjs",
+      "target": "function:scripts/replace-deprecated-plan-types.mjs:replaceAliasReferences",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/replace-deprecated-plan-types.mjs",
+      "target": "function:scripts/replace-deprecated-plan-types.mjs:removeDuplicateNamedImports",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/run-api-tests.ts",
+      "target": "function:scripts/run-api-tests.ts:runFile",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/run-bun-tests.ts",
+      "target": "function:scripts/run-bun-tests.ts:runWithFreshDatabase",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/weather.py",
+      "target": "function:scripts/weather.py:wind_dir_zh",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/weather.py",
+      "target": "function:scripts/weather.py:wind_dir_zh",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/weather.py",
+      "target": "function:scripts/weather.py:fetch_weather",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/weather.py",
+      "target": "function:scripts/weather.py:fetch_weather",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:scripts/weather.py",
+      "target": "function:scripts/weather.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/weather.py",
+      "target": "function:scripts/weather.py:main",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

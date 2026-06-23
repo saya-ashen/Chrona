@@ -1,4 +1,5 @@
 import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
+import { CHRONA_CLAUDE_CODE_PROVIDER_TYPE } from "@chrona/claude-code";
 import { CHRONA_DEBUG_PROVIDER_TYPE } from "@chrona/providers-debug";
 import type {
   RuntimeAdapterDefinition,
@@ -6,9 +7,17 @@ import type {
   RuntimeTaskConfigSpec,
 } from "@chrona/runtime-core";
 import { validateTaskConfigAgainstSpec } from "@chrona/runtime-core";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const HERMES_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
   runtime: HERMES_EXECUTION_RUNTIME,
+  version: "1",
+  fields: [],
+  runnability: { requiredPaths: [] },
+};
+
+const CLAUDE_CODE_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
+  runtime: CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
   version: "1",
   fields: [],
   runnability: { requiredPaths: [] },
@@ -33,6 +42,16 @@ const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
     },
   ],
   [
+    CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
+    {
+      key: CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
+      inputVersion: CLAUDE_CODE_TASK_CONFIG_SPEC.version,
+      getTaskConfigSpec: () => CLAUDE_CODE_TASK_CONFIG_SPEC,
+      validateTaskConfig: (input: unknown) =>
+        validateTaskConfigAgainstSpec(CLAUDE_CODE_TASK_CONFIG_SPEC, input),
+    },
+  ],
+  [
     CHRONA_DEBUG_PROVIDER_TYPE,
     {
       key: CHRONA_DEBUG_PROVIDER_TYPE,
@@ -48,13 +67,16 @@ export function getRuntimeAdapterDefinition(key: string) {
   const normalizedKey = key.trim();
 
   if (!normalizedKey) {
-    throw new Error("runtime key is required");
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "runtime key is required");
   }
 
   const definition = runtimeRegistry.get(normalizedKey);
 
   if (!definition) {
-    throw new Error(`Unknown runtime: ${normalizedKey}`);
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      `Unknown runtime: ${normalizedKey}`,
+    );
   }
 
   return definition;
@@ -94,5 +116,9 @@ export function validateRuntimeTaskConfig(
 }
 
 export function listExecutionRuntimes() {
-  return [HERMES_EXECUTION_RUNTIME, CHRONA_DEBUG_PROVIDER_TYPE];
+  return [
+    HERMES_EXECUTION_RUNTIME,
+    CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
+    CHRONA_DEBUG_PROVIDER_TYPE,
+  ];
 }

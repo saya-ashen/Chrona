@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { createLogger } from "@chrona/logging";
+
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { randomUUID } from "node:crypto";
@@ -8,10 +10,12 @@ import type { GeneratePlanSSEEvent } from "@chrona/contracts";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
+import { heartbeatDelayMs } from "../../lib/sse-heartbeat";
 import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "../tasks/runtime-event-summary";
 
+const logger = createLogger("apps.server.work");
+
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
-const WORKSPACE_SSE_HEARTBEAT_INTERVAL_MS = 5000;
 
 function writeWorkEvent(stream: SseStream, event: TaskProjectionEvent) {
   return stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
@@ -204,6 +208,13 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/plan/saved/id": event.result.id,
         "/plan/saved/status": event.result.status,
         "/plan/saved/revision": event.result.revision,
+        "/execution/has-plan": true,
+        "/execution/has-accepted-plan": false,
+        "/execution/show-accept-plan": true,
+        "/execution/show-generate-plan": false,
+        "/execution/can-start": false,
+        "/execution/start-disabled": true,
+        "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
         "/plan/generation/status": "completed",
       };
     case "cancelled":
@@ -229,6 +240,13 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
   }
 }
 
+
+function optimisticExecutionStatusForAction(action: ExecutionActionInput["action"]): string | null {
+  if (action === "start_manual") return "running";
+  if (action === "pause_session") return "waiting_for_user";
+  if (action === "cancel_session") return "cancelled";
+  return null;
+}
 async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
   taskId: string;
   workspaceId: string;
@@ -308,6 +326,20 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
 
     if (command.type === "plan.accept") {
       await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
+      const headerStateUpdate = await buildHeaderExecutionStateUpdate({
+        engine,
+        taskId,
+        workBlockId: commandWorkBlockId(command),
+        executionStatus: "started",
+      });
+      if (headerStateUpdate) {
+        publishTaskStateUpdate({
+          taskId,
+          workspaceId,
+          workBlockId: commandWorkBlockId(command),
+          updates: headerStateUpdate,
+        });
+      }
       // Acceptance flips the task's accepted plan + primary action
       // (Accept plan → Start plan). rebuildTaskProjection already
       // publishes `task_projection_updated` (which the SSE pipe also
@@ -331,6 +363,23 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         ...command,
         action: command.action,
       } as ExecutionActionInput;
+      const optimisticStatus = optimisticExecutionStatusForAction(action.action);
+      if (optimisticStatus) {
+        const optimisticHeaderState = await buildHeaderExecutionStateUpdate({
+          engine,
+          taskId,
+          workBlockId: commandWorkBlockId(command),
+          executionStatus: optimisticStatus,
+        });
+        if (optimisticHeaderState) {
+          publishTaskStateUpdate({
+            taskId,
+            workspaceId,
+            workBlockId: commandWorkBlockId(command),
+            updates: optimisticHeaderState,
+          });
+        }
+      }
       const result = await engine.tasks.execution.dispatch({
         taskId,
         action,
@@ -509,9 +558,9 @@ export function createWorkRoutes(engine: ChronaEngine) {
             try {
               await write();
             } catch (cause) {
-              console.warn("[work-sse] write failed", {
+              logger.warn("work_sse.write_failed", {
                 taskId,
-                error: cause instanceof Error ? cause.message : String(cause),
+                error: cause,
               });
               throw cause;
             }
@@ -543,7 +592,7 @@ export function createWorkRoutes(engine: ChronaEngine) {
         });
         const heartbeatLoop = async () => {
           while (!isClosed) {
-            await stream.sleep(WORKSPACE_SSE_HEARTBEAT_INTERVAL_MS);
+            await stream.sleep(heartbeatDelayMs());
             if (isClosed) break;
             await writeHeartbeat();
           }

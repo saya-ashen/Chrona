@@ -25,11 +25,11 @@ function parseEnvLine(line: string): EnvFileEntry | null {
   };
 }
 
-export function readHermesEnv(hermesHome?: string): Record<string, string> {
+export function readHermesEnv(hermesHome?: string): Partial<Record<string, string>> {
   const envPath = getHermesEnvPath(hermesHome);
   if (!existsSync(envPath)) return {};
 
-  const entries: Record<string, string> = {};
+  const entries: Partial<Record<string, string>> = {};
   for (const line of readFileSync(envPath, "utf8").split("\n")) {
     const entry = parseEnvLine(line);
     if (entry) entries[entry.key] = entry.value;

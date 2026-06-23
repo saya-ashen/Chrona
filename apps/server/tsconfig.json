@@ -13,6 +13,7 @@
       "@/*": ["./src/*"],
       "@chrona/runtime-core/*": ["../../packages/runtime-core/src/*"],
       "@chrona/runtime-core": ["../../packages/runtime-core/src/index.ts"],
+      "@chrona/logging": ["../../packages/logging/src/index.ts"],
       "@chrona/i18n/*": ["../../packages/i18n/src/*"],
       "@chrona/i18n": ["../../packages/i18n/src/locale.ts"],
       "@chrona/shared/*": ["../../packages/shared/src/*"],

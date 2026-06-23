@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export async function acceptTaskResult(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
@@ -16,7 +17,10 @@ export async function acceptTaskResult(input: { taskId: string }) {
   const latestRun = task.runs[0] ?? null;
 
   if (!latestRun || latestRun.status !== "Completed") {
-    throw new Error("Only completed runs can be accepted.");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Only completed runs can be accepted.",
+    );
   }
 
   await appendCanonicalEvent({

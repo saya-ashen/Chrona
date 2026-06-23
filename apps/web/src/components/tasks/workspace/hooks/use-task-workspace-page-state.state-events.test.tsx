@@ -19,6 +19,7 @@ type FetchEventSourceOptions = {
 const mocks = vi.hoisted(() => ({
   eventHandler: null as JsonEventHandler | null,
   streamOpened: false,
+  fetchUrls: [] as string[],
 }));
 
 vi.mock("@/lib/fetch-json-event-source", () => ({
@@ -54,6 +55,41 @@ vi.mock("@/lib/rpc-client", () => ({
   },
 }));
 
+const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const url = typeof input === "string" ? input : input.toString();
+  mocks.fetchUrls.push(url);
+  if (url.includes("/runtime-context")) {
+    return new Response(JSON.stringify({
+      latestRunSummary: null,
+      activityTimeline: [],
+      graphPlan: null,
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  if (url.includes("/review-context")) {
+    return new Response(JSON.stringify({
+      scheduleProposals: [],
+      approvals: [],
+      artifacts: [],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  if (url.includes("/command-center")) {
+    return new Response(JSON.stringify(taskWorkspaceStateFixtures.idle.pageData.commandCenter), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  if (url.includes("/execution/current")) {
+    return new Response(JSON.stringify({ status: "running" }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  if (url.includes("/plan")) {
+    return new Response(JSON.stringify({
+      taskId: "task-1",
+      aiPlanGenerationStatus: "accepted",
+      savedPlan: { id: "plan-1", status: "accepted", revision: 1 },
+      generationSession: null,
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+  return new Response(JSON.stringify(initialPageForTest), { status: 200, headers: { "Content-Type": "application/json" } });
+});
+vi.stubGlobal("fetch", fetchMock);
+
 let initialPageForTest: TaskPageData = taskWorkspaceStateFixtures.idle.pageData;
 
 function wrapper({ children }: PropsWithChildren) {
@@ -71,6 +107,8 @@ function pushEvent(event: string, data: Record<string, unknown>) {
 afterEach(() => {
   mocks.eventHandler = null;
   mocks.streamOpened = false;
+  mocks.fetchUrls = [];
+  fetchMock.mockClear();
 });
 
 describe("useTaskWorkspacePageState — state.snapshot / state.update dispatch", () => {
@@ -158,5 +196,104 @@ describe("useTaskWorkspacePageState — state.snapshot / state.update dispatch",
     await waitFor(() => expect(result.current.stateStore.get("/plan/generation/phase")).toBe("requesting_provider"));
     // No assertion for fetch count here — the rpc mock makes count opaque
     // (we just ensure no exception escaped during a state-only event).
+  });
+
+  it("applies accepted-plan header action state from state.update", async () => {
+    initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
+    const { result } = renderHook(() => useTaskWorkspacePageState(initialPageForTest), { wrapper });
+
+    await waitFor(() => expect(mocks.streamOpened).toBe(true));
+
+    await act(async () => {
+      pushEvent("state.update", {
+        type: "state.update",
+        updates: {
+          "/plan/saved/status": "accepted",
+          "/execution/has-plan": true,
+          "/execution/has-accepted-plan": true,
+          "/execution/show-accept-plan": false,
+          "/execution/show-generate-plan": false,
+          "/execution/can-start": true,
+          "/execution/start-disabled": false,
+          "/execution/start-disabled-reason": null,
+          "/execution/status": "started",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.stateStore.get("/execution/show-accept-plan")).toBe(false);
+      expect(result.current.stateStore.get("/execution/can-start")).toBe(true);
+      expect(result.current.stateStore.get("/execution/start-disabled")).toBe(false);
+      expect(result.current.stateStore.get("/execution/status")).toBe("started");
+    });
+  });
+
+  it("applies running header action state from post-start state.update", async () => {
+    initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
+    const { result } = renderHook(() => useTaskWorkspacePageState(initialPageForTest), { wrapper });
+
+    await waitFor(() => expect(mocks.streamOpened).toBe(true));
+
+    await act(async () => {
+      pushEvent("state.update", {
+        type: "state.update",
+        updates: {
+          "/execution/status": "running",
+          "/execution/can-start": false,
+          "/execution/can-pause": true,
+          "/execution/can-stop": true,
+          "/execution/start-disabled": false,
+          "/execution/start-disabled-reason": "Task is already running.",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.stateStore.get("/execution/status")).toBe("running");
+      expect(result.current.stateStore.get("/execution/can-start")).toBe(false);
+      expect(result.current.stateStore.get("/execution/can-pause")).toBe(true);
+      expect(result.current.stateStore.get("/execution/can-stop")).toBe(true);
+    });
+  });
+
+  it("refreshes workspace queries for workspace and execution terminal events", async () => {
+    initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
+    renderHook(() => useTaskWorkspacePageState(initialPageForTest), { wrapper });
+
+    await waitFor(() => expect(mocks.streamOpened).toBe(true));
+    fetchMock.mockClear();
+    mocks.fetchUrls = [];
+
+    await act(async () => {
+      pushEvent("task_workspace_updated", {
+        type: "task_workspace_updated",
+        taskId: "task-1",
+        reason: "plan.accepted",
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.fetchUrls.some((url) => url === "/api/tasks/task-1" || url.includes("/api/tasks/task-1?"))).toBe(true);
+      expect(mocks.fetchUrls.some((url) => url.includes("/api/tasks/task-1/runtime-context"))).toBe(true);
+      expect(mocks.fetchUrls.some((url) => url.includes("/api/tasks/task-1/review-context"))).toBe(true);
+    });
+
+    fetchMock.mockClear();
+    mocks.fetchUrls = [];
+
+    await act(async () => {
+      pushEvent("execution.result", {
+        type: "execution.result",
+        taskId: "task-1",
+        eventKind: "running",
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.fetchUrls.some((url) => url === "/api/tasks/task-1" || url.includes("/api/tasks/task-1?"))).toBe(true);
+      expect(mocks.fetchUrls.some((url) => url.includes("/api/tasks/task-1/runtime-context"))).toBe(true);
+      expect(mocks.fetchUrls.some((url) => url.includes("/api/tasks/task-1/review-context"))).toBe(true);
+    });
   });
 });

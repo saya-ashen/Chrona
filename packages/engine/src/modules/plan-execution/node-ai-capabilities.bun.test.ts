@@ -185,6 +185,8 @@ describe("runTaskNodeFeature", () => {
         runtimeRunRef: "runtime-first-entry",
         runtimeSessionKey: "main-session",
         conversationEntryIds: ["conversation-entry-1"],
+        controlRunToken: null,
+        providerName: "claude_code",
         response: {
           provider: "hermes",
           runId: "runtime-first-entry",
@@ -227,6 +229,7 @@ describe("runTaskNodeFeature", () => {
         sessionId: "main-session",
         runId: "local-run-1",
         runtimeName: "hermes",
+        provider: "claude_code",
         runtimeRunRef: "runtime-first-entry",
         conversationEntryIds: ["conversation-entry-1"],
       },
@@ -278,6 +281,8 @@ describe("runTaskNodeFeature", () => {
         runtimeRunRef: "runtime-task-terminal-tool",
         runtimeSessionKey: "main-session",
         conversationEntryIds: ["conversation-entry-task-terminal-tool"],
+        controlRunToken: null,
+        providerName: "claude_code",
         response: {
           provider: "hermes",
           runId: "runtime-task-terminal-tool",
@@ -362,6 +367,8 @@ describe("runTaskNodeFeature", () => {
         runtimeRunRef: "runtime-condition",
         runtimeSessionKey: "main-session",
         conversationEntryIds: ["conversation-entry-condition"],
+        controlRunToken: null,
+        providerName: "claude_code",
         response: {
           provider: "hermes",
           runId: "runtime-condition",
@@ -449,6 +456,8 @@ describe("runTaskNodeFeature", () => {
         runtimeRunRef: "runtime-condition-terminal-tool",
         runtimeSessionKey: "main-session",
         conversationEntryIds: ["conversation-entry-condition-terminal-tool"],
+        controlRunToken: null,
+        providerName: "claude_code",
         response: {
           provider: "hermes",
           runId: "runtime-condition-terminal-tool",
@@ -542,6 +551,8 @@ describe("runTaskNodeFeature", () => {
         runtimeRunRef: "runtime-condition-blocked",
         runtimeSessionKey: "main-session",
         conversationEntryIds: ["conversation-entry-condition-blocked"],
+        controlRunToken: null,
+        providerName: "claude_code",
         response: {
           provider: "hermes",
           runId: "runtime-condition-blocked",

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  agentControlActionBodySchema,
+  agentControlActionPayloadSchemas,
   chronaToolInputSchema,
   chronaToolOperationSchema,
   chronaToolResultSchema,
@@ -166,18 +168,16 @@ describe("MCP task tool contracts", () => {
     expect(() => parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "json", value: { foo: "bar" } }] })).toThrow();
     expect(parseChronaToolPayload("chrona.node.output", {
       mode: "replace",
-      outputs: [
-        {
-          root: "root",
-          elements: {
-            root: { type: "Card", props: { title: "Done" }, children: [] },
-          },
-          state: { status: "done" },
-        },
-      ],
+      spec: {
+        root: "root",
+        elements: [
+          { id: "root", type: "Card", props: { title: "Done" }, children: [] },
+        ],
+        state: { status: "done" },
+      },
     })).toMatchObject({
       mode: "replace",
-      outputs: [{ root: "root" }],
+      spec: { root: "root" },
     });
     expect(() => parseChronaToolPayload("chrona.node.output", {
       outputs: [{ kind: "json", title: "Wrong wrapper", value: { root: "root", elements: {} } }],
@@ -206,5 +206,50 @@ describe("MCP task tool contracts", () => {
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { summary: "Missing ref" })).toThrow();
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { branchRef: "B20260516-01-A", summary: "Missing node" })).toThrow();
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No extra ids" })).toThrow();
+  });
+
+  it("parses array-form node output payloads into flat specs", () => {
+    expect(parseChronaToolPayload("chrona.node.output", {
+      spec: {
+        root: "root",
+        elements: [
+          { id: "root", type: "Stack", props: {}, children: ["table"] },
+          { id: "table", type: "Table", props: { columns: ["A"], rows: [["A"]] }, children: [] },
+        ],
+      },
+    })).toMatchObject({
+      spec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: {}, children: ["table"] },
+          table: { type: "Table", props: { columns: ["A"], rows: [["A"]] }, children: [] },
+        },
+      },
+    });
+
+    expect(() => parseChronaToolPayload("chrona.node.output", {
+      spec: { root: "missing", elements: [{ id: "root", type: "Stack", props: {}, children: [] }] },
+    })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.node.output", {
+      spec: { root: "root", elements: [{ id: "root", type: "Stack", props: {}, children: ["missing"] }] },
+    })).toThrow();
+  });
+  it("defines agent control actions from public MCP payload contracts", () => {
+    expect(agentControlActionPayloadSchemas.output).toBeDefined();
+    expect(agentControlActionBodySchema.parse({
+      kind: "fail",
+      payload: { error: "Command failed" },
+    })).toEqual({ kind: "fail", payload: { error: "Command failed" } });
+    expect(agentControlActionBodySchema.parse({
+      kind: "condition_select",
+      payload: { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" },
+    })).toEqual({
+      kind: "condition_select",
+      payload: { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Condition met" },
+    });
+    expect(() => agentControlActionBodySchema.parse({
+      kind: "complete",
+      payload: { nodeId: "node-1", summary: "Done" },
+    })).toThrow();
   });
 });

@@ -1,0 +1,4375 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 34,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "packages/engine/src/modules/orchestration/graph-version-repository.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 26,
+      "nonEmptyLines": 22,
+      "functions": [
+        {
+          "name": "createGraphVersion",
+          "startLine": 12,
+          "endLine": 14,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "getLatestGraphVersion",
+          "startLine": 16,
+          "endLine": 21,
+          "params": [
+            "taskId"
+          ]
+        },
+        {
+          "name": "assertCurrentGraphVersion",
+          "startLine": 23,
+          "endLine": 26,
+          "params": [
+            "taskId",
+            "expectedVersion"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createGraphVersion",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "getLatestGraphVersion",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "assertCurrentGraphVersion",
+          "line": 23,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createGraphVersion",
+          "callee": "db.graphVersion.create",
+          "lineNumber": 13
+        },
+        {
+          "caller": "getLatestGraphVersion",
+          "callee": "db.graphVersion.findFirst",
+          "lineNumber": 17
+        },
+        {
+          "caller": "assertCurrentGraphVersion",
+          "callee": "getLatestGraphVersion",
+          "lineNumber": 24
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/orchestrator-config.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 33,
+      "functions": [
+        {
+          "name": "readBoolean",
+          "startLine": 10,
+          "endLine": 15,
+          "params": [
+            "name",
+            "fallback"
+          ]
+        },
+        {
+          "name": "readPositiveNumber",
+          "startLine": 17,
+          "endLine": 20,
+          "params": [
+            "name",
+            "fallback"
+          ]
+        },
+        {
+          "name": "readTaskOrchestratorConfig",
+          "startLine": 22,
+          "endLine": 31,
+          "params": []
+        },
+        {
+          "name": "getTaskOrchestratorOwnerId",
+          "startLine": 33,
+          "endLine": 37,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "readTaskOrchestratorConfig",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "getTaskOrchestratorOwnerId",
+          "line": 33,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readBoolean",
+          "callee": "process.env[name]?.trim().toLowerCase",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readBoolean",
+          "callee": "process.env[name]?.trim",
+          "lineNumber": 11
+        },
+        {
+          "caller": "readPositiveNumber",
+          "callee": "Number",
+          "lineNumber": 18
+        },
+        {
+          "caller": "readPositiveNumber",
+          "callee": "Number.isFinite",
+          "lineNumber": 19
+        },
+        {
+          "caller": "readTaskOrchestratorConfig",
+          "callee": "readBoolean",
+          "lineNumber": 24
+        },
+        {
+          "caller": "readTaskOrchestratorConfig",
+          "callee": "readPositiveNumber",
+          "lineNumber": 25
+        },
+        {
+          "caller": "readTaskOrchestratorConfig",
+          "callee": "readBoolean",
+          "lineNumber": 26
+        },
+        {
+          "caller": "readTaskOrchestratorConfig",
+          "callee": "process.env.CHRONA_TASK_ORCHESTRATOR_LEASE_NAME?.trim",
+          "lineNumber": 27
+        },
+        {
+          "caller": "readTaskOrchestratorConfig",
+          "callee": "getTaskOrchestratorOwnerId",
+          "lineNumber": 28
+        },
+        {
+          "caller": "readTaskOrchestratorConfig",
+          "callee": "readPositiveNumber",
+          "lineNumber": 29
+        },
+        {
+          "caller": "getTaskOrchestratorOwnerId",
+          "callee": "process.env.CHRONA_TASK_ORCHESTRATOR_OWNER_ID?.trim",
+          "lineNumber": 34
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/orchestrator-restart-recovery.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 410,
+      "nonEmptyLines": 390,
+      "functions": [
+        {
+          "name": "resetDb",
+          "startLine": 5,
+          "endLine": 35,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetDb",
+          "callee": "db.$executeRaw",
+          "lineNumber": 7
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskAssistantMessage.deleteMany",
+          "lineNumber": 8
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.scheduleProposal.deleteMany",
+          "lineNumber": 9
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.toolInvocation.deleteMany",
+          "lineNumber": 10
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.conversationEntry.deleteMany",
+          "lineNumber": 11
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.runtimeCursor.deleteMany",
+          "lineNumber": 12
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.schedulerEvent.deleteMany",
+          "lineNumber": 13
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.schedulerLease.deleteMany",
+          "lineNumber": 14
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.reconciliationEvent.deleteMany",
+          "lineNumber": 15
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.graphMutationRecord.deleteMany",
+          "lineNumber": 16
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.graphVersion.deleteMany",
+          "lineNumber": 17
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.approval.deleteMany",
+          "lineNumber": 18
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.artifact.deleteMany",
+          "lineNumber": 19
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.executionSession.deleteMany",
+          "lineNumber": 20
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workBlock.deleteMany",
+          "lineNumber": 21
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskProjection.deleteMany",
+          "lineNumber": 22
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.run.deleteMany",
+          "lineNumber": 23
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlanLayer.deleteMany",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlanRun.deleteMany",
+          "lineNumber": 25
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlan.deleteMany",
+          "lineNumber": 26
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskSession.deleteMany",
+          "lineNumber": 27
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskDependency.deleteMany",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.memory.deleteMany",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.task.deleteMany",
+          "lineNumber": 30
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workspace.deleteMany",
+          "lineNumber": 31
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.$executeRaw",
+          "lineNumber": 33
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/recurring-work-block-expansion-worker.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 114,
+      "nonEmptyLines": 100,
+      "functions": [
+        {
+          "name": "runRecurringWorkBlockExpansionWorker",
+          "startLine": 12,
+          "endLine": 114,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "runRecurringWorkBlockExpansionWorker",
+          "line": 12,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "now.getTime",
+          "lineNumber": 14
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "db.task.findMany",
+          "lineNumber": 16
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "latestBlock.scheduledEndAt.getTime",
+          "lineNumber": 48
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "lookaheadDate.getTime",
+          "lineNumber": 48
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "task.recurrenceAnchorEndAt.getTime",
+          "lineNumber": 53
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "anchorStart.getTime",
+          "lineNumber": 53
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "Math.max",
+          "lineNumber": 55
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "latestBlock.scheduledEndAt.getTime",
+          "lineNumber": 55
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "now.getTime",
+          "lineNumber": 55
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "Math.max",
+          "lineNumber": 57
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "lookaheadDate.getTime",
+          "lineNumber": 57
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "expansionFrom.getTime",
+          "lineNumber": 57
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "expandRecurrenceRule",
+          "lineNumber": 61
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "(\n        await db.workBlock.findMany({\n          where: { taskId: task.id, recurrenceKey: { not: null } },\n          select: { recurrenceKey: true },\n        })\n      ).map",
+          "lineNumber": 68
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "db.workBlock.findMany",
+          "lineNumber": 69
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "occurrence.startsAt.toISOString",
+          "lineNumber": 77
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "existingKeys.has",
+          "lineNumber": 78
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "db.workBlock.upsert",
+          "lineNumber": 80
+        },
+        {
+          "caller": "runRecurringWorkBlockExpansionWorker",
+          "callee": "ensureWorkBlockTaskSession",
+          "lineNumber": 101
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/restart-recovery-worker.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 128,
+      "nonEmptyLines": 119,
+      "functions": [
+        {
+          "name": "runRestartRecoveryWorker",
+          "startLine": 33,
+          "endLine": 128,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "runRestartRecoveryWorker",
+          "line": 33,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "taskPlanExecution.reconcileStaleRuntimeRuns.bind",
+          "lineNumber": 40
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "db.schedulerLease.findMany",
+          "lineNumber": 43
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "db.schedulerLease.deleteMany",
+          "lineNumber": 44
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "db.executionSession.findMany",
+          "lineNumber": 51
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "Promise.all",
+          "lineNumber": 66
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "orphanedSessions.map",
+          "lineNumber": 67
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "logger.warn",
+          "lineNumber": 70
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "abandonSession",
+          "lineNumber": 76
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "recordEvent",
+          "lineNumber": 83
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "rebuildProjection",
+          "lineNumber": 90
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "db.run.findMany",
+          "lineNumber": 95
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "Promise.all",
+          "lineNumber": 99
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "degradedRuns.map",
+          "lineNumber": 100
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "logger.warn",
+          "lineNumber": 103
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "Promise.resolve",
+          "lineNumber": 107
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "recordEvent",
+          "lineNumber": 109
+        },
+        {
+          "caller": "runRestartRecoveryWorker",
+          "callee": "reconcileStaleRuntimeRuns",
+          "lineNumber": 119
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-event-repository.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 117,
+      "nonEmptyLines": 106,
+      "functions": [
+        {
+          "name": "resetDb",
+          "startLine": 8,
+          "endLine": 37,
+          "params": []
+        },
+        {
+          "name": "createTask",
+          "startLine": 39,
+          "endLine": 54,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetDb",
+          "callee": "db.$executeRaw",
+          "lineNumber": 10
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskAssistantMessage.deleteMany",
+          "lineNumber": 11
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.scheduleProposal.deleteMany",
+          "lineNumber": 12
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.toolInvocation.deleteMany",
+          "lineNumber": 13
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.conversationEntry.deleteMany",
+          "lineNumber": 14
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.runtimeCursor.deleteMany",
+          "lineNumber": 15
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.schedulerEvent.deleteMany",
+          "lineNumber": 16
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.reconciliationEvent.deleteMany",
+          "lineNumber": 17
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.graphMutationRecord.deleteMany",
+          "lineNumber": 18
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.graphVersion.deleteMany",
+          "lineNumber": 19
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.approval.deleteMany",
+          "lineNumber": 20
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.artifact.deleteMany",
+          "lineNumber": 21
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.executionSession.deleteMany",
+          "lineNumber": 22
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workBlock.deleteMany",
+          "lineNumber": 23
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskProjection.deleteMany",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.run.deleteMany",
+          "lineNumber": 25
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlanLayer.deleteMany",
+          "lineNumber": 26
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlanRun.deleteMany",
+          "lineNumber": 27
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlan.deleteMany",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskSession.deleteMany",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskDependency.deleteMany",
+          "lineNumber": 30
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.memory.deleteMany",
+          "lineNumber": 31
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.task.deleteMany",
+          "lineNumber": 32
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workspace.deleteMany",
+          "lineNumber": 33
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.$executeRaw",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createTask",
+          "callee": "db.workspace.create",
+          "lineNumber": 40
+        },
+        {
+          "caller": "createTask",
+          "callee": "db.task.create",
+          "lineNumber": 43
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-event-repository.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 46,
+      "nonEmptyLines": 41,
+      "functions": [
+        {
+          "name": "recordSchedulerEvent",
+          "startLine": 13,
+          "endLine": 24,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "listSchedulerEvents",
+          "startLine": 26,
+          "endLine": 31,
+          "params": [
+            "taskId"
+          ]
+        },
+        {
+          "name": "redactSchedulerEventPayload",
+          "startLine": 33,
+          "endLine": 46,
+          "params": [
+            "payload"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "recordSchedulerEvent",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "listSchedulerEvents",
+          "line": 26,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "recordSchedulerEvent",
+          "callee": "db.schedulerEvent.create",
+          "lineNumber": 14
+        },
+        {
+          "caller": "recordSchedulerEvent",
+          "callee": "redactSchedulerEventPayload",
+          "lineNumber": 21
+        },
+        {
+          "caller": "listSchedulerEvents",
+          "callee": "db.schedulerEvent.findMany",
+          "lineNumber": 27
+        },
+        {
+          "caller": "redactSchedulerEventPayload",
+          "callee": "JSON.parse",
+          "lineNumber": 38
+        },
+        {
+          "caller": "redactSchedulerEventPayload",
+          "callee": "JSON.stringify",
+          "lineNumber": 39
+        },
+        {
+          "caller": "redactSchedulerEventPayload",
+          "callee": "/token|secret|credential|password|apiKey/i.test",
+          "lineNumber": 40
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-events.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 27,
+      "nonEmptyLines": 24,
+      "functions": [
+        {
+          "name": "recordOrchestratorEvent",
+          "startLine": 25,
+          "endLine": 27,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "recordOrchestratorEvent",
+          "line": 25,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "recordOrchestratorEvent",
+          "callee": "recordSchedulerEvent",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-lease-repository.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 115,
+      "nonEmptyLines": 96,
+      "functions": [
+        {
+          "name": "resetDb",
+          "startLine": 9,
+          "endLine": 11,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetDb",
+          "callee": "db.schedulerLease.deleteMany",
+          "lineNumber": 10
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-lease-repository.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 66,
+      "nonEmptyLines": 57,
+      "functions": [
+        {
+          "name": "acquireSchedulerLease",
+          "startLine": 11,
+          "endLine": 38,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "renewSchedulerLease",
+          "startLine": 40,
+          "endLine": 57,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "releaseSchedulerLease",
+          "startLine": 59,
+          "endLine": 66,
+          "params": [
+            "name",
+            "ownerId"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "acquireSchedulerLease",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "renewSchedulerLease",
+          "line": 40,
+          "isDefault": false
+        },
+        {
+          "name": "releaseSchedulerLease",
+          "line": 59,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "acquireSchedulerLease",
+          "callee": "now.getTime",
+          "lineNumber": 13
+        },
+        {
+          "caller": "acquireSchedulerLease",
+          "callee": "db.schedulerLease.findUnique",
+          "lineNumber": 14
+        },
+        {
+          "caller": "acquireSchedulerLease",
+          "callee": "db.schedulerLease.upsert",
+          "lineNumber": 20
+        },
+        {
+          "caller": "renewSchedulerLease",
+          "callee": "db.schedulerLease.findUnique",
+          "lineNumber": 42
+        },
+        {
+          "caller": "renewSchedulerLease",
+          "callee": "db.schedulerLease.update",
+          "lineNumber": 47
+        },
+        {
+          "caller": "renewSchedulerLease",
+          "callee": "now.getTime",
+          "lineNumber": 51
+        },
+        {
+          "caller": "releaseSchedulerLease",
+          "callee": "db.schedulerLease.findUnique",
+          "lineNumber": 60
+        },
+        {
+          "caller": "releaseSchedulerLease",
+          "callee": "db.schedulerLease.delete",
+          "lineNumber": 64
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 50,
+      "nonEmptyLines": 45,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 183,
+      "nonEmptyLines": 152,
+      "functions": [
+        {
+          "name": "lease",
+          "startLine": 14,
+          "endLine": 25,
+          "params": [
+            "overrides"
+          ]
+        },
+        {
+          "name": "createHarness",
+          "startLine": 27,
+          "endLine": 63,
+          "params": [
+            "overrides"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createHarness",
+          "callee": "mock",
+          "lineNumber": 31
+        },
+        {
+          "caller": "createHarness",
+          "callee": "mock",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createHarness",
+          "callee": "lease",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createHarness",
+          "callee": "mock",
+          "lineNumber": 34
+        },
+        {
+          "caller": "createHarness",
+          "callee": "lease",
+          "lineNumber": 34
+        },
+        {
+          "caller": "createHarness",
+          "callee": "mock",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createHarness",
+          "callee": "intervalCalls.push",
+          "lineNumber": 39
+        },
+        {
+          "caller": "createHarness",
+          "callee": "(fn as () => void)",
+          "lineNumber": 39
+        },
+        {
+          "caller": "createHarness",
+          "callee": "Number",
+          "lineNumber": 39
+        },
+        {
+          "caller": "createHarness",
+          "callee": "setInterval",
+          "lineNumber": 41
+        },
+        {
+          "caller": "createHarness",
+          "callee": "handles.push",
+          "lineNumber": 42
+        },
+        {
+          "caller": "createHarness",
+          "callee": "clearedHandles.push",
+          "lineNumber": 47
+        },
+        {
+          "caller": "createHarness",
+          "callee": "clearInterval",
+          "lineNumber": 48
+        },
+        {
+          "caller": "createHarness",
+          "callee": "createTaskOrchestrator",
+          "lineNumber": 52
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/orchestration/task-orchestrator.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 198,
+      "nonEmptyLines": 181,
+      "functions": [
+        {
+          "name": "createTaskOrchestrator",
+          "startLine": 46,
+          "endLine": 137,
+          "params": [
+            "options"
+          ]
+        },
+        {
+          "name": "createDefaultTaskOrchestratorWorkers",
+          "startLine": 139,
+          "endLine": 172,
+          "params": []
+        },
+        {
+          "name": "createDefaultTaskOrchestrator",
+          "startLine": 174,
+          "endLine": 178,
+          "params": []
+        },
+        {
+          "name": "getTaskOrchestrator",
+          "startLine": 186,
+          "endLine": 192,
+          "params": []
+        },
+        {
+          "name": "startTaskOrchestrator",
+          "startLine": 194,
+          "endLine": 198,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "createTaskOrchestrator",
+          "line": 46,
+          "isDefault": false
+        },
+        {
+          "name": "createDefaultTaskOrchestratorWorkers",
+          "line": 139,
+          "isDefault": false
+        },
+        {
+          "name": "createDefaultTaskOrchestrator",
+          "line": 174,
+          "isDefault": false
+        },
+        {
+          "name": "getTaskOrchestrator",
+          "line": 186,
+          "isDefault": false
+        },
+        {
+          "name": "startTaskOrchestrator",
+          "line": 194,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createTaskOrchestrator",
+          "callee": "readTaskOrchestratorConfig",
+          "lineNumber": 47
+        },
+        {
+          "caller": "createTaskOrchestrator",
+          "callee": "workers.set",
+          "lineNumber": 62
+        },
+        {
+          "caller": "tick",
+          "callee": "leaseRepository.acquire",
+          "lineNumber": 71
+        },
+        {
+          "caller": "tick",
+          "callee": "now",
+          "lineNumber": 75
+        },
+        {
+          "caller": "tick",
+          "callee": "workers.values",
+          "lineNumber": 82
+        },
+        {
+          "caller": "tick",
+          "callee": "leaseRepository.renew",
+          "lineNumber": 83
+        },
+        {
+          "caller": "tick",
+          "callee": "now",
+          "lineNumber": 87
+        },
+        {
+          "caller": "tick",
+          "callee": "worker.run",
+          "lineNumber": 90
+        },
+        {
+          "caller": "tick",
+          "callee": "logger.error",
+          "lineNumber": 94
+        },
+        {
+          "caller": "start",
+          "callee": "tick",
+          "lineNumber": 113
+        },
+        {
+          "caller": "start",
+          "callee": "setIntervalFn",
+          "lineNumber": 115
+        },
+        {
+          "caller": "start",
+          "callee": "tick",
+          "lineNumber": 116
+        },
+        {
+          "caller": "stop",
+          "callee": "clearIntervalFn",
+          "lineNumber": 121
+        },
+        {
+          "caller": "stop",
+          "callee": "leaseRepository.release",
+          "lineNumber": 125
+        },
+        {
+          "caller": "registerWorker",
+          "callee": "workers.set",
+          "lineNumber": 134
+        },
+        {
+          "caller": "run",
+          "callee": "runRestartRecoveryWorker",
+          "lineNumber": 144
+        },
+        {
+          "caller": "run",
+          "callee": "runDueScheduledWorkWorker",
+          "lineNumber": 150
+        },
+        {
+          "caller": "run",
+          "callee": "runDueAutoPlanGenerationWorker",
+          "lineNumber": 156
+        },
+        {
+          "caller": "run",
+          "callee": "runRecurringWorkBlockExpansionWorker",
+          "lineNumber": 162
+        },
+        {
+          "caller": "run",
+          "callee": "runGraphAdvancementWorker",
+          "lineNumber": 168
+        },
+        {
+          "caller": "createDefaultTaskOrchestrator",
+          "callee": "createTaskOrchestrator",
+          "lineNumber": 175
+        },
+        {
+          "caller": "createDefaultTaskOrchestrator",
+          "callee": "createDefaultTaskOrchestratorWorkers",
+          "lineNumber": 176
+        },
+        {
+          "caller": "getTaskOrchestrator",
+          "callee": "createDefaultTaskOrchestrator",
+          "lineNumber": 189
+        },
+        {
+          "caller": "startTaskOrchestrator",
+          "callee": "getTaskOrchestrator",
+          "lineNumber": 195
+        },
+        {
+          "caller": "startTaskOrchestrator",
+          "callee": "orchestrator.start",
+          "lineNumber": 196
+        }
+      ],
+      "metrics": {
+        "importCount": 7,
+        "exportCount": 5,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-inbox.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 239,
+      "nonEmptyLines": 215,
+      "functions": [
+        {
+          "name": "readString",
+          "startLine": 12,
+          "endLine": 14,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "readBlockedReason",
+          "startLine": 16,
+          "endLine": 35,
+          "params": [
+            "blockReason"
+          ]
+        },
+        {
+          "name": "getInbox",
+          "startLine": 37,
+          "endLine": 239,
+          "params": [
+            "workspaceId"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getInbox",
+          "line": 37,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readString",
+          "callee": "value.trim",
+          "lineNumber": 13
+        },
+        {
+          "caller": "readString",
+          "callee": "value.trim",
+          "lineNumber": 13
+        },
+        {
+          "caller": "readBlockedReason",
+          "callee": "readString",
+          "lineNumber": 22
+        },
+        {
+          "caller": "readBlockedReason",
+          "callee": "readString",
+          "lineNumber": 23
+        },
+        {
+          "caller": "readBlockedReason",
+          "callee": "readString",
+          "lineNumber": 24
+        },
+        {
+          "caller": "getInbox",
+          "callee": "Promise.all",
+          "lineNumber": 38
+        },
+        {
+          "caller": "getInbox",
+          "callee": "db.approval.findMany",
+          "lineNumber": 39
+        },
+        {
+          "caller": "getInbox",
+          "callee": "db.scheduleProposal.findMany",
+          "lineNumber": 50
+        },
+        {
+          "caller": "getInbox",
+          "callee": "db.task.findMany",
+          "lineNumber": 58
+        },
+        {
+          "caller": "getInbox",
+          "callee": "db.task.findMany",
+          "lineNumber": 70
+        },
+        {
+          "caller": "getInbox",
+          "callee": "tasksWithLatestRuns\n    .map((task) => task.latestRunId)\n    .filter",
+          "lineNumber": 86
+        },
+        {
+          "caller": "getInbox",
+          "callee": "tasksWithLatestRuns\n    .map",
+          "lineNumber": 86
+        },
+        {
+          "caller": "getInbox",
+          "callee": "Boolean",
+          "lineNumber": 88
+        },
+        {
+          "caller": "getInbox",
+          "callee": "db.run.findMany",
+          "lineNumber": 91
+        },
+        {
+          "caller": "getInbox",
+          "callee": "tasksWithLatestRuns\n      .filter((task): task is typeof task & { latestRunId: string } => Boolean(task.latestRunId))\n      .map",
+          "lineNumber": 109
+        },
+        {
+          "caller": "getInbox",
+          "callee": "tasksWithLatestRuns\n      .filter",
+          "lineNumber": 109
+        },
+        {
+          "caller": "getInbox",
+          "callee": "Boolean",
+          "lineNumber": 110
+        },
+        {
+          "caller": "getInbox",
+          "callee": "blockedTasks\n    .map((task) => task.latestRunId)\n    .filter",
+          "lineNumber": 114
+        },
+        {
+          "caller": "getInbox",
+          "callee": "blockedTasks\n    .map",
+          "lineNumber": 114
+        },
+        {
+          "caller": "getInbox",
+          "callee": "Boolean",
+          "lineNumber": 116
+        },
+        {
+          "caller": "getInbox",
+          "callee": "db.run.findMany",
+          "lineNumber": 119
+        },
+        {
+          "caller": "getInbox",
+          "callee": "blockedRunLabels.map",
+          "lineNumber": 125
+        },
+        {
+          "caller": "getInbox",
+          "callee": "approvals.map",
+          "lineNumber": 127
+        },
+        {
+          "caller": "getInbox",
+          "callee": "proposals.map",
+          "lineNumber": 146
+        },
+        {
+          "caller": "getInbox",
+          "callee": "latestRuns\n    .map((run) => {\n      const task = taskByLatestRunId.get(run.id);\n\n      if (!task) {\n        return null;\n      }\n\n      if (run.status === RunStatus.WaitingForInput) {\n        return {\n          id: run.id,\n          kind: \"input\" as const,\n          actionType: \"Input requested\",\n          riskLevel: \"medium\",\n          sourceTaskTitle: task.title,\n          sourceTaskId: task.id,\n          workspaceId: task.workspaceId,\n          currentRunLabel: run.runtimeRunRef ?? run.id,\n          detail: \"Operator reply required\",\n          summary: run.pendingInputPrompt ?? \"The agent is waiting for guidance before it can continue.\",\n          consequence: \"Execution stays paused until an operator replies from the workbench.\",\n          sortAt: run.updatedAt,\n        };\n      }\n\n      return {\n        id: run.id,\n        kind: \"recovery\" as const,\n        actionType: \"Recovery needed\",\n        riskLevel: run.status === RunStatus.Failed ? \"critical\" : run.retryable ? \"high\" : \"medium\",\n        sourceTaskTitle: task.title,\n        sourceTaskId: task.id,\n        workspaceId: task.workspaceId,\n        currentRunLabel: run.runtimeRunRef ?? run.id,\n        detail: `Latest run ${run.status}`,\n        summary:\n          run.status === RunStatus.Failed\n            ? \"The latest run stopped before finishing and needs an operator recovery prompt.\"\n            : \"The latest run was cancelled and needs operator review before restarting.\",\n        consequence: \"Execution will not resume until someone restarts or recovers the run from the workbench.\",\n        sortAt: run.updatedAt,\n      };\n    })\n    .filter",
+          "lineNumber": 161
+        },
+        {
+          "caller": "getInbox",
+          "callee": "latestRuns\n    .map",
+          "lineNumber": 161
+        },
+        {
+          "caller": "getInbox",
+          "callee": "taskByLatestRunId.get",
+          "lineNumber": 163
+        },
+        {
+          "caller": "getInbox",
+          "callee": "Boolean",
+          "lineNumber": 204
+        },
+        {
+          "caller": "getInbox",
+          "callee": "approvalItems.map",
+          "lineNumber": 211
+        },
+        {
+          "caller": "getInbox",
+          "callee": "runItems.map",
+          "lineNumber": 212
+        },
+        {
+          "caller": "getInbox",
+          "callee": "blockedTasks\n    .filter((task) => !coveredTaskIds.has(task.id))\n    .map",
+          "lineNumber": 215
+        },
+        {
+          "caller": "getInbox",
+          "callee": "blockedTasks\n    .filter",
+          "lineNumber": 215
+        },
+        {
+          "caller": "getInbox",
+          "callee": "coveredTaskIds.has",
+          "lineNumber": 216
+        },
+        {
+          "caller": "getInbox",
+          "callee": "readBlockedReason",
+          "lineNumber": 218
+        },
+        {
+          "caller": "getInbox",
+          "callee": "runLabelByRunId.get",
+          "lineNumber": 228
+        },
+        {
+          "caller": "getInbox",
+          "callee": "[...approvalItems, ...proposalItems, ...runItems, ...blockedItems]\n    .sort((left, right) => right.sortAt.getTime() - left.sortAt.getTime())\n    .map",
+          "lineNumber": 236
+        },
+        {
+          "caller": "getInbox",
+          "callee": "[...approvalItems, ...proposalItems, ...runItems, ...blockedItems]\n    .sort",
+          "lineNumber": 236
+        },
+        {
+          "caller": "getInbox",
+          "callee": "right.sortAt.getTime",
+          "lineNumber": 237
+        },
+        {
+          "caller": "getInbox",
+          "callee": "left.sortAt.getTime",
+          "lineNumber": 237
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-memory-console.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 21,
+      "nonEmptyLines": 19,
+      "functions": [
+        {
+          "name": "getMemoryConsole",
+          "startLine": 3,
+          "endLine": 21,
+          "params": [
+            "workspaceId"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getMemoryConsole",
+          "line": 3,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getMemoryConsole",
+          "callee": "db.memory.findMany",
+          "lineNumber": 4
+        },
+        {
+          "caller": "getMemoryConsole",
+          "callee": "items.map",
+          "lineNumber": 10
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-schedule-page-runnable-state.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 161,
+      "nonEmptyLines": 147,
+      "functions": [
+        {
+          "name": "resetDb",
+          "startLine": 5,
+          "endLine": 19,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetDb",
+          "callee": "db.scheduleProposal.deleteMany",
+          "lineNumber": 6
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.toolInvocation.deleteMany",
+          "lineNumber": 7
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.conversationEntry.deleteMany",
+          "lineNumber": 8
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.runtimeCursor.deleteMany",
+          "lineNumber": 9
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.event.deleteMany",
+          "lineNumber": 10
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.approval.deleteMany",
+          "lineNumber": 11
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.artifact.deleteMany",
+          "lineNumber": 12
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskProjection.deleteMany",
+          "lineNumber": 13
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.run.deleteMany",
+          "lineNumber": 14
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskDependency.deleteMany",
+          "lineNumber": 15
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.memory.deleteMany",
+          "lineNumber": 16
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.task.deleteMany",
+          "lineNumber": 17
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workspace.deleteMany",
+          "lineNumber": 18
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-schedule-page.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 665,
+      "nonEmptyLines": 623,
+      "functions": [
+        {
+          "name": "resetDb",
+          "startLine": 7,
+          "endLine": 21,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetDb",
+          "callee": "db.scheduleProposal.deleteMany",
+          "lineNumber": 8
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.toolInvocation.deleteMany",
+          "lineNumber": 9
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.conversationEntry.deleteMany",
+          "lineNumber": 10
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.runtimeCursor.deleteMany",
+          "lineNumber": 11
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.event.deleteMany",
+          "lineNumber": 12
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.approval.deleteMany",
+          "lineNumber": 13
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.artifact.deleteMany",
+          "lineNumber": 14
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskProjection.deleteMany",
+          "lineNumber": 15
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.run.deleteMany",
+          "lineNumber": 16
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskDependency.deleteMany",
+          "lineNumber": 17
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.memory.deleteMany",
+          "lineNumber": 18
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.task.deleteMany",
+          "lineNumber": 19
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workspace.deleteMany",
+          "lineNumber": 20
+        },
+        {
+          "caller": "addMinutes",
+          "callee": "base.getTime",
+          "lineNumber": 36
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/get-schedule-page.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 660,
+      "nonEmptyLines": 623,
+      "functions": [
+        {
+          "name": "mapProjectionItem",
+          "startLine": 18,
+          "endLine": 82,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "mapWorkBlockItem",
+          "startLine": 84,
+          "endLine": 157,
+          "params": [
+            "block"
+          ]
+        },
+        {
+          "name": "mapTaskRunnability",
+          "startLine": 159,
+          "endLine": 177,
+          "params": [
+            "task"
+          ]
+        },
+        {
+          "name": "mapScheduleTaskPlanSnapshot",
+          "startLine": 179,
+          "endLine": 192,
+          "params": [
+            "savedPlan"
+          ]
+        },
+        {
+          "name": "hasTask",
+          "startLine": 194,
+          "endLine": 198,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "getScheduledMinutes",
+          "startLine": 200,
+          "endLine": 214,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "getReadyNodeIds",
+          "startLine": 216,
+          "endLine": 224,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "buildFocusZones",
+          "startLine": 226,
+          "endLine": 274,
+          "params": [
+            "items"
+          ]
+        },
+        {
+          "name": "buildAutomationCandidates",
+          "startLine": 276,
+          "endLine": 388,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "getSchedulePage",
+          "startLine": 390,
+          "endLine": 660,
+          "params": [
+            "workspaceId"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getSchedulePage",
+          "line": 390,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "mapProjectionItem",
+          "callee": "mapTaskRunnability",
+          "lineNumber": 80
+        },
+        {
+          "caller": "mapWorkBlockItem",
+          "callee": "mapTaskRunnability",
+          "lineNumber": 155
+        },
+        {
+          "caller": "mapTaskRunnability",
+          "callee": "deriveTaskRunnability",
+          "lineNumber": 165
+        },
+        {
+          "caller": "getScheduledMinutes",
+          "callee": "Math.max",
+          "lineNumber": 208
+        },
+        {
+          "caller": "getScheduledMinutes",
+          "callee": "Math.round",
+          "lineNumber": 210
+        },
+        {
+          "caller": "getScheduledMinutes",
+          "callee": "item.scheduledEndAt.getTime",
+          "lineNumber": 211
+        },
+        {
+          "caller": "getScheduledMinutes",
+          "callee": "item.scheduledStartAt.getTime",
+          "lineNumber": 211
+        },
+        {
+          "caller": "getReadyNodeIds",
+          "callee": "getAcceptedCompiledPlanForTask",
+          "lineNumber": 217
+        },
+        {
+          "caller": "getReadyNodeIds",
+          "callee": "resolveSavedPlanEffectiveGraph",
+          "lineNumber": 222
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "formatDateKey",
+          "lineNumber": 234
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "startOfDay",
+          "lineNumber": 234
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "byDay.get",
+          "lineNumber": 235
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "group.push",
+          "lineNumber": 236
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "byDay.set",
+          "lineNumber": 237
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "Array.from(byDay.entries())\n    .sort(([left], [right]) => left.localeCompare(right))\n    .map",
+          "lineNumber": 240
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "Array.from(byDay.entries())\n    .sort",
+          "lineNumber": 240
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "Array.from",
+          "lineNumber": 240
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "byDay.entries",
+          "lineNumber": 240
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "left.localeCompare",
+          "lineNumber": 241
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "dayItems.reduce",
+          "lineNumber": 243
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "getScheduledMinutes",
+          "lineNumber": 244
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "dayItems.reduce",
+          "lineNumber": 247
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "getScheduledMinutes",
+          "lineNumber": 250
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "dayItems.reduce",
+          "lineNumber": 252
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "getScheduledMinutes",
+          "lineNumber": 253
+        },
+        {
+          "caller": "buildFocusZones",
+          "callee": "dayItems.some",
+          "lineNumber": 256
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "startOfDay",
+          "lineNumber": 282
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "today.getTime",
+          "lineNumber": 283
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "input.proposals.map",
+          "lineNumber": 285
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "input.risks.map",
+          "lineNumber": 287
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "item.dueAt.getTime",
+          "lineNumber": 302
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "today.getTime",
+          "lineNumber": 302
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "item.dueAt.getTime",
+          "lineNumber": 303
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "tomorrow.getTime",
+          "lineNumber": 303
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "proposalTaskIds.has",
+          "lineNumber": 305
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "candidates.push",
+          "lineNumber": 306
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "candidates.push",
+          "lineNumber": 316
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "candidates.push",
+          "lineNumber": 332
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "riskTaskIds.has",
+          "lineNumber": 359
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "getReadyNodeIds",
+          "lineNumber": 361
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "Array.isArray",
+          "lineNumber": 365
+        },
+        {
+          "caller": "buildAutomationCandidates",
+          "callee": "candidates.push",
+          "lineNumber": 371
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "Promise.all",
+          "lineNumber": 391
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "db.workspace.findUniqueOrThrow",
+          "lineNumber": 392
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "db.taskProjection.findMany",
+          "lineNumber": 396
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "db.scheduleProposal.findMany",
+          "lineNumber": 416
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "listExecutionRuntimes().map",
+          "lineNumber": 430
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "listExecutionRuntimes",
+          "lineNumber": 430
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "getRuntimeTaskConfigSpec",
+          "lineNumber": 433
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "projections.filter(hasTask).map",
+          "lineNumber": 436
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "projections.filter",
+          "lineNumber": 436
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "mapProjectionItem",
+          "lineNumber": 436
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "Promise.all",
+          "lineNumber": 445
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "listItems.map",
+          "lineNumber": 446
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "getLatestTaskPlanReadModel",
+          "lineNumber": 447
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "mapScheduleTaskPlanSnapshot",
+          "lineNumber": 449
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "planSnapshots.set",
+          "lineNumber": 451
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "planStatuses.set",
+          "lineNumber": 454
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "isTaskPlanGenerationRunning",
+          "lineNumber": 456
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "listItems.map",
+          "lineNumber": 466
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "planSnapshots.get",
+          "lineNumber": 468
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "planStatuses.get",
+          "lineNumber": 469
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "listItemsWithPlanState.filter",
+          "lineNumber": 471
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "topLevelItems\n    .filter((item) => item.scheduledStartAt && item.scheduledEndAt)\n    .map",
+          "lineNumber": 475
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "topLevelItems\n    .filter",
+          "lineNumber": 475
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "topLevelItems\n    .filter(\n      (item) =>\n        item.scheduleStatus === \"Unscheduled\" && item.persistedStatus !== \"Completed\",\n    )\n    .map",
+          "lineNumber": 479
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "topLevelItems\n    .filter",
+          "lineNumber": 479
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "topLevelItems\n    .filter(\n      (item) =>\n        item.scheduleStatus &&\n        [\"AtRisk\", \"Overdue\", \"Interrupted\"].includes(item.scheduleStatus),\n    )\n    .map",
+          "lineNumber": 486
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "topLevelItems\n    .filter",
+          "lineNumber": 486
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "[\"AtRisk\", \"Overdue\", \"Interrupted\"].includes",
+          "lineNumber": 490
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "proposals.filter(hasTask).filter",
+          "lineNumber": 494
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "proposals.filter",
+          "lineNumber": 494
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "topLevelProposals.map",
+          "lineNumber": 498
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "db.workBlock.findMany",
+          "lineNumber": 512
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "workBlocks.map",
+          "lineNumber": 551
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "workBlocks\n    .map((block) => mapWorkBlockItem(block))\n    .filter",
+          "lineNumber": 563
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "workBlocks\n    .map",
+          "lineNumber": 563
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "mapWorkBlockItem",
+          "lineNumber": 564
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "Array.from",
+          "lineNumber": 569
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "workBlockScheduledItemsBase.map",
+          "lineNumber": 570
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "db.run.findMany",
+          "lineNumber": 573
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "activeRunByTaskId.has",
+          "lineNumber": 584
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "activeRunByTaskId.set",
+          "lineNumber": 585
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "Promise.all",
+          "lineNumber": 589
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "workBlockScheduledItemsBase.map",
+          "lineNumber": 589
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "getLatestTaskPlanReadModel",
+          "lineNumber": 590
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "mapScheduleTaskPlanSnapshot",
+          "lineNumber": 591
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "isTaskPlanGenerationRunning",
+          "lineNumber": 592
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "deriveAutoStartEligibility",
+          "lineNumber": 599
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "activeRunByTaskId.get",
+          "lineNumber": 608
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "workBlockScheduledItems.map",
+          "lineNumber": 619
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "item.scheduledStartAt?.getTime",
+          "lineNumber": 619
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "item.scheduledEndAt?.getTime",
+          "lineNumber": 619
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "[...workBlockScheduledItems, ...scheduled.filter((item) => (\n    !workBlockScheduledKeys.has(`${item.taskId}:${item.scheduledStartAt?.getTime() ?? \"\"}:${item.scheduledEndAt?.getTime() ?? \"\"}`)\n  ))].sort",
+          "lineNumber": 621
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "scheduled.filter",
+          "lineNumber": 621
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "workBlockScheduledKeys.has",
+          "lineNumber": 622
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "item.scheduledStartAt?.getTime",
+          "lineNumber": 622
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "item.scheduledEndAt?.getTime",
+          "lineNumber": 622
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "a.scheduledStartAt?.getTime",
+          "lineNumber": 624
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "b.scheduledStartAt?.getTime",
+          "lineNumber": 624
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "buildPlanningSummary",
+          "lineNumber": 627
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "buildFocusZones",
+          "lineNumber": 633
+        },
+        {
+          "caller": "getSchedulePage",
+          "callee": "buildAutomationCandidates",
+          "lineNumber": 634
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 10,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/page-query.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 29,
+      "nonEmptyLines": 23,
+      "classes": [
+        {
+          "name": "PageQuery",
+          "startLine": 7,
+          "endLine": 27,
+          "methods": [
+            "getSchedule",
+            "getInbox",
+            "getDashboard",
+            "getMemory",
+            "getWork"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "PageQuery",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "pageQuery",
+          "line": 29,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getSchedule",
+          "callee": "getSchedulePage",
+          "lineNumber": 9
+        },
+        {
+          "caller": "getInbox",
+          "callee": "getInbox",
+          "lineNumber": 13
+        },
+        {
+          "caller": "getDashboard",
+          "callee": "getDashboard",
+          "lineNumber": 17
+        },
+        {
+          "caller": "getMemory",
+          "callee": "getMemoryConsole",
+          "lineNumber": 21
+        },
+        {
+          "caller": "getWork",
+          "callee": "getWorkPage",
+          "lineNumber": 25
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/builders.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 678,
+      "nonEmptyLines": 632,
+      "functions": [
+        {
+          "name": "buildScheduleImpact",
+          "startLine": 6,
+          "endLine": 26,
+          "params": [
+            "task",
+            "copy"
+          ]
+        },
+        {
+          "name": "readBlockReason",
+          "startLine": 28,
+          "endLine": 68,
+          "params": [
+            "task"
+          ]
+        },
+        {
+          "name": "_deriveTaskPlanStepStatus",
+          "startLine": 70,
+          "endLine": 147,
+          "params": [
+            "stepId",
+            "currentRun",
+            "closure"
+          ]
+        },
+        {
+          "name": "buildTaskPlanFromGraph",
+          "startLine": 151,
+          "endLine": 213,
+          "params": [
+            "{\n  savedPlan,\n  effectivePlanGraph,\n}"
+          ]
+        },
+        {
+          "name": "buildCurrentIntervention",
+          "startLine": 215,
+          "endLine": 466,
+          "params": [
+            "{\n  taskTitle,\n  currentRun,\n  approvals,\n  blockReason,\n  latestOutput,\n  workstreamItems,\n  toolCalls,\n  scheduleImpact,\n  copy,\n  planExecution,\n}"
+          ]
+        },
+        {
+          "name": "buildLatestOutput",
+          "startLine": 468,
+          "endLine": 530,
+          "params": [
+            "{\n  artifacts,\n  conversation,\n  copy,\n}"
+          ]
+        },
+        {
+          "name": "buildReliability",
+          "startLine": 532,
+          "endLine": 568,
+          "params": [
+            "{\n  currentRun,\n  blockReason,\n  now,\n}"
+          ]
+        },
+        {
+          "name": "buildClosureState",
+          "startLine": 570,
+          "endLine": 630,
+          "params": [
+            "{\n  task,\n  currentRun,\n  events,\n  latestFollowUp,\n}"
+          ]
+        },
+        {
+          "name": "buildWorkspaceRail",
+          "startLine": 632,
+          "endLine": 678,
+          "params": [
+            "currentTaskId",
+            "projections",
+            "currentTask"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "buildScheduleImpact",
+          "line": 6,
+          "isDefault": false
+        },
+        {
+          "name": "readBlockReason",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "buildTaskPlanFromGraph",
+          "line": 151,
+          "isDefault": false
+        },
+        {
+          "name": "buildCurrentIntervention",
+          "line": 215,
+          "isDefault": false
+        },
+        {
+          "name": "buildLatestOutput",
+          "line": 468,
+          "isDefault": false
+        },
+        {
+          "name": "buildReliability",
+          "line": 532,
+          "isDefault": false
+        },
+        {
+          "name": "buildClosureState",
+          "line": 570,
+          "isDefault": false
+        },
+        {
+          "name": "buildWorkspaceRail",
+          "line": 632,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "buildScheduleImpact",
+          "callee": "toIsoString",
+          "lineNumber": 14
+        },
+        {
+          "caller": "buildScheduleImpact",
+          "callee": "toIsoString",
+          "lineNumber": 15
+        },
+        {
+          "caller": "buildScheduleImpact",
+          "callee": "toIsoString",
+          "lineNumber": 16
+        },
+        {
+          "caller": "readBlockReason",
+          "callee": "task.projection.blockSince?.toISOString",
+          "lineNumber": 57
+        },
+        {
+          "caller": "_deriveTaskPlanStepStatus",
+          "callee": "[\"Running\", \"WaitingForApproval\", \"Completed\", \"Failed\", \"Cancelled\"].includes",
+          "lineNumber": 91
+        },
+        {
+          "caller": "buildTaskPlanFromGraph",
+          "callee": "effectiveNodesById.set",
+          "lineNumber": 165
+        },
+        {
+          "caller": "buildTaskPlanFromGraph",
+          "callee": "savedPlan.compiledPlan.nodes.map",
+          "lineNumber": 169
+        },
+        {
+          "caller": "buildTaskPlanFromGraph",
+          "callee": "effectiveNodesById.get",
+          "lineNumber": 171
+        },
+        {
+          "caller": "buildTaskPlanFromGraph",
+          "callee": "steps.find",
+          "lineNumber": 194
+        },
+        {
+          "caller": "buildTaskPlanFromGraph",
+          "callee": "[\"in_progress\", \"waiting_for_user\", \"blocked\"].includes",
+          "lineNumber": 194
+        },
+        {
+          "caller": "buildTaskPlanFromGraph",
+          "callee": "savedPlan.compiledPlan.edges.map",
+          "lineNumber": 206
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "[...workstreamItems].reverse",
+          "lineNumber": 266
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "[...toolCalls].reverse().find",
+          "lineNumber": 267
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "[...toolCalls].reverse",
+          "lineNumber": 267
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.push",
+          "lineNumber": 271
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.push",
+          "lineNumber": 280
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.push",
+          "lineNumber": 288
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "[\n              makeEvidence({\n                label: copy.requestedGuidance,\n                value: planExecution.message ?? `Continue work on ${taskTitle}`,\n                tone: \"warning\",\n              }),\n              ...sharedEvidence,\n            ].slice",
+          "lineNumber": 306
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "makeEvidence",
+          "lineNumber": 307
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.slice",
+          "lineNumber": 323
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.slice",
+          "lineNumber": 333
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.slice",
+          "lineNumber": 343
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "[\n          makeEvidence({\n            label: copy.requestedGuidance,\n            value: currentRun.pendingInputPrompt ?? `Continue work on ${taskTitle}`,\n            tone: \"warning\",\n          }),\n          ...sharedEvidence,\n        ].slice",
+          "lineNumber": 378
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "makeEvidence",
+          "lineNumber": 379
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "[\n          makeEvidence({\n            label: copy.pendingApproval,\n            value: approvals[0]?.title ?? copy.approvalRequest,\n            tone: \"warning\",\n          }),\n          ...(approvals[0]?.summary\n            ? [\n                makeEvidence({\n                  label: copy.approvalSummary,\n                  value: approvals[0].summary,\n                  tone: \"warning\",\n                }),\n              ]\n            : []),\n          ...sharedEvidence,\n        ].slice",
+          "lineNumber": 398
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "makeEvidence",
+          "lineNumber": 399
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "makeEvidence",
+          "lineNumber": 406
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "[\n          ...(latestToolIssue\n            ? [\n                makeEvidence({\n                  label: copy.latestToolIssue,\n                  value: latestToolIssue.errorSummary ?? `${latestToolIssue.toolName} ended in ${latestToolIssue.status}`,\n                  tone: \"critical\",\n                }),\n              ]\n            : []),\n          ...sharedEvidence,\n        ].slice",
+          "lineNumber": 425
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "makeEvidence",
+          "lineNumber": 428
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.slice",
+          "lineNumber": 445
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.slice",
+          "lineNumber": 454
+        },
+        {
+          "caller": "buildCurrentIntervention",
+          "callee": "sharedEvidence.slice",
+          "lineNumber": 463
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "[...artifacts].sort",
+          "lineNumber": 488
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "right.createdAt.getTime",
+          "lineNumber": 488
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "left.createdAt.getTime",
+          "lineNumber": 488
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "latestArtifact.createdAt.toISOString",
+          "lineNumber": 494
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "[...conversation]\n    .filter((entry) => entry.role === \"assistant\")\n    .sort",
+          "lineNumber": 501
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "[...conversation]\n    .filter",
+          "lineNumber": 501
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "left.runtimeTs?.getTime",
+          "lineNumber": 504
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "right.runtimeTs?.getTime",
+          "lineNumber": 505
+        },
+        {
+          "caller": "buildLatestOutput",
+          "callee": "latestConversation.runtimeTs?.toISOString",
+          "lineNumber": 514
+        },
+        {
+          "caller": "buildReliability",
+          "callee": "Date.parse",
+          "lineNumber": 550
+        },
+        {
+          "caller": "buildReliability",
+          "callee": "now.getTime",
+          "lineNumber": 551
+        },
+        {
+          "caller": "buildReliability",
+          "callee": "Math.max",
+          "lineNumber": 556
+        },
+        {
+          "caller": "buildReliability",
+          "callee": "Math.round",
+          "lineNumber": 556
+        },
+        {
+          "caller": "buildReliability",
+          "callee": "now.toISOString",
+          "lineNumber": 560
+        },
+        {
+          "caller": "buildClosureState",
+          "callee": "[...events]\n    .reverse()\n    .find",
+          "lineNumber": 595
+        },
+        {
+          "caller": "buildClosureState",
+          "callee": "[...events]\n    .reverse",
+          "lineNumber": 595
+        },
+        {
+          "caller": "buildClosureState",
+          "callee": "Boolean",
+          "lineNumber": 598
+        },
+        {
+          "caller": "buildClosureState",
+          "callee": "acceptanceEvent?.createdAt.toISOString",
+          "lineNumber": 599
+        },
+        {
+          "caller": "buildClosureState",
+          "callee": "task.completedAt?.toISOString",
+          "lineNumber": 601
+        },
+        {
+          "caller": "buildClosureState",
+          "callee": "[\"Failed\", \"Cancelled\"].includes",
+          "lineNumber": 606
+        },
+        {
+          "caller": "buildClosureState",
+          "callee": "latestFollowUp.createdAt.toISOString",
+          "lineNumber": 626
+        },
+        {
+          "caller": "buildWorkspaceRail",
+          "callee": "projections.filter",
+          "lineNumber": 646
+        },
+        {
+          "caller": "buildWorkspaceRail",
+          "callee": "projectionsWithTask\n      .filter((projection) => projection.taskId !== currentTaskId)\n      .slice(0, 8)\n      .map",
+          "lineNumber": 657
+        },
+        {
+          "caller": "buildWorkspaceRail",
+          "callee": "projectionsWithTask\n      .filter((projection) => projection.taskId !== currentTaskId)\n      .slice",
+          "lineNumber": 657
+        },
+        {
+          "caller": "buildWorkspaceRail",
+          "callee": "projectionsWithTask\n      .filter",
+          "lineNumber": 657
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 8,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/get-work-page.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 740,
+      "nonEmptyLines": 688,
+      "functions": [
+        {
+          "name": "resetDb",
+          "startLine": 16,
+          "endLine": 31,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetDb",
+          "callee": "db.scheduleProposal.deleteMany",
+          "lineNumber": 17
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.toolInvocation.deleteMany",
+          "lineNumber": 18
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.conversationEntry.deleteMany",
+          "lineNumber": 19
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.runtimeCursor.deleteMany",
+          "lineNumber": 20
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.event.deleteMany",
+          "lineNumber": 21
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.approval.deleteMany",
+          "lineNumber": 22
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.artifact.deleteMany",
+          "lineNumber": 23
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskProjection.deleteMany",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.run.deleteMany",
+          "lineNumber": 25
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskSession.deleteMany",
+          "lineNumber": 26
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskDependency.deleteMany",
+          "lineNumber": 27
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.memory.deleteMany",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.task.deleteMany",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workspace.deleteMany",
+          "lineNumber": 30
+        },
+        {
+          "caller": "currentLayerId",
+          "callee": "graph.nodes\n        .find((node) => node.id === nodeId)\n        ?.layers.find",
+          "lineNumber": 291
+        },
+        {
+          "caller": "currentLayerId",
+          "callee": "graph.nodes\n        .find",
+          "lineNumber": 291
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/get-work-page.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 400,
+      "nonEmptyLines": 376,
+      "functions": [
+        {
+          "name": "getWorkPage",
+          "startLine": 20,
+          "endLine": 400,
+          "params": [
+            "taskId",
+            "copy"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getWorkPage",
+          "line": 20,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getWorkPage",
+          "callee": "db.task.findUnique",
+          "lineNumber": 23
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "db.task.findUnique",
+          "lineNumber": 34
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "db.taskProjection.findMany",
+          "lineNumber": 56
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "db.task.findFirst",
+          "lineNumber": 71
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "resolveScopeWorkBlockId",
+          "lineNumber": 86
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "getAcceptedCompiledPlan",
+          "lineNumber": 88
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "getLatestCompiledPlan",
+          "lineNumber": 89
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "resolveSavedPlanEffectiveGraph",
+          "lineNumber": 91
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "readBlockReason",
+          "lineNumber": 93
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "currentRun?.approvals.map",
+          "lineNumber": 95
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "db.conversationEntry.findMany",
+          "lineNumber": 101
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "allConversationEntries\n    .slice()\n    .sort((left, right) => {\n      const leftRuntimeTs = left.runtimeTs?.getTime() ?? Number.POSITIVE_INFINITY;\n      const rightRuntimeTs = right.runtimeTs?.getTime() ?? Number.POSITIVE_INFINITY;\n\n      if (leftRuntimeTs !== rightRuntimeTs) {\n        return leftRuntimeTs - rightRuntimeTs;\n      }\n\n      const leftRunCreatedAt = left.run.createdAt.getTime();\n      const rightRunCreatedAt = right.run.createdAt.getTime();\n      if (leftRunCreatedAt !== rightRunCreatedAt) {\n        return leftRunCreatedAt - rightRunCreatedAt;\n      }\n\n      if (left.runId !== right.runId) {\n        return left.runId.localeCompare(right.runId);\n      }\n\n      return left.sequence - right.sequence;\n    })\n    .map",
+          "lineNumber": 113
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "allConversationEntries\n    .slice()\n    .sort",
+          "lineNumber": 113
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "allConversationEntries\n    .slice",
+          "lineNumber": 113
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "left.runtimeTs?.getTime",
+          "lineNumber": 116
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "right.runtimeTs?.getTime",
+          "lineNumber": 117
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "left.run.createdAt.getTime",
+          "lineNumber": 123
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "right.run.createdAt.getTime",
+          "lineNumber": 124
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "left.runId.localeCompare",
+          "lineNumber": 130
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 139
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "currentRun?.artifacts.map",
+          "lineNumber": 142
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 147
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "currentRun?.toolInvocations.map",
+          "lineNumber": 150
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "task.events.map",
+          "lineNumber": 158
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "classifyWorkstreamItem",
+          "lineNumber": 159
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "formatEventTitle",
+          "lineNumber": 164
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "summarizePayload",
+          "lineNumber": 165
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 167
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 179
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 180
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 181
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 182
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "reconcileTaskState",
+          "lineNumber": 191
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "(() => {\n    if (!effectivePlanGraph) {\n      return {\n        status: \"no_plan\" as const,\n        currentNodeId: null,\n        executedNodeIds: [] as string[],\n        waitingNodeIds: [] as string[],\n        blockedNodeIds: [] as string[],\n        message: \"No accepted plan.\",\n      };\n    }\n\n    const effective = effectivePlanGraph;\n\n    const executed = effective.completedNodeIds;\n    const waiting = effective.nodes\n      .filter((n) => n.status === \"waiting_for_user\")\n      .map((n) => n.id);\n    const blocked = Array.from(new Set([\n      ...effective.blockedNodeIds,\n      ...(orchestratorState?.summary.executionState === \"blocked\" || orchestratorState?.summary.executionState === \"failed\"\n        ? [orchestratorState.summary.currentNodeId]\n        : []),\n    ].filter((value): value is string => Boolean(value))));\n    const inProgress = effective.nodes.find((n) => n.status === \"running\");\n\n    const allDone = effective.pendingNodeIds.length === 0 && effective.runningNodeIds.length === 0 && effective.blockedNodeIds.length === 0 && effective.failedNodeIds.length === 0;\n\n    if (allDone) {\n      return {\n        status: \"completed\" as const,\n        currentNodeId: null,\n        executedNodeIds: executed,\n        waitingNodeIds: waiting,\n        blockedNodeIds: blocked,\n        message: \"All plan nodes completed.\",\n      };\n    }\n\n    if (task.status === \"WaitingForInput\" && waiting.length > 0) {\n      return {\n        status: \"waiting_for_user\" as const,\n        currentNodeId: waiting[0],\n        executedNodeIds: executed,\n        waitingNodeIds: waiting,\n        blockedNodeIds: blocked,\n        message: task.blockReason\n          ? (task.blockReason as { actionRequired?: string }).actionRequired ??\n            \"Waiting for user input\"\n          : \"Waiting for user input\",\n      };\n    }\n\n    if (task.status === \"WaitingForApproval\") {\n      return {\n        status: \"waiting_for_approval\" as const,\n        currentNodeId: inProgress?.id ?? null,\n        executedNodeIds: executed,\n        waitingNodeIds: waiting,\n        blockedNodeIds: blocked,\n        message: task.blockReason\n          ? (task.blockReason as { actionRequired?: string }).actionRequired ??\n            \"Waiting for approval\"\n          : \"Waiting for approval\",\n      };\n    }\n\n    if (task.status === \"Blocked\" && (blocked.length > 0 || orchestratorState?.summary.currentNodeId)) {\n      return {\n        status: \"blocked\" as const,\n        currentNodeId: orchestratorState?.summary.currentNodeId ?? blocked[0] ?? null,\n        executedNodeIds: executed,\n        waitingNodeIds: waiting,\n        blockedNodeIds: blocked,\n        message: task.blockReason\n          ? (task.blockReason as { actionRequired?: string }).actionRequired ??\n            \"Execution is blocked\"\n          : \"Execution is blocked\",\n      };\n    }\n\n    return {\n      status: \"running\" as const,\n      currentNodeId: inProgress?.id ?? null,\n      executedNodeIds: executed,\n      waitingNodeIds: waiting,\n      blockedNodeIds: blocked,\n      message: \"Executing plan nodes.\",\n    };\n  })",
+          "lineNumber": 199
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "effective.nodes\n      .filter((n) => n.status === \"waiting_for_user\")\n      .map",
+          "lineNumber": 214
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "effective.nodes\n      .filter",
+          "lineNumber": 214
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "Array.from",
+          "lineNumber": 217
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "[\n      ...effective.blockedNodeIds,\n      ...(orchestratorState?.summary.executionState === \"blocked\" || orchestratorState?.summary.executionState === \"failed\"\n        ? [orchestratorState.summary.currentNodeId]\n        : []),\n    ].filter",
+          "lineNumber": 217
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "Boolean",
+          "lineNumber": 222
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "effective.nodes.find",
+          "lineNumber": 223
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "buildLatestOutput",
+          "lineNumber": 290
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "currentRun?.artifacts.map",
+          "lineNumber": 291
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "currentRun?.conversationEntries.map",
+          "lineNumber": 298
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "buildScheduleImpact",
+          "lineNumber": 306
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "buildReliability",
+          "lineNumber": 312
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "buildClosureState",
+          "lineNumber": 317
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "task.events.map",
+          "lineNumber": 323
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "buildTaskPlanFromGraph",
+          "lineNumber": 338
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 360
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 361
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "toIsoString",
+          "lineNumber": 362
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "buildCurrentIntervention",
+          "lineNumber": 368
+        },
+        {
+          "caller": "getWorkPage",
+          "callee": "buildWorkspaceRail",
+          "lineNumber": 385
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/helpers.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 103,
+      "nonEmptyLines": 85,
+      "functions": [
+        {
+          "name": "isMissingRecordError",
+          "startLine": 3,
+          "endLine": 5,
+          "params": [
+            "error"
+          ]
+        },
+        {
+          "name": "makeEvidence",
+          "startLine": 7,
+          "endLine": 9,
+          "params": [
+            "item"
+          ]
+        },
+        {
+          "name": "toIsoString",
+          "startLine": 11,
+          "endLine": 13,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "summarizeValue",
+          "startLine": 15,
+          "endLine": 33,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "summarizePayload",
+          "startLine": 35,
+          "endLine": 43,
+          "params": [
+            "payload"
+          ]
+        },
+        {
+          "name": "formatEventTitle",
+          "startLine": 45,
+          "endLine": 49,
+          "params": [
+            "eventType"
+          ]
+        },
+        {
+          "name": "classifyWorkstreamItem",
+          "startLine": 51,
+          "endLine": 103,
+          "params": [
+            "eventType",
+            "copy"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "isMissingRecordError",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "makeEvidence",
+          "line": 7,
+          "isDefault": false
+        },
+        {
+          "name": "toIsoString",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "summarizePayload",
+          "line": 35,
+          "isDefault": false
+        },
+        {
+          "name": "formatEventTitle",
+          "line": 45,
+          "isDefault": false
+        },
+        {
+          "name": "classifyWorkstreamItem",
+          "line": 51,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isMissingRecordError",
+          "callee": "error.message.includes",
+          "lineNumber": 4
+        },
+        {
+          "caller": "toIsoString",
+          "callee": "value?.toISOString",
+          "lineNumber": 12
+        },
+        {
+          "caller": "summarizeValue",
+          "callee": "String",
+          "lineNumber": 21
+        },
+        {
+          "caller": "summarizeValue",
+          "callee": "Array.isArray",
+          "lineNumber": 24
+        },
+        {
+          "caller": "summarizePayload",
+          "callee": "Object.entries(payload).slice",
+          "lineNumber": 36
+        },
+        {
+          "caller": "summarizePayload",
+          "callee": "Object.entries",
+          "lineNumber": 36
+        },
+        {
+          "caller": "summarizePayload",
+          "callee": "entries.map(([key, value]) => `${key}: ${summarizeValue(value)}`).join",
+          "lineNumber": 42
+        },
+        {
+          "caller": "summarizePayload",
+          "callee": "entries.map",
+          "lineNumber": 42
+        },
+        {
+          "caller": "summarizePayload",
+          "callee": "summarizeValue",
+          "lineNumber": 42
+        },
+        {
+          "caller": "formatEventTitle",
+          "callee": "eventType\n    .replace(/[._]/g, \" \")\n    .replace",
+          "lineNumber": 46
+        },
+        {
+          "caller": "formatEventTitle",
+          "callee": "eventType\n    .replace",
+          "lineNumber": 46
+        },
+        {
+          "caller": "formatEventTitle",
+          "callee": "letter.toUpperCase",
+          "lineNumber": 48
+        },
+        {
+          "caller": "classifyWorkstreamItem",
+          "callee": "/approval/i.test",
+          "lineNumber": 52
+        },
+        {
+          "caller": "classifyWorkstreamItem",
+          "callee": "/input/i.test",
+          "lineNumber": 61
+        },
+        {
+          "caller": "classifyWorkstreamItem",
+          "callee": "/fail|error|blocked|reject/i.test",
+          "lineNumber": 70
+        },
+        {
+          "caller": "classifyWorkstreamItem",
+          "callee": "/complete|finish/i.test",
+          "lineNumber": 79
+        },
+        {
+          "caller": "classifyWorkstreamItem",
+          "callee": "/artifact|memory|output/i.test",
+          "lineNumber": 88
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 6,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 2,
+      "nonEmptyLines": 2,
+      "exports": [
+        {
+          "name": "WorkPageTaskNotFoundError",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getWorkPage",
+          "line": 2,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/pages/work-page/types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 164,
+      "nonEmptyLines": 158,
+      "classes": [
+        {
+          "name": "WorkPageTaskNotFoundError",
+          "startLine": 159,
+          "endLine": 164,
+          "methods": [
+            "constructor"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "DEFAULT_COPY",
+          "line": 59,
+          "isDefault": false
+        },
+        {
+          "name": "WorkPageTaskNotFoundError",
+          "line": 159,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 161
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/__tests__/duplicate-execution-regression.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 45,
+      "nonEmptyLines": 39,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/__tests__/serial-branch-result-regression.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 60,
+      "nonEmptyLines": 54,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/__tests__/stop-pause-regression.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 107,
+      "nonEmptyLines": 93,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/facade/task-plan-execution.facade.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 49,
+      "nonEmptyLines": 45,
+      "classes": [
+        {
+          "name": "TaskPlanExecution",
+          "startLine": 41,
+          "endLine": 49,
+          "methods": [],
+          "properties": [
+            "start",
+            "dispatch",
+            "submitCheckpointAction",
+            "current",
+            "submitNodeResult",
+            "syncRuntimeResult",
+            "reconcileStaleRuntimeRuns"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "taskPlanExecution",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanExecution",
+          "line": 41,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/kernel/execute-command.smoke.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 106,
+      "nonEmptyLines": 90,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 220,
+      "nonEmptyLines": 199,
+      "functions": [
+        {
+          "name": "asJsonValue",
+          "startLine": 37,
+          "endLine": 39,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "asNullableJsonValue",
+          "startLine": 41,
+          "endLine": 45,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "toSavedCompiledPlan",
+          "startLine": 47,
+          "endLine": 76,
+          "params": [
+            "row"
+          ]
+        },
+        {
+          "name": "saveCompiledPlan",
+          "startLine": 78,
+          "endLine": 136,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "getAcceptedCompiledPlan",
+          "startLine": 138,
+          "endLine": 152,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "getCompiledPlanByPlanId",
+          "startLine": 154,
+          "endLine": 163,
+          "params": [
+            "taskId",
+            "planId"
+          ]
+        },
+        {
+          "name": "getLatestCompiledPlan",
+          "startLine": 165,
+          "endLine": 178,
+          "params": [
+            "taskId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "getLatestPlanScope",
+          "startLine": 188,
+          "endLine": 201,
+          "params": [
+            "taskId",
+            "options"
+          ]
+        },
+        {
+          "name": "updateLatestCompiledPlanPrompt",
+          "startLine": 203,
+          "endLine": 220,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "saveCompiledPlan",
+          "line": 78,
+          "isDefault": false
+        },
+        {
+          "name": "getAcceptedCompiledPlan",
+          "line": 138,
+          "isDefault": false
+        },
+        {
+          "name": "getCompiledPlanByPlanId",
+          "line": 154,
+          "isDefault": false
+        },
+        {
+          "name": "getLatestCompiledPlan",
+          "line": 165,
+          "isDefault": false
+        },
+        {
+          "name": "getLatestPlanScope",
+          "line": 188,
+          "isDefault": false
+        },
+        {
+          "name": "updateLatestCompiledPlanPrompt",
+          "line": 203,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "toSavedCompiledPlan",
+          "callee": "row.createdAt.toISOString",
+          "lineNumber": 73
+        },
+        {
+          "caller": "toSavedCompiledPlan",
+          "callee": "row.updatedAt.toISOString",
+          "lineNumber": 74
+        },
+        {
+          "caller": "saveCompiledPlan",
+          "callee": "db.$transaction",
+          "lineNumber": 92
+        },
+        {
+          "caller": "saveCompiledPlan",
+          "callee": "tx.taskPlan.updateMany",
+          "lineNumber": 94
+        },
+        {
+          "caller": "saveCompiledPlan",
+          "callee": "tx.taskPlan.upsert",
+          "lineNumber": 107
+        },
+        {
+          "caller": "saveCompiledPlan",
+          "callee": "asJsonValue",
+          "lineNumber": 119
+        },
+        {
+          "caller": "saveCompiledPlan",
+          "callee": "asNullableJsonValue",
+          "lineNumber": 120
+        },
+        {
+          "caller": "saveCompiledPlan",
+          "callee": "asJsonValue",
+          "lineNumber": 131
+        },
+        {
+          "caller": "saveCompiledPlan",
+          "callee": "asNullableJsonValue",
+          "lineNumber": 132
+        },
+        {
+          "caller": "getAcceptedCompiledPlan",
+          "callee": "db.taskPlan.findFirst",
+          "lineNumber": 142
+        },
+        {
+          "caller": "getAcceptedCompiledPlan",
+          "callee": "toSavedCompiledPlan",
+          "lineNumber": 151
+        },
+        {
+          "caller": "getCompiledPlanByPlanId",
+          "callee": "db.taskPlan.findFirst",
+          "lineNumber": 158
+        },
+        {
+          "caller": "getCompiledPlanByPlanId",
+          "callee": "toSavedCompiledPlan",
+          "lineNumber": 162
+        },
+        {
+          "caller": "getLatestCompiledPlan",
+          "callee": "db.taskPlan.findFirst",
+          "lineNumber": 169
+        },
+        {
+          "caller": "getLatestCompiledPlan",
+          "callee": "toSavedCompiledPlan",
+          "lineNumber": 177
+        },
+        {
+          "caller": "getLatestPlanScope",
+          "callee": "db.taskPlan.findFirst",
+          "lineNumber": 192
+        },
+        {
+          "caller": "updateLatestCompiledPlanPrompt",
+          "callee": "db.taskPlan.findFirst",
+          "lineNumber": 208
+        },
+        {
+          "caller": "updateLatestCompiledPlanPrompt",
+          "callee": "db.taskPlan.update",
+          "lineNumber": 216
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 6,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/execution-scope.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 176,
+      "nonEmptyLines": 158,
+      "functions": [
+        {
+          "name": "blueprint",
+          "startLine": 16,
+          "endLine": 25,
+          "params": [
+            "title"
+          ]
+        },
+        {
+          "name": "resetDb",
+          "startLine": 27,
+          "endLine": 38,
+          "params": []
+        },
+        {
+          "name": "createTaskWithWorkBlock",
+          "startLine": 40,
+          "endLine": 66,
+          "params": []
+        },
+        {
+          "name": "acceptPlanAtWorkBlock",
+          "startLine": 69,
+          "endLine": 92,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetDb",
+          "callee": "db.executionSession.deleteMany",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlanNodeAttempt.deleteMany",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlanRun.deleteMany",
+          "lineNumber": 30
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskPlan.deleteMany",
+          "lineNumber": 31
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.event.deleteMany",
+          "lineNumber": 32
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskProjection.deleteMany",
+          "lineNumber": 33
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workBlock.deleteMany",
+          "lineNumber": 34
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.taskSession.deleteMany",
+          "lineNumber": 35
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.task.deleteMany",
+          "lineNumber": 36
+        },
+        {
+          "caller": "resetDb",
+          "callee": "db.workspace.deleteMany",
+          "lineNumber": 37
+        },
+        {
+          "caller": "createTaskWithWorkBlock",
+          "callee": "db.workspace.create",
+          "lineNumber": 41
+        },
+        {
+          "caller": "createTaskWithWorkBlock",
+          "callee": "db.task.create",
+          "lineNumber": 44
+        },
+        {
+          "caller": "createTaskWithWorkBlock",
+          "callee": "db.workBlock.create",
+          "lineNumber": 54
+        },
+        {
+          "caller": "acceptPlanAtWorkBlock",
+          "callee": "materializeGeneratedTaskPlan",
+          "lineNumber": 74
+        },
+        {
+          "caller": "acceptPlanAtWorkBlock",
+          "callee": "blueprint",
+          "lineNumber": 78
+        },
+        {
+          "caller": "acceptPlanAtWorkBlock",
+          "callee": "db.taskPlan.findFirstOrThrow",
+          "lineNumber": 80
+        },
+        {
+          "caller": "acceptPlanAtWorkBlock",
+          "callee": "saveCompiledPlan",
+          "lineNumber": 83
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 148,
+      "nonEmptyLines": 136,
+      "functions": [
+        {
+          "name": "resolveExecutionScope",
+          "startLine": 43,
+          "endLine": 101,
+          "params": [
+            "taskId",
+            "hint"
+          ]
+        },
+        {
+          "name": "resolveScopeWorkBlockId",
+          "startLine": 107,
+          "endLine": 112,
+          "params": [
+            "taskId",
+            "hint"
+          ]
+        },
+        {
+          "name": "parseWorkBlockPlanSessionKey",
+          "startLine": 114,
+          "endLine": 127,
+          "params": [
+            "taskId",
+            "sessionId"
+          ]
+        },
+        {
+          "name": "getAcceptedCompiledPlanForTask",
+          "startLine": 139,
+          "endLine": 148,
+          "params": [
+            "taskId",
+            "hint"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "resolveExecutionScope",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "resolveScopeWorkBlockId",
+          "line": 107,
+          "isDefault": false
+        },
+        {
+          "name": "getAcceptedCompiledPlanForTask",
+          "line": 139,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resolveExecutionScope",
+          "callee": "parseWorkBlockPlanSessionKey",
+          "lineNumber": 51
+        },
+        {
+          "caller": "resolveExecutionScope",
+          "callee": "db.workBlock.findFirst",
+          "lineNumber": 53
+        },
+        {
+          "caller": "resolveExecutionScope",
+          "callee": "db.taskSession.findFirst",
+          "lineNumber": 63
+        },
+        {
+          "caller": "resolveExecutionScope",
+          "callee": "db.workBlock.findFirst",
+          "lineNumber": 71
+        },
+        {
+          "caller": "resolveExecutionScope",
+          "callee": "getActiveExecutionSessionScope",
+          "lineNumber": 81
+        },
+        {
+          "caller": "resolveExecutionScope",
+          "callee": "getLatestPlanScope",
+          "lineNumber": 90
+        },
+        {
+          "caller": "resolveExecutionScope",
+          "callee": "getLatestPlanScope",
+          "lineNumber": 95
+        },
+        {
+          "caller": "resolveScopeWorkBlockId",
+          "callee": "resolveExecutionScope",
+          "lineNumber": 111
+        },
+        {
+          "caller": "parseWorkBlockPlanSessionKey",
+          "callee": "sessionId?.startsWith",
+          "lineNumber": 117
+        },
+        {
+          "caller": "parseWorkBlockPlanSessionKey",
+          "callee": "sessionId.endsWith",
+          "lineNumber": 117
+        },
+        {
+          "caller": "parseWorkBlockPlanSessionKey",
+          "callee": "sessionId.slice",
+          "lineNumber": 118
+        },
+        {
+          "caller": "parseWorkBlockPlanSessionKey",
+          "callee": "sessionId?.startsWith",
+          "lineNumber": 124
+        },
+        {
+          "caller": "parseWorkBlockPlanSessionKey",
+          "callee": "sessionId.endsWith",
+          "lineNumber": 124
+        },
+        {
+          "caller": "parseWorkBlockPlanSessionKey",
+          "callee": "sessionId.slice",
+          "lineNumber": 125
+        },
+        {
+          "caller": "getAcceptedCompiledPlanForTask",
+          "callee": "resolveScopeWorkBlockId",
+          "lineNumber": 143
+        },
+        {
+          "caller": "getAcceptedCompiledPlanForTask",
+          "callee": "getAcceptedCompiledPlan",
+          "lineNumber": 145
+        },
+        {
+          "caller": "getAcceptedCompiledPlanForTask",
+          "callee": "getAcceptedCompiledPlan",
+          "lineNumber": 146
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 3,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 345,
+      "nonEmptyLines": 313,
+      "functions": [
+        {
+          "name": "createPlanGraphFromCompiledPlan",
+          "startLine": 15,
+          "endLine": 22,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "asJsonValue",
+          "startLine": 24,
+          "endLine": 26,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "createEmptyPlanRun",
+          "startLine": 53,
+          "endLine": 78,
+          "params": [
+            "compiledPlan"
+          ]
+        },
+        {
+          "name": "loadCompiledPlanForRun",
+          "startLine": 80,
+          "endLine": 87,
+          "params": [
+            "taskId",
+            "planId",
+            "workBlockId"
+          ]
+        },
+        {
+          "name": "toPersistedPlanRunRecord",
+          "startLine": 89,
+          "endLine": 139,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "savePlanRun",
+          "startLine": 141,
+          "endLine": 199,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "savePlanRunGuarded",
+          "startLine": 208,
+          "endLine": 260,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "getPlanRun",
+          "startLine": 262,
+          "endLine": 345,
+          "params": [
+            "taskId",
+            "planId",
+            "workBlockId"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createPlanGraphFromCompiledPlan",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "savePlanRun",
+          "line": 141,
+          "isDefault": false
+        },
+        {
+          "name": "savePlanRunGuarded",
+          "line": 208,
+          "isDefault": false
+        },
+        {
+          "name": "getPlanRun",
+          "line": 262,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createPlanGraphFromCompiledPlan",
+          "callee": "createRuntimePlanGraphFromCompiledPlan",
+          "lineNumber": 21
+        },
+        {
+          "caller": "createEmptyPlanRun",
+          "callee": "new Date().toISOString",
+          "lineNumber": 54
+        },
+        {
+          "caller": "createEmptyPlanRun",
+          "callee": "Object.fromEntries",
+          "lineNumber": 55
+        },
+        {
+          "caller": "createEmptyPlanRun",
+          "callee": "compiledPlan.nodes.map",
+          "lineNumber": 56
+        },
+        {
+          "caller": "loadCompiledPlanForRun",
+          "callee": "db.taskPlan.findFirst",
+          "lineNumber": 81
+        },
+        {
+          "caller": "toPersistedPlanRunRecord",
+          "callee": "createEmptyPlanRun",
+          "lineNumber": 104
+        },
+        {
+          "caller": "toPersistedPlanRunRecord",
+          "callee": "createPlanGraphFromCompiledPlan",
+          "lineNumber": 125
+        },
+        {
+          "caller": "savePlanRun",
+          "callee": "db.taskPlanRun.findFirst",
+          "lineNumber": 153
+        },
+        {
+          "caller": "savePlanRun",
+          "callee": "loadCompiledPlanForRun",
+          "lineNumber": 162
+        },
+        {
+          "caller": "savePlanRun",
+          "callee": "toPersistedPlanRunRecord",
+          "lineNumber": 164
+        },
+        {
+          "caller": "savePlanRun",
+          "callee": "asJsonValue",
+          "lineNumber": 180
+        },
+        {
+          "caller": "savePlanRun",
+          "callee": "db.taskPlanRun.update",
+          "lineNumber": 184
+        },
+        {
+          "caller": "savePlanRun",
+          "callee": "asJsonValue",
+          "lineNumber": 189
+        },
+        {
+          "caller": "savePlanRun",
+          "callee": "db.taskPlanRun.create",
+          "lineNumber": 193
+        },
+        {
+          "caller": "savePlanRunGuarded",
+          "callee": "db.taskPlanRun.findFirst",
+          "lineNumber": 221
+        },
+        {
+          "caller": "savePlanRunGuarded",
+          "callee": "savePlanRun",
+          "lineNumber": 229
+        },
+        {
+          "caller": "savePlanRunGuarded",
+          "callee": "loadCompiledPlanForRun",
+          "lineNumber": 235
+        },
+        {
+          "caller": "savePlanRunGuarded",
+          "callee": "toPersistedPlanRunRecord",
+          "lineNumber": 238
+        },
+        {
+          "caller": "savePlanRunGuarded",
+          "callee": "db.taskPlanRun.updateMany",
+          "lineNumber": 249
+        },
+        {
+          "caller": "savePlanRunGuarded",
+          "callee": "asJsonValue",
+          "lineNumber": 254
+        },
+        {
+          "caller": "getPlanRun",
+          "callee": "db.taskPlanRun.findFirst",
+          "lineNumber": 267
+        },
+        {
+          "caller": "getPlanRun",
+          "callee": "loadCompiledPlanForRun",
+          "lineNumber": 297
+        },
+        {
+          "caller": "getPlanRun",
+          "callee": "createPlanGraphFromCompiledPlan",
+          "lineNumber": 314
+        },
+        {
+          "caller": "getPlanRun",
+          "callee": "savePlanRun",
+          "lineNumber": 320
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 4,
+        "functionCount": 8,
+        "classCount": 0
+      }
+    }
+  ]
+}

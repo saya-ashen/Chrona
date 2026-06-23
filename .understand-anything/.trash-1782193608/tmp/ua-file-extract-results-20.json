@@ -1,0 +1,2030 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 27,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "packages/contracts/src/ai-dispatch-types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 189,
+      "nonEmptyLines": 173,
+      "functions": [
+        {
+          "name": "hasActionTarget",
+          "startLine": 143,
+          "endLine": 145,
+          "params": [
+            "action"
+          ]
+        },
+        {
+          "name": "requiresPlanPatch",
+          "startLine": 147,
+          "endLine": 149,
+          "params": [
+            "action"
+          ]
+        },
+        {
+          "name": "parseTaskDispatchDecision",
+          "startLine": 151,
+          "endLine": 164,
+          "params": [
+            "raw"
+          ]
+        },
+        {
+          "name": "isAutoExecutableDispatchDecision",
+          "startLine": 172,
+          "endLine": 189,
+          "params": [
+            "decision",
+            "policy"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "TASK_DISPATCH_ACTIONS",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "taskDispatchActionSchema",
+          "line": 14,
+          "isDefault": false
+        },
+        {
+          "name": "taskPlanPatchSchema",
+          "line": 61,
+          "isDefault": false
+        },
+        {
+          "name": "taskDispatchDecisionSchema",
+          "line": 86,
+          "isDefault": false
+        },
+        {
+          "name": "parseTaskDispatchDecision",
+          "line": 151,
+          "isDefault": false
+        },
+        {
+          "name": "isAutoExecutableDispatchDecision",
+          "line": 172,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "parseTaskDispatchDecision",
+          "callee": "taskDispatchDecisionSchema.safeParse",
+          "lineNumber": 152
+        },
+        {
+          "caller": "parseTaskDispatchDecision",
+          "callee": "validation.error.issues.map",
+          "lineNumber": 156
+        },
+        {
+          "caller": "parseTaskDispatchDecision",
+          "callee": "issue.path.join",
+          "lineNumber": 157
+        },
+        {
+          "caller": "isAutoExecutableDispatchDecision",
+          "callee": "policy.allowedAutoActions.includes",
+          "lineNumber": 179
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 6,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/ai-feature-specs.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 293,
+      "nonEmptyLines": 258,
+      "functions": [
+        {
+          "name": "toStructuredOutputSchema",
+          "startLine": 158,
+          "endLine": 166,
+          "params": [
+            "toolSpec"
+          ]
+        },
+        {
+          "name": "buildGeneratePlanFeatureInputText",
+          "startLine": 168,
+          "endLine": 206,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "buildGeneratePlanFeatureSpec",
+          "startLine": 208,
+          "endLine": 216,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "buildSuggestFeatureSpec",
+          "startLine": 218,
+          "endLine": 226,
+          "params": []
+        },
+        {
+          "name": "isRecord",
+          "startLine": 228,
+          "endLine": 230,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "validateSuggestPayload",
+          "startLine": 232,
+          "endLine": 252,
+          "params": [
+            "payload"
+          ]
+        },
+        {
+          "name": "validatePreparedFeaturePayload",
+          "startLine": 254,
+          "endLine": 293,
+          "params": [
+            "spec",
+            "payload"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "SUGGEST_TASK_COMPLETIONS_TOOL_NAME",
+          "line": 32,
+          "isDefault": false
+        },
+        {
+          "name": "GENERATE_PLAN_BLUEPRINT_TOOL_NAME",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "SUGGEST_TASK_COMPLETIONS_TOOL_DESCRIPTION",
+          "line": 35,
+          "isDefault": false
+        },
+        {
+          "name": "GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "SUGGEST_SYSTEM_PROMPT",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "GENERATE_PLAN_SYSTEM_PROMPT",
+          "line": 51,
+          "isDefault": false
+        },
+        {
+          "name": "suggestTaskCompletionsToolSpec",
+          "line": 122,
+          "isDefault": false
+        },
+        {
+          "name": "buildGeneratePlanFeatureInputText",
+          "line": 168,
+          "isDefault": false
+        },
+        {
+          "name": "buildGeneratePlanFeatureSpec",
+          "line": 208,
+          "isDefault": false
+        },
+        {
+          "name": "buildSuggestFeatureSpec",
+          "line": 218,
+          "isDefault": false
+        },
+        {
+          "name": "validatePreparedFeaturePayload",
+          "line": 254,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.title.trim",
+          "lineNumber": 181
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "parts.push",
+          "lineNumber": 182
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.title.trim",
+          "lineNumber": 182
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.description?.trim",
+          "lineNumber": 184
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "parts.push",
+          "lineNumber": 185
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.description.trim",
+          "lineNumber": 185
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.sourceContext?.trim",
+          "lineNumber": 187
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "parts.push",
+          "lineNumber": 188
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.sourceContext.trim",
+          "lineNumber": 191
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "parts.push",
+          "lineNumber": 195
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.userInstruction?.trim",
+          "lineNumber": 197
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "parts.push",
+          "lineNumber": 198
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "input.userInstruction.trim",
+          "lineNumber": 201
+        },
+        {
+          "caller": "buildGeneratePlanFeatureInputText",
+          "callee": "parts.join",
+          "lineNumber": 205
+        },
+        {
+          "caller": "buildGeneratePlanFeatureSpec",
+          "callee": "buildGeneratePlanFeatureInputText",
+          "lineNumber": 214
+        },
+        {
+          "caller": "buildSuggestFeatureSpec",
+          "callee": "toStructuredOutputSchema",
+          "lineNumber": 222
+        },
+        {
+          "caller": "isRecord",
+          "callee": "Boolean",
+          "lineNumber": 229
+        },
+        {
+          "caller": "isRecord",
+          "callee": "Array.isArray",
+          "lineNumber": 229
+        },
+        {
+          "caller": "validateSuggestPayload",
+          "callee": "Array.isArray",
+          "lineNumber": 233
+        },
+        {
+          "caller": "validateSuggestPayload",
+          "callee": "isRecord",
+          "lineNumber": 241
+        },
+        {
+          "caller": "validateSuggestPayload",
+          "callee": "suggestion.title.trim",
+          "lineNumber": 243
+        },
+        {
+          "caller": "validatePreparedFeaturePayload",
+          "callee": "isRecord",
+          "lineNumber": 258
+        },
+        {
+          "caller": "validatePreparedFeaturePayload",
+          "callee": "planBlueprintSchema.safeParse",
+          "lineNumber": 267
+        },
+        {
+          "caller": "validatePreparedFeaturePayload",
+          "callee": "validateSuggestPayload",
+          "lineNumber": 279
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 11,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/ai-feature-types.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 390,
+      "nonEmptyLines": 346,
+      "classes": [
+        {
+          "name": "AiClientError",
+          "startLine": 360,
+          "endLine": 374,
+          "methods": [
+            "constructor"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "DEFAULT_AGENT_PROVIDER_MODEL",
+          "line": 29,
+          "isDefault": false
+        },
+        {
+          "name": "AiClientError",
+          "line": 360,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 371
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/contracts/src/ai-plan-blueprint.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 464,
+      "nonEmptyLines": 420,
+      "functions": [
+        {
+          "name": "upgradeBlueprintToEditable",
+          "startLine": 46,
+          "endLine": 64,
+          "params": [
+            "blueprint",
+            "planId",
+            "version"
+          ]
+        },
+        {
+          "name": "upgradeNode",
+          "startLine": 66,
+          "endLine": 101,
+          "params": [
+            "node"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "PlanCompileError",
+          "startLine": 138,
+          "endLine": 146,
+          "methods": [
+            "constructor"
+          ],
+          "properties": [
+            "issues"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AI_PLAN_NODE_TYPES",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "AI_TASK_EXECUTORS",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "AI_TASK_MODES",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "AI_CHECKPOINT_TYPES",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "AI_INPUT_FIELD_TYPES",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "AI_CONDITION_EVALUATORS",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "AI_WAIT_TIMEOUT_ACTIONS",
+          "line": 27,
+          "isDefault": false
+        },
+        {
+          "name": "upgradeBlueprintToEditable",
+          "line": 46,
+          "isDefault": false
+        },
+        {
+          "name": "PlanCompileError",
+          "line": 138,
+          "isDefault": false
+        },
+        {
+          "name": "planBlueprintTaskNodeSchema",
+          "line": 167,
+          "isDefault": false
+        },
+        {
+          "name": "planBlueprintCheckpointNodeSchema",
+          "line": 181,
+          "isDefault": false
+        },
+        {
+          "name": "planBlueprintConditionNodeSchema",
+          "line": 195,
+          "isDefault": false
+        },
+        {
+          "name": "planBlueprintWaitNodeSchema",
+          "line": 215,
+          "isDefault": false
+        },
+        {
+          "name": "planBlueprintNodeSchema",
+          "line": 234,
+          "isDefault": false
+        },
+        {
+          "name": "planBlueprintEdgeSchema",
+          "line": 243,
+          "isDefault": false
+        },
+        {
+          "name": "planBlueprintSchema",
+          "line": 252,
+          "isDefault": false
+        },
+        {
+          "name": "editableTaskNodeSchema",
+          "line": 282,
+          "isDefault": false
+        },
+        {
+          "name": "editableCheckpointNodeSchema",
+          "line": 295,
+          "isDefault": false
+        },
+        {
+          "name": "editableConditionNodeSchema",
+          "line": 308,
+          "isDefault": false
+        },
+        {
+          "name": "editableWaitNodeSchema",
+          "line": 327,
+          "isDefault": false
+        },
+        {
+          "name": "editableNodeSchema",
+          "line": 344,
+          "isDefault": false
+        },
+        {
+          "name": "editableEdgeSchema",
+          "line": 351,
+          "isDefault": false
+        },
+        {
+          "name": "editablePlanSchema",
+          "line": 359,
+          "isDefault": false
+        },
+        {
+          "name": "planPatchOperationSchema",
+          "line": 383,
+          "isDefault": false
+        },
+        {
+          "name": "planPatchSchema",
+          "line": 435,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "upgradeBlueprintToEditable",
+          "callee": "blueprint.nodes.map",
+          "lineNumber": 57
+        },
+        {
+          "caller": "upgradeBlueprintToEditable",
+          "callee": "blueprint.edges.map",
+          "lineNumber": 58
+        },
+        {
+          "caller": "upgradeNode",
+          "callee": "node.inputFields?.map",
+          "lineNumber": 83
+        },
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 142
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 25,
+        "functionCount": 2,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "packages/contracts/src/ai-plan-runtime-status.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 81,
+      "nonEmptyLines": 72,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/common.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 22,
+      "nonEmptyLines": 15,
+      "functions": [
+        {
+          "name": "successResponse",
+          "startLine": 19,
+          "endLine": 20,
+          "params": [
+            "data"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "isoDateString",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "isoDateOrNull",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "isoDateOptional",
+          "line": 9,
+          "isDefault": false
+        },
+        {
+          "name": "taskStatusEnum",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "taskPriorityEnum",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceId",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "taskIdParam",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "successResponse",
+          "line": 19,
+          "isDefault": false
+        },
+        {
+          "name": "errorResponse",
+          "line": 22,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "successResponse",
+          "callee": "data.extend({ success: z.literal(true).optional() }).passthrough",
+          "lineNumber": 20
+        },
+        {
+          "caller": "successResponse",
+          "callee": "data.extend",
+          "lineNumber": 20
+        },
+        {
+          "caller": "successResponse",
+          "callee": "z.literal(true).optional",
+          "lineNumber": 20
+        },
+        {
+          "caller": "successResponse",
+          "callee": "z.literal",
+          "lineNumber": 20
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 9,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/execution.schema.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 425,
+      "nonEmptyLines": 392,
+      "exports": [
+        {
+          "name": "providerApprovalChoiceSchema",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "providerApprovalRiskLevelSchema",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "providerApprovalReadModelSchema",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "providerApprovalListQuerySchema",
+          "line": 70,
+          "isDefault": false
+        },
+        {
+          "name": "providerApprovalListResponseSchema",
+          "line": 76,
+          "isDefault": false
+        },
+        {
+          "name": "providerApprovalResolveParamSchema",
+          "line": 82,
+          "isDefault": false
+        },
+        {
+          "name": "providerApprovalResolveBodySchema",
+          "line": 87,
+          "isDefault": false
+        },
+        {
+          "name": "providerApprovalResolveResponseSchema",
+          "line": 96,
+          "isDefault": false
+        },
+        {
+          "name": "executionActionParamSchema",
+          "line": 106,
+          "isDefault": false
+        },
+        {
+          "name": "executionActionBodySchema",
+          "line": 108,
+          "isDefault": false
+        },
+        {
+          "name": "checkpointActionParamSchema",
+          "line": 209,
+          "isDefault": false
+        },
+        {
+          "name": "checkpointActionKindSchema",
+          "line": 214,
+          "isDefault": false
+        },
+        {
+          "name": "checkpointActionBodySchema",
+          "line": 230,
+          "isDefault": false
+        },
+        {
+          "name": "planMutationParamSchema",
+          "line": 340,
+          "isDefault": false
+        },
+        {
+          "name": "planMutationBodySchema",
+          "line": 341,
+          "isDefault": false
+        },
+        {
+          "name": "taskDoneParamSchema",
+          "line": 350,
+          "isDefault": false
+        },
+        {
+          "name": "taskReopenParamSchema",
+          "line": 353,
+          "isDefault": false
+        },
+        {
+          "name": "taskResultAcceptParamSchema",
+          "line": 356,
+          "isDefault": false
+        },
+        {
+          "name": "scheduleParamSchema",
+          "line": 359,
+          "isDefault": false
+        },
+        {
+          "name": "scheduleBodySchema",
+          "line": 360,
+          "isDefault": false
+        },
+        {
+          "name": "clearScheduleParamSchema",
+          "line": 368,
+          "isDefault": false
+        },
+        {
+          "name": "workBlockScheduleParamSchema",
+          "line": 371,
+          "isDefault": false
+        },
+        {
+          "name": "workBlockScheduleBodySchema",
+          "line": 374,
+          "isDefault": false
+        },
+        {
+          "name": "scheduleProposalParamSchema",
+          "line": 380,
+          "isDefault": false
+        },
+        {
+          "name": "scheduleProposalBodySchema",
+          "line": 381,
+          "isDefault": false
+        },
+        {
+          "name": "scheduleProposalDecisionBodySchema",
+          "line": 392,
+          "isDefault": false
+        },
+        {
+          "name": "resolveApprovalParamSchema",
+          "line": 400,
+          "isDefault": false
+        },
+        {
+          "name": "resolveApprovalBodySchema",
+          "line": 401,
+          "isDefault": false
+        },
+        {
+          "name": "invalidateMemoryParamSchema",
+          "line": 408,
+          "isDefault": false
+        },
+        {
+          "name": "createAssistantMessageParamSchema",
+          "line": 411,
+          "isDefault": false
+        },
+        {
+          "name": "createAssistantMessageBodySchema",
+          "line": 412,
+          "isDefault": false
+        },
+        {
+          "name": "getAssistantMessagesParamSchema",
+          "line": 419,
+          "isDefault": false
+        },
+        {
+          "name": "applyAssistantMessageParamSchema",
+          "line": 422,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 33,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/mcp-task-tools.schema.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 255,
+      "nonEmptyLines": 231,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/mcp-task-tools.schema.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 335,
+      "nonEmptyLines": 292,
+      "functions": [
+        {
+          "name": "nodeOutputArrayToFlatSpec",
+          "startLine": 117,
+          "endLine": 132,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "requireSpecRootElement",
+          "startLine": 157,
+          "endLine": 162,
+          "params": [
+            "value",
+            "ctx"
+          ]
+        },
+        {
+          "name": "describeChronaNodeOutputPublicTool",
+          "startLine": 166,
+          "endLine": 168,
+          "params": []
+        },
+        {
+          "name": "chronaToolInputSchemaFor",
+          "startLine": 268,
+          "endLine": 272,
+          "params": [
+            "toolName"
+          ]
+        },
+        {
+          "name": "isChronaToolMutating",
+          "startLine": 329,
+          "endLine": 331,
+          "params": [
+            "toolName"
+          ]
+        },
+        {
+          "name": "parseChronaToolPayload",
+          "startLine": 333,
+          "endLine": 335,
+          "params": [
+            "toolName",
+            "payload"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "chronaToolNames",
+          "line": 15,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolNameSchema",
+          "line": 37,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolStatusSchema",
+          "line": 39,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolReasonCodeSchema",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolIdempotencyStatusSchema",
+          "line": 52,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolExpectedStateSchema",
+          "line": 58,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolEvidenceSchema",
+          "line": 69,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolContextSchema",
+          "line": 76,
+          "isDefault": false
+        },
+        {
+          "name": "nodeResultOutputSchema",
+          "line": 99,
+          "isDefault": false
+        },
+        {
+          "name": "CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION",
+          "line": 164,
+          "isDefault": false
+        },
+        {
+          "name": "describeChronaNodeOutputPublicTool",
+          "line": 166,
+          "isDefault": false
+        },
+        {
+          "name": "nodeOutputPayloadSchema",
+          "line": 170,
+          "isDefault": false
+        },
+        {
+          "name": "taskCompletePayloadSchema",
+          "line": 174,
+          "isDefault": false
+        },
+        {
+          "name": "conditionSelectPayloadSchema",
+          "line": 176,
+          "isDefault": false
+        },
+        {
+          "name": "blockPayloadSchema",
+          "line": 182,
+          "isDefault": false
+        },
+        {
+          "name": "failPayloadSchema",
+          "line": 184,
+          "isDefault": false
+        },
+        {
+          "name": "waitCompletePayloadSchema",
+          "line": 186,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolPayloadSchemas",
+          "line": 188,
+          "isDefault": false
+        },
+        {
+          "name": "chronaPublicToolPayloadSchemas",
+          "line": 210,
+          "isDefault": false
+        },
+        {
+          "name": "agentControlActionKindSchema",
+          "line": 225,
+          "isDefault": false
+        },
+        {
+          "name": "agentControlActionPayloadSchemas",
+          "line": 236,
+          "isDefault": false
+        },
+        {
+          "name": "agentControlActionBodySchema",
+          "line": 247,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolInputSchema",
+          "line": 264,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolInputSchemaFor",
+          "line": 268,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolOperationSchema",
+          "line": 274,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolAffectedSchema",
+          "line": 279,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolRecoverySchema",
+          "line": 286,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolResultSchema",
+          "line": 291,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolRegistryItemSchema",
+          "line": 306,
+          "isDefault": false
+        },
+        {
+          "name": "chronaToolRegistrySchema",
+          "line": 312,
+          "isDefault": false
+        },
+        {
+          "name": "isChronaToolMutating",
+          "line": 329,
+          "isDefault": false
+        },
+        {
+          "name": "parseChronaToolPayload",
+          "line": 333,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "nodeOutputArrayToFlatSpec",
+          "callee": "elementMap.has",
+          "lineNumber": 120
+        },
+        {
+          "caller": "nodeOutputArrayToFlatSpec",
+          "callee": "elementMap.set",
+          "lineNumber": 121
+        },
+        {
+          "caller": "nodeOutputArrayToFlatSpec",
+          "callee": "elementMap.has",
+          "lineNumber": 123
+        },
+        {
+          "caller": "nodeOutputArrayToFlatSpec",
+          "callee": "elementMap.entries",
+          "lineNumber": 125
+        },
+        {
+          "caller": "nodeOutputArrayToFlatSpec",
+          "callee": "elementMap.has",
+          "lineNumber": 127
+        },
+        {
+          "caller": "requireSpecRootElement",
+          "callee": "ctx.addIssue",
+          "lineNumber": 160
+        },
+        {
+          "caller": "chronaToolInputSchemaFor",
+          "callee": "chronaToolContextSchema.extend",
+          "lineNumber": 269
+        },
+        {
+          "caller": "isChronaToolMutating",
+          "callee": "toolName.endsWith",
+          "lineNumber": 330
+        },
+        {
+          "caller": "parseChronaToolPayload",
+          "callee": "chronaToolPayloadSchemas[toolName].parse",
+          "lineNumber": 334
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 32,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/plans.schema.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 54,
+      "nonEmptyLines": 48,
+      "exports": [
+        {
+          "name": "planStateParamSchema",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "planAcceptParamSchema",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "planAcceptBodySchema",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "planGenerateParamSchema",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "planGenerateBodySchema",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "planGenerateStopParamSchema",
+          "line": 30,
+          "isDefault": false
+        },
+        {
+          "name": "planGenerateActiveParamSchema",
+          "line": 35,
+          "isDefault": false
+        },
+        {
+          "name": "planPatchParamSchema",
+          "line": 40,
+          "isDefault": false
+        },
+        {
+          "name": "planPatchBodySchema",
+          "line": 43,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 9,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/projections.schema.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 67,
+      "nonEmptyLines": 57,
+      "exports": [
+        {
+          "name": "scheduleProjectionQuerySchema",
+          "line": 6,
+          "isDefault": false
+        },
+        {
+          "name": "inboxProjectionQuerySchema",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "dashboardProjectionQuerySchema",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "memoryProjectionQuerySchema",
+          "line": 21,
+          "isDefault": false
+        },
+        {
+          "name": "workProjectionParamSchema",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "workCommandBodySchema",
+          "line": 34,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceOverviewParamSchema",
+          "line": 65,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 7,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/task-plan-boundaries.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 28,
+      "nonEmptyLines": 24,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/tasks.schema.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 192,
+      "nonEmptyLines": 177,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/api/tasks.schema.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 269,
+      "nonEmptyLines": 242,
+      "functions": [
+        {
+          "name": "executionRuntimeSchema",
+          "startLine": 11,
+          "endLine": 24,
+          "params": [
+            "supportedRuntimes"
+          ]
+        },
+        {
+          "name": "createTaskBodySchemaForSupportedRuntimes",
+          "startLine": 26,
+          "endLine": 34,
+          "params": [
+            "supportedRuntimes"
+          ]
+        },
+        {
+          "name": "updateTaskBodySchemaForSupportedRuntimes",
+          "startLine": 36,
+          "endLine": 42,
+          "params": [
+            "supportedRuntimes"
+          ]
+        },
+        {
+          "name": "refineRecurrenceAnchors",
+          "startLine": 136,
+          "endLine": 153,
+          "params": [
+            "schema"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createTaskBodySchemaForSupportedRuntimes",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "updateTaskBodySchemaForSupportedRuntimes",
+          "line": 36,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_LIST_FILTERS",
+          "line": 46,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_FILTER_STATUS_MAP",
+          "line": 58,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_LIST_SORT_FIELDS",
+          "line": 69,
+          "isDefault": false
+        },
+        {
+          "name": "listTasksQuerySchema",
+          "line": 98,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_TITLE_MAX",
+          "line": 113,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_DESCRIPTION_MAX",
+          "line": 114,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_RECURRENCE_RULE_MAX",
+          "line": 115,
+          "isDefault": false
+        },
+        {
+          "name": "createTaskBodySchema",
+          "line": 118,
+          "isDefault": false
+        },
+        {
+          "name": "refineRecurrenceAnchors",
+          "line": 136,
+          "isDefault": false
+        },
+        {
+          "name": "updateTaskParamSchema",
+          "line": 156,
+          "isDefault": false
+        },
+        {
+          "name": "updateTaskBodySchema",
+          "line": 159,
+          "isDefault": false
+        },
+        {
+          "name": "taskDetailParamSchema",
+          "line": 177,
+          "isDefault": false
+        },
+        {
+          "name": "taskNodeActivityParamSchema",
+          "line": 181,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceActivityKindSchema",
+          "line": 186,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceActivityToneSchema",
+          "line": 200,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceToolActivitySchema",
+          "line": 202,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceAssistantActivitySchema",
+          "line": 212,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceActivityItemSchema",
+          "line": 218,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceActivityPageQuerySchema",
+          "line": 239,
+          "isDefault": false
+        },
+        {
+          "name": "workspaceActivityPageSchema",
+          "line": 252,
+          "isDefault": false
+        },
+        {
+          "name": "deleteTaskParamSchema",
+          "line": 264,
+          "isDefault": false
+        },
+        {
+          "name": "deleteTaskQuerySchema",
+          "line": 267,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "executionRuntimeSchema",
+          "callee": "z.string().trim().min",
+          "lineNumber": 12
+        },
+        {
+          "caller": "executionRuntimeSchema",
+          "callee": "z.string().trim",
+          "lineNumber": 12
+        },
+        {
+          "caller": "executionRuntimeSchema",
+          "callee": "z.string",
+          "lineNumber": 12
+        },
+        {
+          "caller": "executionRuntimeSchema",
+          "callee": "schema.refine",
+          "lineNumber": 18
+        },
+        {
+          "caller": "executionRuntimeSchema",
+          "callee": "supportedRuntimes.includes",
+          "lineNumber": 19
+        },
+        {
+          "caller": "executionRuntimeSchema",
+          "callee": "supportedRuntimes.join",
+          "lineNumber": 21
+        },
+        {
+          "caller": "createTaskBodySchemaForSupportedRuntimes",
+          "callee": "refineRecurrenceAnchors",
+          "lineNumber": 29
+        },
+        {
+          "caller": "createTaskBodySchemaForSupportedRuntimes",
+          "callee": "createTaskBodySchema.extend",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createTaskBodySchemaForSupportedRuntimes",
+          "callee": "executionRuntimeSchema(supportedRuntimes).optional",
+          "lineNumber": 31
+        },
+        {
+          "caller": "createTaskBodySchemaForSupportedRuntimes",
+          "callee": "executionRuntimeSchema",
+          "lineNumber": 31
+        },
+        {
+          "caller": "updateTaskBodySchemaForSupportedRuntimes",
+          "callee": "updateTaskBodySchema.extend",
+          "lineNumber": 39
+        },
+        {
+          "caller": "updateTaskBodySchemaForSupportedRuntimes",
+          "callee": "executionRuntimeSchema(supportedRuntimes).optional",
+          "lineNumber": 40
+        },
+        {
+          "caller": "updateTaskBodySchemaForSupportedRuntimes",
+          "callee": "executionRuntimeSchema",
+          "lineNumber": 40
+        },
+        {
+          "caller": "refineRecurrenceAnchors",
+          "callee": "schema.refine",
+          "lineNumber": 143
+        },
+        {
+          "caller": "refineRecurrenceAnchors",
+          "callee": "Boolean",
+          "lineNumber": 146
+        },
+        {
+          "caller": "refineRecurrenceAnchors",
+          "callee": "Boolean",
+          "lineNumber": 146
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 24,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/automation-timing.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 66,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "automationTimingOffsetMs",
+          "startLine": 34,
+          "endLine": 36,
+          "params": [
+            "preset"
+          ]
+        },
+        {
+          "name": "normalizeAutomationTiming",
+          "startLine": 40,
+          "endLine": 45,
+          "params": [
+            "value"
+          ]
+        },
+        {
+          "name": "resolveAutomationTriggerAt",
+          "startLine": 55,
+          "endLine": 66,
+          "params": [
+            "preset",
+            "scheduledStartAt"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AUTOMATION_TIMING_PRESETS",
+          "line": 11,
+          "isDefault": false
+        },
+        {
+          "name": "DEFAULT_AUTOMATION_TIMING",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "automationTimingOffsetMs",
+          "line": 34,
+          "isDefault": false
+        },
+        {
+          "name": "automationTimingSchema",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "normalizeAutomationTiming",
+          "line": 40,
+          "isDefault": false
+        },
+        {
+          "name": "resolveAutomationTriggerAt",
+          "line": 55,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "normalizeAutomationTiming",
+          "callee": "automationTimingSchema.safeParse",
+          "lineNumber": 43
+        },
+        {
+          "caller": "resolveAutomationTriggerAt",
+          "callee": "scheduledStartAt.getTime",
+          "lineNumber": 65
+        },
+        {
+          "caller": "resolveAutomationTriggerAt",
+          "callee": "automationTimingOffsetMs",
+          "lineNumber": 65
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 6,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/attempts.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 34,
+      "nonEmptyLines": 32,
+      "exports": [
+        {
+          "name": "NodeExecutionAttempt",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/checkpoints.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 36,
+      "nonEmptyLines": 32,
+      "exports": [
+        {
+          "name": "CheckpointResponse",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "ExecutionCheckpointKind",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "CheckpointActionKind",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "CheckpointFormField",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "CheckpointForm",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "CheckpointAction",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "ExecutionCheckpoint",
+          "line": 4,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 7,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/commands.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 153,
+      "nonEmptyLines": 147,
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/context.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 71,
+      "nonEmptyLines": 67,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/events.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 175,
+      "nonEmptyLines": 162,
+      "exports": [
+        {
+          "name": "GeneratePlanStatusPhase",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "GeneratePlanErrorCode",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/execution-command.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 108,
+      "nonEmptyLines": 100,
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/execution-state.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 366,
+      "nonEmptyLines": 340,
+      "functions": [
+        {
+          "name": "webPlanNodeStatusForRuntimeStatus",
+          "startLine": 72,
+          "endLine": 107,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "runtimeProgressStatusForWaitKind",
+          "startLine": 109,
+          "endLine": 126,
+          "params": [
+            "waitKind"
+          ]
+        },
+        {
+          "name": "runtimeProgressStatusForNodes",
+          "startLine": 128,
+          "endLine": 163,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "planRunStatusForRuntimeProgress",
+          "startLine": 165,
+          "endLine": 182,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "planGraphStatusForRuntimeProgress",
+          "startLine": 184,
+          "endLine": 201,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "executionSessionStatusForRuntimeProgress",
+          "startLine": 203,
+          "endLine": 220,
+          "params": [
+            "status"
+          ]
+        },
+        {
+          "name": "taskStatusForRuntimeProgress",
+          "startLine": 222,
+          "endLine": 241,
+          "params": [
+            "status"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "webPlanNodeStatusForRuntimeStatus",
+          "line": 72,
+          "isDefault": false
+        },
+        {
+          "name": "runtimeProgressStatusForWaitKind",
+          "line": 109,
+          "isDefault": false
+        },
+        {
+          "name": "runtimeProgressStatusForNodes",
+          "line": 128,
+          "isDefault": false
+        },
+        {
+          "name": "planRunStatusForRuntimeProgress",
+          "line": 165,
+          "isDefault": false
+        },
+        {
+          "name": "planGraphStatusForRuntimeProgress",
+          "line": 184,
+          "isDefault": false
+        },
+        {
+          "name": "executionSessionStatusForRuntimeProgress",
+          "line": 203,
+          "isDefault": false
+        },
+        {
+          "name": "taskStatusForRuntimeProgress",
+          "line": 222,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.nodes.some",
+          "lineNumber": 139
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.nodes.some",
+          "lineNumber": 142
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.nodes.filter",
+          "lineNumber": 152
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "reachableNodes.every",
+          "lineNumber": 155
+        },
+        {
+          "caller": "runtimeProgressStatusForNodes",
+          "callee": "input.completedNodeIds.includes",
+          "lineNumber": 156
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/graph.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 217,
+      "nonEmptyLines": 195,
+      "exports": [
+        {
+          "name": "CompiledNode",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "CompiledEdge",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "CompiledPlan",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "EffectivePlanNode",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "EffectivePlanEdge",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "EffectivePlanGraph",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "PlanGraphStatus",
+          "line": 23,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 7,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 10,
+      "nonEmptyLines": 10,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/node-result.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 62,
+      "nonEmptyLines": 58,
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/plan-runtime/node.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 166,
+      "nonEmptyLines": 147,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/contracts/src/task.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 99,
+      "nonEmptyLines": 85,
+      "exports": [
+        {
+          "name": "TASK_STATUSES",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_PRIORITIES",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "TASK_KINDS",
+          "line": 24,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 3,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    }
+  ]
+}

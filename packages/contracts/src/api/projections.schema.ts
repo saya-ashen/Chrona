@@ -12,6 +12,11 @@ export const inboxProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
+// ── GET /dashboard ──
+export const dashboardProjectionQuerySchema = z.object({
+  workspaceId: workspaceId,
+});
+
 // ── GET /memory ──
 export const memoryProjectionQuerySchema = z.object({
   workspaceId: workspaceId,

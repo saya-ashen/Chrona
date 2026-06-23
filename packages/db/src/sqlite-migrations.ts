@@ -47,6 +47,50 @@ function readAppliedMigrations(db: Database): Map<string, AppliedMigration> {
   return new Map(rows.map((row) => [row.migration_name, row]));
 }
 
+/**
+ * True when the database already holds application tables created outside the
+ * migration runner (e.g. via `prisma db push`). We ignore SQLite-internal
+ * tables and our own bookkeeping table so a genuinely fresh database reads as
+ * empty.
+ */
+function hasExistingSchema(db: Database): boolean {
+  const row = db
+    .query(
+      `SELECT COUNT(*) AS count FROM sqlite_master
+       WHERE type = 'table'
+         AND name NOT LIKE 'sqlite_%'
+         AND name <> '_prisma_migrations'`,
+    )
+    .get() as { count: number } | undefined;
+
+  return (row?.count ?? 0) > 0;
+}
+
+/**
+ * Record a migration as applied without running its SQL. Used to baseline a
+ * schema that already exists (e.g. from `prisma db push`) so the runner does
+ * not try to re-`CREATE TABLE` over live tables and crash.
+ */
+function baselineMigration(db: Database, migrationName: string, checksum: string): void {
+  db.run(
+    `INSERT INTO "_prisma_migrations" (id, checksum, migration_name, finished_at, applied_steps_count)
+     VALUES (?, ?, ?, ?, ?)`,
+    [randomUUID(), checksum, migrationName, new Date().toISOString(), 0],
+  );
+}
+
+/**
+ * True when a migration error means its schema objects already exist (e.g. the
+ * database was synced out-of-band with `prisma db push`, then a new migration
+ * was added). The runner treats this as a baseline instead of crashing.
+ */
+function isSchemaAlreadyPresentError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return /duplicate column name|already exists/i.test(error.message);
+}
+
 function applyMigration(db: Database, migrationName: string, sql: string, checksum: string): void {
   const apply = db.transaction(() => {
     if (hasExecutableStatement(sql)) {
@@ -60,7 +104,17 @@ function applyMigration(db: Database, migrationName: string, sql: string, checks
     );
   });
 
-  apply();
+  try {
+    apply();
+  } catch (error) {
+    if (isSchemaAlreadyPresentError(error)) {
+      // Schema was pushed out-of-band; the transaction rolled back, so record
+      // this migration as applied without re-running its SQL.
+      baselineMigration(db, migrationName, checksum);
+      return;
+    }
+    throw error;
+  }
 }
 
 export function ensureSqliteDatabase(options: EnsureSqliteDatabaseOptions): void {
@@ -98,6 +152,13 @@ export function ensureSqliteDatabase(options: EnsureSqliteDatabaseOptions): void
       throw new Error(`No migrations found in: ${options.migrationsDir}`);
     }
 
+    // A schema pushed with `prisma db push` has the tables but no
+    // `_prisma_migrations` rows. Re-running the migration SQL would
+    // `CREATE TABLE` over live tables and crash ("table AiClient already
+    // exists"). Baseline instead: mark every migration applied without
+    // running its SQL, matching `prisma migrate resolve --applied`.
+    const shouldBaseline = appliedMigrations.size === 0 && hasExistingSchema(db);
+
     for (const entry of entries) {
       const sqlPath = join(options.migrationsDir, entry.name, "migration.sql");
       if (!existsSync(sqlPath)) {
@@ -113,6 +174,12 @@ export function ensureSqliteDatabase(options: EnsureSqliteDatabaseOptions): void
             `Migration checksum mismatch for ${entry.name}. The database was created with different migration SQL.`,
           );
         }
+        continue;
+      }
+
+      if (shouldBaseline) {
+        options.log?.(`  Baselining existing schema: ${entry.name}`);
+        baselineMigration(db, entry.name, checksum);
         continue;
       }
 

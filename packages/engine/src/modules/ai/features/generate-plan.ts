@@ -5,12 +5,10 @@ import {
   type GenerateTaskPlanRequest,
   type StreamEvent,
 } from "@chrona/contracts";
-import { createDebugDump } from "@chrona/shared/debug-dump";
 import type { EngineAiClient } from "../runtime/client-registry";
 import {
   dispatchStream,
   prepareStreamInput,
-  summarizeStreamEvent,
 } from "../streaming";
 
 function asciiSlug(value: string, maxLength: number): string {
@@ -56,31 +54,7 @@ export async function* generatePlanStream(
     featureSpec,
   );
   const generator = dispatchStream(client, "generate_plan", preparedInput);
-  const dump = await createDebugDump({
-    enabledEnv: "CHRONA_AI_STREAM_DUMP",
-    directoryEnv: "CHRONA_AI_STREAM_DUMP_DIR",
-    kind: "ai-stream",
-    label: `generate-plan-${request.taskId ?? preparedInput.scope}`,
-    meta: {
-      layer: "engine.ai.features.generatePlanStream",
-      clientType: client.record.type,
-      taskId: request.taskId ?? null,
-      scope: preparedInput.scope,
-    },
-  });
   for await (const event of generator) {
-    await dump?.write({
-      type: "input_event",
-      event: summarizeStreamEvent(event),
-    });
-    await dump?.write({ type: "yield", event: summarizeStreamEvent(event) });
     yield event;
-    if (event.type === "done") {
-      await dump?.close();
-      return;
-    }
   }
-
-  await dump?.write({ type: "generator_exhausted" });
-  await dump?.close();
 }

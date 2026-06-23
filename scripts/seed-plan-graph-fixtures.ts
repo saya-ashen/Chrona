@@ -87,7 +87,7 @@ const condition = (id: string, title: string, branches: Array<{ label: string; n
   priority: "Medium" as const,
   config: {
     condition: title,
-    evaluationBy: "system",
+    evaluationBy: "ai" as const,
     branches,
     defaultNextNodeId: branches[0]?.nextNodeId,
   },

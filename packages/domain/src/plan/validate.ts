@@ -10,7 +10,48 @@ import type {
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
 const VALID_NODE_TYPES = new Set(["task", "checkpoint", "condition", "wait"]);
 
-const HIGH_RISK_PATTERN = /\b(send|email|message|calendar|schedule|book|pay|purchase|delete|remove|cancel|modify|update|submit|post|publish)\b/i;
+type PlanEdge = { from: string; to: string };
+
+function uniqueEdges(edges: PlanEdge[]): PlanEdge[] {
+  const seen = new Set<string>();
+  const result: PlanEdge[] = [];
+  for (const edge of edges) {
+    const key = `${edge.from}→${edge.to}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(edge);
+  }
+  return result;
+}
+
+function semanticEdges(plan: EditablePlan, nodeIds: Set<string>): PlanEdge[] {
+  const edges: PlanEdge[] = plan.edges
+    .filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to))
+    .map((edge) => ({ from: edge.from, to: edge.to }));
+
+  for (const node of plan.nodes) {
+    if (node.type !== "condition") continue;
+    const conditionNode = node as EditableConditionNode;
+    for (const branch of conditionNode.branches) {
+      if (nodeIds.has(branch.nextNodeId)) {
+        edges.push({ from: conditionNode.id, to: branch.nextNodeId });
+      }
+    }
+    if (conditionNode.defaultNextNodeId && nodeIds.has(conditionNode.defaultNextNodeId)) {
+      edges.push({ from: conditionNode.id, to: conditionNode.defaultNextNodeId });
+    }
+  }
+
+  return uniqueEdges(edges);
+}
+
+function terminalNodeIds(nodeIds: string[], edges: PlanEdge[]): string[] {
+  const outgoing = new Map(nodeIds.map((id) => [id, 0]));
+  for (const edge of edges) {
+    outgoing.set(edge.from, (outgoing.get(edge.from) ?? 0) + 1);
+  }
+  return nodeIds.filter((id) => (outgoing.get(id) ?? 0) === 0);
+}
 
 function isDag(nodeIds: string[], edges: Array<{ from: string; to: string }>): boolean {
   const indegree = new Map(nodeIds.map((id) => [id, 0]));
@@ -139,47 +180,31 @@ export function validateEditablePlan(plan: EditablePlan): ValidationResult {
       });
     }
   });
-
-  // 5. Check DAG
+  // 5. Check DAG and terminal shape over the semantic graph. Condition branches
+  // are execution edges even when omitted from edges[]. Multiple entry nodes are
+  // allowed for real parallel starts; plans must still converge to one final task.
   if (errors.length === 0) {
-    if (!isDag([...nodeIds.keys()], plan.edges)) {
+    const allNodeIds = [...nodeIds.keys()];
+    const graphEdges = semanticEdges(plan, new Set(allNodeIds));
+    if (!isDag(allNodeIds, graphEdges)) {
       errors.push({
         path: "edges",
         message: "Plan graph must be a DAG (no cycles allowed)",
       });
     }
-  }
 
-  // 6. High-risk task warning (not error)
-  if (errors.length === 0) {
-    const incoming = new Map<string, string[]>();
-    for (const edge of plan.edges) {
-      if (!incoming.has(edge.to)) incoming.set(edge.to, []);
-      incoming.get(edge.to)!.push(edge.from);
-    }
-
-    const nodeMap = new Map(plan.nodes.map((n) => [n.id, n]));
-
-    for (const node of plan.nodes) {
-      if (node.type !== "task") continue;
-      const haystack = [node.title, node.expectedOutput, node.completionCriteria]
-        .filter(Boolean)
-        .join(" ");
-      if (!HIGH_RISK_PATTERN.test(haystack)) continue;
-
-      const predecessors = incoming.get(node.id) ?? [];
-      const hasGate = predecessors.some((candidateId) => {
-        const candidate = nodeMap.get(candidateId);
-        return (
-          candidate?.type === "checkpoint" &&
-          (candidate.checkpointType === "approve" || candidate.checkpointType === "confirm")
-        );
+    const terminals = terminalNodeIds(allNodeIds, graphEdges);
+    if (terminals.length !== 1) {
+      errors.push({
+        path: "nodes",
+        message: `Plan must have exactly one terminal node; found ${terminals.length}: ${terminals.join(", ")}`,
       });
-
-      if (!hasGate) {
-        warnings.push({
-          path: `nodes.${node.id}`,
-          message: `High-risk task '${node.id}' should be preceded by an approve/confirm checkpoint`,
+    } else {
+      const terminalNode = plan.nodes.find((node) => node.id === terminals[0]);
+      if (terminalNode?.type !== "task") {
+        errors.push({
+          path: `nodes.${nodeIds.get(terminals[0]!)}`,
+          message: "Plan terminal node must be a task that delivers the result",
         });
       }
     }

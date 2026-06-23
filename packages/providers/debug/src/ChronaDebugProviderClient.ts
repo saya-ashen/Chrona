@@ -34,6 +34,7 @@ export type ChronaDebugProviderConfig = {
 const PLAN_TOOL = "chrona_plan_generate";
 const NODE_OUTPUT_TOOL = "chrona_node_output";
 const NODE_COMPLETE_TOOL = "chrona_node_complete";
+const CONDITION_SELECT_TOOL = "chrona_condition_select";
 const DEFAULT_DEBUG_PROVIDER_PROFILE: DebugProviderProfile = "deterministic";
 
 type DebugRun = {
@@ -149,7 +150,7 @@ function debugPlanBlueprint() {
         type: "condition",
         title: "Route boundary scenario",
         condition: "Does the checkpoint input request the slow external wait path?",
-        evaluationBy: "system",
+        evaluationBy: "ai",
         branches: [
           { label: "slow wait", nextNodeId: "debug_wait_external_event" },
           { label: "fast path", nextNodeId: "debug_validate_parallel_join" },
@@ -249,6 +250,35 @@ function currentNodeTitle(input: StreamRunInput) {
     : "debug node";
 }
 
+function currentNodeType(input: StreamRunInput) {
+  const record = inputRecord(input);
+  const node = record?.node;
+  if (!node || typeof node !== "object" || Array.isArray(node)) return null;
+  const type = (node as Record<string, unknown>).type;
+  return typeof type === "string" ? type : null;
+}
+
+function currentNodeRef(input: StreamRunInput) {
+  const record = inputRecord(input);
+  const node = record?.node;
+  if (!node || typeof node !== "object" || Array.isArray(node)) return null;
+  const ref = (node as Record<string, unknown>).ref;
+  return typeof ref === "string" && ref.trim() ? ref.trim() : null;
+}
+
+function preferredBranchRef(input: StreamRunInput) {
+  const record = inputRecord(input);
+  const directBranchOptions = "branchOptions" in input ? input.branchOptions : undefined;
+  const branchOptions = Array.isArray(record?.branchOptions) ? record.branchOptions : directBranchOptions;
+  if (!Array.isArray(branchOptions)) return null;
+  const branch = branchOptions.find((option) => {
+    if (!option || typeof option !== "object" || Array.isArray(option)) return false;
+    return (option as Record<string, unknown>).label === "fast path";
+  }) ?? branchOptions[0];
+  if (!branch || typeof branch !== "object" || Array.isArray(branch)) return null;
+  const ref = (branch as Record<string, unknown>).ref;
+  return typeof ref === "string" && ref.trim() ? ref : null;
+}
 function isPlanGeneration(input: StreamRunInput) {
   return "instructions" in input && input.instructions.includes(PLAN_TOOL);
 }
@@ -375,6 +405,10 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     this.runs.set(run.runId, run);
     run.status = "running";
     const streamInput = streamInputForRun(run, input);
+    const nodeType = currentNodeType(streamInput);
+    const nodeTitle = currentNodeTitle(streamInput);
+    const nodeRef = currentNodeRef(streamInput);
+    const branchRef = preferredBranchRef(streamInput);
     const signal = "signal" in input ? input.signal : undefined;
     let sequence = 0;
 
@@ -413,6 +447,36 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         tool: PLAN_TOOL,
         callId: "chrona-debug-plan-call",
         result: { ok: true, message: "Debug plan emitted." },
+      };
+    } else if (nodeType === "condition") {
+      const title = nodeTitle;
+      const nodeId = nodeRef;
+      const conditionCallId = `chrona-debug-condition-${sequence}`;
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "reasoning_delta",
+        text: `Debug provider: selecting condition branch for ${title}.`,
+      };
+      await pause(signal);
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_call",
+        tool: CONDITION_SELECT_TOOL,
+        callId: conditionCallId,
+        input: {
+          nodeId,
+          branchRef,
+          summary: `Debug provider selected fast path for ${title}.`,
+        },
+        status: "completed",
+      };
+      await pause(signal);
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_result",
+        tool: CONDITION_SELECT_TOOL,
+        callId: conditionCallId,
+        result: { ok: true, message: `Debug provider selected ${branchRef ?? "a branch"} for ${title}.` },
       };
     } else {
       const title = currentNodeTitle(streamInput);
@@ -506,15 +570,18 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       outputText: isPlanGeneration(streamInput)
         ? "Debug plan generation completed."
         : this.profile === "hermes-like"
-          ? `Hermes-like debug runtime run completed for ${currentNodeTitle(streamInput)}.`
-          : `Debug runtime run completed for ${currentNodeTitle(streamInput)}.`,
+          ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
+          : `Debug runtime run completed for ${nodeTitle}.`,
       output: isPlanGeneration(streamInput)
         ? undefined
         : {
             text: this.profile === "hermes-like"
-              ? `Hermes-like debug runtime run completed for ${currentNodeTitle(streamInput)}.`
-              : `Debug runtime run completed for ${currentNodeTitle(streamInput)}.`,
+              ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
+              : `Debug runtime run completed for ${nodeTitle}.`,
           },
+      structuredPayload: nodeType === "condition"
+        ? { terminalToolName: CONDITION_SELECT_TOOL, nodeId: nodeRef, branchRef, summary: `Debug provider selected fast path for ${nodeTitle}.` }
+        : undefined,
       usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
       raw: { debugProvider: true, profile: this.profile },
     };

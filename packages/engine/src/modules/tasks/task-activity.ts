@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export type WorkspaceActivityGroup = {
   kind: "plan_generation" | "execution_node" | "provider_run";
@@ -496,7 +497,10 @@ export async function getTaskActivityPage(input: TaskActivityPageInput) {
   const limit = Math.min(Math.max(input.limit ?? 100, 1), 3000);
   const scope = input.scope ?? "task";
   if (scope === "node" && !input.nodeId) {
-    throw new Error("nodeId is required for node activity");
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "nodeId is required for node activity",
+    );
   }
   const activity = await getMergedActivity({
     taskId: input.taskId,

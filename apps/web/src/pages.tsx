@@ -1,6 +1,7 @@
 import { Navigate, useLoaderData, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 
 import { InboxPageClient } from "@/components/inbox/inbox-page-client";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { MemoryPageClient } from "@/components/memory/memory-page-client";
 import { SchedulePage } from "@/components/schedule/schedule-page";
 import { TaskListPage } from "@/components/tasks/task-list-page";
@@ -32,6 +33,10 @@ export type ScheduleRouteData = {
 
 export type InboxRouteData = {
   inbox: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-inbox").getInbox>>;
+};
+
+export type DashboardRouteData = {
+  dashboard: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-dashboard").getDashboard>>;
 };
 
 export type MemoryRouteData = {
@@ -91,7 +96,7 @@ export type WorkPageRouteData = {
 
 export function LocaleLandingPage() {
   const params = useParams();
-  return <Navigate to={localizeHref(resolveLocale(params.lang), "/schedule")} replace />;
+  return <Navigate to={localizeHref(resolveLocale(params.lang), "/dashboard")} replace />;
 }
 
 function useAppBootOutletData() {
@@ -133,6 +138,13 @@ export function InboxRoutePage() {
       />
     </div>
   );
+}
+
+export function DashboardRoutePage() {
+  const { dictionary } = useAppBootOutletData();
+  const { dashboard } = useLoaderData() as DashboardRouteData;
+
+  return <DashboardPage data={dashboard} copy={dictionary.pages.dashboard} />;
 }
 
 export function MemoryRoutePage() {

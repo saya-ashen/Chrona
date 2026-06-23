@@ -1,0 +1,2371 @@
+{
+  "nodes": [
+    {
+      "id": "file:apps/web/src/__tests__/localized-child-loader-regression.test.tsx",
+      "type": "file",
+      "name": "localized-child-loader-regression.test.tsx",
+      "filePath": "apps/web/src/__tests__/localized-child-loader-regression.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 67,
+      "nonEmptyLines": 60
+    },
+    {
+      "id": "file:apps/web/src/__tests__/localized-root-index-route.test.tsx",
+      "type": "file",
+      "name": "localized-root-index-route.test.tsx",
+      "filePath": "apps/web/src/__tests__/localized-root-index-route.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 67,
+      "nonEmptyLines": 60
+    },
+    {
+      "id": "file:apps/web/src/app-shell.tsx",
+      "type": "file",
+      "name": "app-shell.tsx",
+      "filePath": "apps/web/src/app-shell.tsx",
+      "summary": "包含 AppShell 函数，属于 \"src\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 25,
+      "nonEmptyLines": 21
+    },
+    {
+      "id": "function:apps/web/src/app-shell.tsx:AppShell",
+      "type": "function",
+      "name": "AppShell",
+      "filePath": "apps/web/src/app-shell.tsx",
+      "summary": "函数 AppShell。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 25
+    },
+    {
+      "id": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "type": "file",
+      "name": "control-plane-shell.test.tsx",
+      "filePath": "apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 252,
+      "nonEmptyLines": 217
+    },
+    {
+      "id": "file:apps/web/src/components/access-key-gate.tsx",
+      "type": "file",
+      "name": "access-key-gate.tsx",
+      "filePath": "apps/web/src/components/access-key-gate.tsx",
+      "summary": "包含 AccessKeyGate 函数，属于 \"components\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 27,
+      "nonEmptyLines": 22
+    },
+    {
+      "id": "function:apps/web/src/components/access-key-gate.tsx:AccessKeyGate",
+      "type": "function",
+      "name": "AccessKeyGate",
+      "filePath": "apps/web/src/components/access-key-gate.tsx",
+      "summary": "函数 AccessKeyGate，接受 { children } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 27
+    },
+    {
+      "id": "file:apps/web/src/components/access-key-unlock.tsx",
+      "type": "file",
+      "name": "access-key-unlock.tsx",
+      "filePath": "apps/web/src/components/access-key-unlock.tsx",
+      "summary": "包含 AccessKeyUnlock 函数，属于 \"components\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 97,
+      "nonEmptyLines": 88
+    },
+    {
+      "id": "function:apps/web/src/components/access-key-unlock.tsx:AccessKeyUnlock",
+      "type": "function",
+      "name": "AccessKeyUnlock",
+      "filePath": "apps/web/src/components/access-key-unlock.tsx",
+      "summary": "函数 AccessKeyUnlock，接受 { onUnlock } 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 19,
+      "endLine": 97
+    },
+    {
+      "id": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "type": "file",
+      "name": "assistant-surface-dropdown.tsx",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "summary": "包含 AssistantSurfaceDropdown 函数，属于 \"assistant-surface\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 168,
+      "nonEmptyLines": 157
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx:AssistantSurfaceDropdown",
+      "type": "function",
+      "name": "AssistantSurfaceDropdown",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "summary": "函数 AssistantSurfaceDropdown。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 31,
+      "endLine": 168
+    },
+    {
+      "id": "file:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "type": "file",
+      "name": "assistant-surface-header-drawer-button.tsx",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "summary": "包含 AssistantSurfaceHeaderDrawerButton 函数，属于 \"assistant-surface\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 59,
+      "nonEmptyLines": 54
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx:AssistantSurfaceHeaderDrawerButton",
+      "type": "function",
+      "name": "AssistantSurfaceHeaderDrawerButton",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "summary": "函数 AssistantSurfaceHeaderDrawerButton。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 59
+    },
+    {
+      "id": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "type": "file",
+      "name": "assistant-surface-provider.tsx",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "包含 createEmptySurface、severityFromTone、mapPageType等 函数，属于 \"assistant-surface\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 309,
+      "nonEmptyLines": 285
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createEmptySurface",
+      "type": "function",
+      "name": "createEmptySurface",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 createEmptySurface，接受 locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 69,
+      "endLine": 90
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:mapQuickAction",
+      "type": "function",
+      "name": "mapQuickAction",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 mapQuickAction，接受 action 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 127,
+      "endLine": 136
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createSurfaceState",
+      "type": "function",
+      "name": "createSurfaceState",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 createSurfaceState，接受 context, actions, locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 138,
+      "endLine": 160
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:assistantSurfaceContextSignature",
+      "type": "function",
+      "name": "assistantSurfaceContextSignature",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 assistantSurfaceContextSignature，接受 surface 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 162,
+      "endLine": 175
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createSchedulePreview",
+      "type": "function",
+      "name": "createSchedulePreview",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 createSchedulePreview，接受 selectedDate, locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 177,
+      "endLine": 195
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createProposalPreview",
+      "type": "function",
+      "name": "createProposalPreview",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 createProposalPreview，接受 surface, action, locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 197,
+      "endLine": 220
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:reducer",
+      "type": "function",
+      "name": "reducer",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 reducer，接受 state, action 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 222,
+      "endLine": 242
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:AssistantSurfaceProvider",
+      "type": "function",
+      "name": "AssistantSurfaceProvider",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 AssistantSurfaceProvider，接受 { children } 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 246,
+      "endLine": 305
+    },
+    {
+      "id": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:useAssistantSurface",
+      "type": "function",
+      "name": "useAssistantSurface",
+      "filePath": "apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "summary": "函数 useAssistantSurface。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 307,
+      "endLine": 309
+    },
+    {
+      "id": "file:apps/web/src/components/control-plane-shell.tsx",
+      "type": "file",
+      "name": "control-plane-shell.tsx",
+      "filePath": "apps/web/src/components/control-plane-shell.tsx",
+      "summary": "包含 ControlPlaneShell 函数，属于 \"components\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 280,
+      "nonEmptyLines": 267
+    },
+    {
+      "id": "function:apps/web/src/components/control-plane-shell.tsx:ControlPlaneShell",
+      "type": "function",
+      "name": "ControlPlaneShell",
+      "filePath": "apps/web/src/components/control-plane-shell.tsx",
+      "summary": "函数 ControlPlaneShell，接受 {\n  children,\n  defaultWorkspace: _defaultWorkspace,\n} 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 42,
+      "endLine": 280
+    },
+    {
+      "id": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "type": "file",
+      "name": "conversation-thread.tsx",
+      "filePath": "apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "summary": "包含 ConversationThread 函数，属于 \"global-ai-sidebar\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 66,
+      "nonEmptyLines": 60
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx:ConversationThread",
+      "type": "function",
+      "name": "ConversationThread",
+      "filePath": "apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "summary": "函数 ConversationThread，接受 { messages, onSubmit } 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 15,
+      "endLine": 66
+    },
+    {
+      "id": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "type": "file",
+      "name": "locale-switcher.tsx",
+      "filePath": "apps/web/src/components/i18n/locale-switcher.tsx",
+      "summary": "包含 LocaleSwitcher 函数，属于 \"i18n\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 27,
+      "nonEmptyLines": 23
+    },
+    {
+      "id": "function:apps/web/src/components/i18n/locale-switcher.tsx:LocaleSwitcher",
+      "type": "function",
+      "name": "LocaleSwitcher",
+      "filePath": "apps/web/src/components/i18n/locale-switcher.tsx",
+      "summary": "函数 LocaleSwitcher。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 27
+    },
+    {
+      "id": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "type": "file",
+      "name": "localized-link.tsx",
+      "filePath": "apps/web/src/components/i18n/localized-link.tsx",
+      "summary": "包含 LocalizedLink 函数，属于 \"i18n\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 21,
+      "nonEmptyLines": 17
+    },
+    {
+      "id": "function:apps/web/src/components/i18n/localized-link.tsx:LocalizedLink",
+      "type": "function",
+      "name": "LocalizedLink",
+      "filePath": "apps/web/src/components/i18n/localized-link.tsx",
+      "summary": "函数 LocalizedLink，接受 { href, children, ...props } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 21
+    },
+    {
+      "id": "file:apps/web/src/components/inbox/__tests__/inbox-list.test.tsx",
+      "type": "file",
+      "name": "inbox-list.test.tsx",
+      "filePath": "apps/web/src/components/inbox/__tests__/inbox-list.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 118,
+      "nonEmptyLines": 105
+    },
+    {
+      "id": "file:apps/web/src/components/inbox/__tests__/inbox-page-client.test.tsx",
+      "type": "file",
+      "name": "inbox-page-client.test.tsx",
+      "filePath": "apps/web/src/components/inbox/__tests__/inbox-page-client.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 228,
+      "nonEmptyLines": 201
+    },
+    {
+      "id": "function:apps/web/src/components/inbox/__tests__/inbox-page-client.test.tsx:renderSingleItem",
+      "type": "function",
+      "name": "renderSingleItem",
+      "filePath": "apps/web/src/components/inbox/__tests__/inbox-page-client.test.tsx",
+      "summary": "函数 renderSingleItem，接受 item, copyOverrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 48,
+      "endLine": 75
+    },
+    {
+      "id": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "type": "file",
+      "name": "inbox-list.tsx",
+      "filePath": "apps/web/src/components/inbox/inbox-list.tsx",
+      "summary": "包含 InboxList 函数，属于 \"inbox\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 120,
+      "nonEmptyLines": 115
+    },
+    {
+      "id": "function:apps/web/src/components/inbox/inbox-list.tsx:InboxList",
+      "type": "function",
+      "name": "InboxList",
+      "filePath": "apps/web/src/components/inbox/inbox-list.tsx",
+      "summary": "函数 InboxList，接受 {\n  items,\n  copy: copyProp,\n  onApprove,\n  onReject,\n  onEditAndApprove,\n} 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 41,
+      "endLine": 120
+    },
+    {
+      "id": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "type": "file",
+      "name": "inbox-page-client.tsx",
+      "filePath": "apps/web/src/components/inbox/inbox-page-client.tsx",
+      "summary": "包含 getActionError、InboxPageClient 函数，属于 \"inbox\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 130,
+      "nonEmptyLines": 120
+    },
+    {
+      "id": "function:apps/web/src/components/inbox/inbox-page-client.tsx:InboxPageClient",
+      "type": "function",
+      "name": "InboxPageClient",
+      "filePath": "apps/web/src/components/inbox/inbox-page-client.tsx",
+      "summary": "函数 InboxPageClient，接受 { initialData, copy } 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 29,
+      "endLine": 130
+    },
+    {
+      "id": "file:apps/web/src/components/memory/__tests__/memory-console.test.tsx",
+      "type": "file",
+      "name": "memory-console.test.tsx",
+      "filePath": "apps/web/src/components/memory/__tests__/memory-console.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 76,
+      "nonEmptyLines": 68
+    },
+    {
+      "id": "file:apps/web/src/components/memory/memory-console.tsx",
+      "type": "file",
+      "name": "memory-console.tsx",
+      "filePath": "apps/web/src/components/memory/memory-console.tsx",
+      "summary": "包含 MemoryConsole 函数，属于 \"memory\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 61,
+      "nonEmptyLines": 57
+    },
+    {
+      "id": "function:apps/web/src/components/memory/memory-console.tsx:MemoryConsole",
+      "type": "function",
+      "name": "MemoryConsole",
+      "filePath": "apps/web/src/components/memory/memory-console.tsx",
+      "summary": "函数 MemoryConsole，接受 { items, copy: copyProp } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 61
+    },
+    {
+      "id": "file:apps/web/src/components/memory/memory-page-client.tsx",
+      "type": "file",
+      "name": "memory-page-client.tsx",
+      "filePath": "apps/web/src/components/memory/memory-page-client.tsx",
+      "summary": "包含 MemoryPageClient 函数，属于 \"memory\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 23,
+      "nonEmptyLines": 19
+    },
+    {
+      "id": "function:apps/web/src/components/memory/memory-page-client.tsx:MemoryPageClient",
+      "type": "function",
+      "name": "MemoryPageClient",
+      "filePath": "apps/web/src/components/memory/memory-page-client.tsx",
+      "summary": "函数 MemoryPageClient，接受 { initialData, copy } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 23
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/ai-insights-panel.test.tsx",
+      "type": "file",
+      "name": "ai-insights-panel.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/ai-insights-panel.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 83,
+      "nonEmptyLines": 73
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "type": "file",
+      "name": "conflict-card.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 133,
+      "nonEmptyLines": 119
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx:makeConflict",
+      "type": "function",
+      "name": "makeConflict",
+      "filePath": "apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "summary": "函数 makeConflict，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 14,
+      "endLine": 23
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx:makeSuggestion",
+      "type": "function",
+      "name": "makeSuggestion",
+      "filePath": "apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "summary": "函数 makeSuggestion，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 37
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/preparation-checklist.test.tsx",
+      "type": "file",
+      "name": "preparation-checklist.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/preparation-checklist.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 70,
+      "nonEmptyLines": 60
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "type": "file",
+      "name": "schedule-command-bar-ai.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 143,
+      "nonEmptyLines": 120
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx:suggestion",
+      "type": "function",
+      "name": "suggestion",
+      "filePath": "apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "summary": "函数 suggestion，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 17,
+      "endLine": 30
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx:hookReturn",
+      "type": "function",
+      "name": "hookReturn",
+      "filePath": "apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "summary": "函数 hookReturn，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 32,
+      "endLine": 44
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/schedule-editor-form.test.tsx",
+      "type": "file",
+      "name": "schedule-editor-form.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/schedule-editor-form.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 208,
+      "nonEmptyLines": 167
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx",
+      "type": "file",
+      "name": "schedule-task-list.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 242,
+      "nonEmptyLines": 219
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx:makeItem",
+      "type": "function",
+      "name": "makeItem",
+      "filePath": "apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx",
+      "summary": "函数 makeItem，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 40,
+      "endLine": 69
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "type": "file",
+      "name": "selected-block-sheet.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 742,
+      "nonEmptyLines": 634
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx:makeStubTaskPlanReadModel",
+      "type": "function",
+      "name": "makeStubTaskPlanReadModel",
+      "filePath": "apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "summary": "函数 makeStubTaskPlanReadModel，接受 overrides 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 241,
+      "endLine": 296
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx:makeSchedulePlanSnapshot",
+      "type": "function",
+      "name": "makeSchedulePlanSnapshot",
+      "filePath": "apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "summary": "函数 makeSchedulePlanSnapshot，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 298,
+      "endLine": 307
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/task-config-form-layout.test.tsx",
+      "type": "file",
+      "name": "task-config-form-layout.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/task-config-form-layout.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 186,
+      "nonEmptyLines": 150
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-ai.test.tsx",
+      "type": "file",
+      "name": "task-create-dialog-ai.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/task-create-dialog-ai.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "type-definition",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 290,
+      "nonEmptyLines": 240
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-core.test.tsx",
+      "type": "file",
+      "name": "task-create-dialog-core.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/task-create-dialog-core.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 251,
+      "nonEmptyLines": 205
+    },
+    {
+      "id": "file:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "type": "file",
+      "name": "task-plan-generation-panel.test.tsx",
+      "filePath": "apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "summary": "测试文件，覆盖 \"__tests__\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 292,
+      "nonEmptyLines": 259
+    },
+    {
+      "id": "function:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx:createSseResponse",
+      "type": "function",
+      "name": "createSseResponse",
+      "filePath": "apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "summary": "函数 createSseResponse，接受 events 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 137,
+      "endLine": 154
+    },
+    {
+      "id": "class:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx:ResizeObserverMock",
+      "type": "class",
+      "name": "ResizeObserverMock",
+      "filePath": "apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "summary": "类 ResizeObserverMock，定义了 3 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 5,
+      "endLine": 9
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:apps/web/src/__tests__/localized-child-loader-regression.test.tsx",
+      "target": "file:apps/web/src/app-shell.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-child-loader-regression.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-child-loader-regression.test.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-child-loader-regression.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-child-loader-regression.test.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-root-index-route.test.tsx",
+      "target": "file:apps/web/src/app-shell.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-root-index-route.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-root-index-route.test.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-root-index-route.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/__tests__/localized-root-index-route.test.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "function:apps/web/src/app-shell.tsx:AppShell",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "function:apps/web/src/app-shell.tsx:AppShell",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "file:apps/web/src/components/access-key-gate.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "file:apps/web/src/components/control-plane-shell.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/app-shell.tsx",
+      "target": "file:apps/web/src/router.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "target": "file:apps/web/src/components/control-plane-shell.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "target": "file:apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "target": "file:apps/web/src/lib/schedule-ai-preferences.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "target": "file:apps/web/src/hooks/ai/task-plan-generation-session-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "target": "file:apps/web/src/lib/schedule-ai-preferences.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/__tests__/control-plane-shell.test.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-gate.tsx",
+      "target": "function:apps/web/src/components/access-key-gate.tsx:AccessKeyGate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-gate.tsx",
+      "target": "function:apps/web/src/components/access-key-gate.tsx:AccessKeyGate",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-gate.tsx",
+      "target": "file:apps/web/src/components/access-key-unlock.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-gate.tsx",
+      "target": "file:apps/web/src/lib/access-key.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-gate.tsx",
+      "target": "file:apps/web/src/lib/access-key.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "function:apps/web/src/components/access-key-unlock.tsx:AccessKeyUnlock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "function:apps/web/src/components/access-key-unlock.tsx:AccessKeyUnlock",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/checkbox.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/field.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/input.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/checkbox.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/field.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/ui/input.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/access-key-unlock.tsx",
+      "target": "file:apps/web/src/components/access-key-route-error.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx:AssistantSurfaceDropdown",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx:AssistantSurfaceDropdown",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/drawer.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/field.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/input.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/drawer.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/field.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/components/ui/input.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx:AssistantSurfaceHeaderDrawerButton",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx:AssistantSurfaceHeaderDrawerButton",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "target": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createEmptySurface",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:mapQuickAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createSurfaceState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:assistantSurfaceContextSignature",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createSchedulePreview",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:createProposalPreview",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:reducer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:AssistantSurfaceProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:AssistantSurfaceProvider",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:useAssistantSurface",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "function:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx:useAssistantSurface",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "target": "file:apps/web/src/components/tasks/workspace/page/task-workspace-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "function:apps/web/src/components/control-plane-shell.tsx:ControlPlaneShell",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "function:apps/web/src/components/control-plane-shell.tsx:ControlPlaneShell",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/assistant-surface/assistant-surface-dropdown.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/assistant-surface/assistant-surface-header-drawer-button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/ui/sidebar.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/lib/router.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/components/ui/sidebar.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/lib/router.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/control-plane-shell.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx:ConversationThread",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx:ConversationThread",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/components/ui/field.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/components/ui/input.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/components/ui/field.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/components/ui/input.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "target": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "target": "function:apps/web/src/components/i18n/locale-switcher.tsx:LocaleSwitcher",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "target": "function:apps/web/src/components/i18n/locale-switcher.tsx:LocaleSwitcher",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "target": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/locale-switcher.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "function:apps/web/src/components/i18n/localized-link.tsx:LocalizedLink",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "function:apps/web/src/components/i18n/localized-link.tsx:LocalizedLink",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/lib/router.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/lib/router.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-mini-calendar.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-task-list.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/schedule/timeline/schedule-timeline-primitives.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/tasks/shared/task-actions-menu.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/tasks/shared/task-context-links.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/tasks/task-list-page.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/work/work-inspector-sections.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/components/work/work-page/work-page-header-card.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/__tests__/inbox-list.test.tsx",
+      "target": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/__tests__/inbox-page-client.test.tsx",
+      "target": "function:apps/web/src/components/inbox/__tests__/inbox-page-client.test.tsx:renderSingleItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/__tests__/inbox-page-client.test.tsx",
+      "target": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "function:apps/web/src/components/inbox/inbox-list.tsx:InboxList",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "function:apps/web/src/components/inbox/inbox-list.tsx:InboxList",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/tasks/shared/task-context-links.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/ui/badge.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/ui/card.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/tasks/shared/task-context-links.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/ui/badge.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "target": "file:apps/web/src/components/ui/card.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "function:apps/web/src/components/inbox/inbox-page-client.tsx:InboxPageClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "function:apps/web/src/components/inbox/inbox-page-client.tsx:InboxPageClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "file:apps/web/src/components/i18n/localized-link.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "file:apps/web/src/components/inbox/inbox-list.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/inbox/inbox-page-client.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/memory/__tests__/memory-console.test.tsx",
+      "target": "file:apps/web/src/components/memory/memory-console.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "function:apps/web/src/components/memory/memory-console.tsx:MemoryConsole",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "function:apps/web/src/components/memory/memory-console.tsx:MemoryConsole",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/tasks/shared/task-context-links.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/ui/badge.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/ui/card.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/tasks/shared/task-context-links.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/ui/badge.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-console.tsx",
+      "target": "file:apps/web/src/components/ui/card.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-page-client.tsx",
+      "target": "function:apps/web/src/components/memory/memory-page-client.tsx:MemoryPageClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-page-client.tsx",
+      "target": "function:apps/web/src/components/memory/memory-page-client.tsx:MemoryPageClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-page-client.tsx",
+      "target": "file:apps/web/src/components/memory/memory-console.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/memory/memory-page-client.tsx",
+      "target": "file:apps/web/src/pages.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/ai-insights-panel.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/ai-insights-panel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/ai-insights-panel.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/ai-insights-panel.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/ai-insights-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/ai-insights-panel.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx:makeConflict",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx:makeSuggestion",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/conflict-card.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/conflict-card.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/conflict-card.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/preparation-checklist.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/preparation-checklist.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/preparation-checklist.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/preparation-checklist.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx:suggestion",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx:hookReturn",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-command-bar.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-command-bar-ai.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-command-bar.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-editor-form.test.tsx",
+      "target": "file:apps/web/src/components/schedule/forms/schedule-editor-form.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-editor-form.test.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-editor-form.test.tsx",
+      "target": "file:apps/web/src/components/schedule/forms/schedule-editor-form.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-editor-form.test.tsx",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx:makeItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-task-list.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/schedule-task-list.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-task-list.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx:makeStubTaskPlanReadModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx:makeSchedulePlanSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/schedule-page-panels.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "target": "file:apps/web/src/components/schedule/panels/schedule-page-panels.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/selected-block-sheet.test.tsx",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-config-form-layout.test.tsx",
+      "target": "file:apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-config-form-layout.test.tsx",
+      "target": "file:apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-ai.test.tsx",
+      "target": "file:apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-ai.test.tsx",
+      "target": "file:apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-core.test.tsx",
+      "target": "file:apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-core.test.tsx",
+      "target": "file:apps/web/src/lib/schedule-ai-preferences.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-core.test.tsx",
+      "target": "file:apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-create-dialog-core.test.tsx",
+      "target": "file:apps/web/src/lib/schedule-ai-preferences.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "target": "function:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx:createSseResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "target": "class:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx:ResizeObserverMock",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "target": "file:apps/web/src/components/tasks/ai/task-plan-generation-panel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "target": "file:apps/web/src/components/tasks/ai/task-plan-generation-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/schedule/__tests__/task-plan-generation-panel.test.tsx",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

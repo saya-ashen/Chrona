@@ -9,6 +9,9 @@ import type {
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { api } from "@/lib/rpc-client";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("web.schedule.selected-block-plan-state");
 
 /** Subset of TaskPlanReadModel used as the accepted-plan shape in UI state. */
 export type SavedTaskPlan = TaskPlanReadModel;
@@ -214,7 +217,7 @@ export function useSelectedBlockPlanState({
 
       await onMutatedAction();
     } catch (err) {
-      console.error("[TaskPlan] Accept failed:", err);
+      logger.error("plan_accept.failed", { taskId: item.taskId, workBlockId: item.workBlockId ?? null, error: err });
     } finally {
       setIsApplying(false);
     }

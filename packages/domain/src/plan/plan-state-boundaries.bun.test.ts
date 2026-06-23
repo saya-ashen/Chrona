@@ -29,33 +29,11 @@ function plan(overrides: Partial<EditablePlan> = {}): EditablePlan {
 }
 
 describe("plan state boundaries", () => {
-  test("high-risk task behind a normal task produces advisory warning only", () => {
+  test("text-only high-risk heuristics do not produce plan warnings", () => {
     const result = validateEditablePlan(plan());
 
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
-    expect(result.warnings).toContainEqual({
-      path: "nodes.publish_report",
-      message: "High-risk task 'publish_report' should be preceded by an approve/confirm checkpoint",
-    });
-  });
-
-  test("approve checkpoint clears high-risk task warning", () => {
-    const checkpoint: EditableNode = {
-      id: "approve",
-      type: "checkpoint",
-      title: "Approve publish",
-      checkpointType: "approve",
-      prompt: "Approve publishing?",
-      required: true,
-    };
-
-    const result = validateEditablePlan(plan({
-      nodes: [task("collect"), checkpoint, task("publish_report", "Publish report")],
-      edges: [{ from: "collect", to: "approve" }, { from: "approve", to: "publish_report" }],
-    }));
-
-    expect(result.ok).toBe(true);
     expect(result.warnings).toEqual([]);
   });
 
@@ -65,9 +43,12 @@ describe("plan state boundaries", () => {
       edges: [{ from: "collect", to: "review" }, { from: "review", to: "collect" }],
     });
 
-    expect(validateEditablePlan(cyclic)).toMatchObject({
-      ok: false,
-      errors: [{ path: "edges", message: "Plan graph must be a DAG (no cycles allowed)" }],
+    const validation = validateEditablePlan(cyclic);
+
+    expect(validation.ok).toBe(false);
+    expect(validation.errors).toContainEqual({
+      path: "edges",
+      message: "Plan graph must be a DAG (no cycles allowed)",
     });
     expect(() => compileEditablePlan(cyclic)).toThrow(PlanCompileError);
   });

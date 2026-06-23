@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getLatestCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { createPlanGraphFromCompiledPlan, getPlanRun, savePlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-runtime-store";
@@ -296,7 +297,10 @@ export async function applyPlanPatchCommand(input: PlanPatchInput) {
   });
 
   if (operations.length === 0 && input.operation !== "update_plan_summary") {
-    throw new Error(`Unsupported plan operation: ${input.operation}`);
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      `Unsupported plan operation: ${input.operation}`,
+    );
   }
 
   const result = await applyPlanMutationCommand({

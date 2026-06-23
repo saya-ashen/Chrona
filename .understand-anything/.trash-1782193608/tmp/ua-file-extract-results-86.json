@@ -1,0 +1,1047 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 23,
+  "filesSkipped": [
+    "packages/engine/.understand-anything/.understandignore",
+    "packages/engine/.understand-anything/config.json"
+  ],
+  "results": [
+    {
+      "path": "packages/db/src/generated/prisma/internal/prismaNamespaceBrowser.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 929,
+      "nonEmptyLines": 788,
+      "exports": [
+        {
+          "name": "Decimal",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "NullTypes",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "DbNull",
+          "line": 36,
+          "isDefault": false
+        },
+        {
+          "name": "JsonNull",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "AnyNull",
+          "line": 50,
+          "isDefault": false
+        },
+        {
+          "name": "ModelName",
+          "line": 53,
+          "isDefault": false
+        },
+        {
+          "name": "TransactionIsolationLevel",
+          "line": 98,
+          "isDefault": false
+        },
+        {
+          "name": "WorkspaceScalarFieldEnum",
+          "line": 105,
+          "isDefault": false
+        },
+        {
+          "name": "CalendarSourceScalarFieldEnum",
+          "line": 118,
+          "isDefault": false
+        },
+        {
+          "name": "ImportedCalendarEventScalarFieldEnum",
+          "line": 144,
+          "isDefault": false
+        },
+        {
+          "name": "TaskScalarFieldEnum",
+          "line": 167,
+          "isDefault": false
+        },
+        {
+          "name": "SchedulerLeaseScalarFieldEnum",
+          "line": 203,
+          "isDefault": false
+        },
+        {
+          "name": "GraphVersionScalarFieldEnum",
+          "line": 216,
+          "isDefault": false
+        },
+        {
+          "name": "GraphMutationRecordScalarFieldEnum",
+          "line": 229,
+          "isDefault": false
+        },
+        {
+          "name": "ReconciliationEventScalarFieldEnum",
+          "line": 247,
+          "isDefault": false
+        },
+        {
+          "name": "SchedulerEventScalarFieldEnum",
+          "line": 262,
+          "isDefault": false
+        },
+        {
+          "name": "TaskSessionScalarFieldEnum",
+          "line": 276,
+          "isDefault": false
+        },
+        {
+          "name": "TaskDependencyScalarFieldEnum",
+          "line": 295,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanScalarFieldEnum",
+          "line": 307,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanRunScalarFieldEnum",
+          "line": 327,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanNodeAttemptScalarFieldEnum",
+          "line": 347,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanProviderRunScalarFieldEnum",
+          "line": 380,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanProviderApprovalScalarFieldEnum",
+          "line": 406,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanLayerScalarFieldEnum",
+          "line": 448,
+          "isDefault": false
+        },
+        {
+          "name": "RunScalarFieldEnum",
+          "line": 463,
+          "isDefault": false
+        },
+        {
+          "name": "ApprovalScalarFieldEnum",
+          "line": 493,
+          "isDefault": false
+        },
+        {
+          "name": "ArtifactScalarFieldEnum",
+          "line": 513,
+          "isDefault": false
+        },
+        {
+          "name": "MemoryScalarFieldEnum",
+          "line": 529,
+          "isDefault": false
+        },
+        {
+          "name": "EventScalarFieldEnum",
+          "line": 547,
+          "isDefault": false
+        },
+        {
+          "name": "RawEventLogScalarFieldEnum",
+          "line": 583,
+          "isDefault": false
+        },
+        {
+          "name": "ConversationEntryScalarFieldEnum",
+          "line": 623,
+          "isDefault": false
+        },
+        {
+          "name": "ToolInvocationScalarFieldEnum",
+          "line": 637,
+          "isDefault": false
+        },
+        {
+          "name": "TaskTimelineItemScalarFieldEnum",
+          "line": 673,
+          "isDefault": false
+        },
+        {
+          "name": "TaskProjectionScalarFieldEnum",
+          "line": 698,
+          "isDefault": false
+        },
+        {
+          "name": "ScheduleProposalScalarFieldEnum",
+          "line": 731,
+          "isDefault": false
+        },
+        {
+          "name": "RuntimeCursorScalarFieldEnum",
+          "line": 750,
+          "isDefault": false
+        },
+        {
+          "name": "AiClientScalarFieldEnum",
+          "line": 763,
+          "isDefault": false
+        },
+        {
+          "name": "AiFeatureBindingScalarFieldEnum",
+          "line": 777,
+          "isDefault": false
+        },
+        {
+          "name": "TaskAssistantMessageScalarFieldEnum",
+          "line": 787,
+          "isDefault": false
+        },
+        {
+          "name": "WorkBlockScalarFieldEnum",
+          "line": 802,
+          "isDefault": false
+        },
+        {
+          "name": "ExecutionSessionScalarFieldEnum",
+          "line": 823,
+          "isDefault": false
+        },
+        {
+          "name": "RunTokenScalarFieldEnum",
+          "line": 848,
+          "isDefault": false
+        },
+        {
+          "name": "TaskPlanTerminalActionScalarFieldEnum",
+          "line": 866,
+          "isDefault": false
+        },
+        {
+          "name": "SortOrder",
+          "line": 883,
+          "isDefault": false
+        },
+        {
+          "name": "JsonNullValueInput",
+          "line": 891,
+          "isDefault": false
+        },
+        {
+          "name": "NullableJsonNullValueInput",
+          "line": 898,
+          "isDefault": false
+        },
+        {
+          "name": "NullsOrder",
+          "line": 906,
+          "isDefault": false
+        },
+        {
+          "name": "JsonNullValueFilter",
+          "line": 914,
+          "isDefault": false
+        },
+        {
+          "name": "QueryMode",
+          "line": 923,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 49,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 14,
+      "nonEmptyLines": 14,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "private",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "type",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "exports",
+          "level": 1,
+          "line": 10
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "packages/domain/src/assistant-surface/assistant-surface.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 65,
+      "nonEmptyLines": 57,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/assistant-surface/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 3,
+      "nonEmptyLines": 3,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/calendar/normalize-imported-events.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 35,
+      "functions": [
+        {
+          "name": "normalizeImportedEvents",
+          "startLine": 13,
+          "endLine": 37,
+          "params": [
+            "candidates"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "normalizeImportedEvents",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "candidates.flatMap",
+          "lineNumber": 15
+        },
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "[\n      candidate.externalUid,\n      candidate.recurrenceId ?? \"single\",\n      candidate.startsAt.toISOString(),\n    ].join",
+          "lineNumber": 16
+        },
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "candidate.startsAt.toISOString",
+          "lineNumber": 19
+        },
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "seen.has",
+          "lineNumber": 21
+        },
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "seen.add",
+          "lineNumber": 22
+        },
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "candidate.title?.trim",
+          "lineNumber": 29
+        },
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "candidate.description?.trim",
+          "lineNumber": 30
+        },
+        {
+          "caller": "normalizeImportedEvents",
+          "callee": "Boolean",
+          "lineNumber": 33
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/plan/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 4,
+      "nonEmptyLines": 4,
+      "exports": [
+        {
+          "name": "validateEditablePlan",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "applyPlanPatch",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "ApplyPatchResult",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "compileEditablePlan",
+          "line": 4,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/task/derive-schedule-state.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 116,
+      "nonEmptyLines": 104,
+      "functions": [
+        {
+          "name": "deriveScheduleState",
+          "startLine": 34,
+          "endLine": 116,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "deriveScheduleState",
+          "line": 34,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "deriveScheduleState",
+          "callee": "Boolean",
+          "lineNumber": 41
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/domain/src/task/validate-schedule-window.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 14,
+      "nonEmptyLines": 12,
+      "functions": [
+        {
+          "name": "validateScheduleWindow",
+          "startLine": 1,
+          "endLine": 14,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "validateScheduleWindow",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "validateScheduleWindow",
+          "callee": "scheduledEndAt.getTime",
+          "lineNumber": 11
+        },
+        {
+          "caller": "validateScheduleWindow",
+          "callee": "scheduledStartAt.getTime",
+          "lineNumber": 11
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/.omc/state/agent-replay-13061a0d-b89a-4dbd-be91-aa088fbc364a.jsonl",
+      "language": "jsonl",
+      "fileCategory": "code",
+      "totalLines": 15,
+      "nonEmptyLines": 15,
+      "metrics": {}
+    },
+    {
+      "path": "packages/engine/package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 23,
+      "nonEmptyLines": 23,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "private",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "type",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "exports",
+          "level": 1,
+          "line": 20
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "packages/engine/README.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 174,
+      "nonEmptyLines": 141,
+      "sections": [
+        {
+          "heading": "Chrona Engine Boundary Plan",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Current State",
+          "level": 2,
+          "line": 10
+        },
+        {
+          "heading": "Target Boundary",
+          "level": 2,
+          "line": 23
+        },
+        {
+          "heading": "Package Layout",
+          "level": 2,
+          "line": 84
+        },
+        {
+          "heading": "Migration Rules",
+          "level": 2,
+          "line": 109
+        },
+        {
+          "heading": "Migration Plan",
+          "level": 2,
+          "line": 122
+        },
+        {
+          "heading": "Non-Goals",
+          "level": 2,
+          "line": 168
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/ai/management/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "exports": [
+        {
+          "name": "AiClientManagement",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "aiClientManagement",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/plan-execution/runtime/execution-events.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 9,
+      "nonEmptyLines": 8,
+      "exports": [
+        {
+          "name": "EXECUTION_EVENT_CLASSIFICATIONS",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/projections/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 10,
+      "nonEmptyLines": 10,
+      "exports": [
+        {
+          "name": "TaskProjectionEvent",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "SpecPatch",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "appendTaskWorkspaceEvent",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "publishTaskProjectionEvent",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "publishTaskStateSnapshot",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "publishTaskStateUpdate",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "publishTaskWorkspaceUpdatedEvent",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "subscribeToTaskProjectionEvents",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "rebuildTaskProjection",
+          "line": 10,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 9,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 43,
+      "nonEmptyLines": 33,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/engine/src/test/llm-fixtures/debug/chat/valid-small-chat.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "feature",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "provider",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "recordedAt",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "request",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "response",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "schemaVersion",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "packages/graph-runtime/src/types/layers.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 8,
+      "nonEmptyLines": 8,
+      "exports": [
+        {
+          "name": "StructuralOperation",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "StructuralLayer",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "RuntimeLayer",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "ResultLayer",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "PlanOverlayLayer",
+          "line": 2,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 5,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/i18n/package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 10,
+      "nonEmptyLines": 10,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "private",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "type",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "exports",
+          "level": 1,
+          "line": 6
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 5
+      }
+    },
+    {
+      "path": "packages/i18n/src/messages/en.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1637,
+      "nonEmptyLines": 1637,
+      "sections": [
+        {
+          "heading": "nav",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "locale",
+          "level": 1,
+          "line": 13
+        },
+        {
+          "heading": "common",
+          "level": 1,
+          "line": 18
+        },
+        {
+          "heading": "metadata",
+          "level": 1,
+          "line": 26
+        },
+        {
+          "heading": "components",
+          "level": 1,
+          "line": 30
+        },
+        {
+          "heading": "queries",
+          "level": 1,
+          "line": 1280
+        },
+        {
+          "heading": "pages",
+          "level": 1,
+          "line": 1339
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": "packages/i18n/src/messages/zh.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1637,
+      "nonEmptyLines": 1637,
+      "sections": [
+        {
+          "heading": "nav",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "locale",
+          "level": 1,
+          "line": 13
+        },
+        {
+          "heading": "common",
+          "level": 1,
+          "line": 18
+        },
+        {
+          "heading": "metadata",
+          "level": 1,
+          "line": 26
+        },
+        {
+          "heading": "components",
+          "level": 1,
+          "line": 30
+        },
+        {
+          "heading": "queries",
+          "level": 1,
+          "line": 1280
+        },
+        {
+          "heading": "pages",
+          "level": 1,
+          "line": 1339
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": "packages/integrations/package.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 13,
+      "nonEmptyLines": 13,
+      "sections": [
+        {
+          "heading": "name",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "version",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "private",
+          "level": 1,
+          "line": 4
+        },
+        {
+          "heading": "type",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "heading": "dependencies",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "exports",
+          "level": 1,
+          "line": 9
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 6
+      }
+    },
+    {
+      "path": "packages/integrations/src/calendar/feed-client.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/integrations/src/calendar/fixtures/all-day.ics",
+      "language": "ics",
+      "fileCategory": "code",
+      "totalLines": 12,
+      "nonEmptyLines": 12,
+      "metrics": {}
+    }
+  ]
+}

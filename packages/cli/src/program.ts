@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { buildControlPayload, sendControlAction, UsageError, ConfigError } from "@chrona-org/agent-cli";
 import { installHermesPlugin, type InstallHermesPluginOptions } from "./hermes-plugin.js";
 import {
   detectHermesEnvironment,
@@ -10,6 +11,47 @@ import {
   type HermesDiagnostics,
   type HermesSetupPlan,
 } from "./integrations/hermes/index.js";
+
+export type NodeDispatchResult = {
+  code: 0 | 1;
+  stdout: string;
+  stderr: string;
+};
+
+/**
+ * Dispatch `chrona node <verb>` (and `chrona task read` / `chrona plan read`)
+ * directly to the agent-cli library without going through Commander. The
+ * reason: the verb is a free-form positional that doesn't fit Commander's
+ * strict subcommand schema, and we want zero surprising option parsing.
+ */
+export async function dispatchNodeCommand(argv: readonly string[]): Promise<NodeDispatchResult> {
+  const stdoutChunks: string[] = [];
+  const stderrChunks: string[] = [];
+  try {
+    const { body } = buildControlPayload([...argv]);
+    const result = await sendControlAction(body, {
+      env: {
+        CHRONA_BASE_URL: process.env.CHRONA_BASE_URL,
+        CHRONA_RUN_TOKEN: process.env.CHRONA_RUN_TOKEN,
+      },
+      fetchImpl: fetch,
+    });
+    stdoutChunks.push(`${JSON.stringify(result)}\n`);
+    return { code: 0, stdout: stdoutChunks.join(""), stderr: "" };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof UsageError) {
+      stderrChunks.push(`Usage error: ${message}\n`);
+      stderrChunks.push("Usage: chrona node <output|complete|condition-select|wait-complete|block|fail> [...]\n");
+    } else if (error instanceof ConfigError) {
+      stderrChunks.push(`Config error: ${message}\n`);
+      stderrChunks.push("Chrona skill-mode commands require CHRONA_BASE_URL and CHRONA_RUN_TOKEN in env.\n");
+    } else {
+      stderrChunks.push(`Chrona agent command failed: ${message}\n`);
+    }
+    return { code: 1, stdout: stdoutChunks.join(""), stderr: stderrChunks.join("") };
+  }
+}
 
 type HermesCommandOptions = {
   apiKey?: string;
@@ -63,7 +105,7 @@ export function createProgram(): Command {
     .option("--api-key <key>", "Hermes API key")
     .option("--mcp-url <url>", "Chrona MCP endpoint for the plugin")
     .option("--hermes-home <path>", "Hermes home directory")
-    .option("--plugin-dir <path>", "Hermes plugin install directory")
+    .option("--plugin-dir <path>", "Chrona plugin install directory")
     .action(async (options: HermesCommandOptions) => {
       const diagnostics = await detectHermesEnvironment(options);
       const plan = planHermesSetup(diagnostics);
@@ -77,7 +119,7 @@ export function createProgram(): Command {
     .option("--api-key <key>", "Hermes API key; generated when omitted")
     .option("--mcp-url <url>", "Chrona MCP endpoint for the plugin")
     .option("--hermes-home <path>", "Hermes home directory")
-    .option("--plugin-dir <path>", "Hermes plugin install directory")
+    .option("--plugin-dir <path>", "Chrona plugin install directory")
     .option("--skip-enable", "Copy the plugin without enabling it", false)
     .option("--show-api-key", "Print the full Hermes API key", false)
     .action(async (options: HermesCommandOptions) => {
@@ -108,7 +150,7 @@ export function createProgram(): Command {
     .description("Install the Chrona Hermes plugin")
     .option("--hermes-home <path>", "Hermes home directory")
     .option("--mcp-url <url>", "Chrona MCP endpoint for the plugin")
-    .option("--plugin-dir <path>", "Hermes plugin install directory")
+    .option("--plugin-dir <path>", "Chrona plugin install directory")
     .option("--skip-enable", "Copy the plugin without enabling it", false)
     .action(async (options: InstallHermesPluginOptions) => {
       const result = await installHermesPlugin(options);

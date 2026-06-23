@@ -51,7 +51,7 @@ async function seedWorkspaceAndTask(title: string) {
 
 function makeConditionConfig(input: {
   condition: string;
-  evaluationBy: "user" | "system";
+  evaluationBy: "user" | "ai";
   branches: Array<{ label: string; nextNodeId: string }>;
   defaultNextNodeId?: string;
 }): ConditionConfig {
@@ -97,13 +97,13 @@ function makeSingleUserConditionPlan(): CompiledPlan {
   };
 }
 
-function makeUserThenSystemConditionPlan(): CompiledPlan {
+function makeUserThenBlockedTaskPlan(): CompiledPlan {
   return {
-    id: "compiled_user_then_system_condition",
-    editablePlanId: "graph_user_then_system_condition",
+    id: "compiled_user_then_blocked_task",
+    editablePlanId: "graph_user_then_blocked_task",
     sourceVersion: 1,
-    title: "User then system condition",
-    goal: "Resume waiting node, then hit deterministic blocked node",
+    title: "User then blocked task",
+    goal: "Resume waiting node, then hit manual downstream task",
     assumptions: [],
     nodes: [
       {
@@ -123,14 +123,15 @@ function makeUserThenSystemConditionPlan(): CompiledPlan {
       {
         id: "cond_system",
         localId: "cond_system",
-        type: "condition",
-        title: "System gate",
-        description: "Deterministic block for runner test",
-        config: makeConditionConfig({
-          condition: "System-evaluated gate",
-          evaluationBy: "system",
-          branches: [{ label: "continue", nextNodeId: "cond_system" }],
-        }),
+        type: "task",
+        title: "Manual gate",
+        description: "Manual task blocks runner test",
+        executor: "ai",
+        mode: "manual",
+        config: {
+          expectedOutput: "Manual completion",
+          completionCriteria: "Manual task is completed",
+        },
         dependencies: ["cond_user"],
         dependents: [],
       },
@@ -151,26 +152,27 @@ function makeUserThenSystemConditionPlan(): CompiledPlan {
   };
 }
 
-function makeSingleBlockedConditionPlan(): CompiledPlan {
+function makeSingleBlockedTaskPlan(): CompiledPlan {
   return {
-    id: "compiled_single_blocked_condition",
-    editablePlanId: "graph_single_blocked_condition",
+    id: "compiled_single_blocked_task",
+    editablePlanId: "graph_single_blocked_task",
     sourceVersion: 1,
-    title: "Single blocked condition",
-    goal: "Deterministically block execution",
+    title: "Single blocked task",
+    goal: "Manual task blocks execution",
     assumptions: [],
     nodes: [
       {
         id: "cond_blocked",
         localId: "cond_blocked",
-        type: "condition",
-        title: "Blocked gate",
-        description: "System condition blocks until unimplemented evaluator exists",
-        config: makeConditionConfig({
-          condition: "Blocked gate",
-          evaluationBy: "system",
-          branches: [{ label: "continue", nextNodeId: "cond_blocked" }],
-        }),
+        type: "task",
+        title: "Manual gate",
+        description: "Manual task blocks until user handles it",
+        executor: "ai",
+        mode: "manual",
+        config: {
+          expectedOutput: "Manual completion",
+          completionCriteria: "Manual task is completed",
+        },
         dependencies: [],
         dependents: [],
       },
@@ -325,7 +327,7 @@ describe("plan-runner native execution actions", () => {
 
   it("resumes waiting node with input, obsoletes prior waiting result, and continues into blocked downstream node", async () => {
     const { workspace, task } = await seedWorkspaceAndTask("Runner resumes waiting node");
-    const compiledPlan = makeUserThenSystemConditionPlan();
+    const compiledPlan = makeUserThenBlockedTaskPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     const initial = await taskPlanExecution.dispatch({
@@ -525,7 +527,7 @@ describe("plan-runner native execution actions", () => {
 
   it("retries a blocked node by obsoleting prior result and creating a fresh blocked attempt", async () => {
     const { workspace, task } = await seedWorkspaceAndTask("Runner retries blocked node");
-    const compiledPlan = makeSingleBlockedConditionPlan();
+    const compiledPlan = makeSingleBlockedTaskPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     const initial = await taskPlanExecution.dispatch({
@@ -605,7 +607,7 @@ describe("plan-runner native execution actions", () => {
     expect(completedRun?.attempts.map((attempt) => attempt.status)).toEqual(["succeeded", "succeeded"]);
 
     const blockedFlow = await seedWorkspaceAndTask("Runner outcome matrix blocked");
-    const blockedPlan = makeSingleBlockedConditionPlan();
+    const blockedPlan = makeSingleBlockedTaskPlan();
     await seedAcceptedCompiledPlan(blockedFlow.workspace.id, blockedFlow.task.id, blockedPlan);
 
     const blocked = await taskPlanExecution.dispatch({

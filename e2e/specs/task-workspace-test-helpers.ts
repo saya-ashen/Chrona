@@ -138,6 +138,24 @@ export function taskWorkspaceScreenshotName(testInfo: TestInfo, label: string) {
   return `${testInfo.project.name}-${label.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.png`;
 }
 
+/**
+ * Drive a single orchestrator tick through the env-gated test-support route
+ * (`POST /api/test/orchestrator/tick`, mounted only when
+ * `CHRONA_E2E_TEST_ROUTES=1`). Deterministic alternative to waiting on the
+ * orchestrator's `setInterval` — the golden-path spec advances the
+ * schedule->auto-execution loop one tick at a time instead of using
+ * wall-clock sleeps (milestone §7.3).
+ */
+export async function triggerOrchestratorTick(request: APIRequestContext) {
+  const response = await request.post("/api/test/orchestrator/tick");
+  if (!response.ok()) {
+    const body = await response.text().catch(() => "<no body>");
+    throw new Error(`triggerOrchestratorTick failed: HTTP ${response.status()} body=${body.slice(0, 300)}`);
+  }
+  const body = (await response.json()) as { ok?: boolean };
+  expect(body.ok).toBe(true);
+}
+
 export async function setTaskWorkspaceViewport(page: Page, viewport: TaskWorkspaceViewport) {
   const size = viewport === "desktop"
     ? { width: 1440, height: 900 }

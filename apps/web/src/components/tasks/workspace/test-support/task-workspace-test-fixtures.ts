@@ -1,5 +1,6 @@
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { buildTaskHeaderSpec, type TaskHeaderActionInput, type UiDocument } from "@chrona/ui-protocol";
+import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { TaskPageData } from "../model/task-workspace-types";
 
 type TaskWorkspaceFixturePageOverrides = Omit<Partial<TaskPageData>, "task"> & {
@@ -297,5 +298,84 @@ export const taskWorkspaceStateFixtures = {
         nextAction: "Confirm evidence and provide launch approval notes before continuing.",
       }),
     ], "long-current-node"),
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Spec 019 — Plan-state fixtures (4 variants of `aiPlanGenerationStatus`)
+// ---------------------------------------------------------------------------
+//
+// The "Current operation" card redesign (spec 019) has one variant per plan
+// state. These fixtures give tests a stable, minimal `TaskPageData` shape for
+// each. The `savedPlan` sub-objects below supply only the fields the page
+// query actually reads (`id`, `status`, `summary`); the unused graph-shaped
+// fields are cast via `as unknown as <Type>` so type-checking passes without
+// hand-writing 200+ lines of CompiledPlan/EffectivePlan data per fixture.
+//
+// See `specs/019-plan-card-and-accept-tests/plan.md` §2.3.
+
+function makeSavedPlanFixture(
+  status: "draft" | "accepted" | "superseded" | "archived",
+  summary: string,
+): TaskPlanReadModel {
+  // The page query only reads `savedPlan.id`, `savedPlan.status`, and
+  // `savedPlan.summary` (see `task-workspace-query.ts:462-463`). The
+  // remaining `TaskPlanReadModel` fields are present so the type-check
+  // passes, but their contents are placeholders — tests do not assert on
+  // them.
+  return {
+    id: "plan-1",
+    status,
+    revision: 1,
+    prompt: null,
+    summary,
+    updatedAt: "2026-06-13T00:00:00.000Z",
+    generatedBy: null,
+    blueprint: {} as unknown as TaskPlanReadModel["blueprint"],
+    compiledPlan: {} as unknown as TaskPlanReadModel["compiledPlan"],
+    effectivePlan: {} as unknown as TaskPlanReadModel["effectivePlan"],
+  };
+}
+
+export const taskWorkspacePlanStateFixtures = {
+  planIdle: {
+    pageData: createTaskWorkspaceFixturePageData({
+      task: { aiPlanGenerationStatus: "idle", savedPlan: null },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph([], null),
+  },
+  planGenerating: {
+    pageData: createTaskWorkspaceFixturePageData({
+      task: { aiPlanGenerationStatus: "generating", savedPlan: null },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph([], null),
+  },
+  planWaitingAcceptance: {
+    pageData: createTaskWorkspaceFixturePageData({
+      task: {
+        aiPlanGenerationStatus: "waiting_acceptance",
+        savedPlan: makeSavedPlanFixture(
+          "draft",
+          "Research the target user, draft a one-page brief, deliver it to the team channel.",
+        ),
+      },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "n1", status: "pending" }),
+    ], "n1"),
+  },
+  planAccepted: {
+    pageData: createTaskWorkspaceFixturePageData({
+      task: {
+        aiPlanGenerationStatus: "accepted",
+        savedPlan: makeSavedPlanFixture(
+          "accepted",
+          "Research the target user, draft a one-page brief, deliver it to the team channel.",
+        ),
+      },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "n1", status: "pending" }),
+    ], "n1"),
   },
 };

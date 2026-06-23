@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { TaskPlanStatus } from "@/generated/prisma/client";
-import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
+import { generateAndAcceptTaskPlan } from "@/modules/plans/auto-generate-task-plan";
+import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
 import {
   AUTOMATION_TIMING_PRESETS,
   automationTimingOffsetMs,
@@ -101,7 +102,16 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
       continue;
     }
 
-    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
+    // Generation is slow (up to provider timeout) and the orchestrator tick
+    // interval is shorter. Without this guard, the next tick re-arms the
+    // same (task, workBlock) and `startTaskPlanGeneration` throws
+    // `TaskPlanGenerationInFlightError` for every subsequent tick until
+    // the in-flight stream finishes.
+    if (isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: block.id })) {
+      result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "generation_in_flight" });
+      continue;
+    }
+    await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
     fired.add(firedKey);
     result.triggered.push({ taskId: task.id, workBlockId: block.id, reason: "scheduled" });
   }
@@ -136,7 +146,16 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
       continue;
     }
 
-    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: null, accept: task.autoExecute });
+    // Generation is slow (up to provider timeout) and the orchestrator tick
+    // interval is shorter. Without this guard, the next tick re-arms the
+    // same task and `startTaskPlanGeneration` throws
+    // `TaskPlanGenerationInFlightError` for every subsequent tick until
+    // the in-flight stream finishes.
+    if (isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: null })) {
+      result.skipped.push({ taskId: task.id, workBlockId: null, reason: "generation_in_flight" });
+      continue;
+    }
+    await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: null, accept: task.autoExecute });
     fired.add(task.id);
     result.triggered.push({ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" });
   }

@@ -58,7 +58,7 @@ function makeCondition(
     type: "condition",
     title: `Condition ${id}`,
     condition: "Check something",
-    evaluationBy: "system",
+    evaluationBy: "ai",
     branches,
     ...overrides,
   };
@@ -208,20 +208,18 @@ describe("validateEditablePlan", () => {
     ).toBe(true);
   });
 
-  it("8. warns about high-risk task without checkpoint", () => {
+  it("8. does not warn from text-only action heuristics", () => {
     const plan = makePlan(
       "plan_1",
       [makeTask("send_email", { title: "Send email to vendor" })],
       [],
     );
     const result = validateEditablePlan(plan);
-    expect(result.ok).toBe(true); // Warning, not error
-    expect(result.warnings.some((w) => w.message.includes("High-risk"))).toBe(
-      true,
-    );
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([]);
   });
 
-  it("9. accepts high-risk task with preceding checkpoint", () => {
+  it("9. accepts checkpointed action plans without advisory text heuristics", () => {
     const plan = makePlan(
       "plan_1",
       [
@@ -235,7 +233,7 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(true);
-    expect(result.warnings).toHaveLength(0);
+    expect(result.warnings).toEqual([]);
   });
 
   it("10. accepts valid snake_case ids with numbers and underscores", () => {
@@ -253,6 +251,85 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(true);
+  });
+
+  it("10b. accepts multiple entry nodes that converge to one terminal task", () => {
+    const plan = makePlan(
+      "plan_parallel",
+      [makeTask("fetch_a"), makeTask("fetch_b"), makeTask("combine_results")],
+      [
+        { from: "fetch_a", to: "combine_results" },
+        { from: "fetch_b", to: "combine_results" },
+      ],
+    );
+    const result = validateEditablePlan(plan);
+    expect(result.ok).toBe(true);
+  });
+
+  it("10c. rejects dangling extra terminal nodes", () => {
+    const plan = makePlan(
+      "plan_dangling",
+      [makeTask("fetch_data"), makeTask("summarize_data"), makeTask("report_empty")],
+      [{ from: "fetch_data", to: "summarize_data" }],
+    );
+    const result = validateEditablePlan(plan);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.message.includes("exactly one terminal node"))).toBe(true);
+  });
+
+  it("10d. rejects plans ending on a checkpoint", () => {
+    const plan = makePlan(
+      "plan_checkpoint_terminal",
+      [makeTask("fetch_data"), makeCheckpoint("choose_empty")],
+      [{ from: "fetch_data", to: "choose_empty" }],
+    );
+    const result = validateEditablePlan(plan);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.message.includes("terminal node must be a task"))).toBe(true);
+  });
+
+  it("10e. rejects condition branch cycles even without explicit edges", () => {
+    const plan = makePlan(
+      "plan_branch_cycle",
+      [
+        makeCondition("check", [{ label: "again", nextNodeId: "fetch_data" }]),
+        makeTask("fetch_data"),
+      ],
+      [{ from: "fetch_data", to: "check" }],
+    );
+    const result = validateEditablePlan(plan);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.message.includes("DAG"))).toBe(true);
+  });
+
+  it("10f. rejects generated empty-result fallback nodes left unconnected", () => {
+    const plan = makePlan(
+      "plan_generated_orphan",
+      [
+        makeTask("task_fetch_trending"),
+        makeTask("task_parse_repos"),
+        makeCondition("condition_has_repos", [
+          { label: "有数据", nextNodeId: "task_summarize" },
+          { label: "无数据", nextNodeId: "checkpoint_handle_empty" },
+        ]),
+        makeTask("task_summarize"),
+        makeCheckpoint("checkpoint_handle_empty", {
+          checkpointType: "choose",
+          required: false,
+          options: ["重试抓取与解析", "改为输出今日无数据说明", "取消任务"],
+        }),
+        makeTask("task_retry_parse"),
+        makeTask("task_report_empty"),
+      ],
+      [
+        { from: "task_fetch_trending", to: "task_parse_repos" },
+        { from: "task_parse_repos", to: "condition_has_repos" },
+        { from: "task_retry_parse", to: "task_summarize" },
+      ],
+    );
+    const result = validateEditablePlan(plan);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.message.includes("exactly one terminal node"))).toBe(true);
   });
 
   it("11. rejects empty plan", () => {
@@ -289,8 +366,12 @@ describe("validateEditablePlan", () => {
         }),
         makeTask("yes_task"),
         makeTask("no_task"),
+        makeTask("deliver_result"),
       ],
-      [],
+      [
+        { from: "yes_task", to: "deliver_result" },
+        { from: "no_task", to: "deliver_result" },
+      ],
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(true);
@@ -588,7 +669,7 @@ describe("compileEditablePlan", () => {
     expect(compiled.completionPolicy).toEqual({ type: "all_tasks_completed" });
   });
 
-  it("29. carries forward validation warnings", () => {
+  it("29. compiles without text-only validation warnings", () => {
     const plan = makePlan(
       "plan_warn",
       [makeTask("send_email", { title: "Send email" })],
@@ -597,10 +678,7 @@ describe("compileEditablePlan", () => {
 
     const compiled = compileEditablePlan(plan);
 
-    // Warning about high-risk task
-    expect(
-      compiled.validationWarnings.some((w) => w.message.includes("High-risk")),
-    ).toBe(true);
+    expect(compiled.validationWarnings).toEqual([]);
   });
 
   it("30. refuses to compile invalid plan", () => {
@@ -619,10 +697,12 @@ describe("compileEditablePlan", () => {
   it("31. correctly resolves dependencies and dependents", () => {
     const plan = makePlan(
       "plan_dep",
-      [makeTask("a"), makeTask("b"), makeTask("c")],
+      [makeTask("a"), makeTask("b"), makeTask("c"), makeTask("d")],
       [
         { from: "a", to: "b" },
         { from: "a", to: "c" },
+        { from: "b", to: "d" },
+        { from: "c", to: "d" },
       ],
     );
 
@@ -631,6 +711,7 @@ describe("compileEditablePlan", () => {
     const nodeA = compiled.nodes.find((n) => n.localId === "a")!;
     const nodeB = compiled.nodes.find((n) => n.localId === "b")!;
     const nodeC = compiled.nodes.find((n) => n.localId === "c")!;
+    const nodeD = compiled.nodes.find((n) => n.localId === "d")!;
 
     // A has no dependencies, 2 dependents
     expect(nodeA.dependencies).toHaveLength(0);
@@ -638,14 +719,16 @@ describe("compileEditablePlan", () => {
     expect(nodeA.dependents).toContain(nodeB.id);
     expect(nodeA.dependents).toContain(nodeC.id);
 
-    // B depends on A, no dependents
+    // B/C depend on A and converge into D
     expect(nodeB.dependencies).toHaveLength(1);
     expect(nodeB.dependencies[0]).toBe(nodeA.id);
-    expect(nodeB.dependents).toHaveLength(0);
+    expect(nodeB.dependents).toEqual([nodeD.id]);
 
-    // C depends on A, no dependents
     expect(nodeC.dependencies).toHaveLength(1);
     expect(nodeC.dependencies[0]).toBe(nodeA.id);
+    expect(nodeC.dependents).toEqual([nodeD.id]);
+
+    expect(nodeD.dependencies).toEqual(expect.arrayContaining([nodeB.id, nodeC.id]));
   });
 
   it("32. handles condition branches as implicit edges", () => {
@@ -657,8 +740,12 @@ describe("compileEditablePlan", () => {
         }),
         makeTask("do_yes"),
         makeTask("do_no"),
+        makeTask("deliver_result"),
       ],
-      [],
+      [
+        { from: "do_yes", to: "deliver_result" },
+        { from: "do_no", to: "deliver_result" },
+      ],
     );
 
     const compiled = compileEditablePlan(plan);
@@ -694,10 +781,13 @@ describe("compileEditablePlan", () => {
         ),
         makeTask("do_yes"),
         makeTask("do_no"),
+        makeTask("deliver_result"),
       ],
       [
         { from: "check", to: "do_yes" },
         { from: "check", to: "do_no", label: "wrong" },
+        { from: "do_yes", to: "deliver_result" },
+        { from: "do_no", to: "deliver_result" },
       ],
     );
 
@@ -727,8 +817,13 @@ describe("compileEditablePlan", () => {
         }),
         makeTask("do_yes"),
         makeTask("do_no"),
+        makeTask("deliver_result"),
       ],
-      [{ from: "check", to: "do_yes" }],
+      [
+        { from: "check", to: "do_yes" },
+        { from: "do_yes", to: "deliver_result" },
+        { from: "do_no", to: "deliver_result" },
+      ],
     );
 
     const compiled = compileEditablePlan(plan);
@@ -758,7 +853,10 @@ describe("compileEditablePlan", () => {
         }),
         makeCondition("cond", [{ label: "ok", nextNodeId: "t" }]),
       ],
-      [],
+      [
+        { from: "c", to: "w" },
+        { from: "w", to: "t" },
+      ],
     );
 
     const compiled = compileEditablePlan(plan);

@@ -4,6 +4,7 @@ import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/ex
 import type { AgentToolOperationsDeps, ToolAuditContext } from "./types";
 import { requireTaskId, requireWorkspaceId } from "./input-guards";
 import { readAiExecutionView } from "./ai-execution-view";
+import { submitNodeResultActionFromTool } from "./node-result-action";
 
 export function toolCommandContext(operation: ChronaToolOperation, audit?: ToolAuditContext | null) {
   return {
@@ -99,84 +100,22 @@ export async function executeValidatedTool(
       });
     case "chrona.node.read":
       return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
-    case "chrona.node.output": {
-      const body = payload as {
-        outputs: unknown;
-        mode?: "append" | "replace";
-        summary?: string;
-      };
-      return deps.execution.submitNodeResult({
-        taskId: requireTaskId(input),
-        commandContext: toolCommandContext(operation, audit),
-        action: {
-          action: "submit_node_output" as const,
-          sessionId: input.sessionId,
-          outputs: body.outputs,
-          mode: body.mode,
-          summary: body.summary,
-        },
-      });
-    }
+    case "chrona.node.output":
     case "chrona.node.complete":
     case "chrona.node.condition_select":
-    case "chrona.node.wait_complete": {
-      const body = payload as {
-        summary?: string;
-        nodeId?: string;
-        branchRef?: string;
-        decision?: "approved" | "rejected" | "needs_input" | "completed";
-        feedback?: string;
-        prompt?: string;
-        input?: unknown;
-      };
-      const terminalKind = toolName === "chrona.node.condition_select"
-        ? "condition"
-        : toolName === "chrona.node.wait_complete"
-            ? "wait"
-            : "task";
-      return deps.execution.submitNodeResult({
-        taskId: requireTaskId(input),
-        commandContext: toolCommandContext(operation, audit),
-        action: {
-          action: "complete_manual_node" as const,
-          sessionId: input.sessionId,
-          nodeId: body.nodeId,
-          summary: body.summary,
-          output: body.input,
-          terminalKind,
-          branchRef: body.branchRef,
-          decision: body.decision,
-          feedback: body.feedback,
-          prompt: body.prompt,
-        },
-      });
-    }
-    case "chrona.node.block": {
-      const body = payload as {
-        reason: string;
-        actionForm: NonNullable<Extract<Parameters<typeof deps.execution.submitNodeResult>[0]["action"], { action: "block_current_node" }>["actionForm"]>;
-      };
-      return deps.execution.submitNodeResult({
-        taskId: requireTaskId(input),
-        commandContext: toolCommandContext(operation, audit),
-        action: {
-          action: "block_current_node" as const,
-          sessionId: input.sessionId,
-          reason: body.reason,
-          actionForm: body.actionForm,
-        },
-      });
-    }
+    case "chrona.node.wait_complete":
+    case "chrona.node.block":
     case "chrona.node.fail": {
-      const body = payload as { error: string };
+      const action = submitNodeResultActionFromTool({
+        toolName,
+        sessionId: input.sessionId,
+        payload,
+      });
+      if (!action) break;
       return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
         commandContext: toolCommandContext(operation, audit),
-        action: {
-          action: "fail_current_node" as const,
-          sessionId: input.sessionId,
-          error: body.error,
-        },
+        action,
       });
     }
   }

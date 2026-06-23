@@ -182,15 +182,11 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
     props: { direction: "horizontal", gap: "md", align: "center", justify: "between", className: "min-w-0 flex-wrap" },
     children: ["identity", "actions"],
   };
-  elements.identity = { type: "Stack", props: { gap: "xs", className: "min-w-0 flex-1" }, children: ["title-row", "meta-row"] };
-  elements["title-row"] = { type: "Stack", props: { direction: "horizontal", gap: "xs", align: "center", className: "min-w-0 flex-wrap" }, children: ["title", ...statusChildren] };
+  elements.identity = { type: "Stack", props: { gap: "sm", className: "min-w-0 flex-1" }, children: ["title-row", "meta-row"] };
+  elements["title-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: ["title", ...statusChildren] };
   elements.title = { type: "Heading", props: { text: input.title, level: "h1", className: "min-w-0 break-words text-base font-semibold leading-tight tracking-tight text-foreground lg:max-w-[42vw]" } };
-  elements["meta-row"] = { type: "Stack", props: { direction: "horizontal", gap: "xs", align: "center", className: "min-w-0 flex-wrap" }, children: ["summary", ...metaChildren, ...(input.workspaceStateGuidance ? ["guidance"] : [])] };
-  elements.summary = { type: "Text", props: { text: input.progressLabel, variant: "caption" } };
-  if (input.workspaceStateGuidance) {
-    elements.guidance = { type: "Text", props: { text: input.workspaceStateGuidance, variant: "caption", className: "min-w-0 truncate lg:max-w-[38vw]" } };
-  }
-  elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "xs", align: "center", justify: "end", className: "w-full flex-wrap sm:w-auto" }, children: actionChildren };
+  elements["meta-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: ["summary", ...metaChildren, ...(input.workspaceStateGuidance ? ["guidance"] : [])] };
+  elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "w-full flex-wrap sm:w-auto" }, children: actionChildren };
 
   // Inline error banner. Visibility + content are driven by `state.update`
   // pushes on `/plan/generation/error/*` from the workspace SSE bus. The
@@ -204,7 +200,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
 function appendErrorRegion(elements: MutableElements) {
   elements["error-region"] = {
     type: "Stack",
-    props: { direction: "vertical", gap: "xs", className: "mt-2" },
+    props: { direction: "vertical", gap: "sm", className: "mt-2" },
     visible: { $state: "/plan/generation/error/code" },
     children: ["error-alert", "error-actions"],
   };
@@ -218,7 +214,7 @@ function appendErrorRegion(elements: MutableElements) {
   };
   elements["error-actions"] = {
     type: "Stack",
-    props: { direction: "horizontal", gap: "xs", className: "flex-wrap" },
+    props: { direction: "horizontal", gap: "sm", className: "flex-wrap" },
     children: ["error-action-retry", "error-action-edit-instruction", "error-action-cancel"],
   };
   elements["error-action-retry"] = {

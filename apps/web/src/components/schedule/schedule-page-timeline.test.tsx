@@ -47,6 +47,8 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     runnabilitySummary: overrides.runnabilitySummary ?? "Ready",
     parentTaskId: null,
     sourceManaged: overrides.sourceManaged ?? null,
+    autoStartEligible: overrides.autoStartEligible,
+    autoStartReason: overrides.autoStartReason,
   };
 }
 
@@ -298,5 +300,104 @@ describe("DayTimeline", () => {
       new Date(2026, 3, 15, 9, 30, 0, 0),
       new Date(2026, 3, 15, 10, 30, 0, 0),
     );
+  });
+
+  const autoStartReasonCases: Array<{ reason: string; copy: RegExp }> = [
+    { reason: "no_accepted_plan", copy: /No accepted plan/i },
+    { reason: "no_runtime_config", copy: /No execution runtime configured/i },
+    { reason: "invalid_task_status", copy: /Task status can't auto-start/i },
+    { reason: "already_running", copy: /Already running/i },
+    { reason: "requires_human_input", copy: /Waiting for your input/i },
+    { reason: "requires_approval", copy: /Waiting for approval/i },
+    { reason: "runtime_unsupported", copy: /Runtime doesn't support auto-start/i },
+    { reason: "not_scheduled", copy: /Not on a schedule block yet/i },
+  ];
+
+  for (const { reason, copy } of autoStartReasonCases) {
+    it(`shows mapped auto-start copy for ${reason}`, async () => {
+      render(
+        <DayTimeline
+          items={[
+            createScheduledItem({
+              title: "Auto-start blocked task",
+              autoStartEligible: false,
+              autoStartReason: reason,
+            }),
+          ]}
+          dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
+          selectedDay="2026-04-15"
+          draggedItem={null}
+          executionRuntimes={[]}
+          defaultExecutionRuntime="hermes"
+          isPending={false}
+          onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
+          onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+          onScheduledDragStart={vi.fn()}
+          onDragEnd={vi.fn()}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(copy)).toBeInTheDocument();
+      });
+    });
+  }
+
+  it("suppresses the not_due auto-start reason from the timeline card", async () => {
+    render(
+      <DayTimeline
+        items={[
+          createScheduledItem({
+            title: "Future block",
+            autoStartEligible: false,
+            autoStartReason: "not_due",
+          }),
+        ]}
+        dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
+        selectedDay="2026-04-15"
+        draggedItem={null}
+        executionRuntimes={[]}
+        defaultExecutionRuntime="hermes"
+        isPending={false}
+        onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
+        onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+        onScheduledDragStart={vi.fn()}
+        onDragEnd={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Future block/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/Scheduled, not due yet/i)).not.toBeInTheDocument();
+  });
+
+  it("does not show an auto-start reason when the block is eligible", async () => {
+    render(
+      <DayTimeline
+        items={[
+          createScheduledItem({
+            title: "Eligible block",
+            autoStartEligible: true,
+            autoStartReason: null,
+          }),
+        ]}
+        dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
+        selectedDay="2026-04-15"
+        draggedItem={null}
+        executionRuntimes={[]}
+        defaultExecutionRuntime="hermes"
+        isPending={false}
+        onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
+        onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
+        onScheduledDragStart={vi.fn()}
+        onDragEnd={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Eligible block/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/No accepted plan/i)).not.toBeInTheDocument();
   });
 });

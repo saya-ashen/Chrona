@@ -1,0 +1,4045 @@
+{
+  "nodes": [
+    {
+      "id": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "type": "file",
+      "name": "plan-execution-output.bun.test.ts",
+      "filePath": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "summary": "测试文件，覆盖 \"api\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 774,
+      "nonEmptyLines": 703
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createMockProviderClient",
+      "type": "function",
+      "name": "createMockProviderClient",
+      "filePath": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "summary": "函数 createMockProviderClient，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 111
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createMockHermesClient",
+      "type": "function",
+      "name": "createMockHermesClient",
+      "filePath": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "summary": "函数 createMockHermesClient，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 113,
+      "endLine": 189
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createRecoverableHermesClient",
+      "type": "function",
+      "name": "createRecoverableHermesClient",
+      "filePath": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "summary": "函数 createRecoverableHermesClient。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 191,
+      "endLine": 270
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:installMockRegistryClient",
+      "type": "function",
+      "name": "installMockRegistryClient",
+      "filePath": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "summary": "函数 installMockRegistryClient，接受 providerClient, clientType 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 274,
+      "endLine": 283
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createNodeAttempt",
+      "type": "function",
+      "name": "createNodeAttempt",
+      "filePath": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "summary": "函数 createNodeAttempt，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 306,
+      "endLine": 323
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:seedFullSetup",
+      "type": "function",
+      "name": "seedFullSetup",
+      "filePath": "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "summary": "函数 seedFullSetup。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 325,
+      "endLine": 420
+    },
+    {
+      "id": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "type": "file",
+      "name": "provider-bridge-malformed-workflow.bun.test.ts",
+      "filePath": "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "summary": "测试文件，覆盖 \"api\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 194,
+      "nonEmptyLines": 175
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:parseSseEvents",
+      "type": "function",
+      "name": "parseSseEvents",
+      "filePath": "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "summary": "函数 parseSseEvents，接受 text 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 32,
+      "endLine": 42
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:singleTaskPlan",
+      "type": "function",
+      "name": "singleTaskPlan",
+      "filePath": "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "summary": "函数 singleTaskPlan，接受 id 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 44,
+      "endLine": 71
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:createMalformedProviderClient",
+      "type": "function",
+      "name": "createMalformedProviderClient",
+      "filePath": "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "summary": "函数 createMalformedProviderClient，接受 message 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 73,
+      "endLine": 134
+    },
+    {
+      "id": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:seedAcceptedPlan",
+      "type": "function",
+      "name": "seedAcceptedPlan",
+      "filePath": "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "summary": "函数 seedAcceptedPlan。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 143,
+      "endLine": 156
+    },
+    {
+      "id": "file:apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "type": "file",
+      "name": "runtime-event-summary.test.ts",
+      "filePath": "apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "summary": "测试文件，覆盖 \"tasks\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 68,
+      "nonEmptyLines": 64
+    },
+    {
+      "id": "file:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "type": "file",
+      "name": "context-summary-card.tsx",
+      "filePath": "apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "summary": "包含 ContextSummaryCard 函数，属于 \"global-ai-sidebar\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 20,
+      "nonEmptyLines": 19
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx:ContextSummaryCard",
+      "type": "function",
+      "name": "ContextSummaryCard",
+      "filePath": "apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "summary": "函数 ContextSummaryCard，接受 { context } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 20
+    },
+    {
+      "id": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "type": "file",
+      "name": "global-ai-sidebar-provider.tsx",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "包含 createUnsupportedContext、createMessage、createTaskProposal等 函数，属于 \"global-ai-sidebar\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 299,
+      "nonEmptyLines": 275
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createUnsupportedContext",
+      "type": "function",
+      "name": "createUnsupportedContext",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "函数 createUnsupportedContext，接受 locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 64,
+      "endLine": 74
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createMessage",
+      "type": "function",
+      "name": "createMessage",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "函数 createMessage，接受 content, responseKind 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 107,
+      "endLine": 116
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createTaskProposal",
+      "type": "function",
+      "name": "createTaskProposal",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "函数 createTaskProposal，接受 context, action, now, locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 118,
+      "endLine": 141
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createScheduleProposal",
+      "type": "function",
+      "name": "createScheduleProposal",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "函数 createScheduleProposal，接受 context, action, now, locale 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 143,
+      "endLine": 176
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:reducer",
+      "type": "function",
+      "name": "reducer",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "函数 reducer，接受 state, action 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 184,
+      "endLine": 204
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:GlobalAiSidebarProvider",
+      "type": "function",
+      "name": "GlobalAiSidebarProvider",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "函数 GlobalAiSidebarProvider，接受 { children } 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 208,
+      "endLine": 295
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:useGlobalAiSidebar",
+      "type": "function",
+      "name": "useGlobalAiSidebar",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "summary": "函数 useGlobalAiSidebar。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 297,
+      "endLine": 299
+    },
+    {
+      "id": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "type": "file",
+      "name": "global-ai-sidebar.tsx",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "summary": "包含 GlobalAiSidebar 函数，属于 \"global-ai-sidebar\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 81,
+      "nonEmptyLines": 78
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx:GlobalAiSidebar",
+      "type": "function",
+      "name": "GlobalAiSidebar",
+      "filePath": "apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "summary": "函数 GlobalAiSidebar。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 20,
+      "endLine": 81
+    },
+    {
+      "id": "file:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "type": "file",
+      "name": "proposal-preview-card.tsx",
+      "filePath": "apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "summary": "包含 ProposalPreviewCard 函数，属于 \"global-ai-sidebar\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 46,
+      "nonEmptyLines": 44
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx:ProposalPreviewCard",
+      "type": "function",
+      "name": "ProposalPreviewCard",
+      "filePath": "apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "summary": "函数 ProposalPreviewCard，接受 { proposal } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 46
+    },
+    {
+      "id": "file:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "type": "file",
+      "name": "quick-action-list.tsx",
+      "filePath": "apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "summary": "包含 QuickActionList 函数，属于 \"global-ai-sidebar\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 29,
+      "nonEmptyLines": 27
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx:QuickActionList",
+      "type": "function",
+      "name": "QuickActionList",
+      "filePath": "apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "summary": "函数 QuickActionList，接受 { actions, onAction } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 29
+    },
+    {
+      "id": "file:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "type": "file",
+      "name": "schedule-ghost-block-layer.tsx",
+      "filePath": "apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "summary": "包含 ScheduleGhostBlockLayer 函数，属于 \"global-ai-sidebar\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility",
+        "component"
+      ],
+      "language": "typescript",
+      "sizeLines": 29,
+      "nonEmptyLines": 26
+    },
+    {
+      "id": "function:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx:ScheduleGhostBlockLayer",
+      "type": "function",
+      "name": "ScheduleGhostBlockLayer",
+      "filePath": "apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "summary": "函数 ScheduleGhostBlockLayer，接受 { preview, mapMinuteToY } 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 29
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts",
+      "type": "file",
+      "name": "task-workspace-primary-action.test.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts",
+      "summary": "测试文件，覆盖 \"model\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 162,
+      "nonEmptyLines": 150
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts:input",
+      "type": "function",
+      "name": "input",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts",
+      "summary": "函数 input，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 32
+    },
+    {
+      "id": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "type": "file",
+      "name": "task-workspace-primary-action.ts",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "summary": "包含 dispatchInputForPrimaryAction、primaryActionTone、resolveCommandCenterPrimaryAction 函数，属于 \"model\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 171,
+      "nonEmptyLines": 159
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:dispatchInputForPrimaryAction",
+      "type": "function",
+      "name": "dispatchInputForPrimaryAction",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "summary": "函数 dispatchInputForPrimaryAction，接受 action, nodeId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 49
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:primaryActionTone",
+      "type": "function",
+      "name": "primaryActionTone",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "summary": "函数 primaryActionTone，接受 action 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 51,
+      "endLine": 70
+    },
+    {
+      "id": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:resolveCommandCenterPrimaryAction",
+      "type": "function",
+      "name": "resolveCommandCenterPrimaryAction",
+      "filePath": "apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "summary": "函数 resolveCommandCenterPrimaryAction，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 93,
+      "endLine": 171
+    },
+    {
+      "id": "file:packages/contracts/src/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/contracts/src/index.ts",
+      "summary": "聚合导出\"src\"模块的公共 API。",
+      "complexity": "complex",
+      "tags": [
+        "barrel"
+      ],
+      "language": "typescript",
+      "sizeLines": 399,
+      "nonEmptyLines": 372
+    },
+    {
+      "id": "file:packages/domain/src/ai-sidebar/proposal-state.bun.test.ts",
+      "type": "file",
+      "name": "proposal-state.bun.test.ts",
+      "filePath": "packages/domain/src/ai-sidebar/proposal-state.bun.test.ts",
+      "summary": "测试文件，覆盖 \"ai-sidebar\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 42,
+      "nonEmptyLines": 37
+    },
+    {
+      "id": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "type": "file",
+      "name": "proposal-state.ts",
+      "filePath": "packages/domain/src/ai-sidebar/proposal-state.ts",
+      "summary": "包含 isProposalStale、syncProposalConfirmability、canConfirmProposal等 函数，属于 \"ai-sidebar\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 31,
+      "nonEmptyLines": 27
+    },
+    {
+      "id": "function:packages/domain/src/ai-sidebar/proposal-state.ts:isProposalStale",
+      "type": "function",
+      "name": "isProposalStale",
+      "filePath": "packages/domain/src/ai-sidebar/proposal-state.ts",
+      "summary": "函数 isProposalStale，接受 proposal, context 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 8
+    },
+    {
+      "id": "function:packages/domain/src/ai-sidebar/proposal-state.ts:syncProposalConfirmability",
+      "type": "function",
+      "name": "syncProposalConfirmability",
+      "filePath": "packages/domain/src/ai-sidebar/proposal-state.ts",
+      "summary": "函数 syncProposalConfirmability，接受 proposal, context 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 19
+    },
+    {
+      "id": "function:packages/domain/src/ai-sidebar/proposal-state.ts:canConfirmProposal",
+      "type": "function",
+      "name": "canConfirmProposal",
+      "filePath": "packages/domain/src/ai-sidebar/proposal-state.ts",
+      "summary": "函数 canConfirmProposal，接受 proposal 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 21,
+      "endLine": 23
+    },
+    {
+      "id": "function:packages/domain/src/ai-sidebar/proposal-state.ts:replacePendingProposal",
+      "type": "function",
+      "name": "replacePendingProposal",
+      "filePath": "packages/domain/src/ai-sidebar/proposal-state.ts",
+      "summary": "函数 replacePendingProposal，接受 current, next 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 25,
+      "endLine": 31
+    },
+    {
+      "id": "file:packages/domain/src/ai-sidebar/summarize-context.bun.test.ts",
+      "type": "file",
+      "name": "summarize-context.bun.test.ts",
+      "filePath": "packages/domain/src/ai-sidebar/summarize-context.bun.test.ts",
+      "summary": "测试文件，覆盖 \"ai-sidebar\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 34,
+      "nonEmptyLines": 32
+    },
+    {
+      "id": "file:packages/domain/src/ai-sidebar/summarize-context.ts",
+      "type": "file",
+      "name": "summarize-context.ts",
+      "filePath": "packages/domain/src/ai-sidebar/summarize-context.ts",
+      "summary": "包含 formatContextSummary、formatPrimaryAction 函数，属于 \"ai-sidebar\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 12,
+      "nonEmptyLines": 10
+    },
+    {
+      "id": "function:packages/domain/src/ai-sidebar/summarize-context.ts:formatContextSummary",
+      "type": "function",
+      "name": "formatContextSummary",
+      "filePath": "packages/domain/src/ai-sidebar/summarize-context.ts",
+      "summary": "函数 formatContextSummary，接受 context 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 8
+    },
+    {
+      "id": "function:packages/domain/src/ai-sidebar/summarize-context.ts:formatPrimaryAction",
+      "type": "function",
+      "name": "formatPrimaryAction",
+      "filePath": "packages/domain/src/ai-sidebar/summarize-context.ts",
+      "summary": "函数 formatPrimaryAction，接受 context 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 10,
+      "endLine": 12
+    },
+    {
+      "id": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "type": "file",
+      "name": "action-mapping.ts",
+      "filePath": "packages/domain/src/assistant-surface/action-mapping.ts",
+      "summary": "包含 getPreviewSurfaceForAction、assistantActionRequiresPreview、normalizeAssistantAction等 函数，属于 \"assistant-surface\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 32,
+      "nonEmptyLines": 27
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/action-mapping.ts:getPreviewSurfaceForAction",
+      "type": "function",
+      "name": "getPreviewSurfaceForAction",
+      "filePath": "packages/domain/src/assistant-surface/action-mapping.ts",
+      "summary": "函数 getPreviewSurfaceForAction，接受 actionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 12,
+      "endLine": 14
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/action-mapping.ts:assistantActionRequiresPreview",
+      "type": "function",
+      "name": "assistantActionRequiresPreview",
+      "filePath": "packages/domain/src/assistant-surface/action-mapping.ts",
+      "summary": "函数 assistantActionRequiresPreview，接受 actionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 16,
+      "endLine": 18
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/action-mapping.ts:normalizeAssistantAction",
+      "type": "function",
+      "name": "normalizeAssistantAction",
+      "filePath": "packages/domain/src/assistant-surface/action-mapping.ts",
+      "summary": "函数 normalizeAssistantAction，接受 action 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 20,
+      "endLine": 28
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/action-mapping.ts:isAssistantActionRunnable",
+      "type": "function",
+      "name": "isAssistantActionRunnable",
+      "filePath": "packages/domain/src/assistant-surface/action-mapping.ts",
+      "summary": "函数 isAssistantActionRunnable，接受 action 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 32
+    },
+    {
+      "id": "file:packages/domain/src/assistant-surface/proposal-routing.ts",
+      "type": "file",
+      "name": "proposal-routing.ts",
+      "filePath": "packages/domain/src/assistant-surface/proposal-routing.ts",
+      "summary": "包含 isAssistantPreviewSurface、createAssistantProposalRoute 函数，属于 \"assistant-surface\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 28,
+      "nonEmptyLines": 26
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/proposal-routing.ts:isAssistantPreviewSurface",
+      "type": "function",
+      "name": "isAssistantPreviewSurface",
+      "filePath": "packages/domain/src/assistant-surface/proposal-routing.ts",
+      "summary": "函数 isAssistantPreviewSurface，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 3,
+      "endLine": 5
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/proposal-routing.ts:createAssistantProposalRoute",
+      "type": "function",
+      "name": "createAssistantProposalRoute",
+      "filePath": "packages/domain/src/assistant-surface/proposal-routing.ts",
+      "summary": "函数 createAssistantProposalRoute，接受 {\n  id,\n  surface,\n  label,\n  baseHref,\n  createdAt = new Date().toISOString(),\n} 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 7,
+      "endLine": 28
+    },
+    {
+      "id": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "type": "file",
+      "name": "summary-priority.ts",
+      "filePath": "packages/domain/src/assistant-surface/summary-priority.ts",
+      "summary": "包含 compareAssistantSeverity、sortAssistantSummaries、pickTopAssistantSummary 函数，属于 \"assistant-surface\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 26,
+      "nonEmptyLines": 22
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/summary-priority.ts:compareAssistantSeverity",
+      "type": "function",
+      "name": "compareAssistantSeverity",
+      "filePath": "packages/domain/src/assistant-surface/summary-priority.ts",
+      "summary": "函数 compareAssistantSeverity，接受 a, b 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 13
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/summary-priority.ts:sortAssistantSummaries",
+      "type": "function",
+      "name": "sortAssistantSummaries",
+      "filePath": "packages/domain/src/assistant-surface/summary-priority.ts",
+      "summary": "函数 sortAssistantSummaries，接受 summaries 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 15,
+      "endLine": 17
+    },
+    {
+      "id": "function:packages/domain/src/assistant-surface/summary-priority.ts:pickTopAssistantSummary",
+      "type": "function",
+      "name": "pickTopAssistantSummary",
+      "filePath": "packages/domain/src/assistant-surface/summary-priority.ts",
+      "summary": "函数 pickTopAssistantSummary，接受 summaries 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 19,
+      "endLine": 26
+    },
+    {
+      "id": "file:packages/domain/src/calendar/planning-busy-blocks.bun.test.ts",
+      "type": "file",
+      "name": "planning-busy-blocks.bun.test.ts",
+      "filePath": "packages/domain/src/calendar/planning-busy-blocks.bun.test.ts",
+      "summary": "测试文件，覆盖 \"calendar\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 97,
+      "nonEmptyLines": 90
+    },
+    {
+      "id": "file:packages/domain/src/calendar/planning-busy-blocks.ts",
+      "type": "file",
+      "name": "planning-busy-blocks.ts",
+      "filePath": "packages/domain/src/calendar/planning-busy-blocks.ts",
+      "summary": "包含 overlaps、projectPlanningBusyBlocks 函数，属于 \"calendar\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 53,
+      "nonEmptyLines": 49
+    },
+    {
+      "id": "function:packages/domain/src/calendar/planning-busy-blocks.ts:projectPlanningBusyBlocks",
+      "type": "function",
+      "name": "projectPlanningBusyBlocks",
+      "filePath": "packages/domain/src/calendar/planning-busy-blocks.ts",
+      "summary": "函数 projectPlanningBusyBlocks，接受 {\n  events,\n  scheduledBlocks = [],\n} 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 26,
+      "endLine": 53
+    },
+    {
+      "id": "file:packages/domain/src/task/derive-task-static-state.bun.test.ts",
+      "type": "file",
+      "name": "derive-task-static-state.bun.test.ts",
+      "filePath": "packages/domain/src/task/derive-task-static-state.bun.test.ts",
+      "summary": "测试文件，覆盖 \"task\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 100,
+      "nonEmptyLines": 95
+    },
+    {
+      "id": "file:packages/domain/src/task/derive-task-static-state.ts",
+      "type": "file",
+      "name": "derive-task-static-state.ts",
+      "filePath": "packages/domain/src/task/derive-task-static-state.ts",
+      "summary": "包含 isRuntimeInput、readPathValue、hasConfiguredValue等 函数，属于 \"task\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 79,
+      "nonEmptyLines": 70
+    },
+    {
+      "id": "function:packages/domain/src/task/derive-task-static-state.ts:readPathValue",
+      "type": "function",
+      "name": "readPathValue",
+      "filePath": "packages/domain/src/task/derive-task-static-state.ts",
+      "summary": "函数 readPathValue，接受 input, path 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 33
+    },
+    {
+      "id": "function:packages/domain/src/task/derive-task-static-state.ts:deriveTaskStaticState",
+      "type": "function",
+      "name": "deriveTaskStaticState",
+      "filePath": "packages/domain/src/task/derive-task-static-state.ts",
+      "summary": "函数 deriveTaskStaticState，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 42,
+      "endLine": 79
+    },
+    {
+      "id": "file:packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts",
+      "type": "file",
+      "name": "schedule-proposal-boundaries.bun.test.ts",
+      "filePath": "packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts",
+      "summary": "测试文件，覆盖 \"task\" 模块的功能验证。",
+      "complexity": "moderate",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 64,
+      "nonEmptyLines": 57
+    },
+    {
+      "id": "function:packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts:proposal",
+      "type": "function",
+      "name": "proposal",
+      "filePath": "packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts",
+      "summary": "函数 proposal，接受 overrides 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 16,
+      "endLine": 37
+    },
+    {
+      "id": "file:packages/engine/src/engine.ts",
+      "type": "file",
+      "name": "engine.ts",
+      "filePath": "packages/engine/src/engine.ts",
+      "summary": "包含 createChronaEngine 函数，属于 \"src\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 45,
+      "nonEmptyLines": 42
+    },
+    {
+      "id": "function:packages/engine/src/engine.ts:createChronaEngine",
+      "type": "function",
+      "name": "createChronaEngine",
+      "filePath": "packages/engine/src/engine.ts",
+      "summary": "函数 createChronaEngine，接受 _ports 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 15,
+      "endLine": 43
+    },
+    {
+      "id": "file:packages/engine/src/errors.ts",
+      "type": "file",
+      "name": "errors.ts",
+      "filePath": "packages/engine/src/errors.ts",
+      "summary": "定义了 EngineError 类，包含 isEngineError、engineErrorFromUnknown 函数，属于 \"src\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 79,
+      "nonEmptyLines": 69
+    },
+    {
+      "id": "function:packages/engine/src/errors.ts:isEngineError",
+      "type": "function",
+      "name": "isEngineError",
+      "filePath": "packages/engine/src/errors.ts",
+      "summary": "函数 isEngineError，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 26,
+      "endLine": 28
+    },
+    {
+      "id": "function:packages/engine/src/errors.ts:engineErrorFromUnknown",
+      "type": "function",
+      "name": "engineErrorFromUnknown",
+      "filePath": "packages/engine/src/errors.ts",
+      "summary": "函数 engineErrorFromUnknown，接受 cause, fallbackCode, fallbackMessage 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 30,
+      "endLine": 79
+    },
+    {
+      "id": "class:packages/engine/src/errors.ts:EngineError",
+      "type": "class",
+      "name": "EngineError",
+      "filePath": "packages/engine/src/errors.ts",
+      "summary": "类 EngineError，定义了 1 个方法。",
+      "complexity": "simple",
+      "tags": [
+        "class"
+      ],
+      "startLine": 15,
+      "endLine": 24
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "type": "file",
+      "name": "audit.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "包含 startToolAudit、resolveToolAuditScope、firstValue等 函数，属于 \"agent-tools\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 392,
+      "nonEmptyLines": 375
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/audit.ts:startToolAudit",
+      "type": "function",
+      "name": "startToolAudit",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "函数 startToolAudit，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 13,
+      "endLine": 91
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/audit.ts:resolveToolAuditScope",
+      "type": "function",
+      "name": "resolveToolAuditScope",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "函数 resolveToolAuditScope，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 93,
+      "endLine": 125
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/audit.ts:findToolAuditRun",
+      "type": "function",
+      "name": "findToolAuditRun",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "函数 findToolAuditRun，接受 sessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 138,
+      "endLine": 147
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/audit.ts:findToolAuditProviderRunByNodeAttempt",
+      "type": "function",
+      "name": "findToolAuditProviderRunByNodeAttempt",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "函数 findToolAuditProviderRunByNodeAttempt，接受 taskId, nodeAttemptId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 158,
+      "endLine": 168
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/audit.ts:findToolAuditExecutionSession",
+      "type": "function",
+      "name": "findToolAuditExecutionSession",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "函数 findToolAuditExecutionSession，接受 taskId, sessionId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 170,
+      "endLine": 186
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/audit.ts:finishToolAudit",
+      "type": "function",
+      "name": "finishToolAudit",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "函数 finishToolAudit，接受 audit, operation, result, status 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 205,
+      "endLine": 343
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/audit.ts:nodeTitleForExecutionSession",
+      "type": "function",
+      "name": "nodeTitleForExecutionSession",
+      "filePath": "packages/engine/src/modules/agent-tools/audit.ts",
+      "summary": "函数 nodeTitleForExecutionSession，接受 taskId, planId, nodeId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 345,
+      "endLine": 365
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "type": "file",
+      "name": "dispatch.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/dispatch.ts",
+      "summary": "包含 toolCommandContext、executeValidatedTool、createTaskForTool等 函数，属于 \"agent-tools\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 177,
+      "nonEmptyLines": 173
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/dispatch.ts:toolCommandContext",
+      "type": "function",
+      "name": "toolCommandContext",
+      "filePath": "packages/engine/src/modules/agent-tools/dispatch.ts",
+      "summary": "函数 toolCommandContext，接受 operation, audit 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 27
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/dispatch.ts:executeValidatedTool",
+      "type": "function",
+      "name": "executeValidatedTool",
+      "filePath": "packages/engine/src/modules/agent-tools/dispatch.ts",
+      "summary": "函数 executeValidatedTool，接受 deps, operation, payload, audit 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 29,
+      "endLine": 122
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/dispatch.ts:createTaskForTool",
+      "type": "function",
+      "name": "createTaskForTool",
+      "filePath": "packages/engine/src/modules/agent-tools/dispatch.ts",
+      "summary": "函数 createTaskForTool，接受 deps, input, payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 124,
+      "endLine": 153
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/dispatch.ts:generatePlanForTool",
+      "type": "function",
+      "name": "generatePlanForTool",
+      "filePath": "packages/engine/src/modules/agent-tools/dispatch.ts",
+      "summary": "函数 generatePlanForTool，接受 deps, input, payload 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 155,
+      "endLine": 177
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/index.ts",
+      "summary": "聚合导出\"agent-tools\"模块的公共 API。",
+      "complexity": "simple",
+      "tags": [
+        "barrel",
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 3,
+      "nonEmptyLines": 3
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "type": "file",
+      "name": "input-guards.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/input-guards.ts",
+      "summary": "包含 requireTaskId、requireWorkspaceId 函数，属于 \"agent-tools\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 16,
+      "nonEmptyLines": 14
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/input-guards.ts:requireTaskId",
+      "type": "function",
+      "name": "requireTaskId",
+      "filePath": "packages/engine/src/modules/agent-tools/input-guards.ts",
+      "summary": "函数 requireTaskId，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 4,
+      "endLine": 9
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/input-guards.ts:requireWorkspaceId",
+      "type": "function",
+      "name": "requireWorkspaceId",
+      "filePath": "packages/engine/src/modules/agent-tools/input-guards.ts",
+      "summary": "函数 requireWorkspaceId，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 11,
+      "endLine": 16
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "type": "file",
+      "name": "operations.bun.test.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "summary": "测试文件，覆盖 \"agent-tools\" 模块的功能验证。",
+      "complexity": "complex",
+      "tags": [
+        "test"
+      ],
+      "language": "typescript",
+      "sizeLines": 862,
+      "nonEmptyLines": 809
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:service",
+      "type": "function",
+      "name": "service",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "summary": "函数 service，接受 input 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 9,
+      "endLine": 88
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:serviceWithDispatchError",
+      "type": "function",
+      "name": "serviceWithDispatchError",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "summary": "函数 serviceWithDispatchError，接受 code 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 90,
+      "endLine": 127
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:seedNodeToolAuditRuntime",
+      "type": "function",
+      "name": "seedNodeToolAuditRuntime",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "summary": "函数 seedNodeToolAuditRuntime，接受 taskId 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 129,
+      "endLine": 167
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:testBlueprint",
+      "type": "function",
+      "name": "testBlueprint",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "summary": "函数 testBlueprint，接受 title 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 169,
+      "endLine": 178
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:resetDb",
+      "type": "function",
+      "name": "resetDb",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "summary": "函数 resetDb。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 180,
+      "endLine": 193
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:seedNodeToolAuditFixture",
+      "type": "function",
+      "name": "seedNodeToolAuditFixture",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "summary": "函数 seedNodeToolAuditFixture。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 195,
+      "endLine": 259
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "type": "file",
+      "name": "operations.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "包含 operationId、duplicateKey、asInputRecord等 函数，属于 \"agent-tools\" 模块。",
+      "complexity": "complex",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 388,
+      "nonEmptyLines": 362
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.ts:operationEvidence",
+      "type": "function",
+      "name": "operationEvidence",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "函数 operationEvidence，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 76,
+      "endLine": 86
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.ts:ensureExpectedState",
+      "type": "function",
+      "name": "ensureExpectedState",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "函数 ensureExpectedState，接受 operation, state 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 88,
+      "endLine": 108
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.ts:reasonCodeFromError",
+      "type": "function",
+      "name": "reasonCodeFromError",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "函数 reasonCodeFromError，接受 cause 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 110,
+      "endLine": 128
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.ts:rejectionDiagnostics",
+      "type": "function",
+      "name": "rejectionDiagnostics",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "函数 rejectionDiagnostics，接受 cause 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 130,
+      "endLine": 143
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.ts:createAgentToolOperationsService",
+      "type": "function",
+      "name": "createAgentToolOperationsService",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "函数 createAgentToolOperationsService，接受 deps 参数。",
+      "complexity": "moderate",
+      "tags": [
+        "function"
+      ],
+      "startLine": 145,
+      "endLine": 355
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.ts:ensureFreshBeforeMutation",
+      "type": "function",
+      "name": "ensureFreshBeforeMutation",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "函数 ensureFreshBeforeMutation，接受 deps, operation 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 357,
+      "endLine": 370
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/operations.ts:readCurrentStateForMutation",
+      "type": "function",
+      "name": "readCurrentStateForMutation",
+      "filePath": "packages/engine/src/modules/agent-tools/operations.ts",
+      "summary": "函数 readCurrentStateForMutation，接受 deps, operation 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 372,
+      "endLine": 381
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/state-summary.ts",
+      "type": "file",
+      "name": "state-summary.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/state-summary.ts",
+      "summary": "包含 summarizeUnknownState、affectedFrom 函数，属于 \"agent-tools\" 模块。",
+      "complexity": "simple",
+      "tags": [
+        "utility"
+      ],
+      "language": "typescript",
+      "sizeLines": 43,
+      "nonEmptyLines": 40
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/state-summary.ts:summarizeUnknownState",
+      "type": "function",
+      "name": "summarizeUnknownState",
+      "filePath": "packages/engine/src/modules/agent-tools/state-summary.ts",
+      "summary": "函数 summarizeUnknownState，接受 value 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 1,
+      "endLine": 32
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/state-summary.ts:affectedFrom",
+      "type": "function",
+      "name": "affectedFrom",
+      "filePath": "packages/engine/src/modules/agent-tools/state-summary.ts",
+      "summary": "函数 affectedFrom，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 34,
+      "endLine": 43
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/tool-result.bun.test.ts",
+      "type": "file",
+      "name": "tool-result.bun.test.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.bun.test.ts",
+      "summary": "测试文件，覆盖 \"agent-tools\" 模块的功能验证。",
+      "complexity": "simple",
+      "tags": [
+        "test",
+        "utility",
+        "type-definition"
+      ],
+      "language": "typescript",
+      "sizeLines": 38,
+      "nonEmptyLines": 36
+    },
+    {
+      "id": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "type": "file",
+      "name": "tool-result.ts",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "包含 completedAt、baseResult、acceptedToolResult等 函数，属于 \"agent-tools\" 模块。",
+      "complexity": "moderate",
+      "tags": [
+        "untagged"
+      ],
+      "language": "typescript",
+      "sizeLines": 87,
+      "nonEmptyLines": 78
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/tool-result.ts:baseResult",
+      "type": "function",
+      "name": "baseResult",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "函数 baseResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 23,
+      "endLine": 35
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/tool-result.ts:acceptedToolResult",
+      "type": "function",
+      "name": "acceptedToolResult",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "函数 acceptedToolResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 37,
+      "endLine": 44
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/tool-result.ts:noopToolResult",
+      "type": "function",
+      "name": "noopToolResult",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "函数 noopToolResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 46,
+      "endLine": 53
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/tool-result.ts:duplicateOperationToolResult",
+      "type": "function",
+      "name": "duplicateOperationToolResult",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "函数 duplicateOperationToolResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 55,
+      "endLine": 62
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/tool-result.ts:rejectedToolResult",
+      "type": "function",
+      "name": "rejectedToolResult",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "函数 rejectedToolResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 64,
+      "endLine": 73
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/tool-result.ts:validationErrorToolResult",
+      "type": "function",
+      "name": "validationErrorToolResult",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "函数 validationErrorToolResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 75,
+      "endLine": 80
+    },
+    {
+      "id": "function:packages/engine/src/modules/agent-tools/tool-result.ts:staleStateToolResult",
+      "type": "function",
+      "name": "staleStateToolResult",
+      "filePath": "packages/engine/src/modules/agent-tools/tool-result.ts",
+      "summary": "函数 staleStateToolResult，接受 input 参数。",
+      "complexity": "simple",
+      "tags": [
+        "function"
+      ],
+      "startLine": 82,
+      "endLine": 87
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createMockProviderClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createMockHermesClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createRecoverableHermesClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:installMockRegistryClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:createNodeAttempt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts:seedFullSetup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "test:apps/server/src/__tests__/bun-test-helpers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:apps/server/src/__tests__/bun-test-helpers.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:parseSseEvents",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:singleTaskPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:createMalformedProviderClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "function:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts:seedAcceptedPlan",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "test:apps/server/src/__tests__/bun-test-helpers.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:apps/server/src/routes/api.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:apps/server/src/__tests__/bun-test-helpers.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:apps/server/src/routes/api.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/db/src/generated/prisma/client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/db/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/engine/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+      "target": "file:packages/providers/foundation/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/server/src/routes/tasks/runtime-event-summary.test.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx:ContextSummaryCard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx:ContextSummaryCard",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "target": "file:apps/web/src/lib/utils.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createUnsupportedContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createMessage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createTaskProposal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:createScheduleProposal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:reducer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:GlobalAiSidebarProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:GlobalAiSidebarProvider",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:useGlobalAiSidebar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx:useGlobalAiSidebar",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "file:packages/domain/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "target": "file:packages/i18n/src/locale.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx:GlobalAiSidebar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx:GlobalAiSidebar",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/global-ai-sidebar/context-summary-card.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar-provider.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/ui/sheet.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/ui/button.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/global-ai-sidebar.tsx",
+      "target": "file:apps/web/src/components/ui/sheet.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx:ProposalPreviewCard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx:ProposalPreviewCard",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/proposal-preview-card.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx:QuickActionList",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx:QuickActionList",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/quick-action-list.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx:ScheduleGhostBlockLayer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "target": "function:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx:ScheduleGhostBlockLayer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/global-ai-sidebar/schedule-ghost-block-layer.tsx",
+      "target": "file:apps/web/src/components/schedule/timeline/schedule-page-timeline.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts:input",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:dispatchInputForPrimaryAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:dispatchInputForPrimaryAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:primaryActionTone",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:primaryActionTone",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:resolveCommandCenterPrimaryAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "function:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts:resolveCommandCenterPrimaryAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:apps/web/src/components/tasks/workspace/model/task-workspace-primary-action.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/model/task-workspace-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/schedule-page-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/forms/task-config-form.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/dialogs/task-create-dialog.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-read-model.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/timeline/schedule-page-timeline.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/work/work-page/work-page-types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/client-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/sections/task-workspace-plan-section.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/tasks/create-task.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/tasks/update-task.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/lib/task-actions-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plans/materialize-generated-task-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/providers.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/calendar-source-setup.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/schedule-page-main-panel.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plans/task-planning.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/calendar-source-list.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/server/src/routes/pages/work.routes.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/schedule/calendar-source-actions.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/lib/external-calendar-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/streaming.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/server/src/routes/tasks/execution.routes.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/assistant-surface/assistant-surface-provider.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/orchestration/reconcile-task-state.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plans/task-plan-generation-registry.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plans/materialize-generated-task-plan.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/services/task-plan.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/test/llm-fixture-recorder.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/server/src/routes/assistant-surface.routes.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/server/src/routes/calendar-sources.routes.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/server/src/routes/tasks/runtime-event-summary.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/server/src/services/external-calendar-service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/global-ai-sidebar/conversation-thread.tsx",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/features/generate-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/runtime/ai-service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:scripts/record-llm-fixtures.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/tasks/plan/task-action-node-action.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/feature-normalizers.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-scope.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/plans/generate-task-plan-for-task.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/server/src/services/assistant-surface.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:apps/web/src/components/tasks/workspace/adapters/task-ai-sidebar-adapter.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/management/create-ai-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/contracts/src/index.ts",
+      "target": "file:packages/engine/src/modules/ai/management/update-ai-client.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.bun.test.ts",
+      "target": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:isProposalStale",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:isProposalStale",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:syncProposalConfirmability",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:syncProposalConfirmability",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:canConfirmProposal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:canConfirmProposal",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:replacePendingProposal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "function:packages/domain/src/ai-sidebar/proposal-state.ts:replacePendingProposal",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/summarize-context.bun.test.ts",
+      "target": "file:packages/domain/src/ai-sidebar/summarize-context.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/summarize-context.ts",
+      "target": "function:packages/domain/src/ai-sidebar/summarize-context.ts:formatContextSummary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/summarize-context.ts",
+      "target": "function:packages/domain/src/ai-sidebar/summarize-context.ts:formatContextSummary",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/summarize-context.ts",
+      "target": "function:packages/domain/src/ai-sidebar/summarize-context.ts:formatPrimaryAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/summarize-context.ts",
+      "target": "function:packages/domain/src/ai-sidebar/summarize-context.ts:formatPrimaryAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/ai-sidebar/summarize-context.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:getPreviewSurfaceForAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:getPreviewSurfaceForAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:assistantActionRequiresPreview",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:assistantActionRequiresPreview",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:normalizeAssistantAction",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:normalizeAssistantAction",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:isAssistantActionRunnable",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "function:packages/domain/src/assistant-surface/action-mapping.ts:isAssistantActionRunnable",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/action-mapping.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/proposal-routing.ts",
+      "target": "function:packages/domain/src/assistant-surface/proposal-routing.ts:isAssistantPreviewSurface",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/proposal-routing.ts",
+      "target": "function:packages/domain/src/assistant-surface/proposal-routing.ts:isAssistantPreviewSurface",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/proposal-routing.ts",
+      "target": "function:packages/domain/src/assistant-surface/proposal-routing.ts:createAssistantProposalRoute",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/proposal-routing.ts",
+      "target": "function:packages/domain/src/assistant-surface/proposal-routing.ts:createAssistantProposalRoute",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/proposal-routing.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "target": "function:packages/domain/src/assistant-surface/summary-priority.ts:compareAssistantSeverity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "target": "function:packages/domain/src/assistant-surface/summary-priority.ts:compareAssistantSeverity",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "target": "function:packages/domain/src/assistant-surface/summary-priority.ts:sortAssistantSummaries",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "target": "function:packages/domain/src/assistant-surface/summary-priority.ts:sortAssistantSummaries",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "target": "function:packages/domain/src/assistant-surface/summary-priority.ts:pickTopAssistantSummary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "target": "function:packages/domain/src/assistant-surface/summary-priority.ts:pickTopAssistantSummary",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/assistant-surface/summary-priority.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/calendar/planning-busy-blocks.bun.test.ts",
+      "target": "file:packages/domain/src/calendar/planning-busy-blocks.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/calendar/planning-busy-blocks.ts",
+      "target": "function:packages/domain/src/calendar/planning-busy-blocks.ts:projectPlanningBusyBlocks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/calendar/planning-busy-blocks.ts",
+      "target": "function:packages/domain/src/calendar/planning-busy-blocks.ts:projectPlanningBusyBlocks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/calendar/planning-busy-blocks.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/task/derive-task-static-state.bun.test.ts",
+      "target": "file:packages/domain/src/task/derive-task-static-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/task/derive-task-static-state.ts",
+      "target": "function:packages/domain/src/task/derive-task-static-state.ts:readPathValue",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/task/derive-task-static-state.ts",
+      "target": "function:packages/domain/src/task/derive-task-static-state.ts:deriveTaskStaticState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/task/derive-task-static-state.ts",
+      "target": "function:packages/domain/src/task/derive-task-static-state.ts:deriveTaskStaticState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/domain/src/task/derive-task-static-state.ts",
+      "target": "file:packages/runtime-core/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/task/derive-task-static-state.ts",
+      "target": "file:packages/runtime-core/src/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts",
+      "target": "function:packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts:proposal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/domain/src/task/schedule-proposal-boundaries.bun.test.ts",
+      "target": "file:packages/domain/src/ai-sidebar/proposal-state.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "function:packages/engine/src/engine.ts:createChronaEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "function:packages/engine/src/engine.ts:createChronaEngine",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/modules/ai/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/ports.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/ai-clients.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/pages.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/runtime.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-execution.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-lifecycle.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-plan.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-result.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-schedule.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/tasks.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/workspaces.service.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/modules/ai/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/ports.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/ai-clients.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/pages.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/runtime.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-execution.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-lifecycle.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-plan.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-result.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/task-schedule.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/tasks.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/engine.ts",
+      "target": "file:packages/engine/src/services/workspaces.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "function:packages/engine/src/errors.ts:isEngineError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "function:packages/engine/src/errors.ts:isEngineError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "function:packages/engine/src/errors.ts:engineErrorFromUnknown",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "function:packages/engine/src/errors.ts:engineErrorFromUnknown",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "class:packages/engine/src/errors.ts:EngineError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "class:packages/engine/src/errors.ts:EngineError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/plans/materialize-generated-task-plan.bun.test.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/plans/materialize-generated-task-plan.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/plans/task-planning.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-bootstrap.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-command-center.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-header.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-page.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-review-context.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/modules/tasks/get-task-runtime-context.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/ai-clients.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/pages.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/task-execution.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/task-lifecycle.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/task-plan.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/task-result.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/task-schedule.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/tasks.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/errors.ts",
+      "target": "file:packages/engine/src/services/workspaces.service.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:startToolAudit",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:startToolAudit",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:resolveToolAuditScope",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:findToolAuditRun",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:findToolAuditProviderRunByNodeAttempt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:findToolAuditExecutionSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:finishToolAudit",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:finishToolAudit",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/audit.ts:nodeTitleForExecutionSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "target": "file:packages/engine/src/modules/events/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/dispatch.ts:toolCommandContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/dispatch.ts:toolCommandContext",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/dispatch.ts:executeValidatedTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/dispatch.ts:executeValidatedTool",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/dispatch.ts:createTaskForTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/dispatch.ts:generatePlanForTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/ai-execution-view.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "target": "file:packages/engine/src/modules/plan-execution/persistence/execution-scope.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/input-guards.ts:requireTaskId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/input-guards.ts:requireTaskId",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/input-guards.ts:requireWorkspaceId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/input-guards.ts:requireWorkspaceId",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:service",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:serviceWithDispatchError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:seedNodeToolAuditRuntime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:testBlueprint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:resetDb",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.bun.test.ts:seedNodeToolAuditFixture",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/engine/src/engine.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:operationEvidence",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:ensureExpectedState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:reasonCodeFromError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:rejectionDiagnostics",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:createAgentToolOperationsService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:createAgentToolOperationsService",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:ensureFreshBeforeMutation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/operations.ts:readCurrentStateForMutation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/errors.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/audit.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/dispatch.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/input-guards.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/state-summary.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/workspaces/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/contracts/src/ai.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/db/src/db.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/types.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/engine/src/modules/workspaces/index.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/operations.ts",
+      "target": "file:packages/shared/src/logger.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/state-summary.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/state-summary.ts:summarizeUnknownState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/state-summary.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/state-summary.ts:summarizeUnknownState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/state-summary.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/state-summary.ts:affectedFrom",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/state-summary.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/state-summary.ts:affectedFrom",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.bun.test.ts",
+      "target": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:baseResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:acceptedToolResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:acceptedToolResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:noopToolResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:noopToolResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:duplicateOperationToolResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:duplicateOperationToolResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:rejectedToolResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:rejectedToolResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:validationErrorToolResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:validationErrorToolResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:staleStateToolResult",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "function:packages/engine/src/modules/agent-tools/tool-result.ts:staleStateToolResult",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/engine/src/modules/agent-tools/tool-result.ts",
+      "target": "file:packages/contracts/src/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    }
+  ]
+}

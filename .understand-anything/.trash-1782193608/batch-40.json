@@ -1,0 +1,61 @@
+{
+  "nodes": [
+    {
+      "id": "config:.omc/state/checkpoints/checkpoint-2026-06-09T09-22-13-966Z.json",
+      "type": "config",
+      "name": "checkpoint-2026-06-09T09-22-13-966Z.json",
+      "filePath": ".omc/state/checkpoints/checkpoint-2026-06-09T09-22-13-966Z.json",
+      "summary": "配置文件 \"checkpoint-2026-06-09T09-22-13-966Z.json\"。",
+      "complexity": "simple",
+      "tags": [
+        "configuration"
+      ],
+      "language": "json",
+      "sizeLines": 16,
+      "nonEmptyLines": 16
+    },
+    {
+      "id": "config:.omc/state/checkpoints/checkpoint-2026-06-09T15-11-06-112Z.json",
+      "type": "config",
+      "name": "checkpoint-2026-06-09T15-11-06-112Z.json",
+      "filePath": ".omc/state/checkpoints/checkpoint-2026-06-09T15-11-06-112Z.json",
+      "summary": "配置文件 \"checkpoint-2026-06-09T15-11-06-112Z.json\"。",
+      "complexity": "simple",
+      "tags": [
+        "configuration"
+      ],
+      "language": "json",
+      "sizeLines": 16,
+      "nonEmptyLines": 16
+    },
+    {
+      "id": "config:.omc/state/checkpoints/checkpoint-2026-06-09T15-45-19-793Z.json",
+      "type": "config",
+      "name": "checkpoint-2026-06-09T15-45-19-793Z.json",
+      "filePath": ".omc/state/checkpoints/checkpoint-2026-06-09T15-45-19-793Z.json",
+      "summary": "配置文件 \"checkpoint-2026-06-09T15-45-19-793Z.json\"。",
+      "complexity": "simple",
+      "tags": [
+        "configuration"
+      ],
+      "language": "json",
+      "sizeLines": 16,
+      "nonEmptyLines": 16
+    },
+    {
+      "id": "config:.omc/state/checkpoints/checkpoint-2026-06-10T09-17-55-436Z.json",
+      "type": "config",
+      "name": "checkpoint-2026-06-10T09-17-55-436Z.json",
+      "filePath": ".omc/state/checkpoints/checkpoint-2026-06-10T09-17-55-436Z.json",
+      "summary": "配置文件 \"checkpoint-2026-06-10T09-17-55-436Z.json\"。",
+      "complexity": "simple",
+      "tags": [
+        "configuration"
+      ],
+      "language": "json",
+      "sizeLines": 16,
+      "nonEmptyLines": 16
+    }
+  ],
+  "edges": []
+}

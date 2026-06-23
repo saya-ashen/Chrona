@@ -44,6 +44,7 @@
     "test:e2e:mobile": "playwright test --project=mobile",
     "test:llm:replay": "bun run chrona test llm:replay",
     "db:generate": "prisma generate",
+    "postinstall": "prisma generate",
     "setup": "bun run db:generate && bun run db:seed",
     "db:seed": "bun prisma/seed.ts",
     "check:boundaries": "bun run chrona check boundaries"
@@ -66,6 +67,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
+    "@copilotkit/aimock": "^1.31.0",
     "@eslint/js": "^9.38.0",
     "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.1",

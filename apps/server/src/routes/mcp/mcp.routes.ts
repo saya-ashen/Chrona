@@ -4,15 +4,17 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { CallToolResult, ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { ChronaEngine } from "@chrona/engine";
-import { createLogger } from "@chrona/shared/logger";
+import { createLogger } from "@chrona/logging";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
+  CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION,
   chronaPublicToolPayloadSchemas,
   chronaToolInputSchema,
   type ChronaToolName,
   type ChronaToolResult,
 } from "@chrona/contracts/api";
+import { chronaNodeOutputSpecJsonSchema } from "@chrona/ui-protocol";
 
 type ExternalChronaToolName = keyof typeof externalTools;
 
@@ -48,6 +50,21 @@ function publicToolSchema(schema: z.ZodObject) {
   });
 }
 
+function publicNodeOutputSchema() {
+  const schema = publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.output"]);
+  schema._zod.toJSONSchema = () => ({
+    type: "object",
+    properties: {
+      spec: chronaNodeOutputSpecJsonSchema,
+      mode: { type: "string", enum: ["append", "replace"] },
+      summary: { type: "string", minLength: 1 },
+    },
+    required: ["spec"],
+    additionalProperties: false,
+  });
+  return schema;
+}
+
 const externalTools = {
   chrona_execution_read: {
     internalName: "chrona.execution.read",
@@ -76,8 +93,8 @@ const externalTools = {
   chrona_node_output: {
     internalName: "chrona.node.output",
     title: "Chrona Node Output",
-    description: "Append or replace user-visible outputs for the current execution node. May be called multiple times before completion.",
-    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.output"]),
+    description: CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION,
+    inputSchema: publicNodeOutputSchema(),
   },
   chrona_node_complete: {
     internalName: "chrona.node.complete",
@@ -116,19 +133,24 @@ const externalTools = {
   inputSchema: z.ZodObject;
 }>;
 
-function sessionIdFrom(input: Record<string, unknown>, extra?: RequestHandlerExtra<ServerRequest, ServerNotification>) {
+function sessionIdFrom(
+  input: Record<string, unknown>,
+  extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  requestSessionId?: string,
+) {
   const meta = input._meta && typeof input._meta === "object" ? input._meta as Record<string, unknown> : undefined;
   const extraMeta = extra?._meta as Record<string, unknown> | undefined;
   assertNoSnakeSessionId(input, "arguments");
   if (meta) assertNoSnakeSessionId(meta, "arguments._meta");
   if (extraMeta) assertNoSnakeSessionId(extraMeta, "extra._meta");
+  assertValidSessionId(requestSessionId, "request.session_id");
   assertValidSessionId(input.sessionId, "arguments.sessionId");
   assertValidSessionId(meta?.sessionId, "arguments._meta.sessionId");
   assertValidSessionId(extraMeta?.sessionId, "extra._meta.sessionId");
   assertValidSessionId(extra?.sessionId, "extra.sessionId");
-  const sessionId = typeof input.sessionId === "string"
+  const sessionId = requestSessionId ?? (typeof input.sessionId === "string"
     ? input.sessionId
-    : meta?.sessionId ?? extraMeta?.sessionId ?? extra?.sessionId;
+    : meta?.sessionId ?? extraMeta?.sessionId ?? extra?.sessionId);
   return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined;
 }
 
@@ -168,14 +190,14 @@ function stableJson(value: unknown): string {
     .join(",")}}`;
 }
 
-function idempotencyKeyFrom(input: Record<string, unknown>, toolName: ChronaToolName, payload: Record<string, unknown>, extra?: RequestHandlerExtra<ServerRequest, ServerNotification>) {
+function idempotencyKeyFrom(input: Record<string, unknown>, toolName: ChronaToolName, payload: Record<string, unknown>, extra?: RequestHandlerExtra<ServerRequest, ServerNotification>, requestSessionId?: string) {
   if (!toolName.endsWith(".read")) {
     const meta = metaFrom(input, extra);
     const explicitKey = meta.idempotencyKey ?? meta.requestId ?? meta.callId ?? input.idempotencyKey;
     if (typeof explicitKey === "string" && explicitKey.length > 0) {
       return explicitKey;
     }
-    const sessionId = sessionIdFrom(input, extra);
+    const sessionId = sessionIdFrom(input, extra, requestSessionId);
     if (!sessionId) {
       throw new Error(`${toolName} requires sessionId for idempotency`);
     }
@@ -228,6 +250,7 @@ function toChronaInput(
   toolName: ChronaToolName,
   input: Record<string, unknown>,
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  requestSessionId?: string,
 ) {
   const payload = { ...input };
   for (const key of hiddenContextKeys) {
@@ -238,13 +261,16 @@ function toChronaInput(
   const evidence = meta.evidence && typeof meta.evidence === "object"
     ? meta.evidence as Record<string, unknown>
     : undefined;
+  const validatedPayload = toolName.endsWith(".read") || toolName === "chrona.schedule.clear"
+    ? {}
+    : chronaPublicToolPayloadSchemas[toolName].parse(payload);
   return {
-    sessionId: sessionIdFrom(input, extra),
+    sessionId: sessionIdFrom(input, extra, requestSessionId),
     actorType: "agent" as const,
-    idempotencyKey: idempotencyKeyFrom(input, toolName, payload, extra),
+    idempotencyKey: idempotencyKeyFrom(input, toolName, payload, extra, requestSessionId),
     expectedRevision,
     evidence,
-    payload: toolName.endsWith(".read") || toolName === "chrona.schedule.clear" ? {} : payload,
+    payload: validatedPayload,
   };
 }
 
@@ -312,11 +338,12 @@ async function callChronaTool(
   toolName: ChronaToolName,
   input: Record<string, unknown>,
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
+  requestSessionId?: string,
 ): Promise<CallToolResult> {
-  const chronaInput = toChronaInput(toolName, input, extra);
+  const chronaInput = toChronaInput(toolName, input, extra, requestSessionId);
   logger.info("tool.call.received", {
     toolName,
-    externalSessionId: sessionIdFrom(input, extra) ?? null,
+    externalSessionId: sessionIdFrom(input, extra, requestSessionId) ?? null,
     inputSessionId: typeof input.sessionId === "string" ? input.sessionId : null,
     inputMetaSessionId: input._meta && typeof input._meta === "object"
       ? (input._meta as Record<string, unknown>).sessionId ?? null
@@ -325,6 +352,7 @@ async function callChronaTool(
     extraMetaSessionId: extra?._meta && typeof extra._meta === "object"
       ? (extra._meta as Record<string, unknown>).sessionId ?? null
       : null,
+    requestSessionId: requestSessionId ?? null,
     payloadKeys: Object.keys(input).filter((key) => key !== "_meta"),
   });
   const resolvedInput = "resolveInputContext" in engine.agentTools
@@ -364,7 +392,7 @@ async function callChronaTool(
   };
 }
 
-function createChronaMcpServer(engine: ChronaEngine) {
+function createChronaMcpServer(engine: ChronaEngine, requestSessionId?: string) {
   const server = new McpServer({ name: "chrona", version: "0.1.0" });
 
   for (const [externalName, tool] of Object.entries(externalTools) as [ExternalChronaToolName, typeof externalTools[ExternalChronaToolName]][]) {
@@ -385,19 +413,28 @@ function createChronaMcpServer(engine: ChronaEngine) {
       (
         input: unknown,
         extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-      ) => callChronaTool(engine, toolName, input as Record<string, unknown>, extra),
+      ) => callChronaTool(engine, toolName, input as Record<string, unknown>, extra, requestSessionId),
     );
   }
 
   return server;
 }
 
+export const __mcpRouteTestHooks = {
+  externalTools,
+  callChronaTool,
+  createChronaMcpServer,
+  sessionIdFrom,
+  toChronaInput,
+};
+
 export function createMcpRoutes(engine: ChronaEngine) {
   return new Hono().all("/mcp", async (c) => {
+    const requestSessionId = c.req.query("session_id") ?? c.req.query("sessionId") ?? undefined;
     const transport = new WebStandardStreamableHTTPServerTransport({
       enableJsonResponse: true,
     });
-    const server = createChronaMcpServer(engine);
+    const server = createChronaMcpServer(engine, requestSessionId);
     await server.connect(transport);
     return transport.handleRequest(c.req.raw);
   });

@@ -17,6 +17,7 @@ import type {
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
+  getAutoStartReasonCopy,
   getSchedulePageCopy,
   TIMELINE_SLOT_MINUTES,
 } from "@/components/schedule/schedule-page-copy";
@@ -68,6 +69,28 @@ function dateForMinute(dayDate: Date, minute: number) {
 
 function fullCalendarTime(hour: number, minute = 0) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+}
+
+function AutoStartReasonNote({ item, copy }: { item: ScheduledItem; copy: ReturnType<typeof getSchedulePageCopy> }) {
+  // `not_due` is the normal steady state, so it stays in the data but is
+  // suppressed from the card surface.
+  const reasonCopy =
+    item.autoStartEligible === false && item.autoStartReason !== "not_due"
+      ? getAutoStartReasonCopy(copy, item.autoStartReason)
+      : null;
+
+  if (!reasonCopy) {
+    return null;
+  }
+
+  return (
+    <p
+      className="truncate text-[10px] text-muted-foreground"
+      title={`${copy.autoStartReasonLabel}: ${reasonCopy}`}
+    >
+      {reasonCopy}
+    </p>
+  );
 }
 
 function buildDragItem(item: ScheduledItem, startAt: Date, endAt: Date): TimelineDragItem {
@@ -552,6 +575,10 @@ export function DayTimeline({
           backgroundColor: `${sourceManaged.sourceColor}18`,
         }
       : undefined;
+    const autoStartReasonCopy = item.autoStartEligible === false && item.autoStartReason !== "not_due"
+      ? getAutoStartReasonCopy(copy, item.autoStartReason)
+      : null;
+    const autoStartReasonTitle = autoStartReasonCopy ? `${copy.autoStartReasonLabel}: ${autoStartReasonCopy}` : undefined;
 
     return (
       <div
@@ -564,6 +591,8 @@ export function DayTimeline({
               : "border-primary/45 bg-primary/12",
         )}
         style={sourceStyle}
+        title={autoStartReasonTitle}
+        aria-label={autoStartReasonTitle ? `${info.event.title}. ${autoStartReasonTitle}` : info.event.title}
         draggable={!isPending}
         onDragStart={() => {
           setHiddenTaskId(item.taskId);
@@ -620,6 +649,7 @@ export function DayTimeline({
               {item.approvalPendingCount ? <Badge variant="secondary">{copy.approvalPending}</Badge> : null}
             </div>
           ) : null}
+          <AutoStartReasonNote item={item} copy={copy} />
         </div>
       </div>
     );

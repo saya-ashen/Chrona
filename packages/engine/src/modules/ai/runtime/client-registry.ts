@@ -1,5 +1,9 @@
 import { HermesProviderClient } from "@chrona/hermes";
 import {
+  CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
+  ClaudeCodeProviderClient,
+} from "@chrona/claude-code";
+import {
   CHRONA_DEBUG_PROVIDER_TYPE,
   ChronaDebugProviderClient,
   normalizeDebugProviderProfile,
@@ -10,6 +14,7 @@ import type {
   AgentProviderClientConfig,
   AiClientRecord,
   AiClientType,
+  ClaudeCodeClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   DebugClientConfig,
@@ -55,6 +60,11 @@ export type EngineDebugClient = EngineAiClient & {
   providerClient: AgentProviderClient;
 };
 
+export type EngineClaudeCodeClient = EngineAiClient & {
+  record: AiClientRecord & { type: "claude_code"; config: ClaudeCodeClientConfig };
+  providerClient: AgentProviderClient;
+};
+
 const clients = new Map<string, EngineAiClient>();
 let defaultClientId: string | null = null;
 let loaded = false;
@@ -68,6 +78,29 @@ function toAiClientRecord(client: StoredAiClient): AiClientRecord {
     isDefault: client.isDefault,
     enabled: client.enabled,
   };
+}
+
+function engineBaseUrl(): string {
+  // The Chrona server publishes itself on CHRONA_PUBLIC_URL when set, then
+  // falls back to the port the HTTP server actually binds. That port comes
+  // from `PORT` (apps/server/src/config/env.ts, default 3101) — NOT
+  // `CHRONA_PORT`, which the server never reads. Using the wrong env name
+  // here defaulted the MCP base URL to :3000 and made every in-process MCP
+  // probe hit an unrelated service (HTTP 405). `CHRONA_PORT` is kept only as
+  // a legacy fallback for older deployments that set it.
+  const explicit = readEnv("CHRONA_PUBLIC_URL");
+  if (explicit) return stripTrailingSlash(explicit);
+  const port = readEnv("PORT") ?? readEnv("CHRONA_PORT") ?? "3101";
+  return `http://localhost:${port}`;
+}
+
+function readEnv(name: string): string | undefined {
+  const v = process.env[name];
+  return v && v.trim().length > 0 ? v.trim() : undefined;
+}
+
+function stripTrailingSlash(s: string): string {
+  return s.endsWith("/") ? s.slice(0, -1) : s;
 }
 
 export function getProviderBaseUrl(
@@ -89,6 +122,20 @@ function createProviderClient(
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
       timeoutMs: config.timeoutMs,
+    });
+  }
+
+  if (record.type === CHRONA_CLAUDE_CODE_PROVIDER_TYPE) {
+    const config = record.config as ClaudeCodeClientConfig;
+    return new ClaudeCodeProviderClient({
+      config: {
+        ...config,
+        // Default the MCP base URL to the engine's own server when the
+        // user did not configure one explicitly. The provider package's
+        // own fallback (localhost:3000) is still consulted inside the
+        // client for `runner` tests; production paths go through here.
+        mcpBaseUrl: config.mcpBaseUrl ?? engineBaseUrl(),
+      },
     });
   }
 

@@ -1,0 +1,3917 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "apps/server/src/__tests__/api/ai-client-crud.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 412,
+      "nonEmptyLines": 351,
+      "functions": [
+        {
+          "name": "createAiClientRouter",
+          "startLine": 22,
+          "endLine": 152,
+          "params": []
+        },
+        {
+          "name": "app",
+          "startLine": 154,
+          "endLine": 158,
+          "params": []
+        },
+        {
+          "name": "createClient",
+          "startLine": 164,
+          "endLine": 170,
+          "params": [
+            "body"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createAiClientRouter",
+          "callee": "api.get",
+          "lineNumber": 25
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "db.aiClient.findMany",
+          "lineNumber": 27
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "httpJson",
+          "lineNumber": 32
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "clients.map",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "client.bindings.map",
+          "lineNumber": 40
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "client.createdAt.toISOString",
+          "lineNumber": 41
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "internalServerError",
+          "lineNumber": 45
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "api.post",
+          "lineNumber": 54
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "c.req.json",
+          "lineNumber": 56
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "createAiClientSchema.safeParse",
+          "lineNumber": 58
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "error",
+          "lineNumber": 60
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "parsed.error.issues\n            .map((e: { path: PropertyKey[]; message: string }) => `${e.path.join(\".\")}: ${e.message}`)\n            .join",
+          "lineNumber": 62
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "parsed.error.issues\n            .map",
+          "lineNumber": 62
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "e.path.join",
+          "lineNumber": 63
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "db.aiClient.updateMany",
+          "lineNumber": 72
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "db.aiClient.create",
+          "lineNumber": 78
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "randomUUID().replace(/-/g, \"\").slice",
+          "lineNumber": 80
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "randomUUID().replace",
+          "lineNumber": 80
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "randomUUID",
+          "lineNumber": 80
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "httpJson",
+          "lineNumber": 90
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "internalServerError",
+          "lineNumber": 92
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "api.patch",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "c.req.param",
+          "lineNumber": 103
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "c.req.json",
+          "lineNumber": 104
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "db.aiClient.findUnique",
+          "lineNumber": 105
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "error",
+          "lineNumber": 110
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "db.aiClient.updateMany",
+          "lineNumber": 114
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "db.aiClient.update",
+          "lineNumber": 120
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "httpJson",
+          "lineNumber": 131
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "internalServerError",
+          "lineNumber": 133
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "api.delete",
+          "lineNumber": 142
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "db.aiClient.delete",
+          "lineNumber": 144
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "c.req.param",
+          "lineNumber": 144
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "httpJson",
+          "lineNumber": 145
+        },
+        {
+          "caller": "createAiClientRouter",
+          "callee": "error",
+          "lineNumber": 147
+        },
+        {
+          "caller": "app",
+          "callee": "a.route",
+          "lineNumber": 156
+        },
+        {
+          "caller": "app",
+          "callee": "createAiClientRouter",
+          "lineNumber": 156
+        },
+        {
+          "caller": "createClient",
+          "callee": "app().request",
+          "lineNumber": 165
+        },
+        {
+          "caller": "createClient",
+          "callee": "app",
+          "lineNumber": 165
+        },
+        {
+          "caller": "createClient",
+          "callee": "JSON.stringify",
+          "lineNumber": 168
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/ai-feature-binding.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 196,
+      "nonEmptyLines": 155,
+      "functions": [
+        {
+          "name": "createBindingRouter",
+          "startLine": 15,
+          "endLine": 66,
+          "params": []
+        },
+        {
+          "name": "app",
+          "startLine": 68,
+          "endLine": 72,
+          "params": []
+        },
+        {
+          "name": "createClient",
+          "startLine": 78,
+          "endLine": 83,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "putBindings",
+          "startLine": 85,
+          "endLine": 91,
+          "params": [
+            "clientId",
+            "features"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createBindingRouter",
+          "callee": "api.put",
+          "lineNumber": 18
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "c.req.param",
+          "lineNumber": 20
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "c.req.json",
+          "lineNumber": 21
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "Array.isArray",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "error",
+          "lineNumber": 25
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "db.aiClient.findUnique",
+          "lineNumber": 28
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "error",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "features.filter",
+          "lineNumber": 34
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "(VALID_AI_FEATURES as readonly string[]).includes",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "db.$transaction",
+          "lineNumber": 39
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "tx.aiFeatureBinding.deleteMany",
+          "lineNumber": 41
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "tx.aiFeatureBinding.deleteMany",
+          "lineNumber": 44
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "tx.aiFeatureBinding.create",
+          "lineNumber": 49
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "randomUUID().replace(/-/g, \"\").slice",
+          "lineNumber": 51
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "randomUUID().replace",
+          "lineNumber": 51
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "randomUUID",
+          "lineNumber": 51
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "httpJson",
+          "lineNumber": 59
+        },
+        {
+          "caller": "createBindingRouter",
+          "callee": "internalServerError",
+          "lineNumber": 61
+        },
+        {
+          "caller": "app",
+          "callee": "a.route",
+          "lineNumber": 70
+        },
+        {
+          "caller": "app",
+          "callee": "createBindingRouter",
+          "lineNumber": 70
+        },
+        {
+          "caller": "createClient",
+          "callee": "db.aiClient.create",
+          "lineNumber": 79
+        },
+        {
+          "caller": "putBindings",
+          "callee": "app().request",
+          "lineNumber": 86
+        },
+        {
+          "caller": "putBindings",
+          "callee": "app",
+          "lineNumber": 86
+        },
+        {
+          "caller": "putBindings",
+          "callee": "JSON.stringify",
+          "lineNumber": 89
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/external-calendar-events.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 176,
+      "nonEmptyLines": 158,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 9,
+          "endLine": 13,
+          "params": []
+        },
+        {
+          "name": "seedSource",
+          "startLine": 15,
+          "endLine": 30,
+          "params": [
+            "workspaceId",
+            "overrides"
+          ]
+        },
+        {
+          "name": "seedImportedEvent",
+          "startLine": 32,
+          "endLine": 69,
+          "params": [
+            "input"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 11
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 11
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 11
+        },
+        {
+          "caller": "seedSource",
+          "callee": "db.calendarSource.create",
+          "lineNumber": 20
+        },
+        {
+          "caller": "seedSource",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 24
+        },
+        {
+          "caller": "seedImportedEvent",
+          "callee": "db.task.create",
+          "lineNumber": 42
+        },
+        {
+          "caller": "seedImportedEvent",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 52
+        },
+        {
+          "caller": "seedImportedEvent",
+          "callee": "db.importedCalendarEvent.create",
+          "lineNumber": 55
+        },
+        {
+          "caller": "seedImportedEvent",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 60
+        },
+        {
+          "caller": "seedImportedEvent",
+          "callee": "crypto.randomUUID",
+          "lineNumber": 61
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/external-calendar-source-management.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 143,
+      "nonEmptyLines": 123,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 13,
+          "endLine": 17,
+          "params": [
+            "transport"
+          ]
+        },
+        {
+          "name": "fixtureUrl",
+          "startLine": 19,
+          "endLine": 21,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "fixture",
+          "startLine": 23,
+          "endLine": 25,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "fixtureTransport",
+          "startLine": 27,
+          "endLine": 30,
+          "params": [
+            "url"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 15
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 15
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 15
+        },
+        {
+          "caller": "fixture",
+          "callee": "readFile",
+          "lineNumber": 24
+        },
+        {
+          "caller": "fixtureTransport",
+          "callee": "new URL(url).pathname.slice",
+          "lineNumber": 28
+        },
+        {
+          "caller": "fixtureTransport",
+          "callee": "fixture",
+          "lineNumber": 29
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/external-calendar-sources.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 232,
+      "nonEmptyLines": 199,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 13,
+          "endLine": 17,
+          "params": [
+            "transport"
+          ]
+        },
+        {
+          "name": "fixtureUrl",
+          "startLine": 19,
+          "endLine": 21,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "fixture",
+          "startLine": 23,
+          "endLine": 25,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "fixtureTransport",
+          "startLine": 27,
+          "endLine": 30,
+          "params": [
+            "url"
+          ]
+        },
+        {
+          "name": "expectImportedFixtureEvent",
+          "startLine": 32,
+          "endLine": 45,
+          "params": [
+            "workspaceId"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 15
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 15
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 15
+        },
+        {
+          "caller": "fixture",
+          "callee": "readFile",
+          "lineNumber": 24
+        },
+        {
+          "caller": "fixtureTransport",
+          "callee": "fixture",
+          "lineNumber": 29
+        },
+        {
+          "caller": "fixtureTransport",
+          "callee": "new URL(url).pathname.slice",
+          "lineNumber": 29
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "db.importedCalendarEvent.findFirstOrThrow",
+          "lineNumber": 33
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect(task).toBeTruthy",
+          "lineNumber": 39
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect",
+          "lineNumber": 39
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect(importedEvent.description).toBe",
+          "lineNumber": 40
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect",
+          "lineNumber": 40
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect(task?.title).toBe",
+          "lineNumber": 41
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect",
+          "lineNumber": 41
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect(task?.description).toBeNull",
+          "lineNumber": 42
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect",
+          "lineNumber": 42
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect(task?.projection?.scheduledStartAt?.toISOString()).toBe",
+          "lineNumber": 43
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect",
+          "lineNumber": 43
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "task?.projection?.scheduledStartAt?.toISOString",
+          "lineNumber": 43
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "importedEvent.startsAt.toISOString",
+          "lineNumber": 43
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect(task?.workBlocks[0]?.scheduledEndAt.toISOString()).toBe",
+          "lineNumber": 44
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "expect",
+          "lineNumber": 44
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "task?.workBlocks[0]?.scheduledEndAt.toISOString",
+          "lineNumber": 44
+        },
+        {
+          "caller": "expectImportedFixtureEvent",
+          "callee": "importedEvent.endsAt.toISOString",
+          "lineNumber": 44
+        },
+        {
+          "caller": "blockedTransport",
+          "callee": "import",
+          "lineNumber": 163
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 5,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/external-task-edit-roundtrip.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 114,
+      "nonEmptyLines": 107,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 8,
+          "endLine": 12,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 10
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 10
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 10
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/plan-execution-module.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 756,
+      "nonEmptyLines": 695,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 35,
+          "endLine": 39,
+          "params": []
+        },
+        {
+          "name": "parseSseEvents",
+          "startLine": 41,
+          "endLine": 51,
+          "params": [
+            "text"
+          ]
+        },
+        {
+          "name": "seedAcceptedCompiledPlan",
+          "startLine": 53,
+          "endLine": 67,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "makeSingleTaskPlan",
+          "startLine": 69,
+          "endLine": 98,
+          "params": [
+            "editablePlanId"
+          ]
+        },
+        {
+          "name": "makeTwoTaskPlan",
+          "startLine": 100,
+          "endLine": 141,
+          "params": [
+            "editablePlanId"
+          ]
+        },
+        {
+          "name": "makeTwoEntryTaskPlan",
+          "startLine": 143,
+          "endLine": 184,
+          "params": [
+            "editablePlanId"
+          ]
+        },
+        {
+          "name": "makeAiConditionBranchPlan",
+          "startLine": 186,
+          "endLine": 262,
+          "params": [
+            "editablePlanId"
+          ]
+        },
+        {
+          "name": "makeInputCheckpointThenTaskPlan",
+          "startLine": 264,
+          "endLine": 311,
+          "params": [
+            "editablePlanId"
+          ]
+        },
+        {
+          "name": "runtimeInputFromRequest",
+          "startLine": 313,
+          "endLine": 317,
+          "params": [
+            "request"
+          ]
+        },
+        {
+          "name": "outputForNode",
+          "startLine": 319,
+          "endLine": 321,
+          "params": [
+            "title"
+          ]
+        },
+        {
+          "name": "structuredPayloadForRequest",
+          "startLine": 323,
+          "endLine": 336,
+          "params": [
+            "request"
+          ]
+        },
+        {
+          "name": "createScriptedProviderClient",
+          "startLine": 338,
+          "endLine": 448,
+          "params": []
+        },
+        {
+          "name": "installMockRegistryClient",
+          "startLine": 450,
+          "endLine": 456,
+          "params": [
+            "providerClient"
+          ]
+        },
+        {
+          "name": "postExecutionAction",
+          "startLine": 458,
+          "endLine": 469,
+          "params": [
+            "server",
+            "taskId",
+            "body"
+          ]
+        },
+        {
+          "name": "postCheckpointAction",
+          "startLine": 471,
+          "endLine": 490,
+          "params": [
+            "server",
+            "taskId",
+            "checkpointId",
+            "body"
+          ]
+        },
+        {
+          "name": "resultFrom",
+          "startLine": 492,
+          "endLine": 496,
+          "params": [
+            "events"
+          ]
+        },
+        {
+          "name": "expectExecutionSse",
+          "startLine": 498,
+          "endLine": 510,
+          "params": [
+            "events",
+            "expectedStatus"
+          ]
+        },
+        {
+          "name": "expectRuntimeSseForNodes",
+          "startLine": 512,
+          "endLine": 523,
+          "params": [
+            "events",
+            "nodeIds"
+          ]
+        },
+        {
+          "name": "expectProviderEvents",
+          "startLine": 525,
+          "endLine": 553,
+          "params": [
+            "taskId",
+            "nodeIds"
+          ]
+        },
+        {
+          "name": "expectNoProviderEventsForNode",
+          "startLine": 555,
+          "endLine": 558,
+          "params": [
+            "taskId",
+            "nodeId"
+          ]
+        },
+        {
+          "name": "expectConversationHistory",
+          "startLine": 560,
+          "endLine": 576,
+          "params": [
+            "taskId",
+            "expectedAssistantTexts"
+          ]
+        },
+        {
+          "name": "getCurrentExecution",
+          "startLine": 578,
+          "endLine": 582,
+          "params": [
+            "server",
+            "taskId"
+          ]
+        },
+        {
+          "name": "setupModuleExecutionTest",
+          "startLine": 584,
+          "endLine": 591,
+          "params": [
+            "compiledPlan",
+            "title"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 37
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 37
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 37
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "text\n    .trim()\n    .split(/\\n\\n+/)\n    .map((chunk) => {\n      const event = chunk.match(/^event: (.+)$/m)?.[1] ?? \"message\";\n      const data = chunk.match(/^data: (.+)$/m)?.[1];\n      return data ? { event, data: JSON.parse(data) as Record<string, unknown> } : null;\n    })\n    .filter",
+          "lineNumber": 42
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "text\n    .trim()\n    .split(/\\n\\n+/)\n    .map",
+          "lineNumber": 42
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "text\n    .trim()\n    .split",
+          "lineNumber": 42
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "text\n    .trim",
+          "lineNumber": 42
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "chunk.match",
+          "lineNumber": 46
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "chunk.match",
+          "lineNumber": 47
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "JSON.parse",
+          "lineNumber": 48
+        },
+        {
+          "caller": "seedAcceptedCompiledPlan",
+          "callee": "saveCompiledPlan",
+          "lineNumber": 58
+        },
+        {
+          "caller": "runtimeInputFromRequest",
+          "callee": "Array.isArray",
+          "lineNumber": 314
+        },
+        {
+          "caller": "structuredPayloadForRequest",
+          "callee": "runtimeInputFromRequest",
+          "lineNumber": 324
+        },
+        {
+          "caller": "structuredPayloadForRequest",
+          "callee": "outputForNode",
+          "lineNumber": 326
+        },
+        {
+          "caller": "structuredPayloadForRequest",
+          "callee": "String",
+          "lineNumber": 326
+        },
+        {
+          "caller": "structuredPayloadForRequest",
+          "callee": "runtimeInput.branchOptions?.find",
+          "lineNumber": 329
+        },
+        {
+          "caller": "checkHealth",
+          "callee": "new Date().toISOString",
+          "lineNumber": 363
+        },
+        {
+          "caller": "createSession",
+          "callee": "Date.now",
+          "lineNumber": 369
+        },
+        {
+          "caller": "createSession",
+          "callee": "new Date().toISOString",
+          "lineNumber": 370
+        },
+        {
+          "caller": "startRun",
+          "callee": "runtimeInputFromRequest",
+          "lineNumber": 376
+        },
+        {
+          "caller": "startRun",
+          "callee": "calls.startRun.push",
+          "lineNumber": 377
+        },
+        {
+          "caller": "startRun",
+          "callee": "calls.nodeTitles.push",
+          "lineNumber": 378
+        },
+        {
+          "caller": "startRun",
+          "callee": "String",
+          "lineNumber": 378
+        },
+        {
+          "caller": "startRun",
+          "callee": "requestsByRunId.set",
+          "lineNumber": 379
+        },
+        {
+          "caller": "streamRun",
+          "callee": "calls.streamRun.push",
+          "lineNumber": 389
+        },
+        {
+          "caller": "streamRun",
+          "callee": "requestsByRunId.get",
+          "lineNumber": 394
+        },
+        {
+          "caller": "streamRun",
+          "callee": "runtimeInputFromRequest",
+          "lineNumber": 399
+        },
+        {
+          "caller": "streamRun",
+          "callee": "String",
+          "lineNumber": 400
+        },
+        {
+          "caller": "streamRun",
+          "callee": "new Date().toISOString",
+          "lineNumber": 408
+        },
+        {
+          "caller": "streamRun",
+          "callee": "outputForNode",
+          "lineNumber": 409
+        },
+        {
+          "caller": "streamRun",
+          "callee": "structuredPayloadForRequest",
+          "lineNumber": 410
+        },
+        {
+          "caller": "postExecutionAction",
+          "callee": "server.request",
+          "lineNumber": 459
+        },
+        {
+          "caller": "postExecutionAction",
+          "callee": "JSON.stringify",
+          "lineNumber": 465
+        },
+        {
+          "caller": "postExecutionAction",
+          "callee": "expect(response.status).toBe",
+          "lineNumber": 467
+        },
+        {
+          "caller": "postExecutionAction",
+          "callee": "expect",
+          "lineNumber": 467
+        },
+        {
+          "caller": "postExecutionAction",
+          "callee": "parseSseEvents",
+          "lineNumber": 468
+        },
+        {
+          "caller": "postExecutionAction",
+          "callee": "response.text",
+          "lineNumber": 468
+        },
+        {
+          "caller": "postCheckpointAction",
+          "callee": "server.request",
+          "lineNumber": 477
+        },
+        {
+          "caller": "postCheckpointAction",
+          "callee": "JSON.stringify",
+          "lineNumber": 485
+        },
+        {
+          "caller": "postCheckpointAction",
+          "callee": "expect(response.status).toBe",
+          "lineNumber": 488
+        },
+        {
+          "caller": "postCheckpointAction",
+          "callee": "expect",
+          "lineNumber": 488
+        },
+        {
+          "caller": "postCheckpointAction",
+          "callee": "parseSseEvents",
+          "lineNumber": 489
+        },
+        {
+          "caller": "postCheckpointAction",
+          "callee": "response.text",
+          "lineNumber": 489
+        },
+        {
+          "caller": "resultFrom",
+          "callee": "events.find",
+          "lineNumber": 493
+        },
+        {
+          "caller": "resultFrom",
+          "callee": "expect(result).toBeDefined",
+          "lineNumber": 494
+        },
+        {
+          "caller": "resultFrom",
+          "callee": "expect",
+          "lineNumber": 494
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect(events.map((entry) => entry.event)).toContain",
+          "lineNumber": 499
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect",
+          "lineNumber": 499
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "events.map",
+          "lineNumber": 499
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect(events.map((entry) => entry.event)).toContain",
+          "lineNumber": 500
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect",
+          "lineNumber": 500
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "events.map",
+          "lineNumber": 500
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect(events.map((entry) => entry.event)).toContain",
+          "lineNumber": 501
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect",
+          "lineNumber": 501
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "events.map",
+          "lineNumber": 501
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect(events.at(-1)?.event).toBe",
+          "lineNumber": 502
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect",
+          "lineNumber": 502
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "events.at",
+          "lineNumber": 502
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect(resultFrom(events).status).toBe",
+          "lineNumber": 503
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect",
+          "lineNumber": 503
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "resultFrom",
+          "lineNumber": 503
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "events.find",
+          "lineNumber": 505
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect(state).toMatchObject",
+          "lineNumber": 506
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect",
+          "lineNumber": 506
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect.objectContaining",
+          "lineNumber": 508
+        },
+        {
+          "caller": "expectExecutionSse",
+          "callee": "expect.any",
+          "lineNumber": 508
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "events\n    .filter((entry) => entry.event === \"runtime_event\")\n    .map",
+          "lineNumber": 513
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "events\n    .filter",
+          "lineNumber": 513
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect(runtimeEvents.length).toBeGreaterThan",
+          "lineNumber": 516
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect",
+          "lineNumber": 516
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "runtimeEvents.filter",
+          "lineNumber": 519
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect(nodeEvents.map((entry) => entry.event?.type)).toContain",
+          "lineNumber": 520
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect",
+          "lineNumber": 520
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "nodeEvents.map",
+          "lineNumber": 520
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect(nodeEvents).toContainEqual",
+          "lineNumber": 521
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect",
+          "lineNumber": 521
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect.objectContaining",
+          "lineNumber": 521
+        },
+        {
+          "caller": "expectRuntimeSseForNodes",
+          "callee": "expect.objectContaining",
+          "lineNumber": 521
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "db.event.findMany",
+          "lineNumber": 526
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(events.length).toBeGreaterThanOrEqual",
+          "lineNumber": 530
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 530
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(new Set(events.map((event: Event) => event.dedupeKey)).size).toBe",
+          "lineNumber": 531
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 531
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "events.map",
+          "lineNumber": 531
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(event.actorType).toBe",
+          "lineNumber": 534
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 534
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(event.actorId).toBe",
+          "lineNumber": 535
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 535
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(payload.provider).toBe",
+          "lineNumber": 537
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 537
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(typeof payload.runId).toBe",
+          "lineNumber": 538
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 538
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(typeof payload.nativeRunId).toBe",
+          "lineNumber": 539
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 539
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(payload.event?.type).toBe",
+          "lineNumber": 540
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 540
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "event.eventType.replace",
+          "lineNumber": 540
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "events.filter",
+          "lineNumber": 544
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(nodeEvents.map((event: Event) => event.eventType)).toEqual",
+          "lineNumber": 545
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 545
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "nodeEvents.map",
+          "lineNumber": 545
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect.arrayContaining",
+          "lineNumber": 545
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect(nodeEvents.every((event: Event) => event.nodeTitle && event.runId)).toBe",
+          "lineNumber": 551
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "expect",
+          "lineNumber": 551
+        },
+        {
+          "caller": "expectProviderEvents",
+          "callee": "nodeEvents.every",
+          "lineNumber": 551
+        },
+        {
+          "caller": "expectNoProviderEventsForNode",
+          "callee": "db.event.count",
+          "lineNumber": 556
+        },
+        {
+          "caller": "expectNoProviderEventsForNode",
+          "callee": "expect(count).toBe",
+          "lineNumber": 557
+        },
+        {
+          "caller": "expectNoProviderEventsForNode",
+          "callee": "expect",
+          "lineNumber": 557
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "db.run.findMany",
+          "lineNumber": 561
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "expect(runs.length).toBeGreaterThanOrEqual",
+          "lineNumber": 562
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "expect",
+          "lineNumber": 562
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "db.conversationEntry.findMany",
+          "lineNumber": 564
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "runs.map",
+          "lineNumber": 565
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "expect(entries.filter((entry: ConversationEntry) => entry.role === \"user\").length).toBeGreaterThanOrEqual",
+          "lineNumber": 568
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "expect",
+          "lineNumber": 568
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "entries.filter",
+          "lineNumber": 568
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "entries\n    .filter((entry: ConversationEntry) => entry.role === \"assistant\")\n    .map",
+          "lineNumber": 570
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "entries\n    .filter",
+          "lineNumber": 570
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "expect(assistantContents).toContain",
+          "lineNumber": 574
+        },
+        {
+          "caller": "expectConversationHistory",
+          "callee": "expect",
+          "lineNumber": 574
+        },
+        {
+          "caller": "getCurrentExecution",
+          "callee": "server.request",
+          "lineNumber": 579
+        },
+        {
+          "caller": "getCurrentExecution",
+          "callee": "expect(response.status).toBe",
+          "lineNumber": 580
+        },
+        {
+          "caller": "getCurrentExecution",
+          "callee": "expect",
+          "lineNumber": 580
+        },
+        {
+          "caller": "getCurrentExecution",
+          "callee": "json",
+          "lineNumber": 581
+        },
+        {
+          "caller": "setupModuleExecutionTest",
+          "callee": "seedWorkspace",
+          "lineNumber": 585
+        },
+        {
+          "caller": "setupModuleExecutionTest",
+          "callee": "seedTask",
+          "lineNumber": 586
+        },
+        {
+          "caller": "setupModuleExecutionTest",
+          "callee": "seedAcceptedCompiledPlan",
+          "lineNumber": 587
+        },
+        {
+          "caller": "setupModuleExecutionTest",
+          "callee": "createScriptedProviderClient",
+          "lineNumber": 588
+        },
+        {
+          "caller": "setupModuleExecutionTest",
+          "callee": "installMockRegistryClient",
+          "lineNumber": 589
+        },
+        {
+          "caller": "setupModuleExecutionTest",
+          "callee": "app",
+          "lineNumber": 590
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 23,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/real-router-smoke.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 509,
+      "nonEmptyLines": 462,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 17,
+          "endLine": 21,
+          "params": []
+        },
+        {
+          "name": "makeSmokeCompiledPlan",
+          "startLine": 23,
+          "endLine": 91,
+          "params": [
+            "planId"
+          ]
+        },
+        {
+          "name": "makeWaitExecutionPlan",
+          "startLine": 93,
+          "endLine": 123,
+          "params": [
+            "planId"
+          ]
+        },
+        {
+          "name": "parseSseEvents",
+          "startLine": 125,
+          "endLine": 134,
+          "params": [
+            "text"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 19
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 19
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 19
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "text\n    .trim()\n    .split(/\\n\\n+/)\n    .map",
+          "lineNumber": 126
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "text\n    .trim()\n    .split",
+          "lineNumber": 126
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "text\n    .trim",
+          "lineNumber": 126
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "chunk.match",
+          "lineNumber": 130
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "chunk.match",
+          "lineNumber": 131
+        },
+        {
+          "caller": "parseSseEvents",
+          "callee": "JSON.parse",
+          "lineNumber": 132
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/schedule-proposal-regression.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 38,
+      "nonEmptyLines": 33,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/task-assistant-message.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 356,
+      "nonEmptyLines": 300,
+      "functions": [
+        {
+          "name": "createAssistantMessageRouter",
+          "startLine": 14,
+          "endLine": 135,
+          "params": []
+        },
+        {
+          "name": "app",
+          "startLine": 137,
+          "endLine": 141,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "api.post",
+          "lineNumber": 17
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "c.req.param",
+          "lineNumber": 19
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "c.req.json",
+          "lineNumber": 20
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "error",
+          "lineNumber": 28
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "error",
+          "lineNumber": 31
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.task.findUnique",
+          "lineNumber": 34
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "error",
+          "lineNumber": 35
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.taskAssistantMessage.findFirst",
+          "lineNumber": 37
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.taskAssistantMessage.create",
+          "lineNumber": 44
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "httpJson",
+          "lineNumber": 54
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "internalServerError",
+          "lineNumber": 66
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "api.get",
+          "lineNumber": 70
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "c.req.param",
+          "lineNumber": 72
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.task.findUnique",
+          "lineNumber": 74
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "error",
+          "lineNumber": 75
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.taskAssistantMessage.findMany",
+          "lineNumber": 77
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "httpJson",
+          "lineNumber": 82
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "messages.map",
+          "lineNumber": 83
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "internalServerError",
+          "lineNumber": 96
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "api.patch",
+          "lineNumber": 100
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "c.req.param",
+          "lineNumber": 102
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "c.req.param",
+          "lineNumber": 103
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.task.findUnique",
+          "lineNumber": 105
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "error",
+          "lineNumber": 106
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.taskAssistantMessage.findFirst",
+          "lineNumber": 108
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "error",
+          "lineNumber": 111
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "db.taskAssistantMessage.update",
+          "lineNumber": 113
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "httpJson",
+          "lineNumber": 118
+        },
+        {
+          "caller": "createAssistantMessageRouter",
+          "callee": "internalServerError",
+          "lineNumber": 130
+        },
+        {
+          "caller": "app",
+          "callee": "a.route",
+          "lineNumber": 139
+        },
+        {
+          "caller": "app",
+          "callee": "createAssistantMessageRouter",
+          "lineNumber": 139
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/task-validation-workflow.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 136,
+      "nonEmptyLines": 112,
+      "functions": [
+        {
+          "name": "createTaskValidationRouter",
+          "startLine": 11,
+          "endLine": 59,
+          "params": []
+        },
+        {
+          "name": "app",
+          "startLine": 61,
+          "endLine": 65,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "api.post",
+          "lineNumber": 14
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "createTaskBodySchema.safeParse",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "c.req.json",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "error",
+          "lineNumber": 18
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "parsed.error.issues.map((issue) => issue.message).join",
+          "lineNumber": 18
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "parsed.error.issues.map",
+          "lineNumber": 18
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "parsed.data.title.trim",
+          "lineNumber": 21
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "error",
+          "lineNumber": 22
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "db.workspace.findUnique",
+          "lineNumber": 24
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "error",
+          "lineNumber": 28
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "c.json",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "createTask",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "toHttpError",
+          "lineNumber": 32
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "error",
+          "lineNumber": 33
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "internalServerError",
+          "lineNumber": 34
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "api.patch",
+          "lineNumber": 38
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "updateTaskBodySchema.safeParse",
+          "lineNumber": 40
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "c.req.json",
+          "lineNumber": 40
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "error",
+          "lineNumber": 42
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "parsed.error.issues.map((issue) => issue.message).join",
+          "lineNumber": 42
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "parsed.error.issues.map",
+          "lineNumber": 42
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "c.json",
+          "lineNumber": 45
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "updateTask",
+          "lineNumber": 45
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "c.req.param",
+          "lineNumber": 45
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "message.includes",
+          "lineNumber": 48
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "message.includes",
+          "lineNumber": 48
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "error",
+          "lineNumber": 49
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "message.includes",
+          "lineNumber": 51
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "message.includes",
+          "lineNumber": 51
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "error",
+          "lineNumber": 52
+        },
+        {
+          "caller": "createTaskValidationRouter",
+          "callee": "internalServerError",
+          "lineNumber": 54
+        },
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 63
+        },
+        {
+          "caller": "app",
+          "callee": "createTaskValidationRouter",
+          "lineNumber": 63
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/task-workspace-activity.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 157,
+      "nonEmptyLines": 143,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 8,
+          "endLine": 12,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 10
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 10
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 10
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/task-workspace-chat.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 117,
+      "nonEmptyLines": 101,
+      "functions": [
+        {
+          "name": "createChatRouter",
+          "startLine": 7,
+          "endLine": 33,
+          "params": []
+        },
+        {
+          "name": "app",
+          "startLine": 35,
+          "endLine": 39,
+          "params": []
+        },
+        {
+          "name": "postChat",
+          "startLine": 41,
+          "endLine": 47,
+          "params": [
+            "body"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createChatRouter",
+          "callee": "api.post",
+          "lineNumber": 10
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "c.req.json",
+          "lineNumber": 12
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "taskWorkspaceChatSchema.safeParse",
+          "lineNumber": 14
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "error",
+          "lineNumber": 16
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "parsed.error.issues\n            .map((e: { path: PropertyKey[]; message: string }) => `${e.path.join(\".\")}: ${e.message}`)\n            .join",
+          "lineNumber": 18
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "parsed.error.issues\n            .map",
+          "lineNumber": 18
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "e.path.join",
+          "lineNumber": 19
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "json",
+          "lineNumber": 26
+        },
+        {
+          "caller": "createChatRouter",
+          "callee": "error",
+          "lineNumber": 28
+        },
+        {
+          "caller": "app",
+          "callee": "a.route",
+          "lineNumber": 37
+        },
+        {
+          "caller": "app",
+          "callee": "createChatRouter",
+          "lineNumber": 37
+        },
+        {
+          "caller": "postChat",
+          "callee": "app().request",
+          "lineNumber": 42
+        },
+        {
+          "caller": "postChat",
+          "callee": "app",
+          "lineNumber": 42
+        },
+        {
+          "caller": "postChat",
+          "callee": "JSON.stringify",
+          "lineNumber": 45
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/api/task-workspace-console.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 453,
+      "nonEmptyLines": 423,
+      "functions": [
+        {
+          "name": "app",
+          "startLine": 10,
+          "endLine": 14,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "app",
+          "callee": "server.route",
+          "lineNumber": 12
+        },
+        {
+          "caller": "app",
+          "callee": "createApiRouter",
+          "lineNumber": 12
+        },
+        {
+          "caller": "app",
+          "callee": "createChronaEngine",
+          "lineNumber": 12
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/bootstrap-runtime.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 15,
+      "nonEmptyLines": 11,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/bun-test-helpers.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 344,
+      "nonEmptyLines": 314,
+      "functions": [
+        {
+          "name": "resetTestDb",
+          "startLine": 16,
+          "endLine": 58,
+          "params": []
+        },
+        {
+          "name": "seedWorkspace",
+          "startLine": 68,
+          "endLine": 73,
+          "params": [
+            "name"
+          ]
+        },
+        {
+          "name": "seedTask",
+          "startLine": 80,
+          "endLine": 100,
+          "params": [
+            "workspaceId",
+            "overrides"
+          ]
+        },
+        {
+          "name": "seedDraftPlan",
+          "startLine": 131,
+          "endLine": 211,
+          "params": [
+            "taskId",
+            "workspaceId",
+            "options"
+          ]
+        },
+        {
+          "name": "seedAcceptedPlan",
+          "startLine": 213,
+          "endLine": 237,
+          "params": [
+            "taskId",
+            "workspaceId",
+            "options"
+          ]
+        },
+        {
+          "name": "seedScheduleProposal",
+          "startLine": 239,
+          "endLine": 270,
+          "params": [
+            "input"
+          ]
+        },
+        {
+          "name": "json",
+          "startLine": 272,
+          "endLine": 274,
+          "params": [
+            "res"
+          ]
+        },
+        {
+          "name": "expectApiError",
+          "startLine": 276,
+          "endLine": 283,
+          "params": [
+            "res",
+            "expectedStatus"
+          ]
+        },
+        {
+          "name": "expectTaskExists",
+          "startLine": 289,
+          "endLine": 293,
+          "params": [
+            "taskId"
+          ]
+        },
+        {
+          "name": "expectTaskNotFound",
+          "startLine": 295,
+          "endLine": 298,
+          "params": [
+            "taskId"
+          ]
+        },
+        {
+          "name": "expectPlanState",
+          "startLine": 300,
+          "endLine": 344,
+          "params": [
+            "taskId",
+            "expected"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "runLiveHermes",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "resetTestDb",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "seedWorkspace",
+          "line": 68,
+          "isDefault": false
+        },
+        {
+          "name": "seedTask",
+          "line": 80,
+          "isDefault": false
+        },
+        {
+          "name": "seedDraftPlan",
+          "line": 131,
+          "isDefault": false
+        },
+        {
+          "name": "seedAcceptedPlan",
+          "line": 213,
+          "isDefault": false
+        },
+        {
+          "name": "seedScheduleProposal",
+          "line": 239,
+          "isDefault": false
+        },
+        {
+          "name": "json",
+          "line": 272,
+          "isDefault": false
+        },
+        {
+          "name": "expectApiError",
+          "line": 276,
+          "isDefault": false
+        },
+        {
+          "name": "expectTaskExists",
+          "line": 289,
+          "isDefault": false
+        },
+        {
+          "name": "expectTaskNotFound",
+          "line": 295,
+          "isDefault": false
+        },
+        {
+          "name": "expectPlanState",
+          "line": 300,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetTestDb",
+          "callee": "assertSafeTestDatabaseUrl",
+          "lineNumber": 17
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.$executeRawUnsafe",
+          "lineNumber": 19
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.aiFeatureBinding.deleteMany",
+          "lineNumber": 21
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.aiClient.deleteMany",
+          "lineNumber": 22
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.importedCalendarEvent.deleteMany",
+          "lineNumber": 23
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.calendarSource.deleteMany",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskAssistantMessage.deleteMany",
+          "lineNumber": 25
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskPlanProviderApproval.deleteMany",
+          "lineNumber": 26
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskPlanProviderRun.deleteMany",
+          "lineNumber": 27
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskPlanNodeAttempt.deleteMany",
+          "lineNumber": 28
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskPlanLayer.deleteMany",
+          "lineNumber": 29
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskPlanRun.deleteMany",
+          "lineNumber": 30
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskPlan.deleteMany",
+          "lineNumber": 31
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.graphMutationRecord.deleteMany",
+          "lineNumber": 32
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.graphVersion.deleteMany",
+          "lineNumber": 33
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.reconciliationEvent.deleteMany",
+          "lineNumber": 34
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.schedulerEvent.deleteMany",
+          "lineNumber": 35
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.scheduleProposal.deleteMany",
+          "lineNumber": 36
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.toolInvocation.deleteMany",
+          "lineNumber": 37
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.conversationEntry.deleteMany",
+          "lineNumber": 38
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.runtimeCursor.deleteMany",
+          "lineNumber": 39
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskTimelineItem.deleteMany",
+          "lineNumber": 40
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.event.deleteMany",
+          "lineNumber": 41
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.rawEventLog.deleteMany",
+          "lineNumber": 42
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.approval.deleteMany",
+          "lineNumber": 43
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.artifact.deleteMany",
+          "lineNumber": 44
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.executionSession.deleteMany",
+          "lineNumber": 45
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.workBlock.deleteMany",
+          "lineNumber": 46
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskProjection.deleteMany",
+          "lineNumber": 47
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.run.deleteMany",
+          "lineNumber": 48
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskSession.deleteMany",
+          "lineNumber": 49
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.taskDependency.deleteMany",
+          "lineNumber": 50
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.memory.deleteMany",
+          "lineNumber": 51
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.task.deleteMany",
+          "lineNumber": 52
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.schedulerLease.deleteMany",
+          "lineNumber": 53
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.workspace.deleteMany",
+          "lineNumber": 54
+        },
+        {
+          "caller": "resetTestDb",
+          "callee": "db.$executeRawUnsafe",
+          "lineNumber": 56
+        },
+        {
+          "caller": "seedWorkspace",
+          "callee": "db.workspace.create",
+          "lineNumber": 69
+        },
+        {
+          "caller": "seedTask",
+          "callee": "db.task.create",
+          "lineNumber": 87
+        },
+        {
+          "caller": "seedDraftPlan",
+          "callee": "JSON.stringify",
+          "lineNumber": 181
+        },
+        {
+          "caller": "seedDraftPlan",
+          "callee": "db.memory.create",
+          "lineNumber": 194
+        },
+        {
+          "caller": "seedAcceptedPlan",
+          "callee": "seedDraftPlan",
+          "lineNumber": 218
+        },
+        {
+          "caller": "seedAcceptedPlan",
+          "callee": "db.memory.findUniqueOrThrow",
+          "lineNumber": 219
+        },
+        {
+          "caller": "seedAcceptedPlan",
+          "callee": "JSON.parse",
+          "lineNumber": 220
+        },
+        {
+          "caller": "seedAcceptedPlan",
+          "callee": "db.memory.update",
+          "lineNumber": 222
+        },
+        {
+          "caller": "seedAcceptedPlan",
+          "callee": "JSON.stringify",
+          "lineNumber": 225
+        },
+        {
+          "caller": "seedScheduleProposal",
+          "callee": "db.scheduleProposal.create",
+          "lineNumber": 250
+        },
+        {
+          "caller": "json",
+          "callee": "res.json",
+          "lineNumber": 273
+        },
+        {
+          "caller": "expectApiError",
+          "callee": "expect(res.status).toBe",
+          "lineNumber": 277
+        },
+        {
+          "caller": "expectApiError",
+          "callee": "expect",
+          "lineNumber": 277
+        },
+        {
+          "caller": "expectApiError",
+          "callee": "await json",
+          "lineNumber": 278
+        },
+        {
+          "caller": "expectApiError",
+          "callee": "body.error.trim",
+          "lineNumber": 279
+        },
+        {
+          "caller": "expectTaskExists",
+          "callee": "db.task.findUnique",
+          "lineNumber": 290
+        },
+        {
+          "caller": "expectTaskNotFound",
+          "callee": "db.task.findUnique",
+          "lineNumber": 296
+        },
+        {
+          "caller": "expectPlanState",
+          "callee": "db.memory.findFirst",
+          "lineNumber": 310
+        },
+        {
+          "caller": "expectPlanState",
+          "callee": "JSON.parse",
+          "lineNumber": 328
+        },
+        {
+          "caller": "expectPlanState",
+          "callee": "JSON.parse",
+          "lineNumber": 337
+        },
+        {
+          "caller": "expectPlanState",
+          "callee": "Array.isArray",
+          "lineNumber": 338
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 12,
+        "functionCount": 11,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/app.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 152,
+      "nonEmptyLines": 121,
+      "functions": [
+        {
+          "name": "getAllowedOrigins",
+          "startLine": 19,
+          "endLine": 21,
+          "params": []
+        },
+        {
+          "name": "resolveOrigin",
+          "startLine": 23,
+          "endLine": 27,
+          "params": [
+            "origin",
+            "allowed"
+          ]
+        },
+        {
+          "name": "wantsHtml",
+          "startLine": 29,
+          "endLine": 31,
+          "params": [
+            "acceptHeader"
+          ]
+        },
+        {
+          "name": "createServerApp",
+          "startLine": 42,
+          "endLine": 152,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "createServerApp",
+          "line": 42,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getAllowedOrigins",
+          "callee": "resolveAllowedOrigins",
+          "lineNumber": 20
+        },
+        {
+          "caller": "getAllowedOrigins",
+          "callee": "readEnv",
+          "lineNumber": 20
+        },
+        {
+          "caller": "resolveOrigin",
+          "callee": "allowed.includes",
+          "lineNumber": 24
+        },
+        {
+          "caller": "resolveOrigin",
+          "callee": "allowed.includes",
+          "lineNumber": 25
+        },
+        {
+          "caller": "wantsHtml",
+          "callee": "acceptHeader.includes",
+          "lineNumber": 30
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "createChronaEngine",
+          "lineNumber": 44
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "createApiRouter",
+          "lineNumber": 45
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "hasSpaDist",
+          "lineNumber": 46
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "getAllowedOrigins",
+          "lineNumber": 47
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.use",
+          "lineNumber": 49
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "apiKeyAuth",
+          "lineNumber": 49
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.use",
+          "lineNumber": 51
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "resolveOrigin",
+          "lineNumber": 52
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.req.header",
+          "lineNumber": 52
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.header",
+          "lineNumber": 54
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.header",
+          "lineNumber": 57
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.header",
+          "lineNumber": 58
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "next",
+          "lineNumber": 63
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.options",
+          "lineNumber": 66
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.body",
+          "lineNumber": 66
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.get",
+          "lineNumber": 68
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.json",
+          "lineNumber": 68
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.route",
+          "lineNumber": 70
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "createSpaAssetMiddleware",
+          "lineNumber": 73
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "createSpaIndexMiddleware",
+          "lineNumber": 74
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.get",
+          "lineNumber": 76
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "getPreferredLocale",
+          "lineNumber": 77
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.req.header",
+          "lineNumber": 78
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.redirect",
+          "lineNumber": 80
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.get",
+          "lineNumber": 83
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "pathname.startsWith",
+          "lineNumber": 86
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "next",
+          "lineNumber": 87
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "next",
+          "lineNumber": 91
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "isSpaAssetPath",
+          "lineNumber": 96
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "serveSpaAsset",
+          "lineNumber": 97
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "pathname.split(\"/\").filter",
+          "lineNumber": 100
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "pathname.split",
+          "lineNumber": 100
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "hasLocale",
+          "lineNumber": 102
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.redirect",
+          "lineNumber": 105
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "pathname.startsWith",
+          "lineNumber": 106
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "serveSpaIndex",
+          "lineNumber": 113
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.notFound",
+          "lineNumber": 117
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "wantsHtml",
+          "lineNumber": 118
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.req.header",
+          "lineNumber": 118
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "getPreferredLocale",
+          "lineNumber": 119
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.req.header",
+          "lineNumber": 119
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.redirect",
+          "lineNumber": 120
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "getApiMessages",
+          "lineNumber": 123
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "getPreferredLocale",
+          "lineNumber": 123
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.req.header",
+          "lineNumber": 123
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.json",
+          "lineNumber": 124
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "app.onError",
+          "lineNumber": 127
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "getApiMessages",
+          "lineNumber": 128
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "getPreferredLocale",
+          "lineNumber": 128
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.req.header",
+          "lineNumber": 128
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "log.warn",
+          "lineNumber": 135
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.json",
+          "lineNumber": 136
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "log.error",
+          "lineNumber": 139
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "String",
+          "lineNumber": 140
+        },
+        {
+          "caller": "createServerApp",
+          "callee": "c.json",
+          "lineNumber": 143
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 1,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/bootstrap-runtime.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 6,
+      "nonEmptyLines": 4,
+      "exports": [
+        {
+          "name": "bootstrapServerRuntime",
+          "line": 6,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/bootstrap.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "exports": [
+        {
+          "name": "bootstrapServerRuntime",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 1,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/config/env.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 37,
+      "nonEmptyLines": 31,
+      "functions": [
+        {
+          "name": "resetEnv",
+          "startLine": 5,
+          "endLine": 10,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetEnv",
+          "callee": "resetEnvCacheForTests",
+          "lineNumber": 9
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/config/env.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 70,
+      "nonEmptyLines": 60,
+      "functions": [
+        {
+          "name": "resetEnvCacheForTests",
+          "startLine": 22,
+          "endLine": 26,
+          "params": []
+        },
+        {
+          "name": "readEnv",
+          "startLine": 28,
+          "endLine": 39,
+          "params": []
+        },
+        {
+          "name": "resolvePort",
+          "startLine": 41,
+          "endLine": 47,
+          "params": [
+            "env"
+          ]
+        },
+        {
+          "name": "resolveAllowedOrigins",
+          "startLine": 49,
+          "endLine": 52,
+          "params": [
+            "env"
+          ]
+        },
+        {
+          "name": "assertSafeBind",
+          "startLine": 54,
+          "endLine": 66,
+          "params": [
+            "env"
+          ]
+        },
+        {
+          "name": "isUnsafePublicBindOverride",
+          "startLine": 68,
+          "endLine": 70,
+          "params": [
+            "env"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "resetEnvCacheForTests",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "readEnv",
+          "line": 28,
+          "isDefault": false
+        },
+        {
+          "name": "resolvePort",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "resolveAllowedOrigins",
+          "line": 49,
+          "isDefault": false
+        },
+        {
+          "name": "assertSafeBind",
+          "line": 54,
+          "isDefault": false
+        },
+        {
+          "name": "isUnsafePublicBindOverride",
+          "line": 68,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "readEnv",
+          "callee": "envSchema.safeParse",
+          "lineNumber": 30
+        },
+        {
+          "caller": "readEnv",
+          "callee": "result.error.issues\n      .map((i) => `  ${i.path.join(\".\")}: ${i.message}`)\n      .join",
+          "lineNumber": 32
+        },
+        {
+          "caller": "readEnv",
+          "callee": "result.error.issues\n      .map",
+          "lineNumber": 32
+        },
+        {
+          "caller": "readEnv",
+          "callee": "i.path.join",
+          "lineNumber": 33
+        },
+        {
+          "caller": "resolvePort",
+          "callee": "Number",
+          "lineNumber": 42
+        },
+        {
+          "caller": "resolvePort",
+          "callee": "Number.isFinite",
+          "lineNumber": 43
+        },
+        {
+          "caller": "resolveAllowedOrigins",
+          "callee": "env.ALLOWED_ORIGINS.split(\",\").map((s) => s.trim()).filter",
+          "lineNumber": 51
+        },
+        {
+          "caller": "resolveAllowedOrigins",
+          "callee": "env.ALLOWED_ORIGINS.split(\",\").map",
+          "lineNumber": 51
+        },
+        {
+          "caller": "resolveAllowedOrigins",
+          "callee": "env.ALLOWED_ORIGINS.split",
+          "lineNumber": 51
+        },
+        {
+          "caller": "resolveAllowedOrigins",
+          "callee": "s.trim",
+          "lineNumber": 51
+        },
+        {
+          "caller": "assertSafeBind",
+          "callee": "[\n      \"Refusing to start Chrona on HOST=0.0.0.0 without API_KEY.\",\n      \"This exposes your local Chrona API to your network.\",\n      \"Set API_KEY for protected access, bind to HOST=127.0.0.1, or explicitly set CHRONA_UNSAFE_PUBLIC_BIND=1 to allow unsafe public binding.\",\n    ].join",
+          "lineNumber": 60
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 6,
+        "functionCount": 6,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/index.bun.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 91,
+      "nonEmptyLines": 78,
+      "functions": [
+        {
+          "name": "startBunServer",
+          "startLine": 13,
+          "endLine": 87,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "startBunServer",
+          "line": 13,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "startBunServer",
+          "callee": "readEnv",
+          "lineNumber": 14
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "resolvePort",
+          "lineNumber": 16
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "assertSafeBind",
+          "lineNumber": 18
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "ensureSqliteDatabase",
+          "lineNumber": 19
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "resolve",
+          "lineNumber": 21
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "bootstrapServerRuntime",
+          "lineNumber": 23
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "createServerApp",
+          "lineNumber": 25
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "isUnsafePublicBindOverride",
+          "lineNumber": 26
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "log.warn",
+          "lineNumber": 27
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "log.warn",
+          "lineNumber": 34
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "resolveAllowedOrigins(env).includes",
+          "lineNumber": 40
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "resolveAllowedOrigins",
+          "lineNumber": 40
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "log.warn",
+          "lineNumber": 41
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "Bun.serve",
+          "lineNumber": 45
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "JSON.stringify",
+          "lineNumber": 51
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "new URL(request.url).pathname.endsWith",
+          "lineNumber": 56
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "server.timeout",
+          "lineNumber": 57
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "app.fetch",
+          "lineNumber": 59
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "log.info",
+          "lineNumber": 63
+        },
+        {
+          "caller": "shutdown",
+          "callee": "log.info",
+          "lineNumber": 68
+        },
+        {
+          "caller": "shutdown",
+          "callee": "server.stop",
+          "lineNumber": 70
+        },
+        {
+          "caller": "shutdown",
+          "callee": "import",
+          "lineNumber": 73
+        },
+        {
+          "caller": "shutdown",
+          "callee": "db.$disconnect",
+          "lineNumber": 74
+        },
+        {
+          "caller": "shutdown",
+          "callee": "log.error",
+          "lineNumber": 76
+        },
+        {
+          "caller": "shutdown",
+          "callee": "String",
+          "lineNumber": 76
+        },
+        {
+          "caller": "shutdown",
+          "callee": "log.info",
+          "lineNumber": 79
+        },
+        {
+          "caller": "shutdown",
+          "callee": "process.exit",
+          "lineNumber": 80
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "process.on",
+          "lineNumber": 83
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "shutdown",
+          "lineNumber": 83
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "process.on",
+          "lineNumber": 84
+        },
+        {
+          "caller": "startBunServer",
+          "callee": "shutdown",
+          "lineNumber": 84
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 1,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/lib/http.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 92,
+      "nonEmptyLines": 81,
+      "functions": [
+        {
+          "name": "json",
+          "startLine": 8,
+          "endLine": 10,
+          "params": [
+            "c",
+            "payload",
+            "status"
+          ]
+        },
+        {
+          "name": "error",
+          "startLine": 12,
+          "endLine": 14,
+          "params": [
+            "c",
+            "message",
+            "status"
+          ]
+        },
+        {
+          "name": "internalServerError",
+          "startLine": 16,
+          "endLine": 24,
+          "params": [
+            "c",
+            "route",
+            "cause",
+            "fallback"
+          ]
+        },
+        {
+          "name": "parseLimit",
+          "startLine": 26,
+          "endLine": 42,
+          "params": [
+            "value",
+            "defaultValue",
+            "max",
+            "locale"
+          ]
+        },
+        {
+          "name": "toHttpError",
+          "startLine": 54,
+          "endLine": 65,
+          "params": [
+            "errorValue"
+          ]
+        },
+        {
+          "name": "isPrismaNotFoundError",
+          "startLine": 67,
+          "endLine": 74,
+          "params": [
+            "errorValue"
+          ]
+        },
+        {
+          "name": "engineErrorStatus",
+          "startLine": 76,
+          "endLine": 92,
+          "params": [
+            "code"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "HttpError",
+          "startLine": 44,
+          "endLine": 52,
+          "methods": [
+            "constructor"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "json",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "error",
+          "line": 12,
+          "isDefault": false
+        },
+        {
+          "name": "internalServerError",
+          "line": 16,
+          "isDefault": false
+        },
+        {
+          "name": "parseLimit",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "HttpError",
+          "line": 44,
+          "isDefault": false
+        },
+        {
+          "name": "toHttpError",
+          "line": 54,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "json",
+          "callee": "c.json",
+          "lineNumber": 9
+        },
+        {
+          "caller": "error",
+          "callee": "json",
+          "lineNumber": 13
+        },
+        {
+          "caller": "internalServerError",
+          "callee": "logger.error",
+          "lineNumber": 22
+        },
+        {
+          "caller": "internalServerError",
+          "callee": "error",
+          "lineNumber": 23
+        },
+        {
+          "caller": "parseLimit",
+          "callee": "Number.parseInt",
+          "lineNumber": 36
+        },
+        {
+          "caller": "parseLimit",
+          "callee": "Number.isFinite",
+          "lineNumber": 37
+        },
+        {
+          "caller": "parseLimit",
+          "callee": "getApiMessages",
+          "lineNumber": 38
+        },
+        {
+          "caller": "parseLimit",
+          "callee": "Math.min",
+          "lineNumber": 41
+        },
+        {
+          "caller": "parseLimit",
+          "callee": "Math.max",
+          "lineNumber": 41
+        },
+        {
+          "caller": "constructor",
+          "callee": "super",
+          "lineNumber": 49
+        },
+        {
+          "caller": "toHttpError",
+          "callee": "engineErrorStatus",
+          "lineNumber": 59
+        },
+        {
+          "caller": "toHttpError",
+          "callee": "isPrismaNotFoundError",
+          "lineNumber": 61
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 6,
+        "functionCount": 7,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "apps/server/src/middleware/auth.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 44,
+      "nonEmptyLines": 36,
+      "functions": [
+        {
+          "name": "resetEnvCache",
+          "startLine": 7,
+          "endLine": 12,
+          "params": []
+        },
+        {
+          "name": "app",
+          "startLine": 14,
+          "endLine": 19,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resetEnvCache",
+          "callee": "resetEnvCacheForTests",
+          "lineNumber": 11
+        },
+        {
+          "caller": "app",
+          "callee": "server.use",
+          "lineNumber": 16
+        },
+        {
+          "caller": "app",
+          "callee": "apiKeyAuth",
+          "lineNumber": 16
+        },
+        {
+          "caller": "app",
+          "callee": "server.get",
+          "lineNumber": 17
+        },
+        {
+          "caller": "app",
+          "callee": "c.json",
+          "lineNumber": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/middleware/auth.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 43,
+      "nonEmptyLines": 34,
+      "functions": [
+        {
+          "name": "matchesApiKey",
+          "startLine": 8,
+          "endLine": 13,
+          "params": [
+            "providedKey",
+            "expectedKey"
+          ]
+        },
+        {
+          "name": "apiKeyAuth",
+          "startLine": 15,
+          "endLine": 43,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "apiKeyAuth",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "matchesApiKey",
+          "callee": "Buffer.from",
+          "lineNumber": 10
+        },
+        {
+          "caller": "matchesApiKey",
+          "callee": "Buffer.from",
+          "lineNumber": 11
+        },
+        {
+          "caller": "matchesApiKey",
+          "callee": "timingSafeEqual",
+          "lineNumber": 12
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "readEnv",
+          "lineNumber": 16
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "next",
+          "lineNumber": 19
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "SKIP_PATHS.some",
+          "lineNumber": 23
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "c.req.path.startsWith",
+          "lineNumber": 23
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "next",
+          "lineNumber": 24
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "next",
+          "lineNumber": 28
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "c.req.header",
+          "lineNumber": 31
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "authHeader?.startsWith",
+          "lineNumber": 32
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "authHeader.slice",
+          "lineNumber": 33
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "matchesApiKey",
+          "lineNumber": 36
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "getApiMessages",
+          "lineNumber": 37
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "getPreferredLocale",
+          "lineNumber": 37
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "c.req.header",
+          "lineNumber": 37
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "c.json",
+          "lineNumber": 38
+        },
+        {
+          "caller": "apiKeyAuth",
+          "callee": "next",
+          "lineNumber": 41
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    }
+  ]
+}

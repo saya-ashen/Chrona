@@ -1,0 +1,191 @@
+{
+  "projectRoot": "/home/saya/workspace/Chrona",
+  "batchFiles": [
+    {
+      "path": "apps/web/src/components/schedule/schedule-mini-calendar.test.tsx",
+      "language": "typescript",
+      "sizeLines": 79,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-mini-calendar.tsx",
+      "language": "typescript",
+      "sizeLines": 114,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-actions.ts",
+      "language": "typescript",
+      "sizeLines": 521,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-copy.ts",
+      "language": "typescript",
+      "sizeLines": 205,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-main-panel.tsx",
+      "language": "typescript",
+      "sizeLines": 234,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-timeline.test.tsx",
+      "language": "typescript",
+      "sizeLines": 302,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-types.ts",
+      "language": "typescript",
+      "sizeLines": 340,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-utils.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 1008,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-utils.ts",
+      "language": "typescript",
+      "sizeLines": 82,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-view-model.bun.test.ts",
+      "language": "typescript",
+      "sizeLines": 136,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page-view-model.ts",
+      "language": "typescript",
+      "sizeLines": 167,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page.test.tsx",
+      "language": "typescript",
+      "sizeLines": 681,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-page.tsx",
+      "language": "typescript",
+      "sizeLines": 353,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/schedule-task-list.tsx",
+      "language": "typescript",
+      "sizeLines": 419,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/timeline/schedule-page-timeline.tsx",
+      "language": "typescript",
+      "sizeLines": 792,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/timeline/schedule-timeline-primitives.tsx",
+      "language": "typescript",
+      "sizeLines": 226,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/use-schedule-page-actions.ts",
+      "language": "typescript",
+      "sizeLines": 188,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/use-schedule-page-state.ts",
+      "language": "typescript",
+      "sizeLines": 124,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/utils/date.ts",
+      "language": "typescript",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/utils/format.ts",
+      "language": "typescript",
+      "sizeLines": 93,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/utils/hydrate.ts",
+      "language": "typescript",
+      "sizeLines": 44,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/utils/item-transforms.ts",
+      "language": "typescript",
+      "sizeLines": 268,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/utils/state.ts",
+      "language": "typescript",
+      "sizeLines": 337,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/schedule/utils/timeline.ts",
+      "language": "typescript",
+      "sizeLines": 175,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/settings/advanced-settings-dialog.test.tsx",
+      "language": "typescript",
+      "sizeLines": 50,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/settings/advanced-settings-dialog.tsx",
+      "language": "typescript",
+      "sizeLines": 65,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/settings/ai-clients-dialog.test.tsx",
+      "language": "typescript",
+      "sizeLines": 52,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/settings/ai-clients-dialog.tsx",
+      "language": "typescript",
+      "sizeLines": 63,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/settings/ai-clients-manager.test.tsx",
+      "language": "typescript",
+      "sizeLines": 483,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/settings/ai-clients-manager.tsx",
+      "language": "typescript",
+      "sizeLines": 849,
+      "fileCategory": "code"
+    },
+    {
+      "path": "apps/web/src/components/settings/schedule-ai-settings-panel.test.tsx",
+      "language": "typescript",
+      "sizeLines": 37,
+      "fileCategory": "code"
+    }
+  ]
+}

@@ -5,7 +5,11 @@ import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 import { appendTaskPrimaryNodeAction } from "@/components/tasks/plan/task-action-node-action";
 import { api } from "@/lib/rpc-client";
 import { useAppRouter } from "@/lib/router";
+import { createLogger } from "@/lib/logger";
+
 import type { WorkCopy, WorkPageData } from "./work-page-types";
+
+const logger = createLogger("web.work-page.projection-state");
 
 type WorkPageTaskPlan = WorkPageData["taskPlan"];
 
@@ -174,7 +178,7 @@ export function useWorkPageProjectionState(initialData: WorkPageData, copy: Work
       },
     }).catch((error) => {
       if (!abortController.signal.aborted) {
-        console.warn("Work page event stream closed", error);
+        logger.warn("event_stream.closed", { taskId: data.taskShell.id, error });
       }
     });
 

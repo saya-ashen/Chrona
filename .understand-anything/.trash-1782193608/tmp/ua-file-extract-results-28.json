@@ -1,0 +1,2293 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 13,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "apps/server/src/__tests__/test-database-safety.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 23,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "apps/server/src/__tests__/test-database-safety.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 19,
+      "nonEmptyLines": 15,
+      "functions": [
+        {
+          "name": "assertSafeTestDatabaseUrl",
+          "startLine": 7,
+          "endLine": 19,
+          "params": [
+            "databaseUrl"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "isSafeTestDatabaseUrl",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "sqlitePathFromDatabaseUrl",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "assertSafeTestDatabaseUrl",
+          "line": 7,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "assertSafeTestDatabaseUrl",
+          "callee": "isSafeTestDatabaseUrl",
+          "lineNumber": 8
+        },
+        {
+          "caller": "assertSafeTestDatabaseUrl",
+          "callee": "[\n      \"Refusing to reset the database for Bun tests because DATABASE_URL does not point to an isolated test SQLite database.\",\n      `Current DATABASE_URL: ${databaseUrl ?? \"(unset)\"}`,\n      \"Run `bun run test:bun` or set `DATABASE_URL=file:./.tmp/bun-test.db` before running destructive Bun tests.\",\n    ].join",
+          "lineNumber": 13
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 3,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/cli/src/bun-entry.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 214,
+      "nonEmptyLines": 174,
+      "functions": [
+        {
+          "name": "findResourceDir",
+          "startLine": 14,
+          "endLine": 29,
+          "params": []
+        },
+        {
+          "name": "getHome",
+          "startLine": 35,
+          "endLine": 37,
+          "params": []
+        },
+        {
+          "name": "getDataDir",
+          "startLine": 39,
+          "endLine": 47,
+          "params": []
+        },
+        {
+          "name": "getConfigDir",
+          "startLine": 49,
+          "endLine": 57,
+          "params": []
+        },
+        {
+          "name": "ensureDirs",
+          "startLine": 63,
+          "endLine": 66,
+          "params": []
+        },
+        {
+          "name": "ensureEnv",
+          "startLine": 68,
+          "endLine": 75,
+          "params": []
+        },
+        {
+          "name": "banner",
+          "startLine": 81,
+          "endLine": 84,
+          "params": []
+        },
+        {
+          "name": "browserHost",
+          "startLine": 86,
+          "endLine": 88,
+          "params": [
+            "host"
+          ]
+        },
+        {
+          "name": "mcpHost",
+          "startLine": 90,
+          "endLine": 92,
+          "params": [
+            "host"
+          ]
+        },
+        {
+          "name": "openBrowser",
+          "startLine": 94,
+          "endLine": 107,
+          "params": [
+            "host",
+            "port"
+          ]
+        },
+        {
+          "name": "readOptionValue",
+          "startLine": 113,
+          "endLine": 119,
+          "params": [
+            "args",
+            "index",
+            "name"
+          ]
+        },
+        {
+          "name": "applyStartArgs",
+          "startLine": 121,
+          "endLine": 149,
+          "params": [
+            "args"
+          ]
+        },
+        {
+          "name": "startServerMode",
+          "startLine": 151,
+          "endLine": 194,
+          "params": [
+            "args"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 200,
+          "endLine": 209,
+          "params": []
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "findResourceDir",
+          "callee": "[\n    process.env.CHRONA_RESOURCE_DIR,\n    join(dirname(Bun.argv[0] ?? process.execPath), \"resources\"),\n    join(packageDir, \"resources\"),\n    packageDir,\n  ].filter",
+          "lineNumber": 15
+        },
+        {
+          "caller": "findResourceDir",
+          "callee": "join",
+          "lineNumber": 17
+        },
+        {
+          "caller": "findResourceDir",
+          "callee": "dirname",
+          "lineNumber": 17
+        },
+        {
+          "caller": "findResourceDir",
+          "callee": "join",
+          "lineNumber": 18
+        },
+        {
+          "caller": "findResourceDir",
+          "callee": "Boolean",
+          "lineNumber": 20
+        },
+        {
+          "caller": "findResourceDir",
+          "callee": "existsSync",
+          "lineNumber": 23
+        },
+        {
+          "caller": "findResourceDir",
+          "callee": "join",
+          "lineNumber": 23
+        },
+        {
+          "caller": "getDataDir",
+          "callee": "getHome",
+          "lineNumber": 41
+        },
+        {
+          "caller": "getDataDir",
+          "callee": "join",
+          "lineNumber": 42
+        },
+        {
+          "caller": "getDataDir",
+          "callee": "join",
+          "lineNumber": 43
+        },
+        {
+          "caller": "getDataDir",
+          "callee": "join",
+          "lineNumber": 43
+        },
+        {
+          "caller": "getDataDir",
+          "callee": "join",
+          "lineNumber": 45
+        },
+        {
+          "caller": "getDataDir",
+          "callee": "join",
+          "lineNumber": 46
+        },
+        {
+          "caller": "getConfigDir",
+          "callee": "getHome",
+          "lineNumber": 51
+        },
+        {
+          "caller": "getConfigDir",
+          "callee": "join",
+          "lineNumber": 52
+        },
+        {
+          "caller": "getConfigDir",
+          "callee": "join",
+          "lineNumber": 53
+        },
+        {
+          "caller": "getConfigDir",
+          "callee": "join",
+          "lineNumber": 53
+        },
+        {
+          "caller": "getConfigDir",
+          "callee": "join",
+          "lineNumber": 55
+        },
+        {
+          "caller": "getConfigDir",
+          "callee": "join",
+          "lineNumber": 56
+        },
+        {
+          "caller": "ensureDirs",
+          "callee": "mkdirSync",
+          "lineNumber": 64
+        },
+        {
+          "caller": "ensureDirs",
+          "callee": "getDataDir",
+          "lineNumber": 64
+        },
+        {
+          "caller": "ensureDirs",
+          "callee": "mkdirSync",
+          "lineNumber": 65
+        },
+        {
+          "caller": "ensureDirs",
+          "callee": "getConfigDir",
+          "lineNumber": 65
+        },
+        {
+          "caller": "ensureEnv",
+          "callee": "join",
+          "lineNumber": 69
+        },
+        {
+          "caller": "ensureEnv",
+          "callee": "getConfigDir",
+          "lineNumber": 69
+        },
+        {
+          "caller": "ensureEnv",
+          "callee": "existsSync",
+          "lineNumber": 70
+        },
+        {
+          "caller": "ensureEnv",
+          "callee": "join",
+          "lineNumber": 71
+        },
+        {
+          "caller": "ensureEnv",
+          "callee": "existsSync",
+          "lineNumber": 72
+        },
+        {
+          "caller": "ensureEnv",
+          "callee": "copyFileSync",
+          "lineNumber": 73
+        },
+        {
+          "caller": "banner",
+          "callee": "console.log",
+          "lineNumber": 82
+        },
+        {
+          "caller": "banner",
+          "callee": "console.log",
+          "lineNumber": 83
+        },
+        {
+          "caller": "openBrowser",
+          "callee": "browserHost",
+          "lineNumber": 95
+        },
+        {
+          "caller": "openBrowser",
+          "callee": "Bun.spawn",
+          "lineNumber": 98
+        },
+        {
+          "caller": "openBrowser",
+          "callee": "Bun.spawn",
+          "lineNumber": 100
+        },
+        {
+          "caller": "openBrowser",
+          "callee": "Bun.spawn",
+          "lineNumber": 102
+        },
+        {
+          "caller": "readOptionValue",
+          "callee": "value.startsWith",
+          "lineNumber": 115
+        },
+        {
+          "caller": "applyStartArgs",
+          "callee": "readOptionValue",
+          "lineNumber": 126
+        },
+        {
+          "caller": "applyStartArgs",
+          "callee": "arg.startsWith",
+          "lineNumber": 131
+        },
+        {
+          "caller": "applyStartArgs",
+          "callee": "arg.slice",
+          "lineNumber": 132
+        },
+        {
+          "caller": "applyStartArgs",
+          "callee": "readOptionValue",
+          "lineNumber": 137
+        },
+        {
+          "caller": "applyStartArgs",
+          "callee": "arg.startsWith",
+          "lineNumber": 142
+        },
+        {
+          "caller": "applyStartArgs",
+          "callee": "arg.slice",
+          "lineNumber": 143
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "applyStartArgs",
+          "lineNumber": 152
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "ensureDirs",
+          "lineNumber": 153
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "ensureEnv",
+          "lineNumber": 154
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "findResourceDir",
+          "lineNumber": 156
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "join",
+          "lineNumber": 157
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "join",
+          "lineNumber": 159
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "join",
+          "lineNumber": 161
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "getDataDir",
+          "lineNumber": 161
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "banner",
+          "lineNumber": 163
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "getDataDir",
+          "lineNumber": 165
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "getConfigDir",
+          "lineNumber": 166
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 167
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 168
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 169
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 171
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "ensureSqliteDatabase",
+          "lineNumber": 172
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 175
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 177
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 178
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "Number.parseInt",
+          "lineNumber": 181
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "browserHost",
+          "lineNumber": 182
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "mcpHost",
+          "lineNumber": 183
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 184
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 185
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "console.log",
+          "lineNumber": 186
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "setTimeout",
+          "lineNumber": 188
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "openBrowser",
+          "lineNumber": 189
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "import",
+          "lineNumber": 192
+        },
+        {
+          "caller": "startServerMode",
+          "callee": "startBunServer",
+          "lineNumber": 193
+        },
+        {
+          "caller": "main",
+          "callee": "process.argv.slice",
+          "lineNumber": 201
+        },
+        {
+          "caller": "main",
+          "callee": "createProgram().parseAsync",
+          "lineNumber": 204
+        },
+        {
+          "caller": "main",
+          "callee": "createProgram",
+          "lineNumber": 204
+        },
+        {
+          "caller": "main",
+          "callee": "startServerMode",
+          "lineNumber": 208
+        },
+        {
+          "caller": "main",
+          "callee": "args.slice",
+          "lineNumber": 208
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 14,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/cli/src/hermes-plugin.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 18,
+      "nonEmptyLines": 18,
+      "exports": [
+        {
+          "name": "DEFAULT_CHRONA_MCP_URL",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "findHermesPluginSourceDir",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getBundledHermesPluginVersion",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getHermesHome",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getHermesPluginConfigPath",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getHermesPluginDir",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getHome",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "getInstalledHermesPluginVersion",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "installHermesPlugin",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "isHermesCliAvailable",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "isHermesPluginInstalled",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "readHermesPluginConfig",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "writeHermesPluginConfig",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "HermesPluginConfig",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "HermesPluginInstallResult",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "InstallHermesPluginOptions",
+          "line": 1,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 16,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/cli/src/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 22,
+      "nonEmptyLines": 18,
+      "functions": [
+        {
+          "name": "main",
+          "startLine": 7,
+          "endLine": 20,
+          "params": [
+            "argv"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "createProgram",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "dispatchNodeCommand",
+          "line": 5,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "main",
+          "callee": "argv.slice",
+          "lineNumber": 12
+        },
+        {
+          "caller": "main",
+          "callee": "dispatchNodeCommand",
+          "lineNumber": 14
+        },
+        {
+          "caller": "main",
+          "callee": "process.stdout.write",
+          "lineNumber": 15
+        },
+        {
+          "caller": "main",
+          "callee": "process.stderr.write",
+          "lineNumber": 16
+        },
+        {
+          "caller": "main",
+          "callee": "process.exit",
+          "lineNumber": 17
+        },
+        {
+          "caller": "main",
+          "callee": "createProgram().parseAsync",
+          "lineNumber": 19
+        },
+        {
+          "caller": "main",
+          "callee": "createProgram",
+          "lineNumber": 19
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/cli/src/integrations/hermes/index.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 16,
+      "nonEmptyLines": 16,
+      "exports": [
+        {
+          "name": "detectHermesEnvironment",
+          "line": 1,
+          "isDefault": false
+        },
+        {
+          "name": "planHermesSetup",
+          "line": 2,
+          "isDefault": false
+        },
+        {
+          "name": "getHermesEnvApiKey",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "getHermesEnvPath",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "readHermesEnv",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "writeHermesEnvValues",
+          "line": 3,
+          "isDefault": false
+        },
+        {
+          "name": "generateHermesApiKey",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "maskHermesApiKey",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "setupLocalHermesIntegration",
+          "line": 4,
+          "isDefault": false
+        },
+        {
+          "name": "HermesCheck",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesCheckKey",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesCheckStatus",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesConnectionMode",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesDiagnostics",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesIntegrationInput",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesLocalSetupInput",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesSetupAction",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesSetupActionKey",
+          "line": 5,
+          "isDefault": false
+        },
+        {
+          "name": "HermesSetupPlan",
+          "line": 5,
+          "isDefault": false
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 19,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/cli/src/program.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 172,
+      "nonEmptyLines": 155,
+      "functions": [
+        {
+          "name": "dispatchNodeCommand",
+          "startLine": 27,
+          "endLine": 54,
+          "params": [
+            "argv"
+          ]
+        },
+        {
+          "name": "printHermesDiagnostics",
+          "startLine": 66,
+          "endLine": 83,
+          "params": [
+            "diagnostics",
+            "plan"
+          ]
+        },
+        {
+          "name": "createProgram",
+          "startLine": 85,
+          "endLine": 172,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "dispatchNodeCommand",
+          "line": 27,
+          "isDefault": false
+        },
+        {
+          "name": "createProgram",
+          "line": 85,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "buildControlPayload",
+          "lineNumber": 31
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "sendControlAction",
+          "lineNumber": 32
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stdoutChunks.push",
+          "lineNumber": 39
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "JSON.stringify",
+          "lineNumber": 39
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stdoutChunks.join",
+          "lineNumber": 40
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "String",
+          "lineNumber": 42
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stderrChunks.push",
+          "lineNumber": 44
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stderrChunks.push",
+          "lineNumber": 45
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stderrChunks.push",
+          "lineNumber": 47
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stderrChunks.push",
+          "lineNumber": 48
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stderrChunks.push",
+          "lineNumber": 50
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stdoutChunks.join",
+          "lineNumber": 52
+        },
+        {
+          "caller": "dispatchNodeCommand",
+          "callee": "stderrChunks.join",
+          "lineNumber": 52
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 67
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 68
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 69
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 70
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 72
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 74
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 76
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 78
+        },
+        {
+          "caller": "printHermesDiagnostics",
+          "callee": "console.log",
+          "lineNumber": 81
+        },
+        {
+          "caller": "createProgram",
+          "callee": "program\n    .name(\"chrona\")\n    .description(\"Chrona CLI: starts the Chrona app server.\")\n    .version",
+          "lineNumber": 88
+        },
+        {
+          "caller": "createProgram",
+          "callee": "program\n    .name(\"chrona\")\n    .description",
+          "lineNumber": 88
+        },
+        {
+          "caller": "createProgram",
+          "callee": "program\n    .name",
+          "lineNumber": 88
+        },
+        {
+          "caller": "createProgram",
+          "callee": "program\n    .command(\"hermes\")\n    .description",
+          "lineNumber": 93
+        },
+        {
+          "caller": "createProgram",
+          "callee": "program\n    .command",
+          "lineNumber": 93
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"plugin\")\n    .description",
+          "lineNumber": 97
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command",
+          "lineNumber": 97
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"doctor\")\n    .description(\"Diagnose Hermes integration state without changing files\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option(\"--plugin-dir <path>\", \"Chrona plugin install directory\")\n    .action",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"doctor\")\n    .description(\"Diagnose Hermes integration state without changing files\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"doctor\")\n    .description(\"Diagnose Hermes integration state without changing files\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"doctor\")\n    .description(\"Diagnose Hermes integration state without changing files\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key\")\n    .option",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"doctor\")\n    .description(\"Diagnose Hermes integration state without changing files\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"doctor\")\n    .description(\"Diagnose Hermes integration state without changing files\")\n    .option",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"doctor\")\n    .description",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command",
+          "lineNumber": 101
+        },
+        {
+          "caller": "createProgram",
+          "callee": "detectHermesEnvironment",
+          "lineNumber": 110
+        },
+        {
+          "caller": "createProgram",
+          "callee": "planHermesSetup",
+          "lineNumber": 111
+        },
+        {
+          "caller": "createProgram",
+          "callee": "printHermesDiagnostics",
+          "lineNumber": 112
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key; generated when omitted\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option(\"--plugin-dir <path>\", \"Chrona plugin install directory\")\n    .option(\"--skip-enable\", \"Copy the plugin without enabling it\", false)\n    .option(\"--show-api-key\", \"Print the full Hermes API key\", false)\n    .action",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key; generated when omitted\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option(\"--plugin-dir <path>\", \"Chrona plugin install directory\")\n    .option(\"--skip-enable\", \"Copy the plugin without enabling it\", false)\n    .option",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key; generated when omitted\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option(\"--plugin-dir <path>\", \"Chrona plugin install directory\")\n    .option",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key; generated when omitted\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key; generated when omitted\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option(\"--api-key <key>\", \"Hermes API key; generated when omitted\")\n    .option",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option(\"--base-url <url>\", \"Hermes API base URL\", \"http://127.0.0.1:8642\")\n    .option",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description(\"Auto-configure local Hermes plugin and API server env\")\n    .option",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command(\"setup\")\n    .description",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermes\n    .command",
+          "lineNumber": 115
+        },
+        {
+          "caller": "createProgram",
+          "callee": "getHermesEnvApiKey",
+          "lineNumber": 126
+        },
+        {
+          "caller": "createProgram",
+          "callee": "generateHermesApiKey",
+          "lineNumber": 126
+        },
+        {
+          "caller": "createProgram",
+          "callee": "setupLocalHermesIntegration",
+          "lineNumber": 127
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 129
+        },
+        {
+          "caller": "createProgram",
+          "callee": "maskHermesApiKey",
+          "lineNumber": 129
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 131
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 134
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 135
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 137
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 139
+        },
+        {
+          "caller": "createProgram",
+          "callee": "printHermesDiagnostics",
+          "lineNumber": 141
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 143
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 144
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermesPlugin\n    .command(\"install\")\n    .description(\"Install the Chrona Hermes plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--plugin-dir <path>\", \"Chrona plugin install directory\")\n    .option(\"--skip-enable\", \"Copy the plugin without enabling it\", false)\n    .action",
+          "lineNumber": 148
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermesPlugin\n    .command(\"install\")\n    .description(\"Install the Chrona Hermes plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option(\"--plugin-dir <path>\", \"Chrona plugin install directory\")\n    .option",
+          "lineNumber": 148
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermesPlugin\n    .command(\"install\")\n    .description(\"Install the Chrona Hermes plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option(\"--mcp-url <url>\", \"Chrona MCP endpoint for the plugin\")\n    .option",
+          "lineNumber": 148
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermesPlugin\n    .command(\"install\")\n    .description(\"Install the Chrona Hermes plugin\")\n    .option(\"--hermes-home <path>\", \"Hermes home directory\")\n    .option",
+          "lineNumber": 148
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermesPlugin\n    .command(\"install\")\n    .description(\"Install the Chrona Hermes plugin\")\n    .option",
+          "lineNumber": 148
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermesPlugin\n    .command(\"install\")\n    .description",
+          "lineNumber": 148
+        },
+        {
+          "caller": "createProgram",
+          "callee": "hermesPlugin\n    .command",
+          "lineNumber": 148
+        },
+        {
+          "caller": "createProgram",
+          "callee": "installHermesPlugin",
+          "lineNumber": 156
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 157
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 158
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 159
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 162
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 164
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 166
+        },
+        {
+          "caller": "createProgram",
+          "callee": "console.log",
+          "lineNumber": 167
+        }
+      ],
+      "metrics": {
+        "importCount": 2,
+        "exportCount": 2,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/cli/src/startup-integrations.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 111,
+      "nonEmptyLines": 94,
+      "functions": [
+        {
+          "name": "isInteractive",
+          "startLine": 21,
+          "endLine": 23,
+          "params": []
+        },
+        {
+          "name": "askYesNo",
+          "startLine": 25,
+          "endLine": 29,
+          "params": [
+            "message"
+          ]
+        },
+        {
+          "name": "runStartupIntegrationChecks",
+          "startLine": 101,
+          "endLine": 111,
+          "params": [
+            "context"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "runStartupIntegrationChecks",
+          "line": 101,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "isInteractive",
+          "callee": "Boolean",
+          "lineNumber": 22
+        },
+        {
+          "caller": "askYesNo",
+          "callee": "isInteractive",
+          "lineNumber": 26
+        },
+        {
+          "caller": "askYesNo",
+          "callee": "prompt",
+          "lineNumber": 27
+        },
+        {
+          "caller": "askYesNo",
+          "callee": "answer?.trim().toLowerCase",
+          "lineNumber": 28
+        },
+        {
+          "caller": "askYesNo",
+          "callee": "answer?.trim",
+          "lineNumber": 28
+        },
+        {
+          "caller": "run",
+          "callee": "getHermesPluginDir",
+          "lineNumber": 34
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 36
+        },
+        {
+          "caller": "run",
+          "callee": "isHermesCliAvailable",
+          "lineNumber": 38
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 39
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 40
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 41
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 42
+        },
+        {
+          "caller": "run",
+          "callee": "isHermesPluginInstalled",
+          "lineNumber": 46
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 47
+        },
+        {
+          "caller": "run",
+          "callee": "askYesNo",
+          "lineNumber": 49
+        },
+        {
+          "caller": "run",
+          "callee": "installHermesPlugin",
+          "lineNumber": 50
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 51
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 52
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 55
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 58
+        },
+        {
+          "caller": "run",
+          "callee": "readHermesPluginConfig",
+          "lineNumber": 62
+        },
+        {
+          "caller": "run",
+          "callee": "getInstalledHermesPluginVersion",
+          "lineNumber": 63
+        },
+        {
+          "caller": "run",
+          "callee": "getBundledHermesPluginVersion",
+          "lineNumber": 64
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 67
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 68
+        },
+        {
+          "caller": "run",
+          "callee": "askYesNo",
+          "lineNumber": 70
+        },
+        {
+          "caller": "run",
+          "callee": "installHermesPlugin",
+          "lineNumber": 71
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 72
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 73
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 74
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 76
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 79
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 80
+        },
+        {
+          "caller": "run",
+          "callee": "askYesNo",
+          "lineNumber": 82
+        },
+        {
+          "caller": "run",
+          "callee": "writeHermesPluginConfig",
+          "lineNumber": 83
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 84
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 86
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 89
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 90
+        },
+        {
+          "caller": "run",
+          "callee": "console.log",
+          "lineNumber": 93
+        },
+        {
+          "caller": "runStartupIntegrationChecks",
+          "callee": "check.run",
+          "lineNumber": 104
+        },
+        {
+          "caller": "runStartupIntegrationChecks",
+          "callee": "String",
+          "lineNumber": 106
+        },
+        {
+          "caller": "runStartupIntegrationChecks",
+          "callee": "console.log",
+          "lineNumber": 107
+        },
+        {
+          "caller": "runStartupIntegrationChecks",
+          "callee": "console.log",
+          "lineNumber": 108
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/sqlite-migrations.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 107,
+      "nonEmptyLines": 90,
+      "functions": [
+        {
+          "name": "createMigration",
+          "startLine": 9,
+          "endLine": 13,
+          "params": [
+            "root",
+            "name",
+            "sql"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "createMigration",
+          "callee": "join",
+          "lineNumber": 10
+        },
+        {
+          "caller": "createMigration",
+          "callee": "mkdirSync",
+          "lineNumber": 11
+        },
+        {
+          "caller": "createMigration",
+          "callee": "writeFileSync",
+          "lineNumber": 12
+        },
+        {
+          "caller": "createMigration",
+          "callee": "join",
+          "lineNumber": 12
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/sqlite-migrations.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 192,
+      "nonEmptyLines": 164,
+      "functions": [
+        {
+          "name": "checksumSql",
+          "startLine": 20,
+          "endLine": 22,
+          "params": [
+            "sql"
+          ]
+        },
+        {
+          "name": "hasExecutableStatement",
+          "startLine": 24,
+          "endLine": 28,
+          "params": [
+            "sql"
+          ]
+        },
+        {
+          "name": "createMigrationsTable",
+          "startLine": 30,
+          "endLine": 41,
+          "params": [
+            "db"
+          ]
+        },
+        {
+          "name": "readAppliedMigrations",
+          "startLine": 43,
+          "endLine": 48,
+          "params": [
+            "db"
+          ]
+        },
+        {
+          "name": "hasExistingSchema",
+          "startLine": 56,
+          "endLine": 67,
+          "params": [
+            "db"
+          ]
+        },
+        {
+          "name": "baselineMigration",
+          "startLine": 74,
+          "endLine": 80,
+          "params": [
+            "db",
+            "migrationName",
+            "checksum"
+          ]
+        },
+        {
+          "name": "isSchemaAlreadyPresentError",
+          "startLine": 87,
+          "endLine": 92,
+          "params": [
+            "error"
+          ]
+        },
+        {
+          "name": "applyMigration",
+          "startLine": 94,
+          "endLine": 118,
+          "params": [
+            "db",
+            "migrationName",
+            "sql",
+            "checksum"
+          ]
+        },
+        {
+          "name": "ensureSqliteDatabase",
+          "startLine": 120,
+          "endLine": 192,
+          "params": [
+            "options"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "ensureSqliteDatabase",
+          "line": 120,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "checksumSql",
+          "callee": "createHash(\"sha256\").update(sql).digest",
+          "lineNumber": 21
+        },
+        {
+          "caller": "checksumSql",
+          "callee": "createHash(\"sha256\").update",
+          "lineNumber": 21
+        },
+        {
+          "caller": "checksumSql",
+          "callee": "createHash",
+          "lineNumber": 21
+        },
+        {
+          "caller": "hasExecutableStatement",
+          "callee": "sql\n    .split(/\\r?\\n/)\n    .some",
+          "lineNumber": 25
+        },
+        {
+          "caller": "hasExecutableStatement",
+          "callee": "sql\n    .split",
+          "lineNumber": 25
+        },
+        {
+          "caller": "hasExecutableStatement",
+          "callee": "line.trim",
+          "lineNumber": 27
+        },
+        {
+          "caller": "hasExecutableStatement",
+          "callee": "line.trim().startsWith",
+          "lineNumber": 27
+        },
+        {
+          "caller": "hasExecutableStatement",
+          "callee": "line.trim",
+          "lineNumber": 27
+        },
+        {
+          "caller": "createMigrationsTable",
+          "callee": "db.run",
+          "lineNumber": 31
+        },
+        {
+          "caller": "readAppliedMigrations",
+          "callee": "db.query(\"SELECT migration_name, checksum FROM _prisma_migrations\")\n    .all",
+          "lineNumber": 44
+        },
+        {
+          "caller": "readAppliedMigrations",
+          "callee": "db.query",
+          "lineNumber": 44
+        },
+        {
+          "caller": "readAppliedMigrations",
+          "callee": "rows.map",
+          "lineNumber": 47
+        },
+        {
+          "caller": "hasExistingSchema",
+          "callee": "db\n    .query(\n      `SELECT COUNT(*) AS count FROM sqlite_master\n       WHERE type = 'table'\n         AND name NOT LIKE 'sqlite_%'\n         AND name <> '_prisma_migrations'`,\n    )\n    .get",
+          "lineNumber": 57
+        },
+        {
+          "caller": "hasExistingSchema",
+          "callee": "db\n    .query",
+          "lineNumber": 57
+        },
+        {
+          "caller": "baselineMigration",
+          "callee": "db.run",
+          "lineNumber": 75
+        },
+        {
+          "caller": "baselineMigration",
+          "callee": "randomUUID",
+          "lineNumber": 78
+        },
+        {
+          "caller": "baselineMigration",
+          "callee": "new Date().toISOString",
+          "lineNumber": 78
+        },
+        {
+          "caller": "isSchemaAlreadyPresentError",
+          "callee": "/duplicate column name|already exists/i.test",
+          "lineNumber": 91
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "db.transaction",
+          "lineNumber": 95
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "hasExecutableStatement",
+          "lineNumber": 96
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "db.run",
+          "lineNumber": 97
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "db.run",
+          "lineNumber": 100
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "randomUUID",
+          "lineNumber": 103
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "new Date().toISOString",
+          "lineNumber": 103
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "apply",
+          "lineNumber": 108
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "isSchemaAlreadyPresentError",
+          "lineNumber": 110
+        },
+        {
+          "caller": "applyMigration",
+          "callee": "baselineMigration",
+          "lineNumber": 113
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "sqlitePathFromFileUrl",
+          "lineNumber": 121
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "existsSync",
+          "lineNumber": 126
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "rmSync",
+          "lineNumber": 127
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "ensureSqliteParentDir",
+          "lineNumber": 130
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "db.run",
+          "lineNumber": 134
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "db.run",
+          "lineNumber": 135
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "db.run",
+          "lineNumber": 137
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "createMigrationsTable",
+          "lineNumber": 140
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "existsSync",
+          "lineNumber": 142
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "readAppliedMigrations",
+          "lineNumber": 146
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "readdirSync(options.migrationsDir, { withFileTypes: true })\n      .filter((entry) => entry.isDirectory())\n      .sort",
+          "lineNumber": 147
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "readdirSync(options.migrationsDir, { withFileTypes: true })\n      .filter",
+          "lineNumber": 147
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "readdirSync",
+          "lineNumber": 147
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "entry.isDirectory",
+          "lineNumber": 148
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "a.name.localeCompare",
+          "lineNumber": 149
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "hasExistingSchema",
+          "lineNumber": 160
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "join",
+          "lineNumber": 163
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "existsSync",
+          "lineNumber": 164
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "readFileSync",
+          "lineNumber": 168
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "checksumSql",
+          "lineNumber": 169
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "appliedMigrations.get",
+          "lineNumber": 170
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "options.log",
+          "lineNumber": 181
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "baselineMigration",
+          "lineNumber": 182
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "options.log",
+          "lineNumber": 186
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "applyMigration",
+          "lineNumber": 187
+        },
+        {
+          "caller": "ensureSqliteDatabase",
+          "callee": "db.close",
+          "lineNumber": 190
+        }
+      ],
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 1,
+        "functionCount": 9,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/sqlite-url.bun.test.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 56,
+      "nonEmptyLines": 48,
+      "metrics": {
+        "importCount": 1,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "packages/db/src/sqlite-url.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 94,
+      "nonEmptyLines": 75,
+      "functions": [
+        {
+          "name": "resolveRuntimeDatabaseUrl",
+          "startLine": 8,
+          "endLine": 24,
+          "params": [
+            "env"
+          ]
+        },
+        {
+          "name": "isSafeTestDatabaseUrl",
+          "startLine": 26,
+          "endLine": 41,
+          "params": [
+            "databaseUrl",
+            "cwd"
+          ]
+        },
+        {
+          "name": "assertSafeTestDatabaseUrl",
+          "startLine": 43,
+          "endLine": 55,
+          "params": [
+            "databaseUrl"
+          ]
+        },
+        {
+          "name": "resolveSqliteAdapterUrl",
+          "startLine": 57,
+          "endLine": 59,
+          "params": [
+            "url"
+          ]
+        },
+        {
+          "name": "isInMemorySqliteUrl",
+          "startLine": 61,
+          "endLine": 63,
+          "params": [
+            "databaseUrl"
+          ]
+        },
+        {
+          "name": "sqlitePathFromFileUrl",
+          "startLine": 65,
+          "endLine": 77,
+          "params": [
+            "databaseUrl"
+          ]
+        },
+        {
+          "name": "assertSqliteFileUrl",
+          "startLine": 79,
+          "endLine": 85,
+          "params": [
+            "databaseUrl"
+          ]
+        },
+        {
+          "name": "ensureSqliteParentDir",
+          "startLine": 87,
+          "endLine": 94,
+          "params": [
+            "databaseUrl"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "AUTO_TEST_DATABASE_ENV",
+          "line": 6,
+          "isDefault": false
+        },
+        {
+          "name": "resolveRuntimeDatabaseUrl",
+          "line": 8,
+          "isDefault": false
+        },
+        {
+          "name": "isSafeTestDatabaseUrl",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "assertSafeTestDatabaseUrl",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "resolveSqliteAdapterUrl",
+          "line": 57,
+          "isDefault": false
+        },
+        {
+          "name": "isInMemorySqliteUrl",
+          "line": 61,
+          "isDefault": false
+        },
+        {
+          "name": "sqlitePathFromFileUrl",
+          "line": 65,
+          "isDefault": false
+        },
+        {
+          "name": "assertSqliteFileUrl",
+          "line": 79,
+          "isDefault": false
+        },
+        {
+          "name": "ensureSqliteParentDir",
+          "line": 87,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "resolveRuntimeDatabaseUrl",
+          "callee": "assertSafeTestDatabaseUrl",
+          "lineNumber": 11
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "process.cwd",
+          "lineNumber": 26
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "sqlitePathFromFileUrl",
+          "lineNumber": 27
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "resolve",
+          "lineNumber": 36
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "absolutePath.split(sep).map",
+          "lineNumber": 37
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "absolutePath.split",
+          "lineNumber": 37
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "segment.toLowerCase",
+          "lineNumber": 37
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "basename(absolutePath).toLowerCase",
+          "lineNumber": 38
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "basename",
+          "lineNumber": 38
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "segments.includes",
+          "lineNumber": 40
+        },
+        {
+          "caller": "isSafeTestDatabaseUrl",
+          "callee": "filename.includes",
+          "lineNumber": 40
+        },
+        {
+          "caller": "assertSafeTestDatabaseUrl",
+          "callee": "isSafeTestDatabaseUrl",
+          "lineNumber": 44
+        },
+        {
+          "caller": "assertSafeTestDatabaseUrl",
+          "callee": "[\n      \"Refusing to use DATABASE_URL for tests because it does not point to an isolated test SQLite database.\",\n      `Current DATABASE_URL: ${databaseUrl ?? \"(unset)\"}`,\n      `Use ${DEFAULT_TEST_DATABASE_URL}, an in-memory database, or another path under .tmp / containing test.`,\n    ].join",
+          "lineNumber": 49
+        },
+        {
+          "caller": "sqlitePathFromFileUrl",
+          "callee": "isInMemorySqliteUrl",
+          "lineNumber": 66
+        },
+        {
+          "caller": "sqlitePathFromFileUrl",
+          "callee": "databaseUrl.startsWith",
+          "lineNumber": 70
+        },
+        {
+          "caller": "sqlitePathFromFileUrl",
+          "callee": "databaseUrl.slice",
+          "lineNumber": 74
+        },
+        {
+          "caller": "sqlitePathFromFileUrl",
+          "callee": "pathWithParams.indexOf",
+          "lineNumber": 75
+        },
+        {
+          "caller": "sqlitePathFromFileUrl",
+          "callee": "pathWithParams.slice",
+          "lineNumber": 76
+        },
+        {
+          "caller": "assertSqliteFileUrl",
+          "callee": "sqlitePathFromFileUrl",
+          "lineNumber": 80
+        },
+        {
+          "caller": "ensureSqliteParentDir",
+          "callee": "sqlitePathFromFileUrl",
+          "lineNumber": 88
+        },
+        {
+          "caller": "ensureSqliteParentDir",
+          "callee": "mkdirSync",
+          "lineNumber": 93
+        },
+        {
+          "caller": "ensureSqliteParentDir",
+          "callee": "dirname",
+          "lineNumber": 93
+        },
+        {
+          "caller": "ensureSqliteParentDir",
+          "callee": "resolve",
+          "lineNumber": 93
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 9,
+        "functionCount": 8,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/init-sqlite-db.ts",
+      "language": "typescript",
+      "fileCategory": "code",
+      "totalLines": 62,
+      "nonEmptyLines": 53,
+      "functions": [
+        {
+          "name": "templateHasCurrentSchema",
+          "startLine": 42,
+          "endLine": 62,
+          "params": [
+            "path"
+          ]
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "db\n        .query<{ name: string }, []>(\"SELECT name FROM pragma_table_info('Task') WHERE name = 'latestEventId'\")\n        .get",
+          "lineNumber": 46
+        },
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "db\n        .query",
+          "lineNumber": 46
+        },
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "db\n        .query<{ name: string }, []>(\"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'RawEventLog'\")\n        .get",
+          "lineNumber": 49
+        },
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "db\n        .query",
+          "lineNumber": 49
+        },
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "db\n        .query<{ name: string }, []>(\"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ToolInvocation'\")\n        .get",
+          "lineNumber": 52
+        },
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "db\n        .query",
+          "lineNumber": 52
+        },
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "Boolean",
+          "lineNumber": 55
+        },
+        {
+          "caller": "templateHasCurrentSchema",
+          "callee": "db.close",
+          "lineNumber": 57
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 1,
+        "classCount": 0
+      }
+    }
+  ]
+}
