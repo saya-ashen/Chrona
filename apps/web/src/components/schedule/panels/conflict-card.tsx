@@ -37,15 +37,15 @@ const DEFAULT_COPY = {
 function getCopy(messages: Record<string, unknown>) {
   const raw = (messages.components as Record<string, Record<string, unknown>> | undefined)?.conflictCard ?? {};
   return {
-    timeRange: (raw.timeRange as string) ?? DEFAULT_COPY.timeRange,
-    suggestions: (raw.suggestions as string) ?? DEFAULT_COPY.suggestions,
-    reason: (raw.reason as string) ?? DEFAULT_COPY.reason,
-    applying: (raw.applying as string) ?? DEFAULT_COPY.applying,
-    applySuggestion: (raw.applySuggestion as string) ?? DEFAULT_COPY.applySuggestion,
+    timeRange: (raw.timeRange ?? DEFAULT_COPY.timeRange) as string,
+    suggestions: (raw.suggestions ?? DEFAULT_COPY.suggestions) as string,
+    reason: (raw.reason ?? DEFAULT_COPY.reason) as string,
+    applying: (raw.applying ?? DEFAULT_COPY.applying) as string,
+    applySuggestion: (raw.applySuggestion ?? DEFAULT_COPY.applySuggestion) as string,
     conflictTypes: { ...DEFAULT_COPY.conflictTypes, ...(raw.conflictTypes as Record<string, string> | undefined) },
     suggestionTypes: { ...DEFAULT_COPY.suggestionTypes, ...(raw.suggestionTypes as Record<string, string> | undefined) },
-    resolvedConflicts: (raw.resolvedConflicts as string) ?? "Resolve {count} conflicts",
-    movedTasks: (raw.movedTasks as string) ?? "Move {count} tasks",
+    resolvedConflicts: (raw.resolvedConflicts ?? "Resolve {count} conflicts") as string,
+    movedTasks: (raw.movedTasks ?? "Move {count} tasks") as string,
   };
 }
 
