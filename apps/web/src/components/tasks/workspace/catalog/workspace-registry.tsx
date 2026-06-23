@@ -293,11 +293,10 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
               <p className="min-w-0 break-words text-sm font-semibold leading-snug text-foreground">{props.title}</p>
               {props.toolState ? <Badge variant={toneBadgeVariant(tone)} className="gap-1 text-[10px]"><Wrench className="size-3" />{props.toolState}</Badge> : null}
             </div>
-            {(props.sourceNodeTitle || props.provider || props.runtimeName) ? (
+            {(props.sourceNodeTitle || props.provider) ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {props.sourceNodeTitle ? <Badge variant="outline" className="max-w-full truncate bg-background/80 text-[10px]">{props.sourceNodeTitle}</Badge> : null}
                 {props.provider ? <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">{props.provider}</span> : null}
-                {props.runtimeName ? <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{props.runtimeName}</span> : null}
               </div>
             ) : null}
             {props.text ? <CollapsibleText text={props.text} threshold={compact ? 220 : undefined} /> : null}

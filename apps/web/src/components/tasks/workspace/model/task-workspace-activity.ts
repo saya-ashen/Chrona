@@ -245,7 +245,7 @@ export function compactWorkspaceActivityText(value: string | undefined, limit = 
   return truncateText(value, limit) ?? "";
 }
 
-export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, index = 0): WorkspaceActivityItem {
+export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, index = 0): WorkspaceActivityItem | null {
   const value = event.event;
   const base = {
     id: `runtime-${event.sequence ?? index}-${value.type}`,
@@ -340,6 +340,10 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
     };
   }
 
+  if (value.type === "raw_event" && (event.provider || event.runtimeName || event.nodeTitle)) {
+    return null;
+  }
+
   const summary = value.rawEventType ?? "Runtime event";
   return {
     ...base,
@@ -352,5 +356,5 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
 }
 
 export function runtimeEventsToWorkspaceActivity(events: WorkspaceRuntimeEvent[], limit = DEFAULT_LIMIT) {
-  return mergeWorkspaceActivity(events.map((event, index) => runtimeEventToWorkspaceActivity(event, index)), limit);
+  return mergeWorkspaceActivity(events.map((event, index) => runtimeEventToWorkspaceActivity(event, index)).filter((item): item is WorkspaceActivityItem => item !== null), limit);
 }

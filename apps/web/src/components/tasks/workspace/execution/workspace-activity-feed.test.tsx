@@ -43,6 +43,7 @@ describe("WorkspaceActivityFeed", () => {
 
     expect(screen.getByText("Execution activity")).toBeInTheDocument();
     expect(screen.getAllByText("anthropic")).toHaveLength(2);
+    expect(screen.queryByText("hermes")).not.toBeInTheDocument();
     expect(screen.getByText("Live answer")).toBeInTheDocument();
     expect(screen.getByText("Answer user")).toBeInTheDocument();
     expect(screen.getByText("Read plan completed")).toBeInTheDocument();

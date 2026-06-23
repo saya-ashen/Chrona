@@ -238,10 +238,9 @@ function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem
             </span>
           )}
         </div>
-        {(item.provider || item.runtimeName) && (
+        {item.provider && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            {item.provider && <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">{item.provider}</span>}
-            {item.runtimeName && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{item.runtimeName}</span>}
+            <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">{item.provider}</span>
           </div>
         )}
         {text && <CollapsibleText text={text} compact={compact} />}

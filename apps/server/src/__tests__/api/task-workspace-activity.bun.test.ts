@@ -102,6 +102,68 @@ describe("task workspace activity endpoint", () => {
     expect(body.items.every((item) => item.sourceNodeId === "node-a")).toBe(true);
   });
 
+  it("uses provider as the visible provider label when runtimeName differs", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Provider Labeling");
+    const { taskId } = await seedTask(workspaceId, { title: "Provider labeling" });
+
+    await db.event.create({
+      data: {
+        eventType: "provider.text_delta",
+        workspaceId,
+        taskId,
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: {
+          runtimeName: "hermes",
+          provider: "claude_code",
+          runId: "run-1",
+          event: { type: "text_delta", text: "Hello" },
+        },
+        dedupeKey: "activity-provider-label",
+        occurredAt: new Date("2026-05-22T00:00:05.000Z"),
+        ingestSequence: 1,
+      },
+    });
+
+    const res = await app().request(`/api/tasks/${taskId}/activity?limit=10`);
+    const body = await json<{ items: Array<{ provider?: string; runtimeName?: string; summary: string }> }>(res);
+
+    expect(res.status).toBe(200);
+    expect(body.items[0]).toMatchObject({ provider: "claude_code", runtimeName: "hermes", summary: "Hello" });
+  });
+
+
+  it("drops generic provider events from the activity feed", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Generic Provider Event");
+    const { taskId } = await seedTask(workspaceId, { title: "Generic provider event" });
+
+    await db.event.create({
+      data: {
+        eventType: "provider.system",
+        workspaceId,
+        taskId,
+        actorType: "runtime",
+        actorId: "claude_code",
+        source: "provider",
+        payload: {
+          runtimeName: "hermes",
+          provider: "claude_code",
+          runId: "run-1",
+          event: { type: "system" },
+        },
+        dedupeKey: "activity-generic-provider-event",
+        occurredAt: new Date("2026-05-22T00:00:06.000Z"),
+        ingestSequence: 1,
+      },
+    });
+
+    const res = await app().request(`/api/tasks/${taskId}/activity?limit=10`);
+    const body = await json<{ items: Array<{ title: string }> }>(res);
+
+    expect(res.status).toBe(200);
+    expect(body.items).toEqual([]);
+  });
   it("returns node-scoped activity without inferring nearby provider events", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Node Activity History");
     const { taskId } = await seedTask(workspaceId, { title: "Node activity history" });

@@ -166,6 +166,16 @@ describe("workspace activity helpers", () => {
     });
   });
 
+  it("drops generic live provider events from activity", () => {
+    expect(runtimeEventToWorkspaceActivity(runtimeEvent({
+      provider: "claude_code",
+      runtimeName: "hermes",
+      nodeTitle: "system",
+      rawEventType: "system",
+      event: { type: "raw_event", rawEventType: "system" },
+    }))).toBeNull();
+  });
+
   it("keeps plan generation projection refreshes out of live activity", () => {
     const projectionEvent: TaskWorkspaceSseEvent = {
       type: "task_workspace_updated",
