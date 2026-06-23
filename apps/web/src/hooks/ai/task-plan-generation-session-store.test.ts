@@ -26,26 +26,6 @@ const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
-function stateStore(initial: Record<string, unknown>) {
-  let snapshot = initial;
-  const listeners = new Set<() => void>();
-  return {
-    get: (path: string) => snapshot[path],
-    set: (path: string, value: unknown) => {
-      snapshot = { ...snapshot, [path]: value };
-      for (const listener of listeners) listener();
-    },
-    getSnapshot: () => snapshot,
-    subscribe: (listener: () => void) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    update: (next: Record<string, unknown>) => {
-      snapshot = { ...snapshot, ...next };
-      for (const listener of listeners) listener();
-    },
-  };
-}
 
 describe("task plan generation session store", () => {
   it("sends workBlockId when starting recurring occurrence generation", async () => {
