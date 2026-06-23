@@ -307,37 +307,32 @@ These boundaries are enforced, not just documented. Two gates run in
 | --- | --- | --- |
 | `domain-stays-pure` | error | `packages/domain` importing db/engine/providers/integrations/apps/react/prisma |
 | `contracts-stay-schema-only` | error | `packages/contracts` importing engine/db/providers/integrations/apps |
-| `providers-own-no-business` | error | `packages/providers/*` importing engine/domain/db/apps |
+| `providers-own-no-business` | error | production `packages/providers/*` code importing engine/domain/db/apps |
+| `providers-own-no-business-tests` | warn | provider test files importing engine/domain/db/apps (debt; production code remains forbidden) |
 | `graph-runtime-owns-no-product` | error | `packages/graph-runtime` importing engine/db/providers/integrations/apps |
-| `packages-never-import-apps` | error | any package importing an app (except the CLI launcher entry) |
+| `packages-never-import-apps` | error | production package code importing an app (except the CLI launcher entry) |
+| `packages-never-import-apps-tests` | warn | package test files importing app entrypoints for end-to-end coverage (debt; production code remains forbidden) |
 | `no-deep-import-engine-internals` | error | runtime (value) imports of `packages/engine/src/modules/*` from outside engine — use the `@chrona/engine` barrel. Type-only imports are allowed as an end-to-end type contract |
 | `no-cross-package-prisma-generated` | error | importing `packages/db/src/generated/*` from another package — use the `@chrona/db` barrel |
-| `engine-sink-modules-via-barrel` | error | runtime (value) imports into an engine *capability* module's internals (`events`/`ai`/`task-execution`/`workspaces`) — use its `modules/<name>/index.ts` barrel. Type-only imports exempt. The co-recursive core modules are deliberately not covered (see [Internal module structure](#internal-module-structure)) |
+| `engine-sink-modules-via-barrel` | error | runtime (value) imports into an engine *capability* module's internals (`events`/`ai`/`execution-runtime`/`workspaces`) — use its `modules/<name>/index.ts` barrel. Type-only imports exempt. The co-recursive core modules are deliberately not covered (see [Internal module structure](#internal-module-structure)) |
 | `no-deep-import-engine-internals-tests` | warn | test files reaching into engine internals (debt; prefer the barrel) |
 | `engine-sink-modules-via-barrel-tests` | warn | test files reaching into capability-module internals (debt; prefer the barrel) |
 | `no-circular` | warn | circular dependencies (remaining ones are intra-package type-only debt) |
 
 ### Known violations (debt)
 
-`.dependency-cruiser-known-violations.json` freezes the pre-existing
-`error`-level violations so the gate can run green while still catching new
-ones. It holds a single entry for an engine→web import:
+`.dependency-cruiser-known-violations.json` freezes pre-existing `error`-level
+violations so the gate can run green while still catching new ones. It is
+currently empty (`[]`) — there are no frozen `error`-level violations, and
+`check:boundaries` is green.
 
-- An engine page-reader imports `schedule-page-utils.ts` (pure
-  aggregation/date helpers) from `apps/web/src/components/schedule/`. These
-  helpers belong in a shared layer (`packages/domain` or `packages/shared`);
-  migrating them (and flipping the web consumers) clears the violation. Do not
-  add new entries to work around the rule — fix the import instead.
+The former engine→web debt (an engine page-reader importing
+`schedule-page-utils.ts` from `apps/web/src/components/schedule/`) has been
+resolved: those helpers are now consumed only within `apps/web`, so no package
+reaches back into an app. Keep it that way — if you need scheduling helpers
+outside the web app, move them into `packages/domain`/`packages/shared` rather
+than importing across the boundary.
 
-  **⚠️ The baseline is currently stale and `check:boundaries` is RED.** The
-  source file moved from `modules/scheduling/get-schedule-page.ts` to
-  `modules/pages/get-schedule-page.ts`, but the frozen baseline entry still
-  references the old `scheduling/` path. Because the path no longer matches,
-  the violation at the new `pages/` location is *unfrozen* and surfaces as a
-  hard error. Resolve it one of two ways: (a) the proper fix — move the shared
-  helpers out of `apps/web` into `packages/domain`/`shared`; or (b) re-snapshot
-  the baseline at the new path as a stopgap (note this contradicts the
-  "fix the import" rule above and should be temporary).
-
-Regenerate the baseline only when intentionally clearing or re-snapshotting
-debt: `bunx dependency-cruiser --config .dependency-cruiser.cjs --output-type baseline apps packages`, then keep only the `error`-severity entries.
+Do not add entries to the baseline to work around a rule — fix the import
+instead. Regenerate the baseline only when intentionally re-snapshotting debt:
+`bunx dependency-cruiser --config .dependency-cruiser.cjs --output-type baseline apps packages`, then keep only the `error`-severity entries.

@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { LocalizedLink } from "@/components/i18n/localized-link";
@@ -364,6 +365,8 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
   const activeFilterLabel = filterLabel(filter, taskCopy);
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
+  const hasSelection = selectedIds.size > 0;
+  const showPagination = total > pageSize || pageCount > 1;
 
   function updateParams(mutate: (params: URLSearchParams) => void, resetPage = true) {
     const next = new URLSearchParams(searchParams);
@@ -481,8 +484,23 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
               onBlur={submitSearch}
               placeholder={taskCopy.searchPlaceholder}
               aria-label={taskCopy.searchPlaceholder}
-              className="h-8 rounded-lg pl-8 text-xs"
+              className="h-8 rounded-lg pl-8 pr-8 text-xs"
             />
+            {searchDraft ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Clear search"
+                className="absolute right-1 size-6 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setSearchDraft("");
+                  setParam("search", "");
+                }}
+              >
+                <X className="size-3.5" />
+              </Button>
+            ) : null}
           </form>
           <Select
             value={priority || "all"}
@@ -523,41 +541,43 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
             {order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending}
           </Button>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
-          <label className="flex items-center gap-2 font-medium text-foreground">
-            <Checkbox
-              aria-label={taskCopy.selectVisible}
-              checked={allVisibleSelected}
-              disabled={tasks.length === 0 || isPending}
-              onCheckedChange={(value) => toggleVisibleSelection(value === true)}
-            />
-            {taskCopy.selectedCount.replace("{count}", String(selectedIds.size))}
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            {actionMessage ? <span className="text-destructive" role="status">{actionMessage}</span> : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={selectedIds.size === 0 || isPending}
-              onClick={() => setSelectedIds(new Set())}
-              className="rounded-xl"
-            >
-              {taskCopy.bulkClear}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={selectedTasks.length === 0 || isPending}
-              onClick={() => setPendingDelete({ kind: "bulk", tasks: selectedTasks })}
-              className="rounded-xl"
-            >
-              <Trash2 className="size-3.5" />
-              {taskCopy.bulkDelete}
-            </Button>
+        {hasSelection || actionMessage ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+            <label className="flex items-center gap-2 font-medium text-foreground">
+              <Checkbox
+                aria-label={taskCopy.selectVisible}
+                checked={allVisibleSelected}
+                disabled={tasks.length === 0 || isPending}
+                onCheckedChange={(value) => toggleVisibleSelection(value === true)}
+              />
+              {taskCopy.selectedCount.replace("{count}", String(selectedIds.size))}
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              {actionMessage ? <span className="text-destructive" role="status">{actionMessage}</span> : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={selectedIds.size === 0 || isPending}
+                onClick={() => setSelectedIds(new Set())}
+                className="rounded-xl"
+              >
+                {taskCopy.bulkClear}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={selectedTasks.length === 0 || isPending}
+                onClick={() => setPendingDelete({ kind: "bulk", tasks: selectedTasks })}
+                className="rounded-xl"
+              >
+                <Trash2 className="size-3.5" />
+                {taskCopy.bulkDelete}
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {tasks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center text-sm text-muted-foreground shadow-xs">
@@ -580,50 +600,52 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <span>{taskCopy.paginationRange.replace("{start}", String(rangeStart)).replace("{end}", String(rangeEnd)).replace("{total}", String(total))}</span>
-            <Select value={String(pageSize)} onValueChange={(value) => setParam("pageSize", value)}>
-              <SelectTrigger size="sm" className="h-7 w-[6.5rem] rounded-lg text-xs" aria-label={taskCopy.pageSizeLabel}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {taskCopy.pageSizeOption.replace("{count}", String(value))}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {showPagination ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <span>{taskCopy.paginationRange.replace("{start}", String(rangeStart)).replace("{end}", String(rangeEnd)).replace("{total}", String(total))}</span>
+              <Select value={String(pageSize)} onValueChange={(value) => setParam("pageSize", value)}>
+                <SelectTrigger size="sm" className="h-7 w-[6.5rem] rounded-lg text-xs" aria-label={taskCopy.pageSizeLabel}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((value) => (
+                    <SelectItem key={value} value={String(value)}>
+                      {taskCopy.pageSizeOption.replace("{count}", String(value))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">
+                {taskCopy.paginationPage.replace("{page}", String(page)).replace("{pageCount}", String(pageCount))}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 rounded-lg"
+                disabled={page <= 1 || isPending}
+                onClick={() => goToPage(page - 1)}
+                aria-label={taskCopy.paginationPrevious}
+              >
+                <ChevronLeft className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 rounded-lg"
+                disabled={page >= pageCount || isPending}
+                onClick={() => goToPage(page + 1)}
+                aria-label={taskCopy.paginationNext}
+              >
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">
-              {taskCopy.paginationPage.replace("{page}", String(page)).replace("{pageCount}", String(pageCount))}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 rounded-lg"
-              disabled={page <= 1 || isPending}
-              onClick={() => goToPage(page - 1)}
-              aria-label={taskCopy.paginationPrevious}
-            >
-              <ChevronLeft className="size-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 rounded-lg"
-              disabled={page >= pageCount || isPending}
-              onClick={() => goToPage(page + 1)}
-              aria-label={taskCopy.paginationNext}
-            >
-              <ChevronRight className="size-3.5" />
-            </Button>
-          </div>
-        </div>
+        ) : null}
       </div>
       <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
         <DialogContent className="sm:max-w-md">

@@ -1053,6 +1053,7 @@
       "title": "新建任务",
       "close": "关闭",
       "titlePlaceholder": "添加标题",
+      "titleLabel": "标题",
       "aiSuggestions": "AI 建议",
       "generatingSuggestions": "正在生成建议...",
       "aiTaskPlanning": "AI 任务规划",
@@ -1548,12 +1549,15 @@
       "acceptProposal": "接受建议",
       "rejectProposal": "拒绝建议",
       "openSchedule": "打开日程",
-      "openWork": "打开执行页"
+      "openWork": "打开执行页",
+      "emptyAction": "查看任务"
     },
     "memory": {
       "title": "记忆",
       "subtitle": "查看当前生效的记忆记录，并在它们不再适用时停用陈旧指导。",
-      "invalidate": "失效"
+      "invalidate": "失效",
+      "emptyTitle": "还没有生效记忆",
+      "emptyDescription": "任务工作产生可复用指导后，Chrona 会把记忆记录显示在这里。"
     },
     "settings": {
       "title": "设置",
@@ -1574,6 +1578,8 @@
         "defaultAutoExecuteDescription": "新建日程任务时默认勾选“到预订时间自动执行”。默认关闭，避免任务未经确认自动运行。",
         "defaultOn": "默认开启",
         "defaultOff": "默认关闭",
+        "currentOn": "开启",
+        "currentOff": "关闭",
         "saved": "已保存"
       }
     },

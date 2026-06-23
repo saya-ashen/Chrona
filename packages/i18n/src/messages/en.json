@@ -1077,6 +1077,7 @@
       "title": "Add task",
       "close": "Close",
       "titlePlaceholder": "Add title",
+      "titleLabel": "Title",
       "aiSuggestions": "AI Suggestions",
       "generatingSuggestions": "Generating suggestions...",
       "aiTaskPlanning": "AI Task Planning",
@@ -1548,12 +1549,15 @@
       "acceptProposal": "Accept Proposal",
       "rejectProposal": "Reject Proposal",
       "openSchedule": "Open Schedule",
-      "openWork": "Open Work"
+      "openWork": "Open Work",
+      "emptyAction": "View tasks"
     },
     "memory": {
       "title": "Memory",
       "subtitle": "Review active memory records and deactivate stale guidance when it no longer applies.",
-      "invalidate": "Invalidate"
+      "invalidate": "Invalidate",
+      "emptyTitle": "No active memories yet",
+      "emptyDescription": "Chrona stores reusable guidance here after task work creates memory records."
     },
     "settings": {
       "title": "Settings",
@@ -1574,6 +1578,8 @@
         "defaultAutoExecuteDescription": "Preselect auto-execute when creating scheduled tasks. Off by default so tasks only run automatically after opt-in.",
         "defaultOn": "Default on",
         "defaultOff": "Default off",
+        "currentOn": "On",
+        "currentOff": "Off",
         "saved": "Saved"
       }
     },

@@ -319,7 +319,9 @@ function DigestModule({
 
     return {
       scoped: scopedItems,
-      headline: copy.digest[headlineKey].replace("{n}", String(headlineCount)),
+      headline: copy.digest[headlineKey]
+        .replace("{n}", String(headlineCount))
+        .replace(headlineCount === 1 ? "tasks" : "__noop__", "task"),
       breakdown: CATEGORY_ORDER.map((category) => ({ category, count: counts.get(category) ?? 0 })).filter(
         (entry) => entry.count > 0,
       ),

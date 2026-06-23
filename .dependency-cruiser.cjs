@@ -61,7 +61,15 @@ module.exports = {
       comment:
         "Provider packages adapt external protocols. Task lifecycle, plan progression, and projection logic live in packages/engine. See docs/provider-boundary.md.",
       severity: "error",
-      from: { path: "^packages/providers/" },
+      from: { path: "^packages/providers/", pathNot: TEST },
+      to: { path: "^(packages/engine/|packages/domain/|packages/db/|apps/)" },
+    },
+    {
+      name: "providers-own-no-business-tests",
+      comment:
+        "Provider test files boot real server/engine surfaces for end-to-end coverage (e.g. the aimock MCP recipe). Acknowledged test debt; production code must not.",
+      severity: "warn",
+      from: { path: `^packages/providers/.*${TEST}` },
       to: { path: "^(packages/engine/|packages/domain/|packages/db/|apps/)" },
     },
 
@@ -87,8 +95,18 @@ module.exports = {
         path: "^packages/",
         // The CLI's sole job is to boot the server (docs/architecture.md). Its
         // launcher entry may import the server entrypoint; nothing else may.
-        pathNot: "^packages/cli/src/bun-entry\\.ts$",
+        // Test files that boot app surfaces end-to-end are handled by the
+        // `-tests` warn variant below.
+        pathNot: `^packages/cli/src/bun-entry\\.ts$|${TEST}`,
       },
+      to: { path: "^apps/" },
+    },
+    {
+      name: "packages-never-import-apps-tests",
+      comment:
+        "Package test files import app entrypoints to exercise end-to-end behavior (e.g. provider tests booting the MCP server). Acknowledged test debt; production package code must not.",
+      severity: "warn",
+      from: { path: `^packages/.*${TEST}` },
       to: { path: "^apps/" },
     },
 

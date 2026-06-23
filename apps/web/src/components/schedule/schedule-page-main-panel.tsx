@@ -176,7 +176,7 @@ export function SchedulePageMainPanel({
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden xl:min-h-0">
-      <Card className="flex min-h-[34rem] flex-1 flex-col rounded-[24px] p-3 xl:min-h-0">
+      <Card className="flex min-h-[28rem] flex-1 flex-col rounded-[24px] p-3 xl:min-h-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">

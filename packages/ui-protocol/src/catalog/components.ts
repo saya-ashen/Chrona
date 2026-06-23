@@ -393,7 +393,7 @@ export const chronaNodeOutputCatalog = defineCatalog(chronaSchema, {
   actions: {},
 });
 
-const nodeOutputComponentPropsJsonSchemas = {
+const nodeOutputComponentPropsJsonSchemas: Record<string, z.core.JSONSchema.JSONSchema> = {
   Stack: {
     type: "object",
     properties: {
@@ -429,8 +429,8 @@ const nodeOutputComponentPropsJsonSchemas = {
   CollapsibleText: { type: "object", properties: { text: { type: "string" }, threshold: { type: "number" } }, required: ["text"], additionalProperties: false },
 } as const;
 
-function nodeOutputJsonSchema() {
-  const componentSchemas = Object.entries(nodeOutputComponentPropsJsonSchemas).map(([name, props]) => ({
+function nodeOutputJsonSchema(): z.core.JSONSchema.JSONSchema {
+  const componentSchemas: z.core.JSONSchema.JSONSchema[] = Object.entries(nodeOutputComponentPropsJsonSchemas).map(([name, props]) => ({
     type: "object",
     properties: {
       id: { type: "string" },

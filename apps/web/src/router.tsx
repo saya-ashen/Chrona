@@ -48,6 +48,7 @@ export function createAppRouter() {
       },
       element: <AppShell />,
       errorElement: <AccessKeyRouteError />,
+      hydrateFallbackElement: <div aria-hidden="true" />,
       children: [
         {
           index: true,

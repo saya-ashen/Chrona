@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarIcon, Loader2, Sparkles, Wrench, X } from "lucide-react";
+import { CalendarIcon, Check, Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -52,6 +52,7 @@ const DEFAULT_DIALOG_COPY = {
   title: "Add task",
   close: "Close",
   titlePlaceholder: "Add title",
+  titleLabel: "Title",
   aiSuggestions: "AI Suggestions",
   generatingSuggestions: "Generating suggestions...",
   date: "Date",
@@ -282,9 +283,9 @@ export function TaskCreateDialog({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[calc(100vh-2rem)] max-w-[calc(100%-2rem)] sm:max-w-4xl overflow-hidden rounded-2xl border border-border/60 bg-background p-0 shadow-2xl"
+        className="flex max-h-[calc(100vh-2rem)] max-w-[calc(100%-2rem)] flex-col overflow-hidden rounded-2xl border border-border/60 bg-background p-0 shadow-2xl sm:max-w-4xl"
       >
-        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border/60 px-6 py-4">
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border/60 px-4 py-3 sm:px-6 sm:py-4">
           <DialogTitle className="text-lg font-semibold text-foreground">{dialogCopy.title}</DialogTitle>
           <DialogClose
             render={
@@ -301,9 +302,13 @@ export function TaskCreateDialog({
           </DialogClose>
         </DialogHeader>
 
-        <div className="space-y-4 overflow-y-auto px-6 py-5">
-          <div className="relative">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          <div className="relative space-y-1.5">
+            <label htmlFor="task-create-title" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {dialogCopy.titleLabel}
+            </label>
             <input
+              id="task-create-title"
               type="text"
               value={title}
               onChange={(e) => {
@@ -464,7 +469,7 @@ export function TaskCreateDialog({
                     </PopoverContent>
                   </Popover>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <TaskConfigField label={dialogCopy.startTime}>
                       <Input
                         type="time"
@@ -499,8 +504,10 @@ export function TaskCreateDialog({
                       size="sm"
                       disabled={isPending}
                       onClick={() => setPriority(option)}
-                      className="w-full"
+                      className="w-full gap-1.5"
+                      aria-pressed={priority === option}
                     >
+                      {priority === option ? <Check className="size-3.5" aria-hidden /> : null}
                       {dialogCopy.priorities[option]}
                     </Button>
                   ))}
@@ -555,12 +562,7 @@ export function TaskCreateDialog({
                 )}
               </TaskConfigSection>
 
-              <TaskConfigSection
-                title={dialogCopy.autoPlanGeneration}
-                actions={effectiveAutoPlan || autoExecute ? (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span>
-                ) : null}
-              >
+              <TaskConfigSection title={dialogCopy.autoPlanGeneration}>
                 <div className="grid gap-3">
                   <label className="flex items-start gap-3 cursor-pointer">
                     <Checkbox
@@ -647,7 +649,7 @@ export function TaskCreateDialog({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-border/60 px-6 py-4">
+        <div className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t border-border/60 bg-background/95 px-4 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.06)] backdrop-blur sm:px-6 sm:py-4">
           <DialogClose
             render={<Button type="button" disabled={isPending} variant="ghost" size="sm" />}
           >

@@ -52,7 +52,7 @@ export interface ClaudeCodeProviderConfig {
    */
   skillDir?: string;
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
-  sdkOptions?: import("./runner").ClaudeCodeRunnerConfig["sdkOptions"];
+  sdkOptions?: Partial<import("@anthropic-ai/claude-agent-sdk").Options>;
 }
 
 export type ClaudeCodeRunnerMode = "sdk" | "replay";

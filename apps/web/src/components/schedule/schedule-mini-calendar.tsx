@@ -33,8 +33,8 @@ export function ScheduleMiniCalendar({
   }, [selectedDate]);
 
   return (
-    <Card className="max-w-full overflow-hidden rounded-[30px]">
-      <div className="mx-auto w-full max-w-full">
+    <Card className="w-full max-w-sm overflow-hidden rounded-[30px]">
+      <div className="mx-auto w-full max-w-sm">
         <div className="px-1">
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Calendar
@@ -48,7 +48,7 @@ export function ScheduleMiniCalendar({
           onMonthChange={setMonth}
           showOutsideDays
           fixedWeeks
-          className="mt-2 max-w-full p-0 [--cell-size:clamp(1.75rem,11.5vw,2.25rem)] sm:[--cell-size:--spacing(9)] xl:[--cell-size:clamp(1.65rem,2.1vw,2.25rem)] [&_.rdp-month]:w-full [&_.rdp-months]:w-full [&_.rdp-week]:w-full [&_.rdp-weekdays]:w-full"
+          className="mt-2 max-w-full p-0 [--cell-size:clamp(2rem,8vw,2.5rem)] xl:[--cell-size:clamp(1.65rem,2.1vw,2.25rem)] [&_.rdp-month]:w-full [&_.rdp-months]:w-full [&_.rdp-week]:w-full [&_.rdp-weekdays]:w-full"
           components={{
             DayButton: (props) => (
               <ScheduleMiniCalendarDayButton {...props} daysByKey={daysByKey} />

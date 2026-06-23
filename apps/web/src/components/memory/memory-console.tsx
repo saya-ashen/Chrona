@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
+import { Brain } from "lucide-react";
 
 type MemoryConsoleProps = {
   items: Array<{
@@ -25,10 +26,28 @@ const DEFAULT_COPY = {
   task: "Task",
   run: "Run",
   invalidate: "Invalidate",
+  emptyTitle: "No active memories yet",
+  emptyDescription: "Chrona stores reusable guidance here after task work creates memory records.",
 };
 
 export function MemoryConsole({ items, copy: copyProp }: MemoryConsoleProps) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
+
+  if (items.length === 0) {
+    return (
+      <Card className="border-dashed bg-card/50">
+        <CardContent className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">
+            <Brain className="size-6" aria-hidden />
+          </span>
+          <div className="space-y-1">
+            <p className="text-base font-semibold text-foreground">{copy.emptyTitle}</p>
+            <p className="mx-auto max-w-md text-sm text-muted-foreground">{copy.emptyDescription}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
