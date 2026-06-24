@@ -88,7 +88,7 @@ export function WorkspaceActivityFeed({
   hasOlderActivity?: boolean;
   isLoadingOlder?: boolean;
   onLoadOlder?: () => void;
-  density?: "compact" | "detailed";
+  density?: "compact" | "detailed" | "rail";
 }) {
   const items = mergeWorkspaceActivity([...runtimeEventsToWorkspaceActivity(runtimeEvents, limit), ...activity], limit);
   const latestProvider = runtimeEvents.at(-1)?.provider;
@@ -101,7 +101,7 @@ export function WorkspaceActivityFeed({
       {items.length === 0 ? (
         <ActivityEmptyState message={emptyMessage} />
       ) : (
-        <div className="mt-4 pl-1">
+        <div className={density === "rail" ? "mt-4" : "mt-4 pl-1"}>
           <ActivityTimeline items={items} density={density} />
         </div>
       )}

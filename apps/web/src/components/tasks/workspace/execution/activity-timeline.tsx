@@ -466,6 +466,112 @@ function PlanGenerationPhaseRow({
   );
 }
 
+function railTitle(entry: RenderEntry) {
+  switch (entry.type) {
+    case "node_header":
+      return entry.nodeTitle;
+    case "tool_pair":
+      return entry.completed?.tool?.label ?? entry.started.tool?.label ?? entry.completed?.tool?.name ?? entry.started.tool?.name ?? entry.started.title;
+    case "plan_phase":
+      return "Planning phase";
+    case "single":
+      return entry.item.title;
+  }
+}
+
+function railDetail(entry: RenderEntry) {
+  switch (entry.type) {
+    case "node_header":
+      return "Node";
+    case "tool_pair": {
+      const tool = entry.completed?.tool ?? entry.started.tool;
+      const duration = fmtDuration(tool?.durationMs);
+      if (entry.completed?.tone === "danger" || tool?.state === "failed") return "failed";
+      if (entry.completed) return duration ? `done · ${duration}` : "done";
+      return "running";
+    }
+    case "plan_phase": {
+      const duration = formatPhaseDuration(entry.items);
+      const status = summarizePlanPhase(entry.items);
+      return duration ? `${status} · ${duration}` : status;
+    }
+    case "single": {
+      const item = entry.item;
+      if (item.tool?.state === "failed") return "failed";
+      if (item.tool?.state === "completed") {
+        const duration = fmtDuration(item.tool.durationMs);
+        return duration ? `done · ${duration}` : "done";
+      }
+      if (item.tool?.state === "started") return "running";
+      return item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : item.provider ?? fmtTime(item.timestamp));
+    }
+  }
+}
+
+function railTone(entry: RenderEntry): Tone {
+  switch (entry.type) {
+    case "node_header":
+      return "info";
+    case "tool_pair": {
+      const tool = entry.completed?.tool ?? entry.started.tool;
+      if (entry.completed?.tone === "danger" || tool?.state === "failed") return "danger";
+      return entry.completed ? "success" : "info";
+    }
+    case "plan_phase": {
+      const status = summarizePlanPhase(entry.items);
+      return status === "failed" ? "danger" : status === "completed" ? "success" : "info";
+    }
+    case "single":
+      if (entry.item.kind === "node") return "info";
+      if (entry.item.tool?.state === "failed") return "danger";
+      if (entry.item.tool?.state === "completed") return "success";
+      if (entry.item.tool?.state === "started") return "info";
+      return entry.item.tone;
+  }
+}
+
+function railDotClass(tone: Tone) {
+  if (tone === "danger") return "border-destructive bg-destructive shadow-[0_0_0_4px_color-mix(in_oklab,var(--destructive)_18%,transparent)]";
+  if (tone === "warning") return "border-warning bg-warning shadow-[0_0_0_4px_color-mix(in_oklab,var(--warning)_18%,transparent)]";
+  if (tone === "success") return "border-success bg-success shadow-[0_0_0_4px_color-mix(in_oklab,var(--success)_16%,transparent)]";
+  if (tone === "info") return "border-primary bg-primary shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_18%,transparent)]";
+  return "border-muted-foreground/50 bg-muted-foreground/70";
+}
+
+function railLineClass(tone: Tone) {
+  if (tone === "danger") return "bg-destructive/45";
+  if (tone === "warning") return "bg-warning/45";
+  if (tone === "success") return "bg-success/40";
+  if (tone === "info") return "bg-primary/45";
+  return "bg-border/70";
+}
+
+
+function ActivityRailTimeline({ entries }: { entries: RenderEntry[] }) {
+  const lastIdx = entries.length - 1;
+  return (
+    <div className="space-y-0.5">
+      {entries.map((entry, index) => {
+        const tone = railTone(entry);
+        const detail = railDetail(entry);
+        const isLast = index === lastIdx;
+        return (
+          <article key={entry.key} className="relative grid grid-cols-[1rem_minmax(0,1fr)] gap-x-2 py-1.5">
+            <div className="relative flex justify-center">
+              {!isLast ? <span className={cn("absolute bottom-[-0.625rem] top-4 w-0.5 rounded-full", railLineClass(tone))} /> : null}
+              <span className={cn("relative z-10 mt-1 size-2.5 rounded-full border", railDotClass(tone))} />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-semibold leading-snug text-foreground">{railTitle(entry)}</p>
+              {detail ? <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">{detail}</p> : null}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function ActivityTimeline({
@@ -473,10 +579,12 @@ export function ActivityTimeline({
   density = "detailed",
 }: {
   items: WorkspaceActivityItem[];
-  density?: "compact" | "detailed";
+  density?: "compact" | "detailed" | "rail";
 }) {
   const renderList = buildRenderList(items);
+  const rail = density === "rail";
   const compact = density === "compact";
+  if (rail) return <ActivityRailTimeline entries={renderList} />;
   const lastIdx = renderList.length - 1;
 
   return (

@@ -24,6 +24,7 @@ export function TaskWorkspaceInspector({
   commandCenterCopy,
   copy,
   onAction,
+  isPlanCompact = false,
 }: {
   taskId: string;
   consoleView: ConsoleView;
@@ -34,6 +35,7 @@ export function TaskWorkspaceInspector({
   liveActivity: WorkspaceActivityItem[];
   commandCenterCopy?: Partial<CommandCenterCopy>;
   copy: WorkspaceCopy;
+  isPlanCompact?: boolean;
   onAction: (nodeId?: string) => void;
 }) {
   return (
@@ -66,6 +68,7 @@ export function TaskWorkspaceInspector({
         liveActivity={liveActivity}
         primaryAction={primaryAction}
         copy={commandCenterCopy}
+        activityLayout={isPlanCompact ? "side" : "below"}
         onAction={onAction}
       />
     </aside>

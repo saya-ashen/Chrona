@@ -205,6 +205,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         provider: bindableStringSchema,
         emptyMessage: z.string().optional(),
         toolLabels: toolDetailLabelsSchema,
+        density: z.enum(["rail"]).optional(),
       }),
       description: "Streaming activity feed backed by json-render state.",
     },

@@ -178,4 +178,17 @@ describe("WorkspaceActivityFeed", () => {
     expect(screen.queryByText("taskId=task-1")).not.toBeInTheDocument();
     expect(screen.queryByText("Loaded")).not.toBeInTheDocument();
   });
+
+  it("renders rail density as a compact vertical timeline", () => {
+    render(<WorkspaceActivityFeed
+      density="rail"
+      activity={[
+        activity({ id: "completed", kind: "tool_completed", title: "Tool completed", summary: "Read plan completed", tone: "success", tool: { name: "chrona_plan_read", label: "Read plan", durationMs: 128, state: "completed" } }),
+      ]}
+    />);
+
+    expect(screen.getByText("Tool completed")).toBeInTheDocument();
+    expect(screen.getByText("done · 128ms")).toBeInTheDocument();
+    expect(screen.queryByText("completed")).not.toBeInTheDocument();
+  });
 });

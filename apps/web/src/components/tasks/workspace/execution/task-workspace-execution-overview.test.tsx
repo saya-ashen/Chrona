@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { buildCommandCenterTrailSpec, type UiDocument } from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
@@ -58,15 +58,31 @@ describe("TaskWorkspaceExecutionOverview", () => {
     cleanup();
   });
 
-  it("surfaces results and activity tabs without a separate current-operation rail", () => {
+  it("renders Results as primary content and keeps Activity secondary", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
     renderOverview(view, { commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: nowDocument("Trail") } } });
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
     expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Results" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
-    expect(screen.queryByText("Backend-rendered now tab.")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Results" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
+    expect(screen.getByText("Activity")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
+  });
+
+  it("renders Activity as a side timeline in compact plan mode", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    renderOverview(view, {
+      activityLayout: "side",
+      commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [{ id: "tool", kind: "tool_completed", title: "Tool completed", summary: "Read plan", description: "Read plan", tone: "success", tool: { label: "Read plan", state: "completed", durationMs: 128 } }], savedCount: 1, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+    });
+
+    const activity = screen.getByRole("region", { name: "Activity" });
+    expect(activity).toHaveClass("rounded-xl");
+    expect(screen.getByText("done · 128ms")).toBeInTheDocument();
+    expect(screen.queryByText("▸ Activity")).not.toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
   });
 
 
@@ -93,8 +109,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     };
 
     renderOverview(view, { commandCenter });
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
 
+    expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.getByText("Plan generation update")).toBeInTheDocument();
     expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
     expect(screen.getAllByText("1 shown · 0 live · 1 saved")).toHaveLength(1);
@@ -118,7 +134,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     };
 
     const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [] });
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
 
     rerender(
@@ -135,7 +151,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
         runtimeEvents={[liveEvent]}
       />,
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.getByText("Activity")).toBeInTheDocument();
 
     return waitFor(() => expect(screen.getByText("正在读取计划")).toBeInTheDocument());
   });
@@ -156,19 +172,19 @@ describe("TaskWorkspaceExecutionOverview", () => {
         timestamp: "2026-05-12T10:00:00.000Z",
       }],
     });
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.getByText("Activity")).toBeInTheDocument();
 
     expect(screen.getByText("Plan generation update")).toBeInTheDocument();
     expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
   });
 
 
-  it("renders shared plan output and artifacts in the output tab", () => {
+  it("renders shared plan output and artifacts as primary results content", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
 
     renderOverview(view, { commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Plan output"), trail: nowDocument("Trail") } } });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Results" }));
+    expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
     expect(screen.getByText("Plan output")).toBeInTheDocument();
     expect(screen.queryByText("summary")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Locate source node" })).not.toBeInTheDocument();
@@ -201,7 +217,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Results" }));
+    expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
     expect(screen.getByText("No execution result yet.")).toBeInTheDocument();
   });
 

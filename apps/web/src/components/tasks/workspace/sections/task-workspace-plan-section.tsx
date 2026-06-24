@@ -341,6 +341,7 @@ export function TaskWorkspacePlanSection({
           runtimeEvents={runtimeEvents}
           liveActivity={liveActivity}
           commandCenterCopy={commandCenterCopy}
+          isPlanCompact={graphMode === "compact"}
           copy={copy}
           onAction={focusNodeActions}
         />

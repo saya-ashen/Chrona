@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type {
   ExecutionOverviewCard,
@@ -18,7 +17,6 @@ import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from 
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../model/task-workspace-activity";
 
 type OverviewAction = (nodeId?: string) => void;
-type CommandCenterTab = "output" | "trail";
 
 export type CommandCenterPrimaryAction = {
   kind?: string;
@@ -60,6 +58,20 @@ function buildNodeResultContentSpec(_node: PlanNodeDataModel | null, emptyMessag
   return buildResultSpec([], { emptyMessage });
 }
 
+function withActivityDensity(spec: UiDocument, density: "rail"): UiDocument {
+  const elements = Object.fromEntries(
+    Object.entries(spec.elements).map(([key, element]) => [
+      key,
+      element.type === "ActivityStream"
+        ? { ...element, props: { ...element.props, density } }
+        : element,
+    ]),
+  );
+  return { ...spec, elements };
+}
+
+type ActivityLayout = "below" | "side";
+
 export function TaskWorkspaceExecutionOverview({
   progress,
   readiness,
@@ -72,6 +84,7 @@ export function TaskWorkspaceExecutionOverview({
   primaryAction,
   copy: copyProp,
   commandCenter,
+  activityLayout = "below",
   onAction,
 }: {
   taskId: string;
@@ -87,6 +100,7 @@ export function TaskWorkspaceExecutionOverview({
   liveActivity?: WorkspaceActivityItem[];
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
+  activityLayout?: ActivityLayout;
   onAction?: OverviewAction;
   commandCenter?: {
     documents: {
@@ -97,15 +111,9 @@ export function TaskWorkspaceExecutionOverview({
   } | null;
   commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
 }) {
-  const [activeTab, setActiveTab] = useState<CommandCenterTab>("output");
   const { messages } = useI18n();
   const ws = messages.components?.taskWorkspace ?? {};
   const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
-
-  const tabs: Array<{ id: CommandCenterTab; label: string; badge?: boolean }> = [
-    { id: "output", label: copy.outputTab },
-    { id: "trail", label: copy.trailTab },
-  ];
 
   const trailStore = useMemo(
     () => commandCenter?.documents.trail ? createStateStore(commandCenter.documents.trail.state ?? {}) : null,
@@ -137,6 +145,60 @@ export function TaskWorkspaceExecutionOverview({
     },
   };
   const resultSpec = buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet ?? "No output yet.");
+
+  const trailSpec = commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
+    activity,
+    runtimeEvents,
+    copy: {
+      ...ws,
+      activityTitle: taskWorkspaceActivityMessages.taskTitle,
+      activityEmpty: taskWorkspaceActivityMessages.taskEmpty,
+    },
+    toolLabels: taskWorkspaceActivityMessages.toolLabels,
+  });
+
+  const results = (
+    <section
+      className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border/55 bg-background/55 p-3 pr-2"
+      aria-labelledby="task-workspace-results-heading"
+    >
+      <h3 id="task-workspace-results-heading" className="sr-only">
+        {copy.outputTab}
+      </h3>
+      <SpecRenderer
+        spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
+        handlers={locateHandlers}
+      />
+    </section>
+  );
+
+  const activityTimeline = (
+    <section
+      className="min-h-0 overflow-y-auto rounded-xl border border-border/55 bg-background/35 p-2 pr-1.5 shadow-[inset_1px_0_0_color-mix(in_oklab,var(--primary)_16%,transparent)]"
+      aria-labelledby="task-workspace-activity-heading"
+    >
+      <div className="sticky top-0 z-10 -mx-1 mb-2 rounded-lg bg-background/85 px-1.5 py-1.5 backdrop-blur">
+        <h3
+          id="task-workspace-activity-heading"
+          className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+        >
+          {copy.trailTab}
+        </h3>
+      </div>
+      <SpecRenderer spec={withActivityDensity(trailSpec, "rail")} store={trailStore ?? undefined} />
+    </section>
+  );
+
+  const activityBelow = (
+    <details className="mt-3 shrink-0 rounded-xl border border-border/60 bg-muted/25">
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
+        {copy.trailTab}
+      </summary>
+      <div className="max-h-72 overflow-y-auto border-t border-border/60 p-2 pr-1.5">
+        <SpecRenderer spec={trailSpec} store={trailStore ?? undefined} />
+      </div>
+    </details>
+  );
 
   return (
     <aside
@@ -182,47 +244,17 @@ export function TaskWorkspaceExecutionOverview({
           ) : null}
         </div>
 
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as CommandCenterTab)}
-          className="min-h-0 flex-1 gap-3 overflow-hidden"
-        >
-          <TabsList className="inline-flex h-auto w-fit max-w-full shrink-0 gap-1 rounded-2xl border border-border/60 bg-muted/45 p-1 shadow-[inset_0_1px_0_hsl(var(--background)/0.75),0_1px_2px_hsl(var(--foreground)/0.06)]">
-            {tabs.map((tab) => (
-              <TabsTrigger
-                key={tab.id}
-                value={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="min-h-8 min-w-[6.75rem] flex-none rounded-xl border border-transparent px-4 py-1.5 text-xs font-semibold text-muted-foreground transition-[background-color,border-color,box-shadow,color] hover:bg-background/55 hover:text-foreground data-[state=active]:border-border/70 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_3px_hsl(var(--foreground)/0.10),inset_0_1px_0_hsl(var(--background)/0.90)]"
-              >
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="output" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            <SpecRenderer
-              spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
-              handlers={locateHandlers}
-            />
-          </TabsContent>
-
-          <TabsContent value="trail" className="min-h-0 space-y-2.5 overflow-y-auto pr-1.5">
-            <SpecRenderer
-              spec={commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
-                activity,
-                runtimeEvents,
-                copy: {
-                  ...ws,
-                  activityTitle: taskWorkspaceActivityMessages.taskTitle,
-                  activityEmpty: taskWorkspaceActivityMessages.taskEmpty,
-                },
-                toolLabels: taskWorkspaceActivityMessages.toolLabels,
-              })}
-              store={trailStore ?? undefined}
-            />
-          </TabsContent>
-        </Tabs>
+        {activityLayout === "side" ? (
+          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(11rem,0.32fr)]">
+            {results}
+            {activityTimeline}
+          </div>
+        ) : (
+          <>
+            {results}
+            {activityBelow}
+          </>
+        )}
       </div>
     </aside>
   );

@@ -320,8 +320,8 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
               <p className="mt-1 text-xs text-muted-foreground">{taskWorkspaceActivityMessages.emptyHint}</p>
             </div>
           ) : (
-            <div className="mt-4 pl-1">
-              <ActivityTimeline items={items} />
+            <div className={props.density === "rail" ? "mt-3" : "mt-4 pl-1"}>
+              <ActivityTimeline items={items} density={props.density === "rail" ? "rail" : undefined} />
             </div>
           )}
         </section>
