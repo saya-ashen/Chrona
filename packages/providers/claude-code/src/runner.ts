@@ -770,7 +770,7 @@ class SdkRunner implements ClaudeCodeRunner {
     const skillMode = cfg.controlPlane === "skill";
     const skillRoot = skillMode ? await mountChronaNodeSkill(cfg, input.control?.skillsDir) : undefined;
     const mcpBaseUrl = stripTrailingSlash(cfg.mcpBaseUrl);
-    const mcpUrl = mcpUrlForSession(mcpBaseUrl, input.sessionId);
+    const mcpUrl = mcpUrlForSession(mcpBaseUrl, input.sessionKey ?? input.sessionId);
     const mcpServers = skillMode
       ? undefined
       : {
