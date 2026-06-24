@@ -491,28 +491,13 @@ export function TaskPlanGraph({
 
   const fullGraphDialog = (
     <Dialog open={isFullDialogOpen} onOpenChange={setIsFullDialogOpen}>
-      <DialogContent
-        showCloseButton={false}
-        className="flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[32px] border border-border bg-background p-0 text-foreground shadow-xl"
-      >
-        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-border bg-card px-6 py-5">
-          <div className="flex flex-col gap-1">
-            <DialogTitle className="text-lg font-semibold tracking-tight text-foreground">
-              {graphCopy.fullTitle}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              {graphCopy.fullDescription}
-            </DialogDescription>
+      <DialogContent showCloseButton={false} className="flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[32px] border border-border bg-background p-0 text-foreground shadow-xl">
+        <DialogHeader className="flex-row items-start justify-between gap-4 border-b border-border/70 bg-card px-6 py-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <DialogTitle className="text-base font-semibold tracking-tight text-foreground">{graphCopy.fullTitle}</DialogTitle>
+            <DialogDescription className="max-w-2xl text-sm leading-6 text-muted-foreground">{graphCopy.fullDescription}</DialogDescription>
           </div>
-          <DialogClose
-            render={
-              <button
-                type="button"
-                aria-label={graphCopy.closeDialog}
-                className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              />
-            }
-          >
+          <DialogClose render={<button type="button" aria-label={graphCopy.closeDialog} className="flex size-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition hover:bg-muted hover:text-foreground" />}>
             <X className="size-4" />
           </DialogClose>
         </DialogHeader>
@@ -552,50 +537,22 @@ export function TaskPlanGraph({
   if (resolvedMode === "compact") {
     return (
       <>
-        <div
-          ref={containerRef}
-          className={cn(
-            "min-w-0 w-full max-w-full",
-            className,
-          )}
-        >
-          <div
-            aria-label={graphCopy.ariaLabel}
-            className="relative overflow-hidden rounded-[24px] border border-border bg-card p-3 text-card-foreground shadow-sm"
-            data-graph-mode="compact"
-            data-testid="task-plan-graph"
-          >
-            <div className="relative flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  {graphCopy.compactTitle}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {graphCopy.compactDescription}
-                </p>
+        <div ref={containerRef} className={cn("min-w-0 w-full max-w-full", className)}>
+          <div aria-label={graphCopy.ariaLabel} className="relative overflow-hidden rounded-[24px] border border-border bg-card p-3 text-card-foreground shadow-sm" data-graph-mode="compact" data-testid="task-plan-graph">
+            <div className="flex items-start justify-between gap-3 border-b border-border/60 pb-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.compactTitle}</p>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">{graphCopy.compactDescription}</p>
               </div>
-              <button
-                type="button"
-                className="shrink-0 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:bg-primary-soft"
-                onClick={() => setIsFullDialogOpen(true)}
-              >
+              <button type="button" className="shrink-0 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:bg-primary-soft" onClick={() => setIsFullDialogOpen(true)}>
                 {graphCopy.openFullGraph}
               </button>
             </div>
-
             <div className="relative mt-3 space-y-3">
               <CompactStageStrip stages={compact.stages} graphCopy={graphCopy} />
               <section className="space-y-2">
-                <p className="text-sm font-semibold text-foreground">
-                  {graphCopy.focusTitle}
-                </p>
-                <CompactFocusStack
-                  items={compact.focusItems}
-                  selectedNodeId={selectedNodeId}
-                  onSelect={handleSelectNode}
-                  graphCopy={graphCopy}
-                  summary={compact.summary}
-                />
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.focusTitle}</p>
+                <CompactFocusStack items={compact.focusItems} selectedNodeId={selectedNodeId} onSelect={handleSelectNode} graphCopy={graphCopy} summary={compact.summary} />
               </section>
             </div>
           </div>
@@ -609,14 +566,7 @@ export function TaskPlanGraph({
 
   return (
     <>
-      <div
-        ref={containerRef}
-        className={cn(
-          "min-w-0 w-full max-w-full space-y-3",
-          fillHeight && "flex h-full min-h-0 flex-col",
-          className,
-        )}
-      >
+      <div ref={containerRef} className={cn("min-w-0 w-full max-w-full space-y-3", fillHeight && "flex h-full min-h-0 flex-col", className)}>
         <GraphShell
           graphCopy={graphCopy}
           layout={layout}

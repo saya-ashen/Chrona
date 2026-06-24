@@ -338,23 +338,17 @@ function NodeCardContent({ data, estimatedLabel, kindTheme, runtimeSpotlight, st
       <TypeAnchor node={node} stepNumber={stepNumber} className={anchorClassName} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5 pr-6 text-[10px] font-medium text-muted-foreground">
-          <span className={cn("size-2 rounded-full", styles.dot)} />
           <span className={cn("truncate rounded-full border px-1.5 py-0.5", kindTheme.badge)}>{nodeKindLabel(node.kind ?? node.type, graphCopy)}</span>
+          {runtimeSpotlight ? (
+            <span className={cn("rounded-full border px-1.5 py-0.5 text-[10px] font-medium", runtimeSpotlight.badge)}>{runtimeSpotlight.label}</span>
+          ) : null}
         </div>
 
         <p className="mt-1.5 break-words pr-6 text-[13px] font-semibold leading-snug text-foreground line-clamp-2">{node.title}</p>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {runtimeSpotlight ? (
-            <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", runtimeSpotlight.badge)}>
-              {runtimeSpotlight.label}
-            </span>
-          ) : (
-            <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{node.statusLabel ?? node.status}</span>
-          )}
-          {estimatedLabel ? (
-            <span className="truncate rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{estimatedLabel}</span>
-          ) : null}
+          <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-medium", runtimeSpotlight ? runtimeSpotlight.badge : "border-border bg-muted text-muted-foreground")}>{node.statusLabel ?? node.status}</span>
+          {estimatedLabel ? <span className="truncate rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{estimatedLabel}</span> : null}
         </div>
       </div>
     </div>

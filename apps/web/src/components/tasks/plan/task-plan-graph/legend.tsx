@@ -30,14 +30,13 @@ export function EdgeLegend({
     >
       <div
         className={cn(
-          "inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-border bg-background px-2.5 py-1.5 text-muted-foreground shadow-sm",
-          placement === "top" && "bg-background",
+          "inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-border/80 bg-background/90 px-2.5 py-1.5 text-muted-foreground shadow-sm backdrop-blur",
+          placement === "top" && "bg-background/95",
         )}
         data-testid="task-plan-graph-legend"
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="text-[10px] font-semibold text-foreground">{graphCopy.legendEdges}</p>
             {visibleEdgeItems.map((item) => (
               <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <svg aria-hidden="true" className="shrink-0" height="8" viewBox="0 0 24 8" width="24">
@@ -48,7 +47,6 @@ export function EdgeLegend({
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="task-plan-graph-node-legend">
-            <p className="text-[10px] font-semibold text-foreground">{graphCopy.legendStates}</p>
             {visibleNodeItems.map((item) => (
               <div key={item.label} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <ShapeChip shape={item.shape} tone={item.tone} />
