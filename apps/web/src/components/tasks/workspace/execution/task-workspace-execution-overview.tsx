@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Sparkles } from "lucide-react";
+import { Activity } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
@@ -159,10 +159,10 @@ export function TaskWorkspaceExecutionOverview({
 
   const results = (
     <section
-      className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border/55 bg-background/55 p-3 pr-2"
+      className="min-h-0 flex-1 overflow-y-auto"
       aria-labelledby="task-workspace-results-heading"
     >
-      <h3 id="task-workspace-results-heading" className="sr-only">
+      <h3 id="task-workspace-results-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {copy.outputTab}
       </h3>
       <SpecRenderer
@@ -174,56 +174,40 @@ export function TaskWorkspaceExecutionOverview({
 
   const activityTimeline = (
     <section
-      className="min-h-0 overflow-y-auto rounded-xl border border-border/55 bg-background/35 p-2 pr-1.5 shadow-[inset_1px_0_0_color-mix(in_oklab,var(--primary)_16%,transparent)]"
+      className="min-h-0 overflow-y-auto border-l border-border/55 pl-3"
       aria-labelledby="task-workspace-activity-heading"
     >
-      <div className="sticky top-0 z-10 -mx-1 mb-2 rounded-lg bg-background/85 px-1.5 py-1.5 backdrop-blur">
-        <h3
-          id="task-workspace-activity-heading"
-          className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
-        >
-          {copy.trailTab}
-        </h3>
-      </div>
+      <h3
+        id="task-workspace-activity-heading"
+        className="sticky top-0 z-10 mb-2 flex items-center gap-1.5 bg-background/85 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground backdrop-blur"
+      >
+        <Activity className="size-3" />
+        {copy.trailTab}
+      </h3>
       <SpecRenderer spec={withActivityDensity(trailSpec, "rail")} store={trailStore ?? undefined} />
     </section>
   );
 
   const activityBelow = (
-    <details className="mt-3 shrink-0 rounded-xl border border-border/60 bg-muted/25">
-      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
+    <details className="mt-3 shrink-0 border-t border-border/55 pt-3">
+      <summary className="cursor-pointer select-none text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
         {copy.trailTab}
       </summary>
-      <div className="max-h-72 overflow-y-auto border-t border-border/60 p-2 pr-1.5">
+      <div className="mt-2 max-h-72 overflow-y-auto pr-1.5">
         <SpecRenderer spec={trailSpec} store={trailStore ?? undefined} />
       </div>
     </details>
   );
 
   return (
-    <aside
+    <section
       aria-label={ws.executionOverviewAria ?? "Execution overview"}
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.15rem] border border-border/65 bg-card/95 p-3.5 shadow-[0_10px_35px_rgba(15,23,42,0.07)]"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-4 ring-primary/10">
-              <Sparkles className="size-4" />
-            </span>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                {ws.taskEyebrow ?? "Task"}
-              </p>
-              <h2 className="font-heading text-base font-semibold leading-tight text-foreground">
-                {ws.commandCenter ?? "Execution"}
-              </h2>
-            </div>
-          </div>
-        </div>
 
 
-        <div className="mb-3 shrink-0 space-y-1.5 rounded-xl border border-border/60 bg-muted/35 px-3 py-2">
+        <div className="mb-3 shrink-0 space-y-1.5 rounded-xl bg-muted/25 px-3 py-2">
           <div className="flex items-center justify-between gap-2">
             {statusLabel ? (
               <span className="truncate text-xs font-medium text-muted-foreground">{statusLabel}</span>
@@ -235,9 +219,9 @@ export function TaskWorkspaceExecutionOverview({
             ) : null}
           </div>
           {progress.totalSteps > 0 ? (
-            <div className="h-2 w-full overflow-hidden rounded-full bg-background shadow-inner">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-background shadow-inner">
               <div
-                className="h-full rounded-full bg-primary shadow-[0_0_18px_color-mix(in_oklab,var(--primary)_55%,transparent)] transition-[width]"
+                className="h-full rounded-full bg-primary transition-[width]"
                 style={{ width: `${progress.percentComplete}%` }}
               />
             </div>
@@ -245,7 +229,7 @@ export function TaskWorkspaceExecutionOverview({
         </div>
 
         {activityLayout === "side" ? (
-          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(11rem,0.32fr)]">
+          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(10.5rem,0.3fr)]">
             {results}
             {activityTimeline}
           </div>
@@ -256,6 +240,6 @@ export function TaskWorkspaceExecutionOverview({
           </>
         )}
       </div>
-    </aside>
+    </section>
   );
 }

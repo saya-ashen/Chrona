@@ -99,36 +99,38 @@ export function TaskWorkspacePlanContent({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
+    <div className="flex h-full min-h-0 flex-col">
       {graphPlan && plan ? (
         <>
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 px-1 pt-1">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
               {planSummary ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{planSummary}</p> : null}
             </div>
             {graphModeControls}
           </div>
-          <TaskPlanGraphPanel
-            label={label}
-            plan={graphPlan}
-            mode={graphMode}
-            summary={planSummary}
-            className={graphMode === "compact"
-              ? "min-h-0 min-w-0 w-full flex-1"
-              : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"}
-            fillHeight
-            showOverview={graphMode === "full"}
-          />
-          {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
+          <div className="min-h-0 flex-1 p-2">
+            <TaskPlanGraphPanel
+              label={label}
+              plan={graphPlan}
+              mode={graphMode}
+              summary={planSummary}
+              className={graphMode === "compact"
+                ? "min-h-0 min-w-0 w-full flex-1"
+                : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"}
+              fillHeight
+              showOverview={graphMode === "full"}
+            />
+          </div>
+          {acceptPlanError ? <p className="border-t border-border/55 px-3 py-2 text-xs text-destructive">{acceptPlanError}</p> : null}
         </>
       ) : (
         <div className="flex h-[520px] min-w-0 max-w-full flex-col md:h-[640px] xl:h-full">
-          <div className="mb-2 flex min-w-0 items-center justify-between gap-2 px-1">
+          <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
             {isGraphPlanPending ? null : generatePlanButton}
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-background/70 px-5 text-center text-sm text-muted-foreground">
+          <div className="m-2 flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-background/70 px-5 text-center text-sm text-muted-foreground">
             {isGraphPlanPending
               ? copy.preparingPlanGraph
               : copy.planGraphPlaceholder}

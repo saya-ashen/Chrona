@@ -274,7 +274,7 @@ export function TaskWorkspacePlanSection({
   return (
     <section
       aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
-      className="relative flex flex-col overflow-visible rounded-[1.75rem] border border-border/80 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--canvas)_88%,var(--background)),var(--canvas))] p-2 pb-0 shadow-[0_18px_60px_rgba(15,23,42,0.08)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+      className="relative flex flex-col overflow-visible rounded-[1.75rem] border border-border/80 bg-muted/20 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.06)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
       {stateMessage ? (
         <div
@@ -313,11 +313,11 @@ export function TaskWorkspacePlanSection({
       ) : null}
 
       <div className={graphMode === "compact"
-        ? "grid min-h-[680px] flex-1 gap-2 xl:min-h-0 xl:grid-cols-[minmax(0,0.44fr)_minmax(36rem,1.56fr)]"
-        : "grid min-h-[680px] flex-1 gap-2 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]"}>
+        ? "grid min-h-[680px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,0.44fr)_minmax(36rem,1.56fr)]"
+        : "grid min-h-[680px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]"}>
         <section
           aria-label={copy.executionFlow ?? "Execution flow"}
-          className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/55 shadow-sm"
+          className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/70 bg-background/75"
         >
           <TaskWorkspacePlanContent
             label={label}

@@ -79,7 +79,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     });
 
     const activity = screen.getByRole("region", { name: "Activity" });
-    expect(activity).toHaveClass("rounded-xl");
+    expect(activity).toHaveClass("border-l");
     expect(screen.getByText("done · 128ms")).toBeInTheDocument();
     expect(screen.queryByText("▸ Activity")).not.toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();

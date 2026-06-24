@@ -40,37 +40,51 @@ export function TaskWorkspaceInspector({
 }) {
   return (
     <aside
-      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/45 p-1 shadow-sm"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-background/75"
       aria-label={copy.commandCenterAria ?? "Task command center"}
     >
-      <TaskWorkspaceActionRail
-        taskId={taskId}
-        serverNowSpec={commandCenter?.documents.now ?? null}
-        primaryAction={primaryAction}
-        readiness={consoleView.readiness}
-        attention={consoleView.attention}
-        runtimeEvents={runtimeEvents}
-        commandCenterActionHandlers={commandCenterActionHandlers}
-        copy={copy}
-      />
-      <TaskWorkspaceExecutionOverview
-        taskId={taskId}
-        progress={consoleView.progress}
-        readiness={consoleView.readiness}
-        latestResult={consoleView.latestResult}
-        attention={consoleView.attention}
-        latestCompletedNode={consoleView.latestCompletedNode}
-        artifacts={consoleView.artifacts}
-        activity={consoleView.activity}
-        commandCenterActionHandlers={commandCenterActionHandlers}
-        commandCenter={commandCenter}
-        runtimeEvents={runtimeEvents}
-        liveActivity={liveActivity}
-        primaryAction={primaryAction}
-        copy={commandCenterCopy}
-        activityLayout={isPlanCompact ? "side" : "below"}
-        onAction={onAction}
-      />
+      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border/55 bg-muted/35 px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+            {copy.commandCenter ?? "Task Execution"}
+          </p>
+          {consoleView.progress.totalSteps > 0 ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {consoleView.progress.completedSteps}/{consoleView.progress.totalSteps} steps
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col p-3">
+        <TaskWorkspaceActionRail
+          taskId={taskId}
+          serverNowSpec={commandCenter?.documents.now ?? null}
+          primaryAction={primaryAction}
+          readiness={consoleView.readiness}
+          attention={consoleView.attention}
+          runtimeEvents={runtimeEvents}
+          commandCenterActionHandlers={commandCenterActionHandlers}
+          copy={copy}
+        />
+        <TaskWorkspaceExecutionOverview
+          taskId={taskId}
+          progress={consoleView.progress}
+          readiness={consoleView.readiness}
+          latestResult={consoleView.latestResult}
+          attention={consoleView.attention}
+          latestCompletedNode={consoleView.latestCompletedNode}
+          artifacts={consoleView.artifacts}
+          activity={consoleView.activity}
+          commandCenterActionHandlers={commandCenterActionHandlers}
+          commandCenter={commandCenter}
+          runtimeEvents={runtimeEvents}
+          liveActivity={liveActivity}
+          primaryAction={primaryAction}
+          copy={commandCenterCopy}
+          activityLayout={isPlanCompact ? "side" : "below"}
+          onAction={onAction}
+        />
+      </div>
     </aside>
   );
 }
