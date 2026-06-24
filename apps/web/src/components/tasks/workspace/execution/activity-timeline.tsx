@@ -537,6 +537,13 @@ function railDotClass(tone: Tone) {
   if (tone === "info") return "border-primary bg-primary shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_18%,transparent)]";
   return "border-muted-foreground/50 bg-muted-foreground/70";
 }
+function isRailEntryActive(entry: RenderEntry) {
+  if (entry.type === "tool_pair") return !entry.completed;
+  if (entry.type === "plan_phase") return summarizePlanPhase(entry.items) === "running";
+  if (entry.type === "single") return entry.item.tool?.state === "started" || entry.item.tone === "info" || entry.item.kind === "provider_run";
+  return false;
+}
+
 
 function railLineClass(tone: Tone) {
   if (tone === "danger") return "bg-destructive/45";
@@ -555,11 +562,14 @@ function ActivityRailTimeline({ entries }: { entries: RenderEntry[] }) {
         const tone = railTone(entry);
         const detail = railDetail(entry);
         const isLast = index === lastIdx;
+        const isActiveLatest = isLast && isRailEntryActive(entry);
         return (
           <article key={entry.key} className="relative grid grid-cols-[1rem_minmax(0,1fr)] gap-x-2 py-1.5">
             <div className="relative flex justify-center">
               {!isLast ? <span className={cn("absolute bottom-[-0.625rem] top-4 w-0.5 rounded-full", railLineClass(tone))} /> : null}
-              <span className={cn("relative z-10 mt-1 size-2.5 rounded-full border", railDotClass(tone))} />
+              {isActiveLatest
+                ? <span aria-label="Latest activity running" className={cn("relative z-10 mt-0.5 size-3.5 rounded-full border-2 border-transparent border-t-current animate-spin", tone === "danger" ? "text-destructive" : tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "text-primary")} />
+                : <span className={cn("relative z-10 mt-1 size-2.5 rounded-full border", railDotClass(tone))} />}
             </div>
             <div className="min-w-0">
               <p className="truncate text-[11px] font-semibold leading-snug text-foreground">{railTitle(entry)}</p>

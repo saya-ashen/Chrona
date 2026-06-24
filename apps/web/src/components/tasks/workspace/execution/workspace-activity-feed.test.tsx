@@ -191,4 +191,16 @@ describe("WorkspaceActivityFeed", () => {
     expect(screen.getByText("done · 128ms")).toBeInTheDocument();
     expect(screen.queryByText("completed")).not.toBeInTheDocument();
   });
+
+  it("uses a spinner for the latest running rail event", () => {
+    render(<WorkspaceActivityFeed
+      density="rail"
+      activity={[
+        activity({ id: "started", kind: "tool_started", title: "Tool started", summary: "Reading plan", tone: "info", tool: { name: "chrona_plan_read", label: "Read plan", state: "started" } }),
+      ]}
+    />);
+
+    expect(screen.getByLabelText("Latest activity running")).toHaveClass("animate-spin");
+    expect(screen.getByText("running")).toBeInTheDocument();
+  });
 });
