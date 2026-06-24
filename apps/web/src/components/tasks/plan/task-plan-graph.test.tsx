@@ -1,9 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
-import { TaskPlanGraphInspector } from "@/components/tasks/plan/task-plan-graph/inspector";
 import { buildFlowLayout } from "@/components/tasks/plan/task-plan-graph/layout";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
 
@@ -317,116 +316,10 @@ describe("TaskPlanGraph", () => {
     expect(screen.getByText(longTitle)).toHaveClass("break-words");
 
     fireEvent.click(node);
-    expect(screen.getAllByText(longObjective).length).toBeGreaterThan(0);
-    const errorText = screen.getByText(longError);
-    expect(errorText).toBeInTheDocument();
-    expect(errorText.closest("aside")).toHaveClass("overflow-hidden");
-    expect(screen.getByText(/Next:/)).toBeInTheDocument();
-    expect(screen.getAllByText("Retry after checking checkpoint evidence and provider logs").length).toBeGreaterThan(0);
+    expect(node).toHaveAttribute("data-node-selected", "true");
+    expect(screen.queryByTestId("task-plan-node-overlay")).not.toBeInTheDocument();
   });
 
-  it("shows inspector guidance when no graph node is selected", () => {
-    render(
-      <TaskPlanGraphInspector
-        graphCopy={DEFAULT_GRAPH_COPY}
-        node={null}
-      />,
-    );
-
-    expect(screen.getByText("No node selected")).toBeInTheDocument();
-    expect(screen.getByText(DEFAULT_GRAPH_COPY.inspectorEmpty)).toBeInTheDocument();
-  });
-
-  it("dispatches execution actions from the node inspector", async () => {
-    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Retry queued" });
-
-    render(
-      <TaskPlanGraphInspector
-        graphCopy={DEFAULT_GRAPH_COPY}
-        node={{
-          id: "node-failed",
-          title: "Recover failed node",
-          objective: "Retry the stale failed run.",
-          phase: "execution",
-          status: "pending",
-          type: "task",
-          interactionType: "retry",
-          availableActions: [
-            {
-              id: "task-primary:retry_sync:node-failed",
-              label: "Retry Run",
-              kind: "retry",
-              emphasis: "danger",
-              executionAction: { action: "retry_node", nodeId: "node-failed" },
-            },
-          ],
-        }}
-        onDispatchExecutionAction={onDispatchExecutionAction}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Retry Run" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-
-    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({
-      action: "retry_node",
-      nodeId: "node-failed",
-    }));
-    expect(await screen.findByText("Retry queued")).toBeInTheDocument();
-  });
-
-  it("dispatches the visible start button and preserves activity while node is running", async () => {
-    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Started Node1" });
-    const startAction = {
-      id: "task-primary:start_manual:node-1",
-      label: "Start",
-      kind: "trigger" as const,
-      executionAction: { action: "start_manual" as const },
-    };
-
-    const { rerender } = render(
-      <TaskPlanGraphInspector
-        graphCopy={DEFAULT_GRAPH_COPY}
-        node={{
-          id: "node-1",
-          title: "Node1",
-          objective: "Run today's occurrence.",
-          phase: "execution",
-          status: "ready",
-          type: "task",
-          interactionType: "execute",
-          availableActions: [startAction],
-        }}
-        onDispatchExecutionAction={onDispatchExecutionAction}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
-
-    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" }));
-    await screen.findByText("Started Node1");
-
-    rerender(
-      <TaskPlanGraphInspector
-        graphCopy={DEFAULT_GRAPH_COPY}
-        node={{
-          id: "node-1",
-          title: "Node1",
-          objective: "Run today's occurrence.",
-          phase: "execution",
-          status: "active",
-          active: true,
-          type: "task",
-          interactionType: "execute",
-          availableActions: [startAction],
-        }}
-        onDispatchExecutionAction={onDispatchExecutionAction}
-      />,
-    );
-
-    expect(screen.getByText("Started Node1")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-  });
 
   it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", async () => {
     render(
@@ -681,7 +574,7 @@ describe("TaskPlanGraph", () => {
     const pane = graph.querySelector(".react-flow__pane") as HTMLElement | null;
     expect(pane).not.toBeNull();
     fireEvent.click(pane as HTMLElement);
-    expect(deliverableNode.getAttribute("data-node-selected")).toBe("false");
+    expect(deliverableNode.getAttribute("data-node-selected")).toBe("true");
   });
 
   it("maps semantic node types to flowchart-like shapes", async () => {

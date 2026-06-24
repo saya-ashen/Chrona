@@ -1,7 +1,6 @@
 import { GitBranch, Loader2, Minimize2, Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
-import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
@@ -30,7 +29,6 @@ type TaskWorkspacePlanContentProps = {
   graphMode: "full" | "compact";
   onGraphModeChange: (mode: "full" | "compact") => void;
   onGeneratePlan: () => void;
-  onSelectedNodeChange: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
 };
 
 export function TaskWorkspacePlanContent({
@@ -43,7 +41,6 @@ export function TaskWorkspacePlanContent({
   graphMode,
   onGraphModeChange,
   onGeneratePlan,
-  onSelectedNodeChange,
 }: TaskWorkspacePlanContentProps) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components?.taskWorkspace ?? {}) };
@@ -121,10 +118,7 @@ export function TaskWorkspacePlanContent({
               ? "min-h-0 min-w-0 w-full flex-1"
               : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"}
             fillHeight
-            inspectorPlacement="none"
-            dismissSelectionOnOutsideClick={false}
             showOverview={graphMode === "full"}
-            onSelectedNodeChange={onSelectedNodeChange}
           />
           {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
         </>

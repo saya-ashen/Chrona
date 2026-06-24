@@ -34,7 +34,6 @@ import {
   CompactStageStrip,
 } from "./compact-view";
 import { TaskPlanGraphFrame } from "./frame";
-import { TaskPlanGraphInspector } from "./inspector";
 import { useGraphLegend } from "./legend";
 import { buildFlowLayout, syncNodeState, type FlowLayout } from "./layout";
 import type {
@@ -69,21 +68,16 @@ function GraphShell({
   edges,
   planNodes,
   overviewItems,
-  selectedNode,
-  selectedNodeId,
   currentStepId,
   edgeLegend,
   nodeLegend,
   handleNodeClick,
   stopIfNodeButton,
-  onDismissOverlay,
   onCenterCurrentNode,
   onExpandGraph,
   onFitGraph,
   onZoomIn,
   onZoomOut,
-  onDispatchExecutionAction,
-  inspectorPlacement,
   showOverview,
   fillHeight = false,
   testId,
@@ -94,21 +88,16 @@ function GraphShell({
   edges: FlowLayout["edges"];
   planNodes: TaskPlanGraphPlan["nodes"];
   overviewItems: GraphOverviewItem[];
-  selectedNode: TaskPlanGraphPlan["nodes"][number] | null;
-  selectedNodeId: string | null;
   currentStepId?: string | null;
   edgeLegend: ReturnType<typeof useGraphLegend>["edgeLegend"];
   nodeLegend: ReturnType<typeof useGraphLegend>["nodeLegend"];
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
   stopIfNodeButton: (event: MouseEvent<Element>) => void;
-  onDismissOverlay: () => void;
   onCenterCurrentNode: () => void;
   onExpandGraph: () => void;
   onFitGraph: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onDispatchExecutionAction?: TaskPlanGraphProps["onDispatchExecutionAction"];
-  inspectorPlacement: "overlay" | "none";
   showOverview: boolean;
   fillHeight?: boolean;
   testId?: string;
@@ -116,26 +105,8 @@ function GraphShell({
   const shellRef = useRef<HTMLDivElement | null>(null);
   const currentNode = planNodes.find((node) => node.id === currentStepId)
     ?? planNodes.find((node) => node.status === "active" || node.status === "in_progress")
-    ?? selectedNode;
+    ?? null;
 
-  useEffect(() => {
-    if (!selectedNodeId || !shellRef.current) {
-      return;
-    }
-
-    const root = shellRef.current;
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (!root.contains(target)) return;
-      if (target.closest("[data-testid^='task-plan-node-']")) return;
-      if (target.closest("[data-testid='task-plan-node-overlay']")) return;
-      onDismissOverlay();
-    };
-
-    root.addEventListener("pointerdown", handlePointerDown);
-    return () => root.removeEventListener("pointerdown", handlePointerDown);
-  }, [onDismissOverlay, selectedNodeId]);
 
   return (
     <div ref={shellRef} className={cn("relative min-w-0 max-w-full", fillHeight && "min-h-0 flex-1")}>
@@ -152,11 +123,11 @@ function GraphShell({
             graphCopy={graphCopy}
             items={overviewItems}
             currentTitle={currentNode?.title ?? null}
-            selectedTitle={selectedNode?.title ?? null}
+            selectedTitle={null}
           />
         ) : null}
         handleNodeClick={handleNodeClick}
-        handlePaneClick={onDismissOverlay}
+        handlePaneClick={() => undefined}
         handleNodeDragStart={stopIfNodeButton}
         handleNodeDrag={stopIfNodeButton}
         handleNodeDragStop={stopIfNodeButton}
@@ -168,23 +139,6 @@ function GraphShell({
         currentNodeId={currentNode?.id ?? null}
         testId={testId}
       />
-      {inspectorPlacement === "overlay" && selectedNode ? (
-        <div className="pointer-events-none absolute inset-x-4 top-24 z-[8] flex min-w-0 justify-end sm:top-20">
-          <div
-            className="pointer-events-auto w-full min-w-0 max-w-[min(380px,calc(100%-32px))]"
-            data-testid="task-plan-node-overlay"
-          >
-            <div className="min-w-0 rounded-[24px]">
-              <TaskPlanGraphInspector
-                node={selectedNode}
-                graphCopy={graphCopy}
-                nodes={planNodes}
-                onDispatchExecutionAction={onDispatchExecutionAction}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -249,10 +203,7 @@ export function TaskPlanGraph({
   mode = "full",
   fillHeight = false,
   className,
-  inspectorPlacement = "overlay",
   onSelectedNodeChange,
-  onDispatchExecutionAction,
-  dismissSelectionOnOutsideClick = true,
   showOverview = true,
 }: TaskPlanGraphProps) {
   const { messages } = useI18n();
@@ -270,7 +221,6 @@ export function TaskPlanGraph({
   }
   const graphCopy = graphCopyRef.current.value;
 
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isFullDialogOpen, setIsFullDialogOpen] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [layout, setLayout] = useState<FlowLayout | null>(null);
@@ -280,14 +230,6 @@ export function TaskPlanGraph({
   const observedContainerRef = useRef<HTMLDivElement | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-  const handleSelectNode = useCallback((nodeId: string) => {
-    setSelectedNodeId(nodeId);
-    onSelectedNodeChange?.(plan.nodes.find((node) => node.id === nodeId) ?? null, plan.nodes);
-  }, [onSelectedNodeChange, plan.nodes]);
-
-  const handleDismissOverlay = useCallback(() => {
-    setSelectedNodeId(null);
-  }, []);
 
   const adjustScroll = useCallback((leftRatio: number, topRatio: number) => {
     const scroll = graphRef.current?.querySelector<HTMLElement>("[data-testid='task-plan-graph-scroll']");
@@ -303,28 +245,21 @@ export function TaskPlanGraph({
 
   const { edgeLegend, nodeLegend } = useGraphLegend(graphCopy);
   const compact = useMemo(() => buildCompactViewModel(plan, graphCopy), [graphCopy, plan]);
-  const selectedNode =
-    plan.nodes.find((node) => node.id === selectedNodeId) ?? null;
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (selectedNodeId || plan.state !== "ready") return;
-    const actionableNode = plan.nodes.find((node) => node.availableActions?.some((action) => action.executionAction));
-    if (actionableNode) {
-      setSelectedNodeId(actionableNode.id);
-    }
-  }, [plan.nodes, plan.state, selectedNodeId]);
 
-  useEffect(() => {
-    onSelectedNodeChange?.(selectedNode, plan.nodes);
-  }, [onSelectedNodeChange, plan.nodes, selectedNode]);
+  const handleNodeSelect = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    onSelectedNodeChange?.(plan.nodes.find((planNode) => planNode.id === nodeId) ?? null, plan.nodes);
+  }, [onSelectedNodeChange, plan.nodes]);
 
   const handleNodeClick = useCallback<NodeMouseHandler<FlowGraphNode>>(
     (event, node) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest("button[data-testid^='task-plan-node-']")) return;
-      handleSelectNode(node.id);
+      handleNodeSelect(node.id);
     },
-    [handleSelectNode],
+    [handleNodeSelect],
   );
 
   const stopIfNodeButton = useCallback((event: MouseEvent<Element>) => {
@@ -335,34 +270,15 @@ export function TaskPlanGraph({
   }, []);
 
   useEffect(() => {
-    if (!dismissSelectionOnOutsideClick) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!selectedNodeId) return;
-      const target = event.target as HTMLElement | null;
-      if (!graphRef.current?.contains(target)) {
-        setSelectedNodeId(null);
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, [dismissSelectionOnOutsideClick, selectedNodeId]);
-
-  useEffect(() => {
     if (plan.state !== "ready" || plan.nodes.length === 0) {
       setSelectedNodeId(null);
       return;
     }
-    if (
-      selectedNodeId &&
-      !plan.nodes.some((node) => node.id === selectedNodeId)
-    ) {
+    if (selectedNodeId && !plan.nodes.some((node) => node.id === selectedNodeId)) {
       setSelectedNodeId(null);
     }
   }, [plan, selectedNodeId]);
+
 
   useEffect(() => {
     let active = true;
@@ -380,7 +296,7 @@ export function TaskPlanGraph({
       plan,
       selectedNodeId,
       graphCopy,
-      onSelect: handleSelectNode,
+      onSelect: handleNodeSelect,
     }).then((nextLayout) => {
       if (!active) return;
       setLayout(nextLayout);
@@ -391,20 +307,20 @@ export function TaskPlanGraph({
     return () => {
       active = false;
     };
-  }, [graphCopy, handleSelectNode, plan, selectedNodeId, setEdges, setNodes]);
+  }, [graphCopy, handleNodeSelect, plan, selectedNodeId, setEdges, setNodes]);
 
   useEffect(() => {
     setNodes((current) =>
       syncNodeState(current, {
         selectedNodeId,
         graphCopy,
-        onSelect: handleSelectNode,
+        onSelect: handleNodeSelect,
         focusNodeIds: plan.analytics.reachableFromActiveIds,
       }),
     );
   }, [
     graphCopy,
-    handleSelectNode,
+    handleNodeSelect,
     plan.analytics.reachableFromActiveIds,
     selectedNodeId,
     setNodes,
@@ -510,21 +426,16 @@ export function TaskPlanGraph({
               edges={edges}
               planNodes={plan.nodes}
               overviewItems={overviewItems}
-              selectedNode={selectedNode}
-              selectedNodeId={selectedNodeId}
               currentStepId={plan.currentStepId}
               edgeLegend={edgeLegend}
               nodeLegend={nodeLegend}
               handleNodeClick={handleNodeClick}
               stopIfNodeButton={stopIfNodeButton}
-              onDismissOverlay={handleDismissOverlay}
               onCenterCurrentNode={handleCenterCurrentNode}
               onExpandGraph={() => setIsFullDialogOpen(true)}
               onFitGraph={handleFitGraph}
               onZoomIn={handleZoomIn}
               onZoomOut={handleZoomOut}
-              onDispatchExecutionAction={onDispatchExecutionAction}
-              inspectorPlacement={inspectorPlacement}
               showOverview={showOverview}
               testId="task-plan-graph-full-dialog"
             />
@@ -552,7 +463,7 @@ export function TaskPlanGraph({
               <CompactStageStrip stages={compact.stages} graphCopy={graphCopy} />
               <section className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.focusTitle}</p>
-                <CompactFocusStack items={compact.focusItems} selectedNodeId={selectedNodeId} onSelect={handleSelectNode} graphCopy={graphCopy} summary={compact.summary} />
+                <CompactFocusStack items={compact.focusItems} selectedNodeId={selectedNodeId} onSelect={handleNodeSelect} graphCopy={graphCopy} summary={compact.summary} />
               </section>
             </div>
           </div>
@@ -575,21 +486,16 @@ export function TaskPlanGraph({
           fillHeight={fillHeight}
           planNodes={plan.nodes}
           overviewItems={overviewItems}
-          selectedNode={selectedNode}
-          selectedNodeId={selectedNodeId}
           currentStepId={plan.currentStepId}
           edgeLegend={edgeLegend}
           nodeLegend={nodeLegend}
           handleNodeClick={handleNodeClick}
           stopIfNodeButton={stopIfNodeButton}
-          onDismissOverlay={handleDismissOverlay}
           onCenterCurrentNode={handleCenterCurrentNode}
           onExpandGraph={() => setIsFullDialogOpen(true)}
           onFitGraph={handleFitGraph}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
-          onDispatchExecutionAction={onDispatchExecutionAction}
-          inspectorPlacement={inspectorPlacement}
           showOverview={showOverview}
         />
       </div>

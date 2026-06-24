@@ -163,10 +163,7 @@ export type TaskPlanGraphProps = {
   fillHeight?: boolean;
   className?: string;
   plan: TaskPlanGraphPlan;
-  inspectorPlacement?: "overlay" | "none";
   onSelectedNodeChange?: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
-  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<{ message: string }>;
-  dismissSelectionOnOutsideClick?: boolean;
   showOverview?: boolean;
 };
 
