@@ -13,10 +13,11 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
 }));
 
 vi.mock("@/components/tasks/panels/task-plan-graph-panel", () => ({
-  TaskPlanGraphPanel: ({ plan }: {
+  TaskPlanGraphPanel: ({ plan, mode }: {
     plan: { nodes: Array<{ id: string; title: string }> };
+    mode?: "full" | "compact";
   }) => (
-    <div data-testid="task-plan-graph-panel">
+    <div data-testid="task-plan-graph-panel" data-graph-mode={mode ?? "full"}>
       {plan.nodes.map((node) => (
         <button
           key={node.id}
@@ -162,6 +163,7 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
     const getCommandCenter = () => screen.getAllByRole("complementary", { name: "Task command center" }).at(-1)!;
+    const getCurrentGraphPanel = () => screen.getAllByTestId("task-plan-graph-panel").at(-1)!;
     const commandCenter = getCommandCenter();
     expect(screen.getByRole("region", { name: "Execution flow" })).toBeInTheDocument();
     expect(within(commandCenter).getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
@@ -209,6 +211,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(getCommandCenter()).getByRole("button", { name: "Start plan" })).toBeInTheDocument();
     fireEvent.click(within(getCommandCenter()).getByRole("button", { name: "Start plan" }));
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
+    expect(getCurrentGraphPanel()).toHaveAttribute("data-graph-mode", "full");
 
     accepted.rerender(
       <TaskWorkspacePlanSection
@@ -234,6 +237,7 @@ describe("TaskWorkspacePlanSection", () => {
     );
     expect(within(getCommandCenter()).getByLabelText(/Decision/)).toBeInTheDocument();
     expect(within(getCommandCenter()).getByText("Tool: Starting plan")).toBeInTheDocument();
+    await waitFor(() => expect(getCurrentGraphPanel()).toHaveAttribute("data-graph-mode", "compact"));
   });
 
   it("adds generate plan as the command center operation when no plan exists", () => {

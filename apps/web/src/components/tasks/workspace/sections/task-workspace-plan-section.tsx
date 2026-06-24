@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
@@ -145,6 +145,16 @@ export function TaskWorkspacePlanSection({
   const isPlanAwaitingAcceptance = Boolean(plan && !isPlanAccepted);
   const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
+  useEffect(() => {
+    if (isGeneratingPlan) {
+      setGraphMode("full");
+      return;
+    }
+
+    if (hasGraphExecutionStarted || hasTaskCompleted) {
+      setGraphMode("compact");
+    }
+  }, [hasGraphExecutionStarted, hasTaskCompleted, isGeneratingPlan]);
   const currentOperationNode = consoleView.nodeDetail.currentNode;
   const taskPrimaryAction = pageData.task.executionSummary?.primaryAction ?? null;
   const primaryActionNodeId = graphNodeIdForAction(taskPrimaryAction, pageData, graphPlan);
