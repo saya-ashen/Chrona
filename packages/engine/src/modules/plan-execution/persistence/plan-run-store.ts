@@ -8,6 +8,7 @@ import type {
   NodeAttempt,
   NodeResult,
   NodeRuntimeState,
+  PlanOutputState,
   PlanGraph,
   PlanRun,
 } from "@chrona/contracts/ai";
@@ -25,11 +26,22 @@ function asJsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
+function createEmptyPlanOutput(): PlanOutputState {
+  return {
+    spec: null,
+    revision: 0,
+    updatedAt: null,
+    updatedByNodeId: null,
+    history: [],
+  };
+}
+
 type MutablePlanRuntimeRecord = {
   graph: PlanGraph;
   attempts: NodeAttempt[];
   results: NodeResult[];
   executionContextSnapshots: ExecutionContextSnapshot[];
+  planOutput: PlanOutputState;
 };
 
 type PersistedPlanRunRecord = {
@@ -44,6 +56,7 @@ type SavedPlanRunState = {
   attempts: NodeAttempt[];
   results: NodeResult[];
   executionContextSnapshots: ExecutionContextSnapshot[];
+  planOutput: PlanOutputState;
   executionOwnerId: string | null;
   executionOwnerScope: string | null;
   executionLeaseUntil: Date | null;
@@ -94,6 +107,7 @@ function toPersistedPlanRunRecord(input: {
   attempts?: NodeAttempt[];
   results?: NodeResult[];
   executionContextSnapshots?: ExecutionContextSnapshot[];
+  planOutput?: PlanOutputState;
   planRun?: PlanRun;
 }): PersistedPlanRunRecord {
   const existing = input.existing ?? null;
@@ -119,6 +133,7 @@ function toPersistedPlanRunRecord(input: {
       results: input.results ?? existingMutable?.results ?? [],
       executionContextSnapshots:
         input.executionContextSnapshots ?? existingMutable?.executionContextSnapshots ?? [],
+      planOutput: input.planOutput ?? existingMutable?.planOutput ?? createEmptyPlanOutput(),
     };
   } else if (!mutableGraph && input.compiledPlan) {
     mutableGraph = {
@@ -129,6 +144,7 @@ function toPersistedPlanRunRecord(input: {
       attempts: [],
       results: [],
       executionContextSnapshots: [],
+      planOutput: input.planOutput ?? createEmptyPlanOutput(),
     };
   }
 
@@ -149,6 +165,7 @@ export async function savePlanRun(input: {
   attempts?: NodeAttempt[];
   results?: NodeResult[];
   executionContextSnapshots?: ExecutionContextSnapshot[];
+  planOutput?: PlanOutputState;
 }): Promise<PlanRun> {
   const existingRow = await db.taskPlanRun.findFirst({
     where: {
@@ -169,6 +186,7 @@ export async function savePlanRun(input: {
     attempts: input.attempts,
     results: input.results,
     executionContextSnapshots: input.executionContextSnapshots,
+    planOutput: input.planOutput,
     planRun: input.run,
   });
 
@@ -217,6 +235,7 @@ export async function savePlanRunGuarded(input: {
   attempts: NodeAttempt[];
   results: NodeResult[];
   executionContextSnapshots: ExecutionContextSnapshot[];
+  planOutput?: PlanOutputState;
 }): Promise<{ committed: boolean; planRun: PlanRun }> {
   const existingRow = await db.taskPlanRun.findFirst({
     where: {
@@ -243,6 +262,7 @@ export async function savePlanRunGuarded(input: {
     attempts: input.attempts,
     results: input.results,
     executionContextSnapshots: input.executionContextSnapshots,
+    planOutput: input.planOutput,
     planRun: input.run,
   });
 
@@ -287,6 +307,7 @@ export async function getPlanRun(
       attempts: record.mutableGraph.attempts,
       results: record.mutableGraph.results,
       executionContextSnapshots: record.mutableGraph.executionContextSnapshots,
+      planOutput: record.mutableGraph.planOutput ?? createEmptyPlanOutput(),
       executionOwnerId: row.executionOwnerId,
       executionOwnerScope: row.executionOwnerScope,
       executionLeaseUntil: row.executionLeaseUntil,
@@ -303,6 +324,7 @@ export async function getPlanRun(
       attempts: [],
       results: [],
       executionContextSnapshots: [],
+      planOutput: createEmptyPlanOutput(),
       executionOwnerId: row.executionOwnerId,
       executionOwnerScope: row.executionOwnerScope,
       executionLeaseUntil: row.executionLeaseUntil,
@@ -315,6 +337,7 @@ export async function getPlanRun(
     attempts: [],
     results: [],
     executionContextSnapshots: [],
+    planOutput: createEmptyPlanOutput(),
   };
 
   await savePlanRun({
@@ -328,6 +351,7 @@ export async function getPlanRun(
     attempts: migrated.attempts,
     results: migrated.results,
     executionContextSnapshots: migrated.executionContextSnapshots,
+    planOutput: migrated.planOutput,
   });
 
   return {
@@ -337,6 +361,7 @@ export async function getPlanRun(
     attempts: migrated.attempts,
     results: migrated.results,
     executionContextSnapshots: migrated.executionContextSnapshots,
+    planOutput: migrated.planOutput,
     executionOwnerId: row.executionOwnerId,
     executionOwnerScope: row.executionOwnerScope,
     executionLeaseUntil: row.executionLeaseUntil,

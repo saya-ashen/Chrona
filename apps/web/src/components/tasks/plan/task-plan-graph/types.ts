@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { CheckpointActionKind, ExecutionActionInput, ExecutionCheckpoint, NodeResult, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
+import type { CheckpointActionKind, ExecutionActionInput, ExecutionCheckpoint, NodeResult, NodeResultEvidence } from "@chrona/contracts/ai";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
@@ -100,7 +100,6 @@ export type PlanNodeDataModel = {
   completionSummary?: string | null;
   result?: NodeResult | null;
   inputFields?: Record<string, string>;
-  resultOutputs?: NodeResultOutput[];
   resultEvidence?: NodeResultEvidence | null;
   branchLabels?: string[];
   options?: string[];

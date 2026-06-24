@@ -48,10 +48,6 @@ function textField(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
 
-function outputValues(node: EffectivePlanNode): unknown[] | undefined {
-  const outputs = node.result?.outputs;
-  return Array.isArray(outputs) && outputs.length > 0 ? outputs : undefined;
-}
 
 function dependencyIds(node: EffectivePlanNode): Set<string> {
   return new Set(node.dependencies.filter((id) => typeof id === "string" && id.length > 0));
@@ -118,6 +114,7 @@ function compactPreviousResults(input: {
   plan: EffectivePlanGraph;
   history: SemanticRefHistory;
   node: EffectivePlanNode;
+  planOutput?: NodeRuntimeInput["context"]["planOutput"];
 }): NodeRuntimeInput["context"] {
   const directDependencyIds = dependencyIds(input.node);
   const completed = input.plan.nodes.filter((node) => node.status === "completed" || node.status === "skipped");
@@ -127,7 +124,6 @@ function compactPreviousResults(input: {
       nodeRef: refForNode(input.history, node.id).ref,
       title: node.title,
       summary: outputSummary(node),
-      outputs: outputValues(node),
     }));
   const globalItems = completed
     .filter((node) => !matchesDependency(node, directDependencyIds))
@@ -142,6 +138,7 @@ function compactPreviousResults(input: {
     ...(globalItems.length > 0
       ? { globalSummary: globalItems.slice(0, 3).join("; ") + (globalItems.length > 3 ? `; +${globalItems.length - 3} more` : "") }
       : {}),
+    planOutput: input.planOutput ?? { revision: 0, spec: null, updatedAt: null },
   };
 }
 
@@ -246,6 +243,7 @@ export function branchBindingForRef(input: {
 export function buildNodeRuntimeInput(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
+  planOutput?: NodeRuntimeInput["context"]["planOutput"];
 }): NodeRuntimeInput {
   const history = buildSemanticRefHistory(input.plan);
   const currentRef = refForNode(history, input.node.id);
@@ -261,7 +259,7 @@ export function buildNodeRuntimeInput(input: {
 
   return {
     node: runtimeNode(input.node, currentRef.ref),
-    context: compactPreviousResults({ plan: input.plan, history, node: input.node }),
+    context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput }),
     branchOptions,
   };
 }

@@ -1,7 +1,6 @@
 // Result + runtime-status types are owned by @chrona/contracts/ai.
 export type {
   NodeResult,
-  NodeResultOutput,
   NodeResultEvidence,
   NodeActionForm,
   NodeActionFormField,

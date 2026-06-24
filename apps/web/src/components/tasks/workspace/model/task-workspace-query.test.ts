@@ -25,7 +25,6 @@ function node(input: Partial<PlanNodeDataModel> & { id: string; status: PlanNode
     availableActions: input.availableActions,
     completionSummary: input.completionSummary,
     result: input.result,
-    resultOutputs: input.resultOutputs,
   };
 }
 
@@ -282,7 +281,6 @@ describe("task workspace execution console view model", () => {
         id: "done",
         status: "done",
         completionSummary: "Finished research",
-        resultOutputs: [],
       })]),
     });
 
@@ -777,23 +775,17 @@ describe("task workspace execution console view model", () => {
     expect(view.readiness).toMatchObject({ description: "Run first step", actionLabel: "Open run controls", actionNodeId: "ready" });
   });
 
-  it("keeps latest completed node available when result only has a renderable spec", () => {
+  it("does not treat node-local renderable output as latest plan output", () => {
     const specOnly = node({
       id: "spec-output",
       status: "done",
-      resultOutputs: [{
-        root: "root",
-        elements: {
-          root: { type: "Text", props: { children: "Rendered result" } },
-        },
-      }],
     });
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData(),
       graphPlan: graph([specOnly]),
     });
 
-    expect(view.latestCompletedNode?.id).toBe("spec-output");
+    expect(view.latestCompletedNode).toBeNull();
     expect(view.latestResult).toMatchObject({
       id: "latest-result-empty",
       description: "No execution result yet.",

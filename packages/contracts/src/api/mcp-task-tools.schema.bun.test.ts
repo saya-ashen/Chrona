@@ -164,22 +164,23 @@ describe("MCP task tool contracts", () => {
     });
 
     expect(parseChronaToolPayload("chrona.node.read", undefined)).toEqual({});
-    expect(() => parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "markdown", content: "Done" }] })).toThrow();
-    expect(() => parseChronaToolPayload("chrona.node.output", { outputs: [{ kind: "json", value: { foo: "bar" } }] })).toThrow();
-    expect(parseChronaToolPayload("chrona.node.output", {
-      mode: "replace",
-      spec: {
-        root: "root",
-        elements: [
-          { id: "root", type: "Card", props: { title: "Done" }, children: [] },
-        ],
-        state: { status: "done" },
-      },
-    })).toMatchObject({
-      mode: "replace",
-      spec: { root: "root" },
+    expect(() => parseChronaToolPayload("chrona.plan.output", { outputs: [{ kind: "markdown", content: "Done" }] })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.plan.output", { outputs: [{ kind: "json", value: { foo: "bar" } }] })).toThrow();
+    expect(parseChronaToolPayload("chrona.plan.output", {
+      patches: [
+        { op: "add", path: "/root", value: "root" },
+        { op: "add", path: "/elements/root", value: { type: "Card", props: { title: "Done" }, children: [] } },
+      ],
+      summary: "Updated plan output",
+    })).toEqual({
+      patches: [
+        { op: "add", path: "/root", value: "root" },
+        { op: "add", path: "/elements/root", value: { type: "Card", props: { title: "Done" }, children: [] } },
+      ],
+      summary: "Updated plan output",
     });
-    expect(() => parseChronaToolPayload("chrona.node.output", {
+    expect(() => parseChronaToolPayload("chrona.plan.output", { spec: { root: "root", elements: {} }, mode: "replace" })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.plan.output", {
       outputs: [{ kind: "json", title: "Wrong wrapper", value: { root: "root", elements: {} } }],
     })).toThrow();
     expect(parseChronaToolPayload("chrona.node.complete", { summary: "Done" })).toEqual({ summary: "Done" });
@@ -208,8 +209,8 @@ describe("MCP task tool contracts", () => {
     expect(() => parseChronaToolPayload("chrona.node.condition_select", { nodeId: "condition-node", branchRef: "B20260516-01-A", nextNodeId: "node-2", summary: "No extra ids" })).toThrow();
   });
 
-  it("parses array-form node output payloads into flat specs", () => {
-    expect(parseChronaToolPayload("chrona.node.output", {
+  it("rejects legacy plan output payloads", () => {
+    expect(() => parseChronaToolPayload("chrona.plan.output", {
       spec: {
         root: "root",
         elements: [
@@ -217,25 +218,15 @@ describe("MCP task tool contracts", () => {
           { id: "table", type: "Table", props: { columns: ["A"], rows: [["A"]] }, children: [] },
         ],
       },
-    })).toMatchObject({
-      spec: {
-        root: "root",
-        elements: {
-          root: { type: "Stack", props: {}, children: ["table"] },
-          table: { type: "Table", props: { columns: ["A"], rows: [["A"]] }, children: [] },
-        },
-      },
-    });
-
-    expect(() => parseChronaToolPayload("chrona.node.output", {
-      spec: { root: "missing", elements: [{ id: "root", type: "Stack", props: {}, children: [] }] },
     })).toThrow();
-    expect(() => parseChronaToolPayload("chrona.node.output", {
-      spec: { root: "root", elements: [{ id: "root", type: "Stack", props: {}, children: ["missing"] }] },
+
+    expect(() => parseChronaToolPayload("chrona.plan.output", {
+      spec: { root: "root", elements: { root: { type: "Stack", props: {}, children: [] } } },
+      mode: "replace",
     })).toThrow();
   });
   it("defines agent control actions from public MCP payload contracts", () => {
-    expect(agentControlActionPayloadSchemas.output).toBeDefined();
+    expect(agentControlActionPayloadSchemas.plan_output).toBeDefined();
     expect(agentControlActionBodySchema.parse({
       kind: "fail",
       payload: { error: "Command failed" },

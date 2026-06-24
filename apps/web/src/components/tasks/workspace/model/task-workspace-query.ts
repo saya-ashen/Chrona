@@ -259,19 +259,13 @@ export function pickWorkspaceCurrentNode(
 }
 
 function nodeResultSummary(node: PlanNodeDataModel) {
-  return node.completionSummary
-    ?? node.result?.outputSummary
-    ?? null;
-}
-
-function hasSpecResultOutput(node: PlanNodeDataModel): boolean {
-  return Boolean(node.resultOutputs?.length);
+  return node.completionSummary ?? null;
 }
 
 function pickLatestResultNode(graphPlan: TaskPlanGraphPlan | null) {
   return [...(graphPlan?.steps ?? graphPlan?.nodes ?? [])]
     .reverse()
-    .find((node) => nodeResultSummary(node) || hasSpecResultOutput(node))
+    .find((node) => nodeResultSummary(node))
     ?? null;
 }
 

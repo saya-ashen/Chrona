@@ -223,7 +223,6 @@ describe("TaskPlanGraph", () => {
               status: "done",
               type: "task",
               displayType: "task",
-              resultOutputs: [],
             },
             {
               id: "node-running",
@@ -271,7 +270,7 @@ describe("TaskPlanGraph", () => {
     );
 
     expect(await screen.findByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-execution-status", "completed");
-    expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-has-artifacts", "true");
+    expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-has-artifacts", "false");
     expect(screen.getByTestId("task-plan-node-node-running")).toHaveAttribute("data-node-execution-status", "running");
     expect(screen.getByTestId("task-plan-node-node-waiting")).toHaveAttribute("data-node-execution-status", "waiting");
     expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute("data-node-execution-status", "approval-needed");
@@ -1210,8 +1209,8 @@ describe("TaskPlanGraph", () => {
     expect(screen.queryByTestId("task-plan-graph-scroll")).not.toBeInTheDocument();
 
     expect(screen.getByText("Current progress")).toBeInTheDocument();
-    expect(screen.getByText("Action / blocked")).toBeInTheDocument();
-    expect(screen.getByText("Next summary")).toBeInTheDocument();
+    expect(screen.queryByText("Action / blocked")).not.toBeInTheDocument();
+    expect(screen.queryByText("Next summary")).not.toBeInTheDocument();
 
     const currentOutlineNode = screen.getByTestId("task-plan-outline-node-node-current");
     expect(currentOutlineNode.getAttribute("data-node-current")).toBe("true");
@@ -1229,8 +1228,6 @@ describe("TaskPlanGraph", () => {
     const deliverableOutlineNode = screen.getByTestId("task-plan-outline-node-node-deliverable");
     expect(deliverableOutlineNode).toHaveTextContent("1 upstream");
 
-    const compactRail = screen.getByTestId("task-plan-compact-groups");
-    expect(compactRail.className).toContain("border-l");
 
     const openFullButton = screen.getByRole("button", { name: "Open full graph" });
     fireEvent.click(openFullButton);

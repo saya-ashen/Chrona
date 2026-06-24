@@ -3,7 +3,6 @@ import { normalizeResultEvidence } from "../evidence";
 import { resolveEffectivePlanGraph } from "../resolve";
 import type { GraphExecutionState, GraphSubmittedNodeResult } from "../execution/types";
 import type { NodeAttempt, NodeResult } from "../types";
-import { normalizeResultOutputs } from "../execution/result-normalization";
 
 export function approveCurrentNodeResult(input: {
   state: GraphExecutionState;
@@ -142,20 +141,6 @@ export function submitNodeResultState(input: {
         result.nodeId === input.nodeResult.nodeId &&
         result.status === "current",
     );
-  // Outputs accumulate across the node's lifetime. Partial outputs submitted
-  // via chrona_node_output live on the prior "current" result; completion
-  // (chrona_node_complete) may carry additional outputs. Merge both so the
-  // completed node keeps every submitted output instead of dropping the
-  // accumulated ones when the prior result is superseded.
-  const completionOutputs =
-    input.nodeResult.status === "done"
-      ? normalizeResultOutputs(input.nodeResult.output)
-      : undefined;
-  const accumulatedOutputs = [
-    ...(currentResult?.outputs ?? []),
-    ...(completionOutputs ?? []),
-  ];
-  const mergedOutputs = accumulatedOutputs.length > 0 ? accumulatedOutputs : undefined;
   const currentAttempt = [...input.state.attempts]
     .reverse()
     .find(
@@ -178,7 +163,6 @@ export function submitNodeResultState(input: {
         input.nodeResult.status === "done"
           ? input.nodeResult.summary ?? currentResult?.outputSummary
           : undefined,
-      outputs: input.nodeResult.status === "done" ? mergedOutputs : undefined,
       error: input.nodeResult.status === "failed"
         ? input.nodeResult.error
         : input.nodeResult.status === "cancelled" || input.nodeResult.status === "blocked"
@@ -225,7 +209,6 @@ export function submitNodeResultState(input: {
           ...baseResult,
           status: "current",
           outputSummary: input.nodeResult.summary ?? currentResult?.outputSummary,
-          outputs: mergedOutputs,
           evidence,
           selectedBranch: input.nodeResult.selectedBranch,
         };

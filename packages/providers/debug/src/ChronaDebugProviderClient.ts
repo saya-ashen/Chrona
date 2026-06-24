@@ -32,7 +32,7 @@ export type ChronaDebugProviderConfig = {
 };
 
 const PLAN_TOOL = "chrona_plan_generate";
-const NODE_OUTPUT_TOOL = "chrona_node_output";
+const PLAN_OUTPUT_TOOL = "chrona_plan_output";
 const NODE_COMPLETE_TOOL = "chrona_node_complete";
 const CONDITION_SELECT_TOOL = "chrona_condition_select";
 const DEFAULT_DEBUG_PROVIDER_PROFILE: DebugProviderProfile = "deterministic";
@@ -497,18 +497,19 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "tool_call",
-        tool: NODE_OUTPUT_TOOL,
+        tool: PLAN_OUTPUT_TOOL,
         callId: outputCallId,
         input: {
           summary: `Debug provider produced output for ${title}.`,
-          outputs: [
+          patches: [
+            { op: "add", path: "/root", value: "root" },
             {
-              root: "root",
-              elements: {
-                root: {
-                  type: "JsonView",
-                  props: { value: { provider: this.provider, nodeTitle: title } },
-                },
+              op: "add",
+              path: "/elements/root",
+              value: {
+                type: "JsonView",
+                props: { value: { provider: this.provider, nodeTitle: title } },
+                children: [],
               },
             },
           ],
@@ -519,7 +520,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "tool_result",
-        tool: NODE_OUTPUT_TOOL,
+        tool: PLAN_OUTPUT_TOOL,
         callId: outputCallId,
         result: { ok: true, message: `Debug provider submitted output for ${title}.` },
       };

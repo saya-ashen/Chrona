@@ -163,17 +163,15 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
 
-  it("renders the latest completed node result and artifacts in the output tab", () => {
+  it("renders shared plan output and artifacts in the output tab", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
-    const onAction = vi.fn();
 
-    renderOverview(view, { onAction });
+    renderOverview(view, { commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Plan output"), trail: nowDocument("Trail") } } });
 
     fireEvent.click(screen.getByRole("tab", { name: "Results" }));
-    expect(screen.getByText("summary")).toBeInTheDocument();
-    expect(screen.queryByText(/runtimeRunRef/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Locate source node" }));
-    expect(onAction).toHaveBeenCalledWith("done");
+    expect(screen.getByText("Plan output")).toBeInTheDocument();
+    expect(screen.queryByText("summary")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Locate source node" })).not.toBeInTheDocument();
     expect(screen.getByText("Report")).toBeInTheDocument();
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });

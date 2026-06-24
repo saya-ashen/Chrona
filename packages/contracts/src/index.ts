@@ -170,7 +170,7 @@ export {
   chronaToolResultSchema,
   chronaToolStatusSchema,
   isChronaToolMutating,
-  describeChronaNodeOutputPublicTool,
+  describeChronaPlanOutputPublicTool,
   parseChronaToolPayload,
 } from "./api/mcp-task-tools.schema";
 
@@ -250,7 +250,9 @@ export type {
   CheckpointResponse,
   ArtifactRef,
   NodeResultEvidence,
-  NodeResultOutput,
+  PlanOutputPatch,
+  PlanOutputRevision,
+  PlanOutputState,
   ExecutionContextSnapshot,
   NodeAttempt,
   RuntimeCommand,

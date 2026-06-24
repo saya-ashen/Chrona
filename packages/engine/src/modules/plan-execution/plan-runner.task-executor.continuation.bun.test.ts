@@ -108,7 +108,7 @@ describe("plan-runner task executor continuation", () => {
     ]);
   });
 
-  it("fails a completed runtime run that has no terminal node output", async () => {
+  it("fails a completed runtime run that has no terminal plan output", async () => {
     executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "started",
       summary: "First runtime run started",

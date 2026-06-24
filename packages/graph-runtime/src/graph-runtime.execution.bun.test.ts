@@ -202,7 +202,6 @@ describe("graph-runtime execution", () => {
     ]);
     expect(second.state.results[1]).toMatchObject({
       evidence: { runId: "run_1" },
-      outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { selected: "yes" } } } } }],
     });
     expect(second.events.map((event) => event.type)).toEqual([
       "command_received",
@@ -384,7 +383,6 @@ describe("graph-runtime execution", () => {
           attemptId: "attempt_left_1",
           status: "current",
           outputSummary: "Provider returned final output but terminal tool submission failed",
-          outputs: undefined,
         },
       ],
     });

@@ -100,7 +100,7 @@ export async function executeValidatedTool(
       });
     case "chrona.node.read":
       return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
-    case "chrona.node.output":
+    case "chrona.plan.output":
     case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete":

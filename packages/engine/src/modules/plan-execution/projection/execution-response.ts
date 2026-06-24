@@ -4,6 +4,7 @@ import type {
   PlanExecutionResult,
   PlanExecutionStatus,
   WaitKind,
+  PlanOutputState,
 } from "@chrona/contracts/ai";
 import { buildCommandCenterCheckpointSpec } from "@chrona/ui-protocol";
 import { deriveExecutionCheckpoint } from "../execution-checkpoint";
@@ -22,6 +23,7 @@ export function buildExecutionResponse(input: {
   errorDetails?: unknown;
   waitKind?: WaitKind;
   checkpoint?: ExecutionCheckpoint | null;
+  planOutput?: Pick<PlanOutputState, "spec" | "revision" | "updatedAt" | "updatedByNodeId">;
 }): PlanExecutionResult {
   const checkpoint = input.checkpoint ?? (
     input.executionSessionId && input.planRunId
@@ -53,6 +55,7 @@ export function buildExecutionResponse(input: {
     waitingNodeIds: input.effective.waitingNodeIds,
     blockedNodeIds: input.effective.blockedNodeIds,
     checkpoint,
+    planOutput: input.planOutput ?? { spec: null, revision: 0, updatedAt: null, updatedByNodeId: null },
     ui: { currentOperationSpec },
     message: input.message,
     ...(input.errorDetails ? { errorDetails: input.errorDetails } : {}),

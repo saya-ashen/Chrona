@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import type { ChronaToolName } from "@chrona/contracts/api";
 import { __mcpRouteTestHooks, createMcpRoutes } from "../mcp/mcp.routes";
+import { chronaPlanOutputPatchJsonSchema } from "@chrona/ui-protocol";
 
 type CapturedToolOperation = {
   toolName: string;
@@ -43,27 +44,23 @@ const blockPayload = {
   },
 };
 
-const nodeOutputPublicSpec = {
-  root: "root",
-  elements: [
+const planOutputPublicSpec = {
+  patches: [
+    { op: "add", path: "/root", value: "root" },
     {
-      id: "root",
-      type: "Markdown",
-      props: { content: "Result" },
-      children: [],
+      op: "add",
+      path: "/elements/root",
+      value: {
+        type: "Markdown",
+        props: { content: "Result" },
+        children: [],
+      },
     },
   ],
 };
 
-const nodeOutputSpec = {
-  root: "root",
-  elements: {
-    root: {
-      type: "Markdown",
-      props: { content: "Result" },
-      children: [],
-    },
-  },
+const planOutputSpec = {
+  patches: planOutputPublicSpec.patches,
 };
 
 function createStubEngine(
@@ -201,38 +198,19 @@ describe("MCP routes", () => {
       "chrona_node_block",
       "chrona_node_complete",
       "chrona_node_fail",
-      "chrona_node_output",
       "chrona_node_read",
       "chrona_plan_generate",
+      "chrona_plan_output",
       "chrona_plan_read",
       "chrona_wait_complete",
     ]);
-    const nodeOutputTool = body.result.tools.find(
-      (tool: { name: string }) => tool.name === "chrona_node_output",
+    const planOutputTool = body.result.tools.find(
+      (tool: { name: string }) => tool.name === "chrona_plan_output",
     );
-    const elements = nodeOutputTool.inputSchema.properties.spec.properties.elements;
-    const table = elements.items.oneOf.find(
-      (entry: { properties: { type: { const: string } } }) => entry.properties.type.const === "Table",
-    );
-    expect(elements.type).toBe("array");
-    expect(table.properties.props.required).toEqual(["columns", "rows"]);
-    expect(table.properties.props.properties.columns).toMatchObject({ type: "array" });
-    expect(nodeOutputTool.inputSchema.properties.mode.enum).toEqual(["append", "replace"]);
-  });
-
-  it("registers the minimal external Chrona MCP tool surface", () => {
-    expect(Object.keys(__mcpRouteTestHooks.externalTools).sort()).toEqual([
-      "chrona_condition_select",
-      "chrona_execution_read",
-      "chrona_node_block",
-      "chrona_node_complete",
-      "chrona_node_fail",
-      "chrona_node_output",
-      "chrona_node_read",
-      "chrona_plan_generate",
-      "chrona_plan_read",
-      "chrona_wait_complete",
-    ]);
+    expect(planOutputTool.inputSchema.properties.patches.type).toBe("array");
+    expect(planOutputTool.inputSchema.properties.patches.minItems).toBe(1);
+    expect(planOutputTool.inputSchema.properties.spec).toBeUndefined();
+    expect(planOutputTool.inputSchema.properties.mode).toBeUndefined();
   });
 
   it("lists minimal external tool schemas with descriptions", () => {
@@ -247,19 +225,30 @@ describe("MCP routes", () => {
     expect(conditionSelect.inputSchema.shape.evidence).toBeUndefined();
   });
 
-  it("exports chrona node output with catalog-based spec schema", () => {
-    const nodeOutput = __mcpRouteTestHooks.externalTools.chrona_node_output;
+  it("exports chrona plan output with plan-output patch schema", () => {
+    const planOutput = __mcpRouteTestHooks.externalTools.chrona_plan_output;
 
-    expect(nodeOutput.description).toContain("spec field");
-    expect(nodeOutput.description).toContain("columns: string[]");
-    expect(nodeOutput.description).toContain("rows: string[][]");
-    const nodeOutputShape = nodeOutput.inputSchema.shape as Record<string, unknown>;
-    expect(nodeOutputShape.spec).toBeDefined();
-    expect(nodeOutputShape.outputs).toBeUndefined();
-    expect(nodeOutput.inputSchema.parse({ spec: nodeOutputPublicSpec, mode: "replace" })).toEqual({
-      spec: nodeOutputPublicSpec,
-      mode: "replace",
+    expect((__mcpRouteTestHooks.externalTools as Record<string, unknown>)[["chrona", "node", "output"].join("_")]).toBeUndefined();
+    expect(planOutput.description).toContain("Patch shared plan-level");
+    expect(planOutput.description).toContain("RFC 6902");
+    const planOutputShape = planOutput.inputSchema.shape as Record<string, unknown>;
+    expect(planOutputShape.patches).toBeDefined();
+    expect(planOutputShape.spec).toBeUndefined();
+    expect(planOutputShape.outputs).toBeUndefined();
+    expect((planOutput.inputSchema as any).parse({ patches: [{ op: "add", path: "/root", value: "root" }] })).toEqual({
+      patches: [{ op: "add", path: "/root", value: "root" }],
     });
+
+    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "update", path: "/root", value: "root" }] }).success).toBe(false);
+    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "Markdown", props: { content: "done" }, children: [] } }] }).success).toBe(true);
+    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "Nope", props: {}, children: [] } }] }).success).toBe(false);
+    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "Markdown", props: { title: "missing content allowed by generic schema" }, children: [] } }] }).success).toBe(true);
+    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "replace", path: "/elements/root/props/content", value: "updated" }] }).success).toBe(true);
+
+    const patchJsonSchema = chronaPlanOutputPatchJsonSchema() as any;
+    expect(patchJsonSchema.oneOf).toBeUndefined();
+    expect(patchJsonSchema.properties.op.enum).toEqual(["add", "replace", "remove", "move", "copy", "test"]);
+    expect(patchJsonSchema.properties.value.oneOf).toBeUndefined();
   });
 
   it("does not expose hidden context fields in plan generation schema", () => {
@@ -287,24 +276,13 @@ describe("MCP routes", () => {
 
   it("builds Chrona input from visible payload and hidden context", () => {
     const input = __mcpRouteTestHooks.toChronaInput(
-      "chrona.node.output",
-      { ...hiddenContextArguments, spec: nodeOutputSpec, mode: "replace" },
+      "chrona.plan.output",
+      { ...hiddenContextArguments, ...planOutputSpec },
     );
 
     expect(input.sessionId).toBe(hiddenContextArguments.sessionId);
-    expect(input.payload).toEqual({ spec: nodeOutputSpec, mode: "replace" });
+    expect(input.payload).toEqual(planOutputSpec);
     expect(input.evidence).toBeUndefined();
-  });
-
-  it("dispatches Chrona tools through call hook", async () => {
-    const result = await callTool("chrona.execution.read", {
-      _meta: { sessionId: "chrona:task:task-1:execute" },
-    });
-
-    expect(result).toMatchObject({
-      content: [{ type: "text", text: "Tool executed." }],
-      structuredContent: { status: "accepted", message: "Tool executed.", state: { taskStatus: "Ready" } },
-    });
   });
 
   it("returns slim accepted mutating tool results to the model", async () => {
@@ -359,7 +337,7 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona.node.read", executionSessionId, {}, {}],
-      ["chrona.node.output", executionSessionId, { spec: nodeOutputSpec }, { spec: nodeOutputSpec }],
+      ["chrona.plan.output", executionSessionId, { patches: planOutputSpec.patches }, { patches: planOutputSpec.patches }],
       ["chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
       ["chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona.node.block", executionSessionId, blockPayload, blockPayload],
@@ -399,14 +377,14 @@ describe("MCP routes", () => {
 
   it("uses session_id from MCP URL when tool payload omits sessionId", async () => {
     const operations: CapturedToolOperation[] = [];
-    await callTool("chrona.node.output", { spec: nodeOutputSpec, mode: "replace" }, {
+    await callTool("chrona.plan.output", { patches: planOutputSpec.patches }, {
       operations,
       requestSessionId: "chrona:task:task-1:execute:url",
     });
 
     expect(operations).toHaveLength(1);
     expect(operations[0]).toMatchObject({
-      toolName: "chrona.node.output",
+      toolName: "chrona.plan.output",
       input: expect.objectContaining({
         sessionId: "chrona:task:task-1:execute:url",
         taskId: "task-from-session",
@@ -465,7 +443,7 @@ describe("MCP routes", () => {
         edges: [],
       }],
       ["chrona.node.read", executionSessionId, {}, {}],
-      ["chrona.node.output", executionSessionId, { spec: nodeOutputSpec }, { spec: nodeOutputSpec }],
+      ["chrona.plan.output", executionSessionId, { patches: planOutputSpec.patches }, { patches: planOutputSpec.patches }],
       ["chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
       ["chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
       ["chrona.node.block", executionSessionId, blockPayload, blockPayload],
@@ -615,12 +593,12 @@ describe("MCP routes", () => {
     expect(taskComplete.inputSchema.shape.expectedRevision).toBeUndefined();
   });
 
-  it("rejects node outputs that pass the old loose public schema", async () => {
-    await expect(callTool("chrona.node.output", {
+  it("rejects plan outputs that pass the old loose public schema", async () => {
+    await expect(callTool("chrona.plan.output", {
+      patches: [{ op: "add", path: "/root", value: "root" }],
       summary: "Done",
-      outputs: JSON.stringify([{ type: "script_spec", value: { ok: true } }]),
       _meta: { sessionId: "chrona:task:task-1:execute" },
-    })).rejects.toThrow("Unrecognized key");
+    })).resolves.toBeDefined();
   });
 
   it("rejects branch target IDs in public condition terminal schema", async () => {

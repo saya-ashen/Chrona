@@ -617,14 +617,14 @@ describe("agent tool operations service", () => {
 
     await expect(
       agentTools.execute({
-        toolName: "chrona.node.output",
+        toolName: "chrona.plan.output",
         input: {
           workspaceId: "workspace-1",
           taskId: "task-1",
           sessionId: "session-1",
           actorType: "agent",
-          idempotencyKey: "node-output-1",
-          payload: { spec: { root: "root", elements: { root: { type: "JsonView", props: { value: { ok: true } }, children: [] } } } },
+          idempotencyKey: "plan-output-1",
+          payload: { patches: [{ op: "add", path: "/root", value: "root" }] },
         },
       }),
     ).resolves.toMatchObject({ status: "accepted" });
@@ -694,9 +694,9 @@ describe("agent tool operations service", () => {
     expect(agentTools.calls.dispatchActions).toEqual([]);
     expect(agentTools.calls.submittedNodeResults).toEqual([
       {
-        action: "submit_node_output",
+        action: "update_plan_output",
         sessionId: "session-1",
-        outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { ok: true } }, children: [] } } }],
+        patches: [{ op: "add", path: "/root", value: "root" }],
       },
       {
         action: "complete_manual_node",

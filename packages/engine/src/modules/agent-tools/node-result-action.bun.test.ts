@@ -20,7 +20,7 @@ describe("node result action mapping", () => {
   });
 
   it("maps every terminal control kind to its MCP tool", () => {
-    expect(toolNameFromControlKind("output")).toBe("chrona.node.output");
+    expect(toolNameFromControlKind("plan_output")).toBe("chrona.plan.output");
     expect(toolNameFromControlKind("complete")).toBe("chrona.node.complete");
     expect(toolNameFromControlKind("condition_select")).toBe("chrona.node.condition_select");
     expect(toolNameFromControlKind("wait_complete")).toBe("chrona.node.wait_complete");

@@ -299,7 +299,6 @@ function isFailedSubmissionNodeResult(result: NodeResult): boolean {
   const text = [
     result.outputSummary,
     result.error,
-    ...(result.outputs ?? []).map(nodeResultOutputText),
   ]
     .filter((value): value is string => Boolean(value))
     .join("\n");
@@ -307,9 +306,6 @@ function isFailedSubmissionNodeResult(result: NodeResult): boolean {
   return FAILED_SUBMISSION_RESULT_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-function nodeResultOutputText(_output: NonNullable<NodeResult["outputs"]>[number]): string | undefined {
-  return undefined;
-}
 
 
 function compareAttemptsForEffectiveState(a: NodeAttempt, b: NodeAttempt): number {

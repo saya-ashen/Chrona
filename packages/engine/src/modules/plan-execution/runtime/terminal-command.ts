@@ -63,17 +63,6 @@ export function validateTerminalCommand(input: {
       `chrona ${kind} terminal tool cannot complete current ${input.node.type} node`,
     );
   }
-  if (kind === "task") {
-    const expectedOutput = (input.node.config as { expectedOutput?: unknown }).expectedOutput;
-    const hasRequiredOutput = typeof expectedOutput === "string" && expectedOutput.trim().length > 0;
-    const outputs = input.node.result?.outputs;
-    if (hasRequiredOutput && (!outputs || outputs.length === 0)) {
-      throw new EngineError(
-        ENGINE_ERROR_CODES.VALIDATION_FAILED,
-        "chrona task node requires chrona_node_output before completion",
-      );
-    }
-  }
   if (kind === "condition") {
     selectedBranchForTerminalCommand(input);
   }

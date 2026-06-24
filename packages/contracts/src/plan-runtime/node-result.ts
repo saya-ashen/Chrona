@@ -2,7 +2,32 @@ import type { CheckpointResponse } from "./checkpoints";
 import type { NodeActionForm, WaitKind } from "./node";
 import type { Spec } from "@chrona/ui-protocol";
 
-export type NodeResultOutput = Spec;
+export type PlanOutputPatch =
+  | { op: "add"; path: string; value: unknown }
+  | { op: "remove"; path: string }
+  | { op: "replace"; path: string; value: unknown }
+  | { op: "move"; path: string; from: string }
+  | { op: "copy"; path: string; from: string }
+  | { op: "test"; path: string; value: unknown };
+
+export type PlanOutputRevision = {
+  id: string;
+  nodeId: string | null;
+  nodeLayerId?: string | null;
+  attemptId?: string | null;
+  sessionId?: string;
+  summary?: string;
+  patches: PlanOutputPatch[];
+  createdAt: string;
+};
+
+export type PlanOutputState = {
+  spec: Spec | null;
+  revision: number;
+  updatedAt: string | null;
+  updatedByNodeId: string | null;
+  history: PlanOutputRevision[];
+};
 
 export interface NodeResultEvidence {
   sessionId?: string;
@@ -33,7 +58,6 @@ export interface NodeResult {
   attemptId?: string;
   status?: "current" | "stale" | "obsolete" | "invalidated" | "rejected";
   outputSummary?: string;
-  outputs?: NodeResultOutput[];
   inputFields?: Record<string, string>;
   evidence?: NodeResultEvidence;
   artifactRefs?: ArtifactRef[];

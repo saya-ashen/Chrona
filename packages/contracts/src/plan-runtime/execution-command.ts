@@ -1,6 +1,5 @@
 import type { GraphMutationOperation } from "./graph";
 import type { NodeActionForm } from "./node";
-import type { NodeResultOutput } from "./node-result";
 
 type SubmittedNodeEvidence = {
   sessionId?: string;
@@ -46,10 +45,8 @@ export type SubmittedNodeResult =
   | {
       kind: "done";
       summary?: string;
-      outputs?: NodeResultOutput[];
       output?: unknown;
       evidence?: SubmittedNodeEvidence;
-      mode?: "append" | "replace";
       selectedBranch?: {
         ref?: string;
         key?: string;

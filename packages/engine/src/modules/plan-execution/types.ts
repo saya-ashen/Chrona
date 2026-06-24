@@ -5,6 +5,7 @@ import type {
   ExecutionActionInput,
   NodeActionForm,
   NodeResult,
+  PlanOutputPatch,
 } from "@chrona/contracts/ai";
 
 export type OrchestratorTrigger = "manual" | "scheduler" | "system" | "auto";
@@ -105,10 +106,9 @@ export type AdvanceRuntimeCommand =
     }
   | { type: "resume_after_unblock"; nodeId?: string }
   | {
-      type: "submit_node_output";
+      type: "update_plan_output";
       nodeId?: string;
-      outputs: unknown;
-      mode?: "append" | "replace";
+      patches: PlanOutputPatch[];
       summary?: string;
     }
   | {

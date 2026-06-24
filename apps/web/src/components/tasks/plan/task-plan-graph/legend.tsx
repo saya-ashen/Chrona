@@ -9,7 +9,7 @@ function ShapeChip({ shape, tone }: { shape: NodeShape; tone: NodeTone }) {
 export function EdgeLegend({
   edgeItems,
   nodeItems,
-  graphCopy,
+  graphCopy: _graphCopy,
   placement = "bottom",
 }: {
   edgeItems: EdgeLegendItem[];

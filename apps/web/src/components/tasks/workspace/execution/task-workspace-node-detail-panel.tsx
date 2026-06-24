@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildResultSpec, normalizeChronaSpec, validateChronaSpec } from "@chrona/ui-protocol";
+import { buildResultSpec } from "@chrona/ui-protocol";
 import { DEFAULT_GRAPH_COPY } from "@/components/tasks/plan/task-plan-graph/constants";
 import { TaskPlanGraphInspectorDetails } from "@/components/tasks/plan/task-plan-graph/inspector-details";
 import { extractRunError } from "@/components/tasks/plan/task-plan-graph/inspector-run-panel";
@@ -58,27 +58,12 @@ function EmptyDetailState() {
 function ResultTab({ node }: { node: PlanNodeDataModel }) {
   const copy = useTaskWorkspaceCopy();
   const runError = useMemo(() => extractRunError(node), [node]);
-  const specOutput = node.resultOutputs?.[0] ?? null;
-  if (specOutput) {
-    const result = validateChronaSpec(specOutput);
-    if (result.ok) {
-      return <SpecRenderer spec={normalizeChronaSpec(result.spec)} />;
-    }
-    const detail = result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
-    return (
-      <SpecRenderer
-        spec={buildResultSpec([], {
-          errorMessage: (copy.invalidResultSpec ?? "Unable to render this node's result ({detail}).").replace("{detail}", detail),
-        })}
-      />
-    );
-  }
-
   const emptyMessage = node.status === "active" || node.status === "in_progress"
     ? (copy.resultPendingWhileRunning ?? "Result will appear when this node completes.")
     : node.status === "done" || node.status === "skipped"
-      ? (copy.noUserVisibleDeliverable ?? "This node completed without a user-visible deliverable.")
+      ? (copy.noUserVisibleDeliverable ?? "This node completed. User-visible output now lives at plan level.")
       : (copy.noRunResult ?? "No run result yet for this node.");
+
 
   return (
     <SpecRenderer
@@ -113,9 +98,6 @@ function AutoRefreshIndicator({ enabled }: { enabled: boolean }) {
 }
 
 
-function hasResultSpec(node: PlanNodeDataModel) {
-  return Boolean(node.resultOutputs?.length);
-}
 
 function isCompletedNode(node: PlanNodeDataModel) {
   return node.status === "done" || node.status === "skipped";
@@ -124,7 +106,7 @@ function isCompletedNode(node: PlanNodeDataModel) {
 function defaultNodeDetailTab(node: PlanNodeDataModel | null, tabs: NodeDetailPanelState["tabs"]): NodeDetailPanelState["tabs"][number] {
   if (!node) return tabs[0] ?? "result";
   const candidates: NodeDetailPanelState["tabs"] = [
-    hasResultSpec(node) || isCompletedNode(node) ? "result" : null,
+    isCompletedNode(node) ? "result" : null,
     node.status === "active" || node.status === "in_progress" ? "activity" : null,
     "configuration",
   ].filter((tab): tab is NodeDetailPanelState["tabs"][number] => Boolean(tab));
@@ -132,7 +114,6 @@ function defaultNodeDetailTab(node: PlanNodeDataModel | null, tabs: NodeDetailPa
 }
 
 function drawerReasonLabel(node: PlanNodeDataModel, copy: TaskWorkspaceCopy) {
-  if (hasResultSpec(node)) return copy.resultReady ?? "Result ready";
   if (node.status === "active" || node.status === "in_progress") return copy.running ?? "Running";
   return copy.node ?? "Node";
 }

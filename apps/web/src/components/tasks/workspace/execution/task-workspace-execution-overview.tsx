@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
-import { buildResultSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
+import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -56,18 +56,7 @@ function commandCenterTrailItems(commandCenter?: { documents: { trail: UiDocumen
   return Array.isArray(trailItems) ? trailItems as WorkspaceActivityItem[] : [];
 }
 
-function buildNodeResultContentSpec(node: PlanNodeDataModel | null, emptyMessage: string) {
-  const specOutput = node?.resultOutputs?.[0] ?? null;
-  if (specOutput) {
-    const result = validateChronaSpec(specOutput);
-    if (!result.ok) {
-      const detail = result.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ");
-      return buildResultSpec([], {
-        errorMessage: `Unable to render this node's result (${detail}).`,
-      });
-    }
-    return specOutput;
-  }
+function buildNodeResultContentSpec(_node: PlanNodeDataModel | null, emptyMessage: string) {
   return buildResultSpec([], { emptyMessage });
 }
 

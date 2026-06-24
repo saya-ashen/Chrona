@@ -573,7 +573,6 @@ function toPlanNode(node: {
     completionSummary: node.result?.outputSummary ?? null,
     result: node.result ?? null,
     inputFields: node.result?.inputFields,
-    resultOutputs: node.result?.outputs ?? [],
     resultEvidence: node.result?.evidence ?? null,
     branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `${node.copy.branchLabelPrefix} ${index + 1}`) ?? [],
     options: metadata.options ?? [],

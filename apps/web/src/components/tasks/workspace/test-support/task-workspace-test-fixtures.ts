@@ -29,7 +29,6 @@ export function createTaskWorkspaceFixtureNode(
     completionSummary: input.completionSummary,
     result: input.result,
     inputFields: input.inputFields,
-    resultOutputs: input.resultOutputs,
     resultEvidence: input.resultEvidence,
     checkpoint: input.checkpoint,
     availableActions: input.availableActions,
@@ -247,13 +246,6 @@ export const taskWorkspaceStateFixtures = {
       createTaskWorkspaceFixtureNode({
         id: "done",
         status: "done",
-        resultOutputs: [{
-          root: "root",
-          elements: {
-            root: { type: "Stack", props: { gap: "sm" }, children: ["content"] },
-            content: { type: "Markdown", props: { content: "summary" } },
-          },
-        }],
       }),
     ], "done"),
   },

@@ -8,7 +8,7 @@ import { getActiveExecutionSessionScope } from "./execution-session-store";
 
 /**
  * The resolved execution context for a task. `workBlockId` is the canonical
- * work block that task-scoped operations (plan reads, node output submission,
+ * work block that task-scoped operations (plan reads, plan output submission,
  * dispatch) should target. For non-recurring tasks — or tasks whose plan is
  * task-scoped — this is `null`.
  */

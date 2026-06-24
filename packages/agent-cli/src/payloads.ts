@@ -59,15 +59,6 @@ function optionalObject(value: unknown, label: string): JsonObject | undefined {
   return value as JsonObject;
 }
 
-function specFromFile(path: string | undefined, label: string) {
-  return readJsonFile(requireString(path, label), label);
-}
-
-function outputsFromFile(path: string | undefined, label: string) {
-  if (!path) return undefined;
-  const parsed = readJsonFile(path, label);
-  return Array.isArray(parsed) ? parsed : [parsed];
-}
 
 
 export function buildControlPayload(argv: string[]): ParseResult {
@@ -84,32 +75,29 @@ export function buildControlPayload(argv: string[]): ParseResult {
     return { body: { kind: "plan_read", payload: {} } };
   }
 
+  if (domain === "plan" && command === "output") {
+    const patchesFile = takeOption(args, "--patches-file");
+    const summary = takeOption(args, "--summary");
+    ensureNoExtra(args);
+    return {
+      body: {
+        kind: "plan_output",
+        payload: {
+          patches: readJsonFile(requireString(patchesFile, "--patches-file"), "--patches-file") as never,
+          ...(summary ? { summary } : {}),
+        },
+      },
+    };
+  }
+
   if (domain !== "node") {
     throw new UsageError("Expected command: node|task|plan");
   }
 
   switch (command) {
-    case "output": {
-      const outputsFile = takeOption(args, "--outputs-file") ?? takeOption(args, "--output-file");
-      const mode = takeOption(args, "--mode");
-      const summary = takeOption(args, "--summary");
-      ensureNoExtra(args);
-      if (mode !== undefined && mode !== "append" && mode !== "replace") {
-        throw new UsageError("--mode must be append or replace");
-      }
-      return {
-        body: {
-          kind: "output",
-          payload: {
-            spec: specFromFile(outputsFile, "--outputs-file") as never,
-            ...(mode ? { mode } : {}),
-            ...(summary ? { summary } : {}),
-          },
-        },
-      };
-    }
+    case "output":
+      throw new UsageError("Use plan output for shared execution output");
     case "complete": {
-      const outputFile = takeOption(args, "--output-file");
       const summary = takeOption(args, "--summary");
       ensureNoExtra(args);
       return {
@@ -117,7 +105,6 @@ export function buildControlPayload(argv: string[]): ParseResult {
           kind: "complete",
           payload: {
             ...(summary ? { summary } : {}),
-            ...(outputFile ? { outputs: outputsFromFile(outputFile, "--output-file") as never[] } : {}),
           },
         },
       };
@@ -125,7 +112,6 @@ export function buildControlPayload(argv: string[]): ParseResult {
     case "condition-select": {
       const branchRef = takeOption(args, "--branch") ?? takeOption(args, "--branch-ref");
       const summary = takeOption(args, "--summary");
-      const outputFile = takeOption(args, "--output-file");
       const nodeId = takeOption(args, "--node-id") ?? "current";
       ensureNoExtra(args);
       return {
@@ -135,21 +121,18 @@ export function buildControlPayload(argv: string[]): ParseResult {
             nodeId,
             branchRef: requireString(branchRef, "--branch"),
             summary: requireString(summary, "--summary"),
-            ...(outputFile ? { outputs: outputsFromFile(outputFile, "--output-file") as never[] } : {}),
           },
         },
       };
     }
     case "wait-complete": {
       const summary = takeOption(args, "--summary");
-      const outputFile = takeOption(args, "--output-file");
       ensureNoExtra(args);
       return {
         body: {
           kind: "wait_complete",
           payload: {
             summary: requireString(summary, "--summary"),
-            ...(outputFile ? { outputs: outputsFromFile(outputFile, "--output-file") as never[] } : {}),
           },
         },
       };

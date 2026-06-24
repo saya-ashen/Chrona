@@ -19,15 +19,18 @@ function jsonFile(name: string, value: unknown) {
 }
 
 describe("buildControlPayload", () => {
-  it("maps node output argv to control payload", () => {
-    const output = { root: "card", elements: { card: { type: "Card", props: {}, children: [], visible: true } } };
-    const path = jsonFile("output.json", output);
+  it("maps plan output argv to control payload", () => {
+    const patches = [{ op: "add", path: "/root", value: "card" }] as const;
+    const path = jsonFile("patches.json", patches);
 
-    expect(buildControlPayload(["node", "output", "--outputs-file", path, "--mode", "replace", "--summary", "partial"]).body).toEqual({
-      kind: "output",
-      payload: { spec: output, mode: "replace", summary: "partial" },
+    expect(buildControlPayload(["plan", "output", "--patches-file", path, "--summary", "partial"]).body).toEqual({
+      kind: "plan_output",
+      payload: { patches: [...patches], summary: "partial" },
     });
+
+    expect(() => buildControlPayload(["node", "output", "--patches-file", path])).toThrow("Use plan output");
   });
+
 
   it("maps terminal node commands to payloads", () => {
     const form = { instructions: "Need key", inputFields: [{ name: "key", label: "Key" }] };

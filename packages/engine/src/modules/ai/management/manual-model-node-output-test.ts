@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 
 import { db, TaskPriority, TaskStatus } from "@chrona/db";
 import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
-import { describeChronaNodeOutputPublicTool, parseChronaToolPayload } from "@chrona/contracts";
+import { describeChronaPlanOutputPublicTool, parseChronaToolPayload } from "@chrona/contracts";
 import { validateChronaSpec } from "@chrona/ui-protocol";
 
 import { aiClientRegistry } from "../runtime/client-registry";
@@ -13,13 +13,13 @@ import { taskPlanExecution } from "../../plan-execution";
 import { buildPlanExecutionTaskSessionKey } from "../../execution-runtime";
 
 const DEFAULT_NODE_PROMPT = "Create a small user-visible result for Chrona.";
-const DEFAULT_EXPECTED_OUTPUT = "A json-render Spec with a heading and checklist proving the model used chrona_node_output before completion.";
+const DEFAULT_EXPECTED_OUTPUT = "A json-render Spec with a heading and checklist proving the model used chrona_plan_output before completion.";
 
 function buildSchemaLabRuntimePrompt(input: { taskInfo: string }) {
   return [
     input.taskInfo,
     "SCHEMA LAB OVERRIDE:",
-    "Call chrona_node_output exactly once. Do not call chrona_node_complete. Do not repair in multiple turns unless the tool itself returns an error.",
+    "Call chrona_plan_output exactly once. Do not call chrona_node_complete. Do not repair in multiple turns unless the tool itself returns an error.",
     "Task information:",
     input.taskInfo,
   ].join("\n\n");
@@ -51,8 +51,7 @@ function requireManualText(value: string | undefined, label: string): string {
 
 
 
-
-type ManualModelNodeOutputTestInput = {
+type ManualModelPlanOutputTestInput = {
   clientId: string;
   baseUrl: string;
   prompt?: string;
@@ -60,7 +59,7 @@ type ManualModelNodeOutputTestInput = {
   cleanup?: boolean;
 };
 
-export type ManualModelNodeOutputTestReport = {
+export type ManualModelPlanOutputTestReport = {
   passed: true;
   taskId: string;
   workspaceId: string;
@@ -69,7 +68,7 @@ export type ManualModelNodeOutputTestReport = {
   workspaceUrl: string;
   prompt: string;
   expectedOutput: string;
-  actionKinds: string[];
+  terminalActionKinds: string[];
   runIds: string[];
   outputSummary: string | null;
   outputCount: number;
@@ -79,7 +78,7 @@ export type ManualModelNodeOutputTestReport = {
   timeline: Array<{ kind: string; title: string; body: string | null }>;
 };
 
-type ManualModelNodeOutputSchemaLabInput = {
+type ManualModelPlanOutputSchemaLabInput = {
   clientId: string;
   baseUrl: string;
   taskInfo?: string;
@@ -88,7 +87,7 @@ type ManualModelNodeOutputSchemaLabInput = {
   cleanup?: boolean;
 };
 
-type NodeOutputAttemptReport = {
+type PlanOutputAttemptReport = {
   index: number;
   callId: string | null;
   rawInput: unknown;
@@ -99,7 +98,7 @@ type NodeOutputAttemptReport = {
   issues: string[];
 };
 
-export type ManualModelNodeOutputSchemaLabReport = {
+export type ManualModelPlanOutputSchemaLabReport = {
   passed: boolean;
   taskId: string;
   workspaceId: string;
@@ -109,7 +108,7 @@ export type ManualModelNodeOutputSchemaLabReport = {
   taskInfo: string;
   prompt: string;
   toolSchema: string;
-  nodeOutputTool: ReturnType<typeof describeChronaNodeOutputPublicTool>;
+  planOutputTool: ReturnType<typeof describeChronaPlanOutputPublicTool>;
   runIds: string[];
   toolCallCount: number;
   reportIssues: string[];
@@ -124,7 +123,7 @@ function buildCompiledPlan(planId: string, input: { prompt?: string; expectedOut
     id: `compiled_${planId}`,
     editablePlanId: planId,
     sourceVersion: 1,
-    title: "Manual model node output protocol test",
+    title: "Manual model plan output protocol test",
     goal: "Verify a real model submits json-render output before completing a task node.",
     assumptions: [
       "This is a manual token-spending provider test and is not part of CI.",
@@ -155,18 +154,18 @@ function buildCompiledPlan(planId: string, input: { prompt?: string; expectedOut
 function requireCompletedResult(results: NodeResult[]): NodeResult {
   const result = results.find((entry) => entry.nodeId === NODE_ID && entry.status === "current");
   if (!result) throw new Error(`No current NodeResult found for ${NODE_ID}.`);
-  if (!Array.isArray(result.outputs) || result.outputs.length === 0) {
-    throw new Error("NodeResult.outputs is empty. Model completed without a prior chrona_node_output submission.");
+  if (!result.outputSummary) {
+    throw new Error("NodeResult outputSummary is empty. Model completed without a recorded summary.");
   }
   return result;
 }
 
-function assertOutputBeforeComplete(actions: Array<{ kind: string; recordedAt: Date }>): void {
-  const outputIndex = actions.findIndex((action) => action.kind === "output");
-  const completeIndex = actions.findIndex((action) => action.kind === "complete");
-  if (outputIndex < 0) throw new Error("No recorded output action. Expected chrona_node_output before completion.");
-  if (completeIndex < 0) throw new Error("No recorded complete action. Expected chrona_node_complete after output.");
-  if (outputIndex > completeIndex) throw new Error("chrona_node_complete was recorded before chrona_node_output.");
+function assertPlanOutputPersistedBeforeComplete(input: { planOutput: { history: Array<{ createdAt: string }> }; actions: Array<{ kind: string; recordedAt: Date }> }): void {
+  const outputAt = input.planOutput.history[0]?.createdAt;
+  const completeAt = input.actions.find((action) => action.kind === "complete")?.recordedAt;
+  if (!outputAt) throw new Error("No persisted plan output revision. Expected chrona_plan_output before completion.");
+  if (!completeAt) throw new Error("No recorded complete action. Expected chrona_node_complete after output.");
+  if (new Date(outputAt).getTime() > completeAt.getTime()) throw new Error("chrona_node_complete was recorded before chrona_plan_output.");
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -188,7 +187,7 @@ async function assertClaudeCodeClient(clientId: string): Promise<void> {
   const client = await db.aiClient.findUnique({ where: { id: clientId } });
   if (!client) throw new Error("AI client not found.");
   if (!client.enabled) throw new Error("AI client is disabled.");
-  if (client.type !== RUNTIME_NAME) throw new Error("Manual node-output test requires a claude_code AI client.");
+  if (client.type !== RUNTIME_NAME) throw new Error("Manual plan-output test requires a claude_code AI client.");
 }
 
 async function bindExecuteTaskNode(clientId: string): Promise<PreviousBinding> {
@@ -224,7 +223,7 @@ async function seedSchemaLabTask(input: { prompt?: string; expectedOutput?: stri
   const task = await db.task.create({
     data: {
       workspaceId: workspace.id,
-      title: "Manual node-output schema lab",
+      title: "Manual plan-output schema lab",
       description: "Manual token-spending test for prompt/schema → model tool output validation.",
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
@@ -241,51 +240,50 @@ async function seedSchemaLabTask(input: { prompt?: string; expectedOutput?: stri
     status: "accepted",
     prompt: plan.nodes[0]?.description ?? plan.title,
     summary: plan.goal,
-    generatedBy: "manual-node-output-schema-lab",
+    generatedBy: "manual-plan-output-schema-lab",
   });
   await savePlanRun({ workspaceId: workspace.id, taskId: task.id, planId: plan.editablePlanId, compiledPlan: plan });
   await db.taskSession.create({
-    data: { taskId: task.id, runtimeName: RUNTIME_NAME, sessionKey, label: "Node output schema lab" },
+    data: { taskId: task.id, runtimeName: RUNTIME_NAME, sessionKey, label: "Plan output schema lab" },
   });
   return { workspaceId: workspace.id, taskId: task.id, sessionKey, plan };
 }
 
 
-function validateNodeOutputAttempt(input: unknown, result: unknown, index: number, callId: string | null): NodeOutputAttemptReport {
+function validatePlanOutputAttempt(input: unknown, result: unknown, index: number, callId: string | null): PlanOutputAttemptReport {
   const issues: string[] = [];
   let normalizedPayload: unknown = null;
   let contractValid = false;
   let runtimeValid = false;
   try {
-    normalizedPayload = parseChronaToolPayload("chrona.node.output", input);
+    normalizedPayload = parseChronaToolPayload("chrona.plan.output", input);
     contractValid = true;
   } catch (error) {
     issues.push(error instanceof Error ? error.message : String(error));
   }
   if (contractValid) {
-    const spec = (normalizedPayload as { spec?: unknown }).spec;
-    const validation = validateChronaSpec(spec);
-    runtimeValid = validation.ok;
-    if (!validation.ok) {
-      issues.push(...validation.issues.map((issue) => `${issue.path}: ${issue.message}`));
+    const patches = (normalizedPayload as { patches?: unknown }).patches;
+    runtimeValid = Array.isArray(patches) && patches.length > 0;
+    if (!runtimeValid) {
+      issues.push("patches must be a non-empty array");
     }
   }
   return { index, callId, rawInput: input, toolResult: result, contractValid, runtimeValid, normalizedPayload, issues };
 }
 
-export function evaluateSchemaLabAttempts(attempts: NodeOutputAttemptReport[]): { passed: boolean; reportIssues: string[] } {
+export function evaluateSchemaLabAttempts(attempts: PlanOutputAttemptReport[]): { passed: boolean; reportIssues: string[] } {
   const reportIssues: string[] = [];
   if (attempts.length !== 1) {
-    reportIssues.push(`Expected exactly one chrona_node_output call, observed ${attempts.length}.`);
+    reportIssues.push(`Expected exactly one chrona_plan_output call, observed ${attempts.length}.`);
     if (attempts.length === 0) return { passed: false, reportIssues };
   }
   const attempt = attempts[0]!;
-  if (!attempt.contractValid) reportIssues.push("chrona_node_output arguments failed contract validation.");
-  if (!attempt.runtimeValid) reportIssues.push("chrona_node_output Spec failed runtime validation.");
+  if (!attempt.contractValid) reportIssues.push("chrona_plan_output arguments failed contract validation.");
+  if (!attempt.runtimeValid) reportIssues.push("chrona_plan_output Spec failed runtime validation.");
   return { passed: attempts.length === 1 && attempt.contractValid && attempt.runtimeValid, reportIssues };
 }
 
-async function writeSchemaLabReport(input: Omit<ManualModelNodeOutputSchemaLabReport, "reportPath">): Promise<string> {
+async function writeSchemaLabReport(input: Omit<ManualModelPlanOutputSchemaLabReport, "reportPath">): Promise<string> {
   await mkdir(RESULT_DIR, { recursive: true });
   const reportPath = join(RESULT_DIR, `${input.taskId}-schema-lab.json`);
   await writeFile(reportPath, JSON.stringify(input, null, 2));
@@ -305,8 +303,8 @@ async function seedTask(input: { prompt?: string; expectedOutput?: string }): Pr
   const task = await db.task.create({
     data: {
       workspaceId: workspace.id,
-      title: "Manual LLM node output protocol test",
-      description: "Manual token-spending test for prompt -> provider -> chrona_node_output -> chrona_node_complete.",
+      title: "Manual LLM plan output protocol test",
+      description: "Manual token-spending test for prompt -> provider -> chrona_plan_output -> chrona_node_complete.",
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
       executionRuntime: RUNTIME_NAME,
@@ -321,12 +319,12 @@ async function seedTask(input: { prompt?: string; expectedOutput?: string }): Pr
     status: "accepted",
     prompt: plan.nodes[0]?.description ?? plan.title,
     summary: plan.goal,
-    generatedBy: "manual-model-node-output-test",
+    generatedBy: "manual-model-plan-output-test",
   });
   return { workspaceId: workspace.id, taskId: task.id, plan };
 }
 
-async function writeReport(input: Omit<ManualModelNodeOutputTestReport, "reportPath">): Promise<string> {
+async function writeReport(input: Omit<ManualModelPlanOutputTestReport, "reportPath">): Promise<string> {
   await mkdir(RESULT_DIR, { recursive: true });
   const reportPath = join(RESULT_DIR, `${input.taskId}.json`);
   await writeFile(reportPath, JSON.stringify(input, null, 2));
@@ -366,25 +364,23 @@ async function executeSeededTask(taskId: string): Promise<void> {
   }
 }
 
-async function validatePersistedResult(taskId: string, planId: string): Promise<NodeResult> {
+async function validatePersistedResult(taskId: string, planId: string): Promise<{ result: NodeResult; output: unknown; planOutput: { history: Array<{ createdAt: string }> } }> {
   const persisted = await getPlanRun(taskId, planId);
   if (!persisted) throw new Error("Plan run was not persisted.");
   const result = requireCompletedResult(persisted.results);
-  const validation = validateChronaSpec(result.outputs?.[0]);
+  const validation = validateChronaSpec(persisted.planOutput.spec);
   if (!validation.ok) {
     throw new Error(`Persisted output is not a valid Chrona json-render Spec: ${validation.issues.map((issue) => `${issue.path}: ${issue.message}`).join("; ")}`);
   }
-  return result;
+  return { result, output: validation.spec, planOutput: persisted.planOutput };
 }
 
 async function getTerminalActions(taskId: string) {
-  const actions = await db.taskPlanTerminalAction.findMany({
+  return await db.taskPlanTerminalAction.findMany({
     where: { taskId },
     orderBy: { recordedAt: "asc" },
     select: { kind: true, recordedAt: true },
   });
-  assertOutputBeforeComplete(actions);
-  return actions;
 }
 
 async function getRunIds(taskId: string): Promise<string[]> {
@@ -412,12 +408,15 @@ async function buildReport(input: {
   taskId: string;
   plan: CompiledPlan;
   result: NodeResult;
-}): Promise<ManualModelNodeOutputTestReport> {
+  output: unknown;
+  planOutput: { history: Array<{ createdAt: string }> };
+}): Promise<ManualModelPlanOutputTestReport> {
   const actions = await getTerminalActions(input.taskId);
+  assertPlanOutputPersistedBeforeComplete({ planOutput: input.planOutput, actions });
   const runIds = await getRunIds(input.taskId);
   const timeline = await getTimeline(input.taskId);
   const nodeReportFields = getNodeReportFields(input.plan);
-  const output = input.result.outputs?.[0] ?? null;
+  const output = input.output as { root?: string } | null;
   const reportWithoutPath = {
     passed: true as const,
     taskId: input.taskId,
@@ -426,11 +425,11 @@ async function buildReport(input: {
     baseUrl: input.baseUrl,
     workspaceUrl: `${input.baseUrl}/en/tasks/${input.taskId}/workspace`,
     ...nodeReportFields,
-    actionKinds: actions.map((action) => action.kind),
+    terminalActionKinds: actions.map((action) => action.kind),
     runIds,
     outputSummary: input.result.outputSummary ?? null,
-    outputCount: input.result.outputs?.length ?? 0,
-    outputRoot: input.result.outputs?.[0]?.root ?? null,
+    outputCount: output ? 1 : 0,
+    outputRoot: output?.root ?? null,
     output,
     timeline,
   };
@@ -443,22 +442,22 @@ function buildSchemaLabInstructions(input: { prompt: string; toolSchema: string 
   return [input.prompt, "Tool schema / validation contract under test:", input.toolSchema].join("\n\n");
 }
 
-export function buildManualModelNodeOutputSchemaLabDefaults(input: { taskInfo?: string } = {}) {
+export function buildManualModelPlanOutputSchemaLabDefaults(input: { taskInfo?: string } = {}) {
   const taskInfo = normalizeManualText(input.taskInfo, "Task: produce a concise Chrona task-node result UI. Include a title and two bullet/checklist items.");
-  const nodeOutputTool = describeChronaNodeOutputPublicTool();
+  const planOutputTool = describeChronaPlanOutputPublicTool();
   return {
     taskInfo,
     prompt: buildSchemaLabRuntimePrompt({ taskInfo }),
-    toolSchema: JSON.stringify(nodeOutputTool, null, 2),
-    nodeOutputTool,
+    toolSchema: JSON.stringify(planOutputTool, null, 2),
+    planOutputTool,
   };
 }
 
-function isNodeOutputTool(tool: string | undefined) {
-  return tool === "chrona_node_output" || tool === "mcp__chrona__chrona_node_output";
+function isPlanOutputTool(tool: string | undefined) {
+  return tool === "chrona_plan_output" || tool === "mcp__chrona__chrona_plan_output";
 }
 
-export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOutputSchemaLabInput): Promise<ManualModelNodeOutputSchemaLabReport> {
+export async function runManualModelPlanOutputSchemaLab(input: ManualModelPlanOutputSchemaLabInput): Promise<ManualModelPlanOutputSchemaLabReport> {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   await assertClaudeCodeClient(input.clientId);
   const restoreEnv = installControlEnv(baseUrl);
@@ -466,7 +465,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
 
   try {
     const taskInfo = requireManualText(input.taskInfo, "taskInfo");
-    const defaults = buildManualModelNodeOutputSchemaLabDefaults({ taskInfo });
+    const defaults = buildManualModelPlanOutputSchemaLabDefaults({ taskInfo });
     const prompt = normalizeManualText(input.prompt, defaults.prompt);
     const toolSchema = normalizeManualText(input.toolSchema, defaults.toolSchema);
     const seeded = await seedSchemaLabTask({ prompt: taskInfo, expectedOutput: taskInfo });
@@ -475,7 +474,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
     if (!client) throw new Error("AI client not found.");
     const provider = aiClientRegistry.requireProviderClient(client).providerClient;
     const instructions = buildSchemaLabInstructions({ prompt, toolSchema });
-    const nodeOutputTool = defaults.nodeOutputTool;
+    const planOutputTool = defaults.planOutputTool;
     const ref = await provider.startRun({
       sessionId: seeded.sessionKey,
       instructions,
@@ -487,7 +486,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
     const runIds = [ref.runId];
     for await (const event of provider.streamRun({ runId: ref.runId, sessionId: seeded.sessionKey })) {
       if (event.type === "text_delta" && event.text.trim()) textDeltas.push(event.text);
-      if (event.type === "tool_call" && isNodeOutputTool(event.tool)) {
+      if (event.type === "tool_call" && isPlanOutputTool(event.tool)) {
         calls.push({ callId: event.callId, input: event.input, result: null });
       }
       if (event.type === "tool_result" && event.callId) {
@@ -495,7 +494,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
         if (call) call.result = event.result;
       }
     }
-    const attempts = calls.map((call, index) => validateNodeOutputAttempt(call.input, call.result, index + 1, call.callId));
+    const attempts = calls.map((call, index) => validatePlanOutputAttempt(call.input, call.result, index + 1, call.callId));
     const evaluation = evaluateSchemaLabAttempts(attempts);
     const reportWithoutPath = {
       passed: evaluation.passed,
@@ -507,7 +506,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
       taskInfo,
       prompt,
       toolSchema,
-      nodeOutputTool,
+      planOutputTool,
       runIds,
       toolCallCount: attempts.length,
       attempts,
@@ -522,7 +521,7 @@ export async function runManualModelNodeOutputSchemaLab(input: ManualModelNodeOu
   }
 }
 
-export async function runManualModelNodeOutputTest(input: ManualModelNodeOutputTestInput): Promise<ManualModelNodeOutputTestReport> {
+export async function runManualModelPlanOutputTest(input: ManualModelPlanOutputTestInput): Promise<ManualModelPlanOutputTestReport> {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   await assertClaudeCodeClient(input.clientId);
   const restoreEnv = installControlEnv(baseUrl);
@@ -533,13 +532,15 @@ export async function runManualModelNodeOutputTest(input: ManualModelNodeOutputT
     const seeded = await seedTask({ prompt: input.prompt, expectedOutput: input.expectedOutput });
     workspaceId = seeded.workspaceId;
     await executeSeededTask(seeded.taskId);
-    const result = await validatePersistedResult(seeded.taskId, seeded.plan.editablePlanId);
+    const persistedResult = await validatePersistedResult(seeded.taskId, seeded.plan.editablePlanId);
     return await buildReport({
       baseUrl,
       workspaceId: seeded.workspaceId,
       taskId: seeded.taskId,
       plan: seeded.plan,
-      result,
+      result: persistedResult.result,
+      output: persistedResult.output,
+      planOutput: persistedResult.planOutput,
     });
   } finally {
     await restoreExecuteTaskNodeBinding(previousBinding);

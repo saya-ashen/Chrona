@@ -1,6 +1,6 @@
 import { appendCurrentResult } from "../execution-state";
 import { normalizeResultEvidence } from "../evidence";
-import type { EffectivePlanNode, NodeAttempt, NodeResult, NodeResultOutput, WaitKind } from "../types";
+import type { EffectivePlanNode, NodeAttempt, NodeResult, WaitKind } from "../types";
 import type {
   GraphExecutionEvent,
   GraphExecutionState,
@@ -48,24 +48,15 @@ export function appendExecutionResult(input: {
 
   switch (input.result.status) {
     case "done": {
-      // Outputs accumulate across the node's lifetime: partial outputs
-      // submitted via chrona_node_output land on the prior "current" result,
-      // and completion (chrona_node_complete) may carry additional outputs.
-      // Merge both so the completed node retains every submitted output rather
-      // than dropping the accumulated ones when the prior result is superseded.
       const priorCurrent = input.state.results.findLast(
         (result) => result.nodeId === input.node.id && result.status === "current",
       );
-      const priorOutputs = priorCurrent?.outputs ?? [];
-      const completionOutputs = normalizeResultOutputs(input.result.output) ?? [];
-      const mergedOutputs = [...priorOutputs, ...completionOutputs];
       return appendCurrentResult({
         results: input.state.results,
         result: {
           ...base,
           status: "current",
           outputSummary: input.result.summary ?? priorCurrent?.outputSummary,
-          outputs: mergedOutputs.length > 0 ? mergedOutputs : undefined,
           inputFields: input.result.inputFields,
           evidence,
           selectedBranch: input.result.selectedBranch,
@@ -140,29 +131,6 @@ export function appendExecutionResult(input: {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function isNodeResultOutput(value: unknown): value is NodeResultOutput {
-  if (!isRecord(value)) return false;
-  if (typeof value.root === "string" && isRecord(value.elements)) return true;
-  return false;
-}
-
-function assertResultOutputs(output: unknown): NodeResultOutput[] | undefined {
-  if (output === undefined || output === null) return undefined;
-  if (Array.isArray(output) && output.every(isNodeResultOutput)) return output;
-  if (isRecord(output) && Array.isArray(output.outputs) && output.outputs.every(isNodeResultOutput)) {
-    return output.outputs;
-  }
-  if (isNodeResultOutput(output)) return [output];
-  throw new Error("Node result output must be a json-render Spec ({ root, elements }). Legacy kind-based outputs are not supported.");
-}
-
-export function normalizeResultOutputs(output: unknown): NodeResultOutput[] | undefined {
-  return assertResultOutputs(output);
-}
 
 export function getPauseKind(result: GraphNodeExecutionResult): WaitKind | null {
   switch (result.status) {

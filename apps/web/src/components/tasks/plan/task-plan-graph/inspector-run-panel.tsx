@@ -294,7 +294,6 @@ export function TaskPlanGraphInspectorRunPanel({
   const selectedAction = useMemo(() => node.availableActions?.find((action) => action.id === selectedActionId) ?? null, [node.availableActions, selectedActionId]);
   const runResult = useMemo(() => extractRunResult(node), [node]);
   const runError = useMemo(() => extractRunError(node), [node]);
-  const resultOutputs = node.resultOutputs ?? [];
   const resultEvidence = useMemo(() => evidenceLines(node.resultEvidence), [node.resultEvidence]);
   const runPanelMode = useMemo(() => node.interactionType, [node]);
   const resolvedRunPanelMode = runPanelMode ?? "observe";
@@ -505,9 +504,9 @@ export function TaskPlanGraphInspectorRunPanel({
             <pre className="whitespace-pre-wrap text-xs leading-5 text-red-700">{runError}</pre>
           ) : runResult ? (
             <p className="text-sm leading-6 text-foreground">{runResult}</p>
-          ) : resultOutputs.length === 0 ? (
+          ) : (
             <p className="text-sm text-muted-foreground">{graphCopy.runResultEmpty}</p>
-          ) : null}
+          )}
           {resultEvidence.length > 0 ? (
             <details className="rounded-xl border border-dashed border-border/60 bg-muted/[0.16] px-3 py-2">
               <summary className="cursor-pointer text-xs font-semibold text-muted-foreground">{graphCopy.runEvidenceTitle}</summary>

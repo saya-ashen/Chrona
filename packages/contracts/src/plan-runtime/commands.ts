@@ -1,7 +1,7 @@
 import type { PlanPatch } from "../ai-plan-blueprint";
 import type { GraphMutationOperation } from "./graph";
 import type { NodeActionForm } from "./node";
-import type { NodeResult } from "./node-result";
+import type { NodeResult, PlanOutputPatch } from "./node-result";
 
 export type RuntimeCommand =
   | { type: "start_plan" }
@@ -19,7 +19,7 @@ export type ExecutionActionType =
   | "resume_with_input"
   | "resume_with_approval"
   | "resume_after_unblock"
-  | "submit_node_output"
+  | "update_plan_output"
   | "complete_manual_node"
   | "block_current_node"
   | "fail_current_node"
@@ -66,11 +66,10 @@ export type ExecutionActionInput =
       idempotencyKey?: string;
     }
   | {
-      action: "submit_node_output";
+      action: "update_plan_output";
       sessionId?: string;
       nodeId?: string;
-      outputs: unknown;
-      mode?: "append" | "replace";
+      patches: PlanOutputPatch[];
       summary?: string;
       idempotencyKey?: string;
     }

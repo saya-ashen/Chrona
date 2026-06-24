@@ -64,13 +64,6 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       interactionType: "approve",
       dependencies: ["research"],
       completionSummary: "Generated patch touches task workspace only.",
-      resultOutputs: [{
-        root: "root",
-        elements: {
-          root: { type: "Stack", props: {}, children: ["content"] },
-          content: { type: "Markdown", props: { content: "Patch summary" } },
-        },
-      }],
       resultEvidence: { runtimeName: "hermes", runId: "run-1", artifactIds: ["artifact-1"] },
       metadata: { dependencies: [{ id: "research", title: "Research current task workspace" }] },
     });
@@ -98,7 +91,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
     expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Action" })).not.toBeInTheDocument();
 
-    expect(screen.getByText("Patch summary")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Result" }));
+    expect(screen.getByText("No run result yet for this node.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByText("Node activity")).toBeInTheDocument();
@@ -116,12 +110,11 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       title: "Format final answer",
       status: "done",
       completionSummary: "Readable final answer",
-      resultOutputs: [],
     });
 
     render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node })} activity={[]} selectedNodes={[node]} />);
 
-    expect(screen.getByText("This node completed without a user-visible deliverable.")).toBeInTheDocument();
+    expect(screen.getByText("This node completed. User-visible output now lives at plan level.")).toBeInTheDocument();
     expect(screen.queryByText("Readable final answer")).not.toBeInTheDocument();
     expect(screen.queryByText(/runtimeRunRef/)).not.toBeInTheDocument();
   });
@@ -134,12 +127,11 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       phase: "Done",
       status: "done",
       completionSummary: "Structured result is ready",
-      resultOutputs: [],
     });
 
     render(<TaskWorkspaceNodeDetailPanel detail={detail({ currentNode: node, selectedNode: node, status: "completed" })} activity={[]} selectedNodes={[node]} />);
 
-    expect(screen.getByText("This node completed without a user-visible deliverable.")).toBeInTheDocument();
+    expect(screen.getByText("This node completed. User-visible output now lives at plan level.")).toBeInTheDocument();
     expect(screen.queryByText(/Structured result is ready/)).not.toBeInTheDocument();
   });
 
@@ -164,13 +156,6 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       id: "ui-result",
       title: "UI result node",
       status: "done",
-      resultOutputs: [{
-        root: "root",
-        elements: {
-          root: { type: "Stack", props: {}, children: ["content"] },
-          content: { type: "Markdown", props: { content: "## AI Result\n\nThis is the AI-produced UI output." } },
-        },
-      }],
     });
 
     render(<TaskWorkspaceNodeDetailPanel
@@ -179,8 +164,8 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       selectedNodes={[node]}
     />);
 
-    expect(screen.getByText("AI Result")).toBeInTheDocument();
-    expect(screen.getByText("This is the AI-produced UI output.")).toBeInTheDocument();
+    expect(screen.getByText("This node completed. User-visible output now lives at plan level.")).toBeInTheDocument();
+    expect(screen.queryByText("AI Result")).not.toBeInTheDocument();
   });
 
   it("renders lowercase json-render report output with a repaired root", () => {
@@ -188,14 +173,6 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       id: "ui-lowercase-result",
       title: "Lowercase UI result node",
       status: "done",
-      resultOutputs: [{
-        root: "github_trending_report",
-        elements: {
-          heading: { type: "heading", props: { text: "GitHub Trending" } },
-          summary_text: { type: "paragraph", props: { text: "Daily report" } },
-          table: { type: "table", props: { columns: ["Repo"], rows: [["chrona"]] } },
-        },
-      }],
     });
 
     render(<TaskWorkspaceNodeDetailPanel
@@ -204,9 +181,9 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       selectedNodes={[node]}
     />);
 
-    expect(screen.getByText("GitHub Trending")).toBeInTheDocument();
-    expect(screen.getByText("Daily report")).toBeInTheDocument();
-    expect(screen.getByText("chrona")).toBeInTheDocument();
+    expect(screen.getByText("This node completed. User-visible output now lives at plan level.")).toBeInTheDocument();
+    expect(screen.queryByText("GitHub Trending")).not.toBeInTheDocument();
+    expect(screen.queryByText("chrona")).not.toBeInTheDocument();
   });
 
 
@@ -215,15 +192,6 @@ describe("TaskWorkspaceNodeDetailPanel", () => {
       id: "ui-compat",
       title: "Compat fallback node",
       status: "done",
-      resultOutputs: [
-        {
-          root: "root",
-          elements: {
-            root: { type: "Stack", props: {}, children: ["content"] },
-            content: { type: "UnknownComponent", props: { content: "Should not render via spec" } },
-          },
-        },
-      ],
     });
 
     render(<TaskWorkspaceNodeDetailPanel

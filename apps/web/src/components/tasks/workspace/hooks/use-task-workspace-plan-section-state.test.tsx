@@ -23,7 +23,6 @@ describe("useTaskWorkspacePlanSectionState", () => {
       status: "done",
       interactionType: "input",
       completionSummary: "默认城市: 北京",
-      resultOutputs: [],
       interactiveFields: [],
       requiresHumanInput: false,
     });

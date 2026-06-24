@@ -22,7 +22,7 @@ function resolveExecutionStatus(node: FlowGraphNode["data"]["node"]) {
 }
 
 function hasNodeArtifacts(node: FlowGraphNode["data"]["node"]) {
-  return Boolean(node.result || node.resultEvidence || node.resultOutputs);
+  return Boolean(node.result || node.resultEvidence);
 }
 
 function formatEstimatedMinutes(value: number | null) {
@@ -206,7 +206,6 @@ type NodeCardContentProps = {
   estimatedLabel: string | null;
   kindTheme: ReturnType<typeof resolveNodeKindTheme>;
   runtimeSpotlight: ReturnType<typeof resolveRuntimeSpotlightTheme>;
-  styles: (typeof TONE_STYLES)[keyof typeof TONE_STYLES];
 };
 
 function statusChipTheme(status: PlanNodeStatus) {
@@ -329,7 +328,7 @@ function WaitNodeFrame(props: NodeFrameProps) {
   );
 }
 
-function NodeCardContent({ data, estimatedLabel, kindTheme, runtimeSpotlight, styles }: NodeCardContentProps) {
+function NodeCardContent({ data, estimatedLabel, kindTheme, runtimeSpotlight }: NodeCardContentProps) {
   const { graphCopy, node, stepNumber } = data;
   const anchorClassName = isCheckpointNode(node) ? "rounded-[10px_16px_10px_10px]" : isConditionNode(node) ? "rounded-[10px]" : undefined;
 
@@ -398,7 +397,6 @@ function PlanNodeCard({ data }: NodeProps<FlowGraphNode>) {
         estimatedLabel={estimatedLabel}
         kindTheme={kindTheme}
         runtimeSpotlight={runtimeSpotlight}
-        styles={styles}
       />
   );
 

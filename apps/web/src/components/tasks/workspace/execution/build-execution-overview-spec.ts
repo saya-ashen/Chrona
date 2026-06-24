@@ -312,20 +312,6 @@ function emptyTextSpec(message: string): UiDocument {
   };
 }
 
-function resultSourceSpec(node: PlanNodeDataModel, copy: WorkspaceCopy): UiDocument {
-  return {
-    root: "root",
-    elements: {
-      root: { type: "Stack", props: { gap: "sm" }, children: ["source", "locate"] },
-      source: { type: "Text", props: { text: `${copy.from ?? "from"}: ${node.title}`, variant: "caption" } },
-      locate: {
-        type: "Button",
-        props: { label: copy.locateSourceNode ?? "Locate source node", variant: "secondary" },
-        on: { press: { action: UI_ACTION.locateWorkspaceNode, params: { nodeId: node.id } } },
-      },
-    },
-  };
-}
 
 
 export function buildCommandCenterOutputTabSpec(input: {
@@ -339,12 +325,9 @@ export function buildCommandCenterOutputTabSpec(input: {
   const children: string[] = [];
   elements.root = { type: "Stack", props: { gap: "sm" }, children };
 
-  if (input.latestCompletedNode) {
-    appendDocument(elements, children, "source", resultSourceSpec(input.latestCompletedNode, input.copy));
-  }
-  appendDocument(elements, children, "result", input.resultSpec);
-  if (input.artifacts.length > 0 || input.apiArtifactsSpec) {
-    appendDocument(elements, children, "artifacts", input.apiArtifactsSpec ?? buildArtifactsSpec({ artifacts: input.artifacts, copy: input.copy, onLocate: true }));
+  appendDocument(elements, children, "output", input.apiArtifactsSpec ?? input.resultSpec);
+  if (input.artifacts.length > 0) {
+    appendDocument(elements, children, "artifacts", buildArtifactsSpec({ artifacts: input.artifacts, copy: input.copy, onLocate: true }));
   }
 
   if (children.length === 0) {

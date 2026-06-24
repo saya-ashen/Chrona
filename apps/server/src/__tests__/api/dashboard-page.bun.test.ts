@@ -77,23 +77,35 @@ async function seedProjection(
   });
 }
 
-async function seedArtifact(
-  workspaceId: string,
-  taskId: string,
-  fields: { type?: string; title?: string; createdAt?: Date },
-) {
-  const run = await db.run.create({
-    data: { taskId, runtimeName: "hermes", status: "Completed", triggeredBy: "system" },
-  });
-  return await db.artifact.create({
+async function seedPlanOutput(workspaceId: string, taskId: string, summary = "Plan output") {
+  const planId = `plan-${crypto.randomUUID()}`;
+  await db.taskPlan.create({
     data: {
       workspaceId,
       taskId,
-      runId: run.id,
-      type: (fields.type ?? "summary") as never,
-      title: fields.title ?? "Output",
-      uri: `artifact://${run.id}`,
-      createdAt: fields.createdAt ?? new Date(),
+      planId,
+      revision: 1,
+      status: "Accepted",
+      compiledPlan: {},
+    },
+  });
+  return await db.taskPlanRun.create({
+    data: {
+      workspaceId,
+      taskId,
+      planId,
+      planRun: {
+        planRun: { id: planId },
+        mutableGraph: {
+          planOutput: {
+            spec: { root: "root", elements: { root: { type: "Text", props: { text: summary } } } },
+            revision: 1,
+            updatedAt: "2030-01-01T00:00:00.000Z",
+            updatedByNodeId: null,
+            history: [{ id: "rev-1", nodeId: null, summary, patches: [], createdAt: "2030-01-01T00:00:00.000Z" }],
+          },
+        },
+      },
     },
   });
 }
@@ -182,12 +194,12 @@ describe("GET /api/dashboard", () => {
       persistedStatus: "Done",
       lastActivityAt: new Date("2030-02-01T00:00:00.000Z"),
     });
-    await seedArtifact(workspaceId, newer, { title: "github-trending-summary.md", type: "report" });
+    await seedPlanOutput(workspaceId, newer, "github-trending-summary");
 
     const body = await fetchDashboard(workspaceId);
     expect(body.autoCompleted.map((item) => item.taskId)).toEqual([newer, older]);
-    expect(body.autoCompleted[0]?.output?.title).toBe("github-trending-summary.md");
-    expect(body.autoCompleted[0]?.category).toBe("report");
+    expect(body.autoCompleted[0]?.output?.title).toBe("github-trending-summary");
+    expect(body.autoCompleted[0]?.category).toBe("automation");
     expect(body.totalAutoCompleted).toBe(2);
   });
 

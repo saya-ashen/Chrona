@@ -1,7 +1,7 @@
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanBlueprint } from "../ai-plan-blueprint";
 import type { WaitKind } from "./node";
-import type { ArtifactRef } from "./node-result";
+import type { ArtifactRef, PlanOutputState } from "./node-result";
 import type {
   CheckpointResponse,
   ExecutionCheckpoint,
@@ -289,6 +289,7 @@ export type PlanExecutionResult = {
   blockedNodeIds: string[];
   message: string;
   checkpoint: ExecutionCheckpoint | null;
+  planOutput?: Pick<PlanOutputState, "spec" | "revision" | "updatedAt" | "updatedByNodeId">;
   ui?: {
     currentOperationSpec?: UiDocument | null;
   };

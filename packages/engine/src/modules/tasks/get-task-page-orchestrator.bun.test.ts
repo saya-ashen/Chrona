@@ -696,11 +696,10 @@ describe("getTaskPage orchestrator read model", () => {
       tone: "warning",
       sourceNodeId: "answer",
     }));
-    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+    expect(page.activityTimeline).not.toContainEqual(expect.objectContaining({
       kind: "raw",
       title: "Provider event",
       rawEventType: "provider.opaque",
-      sourceNodeId: "answer",
     }));
   });
 

@@ -150,10 +150,10 @@ function commandForExecutionAction(
         command: { type: "resume_after_unblock", nodeId: action.nodeId, note: action.note },
         context,
       };
-    case "submit_node_output":
+    case "update_plan_output":
       throw new EngineError(
         ENGINE_ERROR_CODES.VALIDATION_FAILED,
-        "submit_node_output must be handled through node result submission",
+        "update_plan_output must be handled through plan output submission",
       );
     case "complete_manual_node":
       return {
