@@ -401,10 +401,16 @@ export type NodeLegendItem = {
   tone: NodeTone;
 };
 
+export type CompactStageNode = {
+  id: string;
+  tone: NodeTone;
+  label: number;
+};
+
 export type CompactStage = {
   id: string;
   title: string;
-  nodeIds: string[];
+  nodes: CompactStageNode[];
   activeCount: number;
   attentionCount: number;
   doneCount: number;
@@ -421,4 +427,7 @@ export type CompactFocusItem = {
   isCurrent: boolean;
   hasLinkedTask: boolean;
   relationLabel: string | null;
+  phase: string | null;
+  nextAction: string | null;
+  estimatedMinutes: number | null;
 };

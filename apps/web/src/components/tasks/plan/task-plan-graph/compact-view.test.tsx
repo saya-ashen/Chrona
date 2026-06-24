@@ -83,10 +83,10 @@ describe("compact task plan graph view", () => {
         summary={{ nodes: 2, active: 1, attention: 1, done: 0, currentLabel: "Current node", statusLabel: "Running" }}
       />,
     );
-    expect(screen.getByText("Current progress")).toBeInTheDocument();
-    expect(screen.getByText("2 nodes")).toBeInTheDocument();
-    expect(screen.getByText("1 active")).toBeInTheDocument();
-    expect(screen.getAllByText("Current node")).toHaveLength(2);
+    expect(screen.queryByText("Current progress")).not.toBeInTheDocument();
+    expect(screen.queryByText("2 nodes")).not.toBeInTheDocument();
+    expect(screen.queryByText("1 active")).not.toBeInTheDocument();
+    expect(screen.getByText("Current node")).toBeInTheDocument();
     expect(screen.getByText("Needs action")).toBeInTheDocument();
     expect(screen.getByText(/very long current node title/)).toHaveClass("break-words");
 

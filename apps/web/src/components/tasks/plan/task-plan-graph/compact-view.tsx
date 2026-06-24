@@ -40,12 +40,16 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
       const members = ids.map((id) => nodesById.get(id)).filter(Boolean);
       const completed = members.filter((node) => node?.status === "done" || node?.status === "skipped").length;
       const total = members.length || 1;
+      const stageNodes = ids.map((id, index) => {
+        const node = nodesById.get(id);
+        return { id, tone: node ? getNodeTone(node) : "idle" as const, label: index + 1 };
+      });
       return {
         id: `stage-${rank}`,
         title: rank === 0 ? graphCopy.compactEntryLabel : `${graphCopy.compactStageLabel} ${rank + 1}`,
-        nodeIds: ids,
+        nodes: stageNodes,
         activeCount: members.filter((node) => node?.status === "active").length,
-        attentionCount: members.filter((node) => node?.status === "waiting" || node?.status === "blocked").length,
+        attentionCount: members.filter((node) => node?.status === "waiting" || node?.status === "waiting_for_user" || node?.status === "blocked").length,
         doneCount: completed,
         completion: Math.round((completed / total) * 100),
       };
@@ -66,6 +70,9 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
       isCurrent: id === plan.currentStepId,
       hasLinkedTask: Boolean(node?.linkedTaskId),
       relationLabel: upstreamCount > 0 || downstreamCount > 0 ? [upstreamCount > 0 ? `${upstreamCount} upstream` : null, downstreamCount > 0 ? `${downstreamCount} downstream` : null].filter(Boolean).join(" · ") : null,
+      phase: node?.phase ?? null,
+      nextAction: node?.nextAction ?? null,
+      estimatedMinutes: node?.estimatedMinutes ?? null,
     };
   });
 
@@ -85,28 +92,35 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
 
 export function CompactStageStrip({ stages, graphCopy }: { stages: CompactStage[]; graphCopy: GraphCopy }) {
   return (
-    <div className="min-w-0 overflow-x-auto pb-1" data-testid="task-plan-compact-line">
-      <div className="flex min-w-max items-stretch gap-2">
-        {stages.map((stage, index) => (
-          <div key={stage.id} className="flex items-center gap-2">
-            <div className="min-w-28 rounded-2xl border border-border/70 bg-background px-3 py-2 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[10px] font-medium text-muted-foreground">{stage.title}</p>
-                <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-foreground">{stage.completion}%</span>
+    <div className="rounded-[20px] border border-border/70 bg-background/80 p-3" data-testid="task-plan-compact-line">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] sm:items-center">
+        <div className="min-w-0 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.graphStageMap}</p>
+          <p className="text-xs leading-5 text-muted-foreground">{graphCopy.compactDescription}</p>
+        </div>
+        <div className="min-w-0 overflow-x-auto pb-1">
+          <div className="flex min-w-max items-center gap-2">
+            {stages.map((stage, index) => (
+              <div key={stage.id} className="flex items-center gap-2">
+                <div className="min-w-24 rounded-2xl border border-border/60 bg-muted/25 px-2.5 py-2">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="truncate text-[10px] font-medium text-muted-foreground">{stage.title}</p>
+                    <span className="text-[10px] font-semibold text-foreground">{stage.completion}%</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5" aria-label={`${stage.title} nodes`}>
+                    {stage.nodes.map((node) => {
+                      const toneStyle = TONE_STYLES[node.tone];
+                      return (
+                        <span key={node.id} className={cn("size-2.5 rounded-full ring-2 ring-background", toneStyle.dot)} title={`${stage.title} node ${node.label}`} />
+                      );
+                    })}
+                  </div>
+                </div>
+                {index < stages.length - 1 ? <span className="h-px w-5 bg-border" aria-hidden="true" /> : null}
               </div>
-              <p className="mt-1 text-base font-semibold text-foreground">{stage.nodeIds.length}</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-primary/80" style={{ width: `${stage.completion}%` }} />
-              </div>
-              <div className="mt-1 flex gap-1 text-[10px] text-muted-foreground">
-                {stage.activeCount > 0 ? <span className="text-primary">{stage.activeCount} {graphCopy.compactActiveSuffix}</span> : null}
-                {stage.attentionCount > 0 ? <span className="text-primary">{stage.attentionCount} {graphCopy.compactAttentionSuffix}</span> : null}
-                {stage.doneCount > 0 ? <span>{stage.doneCount} {graphCopy.compactDoneSuffix}</span> : null}
-              </div>
-            </div>
-            {index < stages.length - 1 ? <span className="h-px w-5 bg-border" aria-hidden="true" /> : null}
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -127,21 +141,6 @@ export function CompactFocusStack({
 }) {
   return (
     <div className="space-y-2">
-      <div className="rounded-[20px] border border-border/70 bg-background/80 p-3 shadow-sm" data-testid="task-plan-compact-groups">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <p className="text-[11px] font-medium text-muted-foreground">{graphCopy.compactCurrentProgress}</p>
-            <p className="mt-0.5 text-sm font-semibold text-foreground">{summary.currentLabel ?? graphCopy.compactCurrentNode}</p>
-            <p className="text-[11px] text-muted-foreground">{summary.statusLabel ?? graphCopy.compactNeedsAction}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-            <span className="rounded-full border border-border bg-muted px-2 py-1">{summary.nodes} nodes</span>
-            <span className="rounded-full border border-border bg-muted px-2 py-1">{summary.active} active</span>
-            <span className="rounded-full border border-border bg-muted px-2 py-1">{summary.attention} attention</span>
-            <span className="rounded-full border border-border bg-muted px-2 py-1">{summary.done} done</span>
-          </div>
-        </div>
-      </div>
       {items.map((item) => {
         const toneStyle = TONE_STYLES[item.tone];
         const isSelected = selectedNodeId === item.id;
@@ -154,7 +153,7 @@ export function CompactFocusStack({
             data-node-current={item.isCurrent ? "true" : "false"}
             data-node-tone={item.displayTone}
             className={cn(
-              "w-full rounded-[20px] border px-3 py-2.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-accent/30",
+              "w-full rounded-[20px] border px-3 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-accent/30",
               toneStyle.border,
               toneStyle.bg,
               isSelected && "ring-2 ring-primary/35",
@@ -163,13 +162,18 @@ export function CompactFocusStack({
             <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
               <span className={cn("size-2 rounded-full", toneStyle.dot)} />
               <span>{item.statusLabel}</span>
+              {item.phase ? <span>{item.phase}</span> : null}
               {item.isCurrent ? <span className="text-primary">{graphCopy.compactCurrentNode}</span> : null}
               {item.displayTone === "waiting" ? <span className="text-primary">{graphCopy.compactNeedsAction}</span> : null}
               {item.hasLinkedTask ? <span className="text-muted-foreground">{graphCopy.compactLinkedTask}</span> : null}
             </div>
-            <p className="mt-1 break-words text-sm font-semibold text-foreground">{item.title}</p>
-            <p className="mt-1 break-words text-[11px] text-muted-foreground line-clamp-2">{item.summary}</p>
-            {item.relationLabel ? <p className="mt-1 break-words text-[10px] text-muted-foreground">{item.relationLabel}</p> : null}
+            <p className="mt-1.5 break-words text-sm font-semibold text-foreground">{item.title}</p>
+            <p className="mt-1 break-words text-xs leading-5 text-muted-foreground line-clamp-3">{item.summary}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+              {item.nextAction ? <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1">{item.nextAction}</span> : null}
+              {item.estimatedMinutes ? <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1">{item.estimatedMinutes}m</span> : null}
+              {item.relationLabel ? <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1">{item.relationLabel}</span> : null}
+            </div>
           </button>
         );
       })}
