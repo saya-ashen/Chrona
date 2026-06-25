@@ -8,7 +8,7 @@ import {
   useState,
   type MouseEvent,
 } from "react";
-import { AlertTriangle, CheckCircle2, CircleDot, Clock3, GitBranch, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   useEdgesState,
   useNodesState,
@@ -67,7 +67,6 @@ function GraphShell({
   nodes,
   edges,
   planNodes,
-  overviewItems,
   currentStepId,
   edgeLegend,
   nodeLegend,
@@ -78,7 +77,6 @@ function GraphShell({
   onFitGraph,
   onZoomIn,
   onZoomOut,
-  showOverview,
   fillHeight = false,
   testId,
 }: {
@@ -87,7 +85,6 @@ function GraphShell({
   nodes: FlowGraphNode[];
   edges: FlowLayout["edges"];
   planNodes: TaskPlanGraphPlan["nodes"];
-  overviewItems: GraphOverviewItem[];
   currentStepId?: string | null;
   edgeLegend: ReturnType<typeof useGraphLegend>["edgeLegend"];
   nodeLegend: ReturnType<typeof useGraphLegend>["nodeLegend"];
@@ -98,7 +95,6 @@ function GraphShell({
   onFitGraph: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  showOverview: boolean;
   fillHeight?: boolean;
   testId?: string;
 }) {
@@ -118,14 +114,7 @@ function GraphShell({
         fillHeight={fillHeight}
         edgeLegend={edgeLegend}
         nodeLegend={nodeLegend}
-        overview={showOverview ? (
-          <GraphOverviewBar
-            graphCopy={graphCopy}
-            items={overviewItems}
-            currentTitle={currentNode?.title ?? null}
-            selectedTitle={null}
-          />
-        ) : null}
+        overview={null}
         handleNodeClick={handleNodeClick}
         handlePaneClick={() => undefined}
         handleNodeDragStart={stopIfNodeButton}
@@ -143,60 +132,6 @@ function GraphShell({
   );
 }
 
-type GraphOverviewItem = {
-  label: string;
-  value: string | number;
-  tone: "neutral" | "active" | "attention" | "done";
-};
-
-function GraphOverviewBar({
-  graphCopy,
-  items,
-  currentTitle,
-  selectedTitle,
-}: {
-  graphCopy: GraphCopy;
-  items: GraphOverviewItem[];
-  currentTitle: string | null;
-  selectedTitle: string | null;
-}) {
-  const iconByTone = {
-    neutral: GitBranch,
-    active: CircleDot,
-    attention: AlertTriangle,
-    done: CheckCircle2,
-  };
-
-  return (
-    <div className="rounded-[22px] border border-border bg-card p-3 shadow-sm">
-      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
-            <Clock3 className="size-3.5" />
-            {graphCopy.overviewTitle}
-          </div>
-          <p className="mt-1 truncate text-sm font-semibold text-foreground">
-            {selectedTitle ? `${graphCopy.selectedNode}: ${selectedTitle}` : currentTitle ? `${graphCopy.currentNode}: ${currentTitle}` : graphCopy.criticalPath}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-          {items.map((item) => {
-            const Icon = iconByTone[item.tone];
-            return (
-              <div key={item.label} className="min-w-[6rem] rounded-2xl border border-border bg-background px-3 py-2 text-foreground">
-                <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
-                  <Icon className="size-3" />
-                  <span className="truncate">{item.label}</span>
-                </div>
-                <p className="mt-1 text-base font-semibold text-foreground">{item.value}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function TaskPlanGraph({
   plan,
@@ -377,31 +312,6 @@ export function TaskPlanGraph({
 
   if (plan.state !== "ready" || plan.nodes.length === 0) return null;
 
-  const overviewItems = [
-    { label: graphCopy.overviewNodes, value: plan.nodes.length, tone: "neutral" as const },
-    {
-      label: graphCopy.overviewActive,
-      value: plan.analytics.activeNodeIds.length,
-      tone: "active" as const,
-    },
-    {
-      label: graphCopy.overviewAttention,
-      value: plan.analytics.attentionNodeIds.length,
-      tone: "attention" as const,
-    },
-    {
-      label: graphCopy.overviewDone,
-      value: plan.nodes.filter(
-        (node) => node.status === "done" || node.status === "skipped",
-      ).length,
-      tone: "done" as const,
-    },
-    {
-      label: graphCopy.overviewEstimate,
-      value: `${plan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)}m`,
-      tone: "neutral" as const,
-    },
-  ];
 
   if (resolvedMode !== "compact" && !layout) return null;
 
@@ -425,7 +335,6 @@ export function TaskPlanGraph({
               nodes={nodes}
               edges={edges}
               planNodes={plan.nodes}
-              overviewItems={overviewItems}
               currentStepId={plan.currentStepId}
               edgeLegend={edgeLegend}
               nodeLegend={nodeLegend}
@@ -436,7 +345,6 @@ export function TaskPlanGraph({
               onFitGraph={handleFitGraph}
               onZoomIn={handleZoomIn}
               onZoomOut={handleZoomOut}
-              showOverview={showOverview}
               testId="task-plan-graph-full-dialog"
             />
           ) : null}
@@ -476,7 +384,6 @@ export function TaskPlanGraph({
           edges={edges}
           fillHeight={fillHeight}
           planNodes={plan.nodes}
-          overviewItems={overviewItems}
           currentStepId={plan.currentStepId}
           edgeLegend={edgeLegend}
           nodeLegend={nodeLegend}
@@ -487,7 +394,6 @@ export function TaskPlanGraph({
           onFitGraph={handleFitGraph}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
-          showOverview={showOverview}
         />
       </div>
       {fullGraphDialog}
