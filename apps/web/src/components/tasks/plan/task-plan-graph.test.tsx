@@ -1101,7 +1101,7 @@ describe("TaskPlanGraph", () => {
     expect(screen.queryByTestId("task-plan-graph-legend")).not.toBeInTheDocument();
     expect(screen.queryByTestId("task-plan-graph-scroll")).not.toBeInTheDocument();
 
-    expect(screen.getByText("Stage map")).toBeInTheDocument();
+    expect(screen.queryByText("Stage map")).not.toBeInTheDocument();
     expect(screen.queryByText("Current progress")).not.toBeInTheDocument();
     expect(screen.queryByText("Next summary")).not.toBeInTheDocument();
 

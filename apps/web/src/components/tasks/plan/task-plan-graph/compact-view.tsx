@@ -90,36 +90,24 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
   };
 }
 
-export function CompactStageStrip({ stages, graphCopy }: { stages: CompactStage[]; graphCopy: GraphCopy }) {
+export function CompactStageStrip({ stages }: { stages: CompactStage[]; graphCopy: GraphCopy }) {
   return (
-    <div className="rounded-[20px] border border-border/70 bg-background/80 p-3" data-testid="task-plan-compact-line">
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] sm:items-center">
-        <div className="min-w-0 space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.graphStageMap}</p>
-          <p className="text-xs leading-5 text-muted-foreground">{graphCopy.compactDescription}</p>
-        </div>
-        <div className="min-w-0 overflow-x-auto pb-1">
-          <div className="flex min-w-max items-center gap-2">
-            {stages.map((stage, index) => (
-              <div key={stage.id} className="flex items-center gap-2">
-                <div className="min-w-24 rounded-2xl border border-border/60 bg-muted/25 px-2.5 py-2">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="truncate text-[10px] font-medium text-muted-foreground">{stage.title}</p>
-                    <span className="text-[10px] font-semibold text-foreground">{stage.completion}%</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5" aria-label={`${stage.title} nodes`}>
-                    {stage.nodes.map((node) => {
-                      const toneStyle = TONE_STYLES[node.tone];
-                      return (
-                        <span key={node.id} className={cn("size-2.5 rounded-full ring-2 ring-background", toneStyle.dot)} title={`${stage.title} node ${node.label}`} />
-                      );
-                    })}
-                  </div>
-                </div>
-                {index < stages.length - 1 ? <span className="h-px w-5 bg-border" aria-hidden="true" /> : null}
+    <div className="rounded-[20px] border border-border/70 bg-background/80 p-4" data-testid="task-plan-compact-line">
+      <div className="min-w-0 overflow-x-auto py-1">
+        <div className="flex min-w-max items-center px-1">
+          {stages.map((stage, stageIndex) => (
+            <div key={stage.id} className="flex items-center">
+              <div className="flex items-center gap-2" aria-label={`${stage.title} nodes`}>
+                {stage.nodes.map((node) => {
+                  const toneStyle = TONE_STYLES[node.tone];
+                  return (
+                    <span key={node.id} className={cn("size-3 rounded-full ring-2 ring-background", toneStyle.dot)} title={`${stage.title} node ${node.label}`} />
+                  );
+                })}
               </div>
-            ))}
-          </div>
+              {stageIndex < stages.length - 1 ? <span className="mx-2 h-px w-8 bg-border/80" aria-hidden="true" /> : null}
+            </div>
+          ))}
         </div>
       </div>
     </div>
