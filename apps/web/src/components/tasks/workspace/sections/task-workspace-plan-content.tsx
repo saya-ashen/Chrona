@@ -49,19 +49,19 @@ export function TaskWorkspacePlanContent({
     : null;
   const isGeneratingPlan = planGenerationStatus === "generating";
   const graphModeControls = (
-    <div className="flex shrink-0 rounded-2xl border border-border bg-background/80 p-1 shadow-sm" role="group" aria-label={copy.graphModeLabel}>
+    <div className="flex w-full flex-wrap items-stretch gap-1 sm:w-auto sm:justify-end" role="group" aria-label={copy.graphModeLabel}>
       <Button
         type="button"
         variant={graphMode === "full" ? "default" : "ghost"}
         size="sm"
-        className="h-9 rounded-xl px-3 text-xs"
+        className="h-auto min-w-0 flex-1 items-start justify-start rounded-xl px-3 py-2 text-left text-xs sm:flex-none"
         onClick={() => onGraphModeChange("full")}
         aria-pressed={graphMode === "full"}
         title={copy.graphFullHint}
       >
-        <GitBranch className="size-3.5" />
-        <span className="flex flex-col items-start leading-none">
-          <span>{copy.graphFullMode}</span>
+        <GitBranch className="mt-0.5 size-3.5 shrink-0" />
+        <span className="flex min-w-0 flex-col items-start leading-tight">
+          <span className="truncate">{copy.graphFullMode}</span>
           <span className="hidden text-[10px] font-normal opacity-75 md:inline">{copy.graphFullHint}</span>
         </span>
       </Button>
@@ -69,14 +69,14 @@ export function TaskWorkspacePlanContent({
         type="button"
         variant={graphMode === "compact" ? "default" : "ghost"}
         size="sm"
-        className="h-9 rounded-xl px-3 text-xs"
+        className="h-auto min-w-0 flex-1 items-start justify-start rounded-xl px-3 py-2 text-left text-xs sm:flex-none"
         onClick={() => onGraphModeChange("compact")}
         aria-pressed={graphMode === "compact"}
         title={copy.graphCompactHint}
       >
-        <Minimize2 className="size-3.5" />
-        <span className="flex flex-col items-start leading-none">
-          <span>{copy.graphCompactMode}</span>
+        <Minimize2 className="mt-0.5 size-3.5 shrink-0" />
+        <span className="flex min-w-0 flex-col items-start leading-tight">
+          <span className="truncate">{copy.graphCompactMode}</span>
           <span className="hidden text-[10px] font-normal opacity-75 md:inline">{copy.graphCompactHint}</span>
         </span>
       </Button>
@@ -102,7 +102,7 @@ export function TaskWorkspacePlanContent({
     <div className="flex h-full min-h-0 flex-col">
       {graphPlan && plan ? (
         <>
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5">
+          <div className="flex min-w-0 flex-col gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
               {planSummary ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{planSummary}</p> : null}
@@ -126,7 +126,7 @@ export function TaskWorkspacePlanContent({
         </>
       ) : (
         <div className="flex h-[520px] min-w-0 max-w-full flex-col md:h-[640px] xl:h-full">
-          <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5">
+          <div className="flex min-w-0 flex-col gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
             {isGraphPlanPending ? null : generatePlanButton}
           </div>
