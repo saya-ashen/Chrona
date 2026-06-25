@@ -450,15 +450,7 @@ export function TaskPlanGraph({
       <>
         <div ref={containerRef} className={cn("min-w-0 w-full max-w-full", className)}>
           <div aria-label={graphCopy.ariaLabel} className="relative overflow-hidden rounded-[24px] border border-border bg-card p-3 text-card-foreground shadow-sm" data-graph-mode="compact" data-testid="task-plan-graph">
-            <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.compactTitle}</p>
-              </div>
-              <button type="button" className="shrink-0 rounded-full border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:border-primary/35 hover:bg-primary-soft" onClick={() => setIsFullDialogOpen(true)}>
-                {graphCopy.openFullGraph}
-              </button>
-            </div>
-            <div className="relative mt-3 space-y-3">
+            <div className="relative space-y-3">
               <CompactStageStrip stages={compact.stages} graphCopy={graphCopy} />
               <section className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.focusTitle}</p>

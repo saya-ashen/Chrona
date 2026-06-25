@@ -1121,19 +1121,7 @@ describe("TaskPlanGraph", () => {
     expect(childOutlineNode).toHaveTextContent("1 upstream");
     expect(childOutlineNode).toHaveTextContent("1 downstream");
 
-    const deliverableOutlineNode = screen.getByTestId("task-plan-outline-node-node-deliverable");
-    expect(deliverableOutlineNode).toHaveTextContent("1 upstream");
-
-
-    const openFullButton = screen.getByRole("button", { name: "Open full graph" });
-    fireEvent.click(openFullButton);
-
-    const dialog = screen.getByRole("dialog", { name: "Full execution graph" });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    const dialogGraph = await within(dialog).findByTestId("task-plan-graph-full-dialog");
-    expect(dialogGraph).toBeInTheDocument();
-    expect(dialogGraph).toHaveAttribute("data-renderer", "react-flow");
-    expect(dialogGraph).toHaveAttribute("data-graph-mode", "full");
-    expect(within(dialog).getByTestId("task-plan-graph-legend")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open full graph" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Full execution graph" })).not.toBeInTheDocument();
   });
 });

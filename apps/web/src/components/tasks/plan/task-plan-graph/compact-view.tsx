@@ -137,18 +137,11 @@ export function CompactStageStrip({ stages, graphCopy }: { stages: CompactStage[
   const laneCount = Math.max(...positionedStages.map((stage) => new Set(stage.nodes.map((node) => node.lane)).size), 1);
   const width = MINI_PADDING_X * 2 + Math.max(stageCount - 1, 0) * MINI_STAGE_GAP + MINI_NODE_RADIUS * 2;
   const height = MINI_PADDING_Y * 2 + Math.max(laneCount - 1, 0) * MINI_LANE_GAP + MINI_NODE_RADIUS * 2;
+
   return (
-    <div className="rounded-[22px] border border-primary/20 bg-primary-soft/25 p-2.5 shadow-inner" data-testid="task-plan-compact-line">
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.graphStageMap}</p>
-        <div className="flex items-center gap-1.5" aria-hidden="true">
-          <span className="size-2 rounded-full bg-success" />
-          <span className="size-2 rounded-full bg-primary" />
-          <span className="size-2 rounded-full bg-warning" />
-          <span className="size-2 rounded-full bg-destructive" />
-        </div>
-      </div>
-      <div className="min-w-0 overflow-x-auto rounded-[18px] border border-border/70 bg-background/90 px-2 py-2.5 shadow-sm">
+    <div className="space-y-2" data-testid="task-plan-compact-line">
+      <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.graphStageMap}</p>
+      <div className="min-w-0 overflow-x-auto">
         <svg className="block min-w-full" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={graphCopy.graphStageMap}>
           {positionedStages.flatMap((stage) => stage.edges.map((edge) => {
             const from = nodesById.get(edge.from);
