@@ -405,12 +405,20 @@ export type CompactStageNode = {
   id: string;
   tone: NodeTone;
   label: number;
+  lane: number;
+  isCurrent: boolean;
 };
 
+export type CompactStageEdge = {
+  id: string;
+  from: string;
+  to: string;
+};
 export type CompactStage = {
   id: string;
   title: string;
   nodes: CompactStageNode[];
+  edges: CompactStageEdge[];
   activeCount: number;
   attentionCount: number;
   doneCount: number;

@@ -42,12 +42,25 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
       const total = members.length || 1;
       const stageNodes = ids.map((id, index) => {
         const node = nodesById.get(id);
-        return { id, tone: node ? getNodeTone(node) : "idle" as const, label: index + 1 };
+        return {
+          id,
+          tone: node ? getNodeTone(node) : "idle" as const,
+          label: index + 1,
+          lane: plan.analytics.laneByNodeId[id] ?? index,
+          isCurrent: id === plan.currentStepId,
+        };
+      });
+      const stageNodeIds = new Set(ids);
+      const stageEdges = plan.edges.flatMap((edge) => {
+        const from = edge.from ?? edge.fromNodeId;
+        const to = edge.to ?? edge.toNodeId;
+        return from && to && stageNodeIds.has(from) && nodesById.has(to) ? [{ id: edge.id, from, to }] : [];
       });
       return {
         id: `stage-${rank}`,
         title: rank === 0 ? graphCopy.compactEntryLabel : `${graphCopy.compactStageLabel} ${rank + 1}`,
         nodes: stageNodes,
+        edges: stageEdges,
         activeCount: members.filter((node) => node?.status === "active").length,
         attentionCount: members.filter((node) => node?.status === "waiting" || node?.status === "waiting_for_user" || node?.status === "blocked").length,
         doneCount: completed,
@@ -90,25 +103,61 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
   };
 }
 
+const MINI_NODE_RADIUS = 5;
+const MINI_STAGE_GAP = 30;
+const MINI_LANE_GAP = 22;
+const MINI_PADDING_X = 12;
+const MINI_PADDING_Y = 12;
+
+function minimapNodeClass(tone: CompactStage["nodes"][number]["tone"]) {
+  if (tone === "done") return "fill-success stroke-success";
+  if (tone === "active") return "fill-primary stroke-primary";
+  if (tone === "attention" || tone === "upcoming") return "fill-warning stroke-warning";
+  if (tone === "blocked") return "fill-destructive stroke-destructive";
+  if (tone === "skipped") return "fill-muted stroke-muted-foreground/70";
+  return "fill-muted-foreground/65 stroke-muted-foreground/65";
+}
+
 export function CompactStageStrip({ stages }: { stages: CompactStage[]; graphCopy: GraphCopy }) {
+  const positionedStages = stages.map((stage, stageIndex) => {
+    const lanes = [...new Set(stage.nodes.map((node) => node.lane))].sort((left, right) => left - right);
+    const laneIndexByLane = new Map(lanes.map((lane, index) => [lane, index]));
+    return {
+      ...stage,
+      x: MINI_PADDING_X + stageIndex * MINI_STAGE_GAP,
+      nodes: stage.nodes.map((node) => ({
+        ...node,
+        x: MINI_PADDING_X + stageIndex * MINI_STAGE_GAP,
+        y: MINI_PADDING_Y + (laneIndexByLane.get(node.lane) ?? 0) * MINI_LANE_GAP,
+      })),
+    };
+  });
+  const nodesById = new Map(positionedStages.flatMap((stage) => stage.nodes.map((node) => [node.id, node])));
+  const stageCount = Math.max(positionedStages.length, 1);
+  const laneCount = Math.max(...positionedStages.map((stage) => new Set(stage.nodes.map((node) => node.lane)).size), 1);
+  const width = MINI_PADDING_X * 2 + Math.max(stageCount - 1, 0) * MINI_STAGE_GAP + MINI_NODE_RADIUS * 2;
+  const height = MINI_PADDING_Y * 2 + Math.max(laneCount - 1, 0) * MINI_LANE_GAP + MINI_NODE_RADIUS * 2;
   return (
-    <div className="rounded-[20px] border border-border/70 bg-background/80 p-4" data-testid="task-plan-compact-line">
-      <div className="min-w-0 overflow-x-auto py-1">
-        <div className="flex min-w-max items-center px-1">
-          {stages.map((stage, stageIndex) => (
-            <div key={stage.id} className="flex items-center">
-              <div className="flex items-center gap-2" aria-label={`${stage.title} nodes`}>
-                {stage.nodes.map((node) => {
-                  const toneStyle = TONE_STYLES[node.tone];
-                  return (
-                    <span key={node.id} className={cn("size-3 rounded-full ring-2 ring-background", toneStyle.dot)} title={`${stage.title} node ${node.label}`} />
-                  );
-                })}
-              </div>
-              {stageIndex < stages.length - 1 ? <span className="mx-2 h-px w-8 bg-border/80" aria-hidden="true" /> : null}
-            </div>
-          ))}
-        </div>
+    <div className="rounded-[20px] border border-border/70 bg-background/80 p-3" data-testid="task-plan-compact-line">
+      <div className="min-w-0 overflow-x-auto">
+        <svg className="block min-w-full" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Plan minimap">
+          {positionedStages.flatMap((stage) => stage.edges.map((edge) => {
+            const from = nodesById.get(edge.from);
+            const to = nodesById.get(edge.to);
+            if (!from || !to) return null;
+            return (
+              <line key={edge.id} x1={from.x} y1={from.y} x2={to.x} y2={to.y} className="stroke-border/80" strokeWidth="2" strokeLinecap="round" />
+            );
+          }))}
+          {positionedStages.map((stage) => stage.nodes.map((node) => (
+            <g key={node.id}>
+              {node.isCurrent ? <circle cx={node.x} cy={node.y} r={MINI_NODE_RADIUS + 4} className="fill-primary/10 stroke-primary/50" strokeWidth="1.5" /> : null}
+              <circle cx={node.x} cy={node.y} r={MINI_NODE_RADIUS} className={cn("stroke-[1.5]", minimapNodeClass(node.tone))}>
+                <title>{`${stage.title} node ${node.label}`}</title>
+              </circle>
+            </g>
+          )))}
+        </svg>
       </div>
     </div>
   );
