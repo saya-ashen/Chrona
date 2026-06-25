@@ -1101,8 +1101,8 @@ describe("TaskPlanGraph", () => {
     expect(screen.queryByTestId("task-plan-graph-legend")).not.toBeInTheDocument();
     expect(screen.queryByTestId("task-plan-graph-scroll")).not.toBeInTheDocument();
 
-    expect(screen.queryByText("Stage map")).not.toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Plan minimap" })).toBeInTheDocument();
+    expect(screen.getByText("Stage map")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Stage map" })).toBeInTheDocument();
     expect(graph.querySelectorAll("circle").length).toBeGreaterThan(0);
     expect(graph.querySelector("rect")).toBeNull();
     expect(screen.queryByText("Current progress")).not.toBeInTheDocument();
