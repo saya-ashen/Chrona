@@ -162,7 +162,7 @@ export function TaskWorkspaceExecutionOverview({
       className="min-h-0 flex-1 overflow-y-auto"
       aria-labelledby="task-workspace-results-heading"
     >
-      <h3 id="task-workspace-results-heading" className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+      <h3 id="task-workspace-results-heading" className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {copy.outputTab}
       </h3>
       <SpecRenderer
@@ -174,12 +174,12 @@ export function TaskWorkspaceExecutionOverview({
 
   const activityTimeline = (
     <section
-      className="min-h-0 overflow-y-auto border-l border-border/55 pl-3"
+      className="min-h-0 overflow-y-auto border-l border-border/45 pl-2.5"
       aria-labelledby="task-workspace-activity-heading"
     >
       <h3
         id="task-workspace-activity-heading"
-        className="sticky top-0 z-10 mb-2 flex items-center gap-1.5 bg-background/85 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground backdrop-blur"
+        className="sticky top-0 z-10 mb-1.5 flex items-center gap-1.5 bg-background/85 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground backdrop-blur"
       >
         <Activity className="size-3" />
         {copy.trailTab}
@@ -189,11 +189,11 @@ export function TaskWorkspaceExecutionOverview({
   );
 
   const activityBelow = (
-    <details className="mt-3 shrink-0 border-t border-border/55 pt-3">
-      <summary className="cursor-pointer select-none text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
+    <details className="mt-2.5 shrink-0 border-t border-border/45 pt-2.5">
+      <summary className="cursor-pointer select-none text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground">
         {copy.trailTab}
       </summary>
-      <div className="mt-2 max-h-72 overflow-y-auto pr-1.5">
+      <div className="mt-2 max-h-64 overflow-y-auto pr-1">
         <SpecRenderer spec={trailSpec} store={trailStore ?? undefined} />
       </div>
     </details>
@@ -207,19 +207,19 @@ export function TaskWorkspaceExecutionOverview({
       <div className="flex min-h-0 flex-1 flex-col">
 
 
-        <div className="mb-3 shrink-0 space-y-1.5 rounded-xl bg-muted/25 px-3 py-2">
+        <div className="mb-2.5 shrink-0 space-y-1 rounded-lg bg-muted/20 px-2.5 py-1.5">
           <div className="flex items-center justify-between gap-2">
             {statusLabel ? (
-              <span className="truncate text-xs font-medium text-muted-foreground">{statusLabel}</span>
+              <span className="truncate text-[11px] font-medium text-muted-foreground">{statusLabel}</span>
             ) : <span />}
             {progress.totalSteps > 0 ? (
-              <span className="shrink-0 text-xs font-semibold text-foreground">
+              <span className="shrink-0 text-[11px] font-semibold text-foreground">
                 {progress.completedSteps}/{progress.totalSteps}
               </span>
             ) : null}
           </div>
           {progress.totalSteps > 0 ? (
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-background shadow-inner">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-background shadow-inner">
               <div
                 className="h-full rounded-full bg-primary transition-[width]"
                 style={{ width: `${progress.percentComplete}%` }}
@@ -229,7 +229,7 @@ export function TaskWorkspaceExecutionOverview({
         </div>
 
         {activityLayout === "side" ? (
-          <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(10.5rem,0.3fr)]">
+          <div className="grid min-h-0 flex-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(10rem,0.28fr)]">
             {results}
             {activityTimeline}
           </div>

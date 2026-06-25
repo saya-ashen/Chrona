@@ -70,7 +70,7 @@ export function TaskWorkspaceActionRail({
   // always mounts; only the action spec is conditionally shown. When neither
   // has content the wrapper collapses to nothing and takes no vertical space.
   return (
-    <div className="shrink-0 empty:hidden [&:not(:empty)]:mb-3 [&:not(:empty)]:space-y-2.5">
+    <div className="shrink-0 empty:hidden [&:not(:empty)]:mb-2.5 [&:not(:empty)]:space-y-2">
       <ProviderApprovalBanner taskId={taskId} />
       {hasActionContent ? (
         <SpecRenderer

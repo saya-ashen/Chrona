@@ -40,22 +40,22 @@ export function TaskWorkspaceInspector({
 }) {
   return (
     <aside
-      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-background/75"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background/60"
       aria-label={copy.commandCenterAria ?? "Task command center"}
     >
-      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border/55 bg-muted/35 px-3 py-2.5">
+      <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/50 bg-muted/25 px-2.5 py-2">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
             {copy.commandCenter ?? "Task Execution"}
           </p>
           {consoleView.progress.totalSteps > 0 ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
               {consoleView.progress.completedSteps}/{consoleView.progress.totalSteps} steps
             </p>
           ) : null}
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col p-3">
+      <div className="flex min-h-0 flex-1 flex-col p-2.5">
         <TaskWorkspaceActionRail
           taskId={taskId}
           serverNowSpec={commandCenter?.documents.now ?? null}
