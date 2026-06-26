@@ -22,7 +22,9 @@ export async function clearSchedule(input: { taskId: string }) {
     },
   });
 
-  await db.workBlock.delete({ where: { id: currentWorkBlock.id } });
+  if (currentWorkBlock) {
+    await db.workBlock.delete({ where: { id: currentWorkBlock.id } });
+  }
 
   await appendCanonicalEvent({
     eventType: "task.unscheduled",
@@ -34,8 +36,8 @@ export async function clearSchedule(input: { taskId: string }) {
     source: "ui",
     payload: {
       previous_due_at: existingTask.dueAt?.toISOString() ?? null,
-      previous_scheduled_start_at: currentWorkBlock.scheduledStartAt.toISOString(),
-      previous_scheduled_end_at: currentWorkBlock.scheduledEndAt.toISOString(),
+      previous_scheduled_start_at: currentWorkBlock?.scheduledStartAt?.toISOString() ?? null,
+      previous_scheduled_end_at: currentWorkBlock?.scheduledEndAt?.toISOString() ?? null,
     },
     dedupeKey: `task.unscheduled:${task.id}:${task.updatedAt.toISOString()}`,
   });

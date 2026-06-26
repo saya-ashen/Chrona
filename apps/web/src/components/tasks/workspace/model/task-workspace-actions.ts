@@ -17,6 +17,15 @@ export type LoadNodeWorkspaceActivityPageInput = LoadWorkspaceActivityPageInput 
   nodeId: string;
 };
 
+async function readWorkspaceActivityResponse(response: Response, fallbackMessage: string): Promise<WorkspaceActivityPage> {
+  const body = await response.json().catch(() => ({ error: fallbackMessage })) as unknown;
+  if (!response.ok) {
+    throw new Error((body as { error?: string }).error ?? fallbackMessage);
+  }
+
+  return body as WorkspaceActivityPage;
+}
+
 export async function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
   const response = await api.tasks[":taskId"].activity.$get({
     param: { taskId: input.taskId },
@@ -26,8 +35,7 @@ export async function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPage
     },
   });
 
-
-  return await response.json() as unknown as WorkspaceActivityPage;
+  return readWorkspaceActivityResponse(response as unknown as Response, "Failed to load activity history");
 }
 
 export async function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
@@ -39,8 +47,7 @@ export async function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActi
     },
   });
 
-
-  return await response.json() as unknown as WorkspaceActivityPage;
+  return readWorkspaceActivityResponse(response as unknown as Response, "Failed to load node activity history");
 }
 
 type WorkspacePresentationInput = {

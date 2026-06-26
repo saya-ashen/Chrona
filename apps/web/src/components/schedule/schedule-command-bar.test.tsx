@@ -2,10 +2,13 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {} }),
-  useLocale: () => "en",
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useLocale: () => "en",
+  };
+});
 
 const mockUseAutoComplete = vi.fn();
 vi.mock("@/hooks/use-ai", () => ({
@@ -99,7 +102,7 @@ describe("schedule quick create AI-only path", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getAllByText(/AI could not safely interpret this input/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/could not understand this input safely/i).length).toBeGreaterThan(0);
     });
     expect(onSubmit).not.toHaveBeenCalled();
   });

@@ -2,9 +2,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {} }),
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+  };
+});
 
 import { ScheduleInlineQuickCreate } from "@/components/schedule/forms/schedule-inline-quick-create";
 

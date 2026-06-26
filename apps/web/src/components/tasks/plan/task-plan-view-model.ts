@@ -800,7 +800,7 @@ export function compiledPlanToGraphPlan(
   plan: CompiledPlan | null | undefined,
   copyOverrides?: Partial<TaskPlanViewModelCopy>,
 ): TaskPlanGraphPlan | null {
-  if (!plan || plan.nodes.length === 0) return null;
+  if (!plan?.nodes?.length) return null;
   const copy = resolveViewModelCopy(copyOverrides);
 
   return buildGraphPlan({
@@ -840,8 +840,8 @@ export function taskPlanReadModelToGraphPlan(
   readModel: TaskPlanReadModel | null | undefined,
   copyOverrides?: Partial<TaskPlanViewModelCopy>,
 ): TaskPlanGraphPlan | null {
-  if (!readModel || readModel.effectivePlan.nodes.length === 0) {
-    return readModel ? compiledPlanToGraphPlan(readModel.compiledPlan, copyOverrides) : null;
+  if (!readModel || !readModel.effectivePlan?.nodes?.length) {
+    return readModel?.compiledPlan ? compiledPlanToGraphPlan(readModel.compiledPlan, copyOverrides) : null;
   }
 
   const copy = resolveViewModelCopy(copyOverrides);

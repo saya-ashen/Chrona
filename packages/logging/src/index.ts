@@ -150,6 +150,8 @@ export function createLogger(scope: string): ChronaLogger {
   return wrapLogger(scope, rootLogger);
 }
 
+export const createChronaLogger = createLogger;
+
 
 export function summarizeText(value: string | null | undefined, maxLength = 120) {
   if (!value) return null;

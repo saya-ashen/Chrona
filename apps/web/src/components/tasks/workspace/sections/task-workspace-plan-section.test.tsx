@@ -72,9 +72,12 @@ function renderWithQueryClient(ui: ReactElement) {
   });
 }
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {} }),
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+  };
+});
 
 beforeAll(async () => {
   ({ TaskWorkspacePlanSection, derivePreferredGraphMode, recoveryActionButtonVariant } = await import("./task-workspace-plan-section"));
@@ -212,10 +215,10 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
     expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
-    expect(within(getCommandCenter()).getByRole("button", { name: "Accept plan" })).toBeInTheDocument();
+    expect(within(getCommandCenter()).getByRole("button", { name: "Accept" })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-generate"));
     expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
-    fireEvent.click(within(getCommandCenter()).getByRole("button", { name: "Accept plan" }));
+    fireEvent.click(within(getCommandCenter()).getByRole("button", { name: "Accept" }));
     await waitFor(() => expect(onApplyPlan).toHaveBeenCalledWith(draftPlan));
 
     const accepted = mount(
@@ -457,7 +460,7 @@ describe("TaskWorkspacePlanSection", () => {
     fireEvent.change(within(commandCenter).getByLabelText("Plan regeneration instruction"), {
       target: { value: "Add a verification step before accepting the final output." },
     });
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept plan" }));
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept" }));
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Regenerate with instruction" }));
 
     expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);

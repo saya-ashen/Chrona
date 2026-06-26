@@ -21,10 +21,13 @@ vi.mock("@/lib/router", () => ({
   useAppRouter: () => ({ push, refresh }),
 }));
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {} }),
-  useLocale: () => "en",
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useLocale: () => "en",
+  };
+});
 
 vi.mock("@chrona/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@chrona/i18n")>()),

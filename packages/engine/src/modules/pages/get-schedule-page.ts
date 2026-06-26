@@ -67,14 +67,16 @@ function mapProjectionItem(
     autoExecuteTiming: item.task.autoExecuteTiming,
     kind: item.task.kind,
     recurrenceRule: item.task.recurrenceRule,
-    sourceManaged: {
-      source: "external_calendar" as const,
-      eventId: importedEvent.id,
-      sourceName: importedEvent.calendarSource.name,
-      sourceColor: importedEvent.calendarSource.color,
-      description: importedEvent.description,
-      immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
-    },
+    sourceManaged: importedEvent
+      ? {
+          source: "external_calendar" as const,
+          eventId: importedEvent.id,
+          sourceName: importedEvent.calendarSource.name,
+          sourceColor: importedEvent.calendarSource.color,
+          description: importedEvent.description,
+          immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+        }
+      : null,
     ...mapTaskRunnability(item.task),
   };
 }
@@ -140,14 +142,16 @@ function mapWorkBlockItem(
     autoExecuteTiming: block.task.autoExecuteTiming,
     kind: block.task.kind,
     recurrenceRule: block.task.recurrenceRule,
-    sourceManaged: {
-      source: "external_calendar" as const,
-      eventId: importedEvent.id,
-      sourceName: importedEvent.calendarSource.name,
-      sourceColor: importedEvent.calendarSource.color,
-      description: importedEvent.description,
-      immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
-    },
+    sourceManaged: importedEvent
+      ? {
+          source: "external_calendar" as const,
+          eventId: importedEvent.id,
+          sourceName: importedEvent.calendarSource.name,
+          sourceColor: importedEvent.calendarSource.color,
+          description: importedEvent.description,
+          immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+        }
+      : null,
     ...mapTaskRunnability(block.task),
   };
 }

@@ -13,11 +13,27 @@ const logger = createLogger("web.work-page.projection-state");
 
 
 
+function fallbackTaskPlanAnalytics(nodes: WorkPageData["taskPlan"]["nodes"]) {
+  return {
+    entryNodeIds: nodes.slice(0, 1).map((node) => node.id),
+    terminalNodeIds: nodes.slice(-1).map((node) => node.id),
+    activeNodeIds: nodes.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id),
+    reachableFromActiveIds: nodes.map((node) => node.id),
+    criticalPathNodeIds: nodes.map((node) => node.id),
+    attentionNodeIds: nodes.filter((node) => ["blocked", "waiting", "waiting_for_user", "waiting_for_approval"].includes(node.status)).map((node) => node.id),
+    blockedNodeIds: nodes.filter((node) => node.status === "blocked").map((node) => node.id),
+    rankByNodeId: Object.fromEntries(nodes.map((node, index) => [node.id, index])),
+    laneByNodeId: Object.fromEntries(nodes.map((node, index) => [node.id, index])),
+    upstreamByNodeId: Object.fromEntries(nodes.map((node) => [node.id, []])),
+    downstreamByNodeId: Object.fromEntries(nodes.map((node) => [node.id, []])),
+  };
+}
+
 function normalizeWorkPageData(data: WorkPageData): WorkPageData {
   const steps = Array.isArray(data.taskPlan.steps) ? data.taskPlan.steps : [];
   const nodes = Array.isArray(data.taskPlan.nodes) ? data.taskPlan.nodes : steps;
   const edges = Array.isArray(data.taskPlan.edges) ? data.taskPlan.edges : [];
-  const analytics = data.taskPlan.analytics;
+  const analytics = data.taskPlan.analytics ?? fallbackTaskPlanAnalytics(nodes);
 
   const taskPlan = appendTaskPrimaryNodeAction(data, {
     ...data.taskPlan,

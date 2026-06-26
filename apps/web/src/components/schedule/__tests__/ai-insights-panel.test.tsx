@@ -1,10 +1,13 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {}, t: (k: string) => k }),
-  useLocale: () => "en",
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useLocale: () => "en",
+  };
+});
 
 const taskDecompositionPanelProps = vi.fn();
 vi.mock("@/components/tasks/ai/task-plan-generation-panel", () => ({

@@ -8,7 +8,10 @@ vi.mock("@/lib/task-actions-client", () => ({
   clearSchedule: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock("@chrona/i18n/react", () => ({ useI18n: () => ({ messages: {} }) }));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return { useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }) };
+});
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, asChild, ...props }: any) => {
     if (asChild && children) {

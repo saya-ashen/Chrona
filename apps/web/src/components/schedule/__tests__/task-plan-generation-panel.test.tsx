@@ -12,10 +12,13 @@ beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 });
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {}, t: (k: string) => k }),
-  useLocale: () => "en",
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useLocale: () => "en",
+  };
+});
 
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";

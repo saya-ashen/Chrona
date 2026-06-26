@@ -12,10 +12,13 @@ beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 });
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {} }),
-  useLocale: () => "en",
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useLocale: () => "en",
+  };
+});
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en/${href}`} {...props}>{children}</a>,
@@ -607,12 +610,12 @@ describe("WorkPageClient", () => {
     expect(screen.getAllByText("起草任务驱动 Agent 面板").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Add Input").length).toBeGreaterThan(0);
     await userEvent.click(screen.getAllByRole("tab", { name: "Execution Record" })[0]!);
-    expect(screen.getByText("Current Run")).toBeInTheDocument();
-    expect(screen.getByText("Previous Run 1")).toBeInTheDocument();
-    expect(screen.getByText("Task Context")).toBeInTheDocument();
+    expect(screen.getByText("Current run")).toBeInTheDocument();
+    expect(screen.getByText("Previous run 1")).toBeInTheDocument();
+    expect(screen.getByText("Task context")).toBeInTheDocument();
     expect(screen.getByText("等待补充约束")).toBeInTheDocument();
     expect(screen.getByText("上一轮输出首稿")).toBeInTheDocument();
-    expect(screen.getByText("Expand 1 more background records")).toBeInTheDocument();
+    expect(screen.getByText("Expand remaining 1 background records")).toBeInTheDocument();
 
     rectSpy.mockRestore();
     Object.defineProperty(window, "innerWidth", {

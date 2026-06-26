@@ -5,10 +5,13 @@ import { DayTimeline } from "@/components/schedule/timeline/schedule-page-timeli
 import type { ScheduledItem } from "@/components/schedule/schedule-page-types";
 import type { PlanningBusyBlock } from "@chrona/domain";
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: {} }),
-  useLocale: () => "en",
-}));
+vi.mock("@chrona/i18n/react", async () => {
+  const { fallbackMessages } = await import("@chrona/i18n/messages");
+  return {
+    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useLocale: () => "en",
+  };
+});
 
 function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {
   return {

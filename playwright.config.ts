@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,6 +12,21 @@ const E2E_WEB_PORT = process.env.CHRONA_E2E_WEB_PORT ?? "43100";
 const E2E_API_PORT = process.env.CHRONA_E2E_API_PORT ?? "43101";
 const E2E_BASE_URL = `http://127.0.0.1:${E2E_WEB_PORT}`;
 const E2E_API_BASE_URL = `http://127.0.0.1:${E2E_API_PORT}`;
+
+function findChromiumExecutable() {
+  const candidates = [
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    process.env.CHROMIUM_BIN,
+    process.env.CHROME_BIN,
+    "/run/current-system/sw/bin/chromium",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ];
+
+  return candidates.find((candidate) => candidate && existsSync(candidate));
+}
+
+const CHROMIUM_EXECUTABLE_PATH = findChromiumExecutable();
 
 /**
  * Default CI-stable Playwright config.
@@ -29,6 +45,7 @@ export default defineConfig({
   use: {
     baseURL: E2E_BASE_URL,
     trace: "on-first-retry",
+    ...(CHROMIUM_EXECUTABLE_PATH ? { launchOptions: { executablePath: CHROMIUM_EXECUTABLE_PATH } } : {}),
   },
   webServer: {
     command: `bun run scripts/init-sqlite-db.ts --reset${E2E_TEMPLATE_ARG} "${E2E_DB_PATH}" && DATABASE_URL="${E2E_DATABASE_URL}" bun run db:seed && HOST=127.0.0.1 PORT="${E2E_API_PORT}" DATABASE_URL="${E2E_DATABASE_URL}" VITE_API_BASE_URL="${E2E_API_BASE_URL}" CHRONA_WEB_PORT="${E2E_WEB_PORT}" CHRONA_E2E_CALENDAR_FIXTURES=1 CHRONA_E2E_TEST_ROUTES=1 CHRONA_ENABLE_DEBUG_PROVIDER=true CHRONA_TASK_ORCHESTRATOR_ENABLED=true CHRONA_TASK_ORCHESTRATOR_INTERVAL_MS=600000 bun run dev`,

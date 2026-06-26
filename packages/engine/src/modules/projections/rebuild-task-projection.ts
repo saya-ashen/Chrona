@@ -83,7 +83,7 @@ export async function rebuildTaskProjection(taskId: string) {
   const session = task.executionSessions[0] ?? null;
   const currentWorkBlock = pickProjectionWorkBlock(task.workBlocks, now);
   const latestEvent = task.events[0] ?? null;
-  const currentNode = session.currentNodeId && session.planId
+  const currentNode = session?.currentNodeId && session.planId
     ? await db.taskPlanRun.findFirst({
         where: {
           taskId: task.id,
@@ -95,7 +95,7 @@ export async function rebuildTaskProjection(taskId: string) {
     : null;
   const currentNodeTitle = currentNodeTitleFromPlanRun(
     currentNode?.planRun,
-    session.currentNodeId,
+    session?.currentNodeId,
   );
 
   // Latest compiled plan for this work-block scope. Scoped to the same
@@ -110,11 +110,13 @@ export async function rebuildTaskProjection(taskId: string) {
     runs: task.runs,
     approvals: task.approvals,
     sync: { stale: syncStale },
-    executionSession: {
-      status: session.status,
-      currentNodeId: session.currentNodeId,
-      pauseReason: session.pauseReason,
-    },
+    executionSession: session
+      ? {
+          status: session.status,
+          currentNodeId: session.currentNodeId,
+          pauseReason: session.pauseReason,
+        }
+      : null,
     latestPlan: latestPlan
       ? {
           status: latestPlan.status,
@@ -135,11 +137,13 @@ export async function rebuildTaskProjection(taskId: string) {
           scheduledEndAt: currentWorkBlock.scheduledEndAt,
         }
       : null,
-    latestRun: {
-      status: latestRun.status,
-      startedAt: latestRun.startedAt,
-      endedAt: latestRun.endedAt,
-    },
+    latestRun: latestRun
+      ? {
+          status: latestRun.status,
+          startedAt: latestRun.startedAt,
+          endedAt: latestRun.endedAt,
+        }
+      : null,
     now,
   });
 
@@ -150,8 +154,8 @@ export async function rebuildTaskProjection(taskId: string) {
   const shouldClearBlockReason = !derived.blockReason && task.blockReason !== null;
   const updateData: Record<string, unknown> = {
     status: derived.persistedStatus,
-    latestEventId: latestEvent.id,
-    latestRawEventId: latestEvent.rawEventId,
+    latestEventId: latestEvent?.id ?? task.latestEventId ?? null,
+    latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
     blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
     blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
   };
@@ -179,7 +183,7 @@ export async function rebuildTaskProjection(taskId: string) {
       actionRequired: derived.blockReason?.actionRequired ?? null,
       blockDetail: derived.blockReason?.detail ?? null,
       blockNodeId: derived.blockReason?.nodeId ?? null,
-      latestRunStatus: latestRun.status,
+      latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
       scheduledStartAt: currentWorkBlock?.scheduledStartAt ?? null,
@@ -193,12 +197,12 @@ export async function rebuildTaskProjection(taskId: string) {
             : null,
       scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
-      lastActivityAt: latestRun.updatedAt,
-      latestEventId: latestEvent.id,
-      latestRawEventId: latestEvent.rawEventId,
+      lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
+      latestEventId: latestEvent?.id ?? task.latestEventId ?? null,
+      latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
       blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
       blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
-      currentNodeId: session.currentNodeId,
+      currentNodeId: session?.currentNodeId ?? null,
       currentNodeTitle,
     },
     create: {
@@ -212,7 +216,7 @@ export async function rebuildTaskProjection(taskId: string) {
       actionRequired: derived.blockReason?.actionRequired ?? null,
       blockDetail: derived.blockReason?.detail ?? null,
       blockNodeId: derived.blockReason?.nodeId ?? null,
-      latestRunStatus: latestRun.status,
+      latestRunStatus: latestRun?.status ?? null,
       approvalPendingCount: task.approvals.length,
       dueAt: task.dueAt,
       scheduledStartAt: currentWorkBlock?.scheduledStartAt ?? null,
@@ -226,12 +230,12 @@ export async function rebuildTaskProjection(taskId: string) {
             : null,
       scheduleProposalCount: task.scheduleProposals.length,
       latestArtifactTitle: task.artifacts[0]?.title ?? null,
-      lastActivityAt: latestRun.updatedAt,
-      latestEventId: latestEvent.id,
-      latestRawEventId: latestEvent.rawEventId,
+      lastActivityAt: latestRun?.updatedAt ?? task.updatedAt,
+      latestEventId: latestEvent?.id ?? task.latestEventId ?? null,
+      latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
       blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
       blockedByRawEventId: derived.blockReason ? task.blockedByRawEventId : null,
-      currentNodeId: session.currentNodeId,
+      currentNodeId: session?.currentNodeId ?? null,
       currentNodeTitle,
     },
   });

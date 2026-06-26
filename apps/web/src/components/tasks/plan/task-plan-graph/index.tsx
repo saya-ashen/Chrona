@@ -40,6 +40,7 @@ import type {
   FlowGraphEdge,
   FlowGraphNode,
   GraphCopy,
+  PlanGraphAnalytics,
   TaskPlanGraphMode,
   TaskPlanGraphPlan,
   TaskPlanGraphProps,
@@ -60,6 +61,27 @@ export type {
   TaskPlanGraphPlan,
   TaskPlanGraphProps,
 } from "./types";
+
+function ensureGraphAnalytics(plan: TaskPlanGraphPlan): TaskPlanGraphPlan {
+  if (plan.analytics) return plan;
+
+  const analytics: PlanGraphAnalytics = {
+    entryNodeIds: plan.nodes.slice(0, 1).map((node) => node.id),
+    terminalNodeIds: plan.nodes.slice(-1).map((node) => node.id),
+    activeNodeIds: plan.nodes.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id),
+    reachableFromActiveIds: plan.nodes.map((node) => node.id),
+    criticalPathNodeIds: plan.nodes.map((node) => node.id),
+    attentionNodeIds: plan.nodes.filter((node) => ["blocked", "waiting", "waiting_for_user", "waiting_for_approval"].includes(node.status)).map((node) => node.id),
+    blockedNodeIds: plan.nodes.filter((node) => node.status === "blocked").map((node) => node.id),
+    rankByNodeId: Object.fromEntries(plan.nodes.map((node, index) => [node.id, index])),
+    laneByNodeId: Object.fromEntries(plan.nodes.map((node, index) => [node.id, index])),
+    upstreamByNodeId: Object.fromEntries(plan.nodes.map((node) => [node.id, []])),
+    downstreamByNodeId: Object.fromEntries(plan.nodes.map((node) => [node.id, []])),
+  };
+
+  return { ...plan, analytics };
+}
+
 
 function GraphShell({
   graphCopy,
@@ -155,6 +177,8 @@ export function TaskPlanGraph({
   }
   const graphCopy = graphCopyRef.current.value;
 
+  const graphPlan = useMemo(() => ensureGraphAnalytics(plan), [plan]);
+
   const [isFullDialogOpen, setIsFullDialogOpen] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [layout, setLayout] = useState<FlowLayout | null>(null);
@@ -178,14 +202,14 @@ export function TaskPlanGraph({
   const handleCenterCurrentNode = useCallback(() => adjustScroll(0.5, 0.35), [adjustScroll]);
 
   const { edgeLegend, nodeLegend } = useGraphLegend(graphCopy);
-  const compact = useMemo(() => buildCompactViewModel(plan, graphCopy), [graphCopy, plan]);
+  const compact = useMemo(() => buildCompactViewModel(graphPlan, graphCopy), [graphCopy, graphPlan]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
 
   const handleNodeSelect = useCallback((nodeId: string) => {
     setSelectedNodeId(nodeId);
-    onSelectedNodeChange?.(plan.nodes.find((planNode) => planNode.id === nodeId) ?? null, plan.nodes);
-  }, [onSelectedNodeChange, plan.nodes]);
+    onSelectedNodeChange?.(graphPlan.nodes.find((planNode) => planNode.id === nodeId) ?? null, graphPlan.nodes);
+  }, [onSelectedNodeChange, graphPlan.nodes]);
 
   const handleNodeClick = useCallback<NodeMouseHandler<FlowGraphNode>>(
     (event, node) => {
@@ -204,20 +228,20 @@ export function TaskPlanGraph({
   }, []);
 
   useEffect(() => {
-    if (plan.state !== "ready" || plan.nodes.length === 0) {
+    if (graphPlan.state !== "ready" || graphPlan.nodes.length === 0) {
       setSelectedNodeId(null);
       return;
     }
-    if (selectedNodeId && !plan.nodes.some((node) => node.id === selectedNodeId)) {
+    if (selectedNodeId && !graphPlan.nodes.some((node) => node.id === selectedNodeId)) {
       setSelectedNodeId(null);
     }
-  }, [plan, selectedNodeId]);
+  }, [graphPlan, selectedNodeId]);
 
 
   useEffect(() => {
     let active = true;
 
-    if (plan.state !== "ready" || plan.nodes.length === 0) {
+    if (graphPlan.state !== "ready" || graphPlan.nodes.length === 0) {
       setLayout(null);
       setNodes([]);
       setEdges([]);
@@ -227,7 +251,7 @@ export function TaskPlanGraph({
     }
 
     void buildFlowLayout({
-      plan,
+      plan: graphPlan,
       selectedNodeId,
       graphCopy,
       onSelect: handleNodeSelect,
@@ -241,7 +265,7 @@ export function TaskPlanGraph({
     return () => {
       active = false;
     };
-  }, [graphCopy, handleNodeSelect, plan, selectedNodeId, setEdges, setNodes]);
+  }, [graphCopy, handleNodeSelect, graphPlan, selectedNodeId, setEdges, setNodes]);
 
   useEffect(() => {
     setNodes((current) =>
@@ -249,13 +273,13 @@ export function TaskPlanGraph({
         selectedNodeId,
         graphCopy,
         onSelect: handleNodeSelect,
-        focusNodeIds: plan.analytics.reachableFromActiveIds,
+        focusNodeIds: graphPlan.analytics.reachableFromActiveIds,
       }),
     );
   }, [
     graphCopy,
     handleNodeSelect,
-    plan.analytics.reachableFromActiveIds,
+    graphPlan.analytics.reachableFromActiveIds,
     selectedNodeId,
     setNodes,
   ]);
@@ -309,7 +333,7 @@ export function TaskPlanGraph({
     return () => resizeObserverRef.current?.disconnect();
   }, []);
 
-  if (plan.state !== "ready" || plan.nodes.length === 0) return null;
+  if (graphPlan.state !== "ready" || graphPlan.nodes.length === 0) return null;
 
 
   if (resolvedMode !== "compact" && !layout) return null;
@@ -333,8 +357,8 @@ export function TaskPlanGraph({
               layout={layout}
               nodes={nodes}
               edges={edges}
-              planNodes={plan.nodes}
-              currentStepId={plan.currentStepId}
+              planNodes={graphPlan.nodes}
+              currentStepId={graphPlan.currentStepId}
               edgeLegend={edgeLegend}
               nodeLegend={nodeLegend}
               handleNodeClick={handleNodeClick}
@@ -382,8 +406,8 @@ export function TaskPlanGraph({
           nodes={nodes}
           edges={edges}
           fillHeight={fillHeight}
-          planNodes={plan.nodes}
-          currentStepId={plan.currentStepId}
+          planNodes={graphPlan.nodes}
+          currentStepId={graphPlan.currentStepId}
           edgeLegend={edgeLegend}
           nodeLegend={nodeLegend}
           handleNodeClick={handleNodeClick}
