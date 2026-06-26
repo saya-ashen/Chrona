@@ -34,11 +34,11 @@ export function useActionSpecRenderConfig({
   // Track current values of required fields so we can disable the submit button
   // when any are empty — mirrors the legacy getWorkspaceActionDisabledReason gate.
   const [requiredFieldValues, setRequiredFieldValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.filter((f) => f.required).map((f) => [f.key, f.value ?? ""])),
+    Object.fromEntries(fields.filter((f) => f.required).map((f) => [f.key, f.value])),
   );
   useEffect(() => {
     setRequiredFieldValues(
-      Object.fromEntries(fields.filter((f) => f.required).map((f) => [f.key, f.value ?? ""])),
+      Object.fromEntries(fields.filter((f) => f.required).map((f) => [f.key, f.value])),
     );
   }, [fields]);
   const hasEmptyRequired = useMemo(
@@ -93,7 +93,7 @@ export function useActionSpecRenderConfig({
     fields: fields.map((f) => ({
       key: f.key,
       label: f.label,
-      value: f.value ?? "",
+      value: f.value,
       control: f.control,
       required: f.required,
       options: f.options,

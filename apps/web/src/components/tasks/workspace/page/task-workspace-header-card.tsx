@@ -59,7 +59,7 @@ export function TaskWorkspaceHeaderCard({
   onRecoveryCancel,
 }: TaskWorkspaceHeaderCardProps) {
   const { messages } = useI18n();
-  const copy = messages.components.taskWorkspace ?? {};
+  const copy = messages.components.taskWorkspace;
   const [pendingActionId, setPendingActionId] = useState<HeaderActionId | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
 
@@ -131,9 +131,9 @@ export function TaskWorkspaceHeaderCard({
       setActionStatus(null);
       try {
         await currentOnAction({ id: actionId, label });
-        setActionStatus(`${label} ${currentCopy.requestSentSuffix ?? "request sent."}`);
+        setActionStatus(`${label} ${currentCopy.requestSentSuffix}`);
       } catch (error) {
-        setActionStatus(error instanceof Error ? error.message : `${currentCopy.actionFailedPrefix ?? "Failed to"} ${label.toLowerCase()}.`);
+        setActionStatus(error instanceof Error ? error.message : `${currentCopy.actionFailedPrefix} ${label.toLowerCase()}.`);
       } finally {
         setPendingActionId(null);
       }
@@ -165,9 +165,9 @@ export function TaskWorkspaceHeaderCard({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{copy.deleteConfirmTitlePrefix ?? "Delete"} &ldquo;{task.title}&rdquo;{copy.deleteConfirmTitleSuffix ?? "?"}</DialogTitle>
+            <DialogTitle>{copy.deleteConfirmTitlePrefix} &ldquo;{task.title}&rdquo;{copy.deleteConfirmTitleSuffix}</DialogTitle>
             <DialogDescription>
-              {copy.deleteConfirmDescription ?? "This will permanently delete the task and cannot be undone."}
+              {copy.deleteConfirmDescription}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -177,7 +177,7 @@ export function TaskWorkspaceHeaderCard({
               variant="outline"
               disabled={isDeleting}
             >
-              {copy.cancel ?? "Cancel"}
+              {copy.cancel}
             </Button>
             <Button
               type="button"
@@ -185,7 +185,7 @@ export function TaskWorkspaceHeaderCard({
               variant="destructive"
               disabled={isDeleting}
             >
-              {isDeleting ? (copy.deleting ?? "Deleting...") : (copy.deleteTask ?? "Delete Task")}
+              {isDeleting ? copy.deleting : copy.deleteTask}
             </Button>
           </DialogFooter>
         </DialogContent>

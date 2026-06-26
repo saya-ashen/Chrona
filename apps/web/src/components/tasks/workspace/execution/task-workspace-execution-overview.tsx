@@ -112,7 +112,7 @@ export function TaskWorkspaceExecutionOverview({
   commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
 }) {
   const { messages } = useI18n();
-  const ws = messages.components.taskWorkspace ?? {};
+  const ws = messages.components.taskWorkspace;
   const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
 
   const trailStore = useMemo(
@@ -144,7 +144,7 @@ export function TaskWorkspaceExecutionOverview({
       if (nodeId) onAction?.(nodeId);
     },
   };
-  const resultSpec = buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet ?? "No output yet.");
+  const resultSpec = buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet);
 
   const trailSpec = commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
     activity,
@@ -201,7 +201,7 @@ export function TaskWorkspaceExecutionOverview({
 
   return (
     <section
-      aria-label={ws.executionOverviewAria ?? "Execution overview"}
+      aria-label={ws.executionOverviewAria}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
       <div className="flex min-h-0 flex-1 flex-col">

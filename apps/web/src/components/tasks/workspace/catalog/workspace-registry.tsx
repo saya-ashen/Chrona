@@ -51,7 +51,7 @@ function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string;
   const navigate = useNavigate();
   const current = options.find((option) => option.value === value) ?? options[0];
   const availableDates = new Set(options.flatMap((option) => option.date ? [option.date] : []));
-  const selectedDate = current?.date ? dateFromKey(current.date) : undefined;
+  const selectedDate = current.date ? dateFromKey(current.date) : undefined;
 
   const navigateTo = (occurrence: OccurrenceOption) => {
     const search = occurrence.workBlockId ? `?workBlockId=${encodeURIComponent(occurrence.workBlockId)}` : "";
@@ -64,7 +64,7 @@ function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string;
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="h-7 max-w-[20rem] rounded-full bg-background/80 px-2.5 text-xs font-medium">
           <span className="text-muted-foreground">{label}</span>
-          <span className="min-w-0 truncate">{current?.label ?? "Select occurrence"}</span>
+          <span className="min-w-0 truncate">{current.label}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
@@ -82,7 +82,7 @@ function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string;
           }}
         />
         <div className="max-h-40 space-y-1 overflow-y-auto border-t border-border/70 p-2">
-          {options.filter((option) => option.date === (selectedDate ? dateKey(selectedDate) : current?.date)).map((option) => (
+          {options.filter((option) => option.date === (selectedDate ? dateKey(selectedDate) : current.date)).map((option) => (
             <Button key={option.value} type="button" variant={option.value === value ? "secondary" : "ghost"} size="sm" className="h-7 w-full justify-start rounded-md px-2 text-xs" onClick={() => navigateTo(option)}>
               {option.label}
             </Button>

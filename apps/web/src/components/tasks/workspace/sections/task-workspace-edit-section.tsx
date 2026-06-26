@@ -61,13 +61,13 @@ export function TaskWorkspaceEditSection({
   onCancelProposal,
 }: TaskWorkspaceEditSectionProps) {
   const { messages } = useI18n();
-  const copy = messages.components.taskWorkspace ?? {};
-  const formCopy = messages.components.taskConfigForm ?? {};
+  const copy = messages.components.taskWorkspace;
+  const formCopy = messages.components.taskConfigForm;
   const sourceDescriptionLabel = sourceManaged
-    ? `${formCopy.calendarDescription ?? "Calendar description"} · ${sourceManaged.sourceName}`
+    ? `${formCopy.calendarDescription} · ${sourceManaged.sourceName}`
     : undefined;
   const lockedFieldsHint = sourceManaged
-    ? (copy.externalLockedHint ?? "Synced from {source}. Title and time are managed by the calendar source.").replace(
+    ? copy.externalLockedHint.replace(
         "{source}",
         sourceManaged.sourceName,
       )
@@ -89,14 +89,14 @@ export function TaskWorkspaceEditSection({
           <DialogHeader className="flex-row items-start justify-between gap-3 border-b border-border/60 px-4 py-4 text-left sm:px-5">
             <div className="flex flex-col gap-1">
               <DialogTitle className="text-sm font-semibold text-foreground">
-                {copy.editTaskTitle ?? "Edit task"}
+                {copy.editTaskTitle}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                {copy.editTaskDescription ?? "Full-screen editor. Keep changes here until you save them."}
+                {copy.editTaskDescription}
               </DialogDescription>
             </div>
             <DialogClose
-              aria-label={copy.closeTaskEditor ?? "Close task editor"}
+              aria-label={copy.closeTaskEditor}
               render={
                 <Button
                   type="button"
@@ -120,14 +120,14 @@ export function TaskWorkspaceEditSection({
               lockedFieldsHint={lockedFieldsHint}
               sourceDescription={sourceManaged ? sourceManaged.description : undefined}
               sourceDescriptionLabel={sourceDescriptionLabel}
-              submitLabel={copy.saveChanges ?? "Save changes"}
-              pendingLabel={copy.saving ?? "Saving..."}
+              submitLabel={copy.saveChanges}
+              pendingLabel={copy.saving}
               onDraftStateChange={onDraftStateChange}
               onSubmitAction={onSubmitAction}
             />
             {saveSuccess ? (
               <p className="mt-2 px-1 text-xs text-success">
-                {copy.savedSuccessfully ?? "Saved successfully"}
+                {copy.savedSuccessfully}
               </p>
             ) : null}
             {saveError ? (
@@ -138,7 +138,7 @@ export function TaskWorkspaceEditSection({
       </Dialog>
 
       {hasUnsavedConfigChanges ? (
-        <span className="sr-only">{copy.unsavedEdits ?? "Task has unsaved edits"}</span>
+        <span className="sr-only">{copy.unsavedEdits}</span>
       ) : null}
 
       {currentProposal ? (

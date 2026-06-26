@@ -54,9 +54,10 @@ export function TaskWorkspaceActionRail({
   // unless there's still genuine attention (e.g. a pending approval) or live
   // runtime activity to surface.
   const isPassive = Boolean(
-    primaryAction?.suppressAttentionCard &&
-      !primaryAction?.actionSpec &&
-      !primaryAction?.onClick,
+    primaryAction &&
+      primaryAction.suppressAttentionCard &&
+      !primaryAction.actionSpec &&
+      !primaryAction.onClick,
   );
   const hasActionContent = Boolean(
     attention ||
