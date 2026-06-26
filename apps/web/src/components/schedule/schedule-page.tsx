@@ -49,14 +49,13 @@ export function SchedulePage({
   const locale = useLocale();
   const { messages } = useI18n();
   const copy = useMemo(
-    () => getSchedulePageCopy(messages.components?.schedulePage),
-    [messages.components?.schedulePage],
+    () => getSchedulePageCopy(messages.components.schedulePage),
+    [messages.components.schedulePage],
   );
   const [externalEvents, setExternalEvents] = useState<PlanningBusyBlock[]>([]);
   const [externalEventsRefreshKey, setExternalEventsRefreshKey] = useState(0);
 
-  const actionFailedMessage =
-    messages.components?.scheduleEditorForm?.actionFailed ?? "Action failed";
+  const actionFailedMessage = messages.components.scheduleEditorForm.actionFailed;
   const {
     hydratedData,
     viewData,

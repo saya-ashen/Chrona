@@ -112,7 +112,7 @@ export function TaskWorkspaceExecutionOverview({
   commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
 }) {
   const { messages } = useI18n();
-  const ws = messages.components?.taskWorkspace ?? {};
+  const ws = messages.components.taskWorkspace ?? {};
   const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
 
   const trailStore = useMemo(

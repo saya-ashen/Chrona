@@ -35,8 +35,7 @@ export function hydrateSchedulePageData(
     })),
     workBlocks: (data.workBlocks ?? []).map((block) => ({
       ...block,
-      scheduledStartAt:
-        toDate(block.scheduledStartAt) ?? block.scheduledStartAt,
+      scheduledStartAt: toDate(block.scheduledStartAt) ?? block.scheduledStartAt,
       scheduledEndAt: toDate(block.scheduledEndAt) ?? block.scheduledEndAt,
       startedAt: toDate(block.startedAt),
     })),

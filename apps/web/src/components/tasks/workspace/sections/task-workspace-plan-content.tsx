@@ -43,7 +43,7 @@ export function TaskWorkspacePlanContent({
   onGeneratePlan,
 }: TaskWorkspacePlanContentProps) {
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components?.taskWorkspace ?? {}) };
+  const copy = { ...DEFAULT_COPY, ...(messages.components.taskWorkspace ?? {}) };
   const planSummary = graphPlan && plan
     ? `${plan.status} / ${graphPlan.nodes.length} steps / ${graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`
     : null;

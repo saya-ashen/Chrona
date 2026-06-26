@@ -130,7 +130,7 @@ export function ScheduleCommandBar({
   const { messages } = useI18n();
   const aiPreferences = useScheduleAiPreferences();
   const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
-  const copy = useMemo(() => getSchedulePageCopy(messages.components?.schedulePage), [messages.components?.schedulePage]);
+  const copy = useMemo(() => getSchedulePageCopy(messages.components.schedulePage), [messages.components.schedulePage]);
   const cmdBarCopy = {
     generatingSuggestions: "Generating suggestions...",
     ...((messages.components as unknown as Record<string, Record<string, string>> | undefined)?.scheduleCommandBar ?? {}),
@@ -150,7 +150,7 @@ export function ScheduleCommandBar({
     autoCompleteInput,
   );
 
-  const showPanel = resolvedAutoSuggestionsEnabled && showSuggestions && ((structuredSuggestions?.length ?? 0) > 0 || (aiLoading && phase !== "idle"));
+  const showPanel = resolvedAutoSuggestionsEnabled && showSuggestions && (structuredSuggestions.length > 0 || (aiLoading && phase !== "idle"));
   const processTrace = trace ?? (aiLoading || toolCalls.length > 0 || toolResults.length > 0 || Boolean(partialText)
     ? {
         requestId: "live-auto-complete",
@@ -159,8 +159,8 @@ export function ScheduleCommandBar({
         finalSubmittedTitle: null,
         source: "direct_submit" as const,
         statusMessage,
-        toolCalls: toolCalls ?? [],
-        toolResults: toolResults ?? [],
+        toolCalls,
+        toolResults,
         partialText,
         finalSummary: null,
         phase: aiLoading ? "running" as const : "idle" as const,
@@ -255,7 +255,7 @@ export function ScheduleCommandBar({
     });
 
     try {
-      const chosen = structuredSuggestions[0] ?? null;
+      const chosen = structuredSuggestions.at(0) ?? null;
       if (!chosen) {
         throw new Error(
           autoCompleteError
@@ -348,7 +348,7 @@ export function ScheduleCommandBar({
                   <span>{statusMessage}</span>
                 </div>
               ) : null}
-              {toolCalls?.length > 0 ? (
+              {toolCalls.length > 0 ? (
                 <div className="border-b border-border/20 px-3 py-1.5">
                   {toolCalls.map((tc, i) => (
                     <div key={i} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -358,7 +358,7 @@ export function ScheduleCommandBar({
                   ))}
                 </div>
               ) : null}
-              {(structuredSuggestions ?? []).slice(0, 5).map((s, i) => (
+              {structuredSuggestions.slice(0, 5).map((s, i) => (
                 <button
                   key={`${s.id}-${i}`}
                   type="button"
@@ -380,7 +380,7 @@ export function ScheduleCommandBar({
                   </div>
                 </button>
               ))}
-              {(structuredSuggestions?.length ?? 0) === 0 && aiLoading ? (
+              {structuredSuggestions.length === 0 && aiLoading ? (
                 <div className="px-3 py-3 text-center text-xs text-muted-foreground">{cmdBarCopy.generatingSuggestions}</div>
               ) : null}
             </div>

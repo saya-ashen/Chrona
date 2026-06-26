@@ -61,8 +61,8 @@ export function TaskWorkspaceEditSection({
   onCancelProposal,
 }: TaskWorkspaceEditSectionProps) {
   const { messages } = useI18n();
-  const copy = messages.components?.taskWorkspace ?? {};
-  const formCopy = messages.components?.taskConfigForm ?? {};
+  const copy = messages.components.taskWorkspace ?? {};
+  const formCopy = messages.components.taskConfigForm ?? {};
   const sourceDescriptionLabel = sourceManaged
     ? `${formCopy.calendarDescription ?? "Calendar description"} · ${sourceManaged.sourceName}`
     : undefined;

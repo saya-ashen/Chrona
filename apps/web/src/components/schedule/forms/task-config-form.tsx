@@ -386,7 +386,7 @@ function TaskAutomationSection({
     <TaskConfigSection
       title={copy.automation}
       compact={compact}
-      actions={effectiveAutoPlanGeneration || autoExecute ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span> : null}
+      actions={effectiveAutoPlanGeneration ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span> : null}
     >
       <div className="grid gap-2">
         <div className="grid gap-2">
@@ -629,16 +629,7 @@ function resolveExecutionRuntime(
 
   return (
     executionRuntimes.find((runtime) => runtime.key === normalizedKey) ??
-    executionRuntimes[0] ?? {
-      key: defaultExecutionRuntime,
-      label: defaultExecutionRuntime,
-      spec: {
-        runtime: defaultExecutionRuntime,
-        version: `${defaultExecutionRuntime}-v1`,
-        fields: [],
-        runnability: { requiredPaths: [] },
-      },
-    }
+    executionRuntimes[0]
   );
 }
 
@@ -918,11 +909,7 @@ function isFieldVisible(field: RuntimeTaskConfigField, runtimeInput: RuntimeInpu
       return value === rule.value;
     }
 
-    if (rule.op === "in") {
-      return Array.isArray(rule.value) && rule.value.includes(value);
-    }
-
-    return true;
+    return Array.isArray(rule.value) && rule.value.includes(value);
   });
 }
 
@@ -964,17 +951,17 @@ export function TaskConfigForm({
   onSubmitAction,
 }: TaskConfigFormProps) {
   const { messages } = useI18n();
-  const taskConfigFormMessages = messages.components?.taskConfigForm;
+  const taskConfigFormMessages = messages.components.taskConfigForm;
   const copy = useMemo(() => ({
     ...DEFAULT_COPY,
-    ...(taskConfigFormMessages ?? {}),
+    ...taskConfigFormMessages,
     priorities: {
       ...DEFAULT_COPY.priorities,
-      ...(taskConfigFormMessages?.priorities ?? {}),
+      ...taskConfigFormMessages.priorities,
     },
     automationTiming: {
       ...DEFAULT_COPY.automationTiming,
-      ...(taskConfigFormMessages?.automationTiming ?? {}),
+      ...taskConfigFormMessages.automationTiming,
     },
     recurrencePresets: {
       ...DEFAULT_COPY.recurrencePresets,
@@ -1091,7 +1078,7 @@ export function TaskConfigForm({
         }
 
         return accumulator;
-      }, cloneRuntimeInput(formState.fieldExecutionConfig ?? {})),
+      }, cloneRuntimeInput(formState.fieldExecutionConfig)),
     [formState.fieldExecutionConfig, selectedExecutionRuntime.spec.fields],
   );
   const visibleStandardFields = selectedExecutionRuntime.spec.fields.filter(
@@ -1108,7 +1095,7 @@ export function TaskConfigForm({
   );
 
   function updateRuntimeField(field: RuntimeTaskConfigField, nextValue: unknown) {
-    const nextRuntimeInput = cloneRuntimeInput(getValues("fieldExecutionConfig") ?? {});
+    const nextRuntimeInput = cloneRuntimeInput(getValues("fieldExecutionConfig"));
 
     if (nextValue === undefined) {
       deleteValueAtPath(nextRuntimeInput, field.path);

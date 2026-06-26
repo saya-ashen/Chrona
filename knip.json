@@ -57,6 +57,15 @@
         "!**/*.test.tsx",
         "!**/__tests__/**"
       ]
+    },
+    "packages/skills/chrona-node": {
+      "entry": [
+        "SKILL.md",
+        "README.md",
+        "package.json",
+        "bin/chrona"
+      ],
+      "project": []
     }
   }
 }

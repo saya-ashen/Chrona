@@ -16,9 +16,9 @@ function toolLabel(toolName?: string): string {
     case "chrona_task_read":
       return "Reading task";
     case undefined:
-      return toolName ?? "Running tool";
+      return "Running tool";
     default:
-      return toolName ?? "Running tool";
+      return toolName;
   }
 }
 

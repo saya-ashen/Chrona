@@ -91,9 +91,9 @@ export function useSelectedBlockPlanState({
       setAcceptedPlan((current) => {
         if (
           current?.id === accepted.id
-          && current?.status === accepted.status
-          && current?.revision === accepted.revision
-          && current?.updatedAt === accepted.updatedAt
+          && current.status === accepted.status
+          && current.revision === accepted.revision
+          && current.updatedAt === accepted.updatedAt
         ) {
           return current;
         }
@@ -126,12 +126,11 @@ export function useSelectedBlockPlanState({
       return;
     }
 
-    let cancelled = false;
     void (async () => {
       const response = await fetch(
         `/api/tasks/${item.taskId}/plan${item.workBlockId ? `?workBlockId=${encodeURIComponent(item.workBlockId)}` : ""}`,
       );
-      if (!response.ok || cancelled) {
+      if (!response.ok) {
         return;
       }
 
@@ -139,9 +138,6 @@ export function useSelectedBlockPlanState({
         savedPlan?: TaskPlanReadModel | null;
         aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
       };
-      if (cancelled) {
-        return;
-      }
 
       applyPlanStateSnapshot({
         savedPlan: payload.savedPlan ?? null,
@@ -149,9 +145,6 @@ export function useSelectedBlockPlanState({
       });
     })();
 
-    return () => {
-      cancelled = true;
-    };
   }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.savedPlan, item.taskId, item.workBlockId, item.aiPlanGenerationStatus]);
 
   useEffect(() => {
@@ -187,9 +180,9 @@ export function useSelectedBlockPlanState({
     setAcceptedPlan((current) => {
       if (
         current?.id === accepted.id
-        && current?.status === accepted.status
-        && current?.revision === accepted.revision
-        && current?.updatedAt === accepted.updatedAt
+        && current.status === accepted.status
+        && current.revision === accepted.revision
+        && current.updatedAt === accepted.updatedAt
       ) {
         return current;
       }
@@ -206,7 +199,6 @@ export function useSelectedBlockPlanState({
         param: { taskId: item.taskId },
         json: { planId: result.id, workBlockId: item.workBlockId ?? null },
       });
-      if (!res.ok) throw new Error("Failed to accept plan");
       const payload = await res.json() as { savedPlan?: TaskPlanReadModel | null };
       const accepted = payload.savedPlan ?? { ...result, status: "accepted" as const };
       setAcceptedPlan(accepted);

@@ -133,7 +133,7 @@ export function TaskWorkspacePlanSection({
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
-  const copy = messages.components?.taskWorkspace ?? {};
+  const copy = messages.components.taskWorkspace ?? {};
   const consoleView = useMemo(
     () => createTaskWorkspaceExecutionConsoleView({
       pageData,

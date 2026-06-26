@@ -53,7 +53,7 @@ export function QueueCard({
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
+  const copy = getSchedulePageCopy(messages.components.schedulePage);
   const suggestedDurationMinutes = getQueueSuggestedDuration(item);
   const [showTimeslots, setShowTimeslots] = useState(false);
   const accent = getPriorityAccent(item.priority);

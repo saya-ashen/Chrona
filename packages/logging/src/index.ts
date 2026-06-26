@@ -146,11 +146,10 @@ function wrapLogger(scope: string, logger: PinoLogger): ChronaLogger {
   };
 }
 
-export function createChronaLogger(scope: string): ChronaLogger {
+export function createLogger(scope: string): ChronaLogger {
   return wrapLogger(scope, rootLogger);
 }
 
-export const createLogger = createChronaLogger;
 
 export function summarizeText(value: string | null | undefined, maxLength = 120) {
   if (!value) return null;

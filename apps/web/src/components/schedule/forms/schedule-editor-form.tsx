@@ -60,7 +60,7 @@ export function ScheduleEditorForm({
   onMutatedAction,
 }: ScheduleEditorFormProps) {
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...messages.components?.scheduleEditorForm };
+  const copy = { ...DEFAULT_COPY, ...messages.components.scheduleEditorForm };
   const [isPending, setIsPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const defaultValues = useMemo<ScheduleEditorFormValues>(() => ({

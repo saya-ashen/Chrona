@@ -36,7 +36,7 @@ export function TimelinePlacementCard({
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
+  const copy = getSchedulePageCopy(messages.components.schedulePage);
 
   return (
     <div
@@ -117,7 +117,7 @@ export function ScheduledTimelineBlock({
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
+  const copy = getSchedulePageCopy(messages.components.schedulePage);
   const accent = getPriorityAccent(item.priority);
 
   return (

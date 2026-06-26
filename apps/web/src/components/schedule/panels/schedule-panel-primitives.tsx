@@ -26,7 +26,7 @@ export function DayTimelineSummary({
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
+  const copy = getSchedulePageCopy(messages.components.schedulePage);
   const starts = items
     .map((item) => toTimestamp(item.scheduledStartAt))
     .filter((value): value is number => value !== null);

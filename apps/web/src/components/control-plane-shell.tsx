@@ -45,7 +45,7 @@ export function ControlPlaneShell({
 }: ControlPlaneShellProps) {
   const { t } = useI18n();
   const router = useAppRouter();
-  const pathname = useAppPathname() ?? "/schedule";
+  const pathname = useAppPathname();
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const taskDialogDefaults = useMemo(() => {

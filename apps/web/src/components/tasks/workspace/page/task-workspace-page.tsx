@@ -140,7 +140,7 @@ async function acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, accep
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
   const { messages } = useI18n();
-  const executionConsoleCopy = messages.components?.taskWorkspace ?? {};
+  const executionConsoleCopy = messages.components.taskWorkspace ?? {};
   const { registerHandlers, setPageContext } = useAssistantSurface();
   const { pageData, commandCenter, setTask, refreshWorkspace, workspaceEvents, headerSpec, headerStore } = useTaskWorkspacePageState(data);
   const task = pageData.task;

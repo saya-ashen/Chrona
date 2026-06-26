@@ -59,7 +59,7 @@ export function TaskWorkspaceHeaderCard({
   onRecoveryCancel,
 }: TaskWorkspaceHeaderCardProps) {
   const { messages } = useI18n();
-  const copy = messages.components?.taskWorkspace ?? {};
+  const copy = messages.components.taskWorkspace ?? {};
   const [pendingActionId, setPendingActionId] = useState<HeaderActionId | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
 

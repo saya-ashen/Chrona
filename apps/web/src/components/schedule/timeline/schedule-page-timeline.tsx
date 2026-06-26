@@ -191,7 +191,7 @@ export function DayTimeline({
 }) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = getSchedulePageCopy(messages.components?.schedulePage);
+  const copy = getSchedulePageCopy(messages.components.schedulePage);
   const selectedItemById = useMemo(
     () => new Map(items.map((item) => [item.workBlockId ?? item.taskId, item])),
     [items],

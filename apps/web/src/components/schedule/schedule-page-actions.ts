@@ -35,12 +35,10 @@ export function getQuickCreateDefaults(data: SchedulePageData) {
   const selectedRuntime =
     data.executionRuntimes.find(
       (runtime) => runtime.key === data.defaultExecutionRuntime,
-    ) ??
-    data.executionRuntimes[0] ??
-    null;
+    ) ?? data.executionRuntimes[0];
 
   return {
-    executionRuntime: selectedRuntime?.key ?? "",
+    executionRuntime: selectedRuntime.key,
   };
 }
 
@@ -176,9 +174,6 @@ export async function refreshScheduleProjection({
       query: { workspaceId },
     });
 
-    if (!response.ok) {
-      throw new Error(actionFailedMessage);
-    }
 
     const next = hydrateSchedulePageData(
       (await response.json()) as unknown as SchedulePageData,

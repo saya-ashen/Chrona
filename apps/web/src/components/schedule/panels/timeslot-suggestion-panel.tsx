@@ -54,8 +54,9 @@ export function TimeslotSuggestionPanel({
         <div className="space-y-2">
           {suggestions.map((suggestion) => {
             const isBest =
-              bestMatch?.startAt.getTime() === suggestion.startAt.getTime() &&
-              bestMatch?.endAt.getTime() === suggestion.endAt.getTime();
+              bestMatch !== null &&
+              bestMatch.startAt.getTime() === suggestion.startAt.getTime() &&
+              bestMatch.endAt.getTime() === suggestion.endAt.getTime();
 
             return (
               <div

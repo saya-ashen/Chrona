@@ -141,7 +141,7 @@ export function TaskPlanGraph({
   onSelectedNodeChange,
 }: TaskPlanGraphProps) {
   const { messages } = useI18n();
-  const graphCopyOverrides = messages.components?.taskPlanGraph ?? null;
+  const graphCopyOverrides = messages.components.taskPlanGraph ?? null;
   const graphCopySignature = JSON.stringify(graphCopyOverrides ?? {});
   const graphCopyRef = useRef<{ signature: string; value: GraphCopy } | null>(null);
   if (!graphCopyRef.current || graphCopyRef.current.signature !== graphCopySignature) {

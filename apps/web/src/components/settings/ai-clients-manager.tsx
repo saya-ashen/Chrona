@@ -215,11 +215,6 @@ async function testClientAvailability(payload: ClientFormPayload): Promise<TestR
   const res = await api.ai.clients.test.$post({ json: payload });
 
   const data = (await res.json()) as { available?: boolean; reason?: string; error?: string };
-
-  if (!res.ok) {
-    throw new Error(data.error ?? data.reason ?? "Failed to test client availability");
-  }
-
   return {
     status: data.available ? "available" : "unavailable",
     reason: data.reason ?? null,
@@ -235,7 +230,6 @@ async function diagnoseHermes(values: ClientFormValues): Promise<HermesIntegrati
     },
   });
   const data = (await res.json()) as HermesIntegrationResult & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? "Failed to diagnose Hermes integration");
   return data;
 }
 
@@ -248,14 +242,12 @@ async function setupLocalHermes(values: ClientFormValues): Promise<HermesIntegra
     },
   });
   const data = (await res.json()) as HermesIntegrationResult & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? "Failed to configure local Hermes");
   return data;
 }
 
 async function restartLocalHermes(): Promise<{ ok: boolean; message: string; exitCode: number | null }> {
   const res = await api.integrations.hermes["restart-local"].$post();
   const data = (await res.json()) as { ok: boolean; message: string; exitCode: number | null; error?: string };
-  if (!res.ok) throw new Error(data.error ?? "Failed to restart Hermes gateway");
   return data;
 }
 
@@ -356,28 +348,29 @@ function ClientForm({
   providers: RuntimeProviderOption[];
 }) {
   const fallbackType = providers[0]?.key ?? "hermes";
+  const initialConfig = initial?.config;
   const defaultValues = useMemo<ClientFormValues>(() => ({
     name: initial?.name ?? "",
     type: initial && providers.some((provider) => provider.key === initial.type) ? initial.type : fallbackType,
     isDefault: initial?.isDefault ?? false,
     timeoutSeconds: String(
-      (initial?.config as { timeoutSeconds?: number; timeoutMs?: number })?.timeoutSeconds
-        ?? (((initial?.config as { timeoutMs?: number })?.timeoutMs ?? DEFAULT_PROVIDER_IDLE_TIMEOUT_MS) / 1000),
+      (initialConfig as { timeoutSeconds?: number; timeoutMs?: number } | undefined)?.timeoutSeconds
+        ?? (((initialConfig as { timeoutMs?: number } | undefined)?.timeoutMs ?? DEFAULT_PROVIDER_IDLE_TIMEOUT_MS) / 1000),
     ),
-    baseUrl: (initial?.config as { baseUrl?: string; env?: Record<string, string> })?.baseUrl
-      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_BASE_URL
+    baseUrl: (initialConfig as { baseUrl?: string; env?: Record<string, string> } | undefined)?.baseUrl
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_BASE_URL
       ?? "",
-    apiKey: (initial?.config as { apiKey?: string; env?: Record<string, string> })?.apiKey
-      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_AUTH_TOKEN
+    apiKey: (initialConfig as { apiKey?: string; env?: Record<string, string> } | undefined)?.apiKey
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_AUTH_TOKEN
       ?? "",
-    model: (initial?.config as { model?: string; env?: Record<string, string> })?.model
-      ?? (initial?.config as { env?: Record<string, string> })?.env?.ANTHROPIC_MODEL
+    model: (initialConfig as { model?: string; env?: Record<string, string> } | undefined)?.model
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_MODEL
       ?? "",
-    binaryPath: (initial?.config as { binaryPath?: string })?.binaryPath ?? "",
-    hermesScope: (initial?.config as { scope?: HermesClientScope })?.scope ?? "local",
-    debugProfile: normalizeDebugProfile((initial?.config as { profile?: unknown })?.profile),
-    controlPlane: ((initial?.config as { controlPlane?: ControlPlaneMode })?.controlPlane === "skill" ? "skill" : "mcp"),
-  }), [fallbackType, initial, providers]);
+    binaryPath: (initialConfig as { binaryPath?: string } | undefined)?.binaryPath ?? "",
+    hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
+    debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
+    controlPlane: ((initialConfig as { controlPlane?: ControlPlaneMode } | undefined)?.controlPlane === "skill" ? "skill" : "mcp"),
+  }), [fallbackType, initial, initialConfig, providers]);
   const form = useForm<ClientFormValues>({
     defaultValues,
     mode: "onChange",
