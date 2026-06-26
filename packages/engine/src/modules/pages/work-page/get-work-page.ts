@@ -91,13 +91,12 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     ? await resolveSavedPlanEffectiveGraph(savedPlan)
     : null;
   const blockReason = readBlockReason(task);
-  const approvals =
-    currentRun?.approvals.map((approval) => ({
-      id: approval.id,
-      title: approval.title,
-      status: approval.status,
-      summary: approval.summary,
-    })) ?? [];
+  const approvals = currentRun.approvals.map((approval) => ({
+    id: approval.id,
+    title: approval.title,
+    status: approval.status,
+    summary: approval.summary,
+  }));
   const allConversationEntries = await db.conversationEntry.findMany({
     where: { run: { taskId: task.id } },
     include: {
@@ -138,23 +137,21 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       content: entry.content,
       runtimeTs: toIsoString(entry.runtimeTs),
     }));
-  const artifacts =
-    currentRun?.artifacts.map((artifact) => ({
-      id: artifact.id,
-      title: artifact.title,
-      type: artifact.type,
-      uri: artifact.uri,
-      createdAt: toIsoString(artifact.createdAt),
-    })) ?? [];
-  const toolCalls =
-    currentRun?.toolInvocations.map((tool) => ({
-      id: tool.id,
-      toolName: tool.toolName,
-      status: tool.status,
-      argumentsSummary: tool.inputSummary,
-      resultSummary: tool.outputSummary,
-      errorSummary: tool.errorSummary,
-    })) ?? [];
+  const artifacts = currentRun.artifacts.map((artifact) => ({
+    id: artifact.id,
+    title: artifact.title,
+    type: artifact.type,
+    uri: artifact.uri,
+    createdAt: toIsoString(artifact.createdAt),
+  }));
+  const toolCalls = currentRun.toolInvocations.map((tool) => ({
+    id: tool.id,
+    toolName: tool.toolName,
+    status: tool.status,
+    argumentsSummary: tool.inputSummary,
+    resultSummary: tool.outputSummary,
+    errorSummary: tool.errorSummary,
+  }));
   const workstreamItems = task.events.map((event) => {
     const eventInfo = classifyWorkstreamItem(event.eventType, mergedCopy);
 
@@ -172,20 +169,18 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
       linkedEvidenceLabel: eventInfo.linkedEvidenceLabel,
     };
   });
-  const serializedRun = currentRun
-    ? {
-        id: currentRun.id,
-        status: currentRun.status,
-        startedAt: toIsoString(currentRun.startedAt),
-        endedAt: toIsoString(currentRun.endedAt),
-        updatedAt: toIsoString(currentRun.updatedAt),
-        lastSyncedAt: toIsoString(currentRun.lastSyncedAt),
-        syncStatus: currentRun.syncStatus,
-        resumeSupported: currentRun.resumeSupported,
-        pendingInputPrompt: currentRun.pendingInputPrompt,
-        errorSummary: currentRun.errorSummary,
-      }
-    : null;
+  const serializedRun = {
+    id: currentRun.id,
+    status: currentRun.status,
+    startedAt: toIsoString(currentRun.startedAt),
+    endedAt: toIsoString(currentRun.endedAt),
+    updatedAt: toIsoString(currentRun.updatedAt),
+    lastSyncedAt: toIsoString(currentRun.lastSyncedAt),
+    syncStatus: currentRun.syncStatus,
+    resumeSupported: currentRun.resumeSupported,
+    pendingInputPrompt: currentRun.pendingInputPrompt,
+    errorSummary: currentRun.errorSummary,
+  };
 
   const orchestratorState = effectivePlanGraph
     ? reconcileTaskState({
@@ -266,7 +261,7 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
     if (task.status === "Blocked" && (blocked.length > 0 || orchestratorState?.summary.currentNodeId)) {
       return {
         status: "blocked" as const,
-        currentNodeId: orchestratorState?.summary.currentNodeId ?? blocked[0] ?? null,
+        currentNodeId: orchestratorState?.summary.currentNodeId ?? blocked[0],
         executedNodeIds: executed,
         waitingNodeIds: waiting,
         blockedNodeIds: blocked,
@@ -288,19 +283,19 @@ export async function getWorkPage(taskId: string, copy: Partial<WorkPageCopy> = 
   })();
 
   const latestOutput = buildLatestOutput({
-    artifacts: currentRun?.artifacts.map((artifact) => ({
+    artifacts: currentRun.artifacts.map((artifact) => ({
       id: artifact.id,
       title: artifact.title,
       type: artifact.type,
       uri: artifact.uri,
       createdAt: artifact.createdAt,
-    })) ?? [],
-    conversation: currentRun?.conversationEntries.map((entry) => ({
+    })),
+    conversation: currentRun.conversationEntries.map((entry) => ({
       id: entry.id,
       role: entry.role,
       content: entry.content,
       runtimeTs: entry.runtimeTs,
-    })) ?? [],
+    })),
     copy: mergedCopy,
   });
   const scheduleImpact = buildScheduleImpact({

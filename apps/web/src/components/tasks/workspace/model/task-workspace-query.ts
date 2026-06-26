@@ -554,10 +554,6 @@ export async function dispatchTaskExecutionAction(
     json: { type: "execution.action", ...scopedAction },
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Failed to dispatch execution action" }));
-    throw new Error((err as { error?: string }).error ?? "Failed to dispatch execution action");
-  }
 
   const ack = await response.json() as unknown as Omit<TaskWorkspaceCommandAck, "message">;
   return { ...ack, message: "Command accepted. Workspace will update shortly." };
@@ -581,10 +577,6 @@ export async function submitTaskCheckpointAction(
     },
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Failed to submit checkpoint action" }));
-    throw new Error((err as { error?: string }).error ?? "Failed to submit checkpoint action");
-  }
 
   const ack = await response.json() as unknown as Omit<TaskWorkspaceCommandAck, "message">;
   return { ...ack, message: "Command accepted. Workspace will update shortly." };
