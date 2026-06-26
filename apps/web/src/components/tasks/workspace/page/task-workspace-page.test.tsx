@@ -635,7 +635,7 @@ describe("TaskWorkspacePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Select Approve output" }));
 
     expect(screen.getByText("detail-title:Approve output")).toBeInTheDocument();
-    expect(screen.getByText("detail-status:approval-needed")).toBeInTheDocument();
+    expect(screen.getByText("detail-status:input-needed")).toBeInTheDocument();
     expect(screen.getByText("detail-step:3/3")).toBeInTheDocument();
     expect(screen.getByText("detail-refresh:on")).toBeInTheDocument();
     expect(screen.getByText("detail-disabled:No actions are available for this node.")).toBeInTheDocument();

@@ -139,7 +139,6 @@ export function TaskPlanGraph({
   fillHeight = false,
   className,
   onSelectedNodeChange,
-  showOverview = true,
 }: TaskPlanGraphProps) {
   const { messages } = useI18n();
   const graphCopyOverrides = messages.components?.taskPlanGraph ?? null;
@@ -362,7 +361,7 @@ export function TaskPlanGraph({
               <CompactStageStrip stages={compact.stages} graphCopy={graphCopy} />
               <section className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{graphCopy.focusTitle}</p>
-                <CompactFocusStack items={compact.focusItems} selectedNodeId={selectedNodeId} onSelect={handleNodeSelect} graphCopy={graphCopy} summary={compact.summary} />
+                <CompactFocusStack items={compact.focusItems} selectedNodeId={selectedNodeId} onSelect={handleNodeSelect} graphCopy={graphCopy} />
               </section>
             </div>
           </div>

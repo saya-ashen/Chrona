@@ -170,13 +170,11 @@ export function CompactFocusStack({
   selectedNodeId,
   onSelect,
   graphCopy,
-  summary,
 }: {
   items: CompactFocusItem[];
   selectedNodeId: string | null;
   onSelect: (nodeId: string) => void;
   graphCopy: GraphCopy;
-  summary: { nodes: number; active: number; attention: number; done: number; currentLabel: string | null; statusLabel: string | null };
 }) {
   return (
     <div className="space-y-2">

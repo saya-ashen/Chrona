@@ -6,6 +6,7 @@ import {
   mapTaskWorkspaceStatus,
   pickWorkspaceCurrentNode,
 } from "./task-workspace-query";
+import { deriveHeaderActions, deriveWorkspacePresentationState } from "./task-workspace-state";
 import type { TaskPageData } from "./task-workspace-types";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 
@@ -101,11 +102,26 @@ function savedPlan(status: NonNullable<TaskPageData["task"]["savedPlan"]>["statu
   };
 }
 
+const HEADER_ACTION_COPY = {
+  generateAndAcceptPlanBeforeStart: "Generate and accept plan before starting execution.",
+  acceptGeneratedPlanBeforeStart: "Accept generated plan before starting execution.",
+  taskAlreadyRunning: "Task is already running.",
+  taskWaitingForCheckpointInput: "Task is waiting checkpoint input.",
+  resolveBlockerBeforeStart: "Resolve blocker before starting execution.",
+  taskCompleted: "Task is completed.",
+  noRunningExecutionToStop: "No running execution session stop.",
+  noRunningExecutionToPause: "No running execution session pause.",
+  start: "Start",
+  pause: "Pause",
+  stop: "Stop",
+  moreActions: "More actions",
+};
+
 describe("task workspace execution console view model", () => {
   it("maps internal statuses to user-facing workspace states", () => {
     expect(mapTaskWorkspaceStatus("done")).toBe("completed");
     expect(mapTaskWorkspaceStatus("in_progress")).toBe("running");
-    expect(mapTaskWorkspaceStatus("waiting_for_user")).toBe("approval-needed");
+    expect(mapTaskWorkspaceStatus("waiting_for_user")).toBe("input-needed");
     expect(mapTaskWorkspaceStatus("waiting_for_approval")).toBe("approval-needed");
     expect(mapTaskWorkspaceStatus("blocked")).toBe("blocked");
     expect(mapTaskWorkspaceStatus("degraded")).toBe("blocked");
@@ -497,7 +513,7 @@ describe("task workspace execution console view model", () => {
       ], "checkpoint"),
     });
 
-    expect(view.header.status).toBe("approval-needed");
+    expect(view.header.status).toBe("input-needed");
     expect(view.header.actions.find((action) => action.id === "start")).toMatchObject({
       disabled: true,
       disabledReason: "Task is waiting for checkpoint input.",
@@ -652,7 +668,7 @@ describe("task workspace execution console view model", () => {
       selectedNode: selected,
       currentNode: selected,
       title: "Approve patch",
-      status: "approval-needed",
+      status: "input-needed",
       stepPosition: "2/2",
       autoRefreshEnabled: true,
       tabs: ["result", "activity", "configuration"],
@@ -807,5 +823,96 @@ describe("task workspace execution console view model", () => {
 
     expect(view.nodeDetail.disabledActionReason).toBeUndefined();
     expect(view.nodeDetail.autoRefreshEnabled).toBe(true);
+  });
+
+  it.each([
+    {
+      name: "no plan",
+      task: pageData().task,
+      progress: { completedSteps: 0, totalSteps: 0, percentComplete: 0, label: "No plan yet" },
+      currentNode: null,
+      status: "waiting",
+      startDisabledReason: "Generate and accept plan before starting execution.",
+      pauseDisabledReason: "No running execution session pause.",
+      stopDisabledReason: "No running execution session stop.",
+    },
+    {
+      name: "draft plan",
+      task: { ...pageData().task, savedPlan: savedPlan("draft") },
+      progress: { completedSteps: 0, totalSteps: 1, percentComplete: 0, label: "0/1 steps complete" },
+      currentNode: node({ id: "ready", status: "ready" }),
+      status: "waiting",
+      startDisabledReason: "Accept generated plan before starting execution.",
+      pauseDisabledReason: "No running execution session pause.",
+      stopDisabledReason: "No running execution session stop.",
+    },
+    {
+      name: "accepted plan",
+      task: { ...pageData().task, savedPlan: savedPlan("accepted") },
+      progress: { completedSteps: 0, totalSteps: 1, percentComplete: 0, label: "0/1 steps complete" },
+      currentNode: node({ id: "ready", status: "ready" }),
+      status: "waiting",
+      startDisabledReason: undefined,
+      pauseDisabledReason: "No running execution session pause.",
+      stopDisabledReason: "No running execution session stop.",
+    },
+    {
+      name: "running node",
+      task: { ...pageData().task, savedPlan: savedPlan("accepted") },
+      progress: { completedSteps: 0, totalSteps: 1, percentComplete: 0, label: "0/1 steps complete" },
+      currentNode: node({ id: "running", status: "in_progress" }),
+      status: "running",
+      startDisabledReason: "Task is already running.",
+      pauseDisabledReason: undefined,
+      stopDisabledReason: undefined,
+    },
+    {
+      name: "input checkpoint",
+      task: { ...pageData().task, savedPlan: savedPlan("accepted") },
+      progress: { completedSteps: 0, totalSteps: 1, percentComplete: 0, label: "0/1 steps complete" },
+      currentNode: node({ id: "input", status: "waiting_for_user" }),
+      status: "input-needed",
+      startDisabledReason: "Task is waiting checkpoint input.",
+      pauseDisabledReason: "No running execution session pause.",
+      stopDisabledReason: undefined,
+    },
+    {
+      name: "approval checkpoint",
+      task: { ...pageData().task, savedPlan: savedPlan("accepted") },
+      progress: { completedSteps: 0, totalSteps: 1, percentComplete: 0, label: "0/1 steps complete" },
+      currentNode: node({ id: "approval", status: "waiting_for_approval" }),
+      status: "approval-needed",
+      startDisabledReason: "Task is waiting checkpoint input.",
+      pauseDisabledReason: "No running execution session pause.",
+      stopDisabledReason: undefined,
+    },
+    {
+      name: "blocked node",
+      task: { ...pageData().task, savedPlan: savedPlan("accepted") },
+      progress: { completedSteps: 0, totalSteps: 1, percentComplete: 0, label: "0/1 steps complete" },
+      currentNode: node({ id: "blocked", status: "blocked" }),
+      status: "blocked",
+      startDisabledReason: "Resolve blocker before starting execution.",
+      pauseDisabledReason: "No running execution session pause.",
+      stopDisabledReason: "No running execution session stop.",
+    },
+    {
+      name: "completed graph",
+      task: { ...pageData().task, status: "Completed", savedPlan: savedPlan("accepted") },
+      progress: { completedSteps: 1, totalSteps: 1, percentComplete: 100, label: "1/1 steps complete" },
+      currentNode: node({ id: "done", status: "done" }),
+      status: "completed",
+      startDisabledReason: "Task is completed.",
+      pauseDisabledReason: "No running execution session pause.",
+      stopDisabledReason: "No running execution session stop.",
+    },
+  ])("derives header state and actions for $name", ({ task, progress, currentNode, status, startDisabledReason, pauseDisabledReason, stopDisabledReason }) => {
+    const workspaceStatus = deriveWorkspacePresentationState({ task, progress, currentNode });
+    const actions = deriveHeaderActions({ task, progress, workspaceStatus, copy: HEADER_ACTION_COPY });
+
+    expect(workspaceStatus).toBe(status);
+    expect(actions.find((action) => action.id === "start")).toMatchObject({ disabled: Boolean(startDisabledReason), disabledReason: startDisabledReason });
+    expect(actions.find((action) => action.id === "pause")).toMatchObject({ disabled: Boolean(pauseDisabledReason), disabledReason: pauseDisabledReason });
+    expect(actions.find((action) => action.id === "stop")).toMatchObject({ disabled: Boolean(stopDisabledReason), disabledReason: stopDisabledReason });
   });
 });

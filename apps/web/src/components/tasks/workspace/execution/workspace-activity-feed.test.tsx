@@ -203,4 +203,56 @@ describe("WorkspaceActivityFeed", () => {
     expect(screen.getByLabelText("Latest activity running")).toHaveClass("animate-spin");
     expect(screen.getByText("running")).toBeInTheDocument();
   });
+
+  it("orders live and persisted activity by timestamp and sequence while deduping overlap", () => {
+    render(<WorkspaceActivityFeed
+      activity={[
+        activity({
+          id: "persisted-duplicate",
+          kind: "tool_completed",
+          title: "Persisted duplicate",
+          summary: "Persisted duplicate",
+          tone: "success",
+          timestamp: "2026-05-21T00:01:00.000Z",
+          provider: "anthropic",
+          runtimeName: "hermes",
+          runId: "run-1",
+          sourceNodeId: "node-1",
+          rawEventType: "tool_completed",
+          sequence: 2,
+          tool: { name: "chrona_plan_read", label: "Read plan", state: "completed" },
+        }),
+        activity({ id: "persisted-older", kind: "task", title: "Persisted older", summary: "Persisted older", timestamp: "2026-05-21T00:00:00.000Z", sequence: 1 }),
+      ]}
+      runtimeEvents={[
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "node-1",
+          nodeTitle: "Read plan",
+          runtimeName: "hermes",
+          provider: "anthropic",
+          runId: "run-1",
+          sequence: 2,
+          timestamp: "2026-05-21T00:01:00.000Z",
+          event: { type: "tool_completed", toolName: "chrona_plan_read", label: "Read plan", durationMs: 12 },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "node-2",
+          nodeTitle: "Write node",
+          runtimeName: "hermes",
+          provider: "anthropic",
+          runId: "run-1",
+          sequence: 3,
+          timestamp: "2026-05-21T00:01:00.000Z",
+          event: { type: "tool_started", toolName: "chrona_write", label: "Write output" },
+        },
+      ]}
+    />);
+
+    const rendered = [screen.getByText("Write output"), screen.getByText("Persisted duplicate"), screen.getByText("Persisted older")].map((node) => node.textContent);
+    expect(rendered).toEqual(["Write output", "Persisted duplicate", "Persisted older"]);
+  });
 });

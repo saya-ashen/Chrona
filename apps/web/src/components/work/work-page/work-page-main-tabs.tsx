@@ -79,7 +79,6 @@ export function WorkPageMainTabs({
   currentRunId,
   activeTab,
   onTabChange,
-  onDispatchExecutionAction,
   completedCount,
   nodeCount,
   waitingCount,

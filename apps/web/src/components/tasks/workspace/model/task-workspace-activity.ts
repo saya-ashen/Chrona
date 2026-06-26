@@ -226,14 +226,16 @@ export function mergeWorkspaceActivity(items: WorkspaceActivityItem[], limit = D
   const seen = new Set<string>();
 
   for (const item of ordered) {
+    const identity = getWorkspaceActivityIdentity(item);
+    if (seen.has(identity)) continue;
+
     const previous = merged.at(-1);
     if (previous && canMergeAssistantActivity(previous, item)) {
       merged[merged.length - 1] = mergeAssistantActivity(previous, item);
+      seen.add(identity);
       continue;
     }
 
-    const identity = getWorkspaceActivityIdentity(item);
-    if (seen.has(identity)) continue;
     seen.add(identity);
     merged.push(item);
   }

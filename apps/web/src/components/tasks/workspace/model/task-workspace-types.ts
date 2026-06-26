@@ -161,7 +161,7 @@ export type ProgressSummary = {
   label: string;
 };
 
-export type TaskWorkspaceUserStatus = "completed" | "running" | "waiting" | "approval-needed" | "blocked";
+export type TaskWorkspaceUserStatus = "completed" | "running" | "waiting" | "input-needed" | "approval-needed" | "blocked";
 
 export type WorkspaceStateTreatment = {
   label: string;

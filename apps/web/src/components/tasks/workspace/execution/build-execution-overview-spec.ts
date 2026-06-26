@@ -350,7 +350,7 @@ export function buildCommandCenterTrailTabSpec(input: {
   const elements: MutableElements = {};
   const children: string[] = [];
   elements.root = { type: "Stack", props: { gap: "sm" }, children };
-  elements.title = { type: "Heading", props: { text: input.copy.activityTitle ?? "Execution activity", level: 3 } };
+  elements.title = { type: "Heading", props: { text: input.copy.activityTitle ?? "Execution activity", level: "h3" } };
   elements.stats = {
     type: "Text",
     props: { text: `${items.length} shown · ${input.runtimeEvents.length} live · ${input.activity.length} saved`, variant: "caption" },

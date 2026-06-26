@@ -60,6 +60,23 @@ function hasCompletedGraphExecution(graphPlan: TaskPlanGraphPlan | null) {
   return nodes.length > 0 && nodes.every((node) => isCompletedGraphNode(node.status));
 }
 
+export function derivePreferredGraphMode(input: {
+  currentMode: "full" | "compact";
+  isGeneratingPlan: boolean;
+  hasGraphExecutionStarted: boolean;
+  hasTaskCompleted: boolean;
+}): "full" | "compact" {
+  if (input.isGeneratingPlan) return "full";
+  if (input.hasGraphExecutionStarted || input.hasTaskCompleted) return "compact";
+  return input.currentMode;
+}
+
+export function recoveryActionButtonVariant(actionType: TaskAction["type"]): "default" | "outline" | "destructive" {
+  if (actionType === "cancel" || actionType === "cancel_execution") return "destructive";
+  if (actionType === "retry_sync" || actionType === "repair_inconsistency" || actionType === "replan_from_node") return "default";
+  return "outline";
+}
+
 function graphNodeIdForAction(action: TaskAction | null | undefined, pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null) {
   return action?.targetNodeId
     ?? pageData.task.executionSummary?.currentNodeId
@@ -146,14 +163,12 @@ export function TaskWorkspacePlanSection({
   const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
   useEffect(() => {
-    if (isGeneratingPlan) {
-      setGraphMode("full");
-      return;
-    }
-
-    if (hasGraphExecutionStarted || hasTaskCompleted) {
-      setGraphMode("compact");
-    }
+    setGraphMode((currentMode) => derivePreferredGraphMode({
+      currentMode,
+      isGeneratingPlan,
+      hasGraphExecutionStarted,
+      hasTaskCompleted,
+    }));
   }, [hasGraphExecutionStarted, hasTaskCompleted, isGeneratingPlan]);
   const currentOperationNode = consoleView.nodeDetail.currentNode;
   const taskPrimaryAction = pageData.task.executionSummary?.primaryAction ?? null;
@@ -309,7 +324,7 @@ export function TaskWorkspacePlanSection({
                   key={action.type}
                   type="button"
                   size="sm"
-                  variant="destructive"
+                  variant={recoveryActionButtonVariant(action.type)}
                   className="h-7 rounded-lg px-2.5 text-xs"
                   disabled={!action.enabled}
                   onClick={() => focusNodeActions(recoveryCurrentNodeId)}

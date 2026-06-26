@@ -55,6 +55,8 @@ const checkpoint = {
 };
 
 let TaskWorkspacePlanSection: typeof import("./task-workspace-plan-section").TaskWorkspacePlanSection;
+let derivePreferredGraphMode: typeof import("./task-workspace-plan-section").derivePreferredGraphMode;
+let recoveryActionButtonVariant: typeof import("./task-workspace-plan-section").recoveryActionButtonVariant;
 
 function renderWithQueryClient(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -75,7 +77,7 @@ vi.mock("@chrona/i18n/react", () => ({
 }));
 
 beforeAll(async () => {
-  ({ TaskWorkspacePlanSection } = await import("./task-workspace-plan-section"));
+  ({ TaskWorkspacePlanSection, derivePreferredGraphMode, recoveryActionButtonVariant } = await import("./task-workspace-plan-section"));
 
   class ResizeObserverMock {
     observe(target?: Element) {
@@ -103,6 +105,29 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   cleanup();
+});
+
+describe("derivePreferredGraphMode", () => {
+  it.each([
+    { name: "generating keeps full graph", currentMode: "compact" as const, isGeneratingPlan: true, hasGraphExecutionStarted: true, hasTaskCompleted: false, expected: "full" },
+    { name: "running switches to compact", currentMode: "full" as const, isGeneratingPlan: false, hasGraphExecutionStarted: true, hasTaskCompleted: false, expected: "compact" },
+    { name: "completed switches to compact", currentMode: "full" as const, isGeneratingPlan: false, hasGraphExecutionStarted: false, hasTaskCompleted: true, expected: "compact" },
+    { name: "idle keeps current mode", currentMode: "full" as const, isGeneratingPlan: false, hasGraphExecutionStarted: false, hasTaskCompleted: false, expected: "full" },
+  ])("$name", ({ expected, ...input }) => {
+    expect(derivePreferredGraphMode(input)).toBe(expected);
+  });
+});
+
+describe("recoveryActionButtonVariant", () => {
+  it.each([
+    ["retry_sync", "default"],
+    ["repair_inconsistency", "default"],
+    ["replan_from_node", "default"],
+    ["cancel_execution", "destructive"],
+    ["cancel", "destructive"],
+  ] as const)("maps %s recovery action", (actionType, variant) => {
+    expect(recoveryActionButtonVariant(actionType)).toBe(variant);
+  });
 });
 
 describe("TaskWorkspacePlanSection", () => {

@@ -105,6 +105,27 @@ describe("workspace activity helpers", () => {
     expect(merged.map((item) => item.summary)).toEqual(["after", "Before "]);
   });
 
+  it("dedupes persisted and live activity with the same provider identity", () => {
+    const persisted = activity({
+      id: "persisted-tool",
+      kind: "tool_completed",
+      provider: "anthropic",
+      runtimeName: "hermes",
+      runId: "run-1",
+      sourceNodeId: "node-1",
+      rawEventType: "tool_completed",
+      sequence: 7,
+      timestamp: "2026-05-21T00:01:00.000Z",
+    });
+    const liveDuplicate = activity({
+      ...persisted,
+      id: "live-tool",
+      timestamp: "2026-05-21T00:00:59.000Z",
+    });
+
+    expect(mergeWorkspaceActivity([persisted, liveDuplicate], 10)).toHaveLength(1);
+  });
+
   it("converts failed live tool events into danger activity with truncated error details", () => {
     const longError = `${"Runtime permission denied. ".repeat(20)}Refresh credentials before retrying.`;
 

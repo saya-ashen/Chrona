@@ -80,7 +80,6 @@ describe("compact task plan graph view", () => {
         selectedNodeId={null}
         onSelect={onSelect}
         graphCopy={DEFAULT_GRAPH_COPY}
-        summary={{ nodes: 2, active: 1, attention: 1, done: 0, currentLabel: "Current node", statusLabel: "Running" }}
       />,
     );
     expect(screen.queryByText("Current progress")).not.toBeInTheDocument();

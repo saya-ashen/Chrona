@@ -393,18 +393,16 @@ describe("TaskPlanGraph", () => {
     const legend = within(graph).getByTestId("task-plan-graph-legend");
     expect(legend).toHaveTextContent("Sequential");
     expect(legend).toHaveTextContent("Dependency");
-    expect(legend).toHaveTextContent("Task");
-    expect(legend).toHaveTextContent("Checkpoint");
-    expect(legend).toHaveTextContent("Condition");
+    expect(legend).toHaveTextContent("Active");
     expect(legend).toHaveTextContent("Waiting");
-    expect(legend).toHaveTextContent("Skipped");
+    expect(legend).toHaveTextContent("Ready");
+    expect(legend).toHaveTextContent("Blocked");
     expect(within(legend).getByTestId("task-plan-graph-node-legend")).toBeInTheDocument();
     const legendOverlay = legend.parentElement as HTMLElement | null;
     expect(legendOverlay).not.toBeNull();
     expect(legendOverlay?.className).toContain("absolute");
-    expect(legendOverlay?.className).toContain("bottom-4");
-    expect(legendOverlay?.className).toContain("justify-center");
-
+    expect(legendOverlay?.className).toContain("top-3");
+    expect(legendOverlay?.className).toContain("max-w-[calc(100%-17rem)]");
     const scrollShell = within(graph).getByTestId("task-plan-graph-scroll");
     expect(scrollShell.className).toContain("overflow-hidden");
     expect(scrollShell).toHaveAttribute("data-wheel-pan", "scroll");

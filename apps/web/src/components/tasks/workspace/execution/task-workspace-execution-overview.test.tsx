@@ -2,10 +2,11 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { buildCommandCenterTrailSpec, type UiDocument } from "@chrona/ui-protocol";
+import { buildCommandCenterTrailSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "./task-workspace-execution-overview";
+import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
 
 function renderOverview(
   view: ReturnType<typeof createTaskWorkspaceExecutionConsoleView>,
@@ -242,4 +243,25 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("No current operation")).not.toBeInTheDocument();
   });
 
+
+  it("builds valid output and trail fallback specs", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
+    const outputSpec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: view.latestCompletedNode,
+      resultSpec: nowDocument("Result fallback"),
+      artifacts: view.artifacts,
+      copy: { noResultYet: "No output yet.", noArtifacts: "No artifacts yet.", locateSourceNode: "Locate source node" },
+    });
+    const trailSpec = buildCommandCenterTrailTabSpec({
+      activity: view.activity,
+      runtimeEvents: [],
+      copy: { activityTitle: "Execution activity", activityEmpty: "Activity will appear after planning or execution starts." },
+      toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+    });
+
+    const outputResult = validateChronaSpec(outputSpec);
+    const trailResult = validateChronaSpec(trailSpec);
+    expect(outputResult).toMatchObject({ ok: true });
+    expect(trailResult).toMatchObject({ ok: true });
+  });
 });
