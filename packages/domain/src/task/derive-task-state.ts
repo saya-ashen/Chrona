@@ -69,13 +69,13 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
   }
   const activeRun =
     input.runs.find((run) => run.id === input.task.latestRunId) ??
-    [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0] ??
+    [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()).at(0) ??
     null;
 
   const latestPendingApproval =
     [...input.approvals]
       .filter((approval) => approval.status === "Pending")
-      .sort((left, right) => right.requestedAt.getTime() - left.requestedAt.getTime())[0] ?? null;
+      .sort((left, right) => right.requestedAt.getTime() - left.requestedAt.getTime()).at(0) ?? null;
 
   if (input.sync.stale) {
     return {
