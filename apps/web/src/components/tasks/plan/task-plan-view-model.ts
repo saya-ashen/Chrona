@@ -332,7 +332,7 @@ function buildInteractiveFields(node: {
 }): PlanNodeField[] {
   const fields: PlanNodeField[] = [];
 
-  if (node.actionForm?.inputFields?.length) {
+  if (node.actionForm?.inputFields.length) {
     for (const [index, input] of node.actionForm.inputFields.entries()) {
       fields.push({
         key: input.name || `blocker:${index}`,
@@ -800,12 +800,12 @@ export function compiledPlanToGraphPlan(
   plan: CompiledPlan | null | undefined,
   copyOverrides?: Partial<TaskPlanViewModelCopy>,
 ): TaskPlanGraphPlan | null {
-  if (!plan?.nodes?.length) return null;
+  if (!plan || plan.nodes.length === 0) return null;
   const copy = resolveViewModelCopy(copyOverrides);
 
   return buildGraphPlan({
-    title: plan.title ?? null,
-    summary: plan.goal ?? null,
+    title: plan.title,
+    summary: plan.goal,
     revision: plan.sourceVersion ? `r${plan.sourceVersion}` : null,
     generatedBy: null,
     updatedAt: null,
@@ -820,14 +820,14 @@ export function compiledPlanToGraphPlan(
         linkedTaskId: node.linkedTaskId ?? null,
         estimatedMinutes: node.estimatedMinutes ?? null,
         priority: node.priority ?? null,
-        dependencies: node.dependencies ?? [],
+        dependencies: node.dependencies,
         requiredInfo: [],
         nextAction: null,
         config: node.config,
         copy,
       }),
     ),
-    rawEdges: (plan.edges ?? []).map((edge) => ({
+    rawEdges: plan.edges.map((edge) => ({
       id: edge.id,
       from: edge.from,
       to: edge.to,
@@ -840,8 +840,8 @@ export function taskPlanReadModelToGraphPlan(
   readModel: TaskPlanReadModel | null | undefined,
   copyOverrides?: Partial<TaskPlanViewModelCopy>,
 ): TaskPlanGraphPlan | null {
-  if (!readModel?.effectivePlan?.nodes?.length) {
-    return readModel?.compiledPlan ? compiledPlanToGraphPlan(readModel.compiledPlan, copyOverrides) : null;
+  if (!readModel || readModel.effectivePlan.nodes.length === 0) {
+    return readModel ? compiledPlanToGraphPlan(readModel.compiledPlan, copyOverrides) : null;
   }
 
   const copy = resolveViewModelCopy(copyOverrides);
@@ -857,11 +857,11 @@ export function taskPlanReadModelToGraphPlan(
   };
 
   return buildGraphPlan({
-    title: readModel.compiledPlan.title ?? null,
-    summary: readModel.summary ?? readModel.compiledPlan.goal ?? null,
+    title: readModel.compiledPlan.title,
+    summary: readModel.summary ?? readModel.compiledPlan.goal,
     revision: `r${readModel.revision}`,
-    generatedBy: readModel.generatedBy ?? null,
-    updatedAt: readModel.updatedAt ?? null,
+    generatedBy: readModel.generatedBy,
+    updatedAt: readModel.updatedAt,
     nodes: readModel.effectivePlan.nodes.map((node: EffectivePlanNode) =>
       toPlanNode({
         id: node.id,
@@ -873,7 +873,7 @@ export function taskPlanReadModelToGraphPlan(
         linkedTaskId: node.linkedTaskId ?? null,
         estimatedMinutes: node.estimatedMinutes ?? null,
         priority: node.priority ?? null,
-        dependencies: node.dependencies ?? [],
+        dependencies: node.dependencies,
         requiredInfo: readRuntimeArray(node, "requiredInfo"),
         status: node.status,
         blockedReason: node.blockedReason,

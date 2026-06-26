@@ -110,8 +110,7 @@ function pickHeaderWorkBlock(workBlocks: HeaderWorkBlock[], selectedWorkBlockId:
   if (active) return active;
   return workBlocks.find((block) => block.scheduledStartAt.getTime() <= now.getTime() && block.scheduledEndAt.getTime() > now.getTime())
     ?? workBlocks.find((block) => block.scheduledStartAt.getTime() > now.getTime())
-    ?? workBlocks[0]
-    ?? null;
+    ?? workBlocks[0];
 }
 
 function occurrenceValue(taskId: string, workBlockId: string | null) {
@@ -250,7 +249,7 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
     })
     .sort((left, right) => left.sortTime - right.sortTime)
     .map(({ option }) => option satisfies TaskHeaderOccurrenceOptionInput);
-  const occurrenceValueCurrent = occurrenceValue(task.id, currentWorkBlock?.id ?? null);
+  const occurrenceValueCurrent = occurrenceValue(task.id, currentWorkBlock.id);
   const totalSteps = savedPlan?.effectivePlan.nodes.length ?? 0;
   const completedSteps = savedPlan?.effectivePlan.completedNodeIds.length ?? currentExecution.executedNodeIds.length;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
@@ -261,15 +260,15 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
   // the per-occurrence status that should drive the header badge —
   // matching the resolution used by `getTaskPage` for
   // `page.task.status` (see `currentWorkBlock?.status ?? task.status`).
-  const scopedTaskStatus = currentWorkBlock?.status ?? task.status;
+  const scopedTaskStatus = currentWorkBlock.status;
   const status = taskHeaderStatus({
     taskStatus: scopedTaskStatus,
     executionStatus: currentExecution.status,
     hasActiveExecution: isActiveExecutionStatus(currentExecution.status),
   });
   const occurrenceWindow = formatOccurrenceWindow(
-    currentWorkBlock?.scheduledStartAt ?? task.projection?.scheduledStartAt ?? task.dueAt ?? null,
-    currentWorkBlock?.scheduledEndAt ?? task.projection?.scheduledEndAt ?? null,
+    currentWorkBlock.scheduledStartAt,
+    currentWorkBlock.scheduledEndAt,
   );
   const source = task.importedCalendarEvents[0] ?? null;
   const actions = headerActions({
@@ -288,7 +287,7 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
     priorityLabel: task.priority,
     priorityTone: priorityTone(task.priority),
     occurrenceLabel: occurrenceWindow ? `Occurrence · ${occurrenceWindow}` : null,
-    sourceLabel: source?.calendarSource.name ?? null,
+    sourceLabel: source.calendarSource.name,
     occurrenceValue: occurrenceValueCurrent,
     occurrenceOptions,
     actions,

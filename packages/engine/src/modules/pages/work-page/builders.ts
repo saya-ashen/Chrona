@@ -177,13 +177,13 @@ export function buildTaskPlanFromGraph({
     return {
       id: node.id,
       title: node.title,
-      objective: (config?.objective as string) ?? (config?.expectedOutput as string) ?? "",
+      objective: ((config as Record<string, unknown>).objective as string) ?? "",
       phase: node.type,
       status,
       requiresHumanInput: status === "waiting_for_user" || effectiveNode?.status === "waiting_for_user",
       type: node.type,
       linkedTaskId: node.linkedTaskId,
-      executionMode: (node.mode as string) ?? undefined,
+      executionMode: node.mode as string,
       estimatedMinutes: node.estimatedMinutes,
       priority: node.priority,
       completionSummary: undefined,
@@ -299,14 +299,14 @@ export function buildCurrentIntervention({
           return {
             kind: "input" as const,
             title: copy.provideInput,
-            description: planExecution.message ?? blockReason?.actionRequired ?? copy.waitingForGuidance,
+            description: planExecution.message,
             actionLabel: copy.sendToAgent,
             defaultMessage: blockReason?.actionRequired ?? `Continue work on ${taskTitle}`,
             whyNow: blockReason?.actionRequired ?? copy.pausedUntilReply,
             evidence: [
               makeEvidence({
                 label: copy.requestedGuidance,
-                value: planExecution.message ?? `Continue work on ${taskTitle}`,
+                value: planExecution.message,
                 tone: "warning",
               }),
               ...sharedEvidence,
@@ -316,7 +316,7 @@ export function buildCurrentIntervention({
           return {
             kind: "approval" as const,
             title: copy.resolveApproval,
-            description: planExecution.message ?? blockReason?.actionRequired ?? copy.blockedOnApproval,
+            description: planExecution.message,
             actionLabel: copy.approveRejectEdit,
             approvals,
             whyNow: blockReason?.actionRequired ?? copy.humanDecisionRequired,
@@ -326,7 +326,7 @@ export function buildCurrentIntervention({
           return {
             kind: "retry" as const,
             title: copy.recoverRun,
-            description: planExecution.message ?? blockReason?.actionRequired ?? copy.stoppedBeforeFinishing,
+            description: planExecution.message,
             actionLabel: copy.retryRun,
             defaultMessage: `Recover task: ${taskTitle}`,
             whyNow: blockReason?.actionRequired ?? copy.executionStopped,
@@ -337,7 +337,7 @@ export function buildCurrentIntervention({
           return {
             kind: "observe" as const,
             title: copy.observeProgress,
-            description: planExecution.message ?? copy.runActiveDescription,
+            description: planExecution.message,
             actionLabel: copy.watchWorkstream,
             whyNow: copy.agentExecutingWhy,
             evidence: sharedEvidence.slice(0, 3),
@@ -485,7 +485,7 @@ export function buildLatestOutput({
   }>;
   copy: WorkPageCopy;
 }) {
-  const latestArtifact = [...artifacts].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0] ?? null;
+  const latestArtifact = [...artifacts].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
   if (latestArtifact) {
     return {
       kind: "artifact" as const,
@@ -504,7 +504,7 @@ export function buildLatestOutput({
       const leftTs = left.runtimeTs?.getTime() ?? 0;
       const rightTs = right.runtimeTs?.getTime() ?? 0;
       return rightTs - leftTs;
-    })[0] ?? null;
+    })[0];
 
   if (latestConversation) {
     return {
