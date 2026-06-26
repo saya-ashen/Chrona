@@ -17,6 +17,11 @@ import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
 
 const liveTest = process.env.CHRONA_CLAUDE_CODE_SDK_AIMOCK_TEST === "1" ? test : test.skip;
 
+function debugAimockOutput(label: string, value: unknown) {
+  if (process.env.CHRONA_CLAUDE_AIMOCK_DEBUG_OUTPUT !== "1") return;
+  console.info(label, JSON.stringify(value, null, 2));
+}
+
 function tinySpec() {
   return {
     root: "root",
@@ -157,9 +162,9 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () 
         events.push(event);
       }
 
-      console.log("aimock requests", JSON.stringify(llm.getRequests(), null, 2));
-      console.log("mcp tool calls", JSON.stringify(toolCalls, null, 2));
-      console.log("provider events", JSON.stringify(events, null, 2));
+      debugAimockOutput("aimock requests", llm.getRequests());
+      debugAimockOutput("mcp tool calls", toolCalls);
+      debugAimockOutput("provider events", events);
 
       expect(events.some((event) => event.type === "tool_call" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
       expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
@@ -271,9 +276,9 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () 
         events.push(event);
       }
 
-      console.log("abort aimock requests", JSON.stringify(llm.getRequests(), null, 2));
-      console.log("abort mcp tool calls", JSON.stringify(toolCalls, null, 2));
-      console.log("abort provider events", JSON.stringify(events, null, 2));
+      debugAimockOutput("abort aimock requests", llm.getRequests());
+      debugAimockOutput("abort mcp tool calls", toolCalls);
+      debugAimockOutput("abort provider events", events);
 
       expect(toolCalls.map((call) => call.name)).toEqual(["chrona.plan.output"]);
       expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
