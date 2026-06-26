@@ -26,10 +26,6 @@ export async function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPage
     },
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Failed to load task activity" }));
-    throw new Error((err as { error?: string }).error ?? "Failed to load task activity");
-  }
 
   return await response.json() as unknown as WorkspaceActivityPage;
 }
@@ -43,10 +39,6 @@ export async function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActi
     },
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: "Failed to load node activity" }));
-    throw new Error((err as { error?: string }).error ?? "Failed to load node activity");
-  }
 
   return await response.json() as unknown as WorkspaceActivityPage;
 }
@@ -180,7 +172,7 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
     return {
       label: copy.blockedLabel,
       tone: "critical",
-      guidance: input.blockActionRequired ?? input.currentNode?.nextAction ?? copy.blockedGuidance,
+      guidance: input.blockActionRequired ?? input.currentNode.nextAction ?? copy.blockedGuidance,
     };
   }
 
@@ -367,7 +359,7 @@ function buildCheckpointActionPayload(input: {
 function buildWorkspaceInputFields(fields: PlanNodeField[], values: Record<string, string>) {
   return Object.fromEntries(
     fields
-      .map((field) => [field.key, values[field.key]?.trim() ?? ""] as const)
+      .map((field) => [field.key, values[field.key].trim()] as const)
       .filter(([, value]) => Boolean(value)),
   );
 }
@@ -375,7 +367,7 @@ function buildWorkspaceInputFields(fields: PlanNodeField[], values: Record<strin
 function buildWorkspaceInputText(fields: PlanNodeField[], values: Record<string, string>) {
   return fields
     .map((field) => {
-      const value = values[field.key]?.trim();
+      const value = values[field.key].trim();
       return value ? `${field.label}: ${value}` : null;
     })
     .filter((value): value is string => Boolean(value))
