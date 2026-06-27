@@ -1,5 +1,5 @@
 import type { ScheduleTaskListItem } from "./schedule-task-list";
-import type { TaskConfigExecutionRuntime } from "./forms/task-config-form";
+import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "./forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 
@@ -136,6 +136,7 @@ type WorkBlockInfo = {
 export type SchedulePageData = {
   defaultExecutionRuntime: string;
   executionRuntimes: TaskConfigExecutionRuntime[];
+  availableAiClients?: TaskConfigAiClient[];
   summary: SchedulePageSummary;
   planningSummary: SchedulePlanningSummary;
   focusZones: ScheduleFocusZone[];
@@ -171,6 +172,7 @@ export type ScheduleCardItem = {
   scheduledEndAt?: Date | null;
   executionRuntime?: string;
   executionConfig?: unknown;
+  aiClientId?: string | null;
   isRunnable?: boolean;
   runnabilityState?: string;
   runnabilitySummary?: string;
@@ -321,6 +323,7 @@ export type TimelineCreateInput = {
   priority: "Low" | "Medium" | "High" | "Urgent";
   executionRuntime: string;
   executionConfig: RuntimeInput;
+  aiClientId?: string | null;
   autoExecute: boolean;
   autoPlanGenerationEnabled: boolean;
   autoPlanGenerationTiming: AutomationTimingPreset;

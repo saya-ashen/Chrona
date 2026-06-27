@@ -181,6 +181,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     submitCheckpointAction,
     handleGeneratePlanFromHeader,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
+  const isTaskRunning = task.status === "Running" || currentExecution?.status === "running" || currentExecution?.status === "started";
   const consoleView = useMemo(
     () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
     [pageData, graphPlan, executionConsoleCopy],
@@ -296,6 +297,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             defaultExecutionRuntime: data.defaultExecutionRuntime,
             isSaving,
             taskConfigInitialValues,
+            availableAiClients: data.availableAiClients,
+            disableAiClientSelection: isTaskRunning,
+            aiClientSelectionDisabledHint: isTaskRunning ? "AI provider cannot be changed while task is running." : undefined,
             sourceManaged: consoleView.task.sourceManaged,
             saveSuccess,
             saveError,

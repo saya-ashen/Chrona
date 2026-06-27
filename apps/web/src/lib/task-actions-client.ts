@@ -30,6 +30,7 @@ export function createTaskFromSchedule(input: {
   autoExecuteTiming?: AutomationTimingPreset;
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
+  aiClientId?: string | null;
   parentTaskId?: string | null;
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
@@ -53,6 +54,7 @@ export function createTaskFromSchedule(input: {
         autoExecuteTiming: input.autoExecuteTiming,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
+        aiClientId: input.aiClientId ?? null,
         parentTaskId: input.parentTaskId,
         recurrenceRule: input.recurrenceRule ?? undefined,
         recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? undefined,
@@ -69,6 +71,7 @@ export function updateTaskConfigFromSchedule(input: {
   priority?: string;
   executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
+  aiClientId?: string | null;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
   autoPlanGenerationTiming?: AutomationTimingPreset;
@@ -89,6 +92,7 @@ export function updateTaskConfigFromSchedule(input: {
           | "High"
           | "Urgent"
           | undefined,
+        aiClientId: input.aiClientId ?? null,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
         autoPlanGeneration: input.autoPlanGeneration,

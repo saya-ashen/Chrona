@@ -274,6 +274,7 @@ export function SchedulePage({
           externalEvents={externalEvents}
           executionRuntimes={data.executionRuntimes}
           defaultExecutionRuntime={data.defaultExecutionRuntime}
+          availableAiClients={data.availableAiClients}
           isPending={isPending}
           onScheduleDrop={handleScheduleDrop}
           onCreateTaskBlock={handleCreateTaskBlock}
@@ -313,6 +314,7 @@ export function SchedulePage({
           selectedDay={viewModel.activeDay}
           executionRuntimes={data.executionRuntimes}
           defaultExecutionRuntime={data.defaultExecutionRuntime}
+          availableAiClients={data.availableAiClients}
           isPending={isPending}
           onClose={() => {
             setLocalSelectedTaskId(undefined);
@@ -345,6 +347,7 @@ export function SchedulePage({
         actionFailedMessage={actionFailedMessage}
         onCloseQuickAdd={() => setShowNewTaskDialog(false)}
         handleCreateTaskBlock={handleCreateTaskBlock}
+        availableAiClients={data.availableAiClients}
       />
     </div>
   );

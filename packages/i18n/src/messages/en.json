@@ -1429,6 +1429,13 @@
           "research": "{n} summaries",
           "code": "{n} checks",
           "automation": "{n} updates"
+        },
+        "aiBrief": {
+          "generating": "AI brief updating",
+          "dirty": "AI brief ready to update",
+          "failed": "AI brief update failed",
+          "unconfigured": "Dashboard AI provider not configured",
+          "regenerate": "Regenerate"
         }
       },
       "feed": {

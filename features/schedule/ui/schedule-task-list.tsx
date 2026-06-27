@@ -47,6 +47,7 @@ export type ScheduleTaskListItem = {
   } | null;
   executionRuntime: string;
   executionConfig: unknown;
+  aiClientId?: string | null;
   isRunnable: boolean;
   runnabilityState: string;
   runnabilitySummary: string;
@@ -56,6 +57,7 @@ type ScheduleTaskListProps = {
   items: ScheduleTaskListItem[];
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
+  availableAiClients?: Parameters<typeof TaskConfigForm>[0]["availableAiClients"];
   isPending: boolean;
   onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
 };
@@ -205,6 +207,7 @@ export function ScheduleTaskList({
   items,
   executionRuntimes,
   defaultExecutionRuntime,
+  availableAiClients,
   isPending,
   onSaveTaskConfigAction,
 }: ScheduleTaskListProps) {
@@ -395,6 +398,7 @@ export function ScheduleTaskList({
                       executionRuntimes={executionRuntimes}
                       defaultExecutionRuntime={defaultExecutionRuntime}
                       initialValues={toTaskConfigInitialValues(item)}
+                      availableAiClients={availableAiClients}
                       isPending={isPending}
                       lockedFields={item.sourceManaged?.immutableFields}
                       lockedFieldsHint={item.sourceManaged ? `Synced from ${item.sourceManaged.sourceName}. Title and time are managed by the calendar source.` : undefined}

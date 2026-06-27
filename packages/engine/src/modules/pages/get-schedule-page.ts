@@ -27,6 +27,7 @@ function mapProjectionItem(
       priority: string;
       executionRuntime: string;
       executionConfig: unknown;
+      aiClientId: string | null;
       autoPlanGeneration: boolean;
       autoExecute: boolean;
       autoPlanGenerationTiming: string;
@@ -65,6 +66,7 @@ function mapProjectionItem(
     autoExecute: item.task.autoExecute,
     autoPlanGenerationTiming: item.task.autoPlanGenerationTiming,
     autoExecuteTiming: item.task.autoExecuteTiming,
+    aiClientId: item.task.aiClientId,
     kind: item.task.kind,
     recurrenceRule: item.task.recurrenceRule,
     sourceManaged: importedEvent
@@ -95,6 +97,7 @@ function mapWorkBlockItem(
       priority: string;
       executionRuntime: string;
       executionConfig: unknown;
+      aiClientId: string | null;
       autoPlanGeneration: boolean;
       autoExecute: boolean;
       autoPlanGenerationTiming: string;
@@ -140,6 +143,7 @@ function mapWorkBlockItem(
     autoExecute: block.task.autoExecute,
     autoPlanGenerationTiming: block.task.autoPlanGenerationTiming,
     autoExecuteTiming: block.task.autoExecuteTiming,
+    aiClientId: block.task.aiClientId,
     kind: block.task.kind,
     recurrenceRule: block.task.recurrenceRule,
     sourceManaged: importedEvent
@@ -432,6 +436,11 @@ export async function getSchedulePage(workspaceId: string) {
     label: key,
     spec: getRuntimeTaskConfigSpec(key),
   }));
+  const availableAiClients = await db.aiClient.findMany({
+    where: { enabled: true },
+    select: { id: true, name: true, enabled: true },
+    orderBy: { createdAt: "asc" },
+  });
 
   const listItems = projections.filter(hasTask).map((item) => mapProjectionItem(item));
   const planSnapshots = new Map<
@@ -525,6 +534,7 @@ export async function getSchedulePage(workspaceId: string) {
           priority: true,
           executionRuntime: true,
           executionConfig: true,
+          aiClientId: true,
           autoPlanGeneration: true,
           autoExecute: true,
           autoPlanGenerationTiming: true,
@@ -641,6 +651,7 @@ export async function getSchedulePage(workspaceId: string) {
   return {
     defaultExecutionRuntime: workspace.defaultRuntime,
     executionRuntimes,
+    availableAiClients,
     summary: {
       scheduledCount: allScheduled.length,
       unscheduledCount: unscheduled.length,

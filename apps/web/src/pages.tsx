@@ -144,7 +144,7 @@ export function DashboardRoutePage() {
   const { dictionary } = useAppBootOutletData();
   const { dashboard } = useLoaderData() as DashboardRouteData;
 
-  return <DashboardPage data={dashboard} copy={dictionary.pages.dashboard} />;
+  return <DashboardPage data={dashboard} copy={dictionary.pages.dashboard} workspaceId={dashboard.workspaceId} />;
 }
 
 export function MemoryRoutePage() {

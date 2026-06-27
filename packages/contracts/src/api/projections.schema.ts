@@ -17,6 +17,10 @@ export const dashboardProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
+export const dashboardAiBriefGenerateBodySchema = z.object({
+  force: z.boolean().optional(),
+});
+
 // ── GET /memory ──
 export const memoryProjectionQuerySchema = z.object({
   workspaceId: workspaceId,

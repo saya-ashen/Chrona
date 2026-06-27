@@ -38,6 +38,7 @@ type ClientFormPayload = {
 type RuntimeProviderInput = {
   key?: unknown;
   label?: string;
+  features?: unknown;
 };
 
 type ClientFormValues = {
@@ -52,6 +53,7 @@ type ClientFormValues = {
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
   controlPlane: ControlPlaneMode;
+  bindings: string[];
 };
 
 type HermesClientScope = "local" | "remote";
@@ -81,6 +83,7 @@ type TestResult = {
 type RuntimeProviderOption = {
   key: AiClientType;
   label: string;
+  features: string[];
 };
 
 const LOCAL_HERMES_BASE_URL = "http://127.0.0.1:8642";
@@ -208,6 +211,7 @@ function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
     .map((provider) => ({
       key: provider.key,
       label: typeof provider.label === "string" ? provider.label : provider.key,
+      features: Array.isArray(provider.features) ? provider.features.filter((feature): feature is string => typeof feature === "string") : [],
     }));
 }
 
@@ -280,6 +284,61 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
   }
 }
 
+const FEATURE_COPY: Record<string, { label: string; description: string }> = {
+  suggest: {
+    label: "Smart Suggestions",
+    description: "Generate task and schedule suggestions.",
+  },
+  generate_plan: {
+    label: "Task Plan Generation",
+    description: "Generate structured task plans.",
+  },
+  generatePlan: {
+    label: "Task Plan Generation",
+    description: "Generate structured task plans.",
+  },
+  conflicts: {
+    label: "Conflict Analysis",
+    description: "Analyze schedule conflicts.",
+  },
+  timeslots: {
+    label: "Timeslot Recommendations",
+    description: "Recommend scheduling windows.",
+  },
+  chat: {
+    label: "Chat / Plan Generation",
+    description: "Answer task planning chat prompts.",
+  },
+  "dashboard.brief": {
+    label: "Dashboard Brief",
+    description: "Generate dashboard summaries and focus recommendations.",
+  },
+  "task.plan": {
+    label: "Task Planning",
+    description: "Generate or refine task plans.",
+  },
+  "task.execution": {
+    label: "Task Execution",
+    description: "Execute approved task steps.",
+  },
+};
+
+function getFeatureCopy(feature: string) {
+  return FEATURE_COPY[feature] ?? { label: feature, description: feature };
+}
+
+function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientType) {
+  return providers.find((provider) => provider.key === type)?.features ?? [];
+}
+
+async function updateClientBindings(clientId: string, features: string[]) {
+  const res = await api.ai.clients[":clientId"].bindings.$put({
+    param: { clientId },
+    json: { features },
+  });
+  const data = (await res.json()) as { bindings?: string[] };
+  return data.bindings ?? features;
+}
 const DEFAULTS: Record<string, string> = {
   title: "AI Clients",
   subtitle: "Connect Hermes so Chrona can plan tasks and safely execute approved work.",
@@ -342,7 +401,7 @@ function ClientForm({
   providers,
 }: {
   initial?: AiClientInfo;
-  onSave: (data: ClientFormPayload) => void;
+  onSave: (data: { payload: ClientFormPayload; bindings: string[] }) => void;
   onCancel: () => void;
   copy: Record<string, string>;
   providers: RuntimeProviderOption[];
@@ -370,6 +429,7 @@ function ClientForm({
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
     controlPlane: ((initialConfig as { controlPlane?: ControlPlaneMode } | undefined)?.controlPlane === "skill" ? "skill" : "mcp"),
+    bindings: initial?.bindings ?? [],
   }), [fallbackType, initial, initialConfig, providers]);
   const form = useForm<ClientFormValues>({
     defaultValues,
@@ -380,6 +440,7 @@ function ClientForm({
   const isHermesClient = values.type === "hermes";
   const isClaudeCodeClient = values.type === "claude_code";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
+  const availableFeatures = getProviderFeatures(providers, values.type);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
   const [hermesResult, setHermesResult] = useState<HermesIntegrationResult | null>(null);
@@ -398,7 +459,7 @@ function ClientForm({
   }, [form, values.baseUrl, values.hermesScope, values.type]);
 
   function handleSave(nextValues: ClientFormValues) {
-    onSave(buildClientPayload(nextValues));
+    onSave({ payload: buildClientPayload(nextValues), bindings: nextValues.bindings });
   }
 
   return (
@@ -745,6 +806,43 @@ function ClientForm({
               </Field>
             )}
 
+            {availableFeatures.length > 0 && (
+              <Field>
+                <FieldLabel>Feature bindings</FieldLabel>
+                <div className="grid gap-3 rounded-md border p-3">
+                  {availableFeatures.map((feature) => {
+                    const featureCopy = getFeatureCopy(feature);
+                    return (
+                      <Controller
+                        key={feature}
+                        name="bindings"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Field orientation="horizontal" className="items-start gap-3">
+                            <Checkbox
+                              checked={field.value.includes(feature)}
+                              onCheckedChange={(checked) => {
+                                field.onChange(
+                                  checked === true
+                                    ? [...new Set([...field.value, feature])]
+                                    : field.value.filter((value) => value !== feature),
+                                );
+                              }}
+                            />
+                            <FieldContent>
+                              <FieldLabel>{featureCopy.label}</FieldLabel>
+                              <p className="text-xs text-muted-foreground">{featureCopy.description}</p>
+                            </FieldContent>
+                          </Field>
+                        )}
+                      />
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
+
+
             <Controller
               name="isDefault"
               control={form.control}
@@ -832,17 +930,22 @@ export function AiClientsManager() {
     void fetchClients();
   }, [fetchClients]);
 
-  const handleCreate = async (data: ClientFormPayload) => {
-    await api.ai.clients.$post({ json: data });
+  const handleCreate = async (data: { payload: ClientFormPayload; bindings: string[] }) => {
+    const res = await api.ai.clients.$post({ json: data.payload });
+    const result = (await res.json()) as { client?: { id?: string } };
+    if (result.client?.id) {
+      await updateClientBindings(result.client.id, data.bindings);
+    }
     setShowForm(false);
     void fetchClients();
   };
 
-  const handleUpdate = async (id: string, data: ClientFormPayload) => {
+  const handleUpdate = async (id: string, data: { payload: ClientFormPayload; bindings: string[] }) => {
     await api.ai.clients[":clientId"].$patch({
       param: { clientId: id },
-      json: data,
+      json: data.payload,
     });
+    await updateClientBindings(id, data.bindings);
     setEditingId(null);
     void fetchClients();
   };
@@ -949,6 +1052,13 @@ export function AiClientsManager() {
                         {(client.config as { baseUrl?: string }).baseUrl ?? "—"} · {(client.config as { model?: string }).model ?? "default"}
                       </span>
                     )}
+                  {client.bindings.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {client.bindings.map((feature) => (
+                        <Badge key={feature} variant="outline">{getFeatureCopy(feature).label}</Badge>
+                      ))}
+                    </div>
+                  )}
                   </CardDescription>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <Button

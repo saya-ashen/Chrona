@@ -32,6 +32,8 @@ import type { AutomationTimingPreset } from "@chrona/contracts";
 import {
   TaskConfigSection,
   TaskConfigField,
+  TaskConfigSelect,
+  type TaskConfigAiClient,
 } from "../forms/task-config-form";
 
 import { RECURRENCE_PRESETS, recurrenceRuleFromState, type RecurrencePreset } from "@/lib/recurrence-presets";
@@ -81,6 +83,9 @@ const DEFAULT_DIALOG_COPY = {
     before_2h: "2 hours before start",
     before_1d: "1 day before start",
   },
+  aiProvider: "AI provider",
+  defaultAiProvider: "Default provider",
+  aiProviderHint: "Override provider for this task.",
   description: "Description (optional)",
   descriptionPlaceholder: "Add description",
   priority: "Priority",
@@ -116,8 +121,10 @@ type TaskCreateDialogProps = {
     recurrenceRule: string | null;
     recurrenceAnchorStartAt: string | null;
     recurrenceAnchorEndAt: string | null;
+    aiClientId: string | null;
   }) => Promise<void>;
   autoSuggestionsEnabled?: boolean;
+  availableAiClients?: TaskConfigAiClient[];
 };
 
 export function TaskCreateDialog({
@@ -129,6 +136,7 @@ export function TaskCreateDialog({
   onClose,
   onSubmit,
   autoSuggestionsEnabled,
+  availableAiClients = [],
 }: TaskCreateDialogProps) {
   const aiPreferences = useScheduleAiPreferences();
   const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
@@ -157,6 +165,7 @@ export function TaskCreateDialog({
   const [recurrenceMode, setRecurrenceMode] = useState<RecurrencePreset>("daily");
   const [customRRULE, setCustomRRULE] = useState("");
   const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [aiClientId, setAiClientId] = useState("");
 
   /* ---- Auto-complete state ---- */
   const [showAutoComplete, setShowAutoComplete] = useState(false);
@@ -218,6 +227,7 @@ export function TaskCreateDialog({
       setRecurrenceMode("daily");
       setCustomRRULE("");
       setRepeatEnabled(false);
+      setAiClientId("");
       setShowAutoComplete(false);
       suppressRef.current = false;
     }
@@ -251,6 +261,7 @@ export function TaskCreateDialog({
       recurrenceRule,
       recurrenceAnchorStartAt: recurrenceRule ? scheduledStartAt.toISOString() : null,
       recurrenceAnchorEndAt: recurrenceRule ? scheduledEndAt.toISOString() : null,
+      aiClientId: aiClientId || null,
     });
 
     onClose();
@@ -275,6 +286,13 @@ export function TaskCreateDialog({
     value: preset,
     label: dialogCopy.automationTiming[preset],
   }));
+  const aiClientOptions = [
+    { value: "", label: dialogCopy.defaultAiProvider },
+    ...availableAiClients.map((client) => ({
+      value: client.id,
+      label: client.enabled ? client.name : `${client.name} (disabled)`,
+    })),
+  ];
 
   const selectedDate = parseLocalDateInput(startDate);
   const effectiveAutoPlan = autoExecute || autoPlanGenerationEnabled;
@@ -561,6 +579,20 @@ export function TaskCreateDialog({
                   </div>
                 )}
               </TaskConfigSection>
+
+              {aiClientOptions.length > 1 ? (
+                <TaskConfigSection title={dialogCopy.aiProvider}>
+                  <TaskConfigField label={dialogCopy.aiProvider} hint={dialogCopy.aiProviderHint}>
+                    <TaskConfigSelect
+                      name="aiClientId"
+                      value={aiClientId}
+                      options={aiClientOptions}
+                      disabled={isPending}
+                      onValueChange={setAiClientId}
+                    />
+                  </TaskConfigField>
+                </TaskConfigSection>
+              ) : null}
 
               <TaskConfigSection title={dialogCopy.autoPlanGeneration}>
                 <div className="grid gap-3">

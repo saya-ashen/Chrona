@@ -6,16 +6,22 @@ import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
 export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | (string & {});
-export type AiFeature =
-  | "suggest"
-  | "generate_plan"
-  | "conflicts"
-  | "timeslots"
-  | "chat"
-  | "dispatch_task"
-  | "execute_task_node"
-  | "evaluate_condition_node"
-  | "review_checkpoint_node";
+export const AI_FEATURES = [
+  "suggest",
+  "generate_plan",
+  "conflicts",
+  "timeslots",
+  "chat",
+  "dispatch_task",
+  "execute_task_node",
+  "evaluate_condition_node",
+  "review_checkpoint_node",
+  "dashboard.brief",
+  "task.plan",
+  "task.execution",
+] as const;
+
+export type AiFeature = (typeof AI_FEATURES)[number];
 
 export interface AiClientRecord {
   id: string;

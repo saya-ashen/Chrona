@@ -27,6 +27,9 @@ type TaskWorkspaceEditSectionProps = {
   taskConfigInitialValues: ComponentProps<
     typeof TaskConfigForm
   >["initialValues"];
+  availableAiClients: ComponentProps<typeof TaskConfigForm>["availableAiClients"];
+  disableAiClientSelection?: boolean;
+  aiClientSelectionDisabledHint?: string;
   sourceManaged?: TaskData["sourceManaged"];
   saveSuccess: boolean;
   saveError: string | null;
@@ -47,6 +50,9 @@ export function TaskWorkspaceEditSection({
   defaultExecutionRuntime,
   isSaving,
   taskConfigInitialValues,
+  availableAiClients,
+  disableAiClientSelection,
+  aiClientSelectionDisabledHint,
   sourceManaged,
   saveSuccess,
   saveError,
@@ -116,6 +122,9 @@ export function TaskWorkspaceEditSection({
               defaultExecutionRuntime={defaultExecutionRuntime}
               isPending={isSaving}
               initialValues={taskConfigInitialValues}
+              availableAiClients={availableAiClients}
+              disableAiClientSelection={disableAiClientSelection}
+              aiClientSelectionDisabledHint={aiClientSelectionDisabledHint}
               lockedFields={sourceManaged?.immutableFields}
               lockedFieldsHint={lockedFieldsHint}
               sourceDescription={sourceManaged ? sourceManaged.description : undefined}

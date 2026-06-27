@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/i18n/localized-link", () => ({
@@ -31,8 +31,17 @@ vi.mock("@/components/ui/card", () => ({
   CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
 
+
+vi.mock("react-router-dom", () => ({
+  useRevalidator: () => ({ revalidate: vi.fn() }),
+}));
+
+vi.mock("@/api", () => ({
+  apiJson: vi.fn(),
+}));
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import type { DashboardData } from "@/components/dashboard/dashboard-types";
+import { apiJson } from "@/api";
 
 const COPY = {
   title: "Chrona workspace",
@@ -97,6 +106,13 @@ const COPY = {
       code: "{n} checks",
       automation: "{n} updates",
     },
+    aiBrief: {
+      generating: "AI brief updating",
+      dirty: "AI brief ready to update",
+      failed: "AI brief update failed",
+      unconfigured: "Dashboard AI provider not configured",
+      regenerate: "Regenerate",
+    },
   },
   feed: {
     title: "Latest activity",
@@ -133,6 +149,7 @@ function makeData(overrides?: Partial<DashboardData>): DashboardData {
     autoCompleted: [],
     totalAutoCompleted: 0,
     recentEvents: [],
+    aiBrief: null,
     ...overrides,
   } as DashboardData;
 }
@@ -149,6 +166,22 @@ function completed(overrides: Partial<DashboardData["autoCompleted"][number]> = 
   } as DashboardData["autoCompleted"][number];
 }
 
+
+function renderDashboard(data: DashboardData = makeData()) {
+  return render(<DashboardPage data={data} copy={COPY} workspaceId="workspace-1" />);
+}
+
+function dirtyAiBrief(): NonNullable<DashboardData["aiBrief"]> {
+  return {
+    status: "dirty",
+    spec: null,
+    generatedAt: null,
+    providerClientId: "client-1",
+    canGenerate: true,
+    errorMessage: null,
+    inputFingerprint: "fingerprint-1",
+  };
+}
 afterEach(() => cleanup());
 
 describe("DashboardPage", () => {
@@ -312,5 +345,16 @@ describe("DashboardPage", () => {
     expect(screen.getAllByText("Done task").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Needs you").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Auto-completed").length).toBeGreaterThan(0);
+  });
+
+  it("lazily requests AI brief generation for dirty surfaces", async () => {
+    renderDashboard(makeData({ aiBrief: dirtyAiBrief() }));
+
+    await waitFor(() => {
+      expect(apiJson).toHaveBeenCalledWith(
+        "/api/pages/dashboard/ai-brief/generate?workspaceId=workspace-1",
+        { method: "POST", body: JSON.stringify({ force: false }) },
+      );
+    });
   });
 });
