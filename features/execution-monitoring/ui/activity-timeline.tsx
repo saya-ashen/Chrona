@@ -48,12 +48,19 @@ function collectPlanGenerationGroup(items: WorkspaceActivityItem[], startIndex: 
   return group;
 }
 
+function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
+  const sameName = left.tool?.name === right.tool?.name || !left.tool?.name;
+  return left.sourceNodeId === right.sourceNodeId
+    && left.runId === right.runId
+    && left.nativeRunId === right.nativeRunId
+    && sameName;
+}
+
 function getToolPair(items: WorkspaceActivityItem[], item: WorkspaceActivityItem, index: number) {
   if (item.kind !== "tool_started") return undefined;
   const next = items.at(index + 1);
-  const sameTool = next?.tool?.name === item.tool?.name || !item.tool?.name;
-  if (next?.kind === "tool_completed" && next.sourceNodeId === item.sourceNodeId && sameTool) return next;
-  return undefined;
+  if (next?.kind === "tool_completed" && isSameToolActivity(item, next)) return next;
+  return items.find((candidate) => candidate.kind === "tool_completed" && isSameToolActivity(item, candidate));
 }
 
 /**
@@ -540,7 +547,7 @@ function railDotClass(tone: Tone) {
 function isRailEntryActive(entry: RenderEntry) {
   if (entry.type === "tool_pair") return !entry.completed;
   if (entry.type === "plan_phase") return summarizePlanPhase(entry.items) === "running";
-  if (entry.type === "single") return entry.item.tool?.state === "started" || entry.item.tone === "info" || entry.item.kind === "provider_run";
+  if (entry.type === "single") return entry.item.tool?.state === "started" || (entry.item.kind === "provider_run" && entry.item.tone === "info");
   return false;
 }
 
@@ -554,15 +561,16 @@ function railLineClass(tone: Tone) {
 }
 
 
-function ActivityRailTimeline({ entries }: { entries: RenderEntry[] }) {
+function ActivityRailTimeline({ entries, active }: { entries: RenderEntry[]; active: boolean }) {
   const lastIdx = entries.length - 1;
+  const activeIdx = active ? entries.findIndex(isRailEntryActive) : -1;
   return (
     <div className="space-y-0.5">
       {entries.map((entry, index) => {
         const tone = railTone(entry);
         const detail = railDetail(entry);
         const isLast = index === lastIdx;
-        const isActiveLatest = isLast && isRailEntryActive(entry);
+        const isActiveLatest = index === activeIdx;
         return (
           <article key={entry.key} className="relative grid grid-cols-[1rem_minmax(0,1fr)] gap-x-2 py-1.5">
             <div className="relative flex justify-center">
@@ -587,14 +595,16 @@ function ActivityRailTimeline({ entries }: { entries: RenderEntry[] }) {
 export function ActivityTimeline({
   items,
   density = "detailed",
+  active = false,
 }: {
   items: WorkspaceActivityItem[];
   density?: "compact" | "detailed" | "rail";
+  active?: boolean;
 }) {
   const renderList = buildRenderList(items);
   const rail = density === "rail";
   const compact = density === "compact";
-  if (rail) return <ActivityRailTimeline entries={renderList} />;
+  if (rail) return <ActivityRailTimeline entries={renderList} active={active} />;
   const lastIdx = renderList.length - 1;
 
   return (

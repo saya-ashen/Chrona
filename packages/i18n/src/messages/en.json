@@ -133,6 +133,7 @@
       "commandCenterOutputTab": "Results",
       "commandCenterTrailTab": "Activity",
       "stateRunning": "Running",
+      "liveStatusRunning": "Running now",
       "stateBlocked": "Blocked",
       "stateDegraded": "Degraded",
       "stateInvalidated": "Invalidated",
@@ -1296,7 +1297,8 @@
       "filePreviewUnsupportedType": "File type is not supported for preview.",
       "filePreviewReadFailed": "File preview could not be loaded.",
       "expandFilePreview": "Expand preview",
-      "collapseFilePreview": "Collapse preview"
+      "collapseFilePreview": "Collapse preview",
+      "liveStatusRunning": "Running now"
     }
   },
   "queries": {

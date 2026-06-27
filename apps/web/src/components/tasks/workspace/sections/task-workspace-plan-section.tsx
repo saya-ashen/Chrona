@@ -365,6 +365,7 @@ export function TaskWorkspacePlanSection({
           commandCenterActionHandlers={commandCenterActionHandlers}
           runtimeEvents={runtimeEvents}
           liveActivity={liveActivity}
+          currentExecution={currentExecution}
           commandCenterCopy={commandCenterCopy}
           isPlanCompact={graphMode === "compact"}
           copy={copy}

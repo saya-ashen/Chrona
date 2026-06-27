@@ -79,6 +79,7 @@ export function WorkspaceActivityFeed({
   isLoadingOlder = false,
   onLoadOlder,
   density = "detailed",
+  active = false,
 }: {
   activity: WorkspaceActivityItem[];
   runtimeEvents?: WorkspaceRuntimeEvent[];
@@ -89,6 +90,7 @@ export function WorkspaceActivityFeed({
   isLoadingOlder?: boolean;
   onLoadOlder?: () => void;
   density?: "compact" | "detailed" | "rail";
+  active?: boolean;
 }) {
   const items = mergeWorkspaceActivity([...runtimeEventsToWorkspaceActivity(runtimeEvents, limit), ...activity], limit);
   const latestProvider = runtimeEvents.at(-1)?.provider;
@@ -102,7 +104,7 @@ export function WorkspaceActivityFeed({
         <ActivityEmptyState message={emptyMessage} />
       ) : (
         <div className={density === "rail" ? "mt-4" : "mt-4 pl-1"}>
-          <ActivityTimeline items={items} density={density} />
+          <ActivityTimeline items={items} density={density} active={active} />
         </div>
       )}
       <LoadOlderActivityButton visible={hasOlderActivity} loading={isLoadingOlder} onClick={onLoadOlder} />

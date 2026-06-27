@@ -195,6 +195,7 @@ describe("WorkspaceActivityFeed", () => {
   it("uses a spinner for the latest running rail event", () => {
     render(<WorkspaceActivityFeed
       density="rail"
+      active
       activity={[
         activity({ id: "started", kind: "tool_started", title: "Tool started", summary: "Reading plan", tone: "info", tool: { name: "chrona_plan_read", label: "Read plan", state: "started" } }),
       ]}
@@ -204,6 +205,48 @@ describe("WorkspaceActivityFeed", () => {
     expect(screen.getByText("running")).toBeInTheDocument();
   });
 
+  it("keeps the rail spinner on the newest running event, not older info history", () => {
+    render(<WorkspaceActivityFeed
+      density="rail"
+      active
+      activity={[
+        activity({ id: "started", kind: "tool_started", title: "Tool started", summary: "Reading plan", tone: "info", timestamp: "2026-05-21T00:02:00.000Z", tool: { name: "chrona_plan_read", label: "Read plan", state: "started" } }),
+        activity({ id: "created", kind: "task", title: "Task created", summary: "Draft · Medium", tone: "info", timestamp: "2026-05-21T00:00:00.000Z" }),
+      ]}
+    />);
+
+    const spinnerRow = screen.getByLabelText("Latest activity running").closest("article");
+    expect(spinnerRow).toHaveTextContent("Tool started");
+    expect(spinnerRow).not.toHaveTextContent("Task created");
+  });
+
+
+  it("does not spin stale rail starts when feed is inactive", () => {
+    render(<WorkspaceActivityFeed
+      density="rail"
+      activity={[
+        activity({ id: "started", kind: "tool_started", title: "Tool started", summary: "Reading plan", tone: "info", timestamp: "2026-05-21T00:02:00.000Z", tool: { name: "chrona_plan_read", label: "Read plan", state: "started" } }),
+      ]}
+    />);
+
+    expect(screen.queryByLabelText("Latest activity running")).not.toBeInTheDocument();
+    expect(screen.getByText("running")).toBeInTheDocument();
+  });
+
+  it("pairs non-adjacent tool completion before choosing active rail event", () => {
+    render(<WorkspaceActivityFeed
+      density="rail"
+      active
+      activity={[
+        activity({ id: "completed", kind: "tool_completed", title: "Tool completed", summary: "Read plan completed", tone: "success", timestamp: "2026-05-21T00:03:00.000Z", runId: "run-1", sourceNodeId: "node-1", tool: { name: "chrona_plan_read", label: "Read plan", state: "completed" } }),
+        activity({ id: "status", kind: "provider_run", title: "Run status", summary: "Completed", tone: "success", timestamp: "2026-05-21T00:02:00.000Z", runId: "run-1", sourceNodeId: "node-1" }),
+        activity({ id: "started", kind: "tool_started", title: "Tool started", summary: "Read plan", tone: "info", timestamp: "2026-05-21T00:01:00.000Z", runId: "run-1", sourceNodeId: "node-1", tool: { name: "chrona_plan_read", label: "Read plan", state: "started" } }),
+      ]}
+    />);
+
+    expect(screen.queryByLabelText("Latest activity running")).not.toBeInTheDocument();
+    expect(screen.getAllByText("done").length).toBeGreaterThan(0);
+  });
   it("orders live and persisted activity by timestamp and sequence while deduping overlap", () => {
     render(<WorkspaceActivityFeed
       activity={[

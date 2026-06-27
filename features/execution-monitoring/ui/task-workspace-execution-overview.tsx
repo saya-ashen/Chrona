@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
+import type { PlanExecutionResult } from "@chrona/contracts/ai";
 import type { PlanNodeDataModel } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
 import { taskWorkspaceActivityMessages } from "../../../apps/web/src/lib/i18n/messages";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
@@ -58,27 +59,53 @@ function buildNodeResultContentSpec(_node: PlanNodeDataModel | null, emptyMessag
   return buildResultSpec([], { emptyMessage });
 }
 
-function withActivityDensity(spec: UiDocument, density: "rail"): UiDocument {
+function withActivityStreamProps(spec: UiDocument, props: { density?: "rail"; active?: boolean }): UiDocument {
   const elements = Object.fromEntries(
     Object.entries(spec.elements).map(([key, element]) => [
       key,
       element.type === "ActivityStream"
-        ? { ...element, props: { ...element.props, density } }
+        ? { ...element, props: { ...element.props, ...props } }
         : element,
     ]),
   );
   return { ...spec, elements };
 }
+function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
+  return left.sourceNodeId === right.sourceNodeId
+    && left.runId === right.runId
+    && left.nativeRunId === right.nativeRunId
+    && left.tool?.name === right.tool?.name;
+}
+
+function hasCompletedToolActivity(item: WorkspaceActivityItem, items: WorkspaceActivityItem[]) {
+  if (item.tool?.state !== "started") return false;
+  return items.some((candidate) => candidate.kind === "tool_completed" && candidate.tool?.state !== "started" && isSameToolActivity(item, candidate));
+}
+
+function isRunningActivity(item: WorkspaceActivityItem, items: WorkspaceActivityItem[]) {
+  if (item.tool?.state === "started") return !hasCompletedToolActivity(item, items);
+  return item.kind === "provider_run" && item.tone === "info";
+}
+
+function isExecutionRunning(status: PlanExecutionResult["status"] | undefined) {
+  return status === "started" || status === "running";
+}
+
+function runningActivityText(item: WorkspaceActivityItem | undefined) {
+  if (!item) return null;
+  return item.tool?.label ?? item.sourceNodeTitle ?? item.summary ?? item.title;
+}
+
 
 type ActivityLayout = "below" | "side";
 
 export function TaskWorkspaceExecutionOverview({
-  progress,
   readiness,
   attention,
   latestCompletedNode,
   artifacts,
   activity,
+  currentExecution,
   runtimeEvents = [],
   liveActivity = [],
   primaryAction,
@@ -96,9 +123,9 @@ export function TaskWorkspaceExecutionOverview({
   latestCompletedNode: PlanNodeDataModel | null;
   artifacts: WorkspaceArtifactItem[];
   activity: WorkspaceActivityItem[];
+  currentExecution?: Pick<PlanExecutionResult, "status"> | null;
   runtimeEvents?: WorkspaceRuntimeEvent[];
   liveActivity?: WorkspaceActivityItem[];
-  primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   activityLayout?: ActivityLayout;
   onAction?: OverviewAction;
@@ -123,20 +150,24 @@ export function TaskWorkspaceExecutionOverview({
     () => commandCenter?.documents.trail ? commandCenterTrailItems(commandCenter) : activity,
     [activity, commandCenter],
   );
+  const liveRuntimeActivity = useMemo(() => runtimeEventsToWorkspaceActivity(runtimeEvents, TRAIL_ACTIVITY_LIMIT), [runtimeEvents]);
+  const mergedActivity = useMemo(
+    () => mergeWorkspaceActivity([...liveActivity, ...liveRuntimeActivity, ...savedTrailActivity], TRAIL_ACTIVITY_LIMIT),
+    [liveActivity, liveRuntimeActivity, savedTrailActivity],
+  );
+  const showLiveStatus = isExecutionRunning(currentExecution?.status);
+  const activeActivity = showLiveStatus ? mergedActivity.find((item) => isRunningActivity(item, mergedActivity)) : undefined;
+  const liveStatusLabel = primaryAction?.statusLabel ?? attention?.statusLabel ?? readiness.statusLabel ?? ws.liveStatusRunning;
+  const liveStatusText = runningActivityText(activeActivity);
+
   useEffect(() => {
     if (!trailStore) return;
-    const limit = TRAIL_ACTIVITY_LIMIT;
-    const liveRuntimeActivity = runtimeEventsToWorkspaceActivity(runtimeEvents, limit);
-    const items = mergeWorkspaceActivity([...liveActivity, ...liveRuntimeActivity, ...savedTrailActivity], limit);
-    trailStore.set("/trail/items", items);
+    trailStore.set("/trail/items", mergedActivity);
     trailStore.set("/trail/liveCount", liveActivity.length + runtimeEvents.length);
     trailStore.set("/trail/savedCount", savedTrailActivity.length);
     trailStore.set("/trail/provider", runtimeEvents.at(-1)?.provider ?? null);
-  }, [liveActivity, runtimeEvents, savedTrailActivity, trailStore]);
-  const statusLabel = primaryAction?.statusLabel
-    ?? attention?.statusLabel
-    ?? readiness.statusLabel
-    ?? null;
+  }, [liveActivity.length, mergedActivity, runtimeEvents, savedTrailActivity.length, trailStore]);
+
 
   const locateHandlers = {
     "locate-workspace-node": (params: Record<string, unknown>) => {
@@ -146,7 +177,7 @@ export function TaskWorkspaceExecutionOverview({
   };
   const resultSpec = buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet);
 
-  const trailSpec = commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
+  const trailSpec = withActivityStreamProps(commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
     activity,
     runtimeEvents,
     copy: {
@@ -155,7 +186,7 @@ export function TaskWorkspaceExecutionOverview({
       activityEmpty: taskWorkspaceActivityMessages.taskEmpty,
     },
     toolLabels: taskWorkspaceActivityMessages.toolLabels,
-  });
+  }), { active: showLiveStatus });
 
   const results = (
     <UiSurfaceFrame
@@ -168,6 +199,15 @@ export function TaskWorkspaceExecutionOverview({
       <h3 id="task-workspace-results-heading" className="sr-only">
         {copy.outputTab}
       </h3>
+      {showLiveStatus ? (
+        <div className="mb-2.5 flex items-start gap-2 rounded-xl border border-primary/25 bg-primary-soft/50 px-3 py-2 text-xs text-foreground" role="status" aria-live="polite">
+          <span className="mt-0.5 size-3 shrink-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block font-semibold">{ws.liveStatusRunning ?? "Running now"}</span>
+            <span className="mt-0.5 block truncate text-muted-foreground">{liveStatusText ?? liveStatusLabel}</span>
+          </span>
+        </div>
+      ) : null}
       <SpecRenderer
         spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
         handlers={locateHandlers}
@@ -186,7 +226,7 @@ export function TaskWorkspaceExecutionOverview({
       <h3 id="task-workspace-activity-heading" className="sr-only">
         {copy.trailTab}
       </h3>
-      <SpecRenderer spec={withActivityDensity(trailSpec, "rail")} store={trailStore ?? undefined} />
+      <SpecRenderer spec={withActivityStreamProps(trailSpec, { density: "rail", active: showLiveStatus })} store={trailStore ?? undefined} />
     </UiSurfaceFrame>
   );
 
@@ -217,32 +257,6 @@ export function TaskWorkspaceExecutionOverview({
       <div className="flex min-h-0 flex-1 flex-col">
 
 
-        <UiSurfaceFrame
-          kind="runtime-control"
-          label="Execution progress"
-          description="Current execution progress."
-          className="mb-2.5 shrink-0 p-2"
-          bodyClassName="space-y-1"
-        >
-          <div className="flex items-center justify-between gap-2">
-            {statusLabel ? (
-              <span className="truncate text-[11px] font-medium text-muted-foreground">{statusLabel}</span>
-            ) : <span />}
-            {progress.totalSteps > 0 ? (
-              <span className="shrink-0 text-[11px] font-semibold text-foreground">
-                {progress.completedSteps}/{progress.totalSteps}
-              </span>
-            ) : null}
-          </div>
-          {progress.totalSteps > 0 ? (
-            <div className="h-1 w-full overflow-hidden rounded-full bg-background shadow-inner">
-              <div
-                className="h-full rounded-full bg-sky-500 transition-[width]"
-                style={{ width: `${progress.percentComplete}%` }}
-              />
-            </div>
-          ) : null}
-        </UiSurfaceFrame>
 
         {activityLayout === "side" ? (
           <div className="grid min-h-0 flex-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(10rem,0.28fr)]">

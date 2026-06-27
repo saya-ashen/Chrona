@@ -133,6 +133,7 @@
       "commandCenterOutputTab": "结果",
       "commandCenterTrailTab": "活动",
       "stateRunning": "运行中",
+      "liveStatusRunning": "正在运行",
       "stateBlocked": "阻塞中",
       "stateDegraded": "已降级",
       "stateInvalidated": "已失效",
@@ -1296,7 +1297,8 @@
       "filePreviewUnsupportedType": "此文件类型不支持预览。",
       "filePreviewReadFailed": "无法加载文件预览。",
       "expandFilePreview": "展开预览",
-      "collapseFilePreview": "收起预览"
+      "collapseFilePreview": "收起预览",
+      "liveStatusRunning": "正在运行"
     }
   },
   "queries": {

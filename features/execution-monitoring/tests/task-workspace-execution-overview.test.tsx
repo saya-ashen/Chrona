@@ -72,6 +72,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("AI generated")).toBeInTheDocument();
     expect(screen.getAllByText("Runtime state").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("region", { name: "Execution progress" })).not.toBeInTheDocument();
   });
 
   it("renders Activity as a side timeline in compact plan mode", () => {
@@ -120,6 +121,55 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
   });
 
+  it("shows a live status strip above Results while a runtime event is active", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const liveEvent = {
+      type: "runtime_event" as const,
+      action: "start_manual" as const,
+      nodeId: "execute",
+      nodeTitle: "Generate report",
+      runtimeName: "hermes",
+      provider: "hermes",
+      runId: "run-1",
+      sequence: 1,
+      timestamp: "2026-05-12T10:01:00.000Z",
+      event: { type: "tool_started" as const, toolName: "chrona_report_write", label: "Writing report" },
+    };
+
+    renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      runtimeEvents: [liveEvent],
+      currentExecution: { status: "running" },
+    });
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Running now");
+    expect(status).toHaveTextContent("Writing report");
+  });
+
+
+  it("hides live status strip after completion even when stale activity looks active", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const staleStarted = {
+      id: "stale-tool-started",
+      kind: "tool_started" as const,
+      title: "Tool started",
+      summary: "Writing report",
+      description: "Writing report",
+      tone: "info" as const,
+      timestamp: "2026-05-12T10:01:00.000Z",
+      tool: { name: "chrona_report_write", label: "Writing report", state: "started" as const },
+    };
+
+    renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution completed"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [staleStarted], savedCount: 1, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      currentExecution: { status: "completed" },
+      activity: [staleStarted],
+    });
+
+    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Latest activity running")).not.toBeInTheDocument();
+  });
   it("streams live runtime events into a server-driven Trail document", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
     const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
@@ -136,7 +186,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
       event: { type: "tool_started" as const, toolName: "chrona_plan_read", label: "正在读取计划" },
     };
 
-    const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [] });
+    const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [], currentExecution: { status: "running" } });
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
 
@@ -151,12 +201,13 @@ describe("TaskWorkspaceExecutionOverview", () => {
         artifacts={view.artifacts}
         activity={view.activity}
         commandCenter={commandCenter}
+        currentExecution={{ status: "running" }}
         runtimeEvents={[liveEvent]}
       />,
     );
     expect(screen.getByText("Activity")).toBeInTheDocument();
 
-    return waitFor(() => expect(screen.getByText("正在读取计划")).toBeInTheDocument());
+    return waitFor(() => expect(screen.getAllByText("正在读取计划").length).toBeGreaterThan(0));
   });
 
   it("streams live workspace events into a server-driven Trail document", () => {

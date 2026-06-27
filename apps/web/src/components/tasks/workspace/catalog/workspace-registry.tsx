@@ -393,7 +393,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
             </div>
           ) : (
             <div className={props.density === "rail" ? "mt-3" : "mt-4 pl-1"}>
-              <ActivityTimeline items={items} density={props.density === "rail" ? "rail" : undefined} />
+              <ActivityTimeline items={items} density={props.density === "rail" ? "rail" : undefined} active={props.active === true} />
             </div>
           )}
         </section>
