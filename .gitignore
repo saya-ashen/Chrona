@@ -23,9 +23,11 @@ node_modules/
 /out/
 
 # production
-/build
-build/
-
+/build/*
+!/build/manifest.ts
+!/build/manifest.bun.test.ts
+!/build/release-smoke.ts
+!/build/release-smoke.bun.test.ts
 # misc
 .DS_Store
 *.pem
