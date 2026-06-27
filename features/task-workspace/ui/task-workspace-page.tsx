@@ -237,7 +237,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   }, [assistantContext, handleApplyProposal, handleCancelProposal, registerHandlers, setPageContext]);
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem)] min-w-0 flex-col gap-2 xl:overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 xl:overflow-hidden">
       <div className="shrink-0 space-y-1">
         <TaskWorkspaceHeaderEditor
           task={consoleView.task}

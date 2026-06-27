@@ -36,11 +36,19 @@ test.describe("Task workspace layout", () => {
       await expect(page.getByText(`E2E Layout ${viewport}`).first()).toBeVisible();
       await expect(page.getByRole("region", { name: /execution flow/i }).getByText("Plan", { exact: true })).toBeVisible();
 
-      const overflow = await page.evaluate(() => ({
-        bodyOverflow: document.body.scrollWidth > window.innerWidth,
-        documentOverflow: document.documentElement.scrollWidth > window.innerWidth,
-      }));
-      expect(overflow).toEqual({ bodyOverflow: false, documentOverflow: false });
+      const overflow = await page.evaluate(() => {
+        const main = document.querySelector("main");
+        return {
+          bodyHorizontalOverflow: document.body.scrollWidth > window.innerWidth,
+          documentHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+          mainVerticalOverflow: main ? main.scrollHeight > main.clientHeight : false,
+        };
+      });
+      expect(overflow.bodyHorizontalOverflow).toBe(false);
+      expect(overflow.documentHorizontalOverflow).toBe(false);
+      if (viewport === "desktop") {
+        expect(overflow.mainVerticalOverflow).toBe(false);
+      }
     });
   }
 });
