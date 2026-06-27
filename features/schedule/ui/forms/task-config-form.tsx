@@ -137,6 +137,7 @@ type TaskConfigSelectOption = {
   value: string;
   label: string;
 };
+const EMPTY_SELECT_OPTION_VALUE = "__chrona_empty_select_value__";
 
 export function TaskConfigField({
   label,
@@ -247,15 +248,16 @@ export function TaskConfigSelect({
   const triggerId = id ?? `task-config-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find((option) => option.value === value);
+  const selectValue = value === "" ? EMPTY_SELECT_OPTION_VALUE : value;
 
   return (
     <>
       <Input type="hidden" name={name} value={value} />
       <Select
         open={isOpen}
-        value={value || undefined}
+        value={selectValue}
         onOpenChange={(nextOpen) => setIsOpen(disabled ? false : nextOpen)}
-        onValueChange={onValueChange}
+        onValueChange={(nextValue) => onValueChange(nextValue === EMPTY_SELECT_OPTION_VALUE ? "" : nextValue)}
         disabled={disabled}
       >
         <SelectTrigger id={triggerId} className="w-full" disabled={disabled}>
@@ -266,11 +268,15 @@ export function TaskConfigSelect({
         {isOpen ? (
           <SelectContent position="popper" className="z-[160] max-h-72">
             <SelectGroup>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              {options.map((option) => {
+                const itemValue = option.value === "" ? EMPTY_SELECT_OPTION_VALUE : option.value;
+
+                return (
+                  <SelectItem key={itemValue} value={itemValue}>
+                    {option.label}
+                  </SelectItem>
+                );
+              })}
             </SelectGroup>
           </SelectContent>
         ) : null}
