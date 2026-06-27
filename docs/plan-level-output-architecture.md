@@ -38,7 +38,7 @@ This is a clean cutover. No compatibility layer. No legacy `chrona_node_output` 
 | Runtime terminal parsing | `packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts` | Remove output extraction from terminal actions. |
 | Agent CLI | `packages/agent-cli/src/payloads.ts` and README/tests | Rename `chrona node output` to `chrona plan output`; require `--patches-file`. |
 | Frontend graph model | `apps/web/src/components/tasks/plan/task-plan-view-model.ts` and `task-plan-graph/types.ts` | Remove `resultOutputs`; expose plan-level output separately. |
-| Work page output | `apps/web/src/components/tasks/workspace/**` | Render `planOutput.spec` at work/plan level. |
+| Task workspace output | `apps/web/src/components/tasks/workspace/**` | Render `planOutput.spec` at work/plan level. |
 | Dashboard output | `packages/engine/src/modules/pages/get-dashboard.ts` | Read latest output from current/latest plan run `planOutput`, not artifacts or node outputs. |
 
 ## Data model
@@ -201,7 +201,7 @@ type PlanExecutionResult = {
 };
 ```
 
-Work page read model exposes same shape. `GET /api/work/:taskId` is primary UI source for rendered plan output.
+Task workspace read models expose same shape through task-scoped page/current-execution APIs.
 
 Node read/current execution context includes plan output for agents:
 
@@ -284,9 +284,9 @@ Remove prompt text that says:
 
 ## Frontend behavior
 
-Plan output renders at plan/work level.
+Plan output renders at plan/task-workspace level.
 
-Work page:
+Task workspace:
 
 - Add main `PlanOutputPanel` or reuse existing json-render renderer wrapper.
 - Render `planOutput.spec` with Chrona UI registry.
@@ -364,8 +364,8 @@ Frontend:
 
 - `apps/web/src/components/tasks/plan/task-plan-view-model.test.ts`
   - no `resultOutputs` in node data.
-  - plan output maps into work/plan view model.
-- Work page output panel test:
+  - plan output maps into task workspace plan view model.
+- Task workspace output panel test:
   - renders plan output spec.
   - renders empty state when `planOutput.spec` is null.
 
@@ -389,10 +389,10 @@ Manual provider lab:
 3. Control/action mapping: rename `output` kind to `plan_output`; map to `update_plan_output`.
 4. Plan-run persistence: add `planOutput` to mutable run record and guarded save path.
 5. Engine use case: replace node-output write with shared output patch application and validation.
-6. Execution/read models: expose `planOutput` to current execution and Work page.
+6. Execution/read models: expose `planOutput` to current execution and task workspace.
 7. Runtime prompt/context: teach shared SpecStream patches and expose current plan output.
 8. Agent CLI: replace `chrona node output` with `chrona plan output`.
-9. Frontend: render plan output at Work page level; remove node output UI.
+9. Frontend: render plan output at task workspace level; remove node output UI.
 10. Dashboard/latest output: read plan output, not node outputs or artifacts.
 11. Tests/manual lab: update assertions and remove legacy node-output tests.
 
@@ -409,6 +409,6 @@ Manual provider lab:
 - A node can create plan output from empty state with SpecStream patches.
 - A later node can patch same plan output without replacing unrelated elements.
 - Invalid patches/specs reject before persistence.
-- Work page renders one shared plan output for current plan run.
+- Task workspace renders one shared plan output for current plan run.
 - Runtime prompt instructs `chrona_plan_output`, not `chrona_node_output`.
 - Tests prove contract, persistence, runtime prompt, CLI, and UI behavior.

@@ -8,8 +8,6 @@ import { TaskListPage } from "@/components/tasks/task-list-page";
 import { AiClientsDialog } from "../../../features/ai-clients/ui";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
-import { WorkPageClient } from "@/components/work/work-page-client";
-import type { WorkPageData } from "@/components/work/work-page/work-page-types";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,11 +86,6 @@ export type TaskListRouteData = {
   };
 };
 
-export type WorkPageRouteData = {
-  locale: Locale;
-  dictionary: Dictionary;
-  work: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/work-page/get-work-page").getWorkPage>>;
-};
 
 export function LocaleLandingPage() {
   const params = useParams();
@@ -239,8 +232,3 @@ export function TaskDetailRoutePage() {
   return <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />;
 }
 
-export function WorkRoutePage() {
-  const { work } = useLoaderData() as WorkPageRouteData;
-
-  return <WorkPageClient initialData={work as WorkPageData} />;
-}

@@ -1,5 +1,5 @@
 import { ENGINE_ERROR_CODES, EngineError, engineErrorFromUnknown } from "../errors";
-import { generateDashboardBrief, pageQuery, WorkPageTaskNotFoundError } from "../modules/pages";
+import { generateDashboardBrief, pageQuery } from "../modules/pages";
 
 export function createPagesService() {
   return {
@@ -47,16 +47,6 @@ export function createPagesService() {
         return await pageQuery.getMemory(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get memory console");
-      }
-    },
-    async getWork(input: { taskId: string }) {
-      try {
-        return await pageQuery.getWork(input);
-      } catch (cause) {
-        if (cause instanceof WorkPageTaskNotFoundError) {
-          throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found", { cause });
-        }
-        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get work page");
       }
     },
   };

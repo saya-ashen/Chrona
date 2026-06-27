@@ -26,7 +26,7 @@ export const memoryProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
-// ── GET /work/:taskId ──
+// ── /work/:taskId command/event transport ──
 export const workProjectionParamSchema = z.object({
   taskId: z.string().min(1),
 });

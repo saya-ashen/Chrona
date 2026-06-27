@@ -11,7 +11,6 @@ import type {
   ScheduleRouteData,
   TaskListRouteData,
   TaskPageRouteData,
-  WorkPageRouteData,
 } from "./pages";
 import type {
   TaskWorkspaceBootstrapData,
@@ -165,18 +164,3 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
   };
 }
 
-export async function loadWorkPageData({ params, request }: LoaderFunctionArgs): Promise<WorkPageRouteData> {
-  const locale = await resolveRouteLocale(params);
-  const dictionary = await getDictionary(locale);
-  const origin = getOrigin(request);
-
-  if (!params.taskId) {
-    throw new Response("Task id is required", { status: 400 });
-  }
-
-  return {
-    locale,
-    dictionary,
-    work: await apiJson<WorkPageRouteData["work"]>(`${origin}/api/work/${params.taskId}`),
-  };
-}

@@ -421,7 +421,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
  * report completion via Chrona's AI-visible-ref MCP tool
  * (`chrona_node_complete`). Asserting the tool name + tool_result shape
  * here proves the provider preserves the public MCP contract end to end,
- * which is what the engine / Inbox recovery / Work page read downstream.
+ * which is what the engine / Inbox recovery / task workspace read downstream.
  */
 describe("ClaudeCodeProviderClient — golden-path replay (T10)", () => {
   test("dispatch + AI-visible-ref tool call flows to run_completed", async () => {
@@ -468,8 +468,8 @@ describe("ClaudeCodeProviderClient — golden-path replay (T10)", () => {
     const snap = terminalSnapshotFromEvents(events);
     expect(snap?.status).toBe("completed");
 
-    // 5. The provider surfaces usage so the engine can render it on
-    //    the Work page.
+    // 5. The provider surfaces usage so the engine can render it in
+    //    task workspace execution state.
     const completed = events.find((e) => e.type === "run_completed");
     expect(completed).toBeDefined();
     if (completed?.type === "run_completed") {

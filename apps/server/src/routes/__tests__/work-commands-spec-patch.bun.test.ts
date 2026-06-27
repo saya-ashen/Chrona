@@ -22,12 +22,10 @@ const state = {
 
 function makeFakeEngine(): ChronaEngine {
   return {
-    pages: {
-      getWork: async () => ({
-        taskShell: { workspaceId: "ws-1" },
-      }),
-    },
     tasks: {
+      getBootstrap: async () => ({
+        task: { workspaceId: "ws-1" },
+      }),
       plan: {
         generate: (_input: unknown) => {
           const queue: GeneratePlanSSEEvent[] = [];

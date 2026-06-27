@@ -42,8 +42,6 @@ A feature dir (e.g. `components/tasks/`) is self-contained and exposes a public
   `shared/`, `ai/`)
 - `*.test.tsx` next to the component it covers
 
-`components/work/` (the Work page execution cockpit) follows the same pattern:
-page client, timeline, inspector, side panels, each with adjacent tests.
 
 ## Server communication (`src/lib`)
 
@@ -86,4 +84,4 @@ These are the rules an agent must follow when editing `apps/web` (mirrored from
 | Add/change a page | `router.tsx` + `loaders.ts` + the matching `components/<feature>/` dir |
 | Change how the app talks to the server | `src/api.ts`, `lib/rpc-client.ts`, `lib/fetch-json-event-source.ts` |
 | Add a reusable control | `components/ui/` (shadcn) first, then compose in the feature |
-| Task workspace / Work page work | `components/tasks/workspace/`, `components/work/` |
+| Task workspace work | `components/tasks/workspace/` |

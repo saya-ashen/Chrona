@@ -270,7 +270,7 @@ function FocusCard({ task, copy }: { task: DashboardFocusTask | null; copy: Dash
           {task.latestOutput ? <OutputLink output={task.latestOutput} /> : null}
         </div>
         <Button asChild size="sm" className="shrink-0">
-          <LocalizedLink href={`/work/${task.taskId}`}>
+          <LocalizedLink href={`/tasks/${task.taskId}`}>
             {copy.nextStep[task.nextStep]}
             <ArrowRight className="size-4" aria-hidden />
           </LocalizedLink>
@@ -539,7 +539,7 @@ function DigestModule({
                         <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" aria-hidden />
                         <div className="min-w-0 space-y-0.5">
                           <LocalizedLink
-                            href={`/work/${item.taskId}`}
+                            href={`/tasks/${item.taskId}`}
                             className="block truncate text-sm font-medium hover:underline"
                           >
                             {item.title}
@@ -613,7 +613,7 @@ function InProgressCard({
                   ) : null}
                 </div>
                 <Button asChild size="sm" variant="ghost" className="shrink-0">
-                  <LocalizedLink href={`/work/${item.taskId}`}>{copy.openTask}</LocalizedLink>
+                  <LocalizedLink href={`/tasks/${item.taskId}`}>{copy.openTask}</LocalizedLink>
                 </Button>
               </li>
             ))}
@@ -660,7 +660,7 @@ function ActivityFeedCard({
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">
-                      <LocalizedLink href={`/work/${event.taskId}`} className="font-medium hover:underline">
+                      <LocalizedLink href={`/tasks/${event.taskId}`} className="font-medium hover:underline">
                         {event.taskTitle}
                       </LocalizedLink>{" "}
                       <span className="text-muted-foreground">— {event.summary ?? label}</span>
