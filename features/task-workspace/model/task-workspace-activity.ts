@@ -36,6 +36,10 @@ function workspaceEventTimestamp(event: TaskWorkspaceSseEvent) {
   return eventStringValue(event, "occurredAt") ?? eventStringValue(event, "timestamp") ?? undefined;
 }
 
+function workspaceEventTimestampWithFallback(event: TaskWorkspaceSseEvent, fallbackTimestamp?: string) {
+  return workspaceEventTimestamp(event) ?? fallbackTimestamp;
+}
+
 function isPlanGenerationProjectionUpdate(event: TaskWorkspaceSseEvent) {
   if (event.type !== "task_projection_updated" && event.type !== "task_workspace_updated") return false;
   return eventStringValue(event, "reason")?.startsWith("plan_generation.") ?? false;
@@ -69,7 +73,7 @@ function planGenerationTone(kind: string | undefined) {
   return "info" as const;
 }
 
-export function workspaceEventToWorkspaceActivity(event: TaskWorkspaceSseEvent, index = 0): WorkspaceActivityItem | null {
+export function workspaceEventToWorkspaceActivity(event: TaskWorkspaceSseEvent, index = 0, fallbackTimestamp?: string): WorkspaceActivityItem | null {
   if (event.type === "execution.runtime_event") return null;
 
   if (event.type === "command.accepted" || event.type === "command.failed") {
@@ -83,7 +87,7 @@ export function workspaceEventToWorkspaceActivity(event: TaskWorkspaceSseEvent, 
       summary: description,
       description,
       tone: failed ? "danger" : "info",
-      timestamp: workspaceEventTimestamp(event),
+      timestamp: workspaceEventTimestampWithFallback(event, fallbackTimestamp),
       sequence: event.sequence,
       rawEventType: event.type,
       raw: event,

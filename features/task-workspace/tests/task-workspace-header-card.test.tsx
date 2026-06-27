@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStateStore } from "@json-render/core";
@@ -47,13 +47,17 @@ const task = {
   blockReason: null,
   dependencies: [],
 } satisfies TaskData;
-function renderHeader(spec = createHeaderSpecFixture({
-  title: task.title,
-  priority: "Medium",
-  progressLabel: "1 steps · 0 accepted · 0%",
-  occurrenceLabel: "Occurrence · Wed, May 27 04:30 AM-05:30 AM",
-  actions: [{ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
-}), state: Record<string, unknown> = {}) {
+function renderHeader(
+  spec = createHeaderSpecFixture({
+    title: task.title,
+    priority: "Medium",
+    progressLabel: "1 steps · 0 accepted · 0%",
+    occurrenceLabel: "Occurrence · Wed, May 27 04:30 AM-05:30 AM",
+    actions: [{ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
+  }),
+  state: Record<string, unknown> = {},
+  onAction = vi.fn(),
+) {
   const store = createStateStore(spec.state ?? {});
   store.update(state);
   return render(
@@ -61,7 +65,7 @@ function renderHeader(spec = createHeaderSpecFixture({
       task={task}
       spec={spec}
       store={store}
-      onAction={vi.fn()}
+      onAction={onAction}
       onAcceptPlan={vi.fn()}
       onGeneratePlan={vi.fn()}
       onEdit={vi.fn()}
@@ -150,5 +154,27 @@ describe("TaskWorkspaceHeaderCard", () => {
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+  });
+
+  it("announces sent action without adding visible header height", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    renderHeader(createHeaderSpecFixture({
+      title: task.title,
+      status: "waiting",
+      priority: "Medium",
+      progressLabel: "1 steps · 0 accepted · 0%",
+      actions: [{ id: "start", label: "Start" }],
+    }), {
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/can-start": true,
+      "/execution/start-disabled": false,
+    }, onAction);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    const status = await screen.findByRole("status");
+    await waitFor(() => expect(status).toHaveTextContent("Start request sent."));
+    expect(status).toHaveClass("sr-only");
   });
 });

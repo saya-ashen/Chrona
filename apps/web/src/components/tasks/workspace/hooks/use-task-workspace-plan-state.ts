@@ -472,7 +472,7 @@ export function useTaskWorkspacePlanState(
 
     for (const event of nextEvents) {
       if (!isWorkspaceEventInSelectedScope(event, selectedWorkBlockId)) continue;
-      const activityItem = workspaceEventToWorkspaceActivity(event, event.sequence ?? 0);
+      const activityItem = workspaceEventToWorkspaceActivity(event, event.sequence ?? 0, new Date().toISOString());
       if (activityItem) {
         setLiveActivity((current) => mergeWorkspaceActivity([activityItem, ...current]));
       }
