@@ -79,7 +79,6 @@ export function WorkPageMainTabs({
   currentRunId,
   activeTab,
   onTabChange,
-  onDispatchExecutionAction,
   completedCount,
   nodeCount,
   waitingCount,
@@ -163,7 +162,6 @@ export function WorkPageMainTabs({
                   mode="full"
                   fillHeight
                   plan={data.taskPlan}
-                  onDispatchExecutionAction={onDispatchExecutionAction}
                 />
               </div>
               <aside className="min-h-0 overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.045] shadow-[0_18px_58px_rgba(2,6,23,0.22)]">

@@ -207,6 +207,35 @@ export function TaskPlanGraphFrame({
     });
   }, [currentNodeId, onCenterCurrentNode]);
 
+  const graphControls = (
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5" aria-label={graphCopy.controlPanel} data-testid="task-plan-graph-controls">
+      <span
+        className={cn(
+          "pointer-events-none min-w-0 px-1 text-right text-[0.68rem] font-medium text-muted-foreground transition-opacity duration-200",
+          showWheelZoomHint ? "opacity-100" : "opacity-0",
+        )}
+        data-testid="task-plan-graph-wheel-hint"
+      >
+        {graphCopy.wheelZoomHint}
+      </span>
+      <Button type="button" aria-label={graphCopy.zoomIn} variant="ghost" size="icon" className="size-8 rounded-lg border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleZoomIn}>
+        <Plus className="size-3.5" />
+      </Button>
+      <Button type="button" aria-label={graphCopy.zoomOut} variant="ghost" size="icon" className="size-8 rounded-lg border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleZoomOut}>
+        <Minus className="size-3.5" />
+      </Button>
+      <Button type="button" aria-label={graphCopy.fitGraph} variant="ghost" size="icon" className="size-8 rounded-lg border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={() => fitGraph()}>
+        <Scan className="size-3.5" />
+      </Button>
+      <Button type="button" aria-label={graphCopy.centerCurrentNode} variant="ghost" size="icon" className="size-8 rounded-lg border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleCenterCurrentNode}>
+        <LocateFixed className="size-3.5" />
+      </Button>
+      <Button type="button" aria-label={graphCopy.expandGraph} variant="ghost" size="icon" className="size-8 rounded-lg border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={onExpandGraph}>
+        <Maximize2 className="size-3.5" />
+      </Button>
+    </div>
+  );
+
   return (
     <div
       aria-label={graphCopy.ariaLabel}
@@ -226,11 +255,13 @@ export function TaskPlanGraphFrame({
     >
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] opacity-30 [background-size:42px_42px]" />
       <div className={cn("relative min-w-0 max-w-full", fillHeight && "flex min-h-0 flex-1 flex-col")}>
-        {overview ? <div className="absolute inset-x-3 top-3 z-[7]">{overview}</div> : null}
+        <div className="relative z-[7] flex min-w-0 flex-col gap-2 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">{overview}</div>
+          <div className="shrink-0">{graphControls}</div>
+        </div>
         <div
           className={cn(
-            "w-full min-w-0 max-w-full overflow-hidden",
-            hasOverview ? "pt-[5.75rem] sm:pt-[5rem]" : "px-0 pb-3 pt-3",
+            "w-full min-w-0 max-w-full overflow-hidden px-0 pb-3 pt-3",
             fillHeight && "h-full min-h-0 flex-1",
           )}
           data-testid="task-plan-graph-scroll"
@@ -288,32 +319,6 @@ export function TaskPlanGraphFrame({
           graphCopy={graphCopy}
           placement={hasOverview ? "bottom" : "top"}
         />
-        <div className="absolute bottom-3 right-3 top-auto z-[7] flex flex-wrap justify-end gap-1.5 rounded-[18px] border border-border bg-background p-1.5 shadow-sm sm:top-3 sm:bottom-auto" aria-label={graphCopy.controlPanel} data-testid="task-plan-graph-controls">
-          <span
-            className={cn(
-              "pointer-events-none basis-full px-2 text-right text-[0.68rem] font-medium text-muted-foreground transition-opacity duration-200 sm:basis-auto sm:self-center",
-              showWheelZoomHint ? "opacity-100" : "opacity-0",
-            )}
-            data-testid="task-plan-graph-wheel-hint"
-          >
-            {graphCopy.wheelZoomHint}
-          </span>
-          <Button type="button" aria-label={graphCopy.zoomIn} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleZoomIn}>
-            <Plus className="size-4" />
-          </Button>
-          <Button type="button" aria-label={graphCopy.zoomOut} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleZoomOut}>
-            <Minus className="size-4" />
-          </Button>
-          <Button type="button" aria-label={graphCopy.fitGraph} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={() => fitGraph()}>
-            <Scan className="size-4" />
-          </Button>
-          <Button type="button" aria-label={graphCopy.centerCurrentNode} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={handleCenterCurrentNode}>
-            <LocateFixed className="size-4" />
-          </Button>
-          <Button type="button" aria-label={graphCopy.expandGraph} variant="ghost" size="icon" className="size-10 rounded-xl border border-border bg-background text-foreground shadow-none transition hover:bg-muted" onClick={onExpandGraph}>
-            <Maximize2 className="size-4" />
-          </Button>
-        </div>
       </div>
     </div>
   );

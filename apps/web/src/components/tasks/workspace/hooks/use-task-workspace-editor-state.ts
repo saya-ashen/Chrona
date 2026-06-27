@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type SetStateAction } from "react";
 import { useMutation } from "@tanstack/react-query";
-import type { TaskConfigDraftState, TaskConfigFormInput } from "@/components/schedule/forms/task-config-form";
+import type { TaskConfigDraftState, TaskConfigFormInput } from "../../../../../../../features/schedule/ui/forms/task-config-form";
 import { api } from "@/lib/rpc-client";
 import {
   dateToIsoStringOrNull,
@@ -9,8 +9,8 @@ import {
   taskConfigInputToEditableTask,
   taskToEditableTask,
   taskToTaskConfigInitialValues,
-} from "../model/task-workspace-editor-view-model";
-import type { TaskData } from "../model/task-workspace-types";
+} from "../../../../../../../features/task-workspace";
+import type { TaskData } from "../../../../../../../features/task-workspace";
 
 export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: SetStateAction<TaskData>) => void) {
   const [taskConfigDraft, setTaskConfigDraft] = useState<TaskConfigFormInput | null>(null);

@@ -13,6 +13,30 @@
 // paths) to `packages/engine/src/modules/x`, so rules match on resolved file
 // paths, not on the import specifier string.
 
+const { existsSync, readdirSync } = require("node:fs");
+
+function featureNames() {
+  if (!existsSync("features")) {
+    return [];
+  }
+  return readdirSync("features", { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+}
+
+const FEATURE_PUBLIC_IMPORT_RULES = featureNames().map((feature) => ({
+  name: `feature-${feature}-internals-are-private`,
+  comment:
+    `Import features/${feature} from sibling features through features/${feature}/index.ts or documented sub-entry barrels, not internal files.`,
+  severity: "error",
+  from: { path: `^features/(?!${feature}/)[^/]+/` },
+  to: {
+    path: `^features/${feature}/`,
+    pathNot: `^features/${feature}/(index|ui|server)\\.ts$`,
+  },
+}));
+
+const FEATURE_OR_SHARED = "^(features|shared)/";
 const TEST = "(__tests__/|\\.test\\.|\\.bun\\.test\\.|\\.spec\\.)";
 
 /** A package's public entry points (barrels). Importing anything else in the
@@ -61,7 +85,15 @@ module.exports = {
       comment:
         "Provider packages adapt external protocols. Task lifecycle, plan progression, and projection logic live in packages/engine. See docs/provider-boundary.md.",
       severity: "error",
-      from: { path: "^packages/providers/" },
+      from: { path: "^packages/providers/", pathNot: TEST },
+      to: { path: "^(packages/engine/|packages/domain/|packages/db/|apps/)" },
+    },
+    {
+      name: "providers-own-no-business-tests",
+      comment:
+        "Provider test files boot real server/engine surfaces for end-to-end coverage (e.g. the aimock MCP recipe). Acknowledged test debt; production code must not.",
+      severity: "warn",
+      from: { path: `^packages/providers/.*${TEST}` },
       to: { path: "^(packages/engine/|packages/domain/|packages/db/|apps/)" },
     },
 
@@ -87,8 +119,18 @@ module.exports = {
         path: "^packages/",
         // The CLI's sole job is to boot the server (docs/architecture.md). Its
         // launcher entry may import the server entrypoint; nothing else may.
-        pathNot: "^packages/cli/src/bun-entry\\.ts$",
+        // Test files that boot app surfaces end-to-end are handled by the
+        // `-tests` warn variant below.
+        pathNot: `^packages/cli/src/bun-entry\\.ts$|${TEST}`,
       },
+      to: { path: "^apps/" },
+    },
+    {
+      name: "packages-never-import-apps-tests",
+      comment:
+        "Package test files import app entrypoints to exercise end-to-end behavior (e.g. provider tests booting the MCP server). Acknowledged test debt; production package code must not.",
+      severity: "warn",
+      from: { path: `^packages/.*${TEST}` },
       to: { path: "^apps/" },
     },
 
@@ -186,6 +228,41 @@ module.exports = {
         path: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/",
         pathNot: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/index\\.ts$",
       },
+    },
+    ...FEATURE_PUBLIC_IMPORT_RULES,
+
+    // --- feature slices expose public barrels for other slices ---------------
+    {
+      name: "features-do-not-import-apps-or-packages-internals",
+      comment:
+        "Feature slices should use package barrels where practical. Existing migration slices still bridge legacy app/package internals until moved.",
+      severity: "warn",
+      from: { path: "^features/", pathNot: TEST },
+      to: {
+        path: "^(apps/|packages/[^/]+/src/)",
+        pathNot: "^packages/[^/]+/src/index\\.ts$",
+        dependencyTypesNot: ["type-import"],
+      },
+    },
+    {
+      name: "shared-owns-no-feature-or-app-code",
+      comment:
+        "shared/ is stable infrastructure used by features; it must not import feature slices, apps, or product package internals.",
+      severity: "error",
+      from: { path: "^shared/", pathNot: TEST },
+      to: {
+        path: "^(features/|apps/|packages/[^/]+/src/)",
+        pathNot: "^packages/[^/]+/src/index\\.ts$",
+        dependencyTypesNot: ["type-import"],
+      },
+    },
+    {
+      name: "features-and-shared-never-import-apps-tests",
+      comment:
+        "Feature/shared tests should avoid app internals; keep any temporary test reach-through visible.",
+      severity: "warn",
+      from: { path: `${FEATURE_OR_SHARED}.*${TEST}` },
+      to: { path: "^apps/" },
     },
   ],
 

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanExecutionResult, TaskPlanReadModel } from "@chrona/contracts/ai";
 import { useTaskWorkspacePageState, type TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
-import type { TaskPageData } from "../model/task-workspace-types";
+import type { TaskPageData } from "../../../../../../../features/task-workspace";
 
 type JsonEventHandler = (event: { event: string; data: Record<string, unknown>; message: unknown }) => void;
 type FetchEventSourceOptions = {

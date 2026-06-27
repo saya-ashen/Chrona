@@ -12,10 +12,15 @@
 import { describe, expect, test } from "bun:test";
 import { LLMock } from "@copilotkit/aimock";
 import { Hono } from "hono";
-import { createMcpRoutes } from "../../../../apps/server/src/routes/mcp/mcp.routes";
+import { createMcpRoutes } from "../../../../features/mcp-control-plane/server";
 import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
 
 const liveTest = process.env.CHRONA_CLAUDE_CODE_SDK_AIMOCK_TEST === "1" ? test : test.skip;
+
+function debugAimockOutput(label: string, value: unknown) {
+  if (process.env.CHRONA_CLAUDE_AIMOCK_DEBUG_OUTPUT !== "1") return;
+  console.info(label, JSON.stringify(value, null, 2));
+}
 
 function tinySpec() {
   return {
@@ -41,8 +46,16 @@ function tinySpec() {
   };
 }
 
-describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () => {
-  liveTest("fake LLM can drive chrona_node_output then chrona_node_complete through the real SDK", async () => {
+function tinyPatches() {
+  const spec = tinySpec();
+  return [
+    { op: "add", path: "/root", value: spec.root },
+    { op: "add", path: "/elements", value: spec.elements },
+  ];
+}
+
+describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () => {
+  liveTest("fake LLM can drive chrona_plan_output then chrona_node_complete through the real SDK", async () => {
     const llm = new LLMock({ port: 0, strict: true });
     const toolCalls: Array<{ name: string; args: unknown }> = [];
     const engine = {
@@ -60,7 +73,7 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
             toolName: op.toolName,
             status: "accepted",
             reasonCode: null,
-            message: op.toolName === "chrona.node.output" ? "Output accepted" : "Node completed",
+            message: op.toolName === "chrona.plan.output" ? "Output accepted" : "Node completed",
             affected: { taskId: "task-aimock" },
             state: { taskStatus: "Running" },
             idempotency: "not_applicable",
@@ -77,12 +90,12 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
     llm.on(
       { userMessage: "Submit tiny Chrona output through the SDK.", turnIndex: 0 },
       {
-        content: "Submitting node output now.",
+        content: "Submitting plan output now.",
         toolCalls: [
           {
             id: "toolu_node_output",
-            name: "mcp__chrona__chrona_node_output",
-            arguments: JSON.stringify({ outputs: [tinySpec()], mode: "replace", summary: "Tiny fake output" }),
+            name: "mcp__chrona__chrona_plan_output",
+            arguments: JSON.stringify({ patches: tinyPatches(), summary: "Tiny fake output" }),
           },
         ],
       },
@@ -141,7 +154,7 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
 
       const ref = await client.startRun({
         sessionId: "chrona-session-aimock-submit:execute",
-        instructions: "Call chrona_node_output with the tiny json-render Spec, then call chrona_node_complete.",
+        instructions: "Call chrona_plan_output with the tiny json-render Spec, then call chrona_node_complete.",
         input: { type: "text", text: "Submit tiny Chrona output through the SDK." },
       });
       const events = [];
@@ -149,14 +162,14 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
         events.push(event);
       }
 
-      console.log("aimock requests", JSON.stringify(llm.getRequests(), null, 2));
-      console.log("mcp tool calls", JSON.stringify(toolCalls, null, 2));
-      console.log("provider events", JSON.stringify(events, null, 2));
+      debugAimockOutput("aimock requests", llm.getRequests());
+      debugAimockOutput("mcp tool calls", toolCalls);
+      debugAimockOutput("provider events", events);
 
-      expect(events.some((event) => event.type === "tool_call" && event.tool === "mcp__chrona__chrona_node_output")).toBe(true);
-      expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_node_output")).toBe(true);
+      expect(events.some((event) => event.type === "tool_call" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
+      expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
       expect(events.at(-1)?.type).toBe("run_completed");
-      expect(toolCalls.map((call) => call.name)).toEqual(["chrona.node.output", "chrona.node.complete"]);
+      expect(toolCalls.map((call) => call.name)).toEqual(["chrona.plan.output", "chrona.node.complete"]);
     } finally {
       if (previousBaseUrl === undefined) delete process.env.ANTHROPIC_BASE_URL;
       else process.env.ANTHROPIC_BASE_URL = previousBaseUrl;
@@ -169,7 +182,7 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
     }
   }, 60_000);
 
-  liveTest("fake LLM stream abort after chrona_node_output is reported as SDK terminal-result failure", async () => {
+  liveTest("fake LLM stream abort after chrona_plan_output is reported as SDK terminal-result failure", async () => {
     const llm = new LLMock({ port: 0, strict: true });
     const toolCalls: Array<{ name: string; args: unknown }> = [];
     const engine = {
@@ -204,12 +217,12 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
     llm.on(
       { userMessage: "Submit tiny Chrona output then lose the model stream.", turnIndex: 0 },
       {
-        content: "Submitting node output now.",
+        content: "Submitting plan output now.",
         toolCalls: [
           {
             id: "toolu_abort_node_output",
-            name: "mcp__chrona__chrona_node_output",
-            arguments: JSON.stringify({ outputs: [tinySpec()], mode: "replace", summary: "Tiny fake output" }),
+            name: "mcp__chrona__chrona_plan_output",
+            arguments: JSON.stringify({ patches: tinyPatches(), summary: "Tiny fake output" }),
           },
         ],
       },
@@ -255,7 +268,7 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
 
       const ref = await client.startRun({
         sessionId: "chrona-session-aimock-abort:execute",
-        instructions: "Call chrona_node_output with the tiny json-render Spec, then continue so the model stream aborts before completion.",
+        instructions: "Call chrona_plan_output with the tiny json-render Spec, then continue so the model stream aborts before completion.",
         input: { type: "text", text: "Submit tiny Chrona output then lose the model stream." },
       });
       const events = [];
@@ -263,17 +276,17 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-node-output repro", () 
         events.push(event);
       }
 
-      console.log("abort aimock requests", JSON.stringify(llm.getRequests(), null, 2));
-      console.log("abort mcp tool calls", JSON.stringify(toolCalls, null, 2));
-      console.log("abort provider events", JSON.stringify(events, null, 2));
+      debugAimockOutput("abort aimock requests", llm.getRequests());
+      debugAimockOutput("abort mcp tool calls", toolCalls);
+      debugAimockOutput("abort provider events", events);
 
-      expect(toolCalls.map((call) => call.name)).toEqual(["chrona.node.output"]);
-      expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_node_output")).toBe(true);
+      expect(toolCalls.map((call) => call.name)).toEqual(["chrona.plan.output"]);
+      expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
       const terminalEvent = events.at(-1);
       expect(terminalEvent?.type).toBe("run_failed");
       if (terminalEvent?.type !== "run_failed") throw new Error("Expected run_failed terminal event");
-      expect(terminalEvent.error).toBe("Claude Code process aborted after node output was accepted but before node completion");
-      expect(terminalEvent.raw).toMatchObject({ stage: "after_node_output_accepted", lastTool: "mcp__chrona__chrona_node_output" });
+      expect(terminalEvent.error).toBe("Claude Code process aborted after plan output was accepted but before node completion");
+      expect(terminalEvent.raw).toMatchObject({ stage: "after_plan_output_accepted", lastTool: "mcp__chrona__chrona_plan_output" });
     } finally {
       if (previousBaseUrl === undefined) delete process.env.ANTHROPIC_BASE_URL;
       else process.env.ANTHROPIC_BASE_URL = previousBaseUrl;

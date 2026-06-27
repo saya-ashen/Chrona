@@ -41,6 +41,7 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
       waitingNodeIds: [],
       blockedNodeIds: [],
       checkpoint: null,
+      planOutput: { spec: null, revision: 0, updatedAt: null, updatedByNodeId: null },
       message: "No accepted plan. Create or accept a plan before execution.",
     };
   }
@@ -85,5 +86,11 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     executedNodeIds: effective.completedNodeIds,
     message: executionSession ? "Current execution state." : "No active execution session.",
     waitKind: executionSession?.pauseReason as WaitKind | undefined,
+    planOutput: {
+      spec: runtime.persisted.planOutput.spec,
+      revision: runtime.persisted.planOutput.revision,
+      updatedAt: runtime.persisted.planOutput.updatedAt,
+      updatedByNodeId: runtime.persisted.planOutput.updatedByNodeId,
+    },
   });
 }

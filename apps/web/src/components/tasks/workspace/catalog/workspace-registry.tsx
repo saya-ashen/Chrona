@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
-import { ActivityTimeline } from "../execution/activity-timeline";
-import type { WorkspaceActivityItem } from "../model/task-workspace-types";
+import { ActivityTimeline } from "../../../../../../../features/execution-monitoring/ui/activity-timeline";
+import type { WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
 import { useLocale } from "@chrona/i18n/react";
@@ -51,7 +51,7 @@ function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string;
   const navigate = useNavigate();
   const current = options.find((option) => option.value === value) ?? options[0];
   const availableDates = new Set(options.flatMap((option) => option.date ? [option.date] : []));
-  const selectedDate = current?.date ? dateFromKey(current.date) : undefined;
+  const selectedDate = current.date ? dateFromKey(current.date) : undefined;
 
   const navigateTo = (occurrence: OccurrenceOption) => {
     const search = occurrence.workBlockId ? `?workBlockId=${encodeURIComponent(occurrence.workBlockId)}` : "";
@@ -64,7 +64,7 @@ function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string;
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="h-7 max-w-[20rem] rounded-full bg-background/80 px-2.5 text-xs font-medium">
           <span className="text-muted-foreground">{label}</span>
-          <span className="min-w-0 truncate">{current?.label ?? "Select occurrence"}</span>
+          <span className="min-w-0 truncate">{current.label}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
@@ -82,7 +82,7 @@ function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string;
           }}
         />
         <div className="max-h-40 space-y-1 overflow-y-auto border-t border-border/70 p-2">
-          {options.filter((option) => option.date === (selectedDate ? dateKey(selectedDate) : current?.date)).map((option) => (
+          {options.filter((option) => option.date === (selectedDate ? dateKey(selectedDate) : current.date)).map((option) => (
             <Button key={option.value} type="button" variant={option.value === value ? "secondary" : "ghost"} size="sm" className="h-7 w-full justify-start rounded-md px-2 text-xs" onClick={() => navigateTo(option)}>
               {option.label}
             </Button>
@@ -293,11 +293,10 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
               <p className="min-w-0 break-words text-sm font-semibold leading-snug text-foreground">{props.title}</p>
               {props.toolState ? <Badge variant={toneBadgeVariant(tone)} className="gap-1 text-[10px]"><Wrench className="size-3" />{props.toolState}</Badge> : null}
             </div>
-            {(props.sourceNodeTitle || props.provider || props.runtimeName) ? (
+            {(props.sourceNodeTitle || props.provider) ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {props.sourceNodeTitle ? <Badge variant="outline" className="max-w-full truncate bg-background/80 text-[10px]">{props.sourceNodeTitle}</Badge> : null}
                 {props.provider ? <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">{props.provider}</span> : null}
-                {props.runtimeName ? <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{props.runtimeName}</span> : null}
               </div>
             ) : null}
             {props.text ? <CollapsibleText text={props.text} threshold={compact ? 220 : undefined} /> : null}
@@ -321,8 +320,8 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
               <p className="mt-1 text-xs text-muted-foreground">{taskWorkspaceActivityMessages.emptyHint}</p>
             </div>
           ) : (
-            <div className="mt-4 pl-1">
-              <ActivityTimeline items={items} />
+            <div className={props.density === "rail" ? "mt-3" : "mt-4 pl-1"}>
+              <ActivityTimeline items={items} density={props.density === "rail" ? "rail" : undefined} />
             </div>
           )}
         </section>

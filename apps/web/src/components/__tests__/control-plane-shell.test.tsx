@@ -27,7 +27,7 @@ vi.mock("@/components/ui/button", () => ({
   },
 }));
 
-vi.mock("@/components/schedule/dialogs/task-create-dialog", () => ({
+vi.mock("../../../../../features/schedule/ui", () => ({
   TaskCreateDialog: ({ isOpen, onSubmit }: { isOpen: boolean; onSubmit: (input: any) => Promise<void> }) => isOpen ? (
     <div role="dialog">
       <span>Create task dialog</span>

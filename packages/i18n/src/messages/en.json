@@ -839,6 +839,17 @@
       "overviewEstimate": "Estimate",
       "focusTitle": "Focus path",
       "focusDescription": "Current, blocked, and critical nodes are prioritized.",
+      "compactEntryLabel": "Entry",
+      "compactStageLabel": "Stage",
+      "compactActiveSuffix": "active",
+      "compactAttentionSuffix": "attention",
+      "compactDoneSuffix": "done",
+      "compactCurrentProgress": "Current progress",
+      "compactActionBlocked": "Action / blocked",
+      "compactNextSummary": "Next summary",
+      "compactCurrentNode": "Current node",
+      "compactNeedsAction": "Needs action",
+      "compactLinkedTask": "Linked task",
       "inspectorTitle": "Node inspector",
       "inspectorEmpty": "Select a node to inspect its goal, dependencies, and next action.",
       "inspectorEmptyTitle": "No node selected",
@@ -1077,6 +1088,7 @@
       "title": "Add task",
       "close": "Close",
       "titlePlaceholder": "Add title",
+      "titleLabel": "Title",
       "aiSuggestions": "AI Suggestions",
       "generatingSuggestions": "Generating suggestions...",
       "aiTaskPlanning": "AI Task Planning",
@@ -1148,6 +1160,9 @@
       "currentOperation": "Current operation",
       "liveEvents": "Live",
       "from": "from",
+      "graphModeLabel": "Graph display mode",
+      "graphFullMode": "Full",
+      "graphCompactMode": "Compact",
       "generating": "Generating...",
       "noResultYet": "No execution result yet.",
       "resultPlaceholder": "Result summary will appear here after the current node finishes.",
@@ -1548,12 +1563,15 @@
       "acceptProposal": "Accept Proposal",
       "rejectProposal": "Reject Proposal",
       "openSchedule": "Open Schedule",
-      "openWork": "Open Work"
+      "openWork": "Open Work",
+      "emptyAction": "View tasks"
     },
     "memory": {
       "title": "Memory",
       "subtitle": "Review active memory records and deactivate stale guidance when it no longer applies.",
-      "invalidate": "Invalidate"
+      "invalidate": "Invalidate",
+      "emptyTitle": "No active memories yet",
+      "emptyDescription": "Chrona stores reusable guidance here after task work creates memory records."
     },
     "settings": {
       "title": "Settings",
@@ -1574,6 +1592,8 @@
         "defaultAutoExecuteDescription": "Preselect auto-execute when creating scheduled tasks. Off by default so tasks only run automatically after opt-in.",
         "defaultOn": "Default on",
         "defaultOff": "Default off",
+        "currentOn": "On",
+        "currentOff": "Off",
         "saved": "Saved"
       }
     },

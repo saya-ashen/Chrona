@@ -166,4 +166,34 @@ describe("validateChronaSpec", () => {
     // The dynamic sibling must NOT produce a spurious issue.
     expect(result.issues.some((i) => i.path.includes("direction"))).toBe(false);
   });
+
+  test("rejects missing child, cycle, invalid table, activity, and action payload structures", () => {
+    expectIssue(validateChronaSpec({
+      root: "root",
+      elements: { root: { type: "Stack", props: {}, children: ["missing-child"] } },
+    }), "missing-child");
+
+    expectIssue(validateChronaSpec({
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: {}, children: ["child"] },
+        child: { type: "Stack", props: {}, children: ["root"] },
+      },
+    }), "cycle");
+
+    expectIssue(validateChronaSpec({
+      root: "table",
+      elements: { table: { type: "Table", props: { columns: ["Repo"], rows: [{ item: ["chrona"] }] }, children: [] } },
+    }), "elements.table.props.rows");
+
+    expectIssue(validateChronaSpec({
+      root: "activity",
+      elements: { activity: { type: "ActivityStream", props: { items: [{ id: "event-1", title: 42, summary: "Ran", tone: "info" }] }, children: [] } },
+    }), "elements.activity.props.items");
+
+    expectIssue(validateChronaSpec({
+      root: "button",
+      elements: { button: { type: "Button", props: { label: "Run" }, on: { press: { action: "dispatch-execution", params: { actionId: "" } } }, children: [] } },
+    }), "elements.button.on.press.params.actionId");
+  });
 });

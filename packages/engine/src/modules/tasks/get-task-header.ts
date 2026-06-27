@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderSpecInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
-import type { PlanExecutionStatus } from "@chrona/contracts";
+import type { PlanExecutionStatus } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
@@ -110,8 +110,7 @@ function pickHeaderWorkBlock(workBlocks: HeaderWorkBlock[], selectedWorkBlockId:
   if (active) return active;
   return workBlocks.find((block) => block.scheduledStartAt.getTime() <= now.getTime() && block.scheduledEndAt.getTime() > now.getTime())
     ?? workBlocks.find((block) => block.scheduledStartAt.getTime() > now.getTime())
-    ?? workBlocks[0]
-    ?? null;
+    ?? workBlocks[0];
 }
 
 function occurrenceValue(taskId: string, workBlockId: string | null) {

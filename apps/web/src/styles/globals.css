@@ -4,6 +4,7 @@
 @import "@xyflow/react/dist/style.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/noto-sans-sc";
+@source "../../../../features";
 
 @plugin "@tailwindcss/typography";
 

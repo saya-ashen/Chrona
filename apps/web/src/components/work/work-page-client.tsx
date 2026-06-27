@@ -66,6 +66,8 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   } = useWorkPageController(initialData, copy);
 
   const currentRun = data.currentRun;
+  const activePlanNodeIds = data.taskPlan.analytics?.activeNodeIds ?? [];
+
   const currentException = getCurrentException(data, copy);
   const taskSummary = getTaskSummary(data, copy);
   const workComposer = getWorkComposer(
@@ -80,10 +82,10 @@ export function WorkPageClient({ initialData }: WorkPageClientProps) {
   const primaryActionNodeId = data.taskShell.executionSummary?.primaryAction?.targetNodeId
     ?? data.taskShell.executionSummary?.currentNodeId
     ?? data.planExecution?.currentNodeId
-    ?? data.taskPlan.analytics.activeNodeIds[0]
+    ?? activePlanNodeIds[0]
     ?? null;
   const currentPlanStep = data.taskPlan.nodes.find((step) => step.id === primaryActionNodeId)
-    ?? data.taskPlan.nodes.find((step) => step.id === data.taskPlan.analytics.activeNodeIds[0])
+    ?? data.taskPlan.nodes.find((step) => step.id === activePlanNodeIds[0])
     ?? null;
   const quickPrompts = workComposer
     ? getQuickPrompts(workComposer, currentRun, data.currentIntervention, copy)

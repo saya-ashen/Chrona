@@ -52,14 +52,14 @@ function mapProjectionItem(
     persistedStatus: item.persistedStatus,
     displayState: item.displayState,
     actionRequired: item.actionRequired,
-    approvalPendingCount: item.approvalPendingCount ?? 0,
+    approvalPendingCount: item.approvalPendingCount,
     scheduleStatus: item.scheduleStatus,
     scheduleSource: item.scheduleSource,
     dueAt: item.dueAt,
     scheduledStartAt: item.scheduledStartAt,
     scheduledEndAt: item.scheduledEndAt,
     latestRunStatus: item.latestRunStatus,
-    scheduleProposalCount: item.scheduleProposalCount ?? 0,
+    scheduleProposalCount: item.scheduleProposalCount,
     lastActivityAt: item.lastActivityAt,
     autoPlanGeneration: item.task.autoPlanGeneration,
     autoExecute: item.task.autoExecute,
@@ -114,7 +114,7 @@ function mapWorkBlockItem(
     } | null;
   },
 ) {
-  const importedEvent = block.importedCalendarEvent ?? block.task.importedCalendarEvents[0] ?? null;
+  const importedEvent = block.importedCalendarEvent ?? block.task.importedCalendarEvents[0];
   const scheduleStatus = block.status === "Completed" ? "Completed" : "Scheduled";
   return {
     taskId: block.taskId,
@@ -312,7 +312,7 @@ async function buildAutomationCandidates(input: {
       continue;
     }
 
-    if (!item.isRunnable && item.runnabilityState !== "ready_to_run") {
+    if (!item.isRunnable) {
       candidates.push({
         taskId: item.taskId,
         kind: "generate_plan",
@@ -562,7 +562,7 @@ export async function getSchedulePage(workspaceId: string) {
 
   const workBlockScheduledItemsBase = workBlocks
     .map((block) => mapWorkBlockItem(block))
-    .filter((item) => item.parentTaskId === null && item.scheduledStartAt && item.scheduledEndAt);
+    .filter((item) => item.parentTaskId === null);
   // Batch one query for active runs across all scheduled tasks so the
   // eligibility derivation can reuse the same `already_running` signal as the
   // auto-start runner without N+1 reads.
@@ -587,9 +587,9 @@ export async function getSchedulePage(workspaceId: string) {
   }
   const eligibilityNow = new Date();
   const workBlockScheduledItems = await Promise.all(workBlockScheduledItemsBase.map(async (item) => {
-    const savedPlan = await getLatestTaskPlanReadModel(item.taskId, item.workBlockId ?? null);
+    const savedPlan = await getLatestTaskPlanReadModel(item.taskId, item.workBlockId);
     const snapshot = savedPlan ? mapScheduleTaskPlanSnapshot(savedPlan) : null;
-    const aiPlanGenerationStatus = isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: item.workBlockId ?? null })
+    const aiPlanGenerationStatus = isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: item.workBlockId })
       ? "generating" as const
       : savedPlan?.status === "accepted"
         ? "accepted" as const
@@ -616,7 +616,7 @@ export async function getSchedulePage(workspaceId: string) {
     };
   }));
   const workBlockScheduledKeys = new Set(
-    workBlockScheduledItems.map((item) => `${item.taskId}:${item.scheduledStartAt?.getTime() ?? ""}:${item.scheduledEndAt?.getTime() ?? ""}`),
+    workBlockScheduledItems.map((item) => `${item.taskId}:${item.scheduledStartAt.getTime()}:${item.scheduledEndAt.getTime()}`),
   );
   const allScheduled = [...workBlockScheduledItems, ...scheduled.filter((item) => (
     !workBlockScheduledKeys.has(`${item.taskId}:${item.scheduledStartAt?.getTime() ?? ""}:${item.scheduledEndAt?.getTime() ?? ""}`)

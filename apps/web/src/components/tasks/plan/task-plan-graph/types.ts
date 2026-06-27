@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { CheckpointActionKind, ExecutionActionInput, ExecutionCheckpoint, NodeResult, NodeResultEvidence, NodeResultOutput } from "@chrona/contracts/ai";
+import type { CheckpointActionKind, ExecutionActionInput, ExecutionCheckpoint, NodeResult, NodeResultEvidence } from "@chrona/contracts/ai";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
@@ -100,7 +100,6 @@ export type PlanNodeDataModel = {
   completionSummary?: string | null;
   result?: NodeResult | null;
   inputFields?: Record<string, string>;
-  resultOutputs?: NodeResultOutput[];
   resultEvidence?: NodeResultEvidence | null;
   branchLabels?: string[];
   options?: string[];
@@ -164,10 +163,7 @@ export type TaskPlanGraphProps = {
   fillHeight?: boolean;
   className?: string;
   plan: TaskPlanGraphPlan;
-  inspectorPlacement?: "overlay" | "none";
   onSelectedNodeChange?: (node: PlanNodeDataModel | null, nodes: PlanNodeDataModel[]) => void;
-  onDispatchExecutionAction?: (action: ExecutionActionInput) => Promise<{ message: string }>;
-  dismissSelectionOnOutsideClick?: boolean;
   showOverview?: boolean;
 };
 
@@ -213,6 +209,17 @@ export type GraphCopy = {
   overviewEstimate: string;
   focusTitle: string;
   focusDescription: string;
+  compactEntryLabel: string;
+  compactStageLabel: string;
+  compactActiveSuffix: string;
+  compactAttentionSuffix: string;
+  compactDoneSuffix: string;
+  compactCurrentProgress: string;
+  compactActionBlocked: string;
+  compactNextSummary: string;
+  compactCurrentNode: string;
+  compactNeedsAction: string;
+  compactLinkedTask: string;
   inspectorTitle: string;
   inspectorEmpty: string;
   inspectorEmptyTitle: string;
@@ -394,13 +401,28 @@ export type NodeLegendItem = {
   tone: NodeTone;
 };
 
+export type CompactStageNode = {
+  id: string;
+  tone: NodeTone;
+  label: number;
+  lane: number;
+  isCurrent: boolean;
+};
+
+export type CompactStageEdge = {
+  id: string;
+  from: string;
+  to: string;
+};
 export type CompactStage = {
   id: string;
   title: string;
-  nodeIds: string[];
+  nodes: CompactStageNode[];
+  edges: CompactStageEdge[];
   activeCount: number;
   attentionCount: number;
   doneCount: number;
+  completion: number;
 };
 
 export type CompactFocusItem = {
@@ -413,4 +435,7 @@ export type CompactFocusItem = {
   isCurrent: boolean;
   hasLinkedTask: boolean;
   relationLabel: string | null;
+  phase: string | null;
+  nextAction: string | null;
+  estimatedMinutes: number | null;
 };

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/rpc-client";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import { dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../model/task-workspace-query";
+import { dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../../../../../../../features/task-workspace";
 import { useTaskPlanGenerationSession, type TaskPlanSessionState } from "@/hooks/ai/task-plan-generation-session-store";
 import {
   canAcceptPlanFromFlow,
@@ -15,12 +15,12 @@ import {
   getPlanGenerationStatusFromFlow,
   isAcceptingPlanFromFlow,
   startPlanAccept,
-} from "../model/task-workspace-plan-flow-machine";
-import type { TaskData } from "../model/task-workspace-types";
+} from "../../../../../../../features/task-workspace";
+import type { TaskData } from "../../../../../../../features/task-workspace";
 import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
-import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../model/task-workspace-activity";
-import type { WorkspaceActivityItem } from "../model/task-workspace-types";
+import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../../../../../../../features/task-workspace";
+import type { WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
 
 const STARTING_NODE_STATUS_LABEL = "Starting";
 const STARTING_NODE_NEXT_ACTION = "Starting execution...";

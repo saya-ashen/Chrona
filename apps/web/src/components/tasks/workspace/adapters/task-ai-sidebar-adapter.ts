@@ -1,5 +1,5 @@
 import type { AiSidebarPageContextSummary, AiSidebarQuickAction } from "@chrona/contracts";
-import type { TaskData } from "../model/task-workspace-types";
+import type { TaskData } from "../../../../../../../features/task-workspace";
 
 type TaskHighlight = AiSidebarPageContextSummary["highlights"][number];
 

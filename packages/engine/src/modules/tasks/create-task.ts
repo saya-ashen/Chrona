@@ -5,8 +5,8 @@ import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-ta
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ensureDefaultTaskSession, ensureWorkBlockTaskSession, validateTaskRuntimeConfig, getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
 import { deriveTaskStaticState } from "@chrona/domain";
-import { normalizeAutomationTiming } from "@chrona/contracts";
 import type { CreateTaskInput } from "@chrona/contracts";
+import { normalizeAutomationTiming } from "@chrona/contracts";
 import { expandRecurrenceRule } from "@chrona/integrations";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 

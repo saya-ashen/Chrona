@@ -120,8 +120,8 @@ function defaultMcpBaseUrl(): string {
 const SDK_ABORTED_BY_USER_MESSAGE = "Claude Code process aborted by user";
 
 interface ProviderFailureContext {
-  sawNodeOutputCall: boolean;
-  sawNodeOutputResult: boolean;
+  sawPlanOutputCall: boolean;
+  sawPlanOutputResult: boolean;
   sawNodeCompleteResult: boolean;
   lastEventType?: ProviderRunEvent["type"];
   lastTool?: string;
@@ -137,19 +137,19 @@ function noteProviderEvent(ctx: ProviderFailureContext, event: ProviderRunEvent)
   if (event.type === "text_delta") ctx.lastText = event.text;
   if (event.type === "tool_call") {
     ctx.lastTool = event.tool;
-    if (isChronaTool(event.tool, "chrona_node_output")) ctx.sawNodeOutputCall = true;
+    if (isChronaTool(event.tool, "chrona_plan_output")) ctx.sawPlanOutputCall = true;
   }
   if (event.type === "tool_result") {
     ctx.lastTool = event.tool;
-    if (isChronaTool(event.tool, "chrona_node_output")) ctx.sawNodeOutputResult = true;
+    if (isChronaTool(event.tool, "chrona_plan_output")) ctx.sawPlanOutputResult = true;
     if (isChronaTool(event.tool, "chrona_node_complete")) ctx.sawNodeCompleteResult = true;
   }
 }
 
 function newProviderFailureContext(): ProviderFailureContext {
   return {
-    sawNodeOutputCall: false,
-    sawNodeOutputResult: false,
+    sawPlanOutputCall: false,
+    sawPlanOutputResult: false,
     sawNodeCompleteResult: false,
   };
 }
@@ -158,11 +158,11 @@ function providerFailureDiagnostic(ctx: ProviderFailureContext) {
   return {
     stage: ctx.sawNodeCompleteResult
       ? "after_node_complete_accepted"
-      : ctx.sawNodeOutputResult
-        ? "after_node_output_accepted"
-        : ctx.sawNodeOutputCall
-          ? "during_node_output_submission"
-          : "before_node_output_submission",
+      : ctx.sawPlanOutputResult
+        ? "after_plan_output_accepted"
+        : ctx.sawPlanOutputCall
+          ? "during_plan_output_submission"
+          : "before_plan_output_submission",
     lastEventType: ctx.lastEventType,
     lastTool: ctx.lastTool,
     lastText: ctx.lastText,
@@ -176,9 +176,9 @@ function formatTimeout(timeoutMs?: number): string {
 
 function providerAbortMessage(ctx: ProviderFailureContext): string {
   if (ctx.sawNodeCompleteResult) return "Claude Code process aborted after node completion was accepted";
-  if (ctx.sawNodeOutputResult) return "Claude Code process aborted after node output was accepted but before node completion";
-  if (ctx.sawNodeOutputCall) return "Claude Code process aborted while submitting node output";
-  return "Claude Code process aborted before Chrona received node output";
+  if (ctx.sawPlanOutputResult) return "Claude Code process aborted after plan output was accepted but before node completion";
+  if (ctx.sawPlanOutputCall) return "Claude Code process aborted while submitting plan output";
+  return "Claude Code process aborted before Chrona received plan output";
 }
 
 function providerFailureMessage(err: unknown, ctx?: ProviderFailureContext, handle?: ClaudeCodeRunHandle): string {

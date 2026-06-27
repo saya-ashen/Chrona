@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { buildCommandCenterArtifactsSpec, buildCommandCenterNowSpec, buildCommandCenterTrailSpec } from "@chrona/ui-protocol";
+import { buildCommandCenterArtifactsSpec, buildCommandCenterNowSpec, buildCommandCenterTrailSpec, type UiDocument } from "@chrona/ui-protocol";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
@@ -88,7 +88,7 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
         tone: nowTone(currentExecution.status),
         currentOperationSpec: currentExecution.ui?.currentOperationSpec ?? null,
       }),
-      output: buildCommandCenterArtifactsSpec({ artifacts }),
+      output: (currentExecution.planOutput?.spec as UiDocument | null | undefined) ?? buildCommandCenterArtifactsSpec({ artifacts }),
       trail: buildCommandCenterTrailSpec({
         activity: activityTimeline,
         savedCount: activityTimeline.length,

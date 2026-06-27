@@ -3,9 +3,9 @@ import { Navigate, useLoaderData, useOutletContext, useParams, useSearchParams }
 import { InboxPageClient } from "@/components/inbox/inbox-page-client";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { MemoryPageClient } from "@/components/memory/memory-page-client";
-import { SchedulePage } from "@/components/schedule/schedule-page";
+import { SchedulePage } from "../../../features/schedule/ui";
 import { TaskListPage } from "@/components/tasks/task-list-page";
-import { AiClientsDialog } from "@/components/settings/ai-clients-dialog";
+import { AiClientsDialog } from "../../../features/ai-clients/ui";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { WorkPageClient } from "@/components/work/work-page-client";
@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
 
-import type { TaskPageData } from "@/components/tasks/workspace/model/task-workspace-types";
+import type { TaskPageData } from "../../../features/task-workspace";
 export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 
 export type AppBootData = {

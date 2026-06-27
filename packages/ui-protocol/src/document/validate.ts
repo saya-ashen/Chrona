@@ -1,5 +1,6 @@
 import { validateSpec as coreValidateSpec, type Spec } from "@json-render/core";
 import type { ZodType } from "zod";
+import { UI_ACTION_PAYLOAD } from "../actions/actions";
 import { chronaCatalog } from "../catalog/components";
 import type { ChronaSpec } from "./document";
 
@@ -121,6 +122,56 @@ export function normalizeChronaSpec(input: unknown): Spec {
  * Producers that fail validation fall back to typed rendering (plan §7). The
  * AI Node-result path MUST call this before persisting (plan §5.1).
  */
+
+function validateChildCycles(spec: Spec, issues: ValidationIssue[]) {
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(key: string, path: string[]) {
+    if (visiting.has(key)) {
+      issues.push({ path: `elements.${key}.children`, message: `cycle detected: ${[...path, key].join(" -> ")}` });
+      return;
+    }
+    if (visited.has(key)) return;
+    const element = spec.elements[key];
+    if (!element) return;
+    visiting.add(key);
+    for (const child of element.children ?? []) visit(child, [...path, key]);
+    visiting.delete(key);
+    visited.add(key);
+  }
+
+  visit(spec.root, []);
+}
+
+function validateActionBindings(elementKey: string, element: Spec["elements"][string], issues: ValidationIssue[]) {
+  const handlers = (element as { on?: unknown }).on;
+  if (!handlers || typeof handlers !== "object" || Array.isArray(handlers)) return;
+
+  for (const [eventName, binding] of Object.entries(handlers)) {
+    if (!binding || typeof binding !== "object" || Array.isArray(binding)) {
+      issues.push({ path: `elements.${elementKey}.on.${eventName}`, message: "action binding must be an object" });
+      continue;
+    }
+    const action = (binding as { action?: unknown }).action;
+    const params = (binding as { params?: unknown }).params;
+    if (typeof action !== "string") {
+      issues.push({ path: `elements.${elementKey}.on.${eventName}.action`, message: "action binding action must be a string" });
+      continue;
+    }
+    const paramsSchema = UI_ACTION_PAYLOAD[action as keyof typeof UI_ACTION_PAYLOAD];
+    if (!paramsSchema) continue;
+    const paramsResult = paramsSchema.safeParse(stripDynamicExpressions(params));
+    if (!paramsResult.success) {
+      for (const issue of paramsResult.error.issues) {
+        issues.push({
+          path: `elements.${elementKey}.on.${eventName}.params.${issue.path.join(".")}`,
+          message: issue.message,
+        });
+      }
+    }
+  }
+}
 export function validateChronaSpec(input: unknown): ValidateResult {
   if (!isSpecLike(input)) {
     return { ok: false, issues: [{ path: "", message: "not a spec ({ root, elements })" }] };
@@ -156,7 +207,11 @@ export function validateChronaSpec(input: unknown): ValidateResult {
         });
       }
     }
+
+    validateActionBindings(key, element, issues);
   }
+
+  validateChildCycles(spec, issues);
 
   for (const issue of coreValidateSpec(spec).issues) {
     if (issue.severity === "error") {

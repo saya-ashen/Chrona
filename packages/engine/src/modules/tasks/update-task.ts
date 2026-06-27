@@ -6,9 +6,9 @@ import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-ta
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateTaskRuntimeConfig, ensureWorkBlockTaskSession, getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
 import { deriveTaskStaticState } from "@chrona/domain";
+import type { UpdateTaskInput } from "@chrona/contracts";
 import { normalizeAutomationTiming } from "@chrona/contracts";
 import { expandRecurrenceRule } from "@chrona/integrations";
-import type { UpdateTaskInput } from "@chrona/contracts";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const SELF_SERIES_WINDOW_DAYS = 180;

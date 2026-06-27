@@ -1,22 +1,20 @@
 import "@testing-library/jest-dom/vitest";
 
-if (!Element.prototype.hasPointerCapture) {
-  Element.prototype.hasPointerCapture = () => false;
+function installElementPolyfill(name: string, value: unknown) {
+  if (!(name in Element.prototype)) {
+    Object.defineProperty(Element.prototype, name, {
+      configurable: true,
+      value,
+    });
+  }
 }
 
-if (!Element.prototype.setPointerCapture) {
-  Element.prototype.setPointerCapture = () => undefined;
-}
+installElementPolyfill("hasPointerCapture", () => false);
+installElementPolyfill("setPointerCapture", () => undefined);
+installElementPolyfill("releasePointerCapture", () => undefined);
+installElementPolyfill("scrollIntoView", () => undefined);
 
-if (!Element.prototype.releasePointerCapture) {
-  Element.prototype.releasePointerCapture = () => undefined;
-}
-
-if (!Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = () => undefined;
-}
-
-if (!globalThis.ResizeObserver) {
+if (!("ResizeObserver" in globalThis)) {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {}
     unobserve() {}

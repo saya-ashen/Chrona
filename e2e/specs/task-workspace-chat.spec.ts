@@ -49,7 +49,7 @@ test.describe("Task Workspace Assistant Surface", () => {
     );
 
     await page.goto(`/en/tasks/${createdTask.taskId}`);
-    await expect(page.getByText("E2E Assistant Surface Task")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "E2E Assistant Surface Task" })).toBeVisible();
 
     const taskEditor = page.getByRole("dialog", { name: "Edit task" });
     if (await taskEditor.isVisible()) {

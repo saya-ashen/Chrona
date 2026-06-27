@@ -13,21 +13,21 @@ import { z } from "zod";
 
 import { error, internalServerError, json } from "../../lib/http";
 
-const hermesIntegrationSchema = z.object({
-  baseUrl: z.string().optional(),
-  apiKey: z.string().optional(),
-  mcpUrl: z.string().optional(),
-  hermesHome: z.string().optional(),
-  pluginDir: z.string().optional(),
-  timeoutMs: z.number().positive().optional(),
-});
-
-const hermesSetupSchema = hermesIntegrationSchema.extend({
-  apiKey: z.string().optional(),
-  skipEnable: z.boolean().optional(),
-});
 
 export function createHermesIntegrationRoutes() {
+  const hermesIntegrationSchema = z.object({
+    baseUrl: z.string().optional(),
+    apiKey: z.string().optional(),
+    mcpUrl: z.string().optional(),
+    hermesHome: z.string().optional(),
+    pluginDir: z.string().optional(),
+    timeoutMs: z.number().positive().optional(),
+  });
+
+  const hermesSetupSchema = hermesIntegrationSchema.extend({
+    apiKey: z.string().optional(),
+    skipEnable: z.boolean().optional(),
+  });
   return new Hono()
     .post(
       "/integrations/hermes/diagnose",

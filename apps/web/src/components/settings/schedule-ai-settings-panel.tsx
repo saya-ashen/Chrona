@@ -23,6 +23,8 @@ type ScheduleAiSettingsPanelProps = {
     defaultOn: string;
     defaultOff: string;
     saved: string;
+    currentOn: string;
+    currentOff: string;
   };
 };
 
@@ -33,6 +35,8 @@ const fallbackCopy = {
   defaultAutoExecuteDescription: "Preselect auto-execute when creating scheduled tasks. Off by default so tasks only run automatically after opt-in.",
   defaultOn: "Default on",
   defaultOff: "Default off",
+  currentOn: "On",
+  currentOff: "Off",
   saved: "Saved",
 };
 
@@ -105,6 +109,9 @@ function PreferenceToggle({
         <FieldLabel className="flex-wrap items-center">
           {label}
           <Badge variant="outline">{defaultChecked ? copy.defaultOn : copy.defaultOff}</Badge>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
+            {checked ? copy.currentOn : copy.currentOff}
+          </span>
           {saving ? <span className="text-xs font-normal text-muted-foreground">{copy.saved}</span> : null}
         </FieldLabel>
         <FieldDescription>{description}</FieldDescription>
@@ -113,6 +120,7 @@ function PreferenceToggle({
         aria-label={label}
         checked={checked}
         onCheckedChange={onChange}
+        className="shrink-0"
       />
     </Field>
   );

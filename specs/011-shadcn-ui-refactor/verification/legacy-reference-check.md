@@ -3,7 +3,7 @@
 Command shape:
 
 ```bash
-rg -n "from ['\"](@/components/ui/(status-badge|surface-card)|.*components/ui/(status-badge|surface-card))|StatusBadge|SurfaceCard|inputClassName|textareaClassName|selectClassName|buttonVariants" apps/web/src
+rg -n "from (?:'|\")(@/components/ui/(status-badge|surface-card)|.*components/ui/(status-badge|surface-card))|StatusBadge|SurfaceCard|inputClassName|textareaClassName|selectClassName|buttonVariants" apps/web/src
 ```
 
 ## Result

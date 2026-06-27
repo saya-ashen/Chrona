@@ -186,7 +186,7 @@ describe("terminal action recording", () => {
       nodeAttemptId: attempt.id,
     };
     await recordTerminalAction({ scope, kind: "complete", payload: { summary: "ok" }, workspaceId: workspace.id });
-    expect(
+    await expect(
       recordTerminalAction({ scope, kind: "complete", payload: { summary: "again" }, workspaceId: workspace.id }),
     ).rejects.toBeInstanceOf(DuplicateTerminalActionError);
 
@@ -197,16 +197,16 @@ describe("terminal action recording", () => {
   });
 });
 describe("kind -> action mapper", () => {
-  it("maps output kind to submit_node_output action", () => {
+  it("maps plan_output kind to update_plan_output action", () => {
     const action = submitNodeResultActionFromControl({
       body: {
-        kind: "output",
+        kind: "plan_output",
         payload: {
-          spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [], visible: true } } },
+          patches: [{ op: "add", path: "/root", value: "root" }],
         },
       },
     });
-    expect(action?.action).toBe("submit_node_output");
+    expect(action?.action).toBe("update_plan_output");
   });
 
   it("maps terminal kinds (complete / condition_select / wait_complete / block / fail)", () => {
@@ -223,7 +223,7 @@ describe("kind -> action mapper", () => {
     expect(isTerminalControlKind("wait_complete")).toBe(true);
     expect(isTerminalControlKind("block")).toBe(true);
     expect(isTerminalControlKind("fail")).toBe(true);
-    expect(isTerminalControlKind("output")).toBe(false);
+    expect(isTerminalControlKind("plan_output")).toBe(false);
     expect(isTerminalControlKind("task_read")).toBe(false);
     expect(isTerminalControlKind("plan_read")).toBe(false);
   });
@@ -240,7 +240,7 @@ describe("kind -> action mapper", () => {
   });
 
   it("toolNameFromControlKind round-trips with dispatch tool names", () => {
-    expect(toolNameFromControlKind("output")).toBe("chrona.node.output");
+    expect(toolNameFromControlKind("plan_output")).toBe("chrona.plan.output");
     expect(toolNameFromControlKind("complete")).toBe("chrona.node.complete");
     expect(toolNameFromControlKind("block")).toBe("chrona.node.block");
   });

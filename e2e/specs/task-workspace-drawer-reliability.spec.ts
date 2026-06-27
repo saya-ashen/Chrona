@@ -35,18 +35,12 @@ test.describe("Task workspace node drawer reliability", () => {
     await expect(page.getByTestId("task-plan-graph")).toBeVisible();
 
     await clickPlanNode(page);
-    const detailDialog = page.getByRole("dialog", { name: "Selected node details" });
-    const drawer = page.getByRole("region", { name: "Current node details" });
-    await expect(detailDialog).toBeVisible();
-    await expect(drawer).toBeVisible();
-    await expect(drawer).toContainText("Collect boundary context");
-
-    await detailDialog.getByRole("button", { name: "Close node details" }).click();
-    await expect(detailDialog).not.toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Selected node details" })).not.toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
 
     await clickPlanNode(page);
-    await expect(drawer).toBeVisible();
-    await expect(drawer).toContainText("Collect boundary context");
+    await expect(page.getByRole("dialog", { name: "Selected node details" })).not.toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
 
     if (viewport === "mobile") {
       await expectNoHorizontalScroll(page);

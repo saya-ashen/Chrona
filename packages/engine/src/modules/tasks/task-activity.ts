@@ -174,13 +174,36 @@ function providerActivityMergeKey(event: TaskActivityEvent, eventType: string) {
   ].join(":");
 }
 
+function canonicalProviderLabel(event: TaskActivityEvent, payloadEvent: Record<string, unknown> | null) {
+  const provider = stringPayloadValue(event.payload, "provider") ?? undefined;
+  if (provider) return provider;
+  if (payloadEvent && typeof payloadEvent.provider === "string" && payloadEvent.provider.trim()) {
+    return payloadEvent.provider.trim();
+  }
+  return "provider";
+}
+
 function isMergeableProviderTextEvent(eventType: string) {
   return eventType === "text_delta" || eventType === "reasoning_delta";
 }
 
+function isDisplayableProviderEvent(eventType: string) {
+  return eventType === "run_started"
+    || eventType === "text_delta"
+    || eventType === "reasoning_delta"
+    || eventType === "tool_call"
+    || eventType === "tool_started"
+    || eventType === "tool_result"
+    || eventType === "tool_completed"
+    || eventType === "approval_required"
+    || eventType === "run_completed"
+    || eventType === "run_failed"
+    || eventType === "run_cancelled";
+}
+
 function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem {
   const payloadEvent = runtimePayloadEvent(event.payload);
-  const provider = stringPayloadValue(event.payload, "provider") ?? stringPayloadValue(event.payload, "runtimeName") ?? "provider";
+  const provider = canonicalProviderLabel(event, payloadEvent);
   const runtimeName = stringPayloadValue(event.payload, "runtimeName") ?? undefined;
   const runId = stringPayloadValue(event.payload, "runId") ?? undefined;
   const nativeRunId = stringPayloadValue(event.payload, "nativeRunId") ?? undefined;
@@ -348,6 +371,11 @@ export function buildActivityTimeline(events: TaskActivityEvent[]) {
   for (const event of events) {
     const payloadEvent = runtimePayloadEvent(event.payload);
     const eventType = providerActivityEventType(event, payloadEvent);
+
+    if (event.source === "provider" && !isDisplayableProviderEvent(eventType)) {
+      currentTextSegment = null;
+      continue;
+    }
 
     if (event.source !== "provider" || !payloadEvent || !isMergeableProviderTextEvent(eventType)) {
       currentTextSegment = null;

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { chronaNodeOutputSpecSchema } from "@chrona/ui-protocol";
 import { planBlueprintSchema } from "../ai-plan-blueprint";
 import {
   createTaskBodySchema,
@@ -26,7 +25,7 @@ export const chronaToolNames = [
   "chrona.execution.read",
   "chrona.execution.dispatch",
   "chrona.node.read",
-  "chrona.node.output",
+  "chrona.plan.output",
   "chrona.node.complete",
   "chrona.node.condition_select",
   "chrona.node.block",
@@ -96,84 +95,42 @@ export const chronaToolContextSchema = z.object({
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const publicReadPayloadSchema = z.object({}).passthrough();
-export const nodeResultOutputSchema = chronaNodeOutputSpecSchema;
 const nodeEvidencePayloadSchema = z.record(z.string(), z.unknown()).optional();
 
+const planOutputAddPatchSchema = z.object({ op: z.literal("add"), path: z.string().min(1), value: z.unknown() }).strict();
+const planOutputRemovePatchSchema = z.object({ op: z.literal("remove"), path: z.string().min(1) }).strict();
+const planOutputReplacePatchSchema = z.object({ op: z.literal("replace"), path: z.string().min(1), value: z.unknown() }).strict();
+const planOutputMovePatchSchema = z.object({ op: z.literal("move"), path: z.string().min(1), from: z.string().min(1) }).strict();
+const planOutputCopyPatchSchema = z.object({ op: z.literal("copy"), path: z.string().min(1), from: z.string().min(1) }).strict();
+const planOutputTestPatchSchema = z.object({ op: z.literal("test"), path: z.string().min(1), value: z.unknown() }).strict();
 
-const nodeOutputElementSchema = z.object({
-  id: z.string().min(1),
-  type: z.string().min(1),
-  props: z.record(z.string(), z.unknown()).optional(),
-  children: z.array(z.string().min(1)).optional().default([]),
-  visible: z.unknown().optional(),
-}).strict();
+export const planOutputPatchSchema = z.discriminatedUnion("op", [
+  planOutputAddPatchSchema,
+  planOutputRemovePatchSchema,
+  planOutputReplacePatchSchema,
+  planOutputMovePatchSchema,
+  planOutputCopyPatchSchema,
+  planOutputTestPatchSchema,
+]);
 
-const nodeOutputSpecInputSchema = z.object({
-  root: z.string().min(1),
-  elements: z.array(nodeOutputElementSchema).min(1),
-  state: z.record(z.string(), z.unknown()).optional(),
-}).strict();
-
-function nodeOutputArrayToFlatSpec(value: z.infer<typeof nodeOutputSpecInputSchema>) {
-  const elementMap = new Map<string, z.infer<typeof nodeOutputElementSchema>>();
-  for (const element of value.elements) {
-    if (elementMap.has(element.id)) throw new Error(`Duplicate element id: ${element.id}`);
-    elementMap.set(element.id, element);
-  }
-  if (!elementMap.has(value.root)) throw new Error(`Root element not found: ${value.root}`);
-  const flatElements: Record<string, { type: string; props: Record<string, unknown>; children: string[]; visible?: unknown }> = {};
-  for (const [id, element] of elementMap.entries()) {
-    for (const childId of element.children) {
-      if (!elementMap.has(childId)) throw new Error(`Missing child element: ${childId}`);
-    }
-    flatElements[id] = { type: element.type, props: element.props ?? {}, children: element.children, ...(element.visible === undefined ? {} : { visible: element.visible }) };
-  }
-  return { root: value.root, elements: flatElements, ...(value.state === undefined ? {} : { state: value.state }) };
-}
-
-const nodeOutputPayloadShape = {
-  spec: z.preprocess((value) => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-    const spec = value as { elements?: unknown };
-    if (Array.isArray(spec.elements)) return nodeOutputArrayToFlatSpec(nodeOutputSpecInputSchema.parse(value));
-    if (!spec.elements || typeof spec.elements !== "object") return value;
-    let changed = false;
-    const elements: Record<string, { children?: unknown }> = {};
-    for (const [key, element] of Object.entries(spec.elements as Record<string, { children?: unknown }>)) {
-      const children = element.children;
-      if (children === "" || children === "[]") {
-        changed = true;
-        elements[key] = { ...element, children: [] };
-      } else {
-        elements[key] = element;
-      }
-    }
-    return changed ? { ...(value as object), elements } : value;
-  }, chronaNodeOutputSpecSchema),
-  mode: z.enum(["append", "replace"]).optional(),
+const planOutputPayloadShape = {
+  patches: z.array(planOutputPatchSchema).min(1),
   summary: z.string().min(1).optional(),
 };
 
-function requireSpecRootElement(value: { spec: unknown }, ctx: z.RefinementCtx) {
-  const spec = value.spec as { root?: string; elements?: Record<string, unknown> };
-  if (!spec.root || !spec.elements || !(spec.root in spec.elements)) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["spec", "root"], message: "spec.root must match an element id in spec.elements" });
-  }
+export const CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION = "Patch shared plan-level user-visible output as json-render SpecStream patches. Submit { patches, summary }. Patches are RFC 6902 JSON Patch operations over the current plan output Spec. Use paths like /root, /elements/root, /elements/root/children, /elements/summary/props/text. Do not submit complete node-local outputs, markdown-only text, legacy spec/mode fields, or backend IDs. Final Spec after applying patches must be valid against Chrona plan-output catalog.";
+
+export function describeChronaPlanOutputPublicTool() {
+  return { name: "chrona_plan_output", internalName: "chrona.plan.output", description: CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION, visibleArguments: ["patches", "summary"] };
 }
 
-export const CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION = "Submit user-visible output as a complete flat json-render Spec in the spec field. Do not submit patches, raw JSONL, nested element trees, markdown-only text, or legacy output fields. Spec shape: { root: string, elements: [{ id, type, props, children, visible? }], state? }. root must match one element id. Every element must include children; leaf elements use children: []. children contains element-id strings only. Every child id must exist. Self-references and cycles are rejected. Use only the Chrona node-output catalog exposed in the runtime prompt; props must match that catalog exactly. For Table, use columns: string[] and rows: string[][].";
+export const planOutputPayloadSchema = z.object({ ...planOutputPayloadShape, evidence: nodeEvidencePayloadSchema }).strict();
 
-export function describeChronaNodeOutputPublicTool() {
-  return { name: "chrona_node_output", internalName: "chrona.node.output", description: CHRONA_NODE_OUTPUT_TOOL_DESCRIPTION, visibleArguments: ["spec", "mode", "summary"] };
-}
-
-export const nodeOutputPayloadSchema = z.object({ ...nodeOutputPayloadShape, evidence: nodeEvidencePayloadSchema }).strict().superRefine(requireSpecRootElement);
-
-const publicNodeOutputPayloadSchema = z.object(nodeOutputPayloadShape).strict().superRefine(requireSpecRootElement);
+const publicPlanOutputPayloadSchema = z.object(planOutputPayloadShape).strict();
 
 export const taskCompletePayloadSchema = z.object({ summary: z.string().min(1).optional(), evidence: nodeEvidencePayloadSchema }).strict();
 
-export const conditionSelectPayloadSchema = z.object({ nodeId: z.string().min(1), branchRef: z.string().min(1), summary: z.string().min(1), outputs: z.array(chronaNodeOutputSpecSchema).optional(), evidence: nodeEvidencePayloadSchema }).strict();
+export const conditionSelectPayloadSchema = z.object({ nodeId: z.string().min(1), branchRef: z.string().min(1), summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
 
 const blockActionFormFieldSchema = z.object({ name: z.string().min(1), label: z.string().min(1), type: z.enum(["text", "textarea", "select"]).optional(), required: z.boolean().optional(), options: z.array(z.string().min(1)).optional() }).strict();
 
@@ -183,7 +140,7 @@ export const blockPayloadSchema = z.object({ reason: z.string().min(1), actionFo
 
 export const failPayloadSchema = z.object({ error: z.string().min(1), retryable: z.boolean().optional(), diagnostics: z.unknown().optional(), evidence: nodeEvidencePayloadSchema }).strict();
 
-export const waitCompletePayloadSchema = z.object({ summary: z.string().min(1), outputs: z.array(chronaNodeOutputSpecSchema).optional(), evidence: nodeEvidencePayloadSchema }).strict();
+export const waitCompletePayloadSchema = z.object({ summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
 
 export const chronaToolPayloadSchemas = {
   "chrona.task.read": readPayloadSchema,
@@ -199,7 +156,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
   "chrona.node.read": readPayloadSchema,
-  "chrona.node.output": nodeOutputPayloadSchema,
+  "chrona.plan.output": planOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
   "chrona.node.block": blockPayloadSchema,
@@ -214,7 +171,7 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
   "chrona.node.read": publicReadPayloadSchema,
-  "chrona.node.output": publicNodeOutputPayloadSchema,
+  "chrona.plan.output": publicPlanOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.block": blockPayloadSchema.omit({ evidence: true }).strict(),
@@ -225,7 +182,7 @@ export const chronaPublicToolPayloadSchemas = {
 export const agentControlActionKindSchema = z.enum([
   "task_read",
   "plan_read",
-  "output",
+  "plan_output",
   "complete",
   "condition_select",
   "wait_complete",
@@ -236,7 +193,7 @@ export const agentControlActionKindSchema = z.enum([
 export const agentControlActionPayloadSchemas = {
   task_read: chronaPublicToolPayloadSchemas["chrona.task.read"],
   plan_read: chronaPublicToolPayloadSchemas["chrona.plan.read"],
-  output: chronaPublicToolPayloadSchemas["chrona.node.output"],
+  plan_output: chronaPublicToolPayloadSchemas["chrona.plan.output"],
   complete: chronaPublicToolPayloadSchemas["chrona.node.complete"],
   condition_select: chronaPublicToolPayloadSchemas["chrona.node.condition_select"],
   wait_complete: chronaPublicToolPayloadSchemas["chrona.node.wait_complete"],
@@ -247,7 +204,7 @@ export const agentControlActionPayloadSchemas = {
 export const agentControlActionBodySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("task_read"), payload: agentControlActionPayloadSchemas.task_read }).strict(),
   z.object({ kind: z.literal("plan_read"), payload: agentControlActionPayloadSchemas.plan_read }).strict(),
-  z.object({ kind: z.literal("output"), payload: agentControlActionPayloadSchemas.output }).strict(),
+  z.object({ kind: z.literal("plan_output"), payload: agentControlActionPayloadSchemas.plan_output }).strict(),
   z.object({ kind: z.literal("complete"), payload: agentControlActionPayloadSchemas.complete }).strict(),
   z.object({ kind: z.literal("condition_select"), payload: agentControlActionPayloadSchemas.condition_select }).strict(),
   z.object({ kind: z.literal("wait_complete"), payload: agentControlActionPayloadSchemas.wait_complete }).strict(),

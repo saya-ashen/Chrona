@@ -8,12 +8,11 @@ import { createPageRoutes } from "./pages";
 import { createWorkspacesRoutes } from "./workspaces.routes";
 import { createClientsRoutes } from "./ai/clients.routes";
 import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
-import { createMcpRoutes } from "./mcp/mcp.routes";
+import { createMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
 import { createRuntimeRoutes } from "./runtime.routes";
 import { createHermesIntegrationRoutes } from "./integrations/hermes.routes";
-import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "./calendar-sources.routes";
+import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "../../../../features/external-calendar";
 import { areE2eTestRoutesEnabled, createTestSupportRoutes } from "./test-support.routes";
-import { createAgentControlRoutes } from "./agent-control.routes";
 
 export type ApiRouterOptions = {
   calendarSources?: CalendarSourceRouteOptions;

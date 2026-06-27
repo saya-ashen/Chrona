@@ -6,19 +6,20 @@ Schema source: `prisma/schema.prisma`.
 
 Current schema inventory:
 
-- Models: 27
-- Enums: 18
+- Models: 36
+- Enums: 24
 
 ## Main aggregates
 
 | Aggregate | Key models | Purpose |
 | --- | --- | --- |
-| Workspace | `Workspace` | Scope for tasks, memory, schedule, and configuration. |
-| Task | `Task`, `TaskDependency`, `TaskProjection` | Core work item, relationships, and projection-backed read shape. |
-| Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent` | Generated/accepted executable graph plan and graph-change history. |
-| Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact` | Plan/run/session state, runtime cursoring, approvals, and outputs. |
+| Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
+| Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
+| Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
+| Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
 | Schedule | `WorkBlock`, `ScheduleProposal`, `SchedulerLease`, `SchedulerEvent` | Time blocks, schedule suggestions, automation leasing, and scheduler events. |
-| Conversation/tool history | `ConversationEntry`, `ToolCallDetail`, `TaskAssistantMessage` | User/assistant conversation and runtime tool-call detail. |
+| External calendar | `CalendarSource`, `ImportedCalendarEvent` | Read-only calendar subscriptions, sync status, imported busy events, and calendar-backed schedule context. |
+| Conversation/tool history | `ConversationEntry`, `ToolCallDetail`, `ToolInvocation`, `TaskAssistantMessage`, `RawEventLog` | User/assistant conversation, runtime tool-call detail, invocation records, and raw event audit data. |
 | Memory | `Memory` | Workspace/task memory entries shown in Memory Console. |
 | AI configuration | `AiClient`, `AiFeatureBinding` | Database-backed AI clients and feature-to-client bindings. |
 | Event log | `Event` | Durable event records used by projections/integration flows. |
@@ -53,6 +54,8 @@ erDiagram
 
   AiClient ||--o{ AiFeatureBinding : bound_to
   WorkBlock ||--o{ ScheduleProposal : proposal_source
+  Workspace ||--o{ CalendarSource : subscribes
+  CalendarSource ||--o{ ImportedCalendarEvent : imports
 ```
 
 ## Task state
@@ -148,15 +151,35 @@ Important enums:
 
 Schedule state supports user-created and AI-suggested time blocks, proposal decision workflows, scheduler automation leasing, and due-work startup.
 
+## External calendar state
+
+Important models:
+
+- `CalendarSource`
+- `ImportedCalendarEvent`
+
+Important enums:
+
+- `CalendarSourceLifecycleState`
+- `CalendarEventStatus`
+- `CalendarSyncState`
+- `CalendarSyncPolicy`
+- `CalendarAutomationPolicy`
+
+External calendars are read-only subscription sources. Source URLs stay server-side; browser responses use redacted labels. Imported events become read-only busy blocks for schedule/planning context and can drive auto-plan/auto-complete behavior according to source sync and automation policies.
+
 ## Conversation, tool, and assistant state
 
 Important models:
 
 - `ConversationEntry`
 - `ToolCallDetail`
+- `ToolInvocation`
 - `TaskAssistantMessage`
+- `RawEventLog`
+- `TaskTimelineItem`
 
-These records back Work page conversation/execution context, assistant surfaces, and runtime/tool-call inspection.
+These records back Work page conversation/execution context, assistant surfaces, runtime/tool-call inspection, raw provider/runtime event audits, and task timeline projections.
 
 ## Memory state
 
@@ -180,6 +203,15 @@ Important models:
 - `AiFeatureBinding`
 
 Chrona stores AI client configuration in the database and binds clients to feature slots. `packages/engine/src/modules/ai` loads clients directly from this configuration; provider selection is not hard-coded in routes.
+
+## Workspace and task-kind state
+
+Important enums:
+
+- `WorkspaceStatus`
+- `TaskKind`
+
+Workspaces can be lifecycle-gated independently from task state. `TaskKind` distinguishes native Chrona tasks from imported/synthetic task records that exist to project external schedule context.
 
 ## Operational notes
 

@@ -1,7 +1,7 @@
-import type { ExecutionActionInput, NodeResult, NodeResultOutput, PlanExecutionResult } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, PlanExecutionResult, PlanOutputPatch, PlanOutputState } from "@chrona/contracts/ai";
 import { getAcceptedCompiledPlanForTask } from "../persistence/execution-scope";
 import { getCurrentExecution } from "./get-current-execution";
-import { getPlanRun, savePlanRun } from "../persistence/plan-run-store";
+import { getPlanRun, savePlanRunGuarded } from "../persistence/plan-run-store";
 import { appendMainSessionEvent, ensurePlanMainSession } from "../persistence/plan-state-store";
 import { toEffectivePlanGraph } from "../projection/execution-graph-selectors";
 import type { ExecutionDispatchContext } from "../types";
@@ -10,28 +10,100 @@ import { dispatchExecutionAction } from "../task-plan-execution";
 import { validateChronaSpec } from "@chrona/ui-protocol";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
-function asOutputs(value: unknown): NodeResultOutput[] {
-  return Array.isArray(value) ? value as NodeResultOutput[] : [];
+
+function decodePointer(path: string): string[] {
+  if (path === "") return [];
+  if (!path.startsWith("/")) throw new Error(`Invalid JSON Pointer path: ${path}`);
+  return path.slice(1).split("/").map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"));
 }
 
-function sanitizeNodeOutputs(outputs: NodeResultOutput[]): NodeResultOutput[] {
-  if (outputs.length === 0) return [];
+function cloneJson<T>(value: T): T {
+  return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
 
-  const validSpecs: NodeResultOutput[] = [];
-  for (const spec of outputs) {
-    const result = validateChronaSpec(spec);
-    if (!result.ok) {
-      throw new EngineError(
-        ENGINE_ERROR_CODES.VALIDATION_FAILED,
-        `Invalid chrona_node_output json-render Spec: ${result.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`,
-      );
-    }
-    validSpecs.push(spec);
+function parentAt(root: Record<string, unknown>, path: string): { parent: Record<string, unknown> | unknown[]; key: string } {
+  const parts = decodePointer(path);
+  if (parts.length === 0) throw new Error("Patch path must not target the document root");
+  let parent: unknown = root;
+  for (const part of parts.slice(0, -1)) {
+    if (!parent || typeof parent !== "object") throw new Error(`Patch parent does not exist: ${path}`);
+    parent = (parent as Record<string, unknown>)[part];
   }
+  if (!parent || typeof parent !== "object") throw new Error(`Patch parent does not exist: ${path}`);
+  return { parent: parent as Record<string, unknown> | unknown[], key: parts[parts.length - 1]! };
+}
 
-  // Keep the last valid Spec so that append-mode calls update the output rather
-  // than silently retaining the prior Spec (prior outputs are prepended, new at end).
-  return [validSpecs[validSpecs.length - 1]!];
+function valueAt(root: Record<string, unknown>, path: string): unknown {
+  let value: unknown = root;
+  for (const part of decodePointer(path)) {
+    if (!value || typeof value !== "object") throw new Error(`Patch source does not exist: ${path}`);
+    value = (value as Record<string, unknown>)[part];
+  }
+  return value;
+}
+
+function writeValue(target: Record<string, unknown>, path: string, value: unknown, replace: boolean) {
+  const parts = decodePointer(path);
+  if (!replace && parts.length === 1 && !(parts[0]! in target)) {
+    target[parts[0]!] = cloneJson(value);
+    return;
+  }
+  const { parent, key } = parentAt(target, path);
+  if (Array.isArray(parent)) {
+    const index = key === "-" ? parent.length : Number(key);
+    if (!Number.isInteger(index) || index < 0 || index > parent.length) throw new Error(`Invalid array patch path: ${path}`);
+    if (replace) {
+      if (index >= parent.length) throw new Error(`Replace path does not exist: ${path}`);
+      parent[index] = value;
+    } else {
+      parent.splice(index, 0, value);
+    }
+    return;
+  }
+  if (replace && !(key in parent)) throw new Error(`Replace path does not exist: ${path}`);
+  parent[key] = value;
+}
+
+function removeValue(target: Record<string, unknown>, path: string) {
+  const { parent, key } = parentAt(target, path);
+  if (Array.isArray(parent)) {
+    const index = Number(key);
+    if (!Number.isInteger(index) || index < 0 || index >= parent.length) throw new Error(`Remove path does not exist: ${path}`);
+    parent.splice(index, 1);
+    return;
+  }
+  if (!(key in parent)) throw new Error(`Remove path does not exist: ${path}`);
+  delete parent[key];
+}
+
+function applyPlanOutputPatches(current: unknown, patches: PlanOutputPatch[]): unknown {
+  const target = cloneJson((current ?? { elements: {} }) as Record<string, unknown>);
+  for (const patch of patches) {
+    switch (patch.op) {
+      case "add":
+        writeValue(target, patch.path, cloneJson(patch.value), false);
+        break;
+      case "replace":
+        writeValue(target, patch.path, cloneJson(patch.value), true);
+        break;
+      case "remove":
+        removeValue(target, patch.path);
+        break;
+      case "copy":
+        writeValue(target, patch.path, cloneJson(valueAt(target, patch.from)), false);
+        break;
+      case "move": {
+        const value = cloneJson(valueAt(target, patch.from));
+        removeValue(target, patch.from);
+        writeValue(target, patch.path, value, false);
+        break;
+      }
+      case "test":
+        if (JSON.stringify(valueAt(target, patch.path)) !== JSON.stringify(patch.value)) throw new Error(`Patch test failed: ${patch.path}`);
+        break;
+    }
+  }
+  return target;
 }
 
 function outputNodeFromEffective(input: {
@@ -49,10 +121,10 @@ function outputNodeFromEffective(input: {
   return node;
 }
 
-async function submitNodeOutput(input: {
+async function updatePlanOutput(input: {
   taskId: string;
   commandContext?: ExecutionDispatchContext;
-  action: Extract<ExecutionActionInput, { action: "submit_node_output" }>;
+  action: Extract<ExecutionActionInput, { action: "update_plan_output" }>;
 }): Promise<PlanExecutionResult> {
   const accepted = await getAcceptedCompiledPlanForTask(input.taskId, {
     sessionId: input.action.sessionId,
@@ -60,7 +132,7 @@ async function submitNodeOutput(input: {
   if (!accepted)
     throw new EngineError(
       ENGINE_ERROR_CODES.INVALID_TASK_STATE,
-      "No accepted plan. Create or accept a plan before submitting node output.",
+      "No accepted plan. Create or accept a plan before updating plan output.",
     );
   const persisted = await getPlanRun(input.taskId, accepted.compiledPlan.editablePlanId, accepted.workBlockId);
   if (!persisted?.graph) throw new Error("No runtime graph is available for output submission");
@@ -70,39 +142,48 @@ async function submitNodeOutput(input: {
     results: persisted.results,
   });
   const node = outputNodeFromEffective({ effective, nodeId: input.action.nodeId });
-  const prior = persisted.results.findLast((result) => result.nodeId === node.id && result.status === "current");
-  const priorOutputs = input.action.mode === "replace" ? [] : prior?.outputs ?? [];
-  const nextResult: NodeResult = {
-    ...(prior ?? {}),
-    id: prior?.id ?? `result_${persisted.graph.id}_${node.id}_${Date.now()}`,
-    taskId: input.taskId,
-    graphId: persisted.graph.id,
-    nodeId: node.id,
-    nodeLayerId: node.activeLayerId ?? prior?.nodeLayerId,
-    attemptId: prior?.attemptId,
-    status: "current",
-    outputSummary: input.action.summary ?? prior?.outputSummary,
-    outputs: sanitizeNodeOutputs([...priorOutputs, ...asOutputs(input.action.outputs)]),
-    evidence: {
-      ...prior?.evidence,
-      sessionId: input.action.sessionId ?? prior?.evidence?.sessionId,
-    },
+  const nextSpec = applyPlanOutputPatches(persisted.planOutput.spec, input.action.patches);
+  const validation = validateChronaSpec(nextSpec);
+  if (!validation.ok) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      `Invalid chrona_plan_output json-render Spec patches: ${validation.issues.map((i) => `${i.path}: ${i.message}`).join("; ")}`,
+    );
+  }
+  const now = new Date().toISOString();
+  const planOutput: PlanOutputState = {
+    spec: validation.spec as PlanOutputState["spec"],
+    revision: persisted.planOutput.revision + 1,
+    updatedAt: now,
+    updatedByNodeId: node.id,
+    history: [
+      ...persisted.planOutput.history,
+      {
+        id: `plan_output_${persisted.graph.id}_${persisted.planOutput.revision + 1}_${Date.now()}`,
+        nodeId: node.id,
+        nodeLayerId: node.activeLayerId,
+        sessionId: input.action.sessionId,
+        summary: input.action.summary,
+        patches: input.action.patches,
+        createdAt: now,
+      },
+    ],
   };
-  const results = prior
-    ? persisted.results.map((result) => result === prior ? nextResult : result)
-    : [...persisted.results, nextResult];
-  await savePlanRun({
+  const saved = await savePlanRunGuarded({
     workspaceId: accepted.workspaceId,
     taskId: input.taskId,
     planId: accepted.compiledPlan.editablePlanId,
     workBlockId: accepted.workBlockId,
+    expectedEpoch: persisted.executionEpoch,
     run: persisted.planRun,
     compiledPlan: accepted.compiledPlan,
     graph: persisted.graph,
     attempts: persisted.attempts,
-    results,
+    results: persisted.results,
     executionContextSnapshots: persisted.executionContextSnapshots,
+    planOutput,
   });
+  if (!saved.committed) throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Plan output changed concurrently. Retry with latest output.");
   const mainSession = input.action.sessionId
     ? { id: input.action.sessionId }
     : await ensurePlanMainSession({ taskId: input.taskId, planId: accepted.compiledPlan.editablePlanId });
@@ -110,34 +191,34 @@ async function submitNodeOutput(input: {
     taskId: input.taskId,
     planId: accepted.compiledPlan.editablePlanId,
     sessionId: mainSession.id,
-    eventType: "node_result_submitted",
+    eventType: "plan_output_updated",
     payload: {
       nodeId: node.id,
-      outputCount: asOutputs(input.action.outputs).length,
-      mode: input.action.mode ?? "append",
+      patchCount: input.action.patches.length,
+      revision: planOutput.revision,
+      summary: input.action.summary,
     },
   });
   return getCurrentExecution({ taskId: input.taskId, workBlockId: accepted.workBlockId });
 }
 
 /**
- * Terminal node submission. submit_node_output appends partial outputs to the
- * running node; the terminal kinds (complete/block/fail) flow through the
- * kernel via dispatchExecutionAction, which continues serially to the next
- * ready node within the same dispatch — no out-of-band setTimeout follow-up.
+ * Terminal node submission. update_plan_output patches the shared plan-level
+ * json-render document; terminal kinds flow through the kernel via
+ * dispatchExecutionAction and continue serially when appropriate.
  */
 export async function submitTerminalNodeResult(input: {
   taskId: string;
   commandContext?: ExecutionDispatchContext;
   action: Extract<ExecutionActionInput, {
-    action: "submit_node_output" | "complete_manual_node" | "block_current_node" | "fail_current_node";
+    action: "update_plan_output" | "complete_manual_node" | "block_current_node" | "fail_current_node";
   }>;
 }): Promise<PlanExecutionResult> {
-  if (input.action.action === "submit_node_output") {
-    return submitNodeOutput(input as {
+  if (input.action.action === "update_plan_output") {
+    return updatePlanOutput(input as {
       taskId: string;
       commandContext?: ExecutionDispatchContext;
-      action: Extract<ExecutionActionInput, { action: "submit_node_output" }>;
+      action: Extract<ExecutionActionInput, { action: "update_plan_output" }>;
     });
   }
 

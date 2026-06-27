@@ -42,7 +42,7 @@ export async function dispatchNodeCommand(argv: readonly string[]): Promise<Node
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof UsageError) {
       stderrChunks.push(`Usage error: ${message}\n`);
-      stderrChunks.push("Usage: chrona node <output|complete|condition-select|wait-complete|block|fail> [...]\n");
+      stderrChunks.push("Usage: chrona plan output --patches-file <path> | chrona node <complete|condition-select|wait-complete|block|fail> [...]\n");
     } else if (error instanceof ConfigError) {
       stderrChunks.push(`Config error: ${message}\n`);
       stderrChunks.push("Chrona skill-mode commands require CHRONA_BASE_URL and CHRONA_RUN_TOKEN in env.\n");

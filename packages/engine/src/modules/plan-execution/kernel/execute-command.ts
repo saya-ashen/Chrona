@@ -191,7 +191,7 @@ function toSubmittedNodeResult(
         status: "done",
         summary: result.summary ?? "",
         evidence: result.evidence,
-        output: result.output ?? result.outputs,
+        output: result.output,
         selectedBranch: result.selectedBranch ?? selectedBranch,
       };
     case "failed":

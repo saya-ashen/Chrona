@@ -1,37 +1,30 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
-import { buildAcceptOrRegenerateSpec } from "../execution/build-execution-overview-spec";
+import { buildAcceptOrRegenerateSpec } from "../../../../../../../features/execution-monitoring/ui/build-execution-overview-spec";
 import type {
   CommandCenterCopy,
   CommandCenterPrimaryAction,
-} from "../execution/task-workspace-execution-overview";
-import { useActionSpecRenderConfig } from "../execution/action-tab";
+} from "../../../../../../../features/execution-monitoring/ui/task-workspace-execution-overview";
+import { useActionSpecRenderConfig } from "../../../../../../../features/execution-monitoring/ui/action-tab";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { TaskWorkspaceInspector } from "../execution/task-workspace-inspector";
+import { TaskWorkspaceInspector } from "../../../../../../../features/execution-monitoring/ui/task-workspace-inspector";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import {
   createTaskWorkspaceExecutionConsoleView,
   type TaskExecutionDispatchResult,
-} from "../model/task-workspace-query";
+} from "../../../../../../../features/task-workspace";
 import {
   dispatchInputForPrimaryAction,
   resolveCommandCenterPrimaryAction,
-} from "../model/task-workspace-primary-action";
-import { loadNodeWorkspaceActivityPage } from "../model/task-workspace-actions";
+} from "../../../../../../../features/task-workspace";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
-import type {
-  WorkspaceActivityItem,
-  TaskPageData,
-  TaskPlanGenerationStatus,
-} from "../model/task-workspace-types";
-import { useTaskWorkspacePlanSectionState } from "../hooks/use-task-workspace-plan-section-state";
+import type { TaskPageData, TaskPlanGenerationStatus, WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 function isCompletedGraphNode(status: string) {
@@ -65,6 +58,23 @@ function isCompletedTaskStatus(status: string | null | undefined) {
 function hasCompletedGraphExecution(graphPlan: TaskPlanGraphPlan | null) {
   const nodes = graphPlan?.nodes ?? [];
   return nodes.length > 0 && nodes.every((node) => isCompletedGraphNode(node.status));
+}
+
+export function derivePreferredGraphMode(input: {
+  currentMode: "full" | "compact";
+  isGeneratingPlan: boolean;
+  hasGraphExecutionStarted: boolean;
+  hasTaskCompleted: boolean;
+}): "full" | "compact" {
+  if (input.isGeneratingPlan) return "full";
+  if (input.hasGraphExecutionStarted || input.hasTaskCompleted) return "compact";
+  return input.currentMode;
+}
+
+export function recoveryActionButtonVariant(actionType: TaskAction["type"]): "default" | "outline" | "destructive" {
+  if (actionType === "cancel" || actionType === "cancel_execution") return "destructive";
+  if (actionType === "retry_sync" || actionType === "repair_inconsistency" || actionType === "replan_from_node") return "default";
+  return "outline";
 }
 
 function graphNodeIdForAction(action: TaskAction | null | undefined, pageData: TaskPageData, graphPlan: TaskPlanGraphPlan | null) {
@@ -121,21 +131,10 @@ export function TaskWorkspacePlanSection({
   onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
-  const [preferredNodeDetailTab, setPreferredNodeDetailTab] = useState<"result" | null>(null);
-  const { selectedPlanNode, selectedPlanNodes, handleSelectedPlanNodeChange } =
-    useTaskWorkspacePlanSectionState(graphPlan);
+  const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
-  const copy = messages.components?.taskWorkspace ?? {};
+  const copy = messages.components.taskWorkspace;
   const consoleView = useMemo(
-    () => createTaskWorkspaceExecutionConsoleView({
-      pageData,
-      graphPlan,
-      selectedNode: selectedPlanNode,
-      copy,
-    }),
-    [pageData, graphPlan, selectedPlanNode, copy],
-  );
-  const operationConsoleView = useMemo(
     () => createTaskWorkspaceExecutionConsoleView({
       pageData,
       graphPlan,
@@ -163,8 +162,15 @@ export function TaskWorkspacePlanSection({
   const isPlanAwaitingAcceptance = Boolean(plan && !isPlanAccepted);
   const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
-  const currentOperationNode = operationConsoleView.nodeDetail.currentNode;
-  const selectedDetailNode = consoleView.nodeDetail.currentNode;
+  useEffect(() => {
+    setGraphMode((currentMode) => derivePreferredGraphMode({
+      currentMode,
+      isGeneratingPlan,
+      hasGraphExecutionStarted,
+      hasTaskCompleted,
+    }));
+  }, [hasGraphExecutionStarted, hasTaskCompleted, isGeneratingPlan]);
+  const currentOperationNode = consoleView.nodeDetail.currentNode;
   const taskPrimaryAction = pageData.task.executionSummary?.primaryAction ?? null;
   const primaryActionNodeId = graphNodeIdForAction(taskPrimaryAction, pageData, graphPlan);
   const primaryActionDispatch = taskPrimaryAction
@@ -175,30 +181,15 @@ export function TaskWorkspacePlanSection({
     !hasTaskCompleted &&
     taskPrimaryAction?.enabled &&
     taskPrimaryAction.type !== "none" &&
-    taskPrimaryAction.type !== "start",
+    taskPrimaryAction.type !== "start"
   );
-  const nodeActivityQuery = useQuery({
-    queryKey: ["task-workspace-node-activity", pageData.task.id, selectedDetailNode?.id],
-    queryFn: () => loadNodeWorkspaceActivityPage({
-      taskId: pageData.task.id,
-      nodeId: selectedDetailNode?.id ?? "",
-      limit: 100,
-    }),
-    enabled: Boolean(selectedDetailNode?.id) && Boolean(selectedPlanNode),
-  });
-  // Scope follows the user's explicit graph selection. `selectedDetailNode`
-  // falls back to the active node for display, so it must not drive scope.
-  const inspectorScope = selectedPlanNode ? "node" : "task";
-  const selectedNodeRuntimeEvents = selectedDetailNode?.id
-    ? runtimeEvents.filter((event) => event.nodeId === selectedDetailNode.id)
-    : [];
-  const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !operationConsoleView.nodeDetail.disabledActionReason;
+  const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !consoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
   const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
   const commandCenterScopeKey = pageData.task.currentWorkBlock?.id ?? pageData.task.id;
   const currentOperationAction = useActionSpecRenderConfig({
     node: currentOperationNode,
-    disabledActionReason: operationConsoleView.nodeDetail.disabledActionReason,
+    disabledActionReason: consoleView.nodeDetail.disabledActionReason,
     onDispatchExecutionAction,
     onSubmitCheckpointAction,
   });
@@ -233,7 +224,7 @@ export function TaskWorkspacePlanSection({
       if (!checkpointId || !actionId) throw new Error("Checkpoint action payload is incomplete.");
       const rawValues = (params.values ?? {}) as Record<string, unknown>;
       const values = Object.fromEntries(
-        Object.entries(rawValues).filter(([, value]) => typeof value === "string" && value.trim()),
+        Object.entries(rawValues).filter(([, value]) => typeof value === "string" && value.trim().length > 0),
       ) as Record<string, string>;
       const payloadValue = Object.values(values)[0];
       return onSubmitCheckpointAction({
@@ -262,7 +253,7 @@ export function TaskWorkspacePlanSection({
     shouldShowCurrentOperation: shouldShowCurrentOperation && Boolean(currentOperationNode),
     currentOperationStatusLabel: currentOperationNode?.statusLabel ?? currentOperationNode?.status ?? null,
     currentOperationDescription: currentOperationNode?.nextAction ?? currentOperationNode?.summary ?? null,
-    currentOperationTone: operationConsoleView.attention?.tone ?? operationConsoleView.readiness.tone,
+    currentOperationTone: consoleView.attention?.tone ?? consoleView.readiness.tone,
     primaryStateLabel: consoleView.header.primaryStateLabel ?? null,
     taskStatus: pageData.task.status,
     runnabilitySummary: pageData.task.runnabilitySummary || null,
@@ -295,35 +286,20 @@ export function TaskWorkspacePlanSection({
         }
       : {}),
   };
-  const handlePlanNodeChange = useCallback((
-    node: PlanNodeDataModel | null,
-    nodes: PlanNodeDataModel[],
-  ) => {
-    handleSelectedPlanNodeChange(node, nodes);
-  }, [handleSelectedPlanNodeChange]);
   const focusNodeActions = (nodeId?: string) => {
-    if (nodeId && graphPlan) {
-      const node =
-        graphPlan.nodes.find((candidate) => candidate.id === nodeId) ?? null;
-      if (node) {
-        handleSelectedPlanNodeChange(node, [node]);
-      }
-    }
-    setPreferredNodeDetailTab("result");
+    if (!nodeId) return;
 
     const actionsPanel = document.getElementById("task-workspace-node-actions");
     if (typeof actionsPanel?.scrollIntoView === "function") {
       actionsPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   };
-  const handleBackToTask = useCallback(() => {
-    handleSelectedPlanNodeChange(null, []);
-  }, [handleSelectedPlanNodeChange]);
+
 
   return (
     <section
       aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
-      className="relative flex flex-col overflow-visible rounded-[1.75rem] border border-border/80 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--canvas)_88%,var(--background)),var(--canvas))] p-2 pb-0 shadow-[0_18px_60px_rgba(15,23,42,0.08)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+      className="relative flex flex-col overflow-visible rounded-[1.75rem] border border-border/80 bg-muted/20 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.06)] xl:min-h-0 xl:flex-1 xl:overflow-hidden"
     >
       {stateMessage ? (
         <div
@@ -348,7 +324,7 @@ export function TaskWorkspacePlanSection({
                   key={action.type}
                   type="button"
                   size="sm"
-                  variant="destructive"
+                  variant={recoveryActionButtonVariant(action.type)}
                   className="h-7 rounded-lg px-2.5 text-xs"
                   disabled={!action.enabled}
                   onClick={() => focusNodeActions(recoveryCurrentNodeId)}
@@ -361,45 +337,39 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : null}
 
-      <div className="relative flex min-h-[680px] flex-1 flex-col gap-2 xl:min-h-0">
-        <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1.18fr)_minmax(30rem,0.82fr)]">
-          <section
-            aria-label={copy.executionFlow ?? "Execution flow"}
-            className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/60 bg-background/55 shadow-sm"
-          >
-            <TaskWorkspacePlanContent
-              label={label}
-              graphPlan={graphPlan}
-              isGraphPlanPending={isGraphPlanPending}
-              plan={plan}
-              acceptPlanError={acceptPlanError}
-              planGenerationStatus={planGenerationStatus}
-              onGeneratePlan={onGeneratePlan}
-              onSelectedNodeChange={handlePlanNodeChange}
-            />
-          </section>
-          <TaskWorkspaceInspector
-            key={commandCenterScopeKey}
-            taskId={pageData.task.id}
-            scope={inspectorScope}
-            consoleView={consoleView}
-            primaryAction={primaryAction}
-            commandCenter={commandCenter ?? null}
-            commandCenterActionHandlers={commandCenterActionHandlers}
-            runtimeEvents={runtimeEvents}
-            liveActivity={liveActivity}
-            commandCenterCopy={commandCenterCopy}
-            copy={copy}
-            selectedNodes={selectedPlanNodes}
-            selectedNodeRuntimeEvents={selectedNodeRuntimeEvents}
-            nodeActivity={nodeActivityQuery.data?.items ?? []}
-            isNodeActivityLoading={nodeActivityQuery.isLoading || nodeActivityQuery.isFetching}
-            preferredNodeDetailTab={preferredNodeDetailTab}
-            onPreferredNodeDetailTabApplied={() => setPreferredNodeDetailTab(null)}
-            onAction={focusNodeActions}
-            onBackToTask={handleBackToTask}
+      <div className={graphMode === "compact"
+        ? "grid min-h-[680px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,0.44fr)_minmax(36rem,1.56fr)]"
+        : "grid min-h-[680px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]"}>
+        <section
+          aria-label={copy.executionFlow ?? "Execution flow"}
+          className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/70 bg-background/75"
+        >
+          <TaskWorkspacePlanContent
+            label={label}
+            graphPlan={graphPlan}
+            isGraphPlanPending={isGraphPlanPending}
+            plan={plan}
+            acceptPlanError={acceptPlanError}
+            planGenerationStatus={planGenerationStatus}
+            graphMode={graphMode}
+            onGraphModeChange={setGraphMode}
+            onGeneratePlan={onGeneratePlan}
           />
-        </div>
+        </section>
+        <TaskWorkspaceInspector
+          key={commandCenterScopeKey}
+          taskId={pageData.task.id}
+          consoleView={consoleView}
+          primaryAction={primaryAction}
+          commandCenter={commandCenter ?? null}
+          commandCenterActionHandlers={commandCenterActionHandlers}
+          runtimeEvents={runtimeEvents}
+          liveActivity={liveActivity}
+          commandCenterCopy={commandCenterCopy}
+          isPlanCompact={graphMode === "compact"}
+          copy={copy}
+          onAction={focusNodeActions}
+        />
       </div>
     </section>
   );

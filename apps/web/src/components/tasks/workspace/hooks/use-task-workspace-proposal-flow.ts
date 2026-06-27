@@ -10,8 +10,8 @@ import {
   settleProposalApply,
   startProposalApply,
   type ProposalFlowState,
-} from "../model/task-workspace-proposal-flow-machine";
-import type { CurrentProposalState, EditableTask, TaskData } from "../model/task-workspace-types";
+} from "../../../../../../../features/task-workspace";
+import type { CurrentProposalState, EditableTask, TaskData } from "../../../../../../../features/task-workspace";
 
 type UseTaskWorkspaceProposalFlowInput = {
   task: TaskData;

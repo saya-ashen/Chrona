@@ -119,6 +119,13 @@ export async function recordTerminalAction(input: {
   workspaceId: string;
 }): Promise<RecordedTerminalAction> {
   const { workspaceId } = input;
+  if (input.scope.nodeAttemptId) {
+    const existing = await db.taskPlanTerminalAction.findFirst({
+      where: { nodeAttemptId: input.scope.nodeAttemptId, kind: input.kind },
+      select: { id: true },
+    });
+    if (existing) throw new DuplicateTerminalActionError(input.kind);
+  }
   const created = await db.taskPlanTerminalAction
     .create({
       data: {

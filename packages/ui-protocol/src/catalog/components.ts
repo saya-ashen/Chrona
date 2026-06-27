@@ -205,6 +205,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         provider: bindableStringSchema,
         emptyMessage: z.string().optional(),
         toolLabels: toolDetailLabelsSchema,
+        density: z.enum(["rail"]).optional(),
       }),
       description: "Streaming activity feed backed by json-render state.",
     },
@@ -339,7 +340,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
   },
 });
 
-export const chronaNodeOutputCatalog = defineCatalog(chronaSchema, {
+export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
   components: {
     Stack: shadcn.Stack,
     Card: shadcn.Card,
@@ -385,7 +386,7 @@ export const chronaNodeOutputCatalog = defineCatalog(chronaSchema, {
         copyText: z.string().optional(),
       }),
       description:
-        "Compact result summary header with optional copy text. Use once near the top of node output.",
+        "Compact result summary header with optional copy text. Use once near the top of plan output.",
       example: { text: "Implementation complete; focused tests passed." },
     },
     CollapsibleText: collapsibleTextComponentDefinition,
@@ -393,61 +394,120 @@ export const chronaNodeOutputCatalog = defineCatalog(chronaSchema, {
   actions: {},
 });
 
-const nodeOutputComponentPropsJsonSchemas = {
-  Stack: {
-    type: "object",
-    properties: {
-      direction: { type: "string", enum: ["horizontal", "vertical"] },
-      gap: { type: "string", enum: ["none", "sm", "md", "lg", "xl"] },
-      align: { type: "string", enum: ["start", "center", "end", "stretch"] },
-      justify: { type: "string", enum: ["start", "center", "end", "between", "around"] },
-      className: { type: "string" },
-    },
-    additionalProperties: false,
-  },
-  Card: {
-    type: "object",
-    properties: {
-      title: { type: "string" },
-      description: { type: "string" },
-      maxWidth: { type: "string", enum: ["sm", "md", "lg", "full"] },
-      centered: { type: "boolean" },
-      className: { type: "string" },
-    },
-    additionalProperties: false,
-  },
-  Separator: { type: "object", properties: { orientation: { type: "string", enum: ["horizontal", "vertical"] } }, additionalProperties: false },
-  Heading: { type: "object", properties: { text: { type: "string" }, level: { type: "string", enum: ["h1", "h2", "h3", "h4"] } }, required: ["text"], additionalProperties: false },
-  Text: { type: "object", properties: { text: { type: "string" }, variant: { type: "string", enum: ["default", "muted", "lead", "code"] } }, required: ["text"], additionalProperties: false },
-  Badge: { type: "object", properties: { text: { type: "string" }, variant: { type: "string", enum: ["default", "secondary", "destructive", "outline"] } }, required: ["text"], additionalProperties: false },
-  Alert: { type: "object", properties: { title: { type: "string" }, message: { type: "string" }, type: { type: "string", enum: ["info", "success", "warning", "error"] } }, required: ["title"], additionalProperties: false },
-  Table: { type: "object", properties: { columns: { type: "array", items: { type: "string" } }, rows: { type: "array", items: { type: "array", items: { type: "string" } } }, caption: { type: "string" } }, required: ["columns", "rows"], additionalProperties: false },
-  Markdown: { type: "object", properties: { content: { type: "string" }, title: { type: "string" } }, required: ["content"], additionalProperties: false },
-  JsonView: { type: "object", properties: { value: {}, title: { type: "string" } }, required: ["value"], additionalProperties: false },
-  FileRef: { type: "object", properties: { path: { type: "string" }, title: { type: "string" }, language: { type: "string" }, description: { type: "string" } }, required: ["path"], additionalProperties: false },
-  ResultSummary: { type: "object", properties: { text: { type: "string" }, copyText: { type: "string" } }, additionalProperties: false },
-  CollapsibleText: { type: "object", properties: { text: { type: "string" }, threshold: { type: "number" } }, required: ["text"], additionalProperties: false },
-} as const;
+const planOutputComponentEntries = Object.entries(
+  chronaPlanOutputCatalog.data.components,
+);
 
-function nodeOutputJsonSchema() {
-  const componentSchemas = Object.entries(nodeOutputComponentPropsJsonSchemas).map(([name, props]) => ({
+
+const planOutputComponentNames = planOutputComponentEntries.map(([name]) => name) as [
+  string,
+  ...string[],
+];
+
+export const chronaPlanOutputElementSchema = z
+  .object({
+    type: z.enum(planOutputComponentNames),
+    props: z.record(z.string(), z.unknown()).optional(),
+    children: z.array(z.string()).optional(),
+    visible: z.unknown().optional(),
+  })
+  .strict();
+
+function schemaVariants(schema: z.core.JSONSchema.JSONSchema) {
+  if (schema && typeof schema === "object" && !Array.isArray(schema) && "anyOf" in schema) {
+    const variants = (schema as { anyOf?: z.core.JSONSchema.JSONSchema[] }).anyOf;
+    if (Array.isArray(variants)) return variants;
+  }
+  return [schema];
+}
+
+function mergeJsonSchemas(
+  left: z.core.JSONSchema.JSONSchema | undefined,
+  right: z.core.JSONSchema.JSONSchema,
+): z.core.JSONSchema.JSONSchema {
+  const variants = [...(left ? schemaVariants(left) : []), ...schemaVariants(right)];
+  const unique = Array.from(new Map(variants.map((variant) => [JSON.stringify(variant), variant])).values());
+  return unique.length === 1 ? unique[0]! : { anyOf: unique };
+}
+
+function planOutputPropsJsonSchema(): z.core.JSONSchema.JSONSchema {
+  const properties: Record<string, z.core.JSONSchema.JSONSchema> = {};
+  for (const [, component] of planOutputComponentEntries) {
+    const schema = planOutputComponentPropsJsonSchema(component) as {
+      properties?: Record<string, z.core.JSONSchema.JSONSchema>;
+    };
+    for (const [key, propSchema] of Object.entries(schema.properties ?? {})) {
+      properties[key] = mergeJsonSchemas(properties[key], propSchema);
+    }
+  }
+
+  return {
+    type: "object",
+    properties,
+    additionalProperties: false,
+  };
+}
+
+export function chronaPlanOutputCatalogPrompt() {
+  return chronaPlanOutputCatalog.prompt({
+    editModes: ["patch"],
+    customRules: [
+      "Each patch is a JSON Patch operation over Current Node Context JSON.context.planOutput.spec.",
+      "Chrona does not accept raw JSONL text. Put the generated RFC 6902 patch objects in chrona_plan_output.patches.",
+      "Use chrona_plan_output for shared plan-level user-visible output only.",
+      "When planOutput.spec is null, bootstrap with /root and every referenced /elements/<id> entry in one tool call.",
+      "Patch narrowly when output already exists; prefer /elements/<id>/props/<prop> for small text updates.",
+      "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, or node-local outputs.",
+    ],
+  });
+}
+
+function withoutSchemaKeyword(schema: z.core.JSONSchema.JSONSchema) {
+  const { $schema: _schema, ...rest } = schema as Record<string, unknown>;
+  return rest as z.core.JSONSchema.JSONSchema;
+}
+
+function planOutputComponentPropsJsonSchema(
+  component: (typeof planOutputComponentEntries)[number][1],
+): z.core.JSONSchema.JSONSchema {
+  return withoutSchemaKeyword(
+    z.toJSONSchema(component.props, {
+      target: "draft-07",
+      unrepresentable: "any",
+    }) as z.core.JSONSchema.JSONSchema,
+  );
+}
+
+export function chronaPlanOutputElementJsonSchema(): z.core.JSONSchema.JSONSchema {
+  return {
     type: "object",
     properties: {
-      id: { type: "string" },
-      type: { const: name },
-      props,
+      type: { type: "string", enum: planOutputComponentNames },
+      props: planOutputPropsJsonSchema(),
       children: { type: "array", items: { type: "string" } },
       visible: {},
     },
-    required: ["id", "type", "props", "children"],
+    required: ["type", "props"],
     additionalProperties: false,
-  }));
+  };
+}
 
+export function chronaPlanOutputPatchValueJsonSchema(): z.core.JSONSchema.JSONSchema {
+  return {
+    description:
+      "Patch value. Required for add/replace/test; omit for remove/move/copy. Use string for /root or scalar props, string[] for children, element object for /elements/<id>, object for props/state/JsonView, or number/boolean/null for scalar values.",
+  };
+}
+
+export function chronaPlanOutputSpecJsonSchemaFromCatalog(): z.core.JSONSchema.JSONSchema {
   return {
     type: "object",
     properties: {
       root: { type: "string" },
-      elements: { type: "array", items: { oneOf: componentSchemas }, minItems: 1 },
+      elements: {
+        type: "object",
+        additionalProperties: chronaPlanOutputElementJsonSchema(),
+      },
       state: { type: "object", additionalProperties: true },
     },
     required: ["root", "elements"],
@@ -455,11 +515,54 @@ function nodeOutputJsonSchema() {
   };
 }
 
-export const chronaNodeOutputSpecJsonSchema = nodeOutputJsonSchema();
-export const chronaNodeOutputSpecSchema = chronaNodeOutputCatalog.zodSchema();
+export function chronaPlanOutputPatchJsonSchema(): z.core.JSONSchema.JSONSchema {
+  const path: z.core.JSONSchema.JSONSchema = {
+    type: "string",
+    minLength: 1,
+    description:
+      "JSON Pointer into the plan-output Spec. Use /root, /elements/<id>, /elements/<id>/children, /elements/<id>/children/<index>, or /elements/<id>/props/<prop>. Use /state/<key> only when the element uses json-render state expressions.",
+  };
+  const from: z.core.JSONSchema.JSONSchema = {
+    ...path,
+    description: "Source JSON Pointer. Required for move/copy; omit for add/replace/remove/test.",
+  };
+  const value = chronaPlanOutputPatchValueJsonSchema();
 
-export type ChronaNodeOutputCatalog = typeof chronaNodeOutputCatalog;
-export type ChronaNodeOutputComponentName =
-  keyof typeof chronaNodeOutputCatalog.data.components;
+  return {
+    type: "object",
+    properties: {
+      op: { type: "string", enum: ["add", "replace", "remove", "move", "copy", "test"] },
+      path,
+      from,
+      value,
+    },
+    required: ["op", "path"],
+    additionalProperties: false,
+  };
+}
+
+export function chronaPlanOutputToolInputJsonSchema(): z.core.JSONSchema.JSONSchema {
+  return {
+    type: "object",
+    properties: {
+      patches: {
+        type: "array",
+        minItems: 1,
+        items: chronaPlanOutputPatchJsonSchema(),
+        description: "RFC 6902 patches over the shared plan-output Spec.",
+      },
+      summary: { type: "string", minLength: 1 },
+    },
+    required: ["patches"],
+    additionalProperties: false,
+  };
+}
+
+export const chronaPlanOutputSpecJsonSchema = chronaPlanOutputSpecJsonSchemaFromCatalog();
+export const chronaPlanOutputSpecSchema = chronaPlanOutputCatalog.zodSchema();
+
+export type ChronaPlanOutputCatalog = typeof chronaPlanOutputCatalog;
+export type ChronaPlanOutputComponentName =
+  keyof typeof chronaPlanOutputCatalog.data.components;
 export type ChronaCatalog = typeof chronaCatalog;
 export type ChronaComponentName = keyof typeof chronaCatalog.data.components;

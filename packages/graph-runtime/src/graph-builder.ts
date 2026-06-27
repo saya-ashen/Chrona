@@ -35,11 +35,11 @@ export function createNodeDefinitionFromCompiledNode(
       priority: node.priority,
       mode: node.mode,
       linkedTaskId: linkedTaskId ?? node.linkedTaskId,
-      metadata: structuredClone((node.config ?? {}) as Record<string, unknown>),
+      metadata: structuredClone(node.config as Record<string, unknown>),
     },
     executor: node.executor,
     estimatedMinutes: node.estimatedMinutes,
-    metadata: structuredClone((node.config ?? {}) as Record<string, unknown>),
+    metadata: structuredClone(node.config as Record<string, unknown>),
   };
 }
 

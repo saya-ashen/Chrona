@@ -1,0 +1,12 @@
+export * from "./model/task-workspace-types";
+export * from "./model/task-workspace-state";
+export * from "./model/task-workspace-actions";
+export * from "./model/task-workspace-activity";
+export * from "./model/task-workspace-query";
+export * from "./model/task-workspace-primary-action";
+export * from "./model/task-workspace-editor-view-model";
+export * from "./model/task-workspace-plan-flow-machine";
+export * from "./model/task-workspace-proposal-flow-machine";
+export * from "./model/workspace-events";
+export { TaskWorkspacePage } from "./ui/task-workspace-page";
+export { TaskWorkspaceHeaderCard } from "./ui/task-workspace-header-card";

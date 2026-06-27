@@ -28,18 +28,18 @@ run start; never copy it, never echo it, never pass it as a flag).
 Pick the verb that matches the node type you were given in the prompt:
 
 ```sh
-# Streaming output (non-terminal; can call multiple times)
-chrona node output --outputs-file ./outputs.json --mode append
+# Shared plan output (non-terminal; can call multiple times)
+chrona plan output --patches-file ./patches.json
 
 # Terminal verbs (first one wins)
-chrona node complete           --output-file ./result.json
+chrona node complete           --summary "..."
 chrona node condition-select   --branch <branchRef> --summary "..."
 chrona node wait-complete      --summary "..."
 chrona node block              --reason "..." --action-form '{...}'
 chrona node fail               --error "..."
 ```
 
-- `--output-file` / `--outputs-file` read JSON from disk. Write the file with
+- `--patches-file` reads JSON Patch operations from disk. Write the file with
   your normal `Bash` tools first, then reference it.
 - The CLI exits non-zero with an actionable error if the env is missing or the
   engine rejects the action; read the message and adjust.

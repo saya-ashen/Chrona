@@ -136,38 +136,19 @@ describe("plan-runner task executor external results", () => {
     expect(attemptCountAfterReplay).toBe(attemptCountBeforeReplay);
   });
 
-  it("accumulates chrona_node_output outputs into the completed node result", async () => {
+  it("patches shared plan output without writing node-local outputs", async () => {
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
-      const partialSpec = {
-        root: "root",
-        elements: {
-          root: {
-            type: "Stack",
-            props: { gap: "sm" },
-            children: ["partial"],
-          },
-          partial: { type: "Markdown", props: { content: "Partial output" } },
-        },
-      };
-      const resultSpec = {
-        root: "root",
-        elements: {
-          root: {
-            type: "Stack",
-            props: { gap: "sm" },
-            children: ["summary"],
-          },
-          summary: { type: "Markdown", props: { content: "Final UI output" } },
-        },
-      };
-
       const firstAppend = await taskPlanExecution.submitNodeResult({
         taskId: input.taskId,
         action: {
-          action: "submit_node_output",
+          action: "update_plan_output",
           sessionId: input.mainSession.id,
-          mode: "append",
-          outputs: [partialSpec],
+          patches: [
+            { op: "add", path: "/root", value: "root" },
+            { op: "add", path: "/elements/root", value: { type: "Stack", props: { gap: "sm" }, children: ["partial"] } },
+            { op: "add", path: "/elements/partial", value: { type: "Markdown", props: { content: "Partial output" }, children: [] } },
+          ],
+          summary: "Partial output",
         },
       });
       expect(firstAppend.status).toBe("running");
@@ -175,16 +156,17 @@ describe("plan-runner task executor external results", () => {
       await taskPlanExecution.submitNodeResult({
         taskId: input.taskId,
         action: {
-          action: "submit_node_output",
+          action: "update_plan_output",
           sessionId: input.mainSession.id,
-          mode: "append",
-          outputs: [resultSpec],
+          patches: [
+            { op: "replace", path: "/elements/root/children", value: ["summary"] },
+            { op: "remove", path: "/elements/partial" },
+            { op: "add", path: "/elements/summary", value: { type: "Markdown", props: { content: "Final UI output" }, children: [] } },
+          ],
+          summary: "Final output",
         },
       });
 
-      // Completion carries no inline output. The latest json-render Spec submitted
-      // via chrona_node_output (append mode keeps the last Spec) survives into the
-      // completed result. Legacy typed outputs are rejected at submission time.
       const submittedResult = await taskPlanExecution.dispatch({
         taskId: input.taskId,
         action: {
@@ -202,8 +184,8 @@ describe("plan-runner task executor external results", () => {
       } satisfies NodeExecutionResult;
     });
 
-    const { workspace, task } = await seedWorkspaceAndTask("Runner accumulates node outputs");
-    const compiledPlan = makeSingleTaskPlan("graph_task_output_accumulation");
+    const { workspace, task } = await seedWorkspaceAndTask("Runner patches plan output");
+    const compiledPlan = makeSingleTaskPlan("graph_task_output_patch");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     const result = await taskPlanExecution.dispatch({
@@ -220,19 +202,17 @@ describe("plan-runner task executor external results", () => {
       status: "current",
       outputSummary: "Task wrapped up",
     });
-    expect(completed?.outputs).toEqual([
-      {
+    expect(completed).not.toHaveProperty("outputs");
+    expect(persisted?.planOutput).toMatchObject({
+      revision: 2,
+      spec: {
         root: "root",
         elements: {
-          root: {
-            type: "Stack",
-            props: { gap: "sm" },
-            children: ["summary"],
-          },
-          summary: { type: "Markdown", props: { content: "Final UI output" } },
+          root: { type: "Stack", props: { gap: "sm" }, children: ["summary"] },
+          summary: { type: "Markdown", props: { content: "Final UI output" }, children: [] },
         },
       },
-    ]);
+    });
   });
 
   it("continues to downstream work when a running task submits its own terminal result", async () => {
@@ -247,7 +227,7 @@ describe("plan-runner task executor external results", () => {
             output: {
               root: "root",
               elements: {
-                root: { type: "JsonView", props: { value: { source: "chrona_node_output" } } },
+                root: { type: "JsonView", props: { value: { source: "chrona_plan_output" } } },
               },
             },
           },

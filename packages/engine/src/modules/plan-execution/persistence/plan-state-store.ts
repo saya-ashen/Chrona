@@ -22,6 +22,7 @@ type MainSessionEventType =
   | "node_blocked"
   | "graph_mutation_applied"
   | "node_result_submitted"
+  | "plan_output_updated"
   | "continuation_skipped"
   | "replan_proposed"
   | "execution_completed"

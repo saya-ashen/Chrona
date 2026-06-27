@@ -160,23 +160,26 @@ function focusScore(item: ProjectionWithTask, now: number): number {
 
 type OutputRef = { id: string; title: string; type: string; taskId: string } | null;
 
+function planOutputTitle(planRun: unknown): string | null {
+  const record = planRun as { mutableGraph?: { planOutput?: { history?: Array<{ summary?: unknown }> } } } | null;
+  const history = record?.mutableGraph?.planOutput?.history;
+  if (!Array.isArray(history) || history.length === 0) return null;
+  return readString(history.at(-1)?.summary) ?? "Plan output";
+}
+
 async function loadLatestOutputs(workspaceId: string): Promise<Map<string, OutputRef>> {
-  const recent = await db.artifact.findMany({
+  const recent = await db.taskPlanRun.findMany({
     where: { workspaceId },
-    orderBy: { createdAt: "desc" },
+    orderBy: { updatedAt: "desc" },
     take: 60,
-    select: { id: true, taskId: true, title: true, type: true },
+    select: { id: true, taskId: true, planRun: true },
   });
   const byTask = new Map<string, OutputRef>();
-  for (const artifact of recent) {
-    if (!byTask.has(artifact.taskId)) {
-      byTask.set(artifact.taskId, {
-        id: artifact.id,
-        title: artifact.title,
-        type: artifact.type,
-        taskId: artifact.taskId,
-      });
-    }
+  for (const run of recent) {
+    if (byTask.has(run.taskId)) continue;
+    const title = planOutputTitle(run.planRun);
+    if (!title) continue;
+    byTask.set(run.taskId, { id: run.id, title, type: "plan_output", taskId: run.taskId });
   }
   return byTask;
 }

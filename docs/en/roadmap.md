@@ -1,6 +1,6 @@
 # Chrona Roadmap
 
-Current version: 0.1.4
+Current version: 0.1.9
 
 Chrona is evolving into a task control plane for AI-assisted work. The product connects four loops that should stay visible and recoverable: task capture, graph planning, schedule placement, and runtime execution.
 
@@ -32,6 +32,7 @@ These capabilities exist in the current codebase and should be treated as produc
 | AI clients | Database-backed AI clients and feature bindings through Settings / AI Clients. |
 | Backend API | Task CRUD/lifecycle routes, plan generation/acceptance routes, task-scoped execution routes, work/schedule page projections, runtime provider routes, and AI client routes. |
 | MCP / Hermes | Streamable HTTP MCP tools for Chrona execution/plan/node operations and Hermes provider/plugin integration for agent-style execution. |
+| External calendars | Read-only subscription sources, source validation/management, imported busy events, refresh status, and schedule context. |
 
 ## Near-term priorities
 
@@ -83,11 +84,11 @@ Near-term work should make the existing schedule-to-execution product dependable
 - Keep per-session events inspectable from the Work page and execution timeline.
 - Prevent multi-session execution from duplicating node completion or corrupting graph state.
 
-### 7. Integrate external calendar software
+### 7. Finish external calendar ecosystem
 
-- Connect external calendar systems so Chrona can coordinate scheduled work with existing calendars.
+- Keep current read-only subscription import reliable across malformed feeds, blocked local URLs, and refresh failures.
+- Add authenticated provider integrations such as Google/Outlook only after subscription behavior remains stable.
 - Keep calendar import/sync behavior explicit, reversible where possible, and safe around conflicts.
-- Map external events to Chrona work blocks without losing Chrona task, plan, and execution context.
 - Surface calendar conflicts and schedule proposals in the same review loop as native Chrona scheduling.
 
 ### 8. Bring docs in line with the product

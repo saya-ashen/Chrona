@@ -22,6 +22,15 @@ const nodeActionFormSchema = z.object({
   inputFields: z.array(nodeActionFormFieldSchema).min(1, "at least one input field is required"),
 }).strict();
 
+const planOutputPatchSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("add"), path: z.string().min(1), value: z.unknown() }).strict(),
+  z.object({ op: z.literal("remove"), path: z.string().min(1) }).strict(),
+  z.object({ op: z.literal("replace"), path: z.string().min(1), value: z.unknown() }).strict(),
+  z.object({ op: z.literal("move"), path: z.string().min(1), from: z.string().min(1) }).strict(),
+  z.object({ op: z.literal("copy"), path: z.string().min(1), from: z.string().min(1) }).strict(),
+  z.object({ op: z.literal("test"), path: z.string().min(1), value: z.unknown() }).strict(),
+]);
+
 
 export const providerApprovalChoiceSchema = z.enum([
   "approve_once",
@@ -144,11 +153,10 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({
-    action: z.literal("submit_node_output"),
+    action: z.literal("update_plan_output"),
     sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
-    outputs: z.unknown(),
-    mode: z.enum(["append", "replace"]).optional(),
+    patches: z.array(planOutputPatchSchema).min(1),
     summary: z.string().optional(),
     idempotencyKey: idempotencyKeySchema.optional(),
   }),

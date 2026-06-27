@@ -45,21 +45,21 @@ stderr. The agent is the operator; the exit code is its only feedback.
 The CLI accepts flag-based argv. **Task / node ids are never accepted on
 argv** — they are resolved server-side from the run token. Only payload
 fields (e.g. `--summary`, `--error`, `--branch`) and file paths (e.g.
-`--outputs-file`, `--diagnostics-file`) are read from argv.
+`--patches-file`, `--diagnostics-file`) are read from argv.
 
 ### Node actions
 
 ```text
-chrona node output        --outputs-file <path> [--mode append|replace] [--summary <s>]
-chrona node complete      [--summary <s>] [--output-file <path>]
-chrona node condition-select --branch <ref> --summary <s> [--node-id <id>] [--output-file <path>]
-chrona node wait-complete --summary <s> [--output-file <path>]
+chrona plan output        --patches-file <path> [--summary <s>]
+chrona node complete      [--summary <s>]
+chrona node condition-select --branch <ref> --summary <s> [--node-id <id>]
+chrona node wait-complete --summary <s>
 chrona node block         --reason <s> --action-form <json> | --action-form-file <path> [--retryable]
 chrona node fail          --error <s> [--diagnostics <json> | --diagnostics-file <path>] [--retryable]
 ```
 
-`--outputs-file` / `--output-file` take a path to a JSON file on disk (the
-canonical way to pass large output specs without shell-escaping). The
+`--patches-file` takes a path to a JSON Patch array on disk (the
+canonical way to pass large patches without shell-escaping). The
 condition-select `--node-id` defaults to `"current"`; the server resolves
 the actual id from the run token.
 
@@ -73,8 +73,8 @@ chrona plan read
 ### Examples
 
 ```bash
-# Node output — write the spec to disk, then post it.
-chrona node output --outputs-file /tmp/output.json --mode replace --summary "wrote card"
+# Plan output — write JSON Patch operations to disk, then post them.
+chrona plan output --patches-file /tmp/output-patches.json --summary "wrote card"
 
 # Node fail with structured diagnostics.
 chrona node fail --error "command exited 1" --diagnostics '{"exitCode":1}'
@@ -96,7 +96,7 @@ Every command POSTs to `<CHRONA_BASE_URL>/agent/control` with
 
 | Command                         | Wire `kind`        |
 | ------------------------------- | ------------------ |
-| `chrona node output`            | `output`           |
+| `chrona plan output`            | `plan_output`      |
 | `chrona node complete`          | `complete`         |
 | `chrona node condition-select`  | `condition_select` |
 | `chrona node wait-complete`     | `wait_complete`    |

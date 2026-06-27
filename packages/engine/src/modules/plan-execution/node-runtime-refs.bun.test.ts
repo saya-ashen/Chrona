@@ -111,7 +111,6 @@ describe("node runtime refs", () => {
         nodeId: "dependency-real-123",
         status: "completed",
         outputSummary: "Weather script requirements confirmed.",
-        outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { location: "Beijing" } } } } }],
       } as unknown as EffectivePlanNode["result"],
     });
     const unrelated = node({
@@ -152,7 +151,6 @@ describe("node runtime refs", () => {
         nodeRef: "N20260516-01",
         title: "Confirm requirements",
         summary: "Weather script requirements confirmed.",
-        outputs: [{ root: "root", elements: { root: { type: "JsonView", props: { value: { location: "Beijing" } } } } }],
       },
     ]);
     expect(input.context.globalSummary).toBe(
@@ -234,7 +232,7 @@ describe("node runtime refs", () => {
     );
   });
 
-  it("prompts task nodes to submit closed json-render specs", () => {
+  it("prompts task nodes to patch shared json-render specs", () => {
     const current = node({
       id: "task-real-789",
       title: "Render result",
@@ -244,13 +242,13 @@ describe("node runtime refs", () => {
     const plan = graph([current]);
     const runtime = buildNodeRuntimePrompt({ plan, node: current });
 
-    expect(runtime.instructions).toContain("CATALOG_UI_SPEC — use this catalog only inside chrona_node_output.spec.");
-    expect(runtime.instructions).toContain("The submitted spec must be self-contained and closed");
+    expect(runtime.instructions).toContain("CATALOG_UI_SPEC");
+    expect(runtime.instructions).toContain("RFC 6902 SpecStream patches");
+    expect(runtime.instructions).toContain("Current Node Context JSON.context.planOutput.spec");
     expect(runtime.instructions).toContain("root MUST equal one element id");
     expect(runtime.instructions).not.toContain("SCHEMA LAB OVERRIDE:");
-    expect(runtime.instructions).toContain("Submit the complete Spec as the chrona_node_output tool argument");
-    expect(runtime.instructions).not.toContain("OUTPUT FORMAT (JSONL, RFC 6902 JSON Patch)");
-    expect(runtime.instructions).not.toContain("Output ONLY JSONL patches");
+    expect(runtime.instructions).not.toContain("Submit the complete Spec as the chrona_plan_output tool argument");
+    expect(runtime.runtimeInput.context.planOutput).toEqual({ revision: 0, spec: null, updatedAt: null });
   });
   it("spells out literal array and number props for json-render outputs", () => {
     const current = node({
@@ -261,12 +259,10 @@ describe("node runtime refs", () => {
     const plan = graph([current]);
     const runtime = buildNodeRuntimePrompt({ plan, node: current });
 
-    expect(runtime.instructions).toContain("never inline objects or values like [\"[]\"]");
-    expect(runtime.instructions).toContain("columns and rows must be direct JSON arrays");
-    expect(runtime.instructions).toContain("threshold must be a JSON number");
-    expect(runtime.instructions).not.toContain("OUTPUT FORMAT (JSONL, RFC 6902 JSON Patch)");
-    expect(runtime.instructions).not.toContain("Output ONLY JSONL patches");
-    expect(runtime.instructions).toContain("Spec shape for chrona_node_output tool arguments: { root: string, elements: Array<");
+    expect(runtime.instructions).toContain("columns MUST be a direct JSON string array");
+    expect(runtime.instructions).toContain("threshold MUST be a JSON number");
+    expect(runtime.instructions).toContain("RFC 6902");
+    expect(runtime.instructions).not.toContain("Spec shape for chrona_plan_output tool arguments: { root: string, elements: Array<");
   });
 
   it("does not expose checkpoint submit as an AI terminal tool", () => {

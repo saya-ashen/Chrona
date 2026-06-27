@@ -50,13 +50,6 @@ function structuredPayload(input: AiRuntimeInvocation): Record<string, unknown> 
     : undefined;
 }
 
-function outputFromStructuredPayload(input: {
-  structured: Record<string, unknown> | undefined;
-  fallback: unknown;
-}): unknown {
-  const outputs = recordValue(input.structured, "outputs");
-  return outputs === undefined ? input.fallback : outputs;
-}
 
 function terminalToolNameFromSnapshot(response: ProviderRunSnapshot): string | undefined {
   const raw = asRecord(response.raw);
@@ -140,7 +133,6 @@ function terminalNodeResultFromSnapshot(input: {
           input.summary ||
           `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
         evidence: input.evidence,
-        output: outputFromStructuredPayload({ structured: input.structured, fallback: undefined }),
       };
     case undefined:
       return undefined;
@@ -166,7 +158,6 @@ function terminalNodeResultFromRecordedAction(input: {
           input.summary ||
           `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
         evidence: input.evidence,
-        output: extractRecordedOutput(input.recorded.payload),
       };
     case "wait_complete":
       return {
@@ -175,7 +166,6 @@ function terminalNodeResultFromRecordedAction(input: {
           input.summary ||
           `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed (wait)`,
         evidence: input.evidence,
-        output: extractRecordedOutput(input.recorded.payload),
       };
     case "condition_select":
       return conditionSelectionFromRecorded({
@@ -197,22 +187,13 @@ function terminalNodeResultFromRecordedAction(input: {
         error: extractRecordedReason(input.recorded.payload, "Fail action recorded by runtime"),
         evidence: input.evidence,
       };
-    case "output":
+    case "plan_output":
       return undefined;
     default:
       return undefined;
   }
 }
 
-function extractRecordedOutput(payload: unknown): unknown {
-  if (payload && typeof payload === "object" && "output" in (payload as Record<string, unknown>)) {
-    return (payload as Record<string, unknown>).output;
-  }
-  if (payload && typeof payload === "object" && "outputs" in (payload as Record<string, unknown>)) {
-    return (payload as Record<string, unknown>).outputs;
-  }
-  return payload;
-}
 
 function extractRecordedReason(payload: unknown, fallback: string): string {
   if (payload && typeof payload === "object") {
@@ -253,7 +234,6 @@ function conditionSelectionFromRecorded(input: {
       status: "done",
       summary: input.summary || `Condition resolved to branch: ${branch.label}`,
       evidence: input.evidence,
-      output: extractRecordedOutput(input.recorded.payload),
       selectedBranch: {
         label: branch.label,
         nextNodeId: branch.nextNodeId!,
@@ -316,7 +296,6 @@ function conditionSelectionResultFromSnapshot(input: {
       status: "done",
       summary: input.summary || `Condition resolved to branch: ${branch.label}`,
       evidence: input.evidence,
-      output: outputFromStructuredPayload({ structured: input.structured, fallback: undefined }),
       selectedBranch: {
         label: branch.label,
         nextNodeId: branch.nextNodeId!,

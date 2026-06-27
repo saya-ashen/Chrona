@@ -1,10 +1,8 @@
 import type { UiDocument } from "../document/document";
 
 /**
- * The structural slice of `NodeResultOutput` (excluding `kind:"ui"`) that the
- * result builder consumes. Declared here without importing from contracts so
- * `ui-protocol` stays React-free and import-cycle-free; the contracts type
- * satisfies this structurally.
+ * Typed fallback result item shape used by deterministic empty/error/result
+ * builders. Kept local so `ui-protocol` stays React-free and import-cycle-free.
  */
 export type ResultOutputItemInput =
   | { kind: "markdown"; content: string; title?: string }
@@ -20,10 +18,8 @@ export interface BuildResultSpecOptions {
 }
 
 /**
- * Deterministically build a Node-result {@link UiDocument} from typed
- * `NodeResultOutput` items (plan §5.1, §3.2). Used as the **fallback** when
- * the AI did not emit a `kind:"ui"` output (or its spec failed validation) so
- * the result tab can still go through the spec path. Pure and cheap.
+ * Deterministically build a result {@link UiDocument} from typed items. Used for
+ * empty/error fallback tabs and non-generated result summaries. Pure and cheap.
  *
  * Mapping:
  * - `"markdown"` → `Markdown` (content + optional title)
