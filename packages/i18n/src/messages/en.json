@@ -1289,7 +1289,14 @@
       "stop": "Stop",
       "actionAlreadySending": "Action is already being sent.",
       "completeRequiredField": "Complete required field: {fields}.",
-      "completeRequiredFields": "Complete required fields: {fields}."
+      "completeRequiredFields": "Complete required fields: {fields}.",
+      "filePreviewTruncated": "Preview truncated",
+      "filePreviewUnsafePath": "File path is not allowed.",
+      "filePreviewNotFound": "File was not found.",
+      "filePreviewUnsupportedType": "File type is not supported for preview.",
+      "filePreviewReadFailed": "File preview could not be loaded.",
+      "expandFilePreview": "Expand preview",
+      "collapseFilePreview": "Collapse preview"
     }
   },
   "queries": {

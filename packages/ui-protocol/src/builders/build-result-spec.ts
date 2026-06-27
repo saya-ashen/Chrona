@@ -8,6 +8,7 @@ export type ResultOutputItemInput =
   | { kind: "markdown"; content: string; title?: string }
   | { kind: "json"; value: unknown; title?: string }
   | { kind: "file"; path: string; title?: string; language?: string; description?: string }
+  | { kind: "fileView"; path: string; title?: string; language?: string; description?: string }
   | { kind: "link"; href: string; title: string; description?: string };
 
 export interface BuildResultSpecOptions {
@@ -80,8 +81,9 @@ export function buildResultSpec(outputs: ResultOutputItemInput[], options?: Buil
         break;
 
       case "file":
+      case "fileView":
         elements[key] = {
-          type: "FileRef",
+          type: output.kind === "fileView" ? "FileView" : "FileRef",
           props: {
             path: output.path,
             ...(output.title ? { title: output.title } : {}),

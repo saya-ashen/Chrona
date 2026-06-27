@@ -7,7 +7,7 @@ import { ActivityTimeline } from "../../../../../../../features/execution-monito
 import type { WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
-import { useLocale } from "@chrona/i18n/react";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { chronaCatalog } from "@chrona/ui-protocol";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -152,6 +152,83 @@ function CollapsibleText({ text, threshold = COLLAPSE_THRESHOLD }: { text: strin
     </div>
   );
 }
+function formatFileSize(bytes: unknown) {
+  if (typeof bytes !== "number" || !Number.isFinite(bytes)) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function filePreviewErrorMessage(error: unknown, copy: Record<string, string | undefined>) {
+  if (error === "unsafe_path") return copy.filePreviewUnsafePath ?? "File path is not allowed.";
+  if (error === "not_found") return copy.filePreviewNotFound ?? "File was not found.";
+  if (error === "unsupported_type") return copy.filePreviewUnsupportedType ?? "File type is not supported for preview.";
+  if (error === "read_failed") return copy.filePreviewReadFailed ?? "File preview could not be loaded.";
+  return null;
+}
+const EXPANDABLE_FILE_PREVIEW_MIN_LENGTH = 1200;
+
+
+function FileView({ props }: { props: Record<string, unknown> }) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const title = typeof props.title === "string" ? props.title : undefined;
+  const path = typeof props.displayPath === "string"
+    ? props.displayPath
+    : typeof props.uri === "string"
+      ? props.uri
+      : typeof props.path === "string"
+        ? props.path
+        : undefined;
+  const content = typeof props.contentPreview === "string" ? props.contentPreview : undefined;
+  const contentKind = typeof props.contentKind === "string" ? props.contentKind : undefined;
+  const size = formatFileSize(props.contentBytes);
+  const error = filePreviewErrorMessage(props.previewError, copy);
+  const canExpand = Boolean(content && (content.length > EXPANDABLE_FILE_PREVIEW_MIN_LENGTH || props.contentTruncated));
+  const [expanded, setExpanded] = useState(false);
+  const previewHeightClassName = expanded ? "max-h-[70vh]" : "max-h-80";
+  const expandLabel = expanded ? (copy.collapseFilePreview ?? "Collapse preview") : (copy.expandFilePreview ?? "Expand preview");
+
+  return (
+    <article className="rounded-lg border border-border bg-background px-2.5 py-2 text-sm">
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+          <FileText className="size-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-medium text-foreground">{title ?? path ?? "File"}</p>
+          {path ? <p className="break-all text-xs text-muted-foreground">{path}</p> : null}
+          <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+            {contentKind ? <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{contentKind}</Badge> : null}
+            {size ? <span>{size}</span> : null}
+            {props.contentTruncated ? <span>{copy.filePreviewTruncated ?? "Preview truncated"}</span> : null}
+          </div>
+        </div>
+      </div>
+      {error ? <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">{error}</p> : null}
+      {content ? (
+        <>
+          {contentKind === "markdown" ? (
+            <div className={cn("mt-2 overflow-auto rounded-lg border border-border/60 bg-background/95 px-3 py-2 text-sm leading-6 text-foreground", previewHeightClassName)}>
+              <div className="max-w-none space-y-2 break-words [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_blockquote]:rounded-lg [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:bg-primary-soft/45 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_blockquote]:text-foreground/80 [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.82em] [&_code]:text-foreground [&_h1]:font-heading [&_h1]:text-base [&_h1]:font-semibold [&_h1]:leading-tight [&_h2]:font-heading [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:leading-tight [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-border [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5 [&_p]:text-foreground/85 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:text-xs [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border/60 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/60 [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              </div>
+            </div>
+          ) : (
+            <pre className={cn("mt-2 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-muted/50 p-2 text-xs leading-5 text-foreground/80", previewHeightClassName)}>{content}</pre>
+          )}
+          {canExpand ? (
+            <Button type="button" variant="ghost" size="sm" className="mt-1 h-7 rounded-full px-2 text-[11px]" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>
+              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+              {expandLabel}
+            </Button>
+          ) : null}
+        </>
+      ) : null}
+    </article>
+  );
+}
+
 
 function WorkspaceArtifactList({
   emptyLabel,
@@ -266,13 +343,8 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         {typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2)}
       </pre>
     ),
-    FileRef: ({ props }) => (
-      <div className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm">
-        <p className="font-medium text-foreground">{props.title ?? props.path}</p>
-        <p className="break-all text-xs text-muted-foreground">{props.path}</p>
-        {props.description ? <p className="mt-0.5 text-xs text-muted-foreground">{props.description}</p> : null}
-      </div>
-    ),
+    FileRef: ({ props }) => <FileView props={props} />,
+    FileView: ({ props }) => <FileView props={props} />,
     ResultSummary: ({ props }) =>
       props.text ? <p className="text-sm leading-5 text-foreground/80">{props.text}</p> : null,
     ActivityRow: ({ props, children }) => {
@@ -369,23 +441,14 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       const locate = on("locate");
       return (
         <div className="rounded-xl bg-muted/45 px-2 py-1.5">
-          <div className="flex w-full items-center gap-2 text-left">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-              <FileText className="size-3.5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block break-words text-sm font-medium text-foreground">{props.title}</span>
-              <span className="block break-words text-xs text-muted-foreground">{props.type}</span>
-            </span>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 pl-9 text-xs text-muted-foreground">
-            {props.uri ? <span className="break-all">{props.uri}</span> : null}
-            {locate.bound ? (
+          <FileView props={props} />
+          {locate.bound ? (
+            <div className="mt-1 pl-9 text-xs">
               <button type="button" className="font-semibold text-primary" onClick={() => emit("locate")}>
                 {props.locateLabel}
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       );
     },

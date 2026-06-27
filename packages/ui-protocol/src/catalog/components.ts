@@ -93,6 +93,29 @@ const toolDetailLabelsSchema = z.object({
   duration: z.string(),
   error: z.string(),
 });
+const filePreviewKindSchema = z.enum(["markdown", "json", "text", "csv"]);
+
+const filePreviewErrorSchema = z.enum([
+  "unsafe_path",
+  "not_found",
+  "unsupported_type",
+  "read_failed",
+]);
+
+const fileViewPropsSchema = z.object({
+  title: z.string().optional(),
+  uri: z.string().optional(),
+  path: z.string().optional(),
+  displayPath: z.string().optional(),
+  contentKind: filePreviewKindSchema.optional(),
+  contentPreview: z.string().optional(),
+  contentTruncated: z.boolean().optional(),
+  contentBytes: z.number().optional(),
+  previewError: filePreviewErrorSchema.optional(),
+  description: z.string().optional(),
+  language: z.string().optional(),
+});
+
 
 const bindableNumberSchema = z
   .union([z.number(), stateBindingSchema])
@@ -166,13 +189,12 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       description: "Pretty-printed JSON result value.",
     },
     FileRef: {
-      props: z.object({
-        path: z.string(),
-        title: z.string().optional(),
-        language: z.string().optional(),
-        description: z.string().optional(),
-      }),
-      description: "Reference to a produced file artifact.",
+      props: fileViewPropsSchema,
+      description: "Reference to a produced file artifact, optionally hydrated with a safe server-side preview.",
+    },
+    FileView: {
+      props: fileViewPropsSchema,
+      description: "Produced file artifact preview hydrated server-side before browser rendering.",
     },
     ResultSummary: {
       props: z.object({
@@ -244,13 +266,12 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         "Collapsible artifact index used by the task workspace command center.",
     },
     WorkspaceArtifactItem: {
-      props: z.object({
+      props: fileViewPropsSchema.extend({
         title: z.string(),
         type: z.string(),
-        uri: z.string().optional(),
         locateLabel: z.string().optional(),
       }),
-      description: "One workspace artifact row with an optional locate action.",
+      description: "One workspace artifact row with an optional locate action and server-hydrated preview.",
     },
     WorkspaceActionGroup: {
       props: z.object({

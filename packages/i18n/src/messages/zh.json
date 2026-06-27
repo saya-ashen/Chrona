@@ -1289,7 +1289,14 @@
       "stop": "停止",
       "actionAlreadySending": "操作正在发送中。",
       "completeRequiredField": "请填写必填字段：{fields}。",
-      "completeRequiredFields": "请填写必填字段：{fields}。"
+      "completeRequiredFields": "请填写必填字段：{fields}。",
+      "filePreviewTruncated": "预览已截断",
+      "filePreviewUnsafePath": "不允许预览此文件路径。",
+      "filePreviewNotFound": "未找到文件。",
+      "filePreviewUnsupportedType": "此文件类型不支持预览。",
+      "filePreviewReadFailed": "无法加载文件预览。",
+      "expandFilePreview": "展开预览",
+      "collapseFilePreview": "收起预览"
     }
   },
   "queries": {
