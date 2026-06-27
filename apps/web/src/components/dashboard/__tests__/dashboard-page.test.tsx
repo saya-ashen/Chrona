@@ -253,6 +253,8 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Research & summaries")).toBeTruthy();
     // Title appears in both the digest recent list and the task stream.
     expect(screen.getAllByText("Report A").length).toBeGreaterThan(0);
+    expect(screen.getByRole("region", { name: "Auto-completion overview" })).toHaveAttribute("data-ui-surface-kind", "ai-authored");
+    expect(screen.getByText("AI generated")).toBeTruthy();
   });
 
   it("shows the digest empty state when nothing has auto-completed", () => {

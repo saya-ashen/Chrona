@@ -70,6 +70,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.getByText("AI generated")).toBeInTheDocument();
+    expect(screen.getAllByText("Runtime state").length).toBeGreaterThan(0);
   });
 
   it("renders Activity as a side timeline in compact plan mode", () => {

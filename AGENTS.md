@@ -167,6 +167,15 @@ Descriptive source labels for `search(source: "label")`.
 - Required checks: `bun run typecheck`, `bun run lint`, `bun run test`.
 - Run `bun run test:e2e` when task, schedule, or navigation flows are affected.
 
+## Frontend AI surface ownership
+
+- Keep component names domain-first (`TaskResultPanel`, `ExecutionActivity`, `SettingsPage`). Do not rename components by implementation ownership unless the ownership is the domain concept.
+- Mark AI/product/runtime boundaries with surface metadata, props, wrapper names, `data-ui-surface-kind`, and local comments instead of broad directory moves or component-name churn.
+- Use these surface kinds consistently: `product-authored` for fixed Chrona UI, `ai-authored` for validated AI/json-render output, `ai-editable` for product-owned regions AI may patch after review, and `runtime-control` for execution state/actions owned by Chrona runtime.
+- Visual distinction should clarify trust and mutability: AI-authored shows source/validation, AI-editable shows pending/review/revert affordance, runtime-control emphasizes status and next action, product-authored stays default.
+- Surface kind is lifecycle metadata, not permanent identity. A region may move from product-authored to ai-editable or from ai-authored draft to saved artifact without renaming its business component.
+- AI-authored surfaces must not contain product authority controls, secret-bearing data, permission decisions, or execution lifecycle rules.
+
 ## Chrona task workspace / AI auto-edit rules
 
 Chrona task execution monitoring workspace. Core UX goal: user always sees task state, plan state, current execution state, current node state, and next action.

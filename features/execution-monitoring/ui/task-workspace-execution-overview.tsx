@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from "react";
-import { Activity } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
@@ -15,6 +14,7 @@ import type {
 import { SpecRenderer } from "../../../apps/web/src/components/tasks/workspace/catalog/spec-renderer";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
+import { UiSurfaceFrame } from "./ui-surface-frame";
 
 type OverviewAction = (nodeId?: string) => void;
 
@@ -158,45 +158,55 @@ export function TaskWorkspaceExecutionOverview({
   });
 
   const results = (
-    <section
+    <UiSurfaceFrame
+      kind="ai-authored"
+      label="AI generated execution results"
+      description="Validated output from task execution. Product controls stay outside this surface."
       className="min-h-0 flex-1 overflow-y-auto"
-      aria-labelledby="task-workspace-results-heading"
+      bodyClassName="min-w-0"
     >
-      <h3 id="task-workspace-results-heading" className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <h3 id="task-workspace-results-heading" className="sr-only">
         {copy.outputTab}
       </h3>
       <SpecRenderer
         spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
         handlers={locateHandlers}
       />
-    </section>
+    </UiSurfaceFrame>
   );
 
   const activityTimeline = (
-    <section
-      className="min-h-0 overflow-y-auto border-l border-border/45 pl-2.5"
-      aria-labelledby="task-workspace-activity-heading"
+    <UiSurfaceFrame
+      kind="runtime-control"
+      label={copy.trailTab}
+      description="Live execution status and activity."
+      className="min-h-0 overflow-y-auto border-l border-l-sky-300/65 pl-2.5"
+      bodyClassName="min-w-0"
     >
-      <h3
-        id="task-workspace-activity-heading"
-        className="sticky top-0 z-10 mb-1.5 flex items-center gap-1.5 bg-background/85 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground backdrop-blur"
-      >
-        <Activity className="size-3" />
+      <h3 id="task-workspace-activity-heading" className="sr-only">
         {copy.trailTab}
       </h3>
       <SpecRenderer spec={withActivityDensity(trailSpec, "rail")} store={trailStore ?? undefined} />
-    </section>
+    </UiSurfaceFrame>
   );
 
   const activityBelow = (
-    <details className="mt-2.5 shrink-0 border-t border-border/45 pt-2.5">
-      <summary className="cursor-pointer select-none text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground">
-        {copy.trailTab}
-      </summary>
-      <div className="mt-2 max-h-64 overflow-y-auto pr-1">
-        <SpecRenderer spec={trailSpec} store={trailStore ?? undefined} />
-      </div>
-    </details>
+    <UiSurfaceFrame
+      kind="runtime-control"
+      label={copy.trailTab}
+      description="Live execution status and activity."
+      className="mt-2.5 shrink-0"
+      bodyClassName="min-w-0"
+    >
+      <details>
+        <summary className="cursor-pointer select-none text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground">
+          {copy.trailTab}
+        </summary>
+        <div className="mt-2 max-h-64 overflow-y-auto pr-1">
+          <SpecRenderer spec={trailSpec} store={trailStore ?? undefined} />
+        </div>
+      </details>
+    </UiSurfaceFrame>
   );
 
   return (
@@ -207,7 +217,13 @@ export function TaskWorkspaceExecutionOverview({
       <div className="flex min-h-0 flex-1 flex-col">
 
 
-        <div className="mb-2.5 shrink-0 space-y-1 rounded-lg bg-muted/20 px-2.5 py-1.5">
+        <UiSurfaceFrame
+          kind="runtime-control"
+          label="Execution progress"
+          description="Current execution progress."
+          className="mb-2.5 shrink-0 p-2"
+          bodyClassName="space-y-1"
+        >
           <div className="flex items-center justify-between gap-2">
             {statusLabel ? (
               <span className="truncate text-[11px] font-medium text-muted-foreground">{statusLabel}</span>
@@ -221,12 +237,12 @@ export function TaskWorkspaceExecutionOverview({
           {progress.totalSteps > 0 ? (
             <div className="h-1 w-full overflow-hidden rounded-full bg-background shadow-inner">
               <div
-                className="h-full rounded-full bg-primary transition-[width]"
+                className="h-full rounded-full bg-sky-500 transition-[width]"
                 style={{ width: `${progress.percentComplete}%` }}
               />
             </div>
           ) : null}
-        </div>
+        </UiSurfaceFrame>
 
         {activityLayout === "side" ? (
           <div className="grid min-h-0 flex-1 gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(10rem,0.28fr)]">

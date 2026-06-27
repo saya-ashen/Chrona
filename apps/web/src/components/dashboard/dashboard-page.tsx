@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UiSurfaceFrame } from "@/components/ai-surface/ui-surface-frame";
 import { cn } from "@/lib/utils";
 import type {
   DashboardAttentionItem,
@@ -331,7 +332,7 @@ function DigestModule({
   const isEmpty = totalAutoCompleted === 0 && completed.length === 0;
 
   return (
-    <Card>
+    <UiSurfaceFrame kind="ai-authored" label={copy.digest.title} className="p-0" bodyClassName="min-w-0">
       <CardHeader className="gap-3 pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
@@ -440,7 +441,7 @@ function DigestModule({
           </Button>
         </CardContent>
       ) : null}
-    </Card>
+    </UiSurfaceFrame>
   );
 }
 
