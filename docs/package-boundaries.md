@@ -25,6 +25,48 @@ This document explains where code belongs in Chrona's monorepo.
 | `packages/skills` | Chrona skill packages used by agent/runtime integrations |
 | `external-plugins/*` | Integration plugins outside the core app package graph |
 
+
+## Target vertical-slice roots
+
+Chrona is migrating toward Bun-first feature slices while legacy `apps/` and
+`packages/` remain live. New or moved product code should prefer:
+
+| Path | Responsibility |
+| --- | --- |
+| `features/<feature>/index.ts` | Public feature entry point; sibling features import only this file |
+| `features/<feature>/contract.ts` | Feature-owned schemas and public types |
+| `features/<feature>/routes.ts` | Feature route mount/wiring |
+| `features/<feature>/service.ts` | Feature use-case orchestration |
+| `features/<feature>/repository.ts` | Feature persistence wrapper over shared db primitives |
+| `features/<feature>/model/` | Pure projections, derived state, view models |
+| `features/<feature>/ui/` | Product-specific feature UI |
+| `features/<feature>/tests/` | Feature-local Bun and Playwright specs |
+| `shared/db` | Prisma client, migrations, and db helpers |
+| `shared/http` | Hono/auth/CORS/error helpers |
+| `shared/i18n` | Localization primitives |
+| `shared/logging` | Logging primitives |
+| `shared/ui` | Generic UI primitives only |
+| `shared/test` | Cross-feature test helpers |
+
+Feature-internal imports should be relative paths inside the same feature.
+Sibling features must not import `features/<other>/model/*`, `service.ts`,
+`repository.ts`, `routes.ts`, or `ui/*` directly; add a public export to
+`features/<other>/index.ts` instead. `shared/` must stay infrastructure-only:
+no task, plan, execution, schedule, external-calendar, or AI-client product
+workflow logic.
+
+Feature-local checks:
+
+```bash
+bun run test:feature <feature>
+bun run e2e:feature <feature>
+```
+
+These commands discover `features/<feature>/tests/*.bun.test.ts`,
+`features/<feature>/model/*.test.ts`, `features/<feature>/ui/*.test.tsx`, and
+`features/<feature>/tests/e2e.spec.ts`, then merge explicit legacy-path
+mappings while slices migrate.
+
 ## Dependency direction
 
 Prefer this direction:
@@ -317,6 +359,10 @@ These boundaries are enforced, not just documented. Two gates run in
 | `engine-sink-modules-via-barrel` | error | runtime (value) imports into an engine *capability* module's internals (`events`/`ai`/`execution-runtime`/`workspaces`) — use its `modules/<name>/index.ts` barrel. Type-only imports exempt. The co-recursive core modules are deliberately not covered (see [Internal module structure](#internal-module-structure)) |
 | `no-deep-import-engine-internals-tests` | warn | test files reaching into engine internals (debt; prefer the barrel) |
 | `engine-sink-modules-via-barrel-tests` | warn | test files reaching into capability-module internals (debt; prefer the barrel) |
+| `feature-<name>-internals-are-private` | error | sibling features importing another feature internals instead of `features/<name>/index.ts` |
+| `features-do-not-import-apps-or-packages-internals` | warn | production `features/*` importing app files or package internals instead of public barrels/shared primitives (temporary migration debt) |
+| `shared-owns-no-feature-or-app-code` | error | production `shared/*` importing features, apps, or product package internals |
+| `features-and-shared-never-import-apps-tests` | warn | feature/shared tests importing app internals (debt; prefer feature-local helpers) |
 | `no-circular` | warn | circular dependencies (remaining ones are intra-package type-only debt) |
 
 ### Known violations (debt)
@@ -335,4 +381,4 @@ than importing across the boundary.
 
 Do not add entries to the baseline to work around a rule — fix the import
 instead. Regenerate the baseline only when intentionally re-snapshotting debt:
-`bunx dependency-cruiser --config .dependency-cruiser.cjs --output-type baseline apps packages`, then keep only the `error`-severity entries.
+`bunx dependency-cruiser --config .dependency-cruiser.cjs --output-type baseline apps packages features shared`, then keep only the `error`-severity entries.

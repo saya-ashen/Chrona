@@ -8,6 +8,11 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./calendar/feed-fetcher": "./src/calendar/feed-fetcher.ts",
+    "./calendar/normalizer": "./src/calendar/normalizer.ts",
+    "./calendar/parse-feed": "./src/calendar/parse-feed.ts",
+    "./calendar/recurrence": "./src/calendar/recurrence.ts",
+    "./calendar/source-url": "./src/calendar/source-url.ts",
     "./hermes": "./src/hermes/index.ts"
   }
 }

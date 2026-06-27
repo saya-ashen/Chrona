@@ -14,9 +14,9 @@ import {
   fetchTaskCommandCenter,
   fetchTaskWorkspacePage,
   taskWorkspaceQueryKeys,
-} from "../model/task-workspace-query";
+} from "../../../../../../../features/task-workspace";
 import type { UiDocument } from "@chrona/ui-protocol";
-import type { TaskData, TaskPageData } from "../model/task-workspace-types";
+import type { TaskData, TaskPageData } from "../../../../../../../features/task-workspace";
 import { bindTaskPlanSessionToStateStore } from "@/hooks/ai/task-plan-generation-session-store";
 import { createLogger } from "@/lib/logger";
 

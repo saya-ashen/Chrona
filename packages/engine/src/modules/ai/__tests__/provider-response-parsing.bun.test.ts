@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AiClientRecord } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import type { AgentProviderClient, ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
-import type { EngineAiClient } from "../runtime/client-registry";
+import type { EngineAiClient } from "../../../../../../features/ai-clients";
 
 process.env.DATABASE_URL ??= "file:/tmp/chrona-provider-response-parsing.sqlite";
 

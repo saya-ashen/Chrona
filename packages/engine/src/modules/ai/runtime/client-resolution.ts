@@ -1,5 +1,5 @@
-import { aiClientRegistry } from "./client-registry";
-import type { EngineAiClient } from "./client-registry";
+import { aiClientRegistry } from "../../../../../../features/ai-clients";
+import type { EngineAiClient } from "../../../../../../features/ai-clients";
 
 export async function getAiClient(
   clientId?: string | null,

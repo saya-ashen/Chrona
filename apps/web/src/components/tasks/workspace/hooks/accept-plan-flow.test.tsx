@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
-import type { TaskPageData } from "../model/task-workspace-types";
+import type { TaskPageData } from "../../../../../../../features/task-workspace";
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
 import { taskWorkspacePlanStateFixtures } from "../test-support/task-workspace-test-fixtures";
 

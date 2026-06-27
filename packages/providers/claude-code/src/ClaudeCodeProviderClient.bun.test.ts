@@ -13,7 +13,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
-import { createMcpRoutes } from "../../../../apps/server/src/routes/mcp/mcp.routes";
+import { createMcpRoutes } from "../../../../features/mcp-control-plane/server";
 
 import { terminalSnapshotFromEvents } from "@chrona/providers-foundation";
 

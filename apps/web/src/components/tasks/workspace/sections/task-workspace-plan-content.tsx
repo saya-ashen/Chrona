@@ -4,7 +4,7 @@ import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-pa
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import type { TaskPlanGenerationStatus } from "../model/task-workspace-types";
+import type { TaskPlanGenerationStatus } from "../../../../../../../features/task-workspace";
 const DEFAULT_COPY = {
   generatePlan: "Generate plan",
   regeneratePlan: "Regenerate plan",

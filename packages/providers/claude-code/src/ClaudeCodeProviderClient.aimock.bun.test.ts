@@ -12,7 +12,7 @@
 import { describe, expect, test } from "bun:test";
 import { LLMock } from "@copilotkit/aimock";
 import { Hono } from "hono";
-import { createMcpRoutes } from "../../../../apps/server/src/routes/mcp/mcp.routes";
+import { createMcpRoutes } from "../../../../features/mcp-control-plane/server";
 import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
 
 const liveTest = process.env.CHRONA_CLAUDE_CODE_SDK_AIMOCK_TEST === "1" ? test : test.skip;

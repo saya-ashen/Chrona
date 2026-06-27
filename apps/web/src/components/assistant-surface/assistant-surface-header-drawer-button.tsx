@@ -32,7 +32,7 @@ export function AssistantSurfaceHeaderDrawerButton() {
       aria-haspopup="menu"
       aria-label={t("components.assistantSurface.entryLabel")}
       className={cn(
-        "group inline-flex h-9 max-w-[2.25rem] items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary-soft/60 md:max-w-[520px] md:px-2.5",
+        "group inline-flex h-9 max-w-[2.25rem] scroll-mb-24 items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary-soft/60 md:max-w-[520px] md:px-2.5",
         assistant.isOpen
           ? "border-primary/50 bg-primary-soft text-primary"
           : "text-muted-foreground hover:text-primary",

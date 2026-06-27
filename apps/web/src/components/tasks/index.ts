@@ -10,8 +10,8 @@ export {
   mapTaskWorkspaceStatus,
   pickWorkspaceCurrentNode,
   taskWorkspaceQueryKeys,
-} from "./task-workspace-query";
+} from "../../../../../features/task-workspace";
 export type {
   TaskExecutionDispatchResult,
   TaskPlanState,
-} from "./task-workspace-query";
+} from "../../../../../features/task-workspace";

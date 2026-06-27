@@ -4,7 +4,7 @@ import type { ChronaEngine } from "@chrona/engine";
 import { createDashboardRoutes } from "./dashboard.routes";
 import { createInboxRoutes } from "./inbox.routes";
 import { createMemoryRoutes } from "./memory.routes";
-import { createScheduleRoutes } from "./schedule.routes";
+import { createScheduleRoutes } from "../../../../../features/schedule";
 import { createWorkRoutes } from "./work.routes";
 
 export function createPageRoutes(engine: ChronaEngine) {

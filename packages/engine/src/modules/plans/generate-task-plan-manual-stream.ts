@@ -5,7 +5,7 @@ import { ensurePlanGenerationTaskSession, ensureWorkBlockPlanTaskSession, resolv
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { updateLatestCompiledPlanPrompt } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
-import type { GeneratePlanSSEEvent, PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts";
+import type { GeneratePlanSSEEvent, PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts/ai";
 
 const PLAN_GENERATE_TOOL_NAME = "chrona_plan_generate";
 const INTERNAL_PLAN_GENERATE_TOOL_NAME = "chrona.plan.generate";

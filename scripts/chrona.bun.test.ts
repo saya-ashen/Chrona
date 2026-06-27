@@ -7,27 +7,14 @@ describe("chrona command runner", () => {
     expect(resolveCommand(["test"])).toBe(TEST_COMMANDS.all);
   });
 
-  it("keeps CI tests centralized across unit, Bun, API, and LLM replay", () => {
-    expect(resolveCommand(["test", "ci"])).toEqual({
+  it("keeps CI tests centralized across typed steps", () => {
+    expect(resolveCommand(["test", "ci"])).toMatchObject({
       description: "CI unit, Bun, API, and LLM replay tests",
-      run: [
-        "bun",
-        "x",
-        "vitest",
-        "run",
-        "--reporter=verbose",
-        "&&",
-        "bun",
-        "run",
-        "scripts/run-bun-tests.ts",
-        "&&",
-        "bun",
-        "run",
-        "scripts/run-api-tests.ts",
-        "&&",
-        "bun",
-        "test",
-        "packages/engine/src/test/llm-fixtures.bun.test.ts",
+      steps: [
+        { label: "vitest unit tests" },
+        { label: "bun tests" },
+        { label: "api tests" },
+        { label: "llm replay tests" },
       ],
     });
   });
@@ -36,6 +23,19 @@ describe("chrona command runner", () => {
     expect(normalizeArgs(["test", "unit", "--", "--reporter=verbose"])).toEqual({
       commandArgs: ["test", "unit"],
       passthrough: ["--reporter=verbose"],
+    });
+  });
+
+  it("exposes release smoke through build commands", () => {
+    expect(resolveCommand(["build", "smoke"])).toMatchObject({
+      description: "Smoke test release artifacts",
+      steps: [{ label: "release smoke", acceptsExtraArgs: true }],
+    });
+  });
+
+  it("runs boundary checks across apps packages features shared", () => {
+    expect(resolveCommand(["check", "boundaries"])).toMatchObject({
+      steps: [{ label: "boundaries" }],
     });
   });
 });

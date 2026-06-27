@@ -6,9 +6,9 @@ import {
   type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
   type TaskConfigDraftState,
-} from "@/components/schedule/forms/task-config-form";
+} from "../../../../../../../features/schedule/ui/forms/task-config-form";
 import { TaskWorkspaceDiffPreview } from "../assistant/task-workspace-diff-preview";
-import type { CurrentProposalState, TaskData } from "../model/task-workspace-types";
+import type { CurrentProposalState, TaskData } from "../../../../../../../features/task-workspace";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

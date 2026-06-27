@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderSpecInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
-import type { PlanExecutionStatus } from "@chrona/contracts";
+import type { PlanExecutionStatus } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";

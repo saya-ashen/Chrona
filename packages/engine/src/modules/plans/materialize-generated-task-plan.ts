@@ -1,6 +1,6 @@
 import type { PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
-import { compilePlanBlueprint } from "@/modules/plans/plan-blueprint-compiler";
+import { compilePlanBlueprint } from "@features/plan-generation";
 import { saveCompiledPlan, getLatestCompiledPlan, getAcceptedCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { createPlanGraphFromCompiledPlan, savePlanRun, getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-runtime-store";

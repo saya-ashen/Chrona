@@ -27,6 +27,7 @@
       "@/*": ["./apps/web/src/*"],
       "@web/*": ["./apps/web/src/*"],
       "@server/*": ["./apps/server/src/*"],
+      "@features/*": ["./features/*"],
       "@chrona/runtime-core": ["./packages/runtime-core/src/index.ts"],
       "@chrona/runtime-core/*": ["./packages/runtime-core/src/*"],
       "@chrona/logging": ["./packages/logging/src/index.ts"],

@@ -27,8 +27,8 @@ import {
   buildProviderFeatureRequest,
   providerCall,
 } from "./providers";
-import type { EngineAiClient } from "./runtime/client-registry";
-import { aiClientRegistry } from "./runtime/client-registry";
+import type { EngineAiClient } from "../../../../../features/ai-clients";
+import { aiClientRegistry } from "../../../../../features/ai-clients";
 import { buildSessionIdentity } from "./session";
 
 function trimTrailingSlashes(value: string) {

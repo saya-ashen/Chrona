@@ -26,14 +26,14 @@ mock.module("../providers", () => ({
   providerCall: providerCallMock,
 }));
 
-mock.module("../runtime/client-registry", () => ({
+mock.module("../../../../../../features/ai-clients", () => ({
   aiClientRegistry: {
     requireProviderClient: (client: EngineAiClient) => client,
   },
 }));
 
 import { generatePlanStream } from "../features/generate-plan";
-import type { EngineAiClient } from "../runtime/client-registry";
+import type { EngineAiClient } from "../../../../../../features/ai-clients";
 
 describe("generatePlanStream", () => {
   it("does not fall back to blocking provider calls when streaming generate_plan fails", async () => {

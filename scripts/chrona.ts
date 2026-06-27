@@ -1,86 +1,154 @@
 #!/usr/bin/env bun
 
+import { $ } from "bun";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-type Command = {
+import { buildTargets } from "../build/manifest";
+
+export type CommandStep = {
+  label: string;
+  run: (extraArgs: string[]) => Promise<void>;
+  acceptsExtraArgs?: boolean;
+};
+
+export type Command = {
   description: string;
-  run: string[];
+  steps: CommandStep[];
 };
 
 type CommandGroup = Partial<Record<string, Command>>;
 
+const ROOT = resolve(import.meta.dirname, "..");
+
+function bunStep(label: string, args: string[], acceptsExtraArgs = false): CommandStep {
+  return {
+    label,
+    acceptsExtraArgs,
+    run: async (extraArgs) => {
+      await $`bun ${[...args, ...(acceptsExtraArgs ? extraArgs : [])]}`.cwd(ROOT);
+    },
+  };
+}
+function bunxStep(label: string, args: string[], acceptsExtraArgs = false): CommandStep {
+  return {
+    label,
+    acceptsExtraArgs,
+    run: async (extraArgs) => {
+      await $`bunx ${[...args, ...(acceptsExtraArgs ? extraArgs : [])]}`.cwd(ROOT);
+    },
+  };
+}
+
+
+function dependencyCruiserStep(label: string, acceptsExtraArgs = false): CommandStep {
+  return {
+    label,
+    acceptsExtraArgs,
+    run: async (extraArgs) => {
+      const roots = ["apps", "packages", "features", "shared"].filter((path) => existsSync(resolve(ROOT, path)));
+      await $`bun ${["x", "dependency-cruiser", ...roots, ...(acceptsExtraArgs ? extraArgs : [])]}`.cwd(ROOT);
+    },
+  };
+}
+
+function binaryCommand(target?: string): Command {
+  return {
+    description: target ? `Build ${target} binary` : "Build binary for current platform",
+    steps: [bunStep(target ? `build binary ${target}` : "build binary", ["run", "scripts/build-binaries.ts", ...(target ? ["--target", target] : [])])],
+  };
+}
+
 export const TEST_COMMANDS: CommandGroup = {
-  all: { description: "Unit, Bun, API, and Playwright e2e tests", run: ["bun", "x", "vitest", "run", "&&", "bun", "run", "scripts/run-bun-tests.ts", "&&", "bun", "run", "scripts/run-api-tests.ts", "&&", "bun", "x", "playwright", "test"] },
-  ci: { description: "CI unit, Bun, API, and LLM replay tests", run: ["bun", "x", "vitest", "run", "--reporter=verbose", "&&", "bun", "run", "scripts/run-bun-tests.ts", "&&", "bun", "run", "scripts/run-api-tests.ts", "&&", "bun", "test", "packages/engine/src/test/llm-fixtures.bun.test.ts"] },
-  unit: { description: "Vitest unit tests", run: ["bun", "x", "vitest", "run"] },
-  web: { description: "Vitest with coverage", run: ["bun", "x", "vitest", "run", "--coverage"] },
-  watch: { description: "Vitest watch mode", run: ["bun", "x", "vitest"] },
-  api: { description: "Sequential API Bun tests", run: ["bun", "run", "scripts/run-api-tests.ts"] },
-  bun: { description: "All Bun-only tests", run: ["bun", "run", "scripts/run-bun-tests.ts"] },
-  e2e: { description: "Playwright e2e tests", run: ["bun", "x", "playwright", "test"] },
-  desktop: { description: "Playwright desktop viewport", run: ["bun", "x", "playwright", "test", "--project=chromium"] },
-  tablet: { description: "Playwright tablet viewport", run: ["bun", "x", "playwright", "test", "--project=tablet"] },
-  mobile: { description: "Playwright mobile viewport", run: ["bun", "x", "playwright", "test", "--project=mobile"] },
-  "llm:record": { description: "Record LLM fixtures", run: ["bun", "run", "scripts/record-llm-fixtures.ts"] },
-  "llm:replay": { description: "Replay LLM fixtures", run: ["bun", "test", "packages/engine/src/test/llm-fixtures.bun.test.ts"] },
+  all: {
+    description: "Unit, Bun, API, Playwright e2e tests",
+    steps: [
+      bunxStep("vitest unit tests", ["vitest", "run"]),
+      bunStep("bun tests", ["run", "scripts/run-bun-tests.ts"]),
+      bunStep("api tests", ["run", "scripts/run-api-tests.ts"]),
+      bunStep("playwright e2e", ["x", "playwright", "test"]),
+    ],
+  },
+  ci: {
+    description: "CI unit, Bun, API, and LLM replay tests",
+    steps: [
+      bunxStep("vitest unit tests", ["vitest", "run", "--reporter=verbose"]),
+      bunStep("bun tests", ["run", "scripts/run-bun-tests.ts"]),
+      bunStep("api tests", ["run", "scripts/run-api-tests.ts"]),
+      bunStep("llm replay tests", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts"]),
+    ],
+  },
+  unit: { description: "Vitest unit tests", steps: [bunxStep("vitest unit tests", ["vitest", "run"], true)] },
+  web: { description: "Vitest coverage", steps: [bunxStep("vitest coverage", ["vitest", "run", "--coverage"], true)] },
+  watch: { description: "Vitest watch mode", steps: [bunxStep("vitest watch", ["vitest"], true)] },
+  api: { description: "Sequential API Bun tests", steps: [bunStep("api tests", ["run", "scripts/run-api-tests.ts"], true)] },
+  bun: { description: "All Bun-only tests", steps: [bunStep("bun tests", ["run", "scripts/run-bun-tests.ts"], true)] },
+  e2e: { description: "Playwright e2e tests", steps: [bunStep("playwright e2e", ["x", "playwright", "test"], true)] },
+  desktop: { description: "Playwright desktop viewport", steps: [bunStep("playwright desktop", ["x", "playwright", "test", "--project=chromium"], true)] },
+  tablet: { description: "Playwright tablet viewport", steps: [bunStep("playwright tablet", ["x", "playwright", "test", "--project=tablet"], true)] },
+  mobile: { description: "Playwright mobile viewport", steps: [bunStep("playwright mobile", ["x", "playwright", "test", "--project=mobile"], true)] },
+  "llm:record": { description: "Record LLM fixtures", steps: [bunStep("llm record", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts", "--record"], true)] },
+  "llm:replay": { description: "Replay LLM fixtures", steps: [bunStep("llm replay", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts"], true)] },
 };
 
-const COMMANDS: Partial<Record<string, CommandGroup>> = {
+const BUILD_BINARY_COMMANDS = Object.fromEntries(
+  Object.keys(buildTargets).map((target) => [target, binaryCommand(target)]),
+) as CommandGroup;
+
+export const COMMANDS: Record<string, CommandGroup> = {
   dev: {
-    all: { description: "Web and API dev servers", run: ["bun", "run", "scripts/dev.ts"] },
-    web: { description: "Vite web dev server", run: ["bun", "run", "--cwd", "apps/web", "dev", "--host", "0.0.0.0"] },
-    server: { description: "Watched API server", run: ["bun", "--watch", "apps/server/src/index.bun.ts"] },
-  },
-  server: {
-    dev: { description: "Watched API server", run: ["bun", "--watch", "apps/server/src/index.bun.ts"] },
-    start: { description: "Start API server", run: ["bun", "run", "apps/server/src/index.bun.ts"] },
-    "bundle-check": { description: "Verify web bundle exists", run: ["test", "-f", "apps/web/dist/index.html"] },
+    all: { description: "Run API and web dev servers", steps: [bunStep("dev servers", ["run", "scripts/dev.ts"], true)] },
+    web: { description: "Run Vite web dev server", steps: [bunStep("web dev", ["run", "--cwd", "apps/web", "dev"], true)] },
+    server: { description: "Run API server", steps: [bunStep("api dev", ["run", "apps/server/src/index.ts"], true)] },
   },
   build: {
-    all: { description: "Build portable binary for current platform", run: ["bun", "run", "scripts/build-binaries.ts"] },
-    web: { description: "Build web app", run: ["bun", "run", "--cwd", "apps/web", "build"] },
-    "linux-x64": { description: "Build linux x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "linux-x64"] },
-    "linux-arm64": { description: "Build linux arm64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "linux-arm64"] },
-    "darwin-x64": { description: "Build macOS x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "darwin-x64"] },
-    "darwin-arm64": { description: "Build macOS arm64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "darwin-arm64"] },
-    "windows-x64": { description: "Build Windows x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "windows-x64"] },
+    all: {
+      description: "Build web app and binary for current platform",
+      steps: [bunStep("build web", ["run", "--cwd", "apps/web", "build"]), bunStep("build binary", ["run", "scripts/build-binaries.ts"])],
+    },
+    web: { description: "Build web app", steps: [bunStep("build web", ["run", "--cwd", "apps/web", "build"], true)] },
+    smoke: { description: "Smoke test release artifacts", steps: [bunStep("release smoke", ["run", "build/release-smoke.ts"], true)] },
+    ...BUILD_BINARY_COMMANDS,
   },
   binary: {
-    current: { description: "Build binary for current platform", run: ["bun", "run", "scripts/build-binaries.ts"] },
-    "linux-x64": { description: "Build linux x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "linux-x64"] },
-    "linux-arm64": { description: "Build linux arm64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "linux-arm64"] },
-    "darwin-x64": { description: "Build macOS x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "darwin-x64"] },
-    "darwin-arm64": { description: "Build macOS arm64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "darwin-arm64"] },
-    "windows-x64": { description: "Build Windows x64 binary", run: ["bun", "run", "scripts/build-binaries.ts", "--target", "windows-x64"] },
+    current: binaryCommand(),
+    ...BUILD_BINARY_COMMANDS,
   },
   check: {
-    all: { description: "Typecheck, lint, deadcode, pages, boundaries", run: ["bun", "x", "tsc", "--noEmit", "--pretty", "false", "&&", "bun", "x", "eslint", ".", "&&", "bun", "x", "knip", "--include", "unresolved,duplicates", "&&", "bun", "run", "scripts/check-web-page-reachability.ts", "&&", "bun", "x", "dependency-cruiser", "--config", ".dependency-cruiser.cjs", "--ignore-known", ".dependency-cruiser-known-violations.json", "apps", "packages"] },
-    type: { description: "TypeScript typecheck", run: ["bun", "x", "tsc", "--noEmit", "--pretty", "false"] },
-    lint: { description: "ESLint", run: ["bun", "x", "eslint", "."] },
-    deadcode: { description: "Knip unresolved and duplicate checks", run: ["bun", "x", "knip", "--include", "unresolved,duplicates"] },
-    exports: { description: "Knip export checks", run: ["bun", "x", "knip", "--exports"] },
-    deps: { description: "Knip dependency checks", run: ["bun", "x", "knip", "--dependencies"] },
-    pages: { description: "Web page reachability", run: ["bun", "run", "scripts/check-web-page-reachability.ts"] },
-    ui: { description: "UI foundation rules", run: ["bun", "run", "scripts/check-ui-foundation.mjs"] },
-    boundaries: { description: "Dependency boundaries", run: ["bun", "x", "dependency-cruiser", "--config", ".dependency-cruiser.cjs", "--ignore-known", ".dependency-cruiser-known-violations.json", "apps", "packages"] },
+    all: {
+      description: "Typecheck, lint, deadcode, pages, boundaries",
+      steps: [
+        bunStep("typecheck", ["x", "tsc", "--noEmit", "--pretty", "false"]),
+        bunStep("lint", ["x", "eslint", ".", "--max-warnings", "1000"]),
+        bunStep("deadcode", ["run", "scripts/check-deadcode.ts"]),
+        bunStep("pages", ["run", "scripts/check-pages.ts"]),
+        dependencyCruiserStep("boundaries"),
+      ],
+    },
+    types: { description: "TypeScript typecheck", steps: [bunStep("typecheck", ["x", "tsc", "--noEmit", "--pretty", "false"], true)] },
+    lint: { description: "ESLint", steps: [bunStep("lint", ["x", "eslint", ".", "--max-warnings", "1000"], true)] },
+    deadcode: { description: "Dead code scan", steps: [bunStep("deadcode", ["run", "scripts/check-deadcode.ts"], true)] },
+    pages: { description: "Route/page consistency", steps: [bunStep("pages", ["run", "scripts/check-pages.ts"], true)] },
+    boundaries: { description: "Package and feature boundary checks", steps: [dependencyCruiserStep("boundaries", true)] },
+    ui: { description: "UI foundation rules", steps: [bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"], true)] },
   },
   test: TEST_COMMANDS,
   db: {
-    seed: { description: "Seed database", run: ["bun", "prisma/seed.ts"] },
-    fixtures: { description: "Seed graph fixtures", run: ["bun", "scripts/seed-plan-graph-fixtures.ts"] },
-    generate: { description: "Generate Prisma client", run: ["bun", "x", "prisma", "generate"] },
-    push: { description: "Push Prisma schema", run: ["bun", "x", "prisma", "db", "push"] },
-    migrate: { description: "Run Prisma migrate dev", run: ["bun", "x", "prisma", "migrate", "dev"] },
+    seed: { description: "Seed database", steps: [bunStep("seed database", ["prisma/seed.ts"], true)] },
+    fixtures: { description: "Seed graph fixtures", steps: [bunStep("seed graph fixtures", ["scripts/seed-plan-graph-fixtures.ts"], true)] },
+    generate: { description: "Generate Prisma client", steps: [bunStep("prisma generate", ["x", "prisma", "generate"], true)] },
+    push: { description: "Push Prisma schema", steps: [bunStep("prisma db push", ["x", "prisma", "db", "push"], true)] },
+    migrate: { description: "Run Prisma migrate dev", steps: [bunStep("prisma migrate dev", ["x", "prisma", "migrate", "dev"], true)] },
   },
   llm: {
     record: TEST_COMMANDS["llm:record"],
     replay: TEST_COMMANDS["llm:replay"],
   },
   demo: {
-    "readme-gif": { description: "Record README demo GIF", run: ["bun", "scripts/demo/readme-gif.ts"] },
+    "readme-gif": { description: "Record README demo GIF", steps: [bunStep("readme gif", ["scripts/demo/readme-gif.ts"], true)] },
   },
   plugin: {
-    hermes: { description: "Install Hermes plugin", run: ["bash", "external-plugins/hermes/install.sh"] },
+    hermes: { description: "Install Hermes plugin", steps: [{ label: "install Hermes plugin", acceptsExtraArgs: true, run: async (extraArgs) => { await $`bash ${["external-plugins/hermes/install.sh", ...extraArgs]}`.cwd(ROOT); } }] },
   },
 };
 
@@ -99,13 +167,10 @@ Examples:
   bun run chrona check ui
   bun run chrona db migrate
   bun run chrona binary linux-x64
-
+  bun run chrona build smoke
 Groups:`);
 
   for (const [group, commands] of Object.entries(COMMANDS)) {
-    if (!commands) {
-      continue;
-    }
     const names = Object.keys(commands).join(", ");
     console.log(`  ${group.padEnd(8)} ${names}`);
   }
@@ -120,9 +185,7 @@ Usage:
 Commands:`);
 
   for (const [name, command] of Object.entries(commands)) {
-    if (!command) {
-      continue;
-    }
+    if (!command) continue;
     console.log(`  ${name.padEnd(12)} ${command.description}`);
   }
 }
@@ -161,39 +224,26 @@ export function resolveCommand(commandArgs: string[]) {
     return undefined;
   }
 
-  const name = maybeName;
-  const command = commands[name];
+  const command = commands[maybeName];
   if (!command) {
-    throw new Error(`Unknown ${group} command '${name}'. Available: ${names.join(", ")}`);
+    throw new Error(`Unknown ${group} command '${maybeName}'. Available: ${names.join(", ")}`);
   }
   return command;
 }
 
-export async function runSequence(tokens: string[], passthrough: string[]) {
-  const root = resolve(import.meta.dirname, "..");
-  const chunks: string[][] = [[]];
-  for (const token of tokens) {
-    if (token === "&&") {
-      chunks.push([]);
-      continue;
+export async function runCommand(command: Command, passthrough: string[]) {
+  if (passthrough.length > 0 && command.steps.length !== 1) {
+    throw new Error("Extra args '--' only single-step commands.");
+  }
+
+  for (const step of command.steps) {
+    if (passthrough.length > 0 && !step.acceptsExtraArgs) {
+      throw new Error(`Command '${step.label}' does not accept extra args.`);
     }
-    chunks[chunks.length - 1].push(token);
-  }
-
-  if (chunks.length > 1 && passthrough.length > 0) {
-    throw new Error("Extra args after '--' are only supported for single-step commands.");
-  }
-
-  for (const [index, chunk] of chunks.entries()) {
-    const args = index === chunks.length - 1 ? [...chunk, ...passthrough] : chunk;
-    const [cmd, ...rest] = args;
-    const proc = Bun.spawn([cmd, ...rest], {
-      cwd: root,
-      stdio: ["inherit", "inherit", "inherit"],
-    });
-    const code = await proc.exited;
-    if (code !== 0) {
-      process.exit(code);
+    try {
+      await step.run(passthrough);
+    } catch (error) {
+      throw new Error(`Command step failed: ${step.label}`, { cause: error });
     }
   }
 }
@@ -202,13 +252,10 @@ export async function main() {
   const { commandArgs, passthrough } = normalizeArgs(process.argv.slice(2));
   const command = resolveCommand(commandArgs);
   if (!command) {
-    if (command === null) {
-      printHelp();
-    }
+    if (command === null) printHelp();
     return;
   }
-
-  await runSequence(command.run, passthrough);
+  await runCommand(command, passthrough);
 }
 
 if (import.meta.main) {

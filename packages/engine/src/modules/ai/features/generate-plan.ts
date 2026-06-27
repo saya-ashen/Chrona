@@ -5,7 +5,7 @@ import {
   type GenerateTaskPlanRequest,
   type StreamEvent,
 } from "@chrona/contracts";
-import type { EngineAiClient } from "../runtime/client-registry";
+import type { EngineAiClient } from "../../../../../../features/ai-clients";
 import {
   dispatchStream,
   prepareStreamInput,

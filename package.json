@@ -38,7 +38,9 @@
     "test:unit": "bun run chrona test unit",
     "test:api": "bun run scripts/run-api-tests.ts",
     "test:bun": "bun run scripts/run-bun-tests.ts",
+    "test:feature": "bun run scripts/test-feature.ts --run",
     "test:e2e": "playwright test",
+    "e2e:feature": "bun run scripts/test-feature.ts --kind e2e --run",
     "test:e2e:desktop": "playwright test --project=chromium",
     "test:e2e:tablet": "playwright test --project=tablet",
     "test:e2e:mobile": "playwright test --project=mobile",
@@ -47,7 +49,8 @@
     "postinstall": "prisma generate",
     "setup": "bun run db:generate && bun run db:seed",
     "db:seed": "bun prisma/seed.ts",
-    "check:boundaries": "bun run chrona check boundaries"
+    "check:boundaries": "bun run chrona check boundaries",
+    "build:smoke": "bun run chrona build smoke"
   },
   "dependencies": {
     "@base-ui/react": "1.4.1",

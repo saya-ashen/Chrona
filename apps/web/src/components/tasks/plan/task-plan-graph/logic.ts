@@ -7,15 +7,15 @@ import type {
   PlanEdgeKind,
   PlanNodeDataModel,
 } from "./types";
+import { overviewToneForNode } from "../../../../../../../features/task-workspace";
 export { getShapeClassName, getShapeStyle, shapeChipClassName, TONE_STYLES } from "./theme";
 
 export function getNodeTone(node: PlanNodeDataModel): NodeTone {
-  if (node.status === "blocked" || node.status === "failed" || node.status === "degraded") return "blocked";
-  if (node.status === "active" || node.status === "in_progress") return "active";
-  if (node.status === "waiting" || node.status === "waiting_for_user" || node.status === "waiting_for_approval") return "attention";
-  if (node.status === "skipped") return "skipped";
-  if (node.status === "done" || node.status === "completed" || node.status === "cancelled" || node.status === "invalidated") return "done";
-  if (node.status === "ready") return "upcoming";
+  const tone = overviewToneForNode(node);
+  if (tone === "critical") return "blocked";
+  if (tone === "warning") return "attention";
+  if (tone === "success") return node.status === "skipped" ? "skipped" : "done";
+  if (tone === "info") return node.status === "ready" ? "upcoming" : "active";
   return "idle";
 }
 

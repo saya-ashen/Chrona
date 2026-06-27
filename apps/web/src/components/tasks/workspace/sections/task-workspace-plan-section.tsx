@@ -6,25 +6,25 @@ import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
-import { buildAcceptOrRegenerateSpec } from "../execution/build-execution-overview-spec";
+import { buildAcceptOrRegenerateSpec } from "../../../../../../../features/execution-monitoring/ui/build-execution-overview-spec";
 import type {
   CommandCenterCopy,
   CommandCenterPrimaryAction,
-} from "../execution/task-workspace-execution-overview";
-import { useActionSpecRenderConfig } from "../execution/action-tab";
+} from "../../../../../../../features/execution-monitoring/ui/task-workspace-execution-overview";
+import { useActionSpecRenderConfig } from "../../../../../../../features/execution-monitoring/ui/action-tab";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { TaskWorkspaceInspector } from "../execution/task-workspace-inspector";
+import { TaskWorkspaceInspector } from "../../../../../../../features/execution-monitoring/ui/task-workspace-inspector";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import {
   createTaskWorkspaceExecutionConsoleView,
   type TaskExecutionDispatchResult,
-} from "../model/task-workspace-query";
+} from "../../../../../../../features/task-workspace";
 import {
   dispatchInputForPrimaryAction,
   resolveCommandCenterPrimaryAction,
-} from "../model/task-workspace-primary-action";
+} from "../../../../../../../features/task-workspace";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
-import type { TaskPageData, TaskPlanGenerationStatus, WorkspaceActivityItem } from "../model/task-workspace-types";
+import type { TaskPageData, TaskPlanGenerationStatus, WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 function isCompletedGraphNode(status: string) {

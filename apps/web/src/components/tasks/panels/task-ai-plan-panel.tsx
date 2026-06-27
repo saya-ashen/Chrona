@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Clock3, Loader2, Sparkles, WandSparkles } from "lucide-react";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
-import type { TaskConfigFormDraft } from "@/components/schedule/forms/task-config-form";
+import type { TaskConfigFormDraft } from "../../../../../../features/schedule/ui/forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

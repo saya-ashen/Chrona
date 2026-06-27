@@ -266,8 +266,8 @@ describe("MCP routes", () => {
   });
 
   it("does not expose hidden context fields in any public tool schema", () => {
-    for (const tool of Object.values(__mcpRouteTestHooks.externalTools)) {
-      const shape = tool.inputSchema.shape as Record<string, unknown>;
+    for (const tool of Object.values(__mcpRouteTestHooks.externalTools) as Array<{ inputSchema: { shape: Record<string, unknown> } }>) {
+      const shape = tool.inputSchema.shape;
       for (const fieldName of hiddenContextFieldNames) {
         expect(shape[fieldName]).toBeUndefined();
       }

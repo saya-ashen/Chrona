@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { db } from "@chrona/db";
 import type { ConversationEntry, Event, Run } from "@chrona/db/generated/prisma/client";
 import { createChronaEngine } from "@chrona/engine";
-import { aiClientRegistry } from "@chrona/engine/modules/ai/runtime/client-registry";
+import { aiClientRegistry } from "../../../../../features/ai-clients";
 import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
 import type {
   AgentProviderClient,
