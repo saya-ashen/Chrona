@@ -130,8 +130,8 @@ function formatRelative(value: string | null, copy: DashboardCopy["time"]): stri
 function OutputLink({ output }: { output: DashboardOutput }) {
   return (
     <LocalizedLink
-      href={`/work/${output.taskId}`}
-      className="inline-flex max-w-full items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-foreground"
+      href={`/tasks/${output.taskId}`}
+      className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full border bg-background px-2 py-1 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
     >
       <FileText className="size-3.5 shrink-0" aria-hidden />
       <span className="truncate">{output.title}</span>
@@ -724,7 +724,7 @@ function TaskStreamCard({
       title: item.title,
       detail: item.reason ?? copy.attention.kind[item.kind],
       output: item.latestOutput,
-      href: `/work/${item.taskId}`,
+      href: `/tasks/${item.taskId}`,
       action: copy.nextStep[item.nextStep],
       at: item.updatedAt,
     }));
@@ -734,7 +734,7 @@ function TaskStreamCard({
       title: item.title,
       detail: item.stage,
       output: item.latestOutput,
-      href: `/work/${item.taskId}`,
+      href: `/tasks/${item.taskId}`,
       action: copy.openTask,
       at: item.updatedAt,
     }));
@@ -744,7 +744,7 @@ function TaskStreamCard({
       title: item.title,
       detail: item.output ? null : item.summary,
       output: item.output,
-      href: `/work/${item.taskId}`,
+      href: `/tasks/${item.taskId}`,
       action: copy.openTask,
       at: item.completedAt,
     }));
@@ -784,7 +784,7 @@ function TaskStreamCard({
               const Icon = LANE_ICON[row.lane];
               const tone = LANE_BADGE[row.lane];
               return (
-                <li key={`${row.lane}-${row.taskId}`} className="flex items-start justify-between gap-3 py-3">
+                <li key={`${row.lane}-${row.taskId}`} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <Icon
                       className={cn(
@@ -818,14 +818,17 @@ function TaskStreamCard({
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
                     {row.at ? (
-                      <span className="hidden text-xs tabular-nums text-muted-foreground sm:inline">
+                      <span className="text-xs tabular-nums text-muted-foreground">
                         {formatRelative(row.at, copy.time)}
                       </span>
-                    ) : null}
-                    <Button asChild size="sm" variant={row.lane === "attention" ? "outline" : "ghost"}>
-                      <LocalizedLink href={row.href}>{row.action}</LocalizedLink>
+                    ) : <span />}
+                    <Button asChild size="sm" variant={row.lane === "attention" ? "default" : "outline"} className="shadow-sm">
+                      <LocalizedLink href={row.href}>
+                        {row.action}
+                        <ArrowRight className="size-4" aria-hidden />
+                      </LocalizedLink>
                     </Button>
                   </div>
                 </li>
