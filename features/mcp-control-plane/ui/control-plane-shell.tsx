@@ -218,7 +218,7 @@ export function ControlPlaneShell({
             <AssistantSurfaceDropdown />
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:px-6 xl:px-7 xl:pb-3">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:px-6 xl:px-7 xl:pb-3">
           {children}
         </main>
 
