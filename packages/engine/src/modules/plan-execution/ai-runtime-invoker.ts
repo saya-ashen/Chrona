@@ -256,6 +256,7 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
     sessionKey: request.sessionKey,
     instructions: request.instructions,
     input: request.input as ProviderRunInput,
+    terminalToolName: request.terminalToolName,
     maxOutputTokens: request.maxOutputTokens,
     ...(request.resumeSessionRef
       ? { resumeSessionRef: request.resumeSessionRef }
@@ -581,7 +582,7 @@ async function collectProviderRunSnapshot(
 ): Promise<ProviderRunSnapshot> {
   let snapshot: ProviderRunSnapshot | null = null;
   let eventIndex = 0;
-  let terminalToolName: string | undefined = options.terminalToolName;
+  let terminalToolName: string | undefined;
   for await (const event of events) {
     eventIndex += 1;
     await options.onRuntimeEvent?.(event);
@@ -600,7 +601,7 @@ async function collectProviderRunSnapshot(
         runId: event.run.runId,
         nativeRunId: event.run.nativeRunId,
         sessionId,
-        status: event.run.status ?? "completed",
+        status: "completed",
         outputText: event.outputText,
         structuredPayload: event.structuredPayload,
         usage: event.usage,
@@ -612,6 +613,9 @@ async function collectProviderRunSnapshot(
     }
     if (event.type === "tool_completed") {
       terminalToolName = event.toolName ?? terminalToolName;
+    }
+    if (event.type === "tool_call" && event.status === "completed") {
+      terminalToolName = event.tool ?? terminalToolName;
     }
     if (event.type === "run_failed") {
       const run = event.run ?? fallbackRun;
@@ -891,10 +895,22 @@ async function updateProviderRunAuditRefs(input: {
       lastRawEventId: input.rawEventId,
       completedByEventId: input.eventType === "run_completed" ? input.eventId : undefined,
       failedByEventId: input.eventType === "run_failed" ? input.eventId : undefined,
-      status: input.eventType === "approval_required" ? "waiting_for_approval" : undefined,
+      status: providerRunStatusForEvent(input.eventType),
+      finishedAt: providerRunFinishedAtForEvent(input.eventType),
       correlationId: input.correlationId,
     },
   });
+}
+
+function providerRunStatusForEvent(eventType: string) {
+  if (eventType === "run_completed") return "completed";
+  if (eventType === "run_failed") return "failed";
+  if (eventType === "approval_required") return "waiting_for_approval";
+  return undefined;
+}
+
+function providerRunFinishedAtForEvent(eventType: string) {
+  return eventType === "run_completed" || eventType === "run_failed" ? new Date() : undefined;
 }
 
 function summaryForProviderEvent(event: ProviderRunEvent) {

@@ -452,6 +452,9 @@ export function chronaPlanOutputCatalogPrompt() {
   return chronaPlanOutputCatalog.prompt({
     editModes: ["patch"],
     customRules: [
+      "Prefer Card containers around generated sections so results adapt to panel width.",
+      "Use JsonView sparingly; prefer Markdown, Table, ResultSummary, FileRef, and FileView for user-facing reports.",
+      "remove elements no longer reachable from root when replacing result structure.",
       "Each patch is a JSON Patch operation over Current Node Context JSON.context.planOutput.spec.",
       "Chrona does not accept raw JSONL text. Put the generated RFC 6902 patch objects in chrona_plan_output.patches.",
       "Use chrona_plan_output for shared plan-level user-visible output only.",

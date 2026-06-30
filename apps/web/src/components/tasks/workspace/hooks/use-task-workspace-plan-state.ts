@@ -592,6 +592,11 @@ export function useTaskWorkspacePlanState(
     void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction });
   }, [selectedWorkBlockId, task.id]);
 
+  const handleStopPlanGeneration = useCallback(async () => {
+    await dispatchWorkspaceCommand(task.id, { type: "plan.stop_generation", workBlockId: selectedWorkBlockId });
+    void refreshExecutionQueries();
+  }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
+
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);
     const result = await dispatchTaskExecutionAction(task.id, action, selectedWorkBlockId);
@@ -675,6 +680,7 @@ export function useTaskWorkspacePlanState(
     dispatchExecutionAction,
     submitCheckpointAction,
     handleGeneratePlanFromHeader,
+    handleStopPlanGeneration,
     assistantBuildCurrentPlan,
   };
 }

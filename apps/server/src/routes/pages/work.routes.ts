@@ -339,6 +339,21 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
       return;
     }
 
+
+    if (command.type === "plan.stop_generation") {
+      const workBlockId = commandWorkBlockId(command);
+      engine.tasks.plan.stopGeneration({ taskId, workBlockId });
+      resetPlanGenerationHeaderState({ taskId, workspaceId, workBlockId });
+      appendTaskWorkspaceEvent({
+        type: "task_workspace_updated",
+        taskId,
+        workspaceId,
+        workBlockId,
+        reason: "plan.generation.stopped",
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
     if (command.type === "plan.accept") {
       await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
       const headerStateUpdate = await buildHeaderExecutionStateUpdate({

@@ -183,6 +183,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     dispatchExecutionAction,
     submitCheckpointAction,
     handleGeneratePlanFromHeader,
+    handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
   const consoleView = useMemo(
     () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
@@ -247,7 +248,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           store={headerStore}
           onAcceptPlan={() => acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById })}
           onGeneratePlan={handleGeneratePlanFromHeader}
-          onStopPlanGeneration={() => {}}
+          onStopPlanGeneration={handleStopPlanGeneration}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });

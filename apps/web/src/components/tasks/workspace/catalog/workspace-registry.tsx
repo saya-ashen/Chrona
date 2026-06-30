@@ -296,9 +296,12 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       </article>
     ),
     JsonView: ({ props }) => (
-      <pre className="overflow-x-auto rounded-lg bg-muted/50 p-2 text-xs leading-5 text-foreground/80">
-        {typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2)}
-      </pre>
+      <section className="min-w-0 rounded-xl border border-border/70 bg-background/95 p-3 shadow-sm">
+        {props.title ? <p className="mb-2 text-sm font-semibold text-foreground">{props.title}</p> : null}
+        <pre className="min-w-0 overflow-x-auto rounded-lg bg-muted/50 p-2 text-xs leading-5 text-foreground/80">
+          {typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2)}
+        </pre>
+      </section>
     ),
     FileRef: ({ props }) => (
       <div className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm">
@@ -307,8 +310,11 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         {props.description ? <p className="mt-0.5 text-xs text-muted-foreground">{props.description}</p> : null}
       </div>
     ),
-    ResultSummary: ({ props }) =>
-      props.text ? <p className="text-sm leading-5 text-foreground/80">{props.text}</p> : null,
+    ResultSummary: ({ props }) => props.text ? (
+      <section className="rounded-xl border border-primary/20 bg-primary-soft/45 px-3 py-2 text-sm leading-5 text-foreground/80">
+        {props.text}
+      </section>
+    ) : null,
     ActivityRow: ({ props, children }) => {
       const tone = props.tone as Tone;
       const Icon = activityIcon(props.kind, tone);
