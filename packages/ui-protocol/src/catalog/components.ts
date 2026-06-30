@@ -395,7 +395,7 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
         description: z.string().optional(),
       }),
       description:
-        "Reference to a produced or changed file artifact. path must be a repo-relative path when possible.",
+        "Reference to a produced or changed file artifact. path must be repo-relative; generated result artifacts should use .chrona/outputs/<node-ref>/ when not explicit repo/code changes.",
       example: {
         path: "packages/ui-protocol/src/catalog/components.ts",
         title: "Updated catalog",

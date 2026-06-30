@@ -207,17 +207,18 @@ describe("TaskWorkspacePage Generate Plan live header action", () => {
     await waitFor(() => expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.generate" }));
 
     await act(async () => {
-      pushEvent("spec.patch", {
-        type: "spec.patch",
-        document: "header",
-        patches: [
-          { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan..." },
-          { op: "replace", path: "/elements/action:generate-plan/props/disabled", value: true },
-        ],
+      pushEvent("state.update", {
+        type: "state.update",
+        updates: {
+          "/plan/generation/is-running": true,
+          "/plan/generation/header-action-disabled": true,
+          "/plan/generation/stop-disabled": false,
+        },
       });
     });
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate plan..." })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate plan" })).toBeDisabled());
+    expect(screen.getByRole("button", { name: "Stop generation" })).toBeEnabled();
 
     await act(async () => {
       pushEvent("state.update", {
@@ -234,6 +235,8 @@ describe("TaskWorkspacePage Generate Plan live header action", () => {
           "/execution/can-start": false,
           "/execution/start-disabled": true,
           "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
+          "/plan/generation/is-running": false,
+          "/plan/generation/header-action-disabled": false,
         },
       });
     });

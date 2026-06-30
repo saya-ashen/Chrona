@@ -293,9 +293,8 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
   });
 
-  it("shows stop generation instead of generate while plan generation is running", () => {
+  it("keeps stop generation out of the command center while plan generation is running", () => {
     const onGeneratePlan = vi.fn();
-    const onStopPlanGeneration = vi.fn().mockResolvedValue(undefined);
 
     renderWithQueryClient(
       <TaskWorkspacePlanSection
@@ -308,18 +307,15 @@ describe("TaskWorkspacePlanSection", () => {
         acceptPlanError={null}
         runtimeEvents={[]}
         onGeneratePlan={onGeneratePlan}
-        onStopPlanGeneration={onStopPlanGeneration}
         onApplyPlan={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Stop generation" }));
-
+    expect(within(commandCenter).queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
+    expect(within(commandCenter).queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
     expect(onGeneratePlan).not.toHaveBeenCalled();
-    expect(onStopPlanGeneration).toHaveBeenCalledTimes(1);
   });
 
   it("shows a retry action when the task is blocked by a failed run even if graph nodes are stale", () => {

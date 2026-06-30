@@ -62,21 +62,19 @@ function publishWorkspaceTrigger(input: {
   appendTaskWorkspaceEvent(input);
 }
 
-function resetGeneratePlanActionPatch(input: {
+function resetPlanGenerationHeaderState(input: {
   taskId: string;
   workspaceId: string;
   workBlockId: string | null;
 }) {
-  appendTaskWorkspaceEvent({
-    type: "spec.patch",
-    document: "header",
+  publishTaskStateUpdate({
     taskId: input.taskId,
     workspaceId: input.workspaceId,
     workBlockId: input.workBlockId,
-    patches: [
-      { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan" },
-      { op: "remove", path: "/elements/action:generate-plan/props/disabled" },
-    ],
+    updates: {
+      "/plan/generation/is-running": false,
+      "/plan/generation/header-action-disabled": false,
+    },
   });
 }
 
@@ -123,6 +121,9 @@ async function buildTaskWorkspaceStateSnapshot(
     "/plan/generation/statusMessage": session?.statusMessage ?? null,
     "/plan/generation/error/message": session?.error?.message ?? null,
     "/plan/generation/error/code": session?.error?.code ?? null,
+    "/plan/generation/is-running": session?.status === "running",
+    "/plan/generation/header-action-disabled": session?.status === "running",
+    "/plan/generation/stop-disabled": false,
     ...headerExecutionStateToStatePaths(executionState),
   };
 }
@@ -221,10 +222,17 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
         "/plan/status": "waiting_acceptance",
         "/plan/generation/status": "completed",
+        "/plan/generation/is-running": false,
+        "/plan/generation/header-action-disabled": false,
       };
     case "cancelled":
     case "done":
-      return { "/plan/status": "idle", "/plan/generation/status": event.type };
+      return {
+        "/plan/status": "idle",
+        "/plan/generation/status": event.type,
+        "/plan/generation/is-running": false,
+        "/plan/generation/header-action-disabled": false,
+      };
     case "error": {
       // Surface a `state.update` so the header spec can render an inline
       // error Alert and a recovery-actions row. `buttonRetry` /
@@ -239,6 +247,8 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/plan/generation/error/buttonRetry": retryable,
         "/plan/generation/error/buttonEditInstruction": true,
         "/plan/generation/error/buttonCancel": false,
+        "/plan/generation/is-running": false,
+        "/plan/generation/header-action-disabled": false,
       };
     }
     default:
@@ -272,17 +282,6 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
   try {
     if (command.type === "plan.generate") {
       const workBlockId = commandWorkBlockId(command);
-      appendTaskWorkspaceEvent({
-        type: "spec.patch",
-        document: "header",
-        taskId,
-        workspaceId,
-        workBlockId,
-        patches: [
-          { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan..." },
-          { op: "replace", path: "/elements/action:generate-plan/props/disabled", value: true },
-        ],
-      });
       publishTaskStateUpdate({
         taskId,
         workspaceId,
@@ -294,6 +293,9 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
           "/plan/generation/statusMessage": "Starting plan generation...",
           "/plan/generation/error/code": null,
           "/plan/generation/error/message": null,
+          "/plan/generation/is-running": true,
+          "/plan/generation/header-action-disabled": true,
+          "/plan/generation/stop-disabled": false,
         },
       });
       const generation = engine.tasks.plan.generate({
@@ -322,10 +324,10 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         }
       }
       generation.finish();
-      // Always restore the header action to its idle state once the
-      // generation stream closes — success, error, and cancel all leave the
-      // button in a "Generate plan" / enabled state so the user can retry.
-      resetGeneratePlanActionPatch({ taskId, workspaceId, workBlockId });
+      // Always restore the header generation state once the stream closes.
+      // Terminal stream events normally do this; this extra reset covers
+      // runners that close without a terminal event.
+      resetPlanGenerationHeaderState({ taskId, workspaceId, workBlockId });
       // Single terminal `task_workspace_updated` for the whole plan stream
       // so the client can refresh the REST snapshot (savedPlan on success,
       // error state on failure). Intermediate `plan.generation.status` /
@@ -520,7 +522,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
       message: httpError?.message ?? (cause instanceof Error ? cause.message : "Workspace command failed"),
     });
     if (command.type === "plan.generate") {
-      resetGeneratePlanActionPatch({ taskId, workspaceId, workBlockId });
+      resetPlanGenerationHeaderState({ taskId, workspaceId, workBlockId });
     }
   }
 }

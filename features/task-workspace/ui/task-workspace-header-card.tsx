@@ -23,6 +23,7 @@ type TaskWorkspaceHeaderCardProps = {
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
   onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void | Promise<void>;
+  onStopPlanGeneration: () => void | Promise<void>;
   onEdit: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
@@ -48,6 +49,7 @@ export function TaskWorkspaceHeaderCard({
   onAction,
   onAcceptPlan,
   onGeneratePlan,
+  onStopPlanGeneration,
   onEdit,
   showDeleteConfirm,
   isDeleting,
@@ -69,6 +71,7 @@ export function TaskWorkspaceHeaderCard({
   const ref = useRef({
     onAcceptPlan,
     onGeneratePlan,
+    onStopPlanGeneration,
     onEdit,
     onStartDeleteConfirm,
     onAction,
@@ -83,6 +86,7 @@ export function TaskWorkspaceHeaderCard({
   ref.current = {
     onAcceptPlan,
     onGeneratePlan,
+    onStopPlanGeneration,
     onEdit,
     onStartDeleteConfirm,
     onAction,
@@ -120,6 +124,9 @@ export function TaskWorkspaceHeaderCard({
     },
     [UI_ACTION.regeneratePlan]: async () => {
       await Promise.resolve(ref.current.onGeneratePlan());
+    },
+    [UI_ACTION.stopPlanGeneration]: async () => {
+      await Promise.resolve(ref.current.onStopPlanGeneration());
     },
     [UI_ACTION.dispatchExecution]: async (params: Record<string, unknown>) => {
       const actionId = params.actionId;

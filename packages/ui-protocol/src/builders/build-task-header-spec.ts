@@ -100,10 +100,30 @@ function appendAction(elements: MutableElements, children: string[], actionId: T
   } else if (actionId === "accept-plan") {
     element.visible = { $state: "/execution/show-accept-plan" };
   } else if (actionId === "generate-plan") {
+    element.props = {
+      ...baseProps,
+      disabled: { $state: "/plan/generation/header-action-disabled" },
+    };
+    element.on = { press: { action: UI_ACTION.regeneratePlan, params: {} } };
     element.visible = { $state: "/execution/show-generate-plan" };
   }
   elements[key] = element;
   children.push(key);
+}
+
+function appendStopPlanGenerationAction(elements: MutableElements, children: string[]) {
+  elements["action:stop-plan-generation"] = {
+    type: "Button",
+    props: {
+      label: "Stop generation",
+      variant: "danger",
+      size: "sm",
+      disabled: { $state: "/plan/generation/stop-disabled" },
+    },
+    visible: { $state: "/plan/generation/is-running" },
+    on: { press: { action: UI_ACTION.stopPlanGeneration, params: {} } },
+  };
+  children.push("action:stop-plan-generation");
 }
 
 function appendOverflowMenu(elements: MutableElements, children: string[], actions: TaskHeaderActionInput[]) {
@@ -196,6 +216,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   appendAction(elements, actionChildren, "stop", "Stop");
   appendAction(elements, actionChildren, "accept-plan", "Accept plan");
   appendAction(elements, actionChildren, "generate-plan", "Generate plan");
+  appendStopPlanGenerationAction(elements, actionChildren);
   appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "edit" || action.id === "delete"));
 
   elements.root = {
@@ -220,7 +241,20 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   // `error/button*` flag; missing/disabled buttons hide themselves.
   appendErrorRegion(elements);
 
-  return { root: "root", elements, state: { headerOverflowAction: "" } };
+  return {
+    root: "root",
+    elements,
+    state: {
+      headerOverflowAction: "",
+      plan: {
+        generation: {
+          "header-action-disabled": false,
+          "is-running": false,
+          "stop-disabled": false,
+        },
+      },
+    },
+  };
 }
 
 function appendErrorRegion(elements: MutableElements) {

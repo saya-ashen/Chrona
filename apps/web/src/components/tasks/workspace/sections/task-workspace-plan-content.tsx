@@ -1,4 +1,4 @@
-import { GitBranch, Loader2, Minimize2, Sparkles, Square } from "lucide-react";
+import { GitBranch, Minimize2, Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -10,8 +10,6 @@ const DEFAULT_COPY = {
   regeneratePlan: "Regenerate plan",
   generating: "Generating...",
   preparingPlanGraph: "Preparing plan graph...",
-  stopGeneration: "Stop generation",
-  stoppingGeneration: "Stopping...",
   planGraphPlaceholder: "The plan graph will appear here once AI generates a plan.",
   graphModeLabel: "Graph display mode",
   graphFullMode: "Full graph",
@@ -31,8 +29,6 @@ type TaskWorkspacePlanContentProps = {
   graphMode: "full" | "compact";
   onGraphModeChange: (mode: "full" | "compact") => void;
   onGeneratePlan: () => void;
-  onStopPlanGeneration: () => void;
-  isStoppingPlanGeneration?: boolean;
 };
 
 export function TaskWorkspacePlanContent({
@@ -45,8 +41,6 @@ export function TaskWorkspacePlanContent({
   graphMode,
   onGraphModeChange,
   onGeneratePlan,
-  onStopPlanGeneration,
-  isStoppingPlanGeneration = false,
 }: TaskWorkspacePlanContentProps) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components.taskWorkspace) };
@@ -88,19 +82,7 @@ export function TaskWorkspacePlanContent({
       </Button>
     </div>
   );
-  const generatePlanButton = isGeneratingPlan ? (
-    <Button
-      type="button"
-      disabled={isStoppingPlanGeneration}
-      onClick={onStopPlanGeneration}
-      variant="secondary"
-      size="sm"
-      className="rounded-xl"
-    >
-      {isStoppingPlanGeneration ? <Loader2 className="size-4 animate-spin" /> : <Square className="size-4" />}
-      {isStoppingPlanGeneration ? copy.stoppingGeneration : copy.stopGeneration}
-    </Button>
-  ) : (
+  const generatePlanButton = isGeneratingPlan ? null : (
     <Button
       type="button"
       onClick={onGeneratePlan}

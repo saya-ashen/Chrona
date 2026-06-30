@@ -58,6 +58,7 @@ describe("validateChronaSpec", () => {
     expect(prompt).toContain("Card containers");
     expect(prompt).toContain("Use JsonView sparingly");
     expect(prompt).toContain("remove elements no longer reachable from root");
+    expect(prompt).toContain(".chrona/outputs/<node-ref>/");
   });
 
 

@@ -100,7 +100,6 @@ type TaskWorkspacePlanSectionProps = {
   liveActivity?: WorkspaceActivityItem[];
   currentExecution?: PlanExecutionResult | null;
   generationUserInstruction?: string | null;
-  onStopPlanGeneration?: () => Promise<void>;
   onGeneratePlan: (request?: PlanGenerationRequest) => void;
   onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;
   onDispatchExecutionAction: (
@@ -127,13 +126,11 @@ export function TaskWorkspacePlanSection({
   liveActivity = [],
   currentExecution,
   onGeneratePlan,
-  onStopPlanGeneration,
   onApplyPlan,
   onDispatchExecutionAction,
   onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
-  const [isStoppingPlanGeneration, setIsStoppingPlanGeneration] = useState(false);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
@@ -217,15 +214,6 @@ export function TaskWorkspacePlanSection({
       onGeneratePlan({ userInstruction: instruction });
     },
   }), [onApplyPlan, onGeneratePlan, plan, regenerationInstruction]);
-  const handleStopPlanGeneration = useCallback(async () => {
-    if (isStoppingPlanGeneration) return;
-    setIsStoppingPlanGeneration(true);
-    try {
-      await onStopPlanGeneration?.();
-    } finally {
-      setIsStoppingPlanGeneration(false);
-    }
-  }, [isStoppingPlanGeneration, onStopPlanGeneration]);
   const commandCenterActionHandlers = useMemo(() => ({
     "submit-checkpoint": async (params: Record<string, unknown>) => {
       if (!onSubmitCheckpointAction) throw new Error("Checkpoint actions are not available for this view.");
@@ -272,42 +260,32 @@ export function TaskWorkspacePlanSection({
     blockActionRequired: pageData.task.blockReason?.actionRequired ?? null,
     blockType: pageData.task.blockReason?.blockType ?? null,
   });
-  const primaryAction: CommandCenterPrimaryAction = isGeneratingPlan
-    ? {
-        kind: "stop-plan-generation",
-        label: isStoppingPlanGeneration ? "Stopping..." : "Stop generation",
-        description: "Stop the current plan generation before starting another one.",
-        statusLabel: "generating",
-        tone: "info",
-        disabled: isStoppingPlanGeneration,
-        onClick: () => void handleStopPlanGeneration(),
-      }
-    : {
-        ...primaryActionDescriptor,
-        ...(primaryActionDescriptor.kind === "generate"
-          ? { onClick: () => onGeneratePlan() }
-          : {}),
-        ...(primaryActionDescriptor.kind === "task-primary-action" && primaryActionDispatch
-          ? { onClick: () => void onDispatchExecutionAction(primaryActionDispatch) }
-          : {}),
-        ...(primaryActionDescriptor.kind === "start-plan"
-          ? { onClick: () => void onDispatchExecutionAction({ action: "start_manual" }) }
-          : {}),
-        ...(primaryActionDescriptor.kind === "accept-or-regenerate" && plan
-          ? {
-              actionSpec: acceptOrRegenerateSpec,
-              actionHandlers: acceptOrRegenerateHandlers,
-              onActionStateChange: handleAcceptOrRegenerateStateChange,
-            }
-          : {}),
-        ...(primaryActionDescriptor.kind === "current-operation" && currentOperationNode
-          ? {
-              actionSpec: apiCurrentOperationSpec ?? currentOperationAction.spec,
-              actionHandlers: currentOperationAction.handlers,
-              onActionStateChange: currentOperationAction.onStateChange,
-            }
-          : {}),
-      };
+  const primaryAction: CommandCenterPrimaryAction = {
+    ...primaryActionDescriptor,
+    ...(primaryActionDescriptor.kind === "generate"
+      ? { onClick: () => onGeneratePlan() }
+      : {}),
+    ...(primaryActionDescriptor.kind === "task-primary-action" && primaryActionDispatch
+      ? { onClick: () => void onDispatchExecutionAction(primaryActionDispatch) }
+      : {}),
+    ...(primaryActionDescriptor.kind === "start-plan"
+      ? { onClick: () => void onDispatchExecutionAction({ action: "start_manual" }) }
+      : {}),
+    ...(primaryActionDescriptor.kind === "accept-or-regenerate" && plan
+      ? {
+          actionSpec: acceptOrRegenerateSpec,
+          actionHandlers: acceptOrRegenerateHandlers,
+          onActionStateChange: handleAcceptOrRegenerateStateChange,
+        }
+      : {}),
+    ...(primaryActionDescriptor.kind === "current-operation" && currentOperationNode
+      ? {
+          actionSpec: apiCurrentOperationSpec ?? currentOperationAction.spec,
+          actionHandlers: currentOperationAction.handlers,
+          onActionStateChange: currentOperationAction.onStateChange,
+        }
+      : {}),
+  };
   const focusNodeActions = (nodeId?: string) => {
     if (!nodeId) return;
 
@@ -376,8 +354,6 @@ export function TaskWorkspacePlanSection({
             graphMode={graphMode}
             onGraphModeChange={setGraphMode}
             onGeneratePlan={onGeneratePlan}
-            onStopPlanGeneration={() => void handleStopPlanGeneration()}
-            isStoppingPlanGeneration={isStoppingPlanGeneration}
           />
         </section>
         <TaskWorkspaceInspector
