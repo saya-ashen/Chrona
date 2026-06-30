@@ -33,6 +33,8 @@ mock.module("../../../../../../features/ai-clients", () => ({
 }));
 
 import { generatePlanStream } from "../features/generate-plan";
+import { dispatchStream } from "../streaming";
+import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type { EngineAiClient } from "../../../../../../features/ai-clients";
 
 describe("generatePlanStream", () => {
@@ -122,7 +124,7 @@ describe("generatePlanStream", () => {
       },
     } as unknown as EngineAiClient;
 
-    const { dispatchStream } = await import("../streaming");
+    
     const events = [] as Array<{ type: string; text?: string; structured?: unknown; tool?: string; input?: Record<string, unknown> }>;
     for await (const event of dispatchStream(client, "generate_plan", {
       scope: "task-1",
@@ -215,5 +217,58 @@ describe("generatePlanStream", () => {
       { type: "tool_result", tool: "skill_view", result: "completed", error: false },
       { type: "done", text: "", structured: null },
     ]);
+  });
+
+  it("cancels the provider run when the caller aborts an active generate_plan stream", async () => {
+    const controller = new AbortController();
+    const cancelRunMock = mock(async () => ({
+      provider: "hermes",
+      runId: "run-1",
+      sessionId: "session-1",
+      status: "cancelled" as const,
+    }));
+    const streamRunMock = mock(async function* () {
+      yield { type: "text_delta" as const, text: "still running" };
+      yield { type: "text_delta" as const, text: "late event" };
+    });
+    const providerClient: Partial<AgentProviderClient> = {
+      provider: "hermes",
+      startRun: mock(async () => ({
+        provider: "hermes",
+        runId: "run-1",
+        sessionId: "session-1",
+        status: "running" as const,
+      })),
+      streamRun: streamRunMock,
+      cancelRun: cancelRunMock,
+    };
+    const client = {
+      record: {
+        id: "client-4",
+        name: "Hermes",
+        type: "hermes",
+        config: { baseUrl: "" },
+        isDefault: true,
+        enabled: true,
+      },
+      providerClient,
+    } as EngineAiClient;
+
+    const events = [] as Array<{ type: string; text?: string }>;
+    for await (const event of dispatchStream(client, "generate_plan", {
+      scope: "task-1",
+      instructions: "Generate plan",
+      inputText: "Build plan",
+      input: { title: "Build plan" },
+      userMessage: "Build plan",
+      signal: controller.signal,
+    })) {
+      events.push(event as { type: string; text?: string });
+      if (event.type === "partial") controller.abort();
+    }
+
+    expect(events).toContainEqual({ type: "partial", text: "still running" });
+    expect(events).not.toContainEqual({ type: "partial", text: "late event" });
+    expect(cancelRunMock).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1", sessionId: "session-1" }));
   });
 });

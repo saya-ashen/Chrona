@@ -306,8 +306,33 @@ export async function runProviderRequest(
     status: run.status ?? "running",
   });
 
+  const cancelProviderRun = async (): Promise<ProviderRunSnapshot> => {
+    const snapshot = await providerClient.cancelRun?.({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      reason: "Execution stopped",
+    }).catch(() => null);
+    const cancelledSnapshot: ProviderRunSnapshot = snapshot ?? {
+      provider: providerClient.provider,
+      runId: run.runId,
+      nativeRunId: run.nativeRunId,
+      sessionId: run.sessionId,
+      status: "cancelled",
+      error: null,
+    };
+    await updateProviderRunRecord(options.providerRunRecordId, {
+      status: "cancelled",
+      finishedAt: new Date(),
+    });
+    return { ...cancelledSnapshot, status: "cancelled", error: cancelledSnapshot.error ?? null };
+  };
+
+  if (options.signal?.aborted) {
+    return cancelProviderRun();
+  }
+
   try {
-    return await collectProviderRunSnapshot(
+    const snapshot = await collectProviderRunSnapshot(
       providerClient.provider,
       providerClient.streamRun({
         runId: run.runId,
@@ -319,12 +344,13 @@ export async function runProviderRequest(
       run,
       options,
     );
+    return options.signal?.aborted ? cancelProviderRun() : snapshot;
   } catch (error) {
     if (!isTransientProviderError(error)) throw error;
     await delay(PROVIDER_RETRY_BACKOFF_MS);
 
     try {
-      return await collectProviderRunSnapshot(
+      const snapshot = await collectProviderRunSnapshot(
         providerClient.provider,
         providerClient.streamRun({
           runId: run.runId,
@@ -336,6 +362,7 @@ export async function runProviderRequest(
         run,
         options,
       );
+      return options.signal?.aborted ? cancelProviderRun() : snapshot;
     } catch (resumeError) {
       if (!isTransientProviderError(resumeError)) throw resumeError;
     }

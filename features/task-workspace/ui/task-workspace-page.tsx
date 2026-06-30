@@ -247,7 +247,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           store={headerStore}
           onAcceptPlan={() => acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById })}
           onGeneratePlan={handleGeneratePlanFromHeader}
-          onStopPlanGeneration={handleStopPlanGeneration}
+          onStopPlanGeneration={() => {}}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chronaCatalog, validateChronaSpec, type ValidateResult } from "../index";
+import { chronaCatalog, chronaPlanOutputCatalogPrompt, validateChronaSpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {

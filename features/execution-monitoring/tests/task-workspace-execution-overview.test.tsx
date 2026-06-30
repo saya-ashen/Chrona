@@ -120,6 +120,67 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
   });
 
+  it("shows a live status strip above Results while a runtime event is active", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const liveEvent = {
+      type: "runtime_event" as const,
+      action: "start_manual" as const,
+      nodeId: "execute",
+      nodeTitle: "Generate report",
+      runtimeName: "hermes",
+      provider: "hermes",
+      runId: "run-1",
+      sequence: 1,
+      timestamp: "2026-05-12T10:01:00.000Z",
+      event: { type: "tool_started" as const, toolName: "chrona_report_write", label: "Writing report" },
+    };
+
+    renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      runtimeEvents: [liveEvent],
+      currentExecution: { status: "running" },
+    });
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Running now");
+    expect(status).toHaveTextContent("Writing report");
+  });
+
+  it("hides live status strip before execution has active runtime activity", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+
+    renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution ready"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      currentExecution: { status: "started" },
+    });
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+  });
+
+
+  it("hides live status strip after completion even when stale activity looks active", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const staleStarted = {
+      id: "stale-tool-started",
+      kind: "tool_started" as const,
+      title: "Tool started",
+      summary: "Writing report",
+      description: "Writing report",
+      tone: "info" as const,
+      timestamp: "2026-05-12T10:01:00.000Z",
+      tool: { name: "chrona_report_write", label: "Writing report", state: "started" as const },
+    };
+
+    renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution completed"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [staleStarted], savedCount: 1, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      currentExecution: { status: "completed" },
+      activity: [staleStarted],
+    });
+
+    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Latest activity running")).not.toBeInTheDocument();
+  });
   it("streams live runtime events into a server-driven Trail document", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
     const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };

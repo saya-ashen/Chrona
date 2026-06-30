@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
+import type { PlanExecutionResult } from "@chrona/contracts/ai";
 import type { PlanNodeDataModel } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
 import { taskWorkspaceActivityMessages } from "../../../apps/web/src/lib/i18n/messages";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
@@ -58,13 +59,34 @@ function buildNodeResultContentSpec(_node: PlanNodeDataModel | null, emptyMessag
   return buildResultSpec([], { emptyMessage });
 }
 
-function withActivityDensity(spec: UiDocument, density: "rail"): UiDocument {
+function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
+  return Boolean(left.tool && right.tool)
+    && left.tool?.name === right.tool?.name
+    && left.runId === right.runId
+    && left.sourceNodeId === right.sourceNodeId;
+}
+
+function hasCompletedToolActivity(item: WorkspaceActivityItem, items: WorkspaceActivityItem[]) {
+  return item.tool?.state === "started" && items.some((candidate) => candidate.kind === "tool_completed" && candidate.tool?.state !== "started" && isSameToolActivity(item, candidate));
+}
+
+function isRunningActivity(item: WorkspaceActivityItem, items: WorkspaceActivityItem[]) {
+  if (item.tool?.state === "started") return !hasCompletedToolActivity(item, items);
+  return item.kind === "provider_run" && item.tone === "info";
+}
+
+function runningActivityText(item: WorkspaceActivityItem | undefined) {
+  if (!item) return null;
+  return item.tool?.label ?? item.sourceNodeTitle ?? item.summary ?? item.title;
+}
+
+function withActivityStreamProps(spec: UiDocument, props: { density?: "rail"; active?: boolean }): UiDocument {
   const elements = Object.fromEntries(
     Object.entries(spec.elements).map(([key, element]) => [
       key,
       element.type === "ActivityStream"
-        ? { ...element, props: { ...element.props, density } }
-        : element,
+        ? { ...element, props: { ...element.props, ...props } }
+      : element,
     ]),
   );
   return { ...spec, elements };
@@ -82,6 +104,7 @@ export function TaskWorkspaceExecutionOverview({
   runtimeEvents = [],
   liveActivity = [],
   primaryAction,
+  currentExecution,
   copy: copyProp,
   commandCenter,
   activityLayout = "below",
@@ -98,6 +121,7 @@ export function TaskWorkspaceExecutionOverview({
   activity: WorkspaceActivityItem[];
   runtimeEvents?: WorkspaceRuntimeEvent[];
   liveActivity?: WorkspaceActivityItem[];
+  currentExecution?: Pick<PlanExecutionResult, "status"> | null;
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   activityLayout?: ActivityLayout;
@@ -123,6 +147,15 @@ export function TaskWorkspaceExecutionOverview({
     () => commandCenter?.documents.trail ? commandCenterTrailItems(commandCenter) : activity,
     [activity, commandCenter],
   );
+  const liveRuntimeActivity = useMemo(() => runtimeEventsToWorkspaceActivity(runtimeEvents, TRAIL_ACTIVITY_LIMIT), [runtimeEvents]);
+  const mergedActivity = useMemo(
+    () => mergeWorkspaceActivity([...liveActivity, ...liveRuntimeActivity, ...savedTrailActivity], TRAIL_ACTIVITY_LIMIT),
+    [liveActivity, liveRuntimeActivity, savedTrailActivity],
+  );
+  const activeActivity = mergedActivity.find((item) => isRunningActivity(item, mergedActivity));
+  const showLiveStatus = currentExecution?.status === "running" && Boolean(activeActivity);
+  const liveStatusLabel = primaryAction?.statusLabel ?? attention?.statusLabel ?? readiness.statusLabel ?? "Running now";
+  const liveStatusText = showLiveStatus ? runningActivityText(activeActivity) : null;
   useEffect(() => {
     if (!trailStore) return;
     const limit = TRAIL_ACTIVITY_LIMIT;
@@ -168,6 +201,15 @@ export function TaskWorkspaceExecutionOverview({
       <h3 id="task-workspace-results-heading" className="sr-only">
         {copy.outputTab}
       </h3>
+      {showLiveStatus ? (
+        <div className="mb-2.5 flex items-start gap-2 rounded-xl border border-primary/25 bg-primary-soft/50 px-3 py-2 text-xs text-foreground" role="status" aria-live="polite">
+          <span className="mt-0.5 size-3 shrink-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block font-semibold">Running now</span>
+            <span className="mt-0.5 block truncate text-muted-foreground">{liveStatusText ?? liveStatusLabel}</span>
+          </span>
+        </div>
+      ) : null}
       <SpecRenderer
         spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
         handlers={locateHandlers}
@@ -186,7 +228,7 @@ export function TaskWorkspaceExecutionOverview({
       <h3 id="task-workspace-activity-heading" className="sr-only">
         {copy.trailTab}
       </h3>
-      <SpecRenderer spec={withActivityDensity(trailSpec, "rail")} store={trailStore ?? undefined} />
+      <SpecRenderer spec={withActivityStreamProps(trailSpec, { density: "rail", active: showLiveStatus })} store={trailStore ?? undefined} />
     </UiSurfaceFrame>
   );
 
