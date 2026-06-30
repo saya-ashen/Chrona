@@ -204,6 +204,40 @@ function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?:
   );
 }
 
+function WorkspaceTable({ props }: { props: { columns?: string[] | null; rows?: string[][] | null; caption?: string | null } }) {
+  const columns = props.columns ?? [];
+  const rows = (props.rows ?? []).map((row) => row.map(String));
+
+  return (
+    <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border">
+      <table className="w-full table-fixed caption-bottom text-sm">
+        {props.caption ? <caption className="mt-4 text-sm text-muted-foreground">{props.caption}</caption> : null}
+        <thead className="[&_tr]:border-b">
+          <tr className="border-b transition-colors hover:bg-muted/50">
+            {columns.map((column) => (
+              <th key={column} className="h-10 min-w-0 px-2 text-left align-middle font-medium text-foreground">
+                <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-snug">{column}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="[&_tr:last-child]:border-0">
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-b transition-colors hover:bg-muted/50">
+              {row.map((cell, cellIndex) => (
+                <td key={cellIndex} className="min-w-0 p-2 align-top text-foreground/80">
+                  <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-5">{cell}</span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
 
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt
@@ -219,7 +253,7 @@ function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?:
 export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
     // standard primitives (shadcn)
-    Card: shadcnComponents.Card,
+    Card: (input) => shadcnComponents.Card({ ...input, props: { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-none") } }),
     Stack: shadcnComponents.Stack,
     Separator: shadcnComponents.Separator,
     Text: shadcnComponents.Text,
@@ -232,11 +266,11 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Textarea: shadcnComponents.Textarea,
     Select: shadcnComponents.Select,
     Tabs: shadcnComponents.Tabs,
-    Table: shadcnComponents.Table,
+    Table: WorkspaceTable,
     heading: shadcnComponents.Heading,
     DropdownMenu: shadcnComponents.DropdownMenu,
     paragraph: ({ props }) => <p className="text-sm leading-6 text-foreground/85">{props.text ?? props.content}</p>,
-    table: shadcnComponents.Table,
+    table: WorkspaceTable,
     section: ({ props, children }) => (
       <section className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3">
         {props.title ? <h3 className="font-heading text-sm font-semibold text-foreground">{props.title}</h3> : null}
