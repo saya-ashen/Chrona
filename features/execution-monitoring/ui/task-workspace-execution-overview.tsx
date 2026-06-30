@@ -156,10 +156,10 @@ export function TaskWorkspaceExecutionOverview({
     () => mergeWorkspaceActivity([...liveActivity, ...liveRuntimeActivity, ...savedTrailActivity], TRAIL_ACTIVITY_LIMIT),
     [liveActivity, liveRuntimeActivity, savedTrailActivity],
   );
-  const showLiveStatus = isExecutionRunning(currentExecution?.status);
-  const activeActivity = showLiveStatus ? mergedActivity.find((item) => isRunningActivity(item, mergedActivity)) : undefined;
+  const activeActivity = mergedActivity.find((item) => isRunningActivity(item, mergedActivity));
+  const showLiveStatus = currentExecution?.status === "running" && Boolean(activeActivity);
   const liveStatusLabel = primaryAction?.statusLabel ?? attention?.statusLabel ?? readiness.statusLabel ?? ws.liveStatusRunning;
-  const liveStatusText = runningActivityText(activeActivity);
+  const liveStatusText = showLiveStatus ? runningActivityText(activeActivity) : null;
 
   useEffect(() => {
     if (!trailStore) return;

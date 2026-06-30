@@ -147,6 +147,18 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(status).toHaveTextContent("Writing report");
   });
 
+  it("hides live status strip before execution has active runtime activity", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+
+    renderOverview(view, {
+      commandCenter: { documents: { now: nowDocument("Execution ready"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      currentExecution: { status: "started" },
+    });
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+  });
+
 
   it("hides live status strip after completion even when stale activity looks active", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);

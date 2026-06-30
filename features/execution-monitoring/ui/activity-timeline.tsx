@@ -544,11 +544,20 @@ function railDotClass(tone: Tone) {
   if (tone === "info") return "border-primary bg-primary shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_18%,transparent)]";
   return "border-muted-foreground/50 bg-muted-foreground/70";
 }
-function isRailEntryActive(entry: RenderEntry) {
+function isConcreteRunningEntry(entry: RenderEntry) {
   if (entry.type === "tool_pair") return !entry.completed;
   if (entry.type === "plan_phase") return summarizePlanPhase(entry.items) === "running";
-  if (entry.type === "single") return entry.item.tool?.state === "started" || (entry.item.kind === "provider_run" && entry.item.tone === "info");
+  if (entry.type === "single") return entry.item.tool?.state === "started";
   return false;
+}
+
+function isProviderRunFallback(entry: RenderEntry) {
+  return entry.type === "single" && entry.item.kind === "provider_run" && entry.item.tone === "info";
+}
+
+function activeRailEntryIndex(entries: RenderEntry[]) {
+  const concreteIndex = entries.findIndex(isConcreteRunningEntry);
+  return concreteIndex >= 0 ? concreteIndex : entries.findIndex(isProviderRunFallback);
 }
 
 
@@ -563,7 +572,7 @@ function railLineClass(tone: Tone) {
 
 function ActivityRailTimeline({ entries, active }: { entries: RenderEntry[]; active: boolean }) {
   const lastIdx = entries.length - 1;
-  const activeIdx = active ? entries.findIndex(isRailEntryActive) : -1;
+  const activeIdx = active ? activeRailEntryIndex(entries) : -1;
   return (
     <div className="space-y-0.5">
       {entries.map((entry, index) => {

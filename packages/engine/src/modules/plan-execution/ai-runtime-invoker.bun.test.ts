@@ -316,6 +316,60 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(reloaded.failedByEventId).toBeNull();
   });
 
+  it("cancels the provider run when the execution signal aborts during streaming", async () => {
+    const controller = new AbortController();
+    const { providerRun, run } = await seedProviderRunChain();
+    const cancelRun = mock(async (): Promise<ProviderRunSnapshot> => ({
+      provider: "hermes",
+      runId: "provider-run-1",
+      nativeRunId: "provider-run-1",
+      sessionId: "provider-session-1",
+      status: "cancelled",
+      error: null,
+    }));
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => ({
+        provider: "hermes",
+        runId: "provider-run-1",
+        nativeRunId: "provider-run-1",
+        sessionId: "provider-session-1",
+        status: "running",
+      } satisfies ProviderRunRef)),
+      streamRun: mock(() =>
+        (async function* () {
+          yield { type: "text_delta", text: "started" } as ProviderRunEvent;
+          yield {
+            type: "run_completed",
+            run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "completed" },
+            outputText: "late completion",
+          } as ProviderRunEvent;
+        })(),
+      ),
+      cancelRun,
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request, {
+      runId: run.id,
+      providerRunRecordId: providerRun.id,
+      signal: controller.signal,
+      onRuntimeEvent(event) {
+        if (event.type === "text_delta") controller.abort();
+      },
+    });
+
+    expect(cancelRun).toHaveBeenCalledWith(expect.objectContaining({ runId: "provider-run-1", sessionId: "provider-session-1" }));
+    expect(snapshot.status).toBe("cancelled");
+    expect(snapshot.outputText).toBeUndefined();
+
+    const reloaded = await db.taskPlanProviderRun.findUniqueOrThrow({
+      where: { id: providerRun.id },
+      select: { status: true, finishedAt: true },
+    });
+    expect(reloaded.status).toBe("cancelled");
+    expect(reloaded.finishedAt).toBeInstanceOf(Date);
+  });
+
 });
 
 describe("runProviderRequest resume threading", () => {

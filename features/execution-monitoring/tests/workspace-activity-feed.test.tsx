@@ -220,6 +220,21 @@ describe("WorkspaceActivityFeed", () => {
     expect(spinnerRow).not.toHaveTextContent("Task created");
   });
 
+  it("prefers a concrete running tool over provider-run fallback in rail", () => {
+    render(<WorkspaceActivityFeed
+      density="rail"
+      active
+      activity={[
+        activity({ id: "provider", kind: "provider_run", title: "Provider run started", summary: "claude_code", tone: "info", timestamp: "2026-05-21T00:01:00.000Z", runId: "run-1" }),
+        activity({ id: "tool", kind: "tool_started", title: "Writing result", summary: "Writing result", tone: "info", timestamp: "2026-05-21T00:02:00.000Z", runId: "run-1", tool: { name: "chrona_result_write", label: "Writing result", state: "started" } }),
+      ]}
+    />);
+
+    const spinnerRow = screen.getByLabelText("Latest activity running").closest("article");
+    expect(spinnerRow).toHaveTextContent("Writing result");
+    expect(spinnerRow).not.toHaveTextContent("Provider run started");
+  });
+
 
   it("does not spin stale rail starts when feed is inactive", () => {
     render(<WorkspaceActivityFeed
