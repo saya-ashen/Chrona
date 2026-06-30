@@ -31,12 +31,14 @@ export {
   locateWorkspaceNodePayloadSchema,
   submitCheckpointPayloadSchema,
   regeneratePlanPayloadSchema,
+  stopPlanGenerationPayloadSchema,
   type UiActionName,
   type CommandCenterPrimaryPayload,
   type AcceptPlanPayload,
   type DispatchExecutionPayload,
   type LocateWorkspaceNodePayload,
   type RegeneratePlanPayload,
+  type StopPlanGenerationPayload,
   type SubmitCheckpointPayload,
 } from "./actions/actions";
 export {

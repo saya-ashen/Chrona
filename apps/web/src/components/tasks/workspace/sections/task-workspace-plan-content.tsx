@@ -1,4 +1,4 @@
-import { GitBranch, Loader2, Minimize2, Sparkles } from "lucide-react";
+import { GitBranch, Minimize2, Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -82,19 +82,17 @@ export function TaskWorkspacePlanContent({
       </Button>
     </div>
   );
-  const generatePlanButton = (
+  const generatePlanButton = isGeneratingPlan ? null : (
     <Button
       type="button"
       disabled={isGeneratingPlan}
       onClick={onGeneratePlan}
       variant="secondary" size="sm" className="rounded-xl"
     >
-      {isGeneratingPlan ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-      {isGeneratingPlan
-        ? copy.generating
-        : plan
-          ? copy.regeneratePlan
-          : copy.generatePlan}
+      <Sparkles className="size-4" />
+      {plan
+        ? copy.regeneratePlan
+        : copy.generatePlan}
     </Button>
   );
 

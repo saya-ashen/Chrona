@@ -31,4 +31,30 @@ describe("buildTaskHeaderSpec", () => {
       children: expect.arrayContaining(["badge:workspace-state", "badge:primary-state", "badge:priority"]),
     });
   });
+
+  it("places plan generation stop action in header actions", () => {
+    const spec = buildTaskHeaderSpec({
+      title: "Launch task",
+      status: "waiting",
+      statusLabel: "Ready",
+      progressLabel: "No plan",
+      actions: [{ id: "generate-plan", label: "Generate plan" }],
+    });
+
+    expect(spec.elements.actions?.children).toContain("action:stop-plan-generation");
+    expect(spec.elements["action:stop-plan-generation"]).toMatchObject({
+      type: "Button",
+      props: {
+        label: "Stop generation",
+        variant: "danger",
+        disabled: { $state: "/plan/generation/stop-disabled" },
+      },
+      visible: { $state: "/plan/generation/is-running" },
+      on: { press: { action: "stop-plan-generation", params: {} } },
+    });
+    expect(spec.elements["action:generate-plan"]?.props).toMatchObject({
+      label: "Generate plan",
+      disabled: { $state: "/plan/generation/header-action-disabled" },
+    });
+  });
 });
