@@ -1,5 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("elkjs/lib/elk.bundled.js", () => ({
+  default: class {
+    layout(graph: unknown) {
+      return Promise.resolve(graph);
+    }
+  },
+}));
 import { fireEvent, render, screen } from "@testing-library/react";
 import { CompactFocusStack, buildCompactViewModel } from "./compact-view";
 import { DEFAULT_GRAPH_COPY } from "./constants";
@@ -16,6 +24,8 @@ function node(input: Partial<PlanNodeDataModel> & { id: string; status: PlanNode
     summary: input.summary,
     interactionType: input.interactionType,
     linkedTaskId: input.linkedTaskId,
+    estimatedMinutes: input.estimatedMinutes,
+    nextAction: input.nextAction,
   };
 }
 
@@ -24,7 +34,7 @@ function plan(nodes: PlanNodeDataModel[]): TaskPlanGraphPlan {
     state: "ready",
     nodes,
     steps: nodes,
-    currentStepId: nodes[0]?.id ?? null,
+    currentStepId: nodes.find((candidate) => candidate.status === "active")?.id ?? nodes[0]?.id ?? null,
     edges: nodes.slice(1).map((candidate, index) => ({
       id: `${nodes[index]?.id ?? "node"}-${candidate.id}`,
       from: nodes[index]?.id,
@@ -91,5 +101,33 @@ describe("compact task plan graph view", () => {
 
     fireEvent.click(screen.getByTestId("task-plan-outline-node-current"));
     expect(onSelect).toHaveBeenCalledWith("current");
+  });
+
+  it("keeps focus path in plan order and dims completed cards", () => {
+    const items = buildCompactViewModel(plan([
+      node({ id: "done", status: "done", statusLabel: "Done", summary: "Finished" }),
+      node({ id: "running", status: "active", statusLabel: "Running", summary: "In progress" }),
+      node({ id: "skipped", status: "skipped", statusLabel: "Skipped", summary: "Skipped branch" }),
+      node({ id: "todo", status: "ready", statusLabel: "Ready", summary: "Next" }),
+    ]), DEFAULT_GRAPH_COPY).focusItems;
+
+    expect(items.map((item) => item.id)).toEqual(["done", "running", "skipped", "todo"]);
+    expect(items[0]).toMatchObject({ isDone: true, isSkipped: false, tone: "done" });
+    expect(items[2]).toMatchObject({ isDone: true, isSkipped: true, tone: "skipped" });
+
+    render(
+      <CompactFocusStack
+        items={items}
+        selectedNodeId={null}
+        onSelect={vi.fn()}
+        graphCopy={DEFAULT_GRAPH_COPY}
+      />,
+    );
+
+    expect(screen.getByTestId("task-plan-outline-node-done")).toHaveClass("opacity-75");
+    expect(screen.getByText("done")).toHaveClass("line-through");
+    expect(screen.getByTestId("task-plan-outline-node-done").querySelector("span")).toHaveClass("bg-success");
+    expect(screen.getByTestId("task-plan-outline-node-skipped").querySelector("span")).toHaveClass("bg-muted-foreground/45");
+    expect(screen.getByTestId("task-plan-outline-node-running")).toHaveClass("border-primary/60");
   });
 });

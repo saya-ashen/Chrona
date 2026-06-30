@@ -64,6 +64,64 @@ describe("task-plan-view-model", () => {
     expect(graphPlan?.edges?.[0]?.label).toBe("是");
   });
 
+  it("adds condition branch edges from metadata before execution runtime exists", () => {
+    const graphPlan = compiledPlanToGraphPlan({
+      ...compiledPlan,
+      nodes: [
+        {
+          id: "condition-1",
+          localId: "condition_local",
+          type: "condition",
+          title: "是否加芝士",
+          config: {
+            condition: "用户是否要芝士",
+            evaluationBy: "user",
+            branches: [
+              { label: "是", nextNodeId: "task-yes" },
+              { label: "否", nextNodeId: "task-no" },
+            ],
+            defaultNextNodeId: "task-no",
+          },
+          dependencies: [],
+          dependents: ["task-yes", "task-no"],
+        },
+        {
+          id: "task-yes",
+          localId: "task_yes",
+          type: "task",
+          title: "加芝士",
+          config: { expectedOutput: "加好芝士" },
+          dependencies: ["condition-1"],
+          dependents: [],
+        },
+        {
+          id: "task-no",
+          localId: "task_no",
+          type: "task",
+          title: "不加芝士",
+          config: { expectedOutput: "不加芝士" },
+          dependencies: ["condition-1"],
+          dependents: [],
+        },
+      ],
+      edges: [],
+      entryNodeIds: ["condition-1"],
+      terminalNodeIds: ["task-yes", "task-no"],
+      topologicalOrder: ["condition-1", "task-yes", "task-no"],
+    });
+
+    expect(graphPlan?.edges.map((edge) => ({ from: edge.from, to: edge.to, label: edge.label }))).toEqual([
+      { from: "condition-1", to: "task-yes", label: "是" },
+      { from: "condition-1", to: "task-no", label: "否" },
+      { from: "condition-1", to: "task-no", label: "default" },
+    ]);
+    expect(graphPlan?.analytics.rankByNodeId).toMatchObject({
+      "condition-1": 0,
+      "task-yes": 1,
+      "task-no": 1,
+    });
+  });
+
   it("models confirm checkpoints as approval decisions", () => {
     const graphPlan = compiledPlanToGraphPlan({
       ...compiledPlan,

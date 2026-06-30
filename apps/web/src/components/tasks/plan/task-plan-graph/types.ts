@@ -438,4 +438,6 @@ export type CompactFocusItem = {
   phase: string | null;
   nextAction: string | null;
   estimatedMinutes: number | null;
+  isDone: boolean;
+  isSkipped: boolean;
 };
