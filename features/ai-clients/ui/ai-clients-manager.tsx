@@ -49,17 +49,14 @@ type ClientFormValues = {
   baseUrl: string;
   apiKey: string;
   model: string;
-  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
-  controlPlane: ControlPlaneMode;
   bindings: string[];
 };
 
 type HermesClientScope = "local" | "remote";
 
 type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
-type ControlPlaneMode = "mcp" | "skill";
 
 const DEBUG_PROVIDER_PROFILES = [
   "deterministic",
@@ -128,13 +125,10 @@ function buildClaudeCodeConfig(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
-  binaryPath: string;
-  controlPlane: ControlPlaneMode;
 }): Record<string, unknown> {
   const model = nonEmptyEnvValue(input.model);
   const baseUrl = nonEmptyEnvValue(input.baseUrl);
   const authToken = nonEmptyEnvValue(input.apiKey);
-  const binaryPath = nonEmptyEnvValue(input.binaryPath);
   const env: Record<string, string> = {};
 
   if (model) env.ANTHROPIC_MODEL = model;
@@ -143,9 +137,7 @@ function buildClaudeCodeConfig(input: {
 
   return {
     model,
-    binaryPath,
     timeoutMs: Number(input.timeoutSeconds) * 1000,
-    controlPlane: input.controlPlane,
     env: Object.keys(env).length > 0 ? env : undefined,
   };
 }
@@ -158,10 +150,8 @@ function buildClientPayload(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
-  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
-  controlPlane: ControlPlaneMode;
 }): ClientFormPayload {
   if (input.type === "debug") {
     return {
@@ -425,10 +415,8 @@ function ClientForm({
     model: (initialConfig as { model?: string; env?: Record<string, string> } | undefined)?.model
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_MODEL
       ?? "",
-    binaryPath: (initialConfig as { binaryPath?: string } | undefined)?.binaryPath ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
-    controlPlane: ((initialConfig as { controlPlane?: ControlPlaneMode } | undefined)?.controlPlane === "skill" ? "skill" : "mcp"),
     bindings: initial?.bindings ?? [],
   }), [fallbackType, initial, initialConfig, providers]);
   const form = useForm<ClientFormValues>({
@@ -542,7 +530,6 @@ function ClientForm({
                   <p className="text-sm text-muted-foreground">
                     {isLocalHermes ? copy.hermesLocalDescription : copy.hermesRemoteDescription}
                   </p>
-                  <p className="text-xs text-muted-foreground">Hermes control plane: MCP only. Skill mode is unsupported for Hermes this milestone.</p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -722,43 +709,13 @@ function ClientForm({
                     />
                   </Field>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-api-key">ANTHROPIC_AUTH_TOKEN</FieldLabel>
-                    <Input
-                      {...form.register("apiKey")}
-                      id="ai-client-api-key"
-                      type="password"
-                      placeholder="optional auth token"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-binary-path">Binary path</FieldLabel>
-                    <Input
-                      {...form.register("binaryPath")}
-                      id="ai-client-binary-path"
-                      placeholder="claude"
-                    />
-                  </Field>
-                </div>
                 <Field>
-                  <FieldLabel>Control plane</FieldLabel>
-                  <Controller
-                    name="controlPlane"
-                    control={form.control}
-                    render={({ field, fieldState }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label="Control plane">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="mcp">MCP</SelectItem>
-                            <SelectItem value="skill">Skill</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
+                  <FieldLabel htmlFor="ai-client-api-key">ANTHROPIC_AUTH_TOKEN</FieldLabel>
+                  <Input
+                    {...form.register("apiKey")}
+                    id="ai-client-api-key"
+                    type="password"
+                    placeholder="optional auth token"
                   />
                 </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>

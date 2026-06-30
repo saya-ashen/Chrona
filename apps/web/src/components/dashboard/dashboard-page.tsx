@@ -9,14 +9,10 @@ import {
   CircleAlert,
   Clock,
   FileText,
-  GitPullRequestArrow,
-  Inbox as InboxIcon,
   Loader2,
   MessageSquare,
   Plus,
-  Search,
   Sparkles,
-  Wand2,
   type LucideProps,
 } from "lucide-react";
 
@@ -27,18 +23,13 @@ import { apiJson } from "@/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UiSurfaceFrame } from "@/components/ai-surface/ui-surface-frame";
 import { SpecRenderer } from "@/components/tasks/workspace/catalog/spec-renderer";
 import type { UiDocument } from "@chrona/ui-protocol";
 import { cn } from "@/lib/utils";
 import type {
   DashboardAttentionItem,
-  DashboardCompletedItem,
-  DashboardCompletionCategory,
   DashboardData,
-  DashboardEvent,
   DashboardFocusTask,
   DashboardInProgressItem,
   DashboardOutput,
@@ -68,37 +59,6 @@ const ATTENTION_ICON: Record<DashboardAttentionItem["kind"], ComponentType<Lucid
   schedule_risk: Clock,
 };
 
-const CATEGORY_ICON: Record<DashboardCompletionCategory, ComponentType<LucideProps>> = {
-  report: FileText,
-  research: Search,
-  code: GitPullRequestArrow,
-  automation: Wand2,
-};
-
-const CATEGORY_TONE: Record<DashboardCompletionCategory, string> = {
-  report: "text-violet-500",
-  research: "text-sky-500",
-  code: "text-emerald-500",
-  automation: "text-amber-500",
-};
-
-const FEED_TONE: Record<string, string> = {
-  completed: "bg-emerald-500",
-  failed: "bg-destructive",
-  blocked: "bg-destructive",
-  approval: "bg-amber-500",
-  input: "bg-sky-500",
-  plan: "bg-violet-500",
-  schedule: "bg-amber-500",
-  started: "bg-sky-500",
-  created: "bg-muted-foreground",
-};
-
-type DigestRange = "today" | "week" | "all";
-type StreamFilter = "all" | "attention" | "inProgress" | "autoCompleted";
-
-const CATEGORY_ORDER: DashboardCompletionCategory[] = ["report", "research", "code", "automation"];
-const STREAM_FILTERS: StreamFilter[] = ["all", "attention", "inProgress", "autoCompleted"];
 
 function startOfToday(): number {
   const now = new Date();
@@ -287,11 +247,7 @@ function NeedsYouCard({
   copy: DashboardCopy;
   items: DashboardAttentionItem[];
 }) {
-  const counts = useMemo(() => {
-    const map = new Map<DashboardAttentionItem["kind"], number>();
-    for (const item of items) map.set(item.kind, (map.get(item.kind) ?? 0) + 1);
-    return map;
-  }, [items]);
+  const visibleItems = items.slice(0, 5);
 
   return (
     <Card className="shadow-sm">
@@ -305,29 +261,44 @@ function NeedsYouCard({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
             <CheckCircle2 className="size-6 text-emerald-500/70" aria-hidden />
             <p className="text-sm text-muted-foreground">{copy.attention.empty}</p>
           </div>
         ) : (
-          <ul className="space-y-2">
-            {[...counts.entries()].map(([kind, count]) => {
-              const Icon = ATTENTION_ICON[kind];
-              const tone = ATTENTION_TONE[kind];
+          <ul className="divide-y">
+            {visibleItems.map((item) => {
+              const Icon = ATTENTION_ICON[item.kind];
+              const tone = ATTENTION_TONE[item.kind];
               return (
-                <li key={kind} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="flex items-center gap-2">
+                <li key={item.taskId} className="flex flex-col gap-2 py-3">
+                  <div className="flex min-w-0 items-start gap-2.5">
                     <Icon
                       className={cn(
-                        "size-4 shrink-0",
+                        "mt-0.5 size-4 shrink-0",
                         tone === "danger" ? "text-destructive" : tone === "warning" ? "text-amber-500" : "text-sky-500",
                       )}
                       aria-hidden
                     />
-                    <span className="text-muted-foreground">{copy.attention.kind[kind]}</span>
-                  </span>
-                  <span className="font-semibold tabular-nums">{count}</span>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium">{item.title}</span>
+                        <Badge variant="outline" className="shrink-0">{copy.attention.kind[item.kind]}</Badge>
+                      </div>
+                      {item.reason ? <p className="line-clamp-2 text-xs text-muted-foreground">{item.reason}</p> : null}
+                      {item.latestOutput ? <OutputLink output={item.latestOutput} /> : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pl-6">
+                    <span className="text-xs tabular-nums text-muted-foreground">{formatRelative(item.updatedAt, copy.time)}</span>
+                    <Button asChild size="sm" variant="default" className="shrink-0 shadow-sm">
+                      <LocalizedLink href={`/tasks/${item.taskId}`}>
+                        {copy.nextStep[item.nextStep]}
+                        <ArrowRight className="size-4" aria-hidden />
+                      </LocalizedLink>
+                    </Button>
+                  </div>
                 </li>
               );
             })}
@@ -338,7 +309,7 @@ function NeedsYouCard({
   );
 }
 
-/* ── Auto-completion digest ───────────────────────────────────────────────── */
+/* ── AI dashboard summary ─────────────────────────────────────────────────── */
 function DashboardAiBriefStatus({
   aiBrief,
   copy,
@@ -384,11 +355,13 @@ function useDashboardAiBriefGeneration(input: {
 }) {
   const revalidator = useRevalidator();
   const inFlightKeyRef = useRef<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const generate = async (force = false) => {
     const key = force ? `force:${input.aiBrief?.inputFingerprint ?? "unknown"}` : input.aiBrief?.inputFingerprint;
     if (!key || inFlightKeyRef.current === key) return;
     inFlightKeyRef.current = key;
+    setIsGenerating(true);
     try {
       await apiJson(`/api/pages/dashboard/ai-brief/generate?workspaceId=${encodeURIComponent(input.workspaceId)}`, {
         method: "POST",
@@ -397,6 +370,7 @@ function useDashboardAiBriefGeneration(input: {
       void revalidator.revalidate();
     } finally {
       inFlightKeyRef.current = null;
+      setIsGenerating(false);
     }
   };
 
@@ -406,59 +380,26 @@ function useDashboardAiBriefGeneration(input: {
     }
   }, [input.aiBrief?.status, input.aiBrief?.canGenerate, input.aiBrief?.inputFingerprint, input.workspaceId]);
 
-  return { regenerate: () => void generate(true) };
+  return { isGenerating: isGenerating || input.aiBrief?.status === "generating", regenerate: () => void generate(true) };
 }
+
 
 
 function DigestModule({
   copy,
-  completed,
-  totalAutoCompleted,
   aiBrief,
   onRegenerate,
+  isGenerating,
 }: {
   copy: DashboardCopy;
-  completed: DashboardCompletedItem[];
-  totalAutoCompleted: number;
   aiBrief: DashboardData["aiBrief"];
   onRegenerate: () => void;
+  isGenerating: boolean;
 }) {
-  const [range, setRange] = useState<DigestRange>("today");
-
-  const { scoped, headline, breakdown } = useMemo(() => {
-    const dayStart = startOfToday();
-    const weekStart = dayStart - 6 * 24 * 60 * 60 * 1000;
-    const inRange = (item: DashboardCompletedItem) => {
-      if (range === "all") return true;
-      const at = item.completedAt ? new Date(item.completedAt).getTime() : 0;
-      return at >= (range === "today" ? dayStart : weekStart);
-    };
-    const scopedItems = completed.filter(inRange);
-
-    const counts = new Map<DashboardCompletionCategory, number>();
-    for (const item of scopedItems) counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
-
-    const headlineKey =
-      range === "today" ? "todayHeadline" : range === "week" ? "weekHeadline" : "allTimeHeadline";
-    const headlineCount = range === "all" ? totalAutoCompleted : scopedItems.length;
-
-    return {
-      scoped: scopedItems,
-      headline: copy.digest[headlineKey]
-        .replace("{n}", String(headlineCount))
-        .replace(headlineCount === 1 ? "tasks" : "__noop__", "task"),
-      breakdown: CATEGORY_ORDER.map((category) => ({ category, count: counts.get(category) ?? 0 })).filter(
-        (entry) => entry.count > 0,
-      ),
-    };
-  }, [completed, copy, range, totalAutoCompleted]);
-
-  const isEmpty = totalAutoCompleted === 0 && completed.length === 0;
-
-  return (
-    <UiSurfaceFrame kind="ai-authored" label={copy.digest.title} className="overflow-hidden p-0" bodyClassName="min-w-0">
-      <CardHeader className="gap-4 border-b bg-muted/20 pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+  if (aiBrief?.spec) {
+    return (
+      <UiSurfaceFrame kind="ai-authored" label={copy.digest.title} className="overflow-hidden p-0" bodyClassName="min-w-0">
+        <CardHeader className="gap-4 border-b bg-muted/20 pb-4">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="size-5 text-primary" aria-hidden />
@@ -466,114 +407,41 @@ function DigestModule({
             </CardTitle>
             <CardDescription>{copy.digest.description}</CardDescription>
           </div>
-          <Tabs value={range} onValueChange={(value) => setRange(value as DigestRange)}>
-            <TabsList className="rounded-full">
-              <TabsTrigger value="today" className="rounded-full">{copy.digest.rangeToday}</TabsTrigger>
-              <TabsTrigger value="week" className="rounded-full">{copy.digest.rangeWeek}</TabsTrigger>
-              <TabsTrigger value="all" className="rounded-full">{copy.digest.rangeAll}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-        {aiBrief?.spec ? (
           <DashboardAiBriefStatus aiBrief={aiBrief} copy={copy.digest.aiBrief} onRegenerate={onRegenerate} />
-        ) : null}
-      </CardHeader>
-      {aiBrief?.spec ? (
+        </CardHeader>
         <CardContent className="p-5">
           <SpecRenderer spec={aiBrief.spec as UiDocument} fallback={null} />
         </CardContent>
-      ) : null}
-      {!aiBrief?.spec ? <CardContent className="p-5">
-        {isEmpty ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+      </UiSurfaceFrame>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden border-dashed bg-muted/20">
+      <CardHeader className="gap-3 pb-4">
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Sparkles className="size-5 text-primary" aria-hidden />
+            {copy.digest.title}
+          </CardTitle>
+          <CardDescription>{copy.digest.description}</CardDescription>
+        </div>
+        <DashboardAiBriefStatus aiBrief={aiBrief} copy={copy.digest.aiBrief} onRegenerate={onRegenerate} />
+      </CardHeader>
+      <CardContent className="flex flex-col items-center justify-center gap-2 px-5 pb-8 pt-2 text-center">
+        {isGenerating ? (
+          <>
+            <Loader2 className="size-7 animate-spin text-primary" aria-hidden />
+            <p className="max-w-sm text-sm text-muted-foreground">{copy.digest.aiBrief.generating}</p>
+          </>
+        ) : (
+          <>
             <Sparkles className="size-7 text-muted-foreground/50" aria-hidden />
             <p className="max-w-sm text-sm text-muted-foreground">{copy.digest.empty}</p>
-          </div>
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            <div className="space-y-4">
-              <p className="text-2xl font-semibold tracking-tight">{headline}</p>
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {copy.digest.breakdownTitle}
-                </p>
-                {breakdown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{copy.completed.empty}</p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    {breakdown.map(({ category, count }) => {
-                      const Icon = CATEGORY_ICON[category];
-                      return (
-                        <div
-                          key={category}
-                          className="flex items-center gap-2 rounded-xl border bg-background/70 px-3 py-2 shadow-sm"
-                        >
-                          <Icon className={cn("size-4 shrink-0", CATEGORY_TONE[category])} aria-hidden />
-                          <div className="min-w-0">
-                            <p className="truncate text-xs text-muted-foreground">
-                              {copy.digest.category[category]}
-                            </p>
-                            <p className="text-sm font-semibold tabular-nums">
-                              {copy.digest.categoryUnit[category].replace("{n}", String(count))}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {copy.digest.recentTitle}
-              </p>
-              {scoped.length === 0 ? (
-                <p className="py-4 text-sm text-muted-foreground">{copy.completed.empty}</p>
-              ) : (
-                <ul className="divide-y">
-                  {scoped.slice(0, 5).map((item) => (
-                    <li key={item.taskId} className="flex items-start justify-between gap-3 py-2.5">
-                      <div className="flex min-w-0 items-start gap-2.5">
-                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" aria-hidden />
-                        <div className="min-w-0 space-y-0.5">
-                          <LocalizedLink
-                            href={`/tasks/${item.taskId}`}
-                            className="block truncate text-sm font-medium hover:underline"
-                          >
-                            {item.title}
-                          </LocalizedLink>
-                          {item.output ? (
-                            <OutputLink output={item.output} />
-                          ) : item.summary ? (
-                            <p className="truncate text-xs text-muted-foreground">{item.summary}</p>
-                          ) : null}
-                        </div>
-                      </div>
-                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {formatRelative(item.completedAt, copy.time)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+          </>
         )}
-      </CardContent> : null}
-      {!isEmpty ? (
-        <CardContent className="p-5 pt-0">
-          <Separator className="mb-3" />
-          <Button asChild variant="ghost" size="sm" className="px-0 text-muted-foreground hover:text-foreground">
-            <LocalizedLink href="/tasks?filter=completed">
-              {copy.digest.viewAll}
-              <ArrowRight className="size-4" aria-hidden />
-            </LocalizedLink>
-          </Button>
-        </CardContent>
-      ) : null}
-    </UiSurfaceFrame>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -624,227 +492,11 @@ function InProgressCard({
   );
 }
 
-function ActivityFeedCard({
-  copy,
-  events,
-}: {
-  copy: DashboardCopy;
-  events: DashboardEvent[];
-}) {
-  return (
-    <Card className="shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <InboxIcon className="size-4 text-muted-foreground" aria-hidden />
-          {copy.feed.title}
-        </CardTitle>
-        <CardDescription>{copy.feed.description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-            <InboxIcon className="size-6 text-muted-foreground/50" aria-hidden />
-            <p className="text-sm text-muted-foreground">{copy.feed.empty}</p>
-          </div>
-        ) : (
-          <ul className="space-y-0.5">
-            {events.map((event) => {
-              const label = copy.feed.category[event.category as keyof DashboardCopy["feed"]["category"]];
-              return (
-                <li key={event.id} className="flex gap-3 py-2">
-                  <span
-                    className={cn(
-                      "mt-1.5 size-2 shrink-0 rounded-full",
-                      FEED_TONE[event.category] ?? "bg-muted-foreground",
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">
-                      <LocalizedLink href={`/tasks/${event.taskId}`} className="font-medium hover:underline">
-                        {event.taskTitle}
-                      </LocalizedLink>{" "}
-                      <span className="text-muted-foreground">— {event.summary ?? label}</span>
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                    {formatRelative(event.at, copy.time)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ── Task stream (filtered) ───────────────────────────────────────────────── */
-
-type StreamRow = {
-  taskId: string;
-  lane: "attention" | "inProgress" | "autoCompleted";
-  title: string;
-  detail: string | null;
-  output: DashboardOutput | null;
-  href: string;
-  action: string;
-  at: string | null;
-};
-
-const LANE_BADGE: Record<StreamRow["lane"], "warning" | "info" | "success"> = {
-  attention: "warning",
-  inProgress: "info",
-  autoCompleted: "success",
-};
-
-const LANE_ICON: Record<StreamRow["lane"], ComponentType<LucideProps>> = {
-  attention: AlertTriangle,
-  inProgress: Loader2,
-  autoCompleted: CheckCircle2,
-};
-
-function TaskStreamCard({
-  copy,
-  attention,
-  inProgress,
-  completed,
-}: {
-  copy: DashboardCopy;
-  attention: DashboardAttentionItem[];
-  inProgress: DashboardInProgressItem[];
-  completed: DashboardCompletedItem[];
-}) {
-  const [filter, setFilter] = useState<StreamFilter>("all");
-
-  const rows = useMemo<StreamRow[]>(() => {
-    const attentionRows: StreamRow[] = attention.map((item) => ({
-      taskId: item.taskId,
-      lane: "attention",
-      title: item.title,
-      detail: item.reason ?? copy.attention.kind[item.kind],
-      output: item.latestOutput,
-      href: `/tasks/${item.taskId}`,
-      action: copy.nextStep[item.nextStep],
-      at: item.updatedAt,
-    }));
-    const inProgressRows: StreamRow[] = inProgress.map((item) => ({
-      taskId: item.taskId,
-      lane: "inProgress",
-      title: item.title,
-      detail: item.stage,
-      output: item.latestOutput,
-      href: `/tasks/${item.taskId}`,
-      action: copy.openTask,
-      at: item.updatedAt,
-    }));
-    const completedRows: StreamRow[] = completed.map((item) => ({
-      taskId: item.taskId,
-      lane: "autoCompleted",
-      title: item.title,
-      detail: item.output ? null : item.summary,
-      output: item.output,
-      href: `/tasks/${item.taskId}`,
-      action: copy.openTask,
-      at: item.completedAt,
-    }));
-
-    if (filter === "attention") return attentionRows;
-    if (filter === "inProgress") return inProgressRows;
-    if (filter === "autoCompleted") return completedRows;
-    return [...attentionRows, ...inProgressRows, ...completedRows];
-  }, [attention, completed, copy, filter, inProgress]);
-
-  return (
-    <Card className="overflow-hidden shadow-sm">
-      <CardHeader className="gap-3 border-b bg-muted/20 pb-3">
-        <div className="space-y-1">
-          <CardTitle className="text-base">{copy.taskStream.title}</CardTitle>
-          <CardDescription>{copy.taskStream.description}</CardDescription>
-        </div>
-        <Tabs value={filter} onValueChange={(value) => setFilter(value as StreamFilter)}>
-          <TabsList className="flex-wrap rounded-full">
-            {STREAM_FILTERS.map((key) => (
-              <TabsTrigger key={key} value={key} className="rounded-full">
-                {copy.taskStream.filters[key]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      </CardHeader>
-      <CardContent>
-        {rows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-            <InboxIcon className="size-6 text-muted-foreground/50" aria-hidden />
-            <p className="text-sm text-muted-foreground">{copy.taskStream.empty}</p>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {rows.map((row) => {
-              const Icon = LANE_ICON[row.lane];
-              const tone = LANE_BADGE[row.lane];
-              return (
-                <li key={`${row.lane}-${row.taskId}`} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-2.5">
-                    <Icon
-                      className={cn(
-                        "mt-0.5 size-4 shrink-0",
-                        tone === "warning"
-                          ? "text-amber-500"
-                          : tone === "info"
-                            ? "animate-spin text-sky-500"
-                            : "text-emerald-500",
-                      )}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Badge
-                          variant={tone === "success" ? "secondary" : "outline"}
-                          className={cn(
-                            "shrink-0",
-                            tone === "warning" && "border-amber-500/40 text-amber-600 dark:text-amber-400",
-                            tone === "info" && "border-sky-500/40 text-sky-600 dark:text-sky-400",
-                          )}
-                        >
-                          {copy.taskStream.lane[row.lane]}
-                        </Badge>
-                        <span className="truncate text-sm font-medium">{row.title}</span>
-                      </div>
-                      {row.output ? (
-                        <OutputLink output={row.output} />
-                      ) : row.detail ? (
-                        <p className="truncate text-xs text-muted-foreground">{row.detail}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-end">
-                    {row.at ? (
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {formatRelative(row.at, copy.time)}
-                      </span>
-                    ) : <span />}
-                    <Button asChild size="sm" variant={row.lane === "attention" ? "default" : "outline"} className="shadow-sm">
-                      <LocalizedLink href={row.href}>
-                        {row.action}
-                        <ArrowRight className="size-4" aria-hidden />
-                      </LocalizedLink>
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: DashboardPageProps) {
-  const { focusTask, needsAttention, inProgress, autoCompleted, totalAutoCompleted, recentEvents } = data;
-  const { regenerate } = useDashboardAiBriefGeneration({ workspaceId, aiBrief: data.aiBrief });
+  const { focusTask, needsAttention, inProgress, autoCompleted, totalAutoCompleted } = data;
+  const { isGenerating, regenerate } = useDashboardAiBriefGeneration({ workspaceId, aiBrief: data.aiBrief });
 
   const completedToday = useMemo(() => {
     const dayStart = startOfToday();
@@ -867,16 +519,9 @@ export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: Da
         <div className="min-w-0 space-y-5">
           <DigestModule
             copy={copy}
-            completed={autoCompleted}
-            totalAutoCompleted={totalAutoCompleted}
             aiBrief={data.aiBrief}
             onRegenerate={regenerate}
-          />
-          <TaskStreamCard
-            copy={copy}
-            attention={needsAttention}
-            inProgress={inProgress}
-            completed={autoCompleted}
+            isGenerating={isGenerating}
           />
         </div>
 
@@ -884,7 +529,6 @@ export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: Da
           <FocusCard task={focusTask} copy={copy} />
           <NeedsYouCard copy={copy} items={needsAttention} />
           <InProgressCard copy={copy} items={inProgress} />
-          <ActivityFeedCard copy={copy} events={recentEvents} />
         </aside>
       </div>
     </div>

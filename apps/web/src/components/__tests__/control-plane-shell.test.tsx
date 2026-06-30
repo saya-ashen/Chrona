@@ -121,7 +121,7 @@ afterEach(() => {
 });
 
 describe("ControlPlaneShell", () => {
-  it("renders primary navigation with Schedule, Inbox, Tasks, and Settings", () => {
+  it("renders primary navigation with Schedule, Tasks, and Settings", () => {
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
         <div>Workspace body</div>
@@ -132,13 +132,13 @@ describe("ControlPlaneShell", () => {
     expect(chronaLinks.length).toBeGreaterThan(0);
     expect(chronaLinks[0]).toHaveAttribute("href", "/en/schedule");
     expectNavLink("Schedule", "/en/schedule");
-    expectNavLink("Inbox", "/en/inbox");
     const taskLinks = expectNavLink("Tasks", "/en/tasks");
     expect(taskLinks.some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
     expectNavLink("Settings", "/en/settings");
 
     // Should NOT show inactive or legacy workspace navigation.
     expect(screen.queryByRole("link", { name: "Memory" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Workspaces" })).not.toBeInTheDocument();
   });
 

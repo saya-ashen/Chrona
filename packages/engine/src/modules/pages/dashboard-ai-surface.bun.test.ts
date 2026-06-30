@@ -84,16 +84,18 @@ describe("dashboard AI surface state", () => {
     expect(surface?.inputFingerprint).toBe(dashboard.aiBrief.inputFingerprint);
   });
 
-  it("marks cached ready brief dirty when dashboard facts change", async () => {
+  it("marks stale failed brief dirty and clears retry cooldown when dashboard facts change", async () => {
     const { workspaceId } = await seedWorkspace("Stale workspace");
     await seedDefaultClient();
     const initial = await getDashboard(workspaceId);
     await db.workspaceAiSurface.update({
       where: { workspaceId_surface: { workspaceId, surface: "dashboard.brief" } },
       data: {
-        status: "ready",
+        status: "failed",
         generatedSpec: { root: "root", elements: { root: { type: "Stack", props: {} } } },
         generatedAt: new Date(),
+        lastAttemptAt: new Date(),
+        errorMessage: "old schema failure",
       },
     });
 
@@ -112,8 +114,15 @@ describe("dashboard AI surface state", () => {
     const changed = await getDashboard(workspaceId);
 
     expect(changed.aiBrief.status).toBe("dirty");
+    expect(changed.aiBrief.canGenerate).toBe(true);
+    expect(changed.aiBrief.errorMessage).toBeNull();
     expect(changed.aiBrief.spec).not.toBeNull();
     expect(changed.aiBrief.inputFingerprint).not.toBe(initial.aiBrief.inputFingerprint);
+
+    const surface = await db.workspaceAiSurface.findUniqueOrThrow({
+      where: { workspaceId_surface: { workspaceId, surface: "dashboard.brief" } },
+    });
+    expect(surface.lastAttemptAt).toBeNull();
   });
 
   it("uses stable fingerprints for equivalent dashboard facts", () => {

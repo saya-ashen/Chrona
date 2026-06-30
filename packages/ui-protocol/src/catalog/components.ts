@@ -384,8 +384,8 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
     JsonView: {
       props: z.object({ value: z.unknown(), title: z.string().optional() }),
       description:
-        "Pretty-printed JSON result value. Use for structured output, diagnostics, API payloads, or machine-readable results.",
-      example: { title: "Result", value: { status: "ok" } },
+        "Pretty-printed JSON result value. Use only for diagnostics, API payloads, machine-readable evidence, or debugging details; prefer Markdown/Table/Card for user-facing reports and summaries.",
+      example: { title: "Diagnostic payload", value: { status: "ok" } },
     },
     FileRef: {
       props: z.object({
@@ -478,7 +478,9 @@ export function chronaPlanOutputCatalogPrompt() {
       "Chrona does not accept raw JSONL text. Put the generated RFC 6902 patch objects in chrona_plan_output.patches.",
       "Use chrona_plan_output for shared plan-level user-visible output only.",
       "When planOutput.spec is null, bootstrap with /root and every referenced /elements/<id> entry in one tool call.",
-      "Patch narrowly when output already exists; prefer /elements/<id>/props/<prop> for small text updates.",
+      "User-facing reports should compose clear sections with Card containers around Markdown/Table/ResultSummary content so each major block has a visible background.",
+      "Use JsonView sparingly: only for diagnostics, API payloads, machine-readable evidence, or debugging details. Do not show source data or report rationale as raw JSON when Markdown or Table would be readable.",
+      "When replacing prior output, remove elements no longer reachable from root so stale sections do not remain in the shared spec.",
       "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, or node-local outputs.",
     ],
   });

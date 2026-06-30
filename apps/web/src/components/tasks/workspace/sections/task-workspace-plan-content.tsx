@@ -1,4 +1,4 @@
-import { GitBranch, Loader2, Minimize2, Sparkles } from "lucide-react";
+import { GitBranch, Loader2, Minimize2, Sparkles, Square } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -10,6 +10,8 @@ const DEFAULT_COPY = {
   regeneratePlan: "Regenerate plan",
   generating: "Generating...",
   preparingPlanGraph: "Preparing plan graph...",
+  stopGeneration: "Stop generation",
+  stoppingGeneration: "Stopping...",
   planGraphPlaceholder: "The plan graph will appear here once AI generates a plan.",
   graphModeLabel: "Graph display mode",
   graphFullMode: "Full graph",
@@ -29,6 +31,8 @@ type TaskWorkspacePlanContentProps = {
   graphMode: "full" | "compact";
   onGraphModeChange: (mode: "full" | "compact") => void;
   onGeneratePlan: () => void;
+  onStopPlanGeneration: () => void;
+  isStoppingPlanGeneration?: boolean;
 };
 
 export function TaskWorkspacePlanContent({
@@ -41,6 +45,8 @@ export function TaskWorkspacePlanContent({
   graphMode,
   onGraphModeChange,
   onGeneratePlan,
+  onStopPlanGeneration,
+  isStoppingPlanGeneration = false,
 }: TaskWorkspacePlanContentProps) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components.taskWorkspace) };
@@ -82,19 +88,28 @@ export function TaskWorkspacePlanContent({
       </Button>
     </div>
   );
-  const generatePlanButton = (
+  const generatePlanButton = isGeneratingPlan ? (
     <Button
       type="button"
-      disabled={isGeneratingPlan}
-      onClick={onGeneratePlan}
-      variant="secondary" size="sm" className="rounded-xl"
+      disabled={isStoppingPlanGeneration}
+      onClick={onStopPlanGeneration}
+      variant="secondary"
+      size="sm"
+      className="rounded-xl"
     >
-      {isGeneratingPlan ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-      {isGeneratingPlan
-        ? copy.generating
-        : plan
-          ? copy.regeneratePlan
-          : copy.generatePlan}
+      {isStoppingPlanGeneration ? <Loader2 className="size-4 animate-spin" /> : <Square className="size-4" />}
+      {isStoppingPlanGeneration ? copy.stoppingGeneration : copy.stopGeneration}
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      onClick={onGeneratePlan}
+      variant="secondary"
+      size="sm"
+      className="rounded-xl"
+    >
+      <Sparkles className="size-4" />
+      {plan ? copy.regeneratePlan : copy.generatePlan}
     </Button>
   );
 

@@ -6,8 +6,6 @@ import { apiJson } from "./api";
 import type {
   AppBootData,
   DashboardRouteData,
-  InboxRouteData,
-  MemoryRouteData,
   ScheduleRouteData,
   TaskListRouteData,
   TaskPageRouteData,
@@ -53,16 +51,6 @@ export async function loadScheduleRouteData({ request }: LoaderFunctionArgs): Pr
   };
 }
 
-export async function loadInboxRouteData({ request }: LoaderFunctionArgs): Promise<InboxRouteData> {
-  const origin = getOrigin(request);
-  const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
-
-  return {
-    inbox: await apiJson<InboxRouteData["inbox"]>(
-      `${origin}/api/inbox?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`,
-    ),
-  };
-}
 
 export async function loadDashboardRouteData({ request }: LoaderFunctionArgs): Promise<DashboardRouteData> {
   const origin = getOrigin(request);
@@ -75,16 +63,6 @@ export async function loadDashboardRouteData({ request }: LoaderFunctionArgs): P
   };
 }
 
-export async function loadMemoryRouteData({ request }: LoaderFunctionArgs): Promise<MemoryRouteData> {
-  const origin = getOrigin(request);
-  const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
-
-  return {
-    memory: await apiJson<MemoryRouteData["memory"]>(
-      `${origin}/api/memory?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`,
-    ),
-  };
-}
 
 export async function loadTaskListData({ params, request }: LoaderFunctionArgs): Promise<TaskListRouteData> {
   const locale = await resolveRouteLocale(params);

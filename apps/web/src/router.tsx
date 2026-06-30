@@ -6,9 +6,7 @@ import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import {
   DashboardRoutePage,
-  InboxRoutePage,
   LocaleLandingPage,
-  MemoryRoutePage,
   ScheduleRoutePage,
   SettingsRoutePage,
   TaskDetailRoutePage,
@@ -18,8 +16,6 @@ import { NotFoundPage } from "@/components/not-found-page";
 import {
   loadAppBootData,
   loadDashboardRouteData,
-  loadInboxRouteData,
-  loadMemoryRouteData,
   loadScheduleRouteData,
   loadTaskListData,
   loadTaskPageData,
@@ -61,16 +57,9 @@ export function createAppRouter() {
           loader: loadScheduleRouteData,
           element: <ScheduleRoutePage />,
         },
-        {
-          path: "inbox",
-          loader: loadInboxRouteData,
-          element: <InboxRoutePage />,
-        },
-        {
-          path: "memory",
-          loader: loadMemoryRouteData,
-          element: <MemoryRoutePage />,
-        },
+        // Inbox and Memory routes intentionally hidden. Dashboard owns concise
+        // attention/recovery visibility; do not re-add standalone routes without
+        // actionable controls and a clear product role.
         {
           path: "tasks",
           loader: loadTaskListData,

@@ -133,8 +133,6 @@ export {
   taskRecoveryActionTypeSchema,
 } from "./task-orchestrator";
 
-export type { ControlPlaneMode } from "./ai-feature-types";
-
 export type {
   ChronaToolExpectedState,
   ChronaToolIdempotencyStatus,

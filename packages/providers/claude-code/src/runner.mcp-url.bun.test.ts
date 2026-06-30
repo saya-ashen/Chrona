@@ -47,7 +47,6 @@ describe("Claude Code MCP URL session identity", () => {
     const runner = await createClaudeCodeRunner({
       mcpBaseUrl: "http://mcp.test/",
       mcpRunToken: "",
-      controlPlane: "mcp",
     });
 
     const input = {

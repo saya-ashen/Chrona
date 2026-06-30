@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chronaCatalog, validateChronaSpec, type ValidateResult } from "../index";
+import { chronaCatalog, chronaPlanOutputCatalogPrompt, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
@@ -50,6 +50,14 @@ describe("validateChronaSpec", () => {
     expect(prompt).toContain("rows: [[\"chrona\", \"120\"]]");
     expect(prompt).toContain("Do not wrap arrays in objects such as { item: [...] }");
     expect(prompt).toContain("threshold MUST be a JSON number such as 800");
+  });
+
+  test("plan-output prompt discourages raw JsonView reports", () => {
+    const prompt = chronaPlanOutputCatalogPrompt();
+
+    expect(prompt).toContain("Card containers");
+    expect(prompt).toContain("Use JsonView sparingly");
+    expect(prompt).toContain("remove elements no longer reachable from root");
   });
 
 
@@ -196,4 +204,50 @@ describe("validateChronaSpec", () => {
       elements: { button: { type: "Button", props: { label: "Run" }, on: { press: { action: "dispatch-execution", params: { actionId: "" } } }, children: [] } },
     }), "elements.button.on.press.params.actionId");
   });
+
+describe("validateDashboardSummarySpec", () => {
+  test("accepts only compact dashboard summary components", () => {
+    const result = validateDashboardSummarySpec({
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, children: ["title", "summary", "risk"] },
+        title: { type: "Heading", props: { text: "AI summary", level: "h3" }, children: [] },
+        summary: { type: "Text", props: { text: "Two tasks completed; one needs review." }, children: [] },
+        risk: { type: "Alert", props: { title: "Needs review", description: "Approval blocks next run." }, children: [] },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  test("rejects interactive or broad workspace components", () => {
+    expectIssue(validateDashboardSummarySpec({
+      root: "button",
+      elements: { button: { type: "Button", props: { label: "Approve" }, children: [] } },
+    }), "Invalid discriminator value");
+
+    expectIssue(validateDashboardSummarySpec({
+      root: "activity",
+      elements: { activity: { type: "ActivityStream", props: { items: [] }, children: [] } },
+    }), "Invalid discriminator value");
+  });
+
+  test("rejects dynamic expressions and unknown props", () => {
+    expectIssue(validateDashboardSummarySpec({
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, children: ["title"] },
+        title: { type: "Heading", props: { text: { $state: "/title" }, level: "h3" }, children: [] },
+      },
+      state: { title: "Injected" },
+    }), "Invalid input");
+
+    expectIssue(validateDashboardSummarySpec({
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, repeat: { statePath: "/items" }, children: [] },
+      },
+    }), "Unrecognized key");
+  });
+});
 });

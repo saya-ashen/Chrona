@@ -1414,8 +1414,8 @@
         "empty": "暂无已完成的任务。"
       },
       "digest": {
-        "title": "Chrona 自动完成概览",
-        "description": "Chrona 在后台替你完成工作的每日摘要。",
+        "title": "AI 总结",
+        "description": "由 AI 根据 Dashboard 事实生成的变化、注意事项和下一步摘要。",
         "todayHeadline": "今天已自动完成 {n} 个任务",
         "weekHeadline": "本周已自动完成 {n} 个任务",
         "allTimeHeadline": "累计已自动完成 {n} 个任务",
@@ -1425,7 +1425,7 @@
         "breakdownTitle": "主要成果",
         "recentTitle": "最近自动完成",
         "viewAll": "查看全部已完成任务",
-        "empty": "Chrona 还没有自动完成任何任务。完成后，重点成果会显示在这里。",
+        "empty": "Chrona 根据 Dashboard 事实生成后，AI 总结会显示在这里。",
         "outputLabel": "产出",
         "category": {
           "report": "生成报告",
@@ -1531,6 +1531,9 @@
       "duePrefix": "截止",
       "updatedPrefix": "更新",
       "recurringBadge": "循环",
+      "automationManual": "手动完成",
+      "automationAutoPlan": "仅自动生成计划",
+      "automationAutoComplete": "自动执行完成",
       "externalSourceTitle": "同步自 {source}。标题和时间由日历来源管理。",
       "emptyFiltered": "当前筛选下没有匹配任务。",
       "relativeJustNow": "刚刚",

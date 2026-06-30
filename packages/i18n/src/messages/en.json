@@ -1414,8 +1414,8 @@
         "empty": "No completed tasks yet."
       },
       "digest": {
-        "title": "Auto-completion overview",
-        "description": "A daily report of the work Chrona finished for you in the background.",
+        "title": "AI summary",
+        "description": "AI-generated readout of what changed, what needs attention, and what to do next.",
         "todayHeadline": "{n} tasks auto-completed today",
         "weekHeadline": "{n} tasks auto-completed this week",
         "allTimeHeadline": "{n} tasks auto-completed all-time",
@@ -1425,7 +1425,7 @@
         "breakdownTitle": "What got done",
         "recentTitle": "Recently auto-completed",
         "viewAll": "View all completed tasks",
-        "empty": "Chrona hasn't auto-completed any tasks yet. Once it does, the highlights show up here.",
+        "empty": "AI summary will appear here after Chrona generates it from dashboard facts.",
         "outputLabel": "Output",
         "category": {
           "report": "Reports generated",
@@ -1531,6 +1531,9 @@
       "duePrefix": "Due",
       "updatedPrefix": "Updated",
       "recurringBadge": "Recurring",
+      "automationManual": "Manual",
+      "automationAutoPlan": "Auto-plan only",
+      "automationAutoComplete": "Auto-run",
       "externalSourceTitle": "Synced from {source}. Title and time are managed by the calendar source.",
       "emptyFiltered": "No tasks match the current filter.",
       "relativeJustNow": "just now",

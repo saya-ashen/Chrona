@@ -13,11 +13,8 @@ import type {
   ProviderRunInput,
   ProviderRunRef,
   StartRunInput,
-  StartRunInputWithControl,
 } from "@chrona/providers-foundation";
 import { requireAiClient } from "@/modules/ai";
-import { mintRunToken } from "./runtime/agent-control-store";
-
 type ProviderChatHistory = {
   messages: Array<{ role: string; content: string }>;
 };
@@ -62,12 +59,6 @@ export type AiRuntimeInvocation = {
   runtimeSessionKey: string;
   conversationEntryIds: string[];
   response: ProviderRunSnapshot;
-  /**
-   * Plain run token minted for this invocation; null if the active provider is
-   * not `claude_code` or the caller did not opt into skill-mode control plane.
-   * Exposed only to the engine + provider; the CLI receives it via env.
-   */
-  controlRunToken: string | null;
   providerName: string;
 };
 
@@ -125,19 +116,6 @@ export class AiRuntimeInvoker {
         );
       }
       const providerName = client.providerClient.provider;
-      const useSkillControl = providerName === "claude_code";
-      let controlRunToken: string | null = null;
-      if (useSkillControl) {
-        controlRunToken = await mintRunToken({
-          taskId: input.taskId,
-          workspaceId: task.workspaceId,
-          taskSessionId: input.taskSessionId,
-          runId: run.id,
-          runtimeSessionKey: input.runtimeSessionKey,
-          nodeId: input.nodeContext?.nodeId,
-          nodeAttemptId: input.nodeAttemptId,
-        });
-      }
 
       // Resume the prior provider conversation across process restarts: the
       // runner's in-process SDK-session cache is empty on a fresh process, so
@@ -166,7 +144,6 @@ export class AiRuntimeInvoker {
         runId: run.id,
         idempotencyKey: input.providerRunIdempotencyKey,
         providerRunRecordId: providerRun?.id,
-        controlRunToken,
         onRuntimeEvent: input.onRuntimeEvent,
         terminalToolName,
         eventPersistence: {
@@ -226,7 +203,6 @@ export class AiRuntimeInvoker {
         runtimeSessionKey,
         conversationEntryIds,
         response,
-        controlRunToken,
         providerName,
       };
     } catch (error) {
@@ -274,7 +250,6 @@ export async function runProviderRequest(
     runId?: string;
     idempotencyKey?: string;
     providerRunRecordId?: string;
-    controlRunToken?: string | null;
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     terminalToolName?: string;
     eventPersistence?: RuntimeEventPersistenceContext;
@@ -285,20 +260,11 @@ export async function runProviderRequest(
   const idempotencyKey = options.idempotencyKey ?? (options.runId
     ? `chrona-runtime:${options.runId}`
     : undefined);
-  const controlPlane = providerClient.provider === "claude_code" && options.controlRunToken
-    ? {
-        baseUrl: process.env.CHRONA_BASE_URL ?? "",
-        runToken: options.controlRunToken,
-        skillsDir: process.env.CHRONA_SKILLS_DIR ?? "",
-        skillName: process.env.CHRONA_SKILL_NAME ?? undefined,
-      }
-    : undefined;
   const run = await providerClient.startRun({
     ...startInput,
     signal: options.signal,
     idempotencyKey,
-    ...(controlPlane ? { control: controlPlane } : {}),
-  } as StartRunInputWithControl & { idempotencyKey?: string });
+  } as StartRunInput & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
   await updateProviderRunRecord(options.providerRunRecordId, {
     providerRunRef: run.nativeRunId ?? run.runId,
@@ -573,7 +539,7 @@ async function collectProviderRunSnapshot(
         runId: event.run.runId,
         nativeRunId: event.run.nativeRunId,
         sessionId,
-        status: event.run.status ?? "completed",
+        status: "completed",
         outputText: event.outputText,
         structuredPayload: event.structuredPayload,
         usage: event.usage,
@@ -855,6 +821,12 @@ async function updateProviderRunAuditRefs(input: {
     where: { id: input.providerRunRecordId },
     select: { firstRawEventId: true },
   });
+  const terminalStatus = (() => {
+    if (input.eventType === "run_completed") return "completed";
+    if (input.eventType === "run_failed") return "failed";
+    if (input.eventType === "run_cancelled") return "cancelled";
+    return null;
+  })();
   await db.taskPlanProviderRun.update({
     where: { id: input.providerRunRecordId },
     data: {
@@ -864,7 +836,8 @@ async function updateProviderRunAuditRefs(input: {
       lastRawEventId: input.rawEventId,
       completedByEventId: input.eventType === "run_completed" ? input.eventId : undefined,
       failedByEventId: input.eventType === "run_failed" ? input.eventId : undefined,
-      status: input.eventType === "approval_required" ? "waiting_for_approval" : undefined,
+      status: terminalStatus ?? (input.eventType === "approval_required" ? "waiting_for_approval" : undefined),
+      finishedAt: terminalStatus ? new Date() : undefined,
       correlationId: input.correlationId,
     },
   });

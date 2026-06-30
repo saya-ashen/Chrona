@@ -1,8 +1,6 @@
 import { Navigate, useLoaderData, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 
-import { InboxPageClient } from "@/components/inbox/inbox-page-client";
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { MemoryPageClient } from "@/components/memory/memory-page-client";
 import { SchedulePage } from "../../../features/schedule/ui";
 import { TaskListPage } from "@/components/tasks/task-list-page";
 import { AiClientsDialog } from "../../../features/ai-clients/ui";
@@ -29,17 +27,11 @@ export type ScheduleRouteData = {
   schedule: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-schedule-page").getSchedulePage>>;
 };
 
-export type InboxRouteData = {
-  inbox: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-inbox").getInbox>>;
-};
 
 export type DashboardRouteData = {
   dashboard: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-dashboard").getDashboard>>;
 };
 
-export type MemoryRouteData = {
-  memory: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-memory-console").getMemoryConsole>>;
-};
 
 export type TaskPageRouteData = {
   locale: Locale;
@@ -61,6 +53,8 @@ export type TaskListRouteData = {
     recurrenceRule: string | null;
     dueAt: string | null;
     updatedAt: string;
+    autoPlanGeneration: boolean;
+    autoExecute: boolean;
     projection: {
       runStatus: string | null;
       isRunnable: boolean;
@@ -113,25 +107,6 @@ export function ScheduleRoutePage() {
   );
 }
 
-export function InboxRoutePage() {
-  const { defaultWorkspace, dictionary } = useAppBootOutletData();
-  const { inbox } = useLoaderData() as InboxRouteData;
-  const t = dictionary.pages.inbox;
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-      </div>
-      <InboxPageClient
-        workspaceId={defaultWorkspace.id}
-        initialData={inbox}
-        copy={dictionary.components.inboxList}
-      />
-    </div>
-  );
-}
 
 export function DashboardRoutePage() {
   const { dictionary } = useAppBootOutletData();
@@ -140,25 +115,6 @@ export function DashboardRoutePage() {
   return <DashboardPage data={dashboard} copy={dictionary.pages.dashboard} workspaceId={dashboard.workspaceId} />;
 }
 
-export function MemoryRoutePage() {
-  const { defaultWorkspace, dictionary } = useAppBootOutletData();
-  const { memory } = useLoaderData() as MemoryRouteData;
-  const t = dictionary.pages.memory;
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-      </div>
-      <MemoryPageClient
-        workspaceId={defaultWorkspace.id}
-        initialData={memory}
-        copy={dictionary.components.memoryConsole}
-      />
-    </div>
-  );
-}
 
 export function SettingsRoutePage() {
   const { locale, dictionary } = useAppBootOutletData();

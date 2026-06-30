@@ -126,6 +126,7 @@ export function TaskWorkspaceExecutionOverview({
   currentExecution?: Pick<PlanExecutionResult, "status"> | null;
   runtimeEvents?: WorkspaceRuntimeEvent[];
   liveActivity?: WorkspaceActivityItem[];
+  primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   activityLayout?: ActivityLayout;
   onAction?: OverviewAction;

@@ -16,9 +16,12 @@ for the system as a whole, see [Architecture](./architecture.md).
 | `src/pages.tsx` | Top-level route page components wired in `router.tsx` |
 | `src/app-shell.tsx` | `AppShell` layout (nav/chrome) wrapping all locale routes |
 
-Routes today: `/:lang` landing, `schedule`, `inbox`, `memory`, `tasks`,
-`tasks/:taskId` (task workspace), `settings`. Routing is locale-prefixed; the
-default locale redirects from `/`.
+Routes today: `/:lang` landing, `schedule`, `tasks`, `tasks/:taskId` (task workspace),
+`settings`. Routing is locale-prefixed; the default locale redirects from `/`.
+`inbox` and `memory` are intentionally hidden until they have actionable product
+roles beyond read-only/duplicative record display; Dashboard owns concise
+attention/recovery visibility. Do not re-add them to primary navigation or routes
+without implementing those controls first.
 
 ## Directories
 

@@ -272,8 +272,8 @@ export interface LiveClient {
   client: ClaudeCodeProviderClient;
   runner: ClaudeCodeRunner;
   configDir: string;
-  /** Absolute path of the runnable `claude` binary that was selected. */
-  binaryPath: string;
+  /** Absolute path of the runnable `claude` executable that was selected. */
+  claudeExecutable: string;
   cleanup: () => void;
 }
 
@@ -297,8 +297,8 @@ export async function makeLiveClient(opts: {
   mcpBaseUrl: string;
   model?: string;
 }): Promise<LiveClient> {
-  const binaryPath = findClaudeBinary();
-  if (!binaryPath) {
+  const claudeExecutable = findClaudeBinary();
+  if (!claudeExecutable) {
     throw new Error(
       "makeLiveClient: no runnable `claude` binary. Install Claude Code or run on a machine with @anthropic-ai/claude-agent-sdk-linux-x64 present.",
     );
@@ -306,8 +306,8 @@ export async function makeLiveClient(opts: {
 
   const configDir = mkdtempSync(join(tmpdir(), "chrona-claude-live-"));
   const onPath = process.env.PATH ?? "";
-  const binaryDir = dirname(binaryPath);
-  const needsPathPrepend = !onPath.split(":").includes(binaryDir);
+  const executableDir = dirname(claudeExecutable);
+  const needsPathPrepend = !onPath.split(":").includes(executableDir);
   const env: Record<string, string> = {
     ANTHROPIC_BASE_URL: opts.mockUrl,
     ANTHROPIC_API_KEY: "sk-aimock-placeholder",
@@ -315,7 +315,7 @@ export async function makeLiveClient(opts: {
     CLAUDE_CONFIG_DIR: configDir,
     DISABLE_OMC: "1",
     OMC_SKIP_HOOKS: "1",
-    PATH: needsPathPrepend ? `${binaryDir}:${onPath}` : onPath,
+    PATH: needsPathPrepend ? `${executableDir}:${onPath}` : onPath,
     HOME: process.env.HOME ?? "",
   };
 
@@ -324,12 +324,10 @@ export async function makeLiveClient(opts: {
     mcpBaseUrl: opts.mcpBaseUrl,
     mcpRunToken: "live-test-token",
     env,
-    // Hand the resolved binary to the SDK via `pathToClaudeCodeExecutable`.
-    binaryPath,
   };
   const runner = await createClaudeCodeRunner(cfg);
   const client = new ClaudeCodeProviderClient({
-    config: { mcpBaseUrl: opts.mcpBaseUrl, binaryPath },
+    config: { mcpBaseUrl: opts.mcpBaseUrl },
     runner,
   });
 
@@ -337,7 +335,7 @@ export async function makeLiveClient(opts: {
     client,
     runner,
     configDir,
-    binaryPath,
+    claudeExecutable,
     cleanup: () => rmSync(configDir, { recursive: true, force: true }),
   };
 }

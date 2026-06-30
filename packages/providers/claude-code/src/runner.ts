@@ -48,7 +48,6 @@ import {
   type NormalizerOptions,
 } from "./normalizers";
 import {
-  mountChronaNodeSkill,
   renderPrompt,
   snapshotFromRef,
   stripTrailingSlash,
@@ -133,11 +132,6 @@ function buildDebugHooks(logger: ChronaLogger): SdkHooksOption {
 }
 
 export interface ClaudeCodeRunnerConfig {
-   /**
-   * Path to the `claude` executable handed to the SDK
-   * (`pathToClaudeCodeExecutable`). Default: the SDK's built-in executable.
-   */
-  binaryPath?: string;
   /** Default "claude-opus-4-8". */
   model?: string;
   /** Idle timeout (ms). Aborts only when SDK produces no events within this window. */
@@ -146,12 +140,6 @@ export interface ClaudeCodeRunnerConfig {
   mcpBaseUrl: string;
   /** Per-run Bearer token sent in the MCP `Authorization` header. */
   mcpRunToken: string;
-  /** Control transport used by Chrona node execution. Default: "mcp". */
-  controlPlane?: "mcp" | "skill";
-  /** Chrona /agent/control base URL for skill-mode CLI calls. */
-  controlBaseUrl?: string;
-  /** Optional source skill directory override. */
-  skillDir?: string;
   /** CWD for the spawned process. Default: `process.cwd()`. */
   cwd?: string;
   /** Pass-through env (merged on top of `process.env`). */
@@ -328,43 +316,18 @@ function resolveSelfChronaPath(): string | undefined {
  * Build the env passed to a spawned `claude` process. Always sets
  * `CHRONA_CLI` to a value the spawned process can resolve:
  *   - Caller env override (`cfg.env.CHRONA_CLI`)
- *   - Per-run skill mount (`<skillRoot>/.claude/skills/chrona-node/bin/chrona`)
  *   - Real path of the current chrona binary (e.g. launcher cache ELF
  *     in production, `packages/cli/src/index.ts` in dev)
  *   - Bare `chrona` (PATH lookup) as final fallback
  *
- * When `controlPlane === "skill"`, also sets `CHRONA_BASE_URL` +
- * `CHRONA_RUN_TOKEN` and prepends the mounted skill bin to `PATH` so
- * the agent's `Bash` tool can resolve `chrona` without an absolute path.
- *
  * Exported for unit testing the env-construction seam without spawning
  * a real `claude` process.
  */
-export function skillEnv(cfg: ClaudeCodeRunnerConfig, input: StartRunInput, skillRoot?: string): NodeJS.ProcessEnv {
+export function skillEnv(cfg: ClaudeCodeRunnerConfig): NodeJS.ProcessEnv {
   const env = { ...process.env, ...(cfg.env ?? {}) };
   if (env.CHRONA_CLI === undefined) {
-    let resolved: string | undefined;
-    if (skillRoot) {
-      // Skill mount is the most explicit: the runner just wrote the
-      // per-run `bin/chrona` shim there. Use the absolute path so the
-      // agent never has to depend on PATH lookup at all.
-      const skillBin = join(skillRoot, ".claude", "skills", "chrona-node", "bin");
-      resolved = join(skillBin, "chrona");
-    } else {
-      // No skill mount. The current process was started by the chrona
-      // binary (production) or `bun run` of `packages/cli/src/index.ts`
-      // (dev). In both cases `process.argv[1]` is the chrona entry —
-      // resolve symlinks and pass the real absolute path.
-      resolved = resolveSelfChronaPath();
-    }
+    const resolved = resolveSelfChronaPath();
     env.CHRONA_CLI = resolved ?? "chrona";
-  }
-  if (skillRoot) {
-    env.PATH = `${join(skillRoot, ".claude", "skills", "chrona-node", "bin")}:${env.PATH ?? ""}`;
-  }
-  if (cfg.controlPlane === "skill") {
-    env.CHRONA_BASE_URL = input.control?.baseUrl ?? cfg.controlBaseUrl ?? cfg.mcpBaseUrl;
-    env.CHRONA_RUN_TOKEN = input.control?.runToken ?? cfg.mcpRunToken;
   }
   return env;
 }
@@ -451,12 +414,6 @@ class ReplayRunner implements ClaudeCodeRunner {
 /*                                  SDK runner                                 */
 /* -------------------------------------------------------------------------- */
 
-/** SDK option fragment that pins the `claude` executable, when overridden. */
-function binaryOption(
-  cfg: ClaudeCodeRunnerConfig,
-): { pathToClaudeCodeExecutable?: string } {
-  return cfg.binaryPath ? { pathToClaudeCodeExecutable: cfg.binaryPath } : {};
-}
 
 /**
  * Thrown by `probeMcpServer` when the MCP transport the SDK is about to
@@ -767,46 +724,34 @@ class SdkRunner implements ClaudeCodeRunner {
   async start(input: StartRunInput): Promise<{ handle: ClaudeCodeRunHandle }> {
     const cfg = this.cfg;
     const model = cfg.model ?? DEFAULT_MODEL;
-    const skillMode = cfg.controlPlane === "skill";
-    const skillRoot = skillMode ? await mountChronaNodeSkill(cfg, input.control?.skillsDir) : undefined;
     const mcpBaseUrl = stripTrailingSlash(cfg.mcpBaseUrl);
     const mcpUrl = mcpUrlForSession(mcpBaseUrl, input.sessionKey ?? input.sessionId);
-    const mcpServers = skillMode
-      ? undefined
-      : {
-          chrona: {
-            type: "http" as const,
-            url: mcpUrl,
-            // Omit the Authorization header entirely when no token is
-            // configured: a server running without `API_KEY` accepts
-            // unauthenticated requests, and sending `Bearer ` (empty)
-            // would be a malformed header rather than "no auth".
-            headers: cfg.mcpRunToken
-              ? { Authorization: `Bearer ${cfg.mcpRunToken}` }
-              : {},
-          },
-        };
-    if (!skillMode) {
-      // Fail-fast: the agent model needs the `mcp__chrona__*` tool group
-      // to be reachable BEFORE it can call `mcp__chrona__chrona_plan_generate`.
-      // The 401 we keep hitting in dev comes from this transport being
-      // registered with a stale/invalid token — the agent would only
-      // notice mid-session (wasting a model turn + scraping the OMC skill
-      // catalog instead of running the task). Probe the MCP server once
-      // here so a bad token / wrong URL is reported at start() time.
-      await probeMcpServer({
-        baseUrl: mcpBaseUrl,
-        token: cfg.mcpRunToken,
-        runId: "preflight",
-      });
-    }
+    const mcpServers = {
+      chrona: {
+        type: "http" as const,
+        url: mcpUrl,
+        // Omit the Authorization header entirely when no token is
+        // configured: a server running without `API_KEY` accepts
+        // unauthenticated requests, and sending `Bearer ` (empty)
+        // would be a malformed header rather than "no auth".
+        headers: cfg.mcpRunToken
+          ? { Authorization: `Bearer ${cfg.mcpRunToken}` }
+          : {},
+      },
+    };
+    // Fail-fast: the agent model needs the `mcp__chrona__*` tool group
+    // to be reachable BEFORE it can call `mcp__chrona__chrona_plan_generate`.
+    // The 401 we keep hitting in dev comes from this transport being
+    // registered with a stale/invalid token — the agent would only
+    // notice mid-session (wasting a model turn + scraping the OMC skill
+    // catalog instead of running the task). Probe the MCP server once
+    // here so a bad token / wrong URL is reported at start() time.
+    await probeMcpServer({
+      baseUrl: mcpBaseUrl,
+      token: cfg.mcpRunToken,
+      runId: "preflight",
+    });
     const abortController = new AbortController();
-    const skillOptions: { additionalDirectories?: string[]; skills?: string[] } = {};
-    if (skillMode && typeof skillRoot === "string") {
-      const mountedSkillRoot: string = skillRoot;
-      skillOptions.additionalDirectories = [mountedSkillRoot] as string[];
-      skillOptions.skills = [input.control?.skillName ?? "chrona-node"];
-    }
     const runId = `claude-sdk-${crypto.randomUUID()}`;
     // Prefer the live in-process capture (same process, mid-conversation);
     // fall back to the engine-supplied `resumeSessionRef` so a restarted
@@ -817,7 +762,6 @@ class SdkRunner implements ClaudeCodeRunner {
       runId,
       sessionId: input.sessionId,
       sessionKey: input.sessionKey ?? null,
-      controlPlane: cfg.controlPlane,
     });
     const debugEnabled = isProviderDebugEnabled(log);
     const debugFile = debugEnabled
@@ -827,16 +771,12 @@ class SdkRunner implements ClaudeCodeRunner {
       ...(cfg.sdkOptions ?? {}),
       model,
       mcpServers,
-      allowedTools: skillMode ? ["Bash"] : ["mcp__chrona__*"],
+      allowedTools: ["mcp__chrona__*"],
       permissionMode: "bypassPermissions",
       abortController,
       cwd: cfg.cwd,
-      env: skillEnv(cfg, input, skillRoot),
+      env: skillEnv(cfg),
       ...(resumedSdkSessionId ? { resume: resumedSdkSessionId } : {}),
-      // Honor an explicit binary override; otherwise the SDK uses its
-      // built-in `claude` executable.
-      ...binaryOption(cfg),
-      ...skillOptions,
       ...(debugEnabled ? { hooks: buildDebugHooks(log) } : {}),
       ...(debugFile ? { debugFile } : {}),
     } as Parameters<typeof sdkQuery>[0]["options"];
@@ -844,19 +784,16 @@ class SdkRunner implements ClaudeCodeRunner {
     const prompt = renderPrompt(input) ?? "";
     log.info("claude_code.run_start", {
       model,
-      skillMode,
       allowedTools: options?.allowedTools,
       hasDebugFile: Boolean(debugFile),
       resumedSdkSessionId: resumedSdkSessionId ?? null,
     });
     logProviderDebug(log, "claude_code.run_options", {
       cwd: cfg.cwd,
-      binaryPath: cfg.binaryPath ?? null,
       timeoutMs: cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       timeoutMode: "idle",
       mcpBaseUrl,
       mcpUrl,
-      skillRoot,
       options,
     });
     logProviderDebug(log, "claude_code.prompt", { prompt });

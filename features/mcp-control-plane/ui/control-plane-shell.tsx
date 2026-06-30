@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, CalendarDays, ClipboardList, Inbox, LayoutDashboard, Plus, Settings } from "lucide-react";
+import { CalendarDays, ClipboardList, LayoutDashboard, Plus, Settings } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assistant-surface-dropdown";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
@@ -63,7 +63,6 @@ export function ControlPlaneShell({
       if (segment === "dashboard") return t("nav.dashboard");
       if (segment === "schedule") return t("nav.schedule");
       if (segment === "tasks") return t("nav.tasks");
-      if (segment === "inbox") return t("nav.inbox");
       if (segment === "settings") return t("nav.settings");
       if (segment === "work") return t("common.work");
       return segment;
@@ -87,18 +86,9 @@ export function ControlPlaneShell({
       icon: ClipboardList,
       active: pathname.startsWith("/tasks"),
     },
-    {
-      href: "/inbox",
-      label: t("nav.inbox"),
-      icon: Inbox,
-      active: pathname.startsWith("/inbox"),
-    },
-    {
-      href: "/memory",
-      label: t("nav.memory"),
-      icon: Brain,
-      active: pathname.startsWith("/memory"),
-    },
+    // Inbox and Memory intentionally stay out of primary navigation. Dashboard
+    // owns concise attention/recovery visibility until separate pages have clear,
+    // actionable product value.
     {
       href: "/settings",
       label: t("nav.settings"),

@@ -6,7 +6,7 @@ import type {
   ProviderRunSnapshot,
 } from "@chrona/providers-foundation";
 import { db } from "@/lib/db";
-import { RunStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
+import { RunStatus, TaskPlanStatus, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { runProviderRequest } from "./ai-runtime-invoker";
 
 const request = {
@@ -54,6 +54,50 @@ async function seedRunPair() {
     data: { taskId: task.id, runtimeName: "hermes", status: RunStatus.Pending, triggeredBy: "system" },
   });
   return { first, second };
+}
+
+async function seedProviderRunChain() {
+  const workspace = await db.workspace.create({
+    data: { name: "Provider audit workspace", status: "Active", defaultRuntime: "hermes" },
+  });
+  const task = await db.task.create({
+    data: { workspaceId: workspace.id, title: "Provider audit task", executionRuntime: "hermes", executionConfig: {}, status: TaskStatus.Running, priority: TaskPriority.Medium },
+  });
+  const plan = await db.taskPlan.create({
+    data: { workspaceId: workspace.id, taskId: task.id, planId: "plan-1", revision: 1, status: TaskPlanStatus.Accepted, compiledPlan: {} },
+  });
+  const planRun = await db.taskPlanRun.create({
+    data: { workspaceId: workspace.id, taskId: task.id, planId: plan.planId, planRun: {} },
+  });
+  const attempt = await db.taskPlanNodeAttempt.create({
+    data: {
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: plan.planId,
+      planRunId: planRun.id,
+      nodeId: "node-1",
+      nodeLayerId: "layer-1",
+      idempotencyKey: "attempt-key-1",
+      attemptNumber: 1,
+      status: "running",
+      executionEpoch: 0,
+    },
+  });
+  const providerRun = await db.taskPlanProviderRun.create({
+    data: {
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: plan.planId,
+      planRunId: planRun.id,
+      nodeAttemptId: attempt.id,
+      idempotencyKey: "provider-run-key-1",
+      status: "running",
+    },
+  });
+  const run = await db.run.create({
+    data: { taskId: task.id, runtimeName: "hermes", status: RunStatus.Pending, triggeredBy: "system" },
+  });
+  return { workspace, task, plan, planRun, attempt, providerRun, run };
 }
 
 beforeEach(async () => {
@@ -199,6 +243,79 @@ describe("runProviderRequest runtime ref persistence", () => {
       { id: second.id, runtimeRunRef: `provider-run-1:${second.id}` },
     ]);
   });
+
+  it("treats run_completed as completed even when embedded run status is still running", async () => {
+    const { second } = await seedRunPair();
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => ({
+        provider: "hermes",
+        runId: "provider-run-1",
+        nativeRunId: "provider-run-1",
+        sessionId: "provider-session-1",
+        status: "running",
+      } satisfies ProviderRunRef)),
+      streamRun: mock(() =>
+        (async function* () {
+          yield {
+            type: "run_completed",
+            run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "running" },
+            outputText: "ok",
+          } as ProviderRunEvent;
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request, { runId: second.id });
+
+    expect(snapshot.status).toBe("completed");
+    expect(snapshot.outputText).toBe("ok");
+  });
+
+  it("closes provider audit rows from terminal run_completed events", async () => {
+    const { workspace, task, providerRun, run } = await seedProviderRunChain();
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => ({
+        provider: "hermes",
+        runId: "provider-run-1",
+        nativeRunId: "provider-run-1",
+        sessionId: "provider-session-1",
+        status: "running",
+      } satisfies ProviderRunRef)),
+      streamRun: mock(() =>
+        (async function* () {
+          yield {
+            type: "run_completed",
+            run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "running" },
+            outputText: "ok",
+          } as ProviderRunEvent;
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(client, request, {
+      runId: run.id,
+      providerRunRecordId: providerRun.id,
+      eventPersistence: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        runtimeName: "hermes",
+        providerRunId: providerRun.id,
+      },
+    });
+
+    const reloaded = await db.taskPlanProviderRun.findUniqueOrThrow({
+      where: { id: providerRun.id },
+      select: { status: true, finishedAt: true, completedByEventId: true, failedByEventId: true },
+    });
+    expect(reloaded.status).toBe("completed");
+    expect(reloaded.finishedAt).toBeInstanceOf(Date);
+    expect(reloaded.completedByEventId).toBeString();
+    expect(reloaded.failedByEventId).toBeNull();
+  });
+
 });
 
 describe("runProviderRequest resume threading", () => {

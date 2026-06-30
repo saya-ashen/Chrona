@@ -180,6 +180,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     dispatchExecutionAction,
     submitCheckpointAction,
     handleGeneratePlanFromHeader,
+    handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
   const isTaskRunning = task.status === "Running" || currentExecution?.status === "running" || currentExecution?.status === "started";
   const consoleView = useMemo(
@@ -334,6 +335,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         liveActivity={liveActivity}
         currentExecution={currentExecution}
         onGeneratePlan={handleGeneratePlanFromHeader}
+        onStopPlanGeneration={handleStopPlanGeneration}
         onApplyPlan={async (result) => {
           if (!result.id) return;
           setAcceptPlanError(null);

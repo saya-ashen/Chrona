@@ -4,7 +4,7 @@ import type { Prisma } from "@chrona/db";
 
 import { db } from "@/lib/db";
 import { dispatch, extractJSON, getAiClientForFeature } from "@/modules/ai";
-import { validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
+import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
 
 export const DASHBOARD_BRIEF_SURFACE = "dashboard.brief" as const;
 
@@ -61,75 +61,26 @@ type DashboardFingerprintInput = {
 };
 
 const DASHBOARD_BRIEF_RETRY_COOLDOWN_MS = 30_000;
+const DASHBOARD_BRIEF_PROMPT_VERSION = 3;
 
 const dashboardAiBriefResultSchema = z.object({
-  title: z.string().trim().min(1).max(80),
-  summary: z.string().trim().min(1).max(500),
-  highlights: z.array(z.object({
-    tone: z.enum(["success", "warning", "danger", "info"]),
-    label: z.string().trim().min(1).max(80),
-    detail: z.string().trim().min(1).max(240),
-    taskRef: z.string().trim().min(1).optional(),
-  })).max(4),
-  suggestedNextActions: z.array(z.object({
-    label: z.string().trim().min(1).max(80),
-    reason: z.string().trim().min(1).max(240),
-    taskRef: z.string().trim().min(1).optional(),
-    actionKind: z.enum(["open_task", "review_approval", "provide_input", "inspect_failure"]),
-  })).max(4),
+  summaryText: z.string().trim().min(1).max(500).optional(),
+  spec: z.unknown(),
 });
 
-type DashboardAiBriefResult = z.infer<typeof dashboardAiBriefResultSchema>;
 
-function textElement(text: string, variant?: string) {
-  return { type: "Text", props: variant ? { text, variant } : { text }, children: [] };
-}
-
-function buildDashboardBriefSpec(result: DashboardAiBriefResult): UiDocument {
-  const elements: UiDocument["elements"] = {
-    root: { type: "Stack", props: { gap: "md" }, children: ["title", "summary"] },
-    title: { type: "Heading", props: { text: result.title, level: "h3" }, children: [] },
-    summary: textElement(result.summary),
-  };
-
-  const rootChildren = elements.root.children ?? [];
-
-  if (result.highlights.length > 0) {
-    elements.highlights = { type: "Stack", props: { gap: "sm" }, children: [] };
-    rootChildren.push("highlights");
-    result.highlights.forEach((item, index) => {
-      const key = `highlight:${index}`;
-      elements[key] = {
-        type: "Alert",
-        props: { title: item.label, description: item.detail, variant: item.tone === "danger" ? "destructive" : "default" },
-        children: [],
-      };
-      elements.highlights.children?.push(key);
-    });
-  }
-
-  if (result.suggestedNextActions.length > 0) {
-    elements.actionsTitle = textElement("Suggested next actions", "muted");
-    elements.actions = { type: "Stack", props: { gap: "sm" }, children: [] };
-    rootChildren.push("actionsTitle", "actions");
-    result.suggestedNextActions.forEach((item, index) => {
-      const key = `action:${index}`;
-      elements[key] = textElement(`${item.label} — ${item.reason}`);
-      elements.actions.children?.push(key);
-    });
-  }
-
-  return { root: "root", elements };
-}
 
 function buildPromptInput(input: DashboardFingerprintInput) {
   return {
     role: "dashboard.brief",
     rules: [
-      "Interpret dashboard facts only.",
+      "Generate a compact json-render Chrona UI spec for the Dashboard AI summary card.",
+      "Return JSON only with summaryText and spec.",
+      "spec may use ONLY these component types: Stack, Card, Heading, Text, Alert, Badge, Separator, Table.",
+      "All props must be literal JSON values. No actions, links, buttons, forms, inputs, repeat, state, dynamic expressions, or custom components.",
+      "Keep output short: one heading, one concise summary, up to three highlights, and optional next-step text.",
       "Do not invent task IDs, counts, statuses, hrefs, approval actions, destructive actions, secrets, provider payloads, or raw task context.",
-      "Use taskRef only when it exactly matches a provided taskId.",
-      "Return JSON only with title, summary, highlights, suggestedNextActions.",
+      "Do not include buttons, links, forms, inputs, tool payloads, tokens, or backend IDs.",
     ],
     facts: {
       needsAttention: input.needsAttention,
@@ -149,26 +100,6 @@ function errorMessage(cause: unknown) {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-function allowedTaskRefs(input: DashboardFingerprintInput) {
-  return new Set([
-    ...input.needsAttention.map((item) => item.taskId),
-    ...input.inProgress.map((item) => item.taskId),
-    ...input.autoCompleted.map((item) => item.taskId),
-    ...input.recentEvents.map((item) => item.taskId),
-  ]);
-}
-
-function assertKnownTaskRefs(result: DashboardAiBriefResult, input: DashboardFingerprintInput) {
-  const allowed = allowedTaskRefs(input);
-  const refs = [
-    ...result.highlights.map((item) => item.taskRef),
-    ...result.suggestedNextActions.map((item) => item.taskRef),
-  ].filter((ref): ref is string => Boolean(ref));
-  const unknown = refs.find((ref) => !allowed.has(ref));
-  if (unknown) {
-    throw new Error(`Generated dashboard brief referenced unknown taskRef ${unknown}`);
-  }
-}
 
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -183,6 +114,7 @@ function stableJson(value: unknown): string {
 
 export function fingerprintDashboardBriefInput(input: DashboardFingerprintInput): string {
   const payload = {
+    promptVersion: DASHBOARD_BRIEF_PROMPT_VERSION,
     needsAttention: input.needsAttention.map((item) => ({
       taskId: item.taskId,
       title: item.title,
@@ -286,6 +218,7 @@ export async function getDashboardAiBriefState(input: {
         status: "dirty",
         inputFingerprint,
         dirtyAt: new Date(),
+        lastAttemptAt: null,
         errorMessage: null,
       },
     });
@@ -389,9 +322,7 @@ export async function generateDashboardBrief(input: {
       `workspace:${input.workspaceId}:dashboard.brief:${inputFingerprint}`,
     );
     const parsed = dashboardAiBriefResultSchema.parse(extractJSON(rawText));
-    assertKnownTaskRefs(parsed, input.fingerprintInput);
-    const spec = buildDashboardBriefSpec(parsed);
-    const validation = validateChronaSpec(spec);
+    const validation = validateDashboardSummarySpec(parsed.spec);
     if (!validation.ok) {
       throw new Error(`Generated dashboard brief spec invalid: ${validation.issues[0]?.message ?? "unknown issue"}`);
     }
@@ -401,7 +332,7 @@ export async function generateDashboardBrief(input: {
       data: {
         status: "ready",
         generatedSpec: validation.spec as Prisma.InputJsonValue,
-        summaryText: parsed.summary,
+        summaryText: parsed.summaryText ?? null,
         providerClientId: provider.record.id,
         generatedAt: new Date(),
         inputFingerprint,

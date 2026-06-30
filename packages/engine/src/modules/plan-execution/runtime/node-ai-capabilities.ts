@@ -11,10 +11,6 @@ import type { NodeExecutionResult } from "../node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
 import { branchBindingForRef } from "./node-runtime-refs";
-import {
-  latestRecordedTerminalAction,
-  type RecordedTerminalAction,
-} from "./agent-control-store";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
@@ -33,8 +29,6 @@ export type NodeAiCapabilityInput = {
   attempt: NodeAttempt;
   runtimeName: string;
   aiRuntimeInvoker: AiRuntimeInvoker;
-  /** "skill" routes through the recorded-action path; "mcp" (default) keeps the snapshot path. */
-  controlPlane?: "mcp" | "skill";
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
   signal?: AbortSignal;
 };
@@ -141,113 +135,6 @@ function terminalNodeResultFromSnapshot(input: {
   }
 }
 
-function terminalNodeResultFromRecordedAction(input: {
-  invocation: AiRuntimeInvocation;
-  recorded: RecordedTerminalAction | null;
-  node: EffectivePlanNode;
-  plan: EffectivePlanGraph;
-  evidence: NodeExecutionEvidence;
-  summary?: string;
-}): NodeExecutionResult | undefined {
-  if (!input.recorded) return undefined;
-  switch (input.recorded.kind) {
-    case "complete":
-      return {
-        status: "done",
-        summary:
-          input.summary ||
-          `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
-        evidence: input.evidence,
-      };
-    case "wait_complete":
-      return {
-        status: "done",
-        summary:
-          input.summary ||
-          `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed (wait)`,
-        evidence: input.evidence,
-      };
-    case "condition_select":
-      return conditionSelectionFromRecorded({
-        node: input.node,
-        plan: input.plan,
-        evidence: input.evidence,
-        recorded: input.recorded,
-        summary: input.summary,
-      });
-    case "block":
-      return {
-        status: "blocked",
-        reason: extractRecordedReason(input.recorded.payload, "Block action recorded by runtime"),
-        evidence: input.evidence,
-      };
-    case "fail":
-      return {
-        status: "failed",
-        error: extractRecordedReason(input.recorded.payload, "Fail action recorded by runtime"),
-        evidence: input.evidence,
-      };
-    case "plan_output":
-      return undefined;
-    default:
-      return undefined;
-  }
-}
-
-
-function extractRecordedReason(payload: unknown, fallback: string): string {
-  if (payload && typeof payload === "object") {
-    const record = payload as Record<string, unknown>;
-    const value = record.reason ?? record.error;
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return fallback;
-}
-
-function conditionSelectionFromRecorded(input: {
-  node: EffectivePlanNode;
-  plan: EffectivePlanGraph;
-  evidence: NodeExecutionEvidence;
-  recorded: RecordedTerminalAction;
-  summary?: string;
-}): NodeExecutionResult {
-  const payloadRecord = input.recorded.payload && typeof input.recorded.payload === "object"
-    ? (input.recorded.payload as Record<string, unknown>)
-    : undefined;
-  const branchRef = payloadRecord && typeof payloadRecord.branchRef === "string"
-    ? payloadRecord.branchRef
-    : undefined;
-  if (input.node.type !== "condition" || !branchRef) {
-    return {
-      status: "blocked",
-      reason: "Condition selection terminal action recorded without a valid branchRef",
-      evidence: input.evidence,
-    };
-  }
-  try {
-    const branch = branchBindingForRef({
-      plan: input.plan,
-      node: input.node,
-      branchRef,
-    });
-    return {
-      status: "done",
-      summary: input.summary || `Condition resolved to branch: ${branch.label}`,
-      evidence: input.evidence,
-      selectedBranch: {
-        label: branch.label,
-        nextNodeId: branch.nextNodeId!,
-        source: "ai",
-      },
-    };
-  } catch (error) {
-    return {
-      status: "blocked",
-      reason: error instanceof Error ? error.message : "Condition branchRef could not be resolved",
-      evidence: input.evidence,
-    };
-  }
-}
 
 function missingTerminalToolResult(input: {
   invocation: AiRuntimeInvocation;
@@ -342,23 +229,7 @@ async function resolveTerminalNodeResult(input: {
   evidence: NodeExecutionEvidence;
   structured: Record<string, unknown> | undefined;
   summary?: string;
-  controlPlane: "mcp" | "skill";
-  nodeAttemptId: string;
 }): Promise<NodeExecutionResult | undefined> {
-  if (input.controlPlane === "skill") {
-    const recorded = await latestRecordedTerminalAction({
-      runId: input.invocation.runId,
-      nodeAttemptId: input.nodeAttemptId,
-    });
-    return terminalNodeResultFromRecordedAction({
-      invocation: input.invocation,
-      recorded,
-      node: input.node,
-      plan: input.plan,
-      evidence: input.evidence,
-      summary: input.summary,
-    });
-  }
   return terminalNodeResultFromSnapshot({
     invocation: input.invocation,
     node: input.node,
@@ -442,8 +313,6 @@ export async function runTaskNodeFeature(
           evidence,
           structured,
           summary,
-          controlPlane: input.controlPlane ?? "mcp",
-          nodeAttemptId: input.attempt.id,
         })
       : undefined;
     const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed"

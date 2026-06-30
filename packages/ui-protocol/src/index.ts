@@ -5,6 +5,10 @@ export {
   type ValidateResult,
   type ValidationIssue,
 } from "./document/validate";
+export {
+  dashboardSummarySpecSchema,
+  validateDashboardSummarySpec,
+} from "./dashboard/dashboard-summary-spec";
 export { chronaSchema, type ChronaSchema } from "./schema";
 export {
   chronaCatalog,

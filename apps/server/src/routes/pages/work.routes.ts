@@ -193,16 +193,20 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
   switch (event.type) {
     case "status":
       return {
+        "/plan/status": "generating",
+        "/plan/generation/status": "running",
         "/plan/generation/phase": event.phase,
         "/plan/generation/statusMessage": event.message,
       };
     case "tool_call":
       return {
+        "/plan/status": "generating",
+        "/plan/generation/status": "running",
         "/plan/generation/lastTool": event.tool,
         "/plan/generation/lastToolAt": new Date().toISOString(),
       };
     case "partial":
-      return { "/plan/generation/partialText": event.text };
+      return { "/plan/status": "generating", "/plan/generation/status": "running", "/plan/generation/partialText": event.text };
     case "result":
       return {
         "/plan/saved/id": event.result.id,
@@ -215,11 +219,12 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/execution/can-start": false,
         "/execution/start-disabled": true,
         "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
+        "/plan/status": "waiting_acceptance",
         "/plan/generation/status": "completed",
       };
     case "cancelled":
     case "done":
-      return { "/plan/generation/status": event.type };
+      return { "/plan/status": "idle", "/plan/generation/status": event.type };
     case "error": {
       // Surface a `state.update` so the header spec can render an inline
       // error Alert and a recovery-actions row. `buttonRetry` /
@@ -228,6 +233,7 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
       // which ones are appropriate for the failure class.
       const retryable = event.code !== "TASK_NOT_FOUND";
       return {
+        "/plan/status": "idle",
         "/plan/generation/error/code": event.code,
         "/plan/generation/error/message": event.message,
         "/plan/generation/error/buttonRetry": retryable,
@@ -276,6 +282,19 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
           { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan..." },
           { op: "replace", path: "/elements/action:generate-plan/props/disabled", value: true },
         ],
+      });
+      publishTaskStateUpdate({
+        taskId,
+        workspaceId,
+        workBlockId,
+        updates: {
+          "/plan/status": "generating",
+          "/plan/generation/status": "running",
+          "/plan/generation/phase": "connecting",
+          "/plan/generation/statusMessage": "Starting plan generation...",
+          "/plan/generation/error/code": null,
+          "/plan/generation/error/message": null,
+        },
       });
       const generation = engine.tasks.plan.generate({
         taskId,
