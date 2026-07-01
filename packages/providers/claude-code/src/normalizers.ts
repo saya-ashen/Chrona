@@ -175,6 +175,15 @@ function pushAssistant(
   ctx: NormalizerContext,
   options: NormalizerOptions,
 ): void {
+  if (typeof rec.error === "string") {
+    out.push(
+      buildEvent(ctx, options, {
+        type: "run_failed",
+        error: sdkErrorMessage(rec, "Claude Code assistant error"),
+      }),
+    );
+    return;
+  }
   const message = rec.message as
     | { content?: ReadonlyArray<Record<string, unknown>> }
     | undefined;
@@ -268,6 +277,26 @@ function pushStreamEvent(
   mapStreamEvent(out, ev, ctx, options);
 }
 
+function sdkErrorMessage(rec: Record<string, unknown>, fallback: string): string {
+  const errors = Array.isArray(rec.errors) && rec.errors.length > 0
+    ? (rec.errors as unknown[]).map(String).join("; ")
+    : null;
+  const apiStatus = typeof rec.api_error_status === "number" ? rec.api_error_status : null;
+  const assistantError = typeof rec.error === "string" ? rec.error : null;
+  const terminalReason = typeof rec.terminal_reason === "string" ? rec.terminal_reason : null;
+
+  if (apiStatus) {
+    const base = apiStatus === 401
+      ? "Claude Code API request failed with HTTP 401 (authentication failed)."
+      : `Claude Code API request failed with HTTP ${apiStatus}.`;
+    return errors ? `${base} ${errors}` : base;
+  }
+  if (assistantError) return `Claude Code assistant error: ${assistantError}`;
+  if (errors) return errors;
+  if (terminalReason) return `Claude Code run failed (${terminalReason})`;
+  return fallback;
+}
+
 function pushResult(
   out: ProviderRunEvent[],
   rec: Record<string, unknown>,
@@ -276,6 +305,17 @@ function pushResult(
 ): void {
   const subtype = typeof rec.subtype === "string" ? rec.subtype : "success";
   const ref = buildBaseRef(rec, options);
+  const apiStatus = typeof rec.api_error_status === "number" ? rec.api_error_status : null;
+  if (rec.is_error === true || apiStatus !== null) {
+    out.push(
+      buildEvent(ctx, options, {
+        type: "run_failed",
+        run: ref,
+        error: sdkErrorMessage(rec, `Claude Code run failed (${subtype})`),
+      }),
+    );
+    return;
+  }
   if (subtype === "success") {
     out.push(
       buildEvent(ctx, options, {
@@ -303,10 +343,7 @@ function pushResult(
     buildEvent(ctx, options, {
       type: "run_failed",
       run: ref,
-      error:
-        Array.isArray(rec.errors) && rec.errors.length > 0
-          ? (rec.errors as unknown[]).map(String).join("; ")
-          : `Claude Code run failed (${subtype})`,
+      error: sdkErrorMessage(rec, `Claude Code run failed (${subtype})`),
     }),
   );
 }

@@ -28,9 +28,9 @@ Chrona currently centers on five workflows:
 
 1. Task management: create, edit, complete, reopen, delete, prioritize, tag, nest, and relate tasks.
 2. Plan generation: ask AI to draft a graph plan, then review, edit, accept, and materialize it.
-3. Plan execution: run task/checkpoint/condition/wait nodes with human checkpoints and AI-visible refs.
+3. Plan execution in task workspace: run task/checkpoint/condition/wait nodes with human checkpoints and AI-visible refs.
 4. Schedule cockpit: arrange time blocks, inspect conflicts, accept schedule proposals, and auto-start due work.
-5. Work page: observe latest results, plan graph, execution records, task details, and conversation/input context in one task-focused surface.
+5. Dashboard/Inbox visibility: review workspace status, attention items, latest results, and execution state.
 
 Supporting surfaces include Inbox, Memory Console, Global AI Sidebar, Assistant Surface, Settings / AI Clients, and runtime/provider status.
 

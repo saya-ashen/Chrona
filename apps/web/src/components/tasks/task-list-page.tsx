@@ -48,6 +48,8 @@ type TaskItem = {
   recurrenceRule: string | null;
   dueAt: string | null;
   updatedAt: string;
+  autoPlanGeneration: boolean;
+  autoExecute: boolean;
   projection: {
     runStatus: string | null;
     isRunnable: boolean;
@@ -115,6 +117,12 @@ function priorityTone(priority: string) {
   return "outline" as const;
 }
 
+
+export function taskAutomationLabel(task: Pick<TaskItem, "autoPlanGeneration" | "autoExecute">, copy: TaskListCopy) {
+  if (task.autoExecute) return copy.automationAutoComplete;
+  if (task.autoPlanGeneration) return copy.automationAutoPlan;
+  return copy.automationManual;
+}
 function toPreviewText(value: string): string {
   return value
     .replace(/<[^>]*>/g, " ")
@@ -294,6 +302,9 @@ function TaskRow({
             <h3 className="truncate text-sm font-semibold text-foreground">{task.title}</h3>
             <Badge variant={statusTone(task.status)}>{task.status}</Badge>
             <Badge variant={priorityTone(task.priority)}>{task.priority}</Badge>
+            <Badge variant={task.autoExecute ? "info" : task.autoPlanGeneration ? "secondary" : "outline"}>
+              {taskAutomationLabel(task, copy)}
+            </Badge>
             {task.source?.source === "external_calendar" && (
               <Badge
                 variant="outline"

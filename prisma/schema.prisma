@@ -192,6 +192,7 @@ model Workspace {
   importedCalendarEvents ImportedCalendarEvent[]
   runTokens            RunToken[]
   taskPlanTerminalActions TaskPlanTerminalAction[]
+  aiSurfaces           WorkspaceAiSurface[]
 }
 
 model CalendarSource {
@@ -274,6 +275,7 @@ model Task {
   dueAt                DateTime?
   blockReason          Json?
   defaultSessionId     String?
+  aiClientId           String?
   latestRunId          String?
   latestEventId        String?
   latestRawEventId     String?
@@ -308,6 +310,7 @@ model Task {
   graphVersions        GraphVersion[]
   graphMutations       GraphMutationRecord[]
   reconciliationEvents ReconciliationEvent[]
+  aiClient             AiClient?              @relation(fields: [aiClientId], references: [id], onDelete: SetNull)
   schedulerEvents      SchedulerEvent[]
   importedCalendarEvents ImportedCalendarEvent[]
   runTokens             RunToken[]
@@ -317,6 +320,7 @@ model Task {
   @@index([workspaceId, priority])
   @@index([workspaceId, seriesExternalUid])
   @@index([defaultSessionId])
+  @@index([aiClientId])
 }
 
 enum GraphMutationStatus {
@@ -1028,6 +1032,27 @@ enum ExecutionSessionStatus {
   Abandoned
 }
 
+model WorkspaceAiSurface {
+  id               String    @id @default(cuid())
+  workspaceId      String
+  surface          String
+  status           String    @default("dirty")
+  inputFingerprint String?
+  generatedSpec    Json?
+  summaryText      String?
+  providerClientId String?
+  dirtyAt          DateTime?
+  generatedAt      DateTime?
+  lastAttemptAt    DateTime?
+  errorMessage     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, surface])
+  @@index([surface, status])
+}
+
 model AiClient {
   id        String             @id @default(cuid())
   name      String
@@ -1042,6 +1067,7 @@ model AiClient {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   bindings  AiFeatureBinding[]
+  tasks     Task[]
 }
 
 model AiFeatureBinding {

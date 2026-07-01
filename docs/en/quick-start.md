@@ -79,8 +79,8 @@ bun run test:api
 6. Place the task on the schedule.
 7. Generate a plan from the task workspace.
 8. Review or edit the plan graph, then accept it.
-9. Start execution from the task workspace or Work page, or let configured auto-execution move due work forward.
-10. Review progress, blockers, approvals, and outputs from Work, Inbox, or the task workspace.
+9. Start execution from the task workspace, or let configured auto-execution move due work forward.
+10. Review progress, blockers, approvals, and outputs from Inbox or the task workspace.
 
 ## Providers and AI clients
 
@@ -120,15 +120,15 @@ Use remote Hermes when the Hermes gateway runs on another machine.
 4. On the remote machine, install/enable the Chrona Hermes plugin, point the plugin MCP URL at this Chrona server, set `API_SERVER_ENABLED=true`, set `API_SERVER_KEY`, and restart Hermes.
 5. Run `Diagnose Hermes` and `Test availability` from Chrona.
 
-## Work page basics
+## Task workspace execution basics
 
-The Work page is the main execution surface for a task. It combines:
+The task workspace is the main execution surface for a task. It combines:
 
 - latest result
 - accepted/generated plan graph
 - execution records grouped around plan runs and runtime events
 - task metadata and schedule status
-- conversation and command composer context
+- conversation and command center context
 - checkpoints, inputs, approvals, blocks, and failure recovery actions
 
 ## Troubleshooting
@@ -136,5 +136,5 @@ The Work page is the main execution surface for a task. It combines:
 - If the server is unreachable, confirm the process is listening on port `3101` and that no other service is using it.
 - If AI features do nothing, verify Settings / AI Clients has an enabled client and feature binding.
 - If Hermes diagnosis fails, read the individual checks first. Local mode can auto-fix plugin/config/env issues; remote mode shows manual instructions because Chrona should not modify another machine.
-- If execution pauses, check Inbox and the Work page for waiting input, approval, block, or failure state.
+- If execution pauses, check Inbox and the task workspace for waiting input, approval, block, or failure state.
 - If developing locally after schema or dependency changes, run `bun run setup`. On NixOS, Prisma may require custom engine configuration or `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1` because upstream checksum files can be unavailable for the `linux-nixos` engine target.

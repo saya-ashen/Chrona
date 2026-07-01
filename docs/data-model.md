@@ -179,7 +179,7 @@ Important models:
 - `RawEventLog`
 - `TaskTimelineItem`
 
-These records back Work page conversation/execution context, assistant surfaces, runtime/tool-call inspection, raw provider/runtime event audits, and task timeline projections.
+These records back task workspace conversation/execution context, assistant surfaces, runtime/tool-call inspection, raw provider/runtime event audits, and task timeline projections.
 
 ## Memory state
 

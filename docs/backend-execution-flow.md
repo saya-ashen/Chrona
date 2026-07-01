@@ -17,9 +17,8 @@ This document traces the current backend path from task creation to plan executi
 | Current execution | `GET /api/tasks/:taskId/execution/current` |
 | Execution action SSE | `POST /api/tasks/:taskId/execution/actions` |
 | Checkpoint action SSE | `POST /api/tasks/:taskId/execution/checkpoint/:checkpointId/actions` |
-| Work projection | `GET /api/work/:taskId` |
-| Work command | `POST /api/work/:taskId/commands` |
-| Work events | `GET /api/work/:taskId/events` |
+| Task workspace command | `POST /api/work/:taskId/commands` |
+| Task workspace events | `GET /api/work/:taskId/events` |
 | MCP tools | `POST /api/mcp` |
 
 ## End-to-end flow
@@ -138,9 +137,9 @@ This avoids two failure modes:
 
 `POST /api/tasks/:taskId/execution/checkpoint/:checkpointId/actions` maps checkpoint-level actions onto execution continuation actions. It supports input submission, result approval/rejection, replan decisions, retry, unblock, manual completion/skip, fail, and cancel.
 
-## Work page command flow
+## Task workspace command flow
 
-The Work page uses asynchronous commands:
+The task workspace uses asynchronous commands:
 
 1. `POST /api/work/:taskId/commands` validates and accepts the command.
 2. The server publishes a command accepted event.

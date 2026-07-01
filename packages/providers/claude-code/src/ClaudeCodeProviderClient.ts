@@ -26,8 +26,6 @@ import {
   type StartRunInput,
   type StreamRunInput,
 } from "@chrona/providers-foundation";
-import type { ControlPlaneMode } from "@chrona/contracts";
-
 import {
   createClaudeCodeRunner,
   type ClaudeCodeRunHandle,
@@ -66,7 +64,6 @@ interface InternalRun {
 
 /** Public constructor-friendly config (subset of contracts config). */
 export interface ClaudeCodeProviderConfig {
-  binaryPath?: string;
   model?: string;
   timeoutMs?: number;
   mcpBaseUrl?: string;
@@ -80,18 +77,6 @@ export interface ClaudeCodeProviderConfig {
   apiKey?: string;
   cwd?: string;
   env?: Record<string, string>;
-  /**
-   * Skill-mode selector (Spec 018). Defaults to "mcp".
-   * Mirrors the contracts-level `ClaudeCodeClientConfig.controlPlane`.
-   * Hermes is MCP-only and ignores this field.
-   */
-  controlPlane?: ControlPlaneMode;
-  /**
-   * Skill directory mounted into the spawned run when
-   * `controlPlane === "skill"`. Optional; can be overridden per-run via
-   * `StartRunInput.control.skillsDir`.
-   */
-  skillDir?: string;
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
 }
@@ -470,14 +455,11 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       this.opts.config.mcpBaseUrl ??
       readEnv("CHRONA_MCP_BASE_URL") ??
       defaultMcpBaseUrl();
-    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
     // The MCP server at /api/mcp sits behind the same `apiKeyAuth()`
     // middleware as every other /api/* route (apps/server/src/middleware/
     // auth.ts), so the Bearer token we hand the SDK here MUST be the
     // server's static `API_KEY` (the same one operators set in
-    // apps/server/.env). Skill mode overrides this via `input.control.
-    // runToken` (see runner start()), but the per-run token is a separate
-    // scope (per node attempt), not the MCP transport credential.
+    // apps/server/.env).
     const mcpRunToken =
       this.opts.config.mcpRunToken ??
       readEnv("CHRONA_API_KEY") ??
@@ -493,13 +475,9 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       mcpBaseUrl,
       mcpRunToken,
       env: Object.keys(env).length > 0 ? env : undefined,
-      binaryPath: this.opts.config.binaryPath,
       cwd: this.opts.config.cwd,
       recordDir,
       strictUnknownEvents: strict,
-      controlPlane: this.opts.config.controlPlane,
-      controlBaseUrl,
-      skillDir: this.opts.config.skillDir,
       sdkOptions: this.opts.config.sdkOptions,
     };
     return createClaudeCodeRunner(cfg);
@@ -511,19 +489,19 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
    * construction — only on first `start`). We additionally run a
    * `claude --version` probe for binary availability.
    *
-   * The binary resolves to (in order): an explicit `config.binaryPath`, the
-   * `claude` executable bundled inside the `@anthropic-ai/claude-agent-sdk`
-   * platform package, or a `claude` on PATH. Chrona never requires a
-   * system-installed Claude Code CLI — the SDK ships the binary.
+   * The binary resolves to the `claude` executable bundled inside the
+   * `@anthropic-ai/claude-agent-sdk` platform package, or a `claude` on PATH.
+   * Chrona never requires a system-installed Claude Code CLI — the SDK ships
+   * the binary.
    *
    * Reason strings are actionable per the spec.
    */
   private async probe(): Promise<string | null> {
     if (this.opts.runner) return null; // user provided runner → trust it
     if (readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR")) return null; // record-only
-    const binary = this.opts.config.binaryPath ?? resolveClaudeBinary();
+    const binary = resolveClaudeBinary();
     if (!binary) {
-      return "Claude Code binary not found: the @anthropic-ai/claude-agent-sdk platform package is missing and no 'claude' is on PATH. Reinstall dependencies or set config.binaryPath.";
+      return "Claude Code binary not found: the @anthropic-ai/claude-agent-sdk platform package is missing and no 'claude' is on PATH. Reinstall dependencies.";
     }
     try {
       const proc = Bun.spawn([binary, "--version"], {

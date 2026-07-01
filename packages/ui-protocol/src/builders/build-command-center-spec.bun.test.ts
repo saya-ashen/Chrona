@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildCommandCenterCheckpointSpec, buildCommandCenterTrailSpec } from "./build-command-center-spec";
+import { buildCommandCenterArtifactsSpec, buildCommandCenterCheckpointSpec, buildCommandCenterTrailSpec } from "./build-command-center-spec";
 
 describe("buildCommandCenterTrailSpec", () => {
   it("binds activity stream props to json-render state", () => {
@@ -37,6 +37,36 @@ describe("buildCommandCenterTrailSpec", () => {
       type: "Stack",
       props: { gap: "sm" },
       children: ["title", "provider", "activity"],
+    });
+  });
+});
+
+describe("buildCommandCenterArtifactsSpec", () => {
+  it("passes server-hydrated file preview props to artifact items", () => {
+    const spec = buildCommandCenterArtifactsSpec({
+      artifacts: [{
+        id: "artifact-1",
+        title: "Report",
+        type: "markdown",
+        uri: ".chrona/reports/report.md",
+        displayPath: ".chrona/reports/report.md",
+        contentKind: "markdown",
+        contentPreview: "# Report",
+        contentBytes: 8,
+        contentTruncated: false,
+      }],
+    });
+
+    expect(spec.elements["artifact:artifact-1"]).toMatchObject({
+      type: "WorkspaceArtifactItem",
+      props: {
+        title: "Report",
+        uri: ".chrona/reports/report.md",
+        contentKind: "markdown",
+        contentPreview: "# Report",
+        contentBytes: 8,
+        contentTruncated: false,
+      },
     });
   });
 });

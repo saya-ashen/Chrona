@@ -176,7 +176,7 @@ function primaryActionId(action: CommandCenterPrimaryAction) {
   return action.kind ?? action.label;
 }
 
-function buildPrimaryActionSpec(primaryAction: CommandCenterPrimaryAction | null | undefined, copy: WorkspaceCopy): UiDocument | null {
+function buildPrimaryActionSpec(primaryAction: CommandCenterPrimaryAction | null | undefined): UiDocument | null {
   if (!primaryAction?.onClick) return null;
   return {
     root: "root",
@@ -185,7 +185,7 @@ function buildPrimaryActionSpec(primaryAction: CommandCenterPrimaryAction | null
       action: {
         type: "Button",
         props: {
-          label: primaryAction.isLoading ? (copy.generating ?? "Generating...") : primaryAction.label,
+          label: primaryAction.label,
           variant: primaryAction.tone === "critical" ? "danger" : "primary",
           ...((primaryAction.disabled || primaryAction.isLoading) && { disabled: true }),
         },
@@ -294,7 +294,7 @@ export function buildCommandCenterNowSpec(input: {
   }
 
   appendDocument(elements, rootChildren, "primary-action", input.primaryAction?.actionSpec);
-  appendDocument(elements, rootChildren, "primary-button", buildPrimaryActionSpec(input.primaryAction, input.copy));
+  appendDocument(elements, rootChildren, "primary-button", buildPrimaryActionSpec(input.primaryAction));
 
   const spec: UiDocument = { root: "root", elements };
   mergeDocumentState(spec, input.primaryAction?.actionSpec);

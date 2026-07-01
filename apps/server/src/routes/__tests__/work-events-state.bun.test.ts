@@ -29,12 +29,10 @@ const state = {
 
 function makeFakeEngine(): ChronaEngine {
   return {
-    pages: {
-      getWork: async () => ({
-        taskShell: { workspaceId: "ws-1" },
-      }),
-    },
     tasks: {
+      getBootstrap: async () => ({
+        task: { workspaceId: "ws-1" },
+      }),
       plan: {
         generate: (_input: unknown) => {
           const queue: GeneratePlanSSEEvent[] = [];
@@ -503,6 +501,11 @@ describe("POST /work/:taskId/commands plan.generate — state.update alongside p
       });
       expect(phases).toContain("requesting_provider");
 
+      const runningUpdate = stateUpdates.find((updates) => updates["/plan/status"] === "generating");
+      expect(runningUpdate).toBeDefined();
+      expect(runningUpdate!["/plan/generation/status"]).toBe("running");
+
+
       // Result event must carry both saved-plan fields and header action
       // visibility. Without the /execution flags, the client receives the
       // generated plan but keeps rendering Generate Plan until refresh.
@@ -512,6 +515,7 @@ describe("POST /work/:taskId/commands plan.generate — state.update alongside p
       expect(resultUpdate).toBeDefined();
       expect(resultUpdate!["/plan/saved/id"]).toBe("plan-test");
       expect(resultUpdate!["/plan/generation/status"]).toBe("completed");
+      expect(resultUpdate!["/plan/status"]).toBe("waiting_acceptance");
       expect(resultUpdate!["/execution/show-accept-plan"]).toBe(true);
       expect(resultUpdate!["/execution/show-generate-plan"]).toBe(false);
       expect(resultUpdate!["/execution/can-start"]).toBe(false);
@@ -648,6 +652,7 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
       const errorUpdate = stateUpdates.find((updates) => updates["/plan/generation/error/code"] === "PROVIDER_ERROR");
       expect(errorUpdate).toBeDefined();
       expect(errorUpdate!["/plan/generation/error/message"]).toBe("chrona_plan_generate failed: provider returned 502");
+      expect(errorUpdate!["/plan/status"]).toBe("idle");
       expect(errorUpdate!["/plan/generation/error/buttonRetry"]).toBe(true);
       expect(errorUpdate!["/plan/generation/error/buttonEditInstruction"]).toBe(true);
       expect(errorUpdate!["/plan/generation/error/buttonCancel"]).toBe(false);

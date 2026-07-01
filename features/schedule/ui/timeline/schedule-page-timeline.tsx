@@ -46,7 +46,7 @@ import {
   getTodayKey,
   snapMinuteToGrid,
 } from "../schedule-page-utils";
-import { type TaskConfigExecutionRuntime } from "../forms/task-config-form";
+import { type TaskConfigAiClient, type TaskConfigExecutionRuntime } from "../forms/task-config-form";
 import { CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
@@ -110,12 +110,14 @@ function buildDragItem(item: ScheduledItem, startAt: Date, endAt: Date): Timelin
 function TimelineComposer({
   draft,
   defaultExecutionRuntime,
+  availableAiClients,
   isPending,
   onClose,
   onCreate,
 }: {
   draft: TimelinePlacementPreview;
   defaultExecutionRuntime: string;
+  availableAiClients?: TaskConfigAiClient[];
   isPending: boolean;
   onClose: () => void;
   onCreate: (input: TimelineCreateInput) => Promise<void>;
@@ -126,6 +128,7 @@ function TimelineComposer({
       initialStartAt={draft.startAt}
       initialEndAt={draft.endAt}
       isPending={isPending}
+      availableAiClients={availableAiClients}
       onClose={onClose}
       onSubmit={async (input) => {
         await onCreate({
@@ -144,6 +147,7 @@ function TimelineComposer({
           recurrenceRule: input.recurrenceRule,
           recurrenceAnchorStartAt: input.recurrenceAnchorStartAt,
           recurrenceAnchorEndAt: input.recurrenceAnchorEndAt,
+          aiClientId: input.aiClientId,
         });
       }}
     />
@@ -161,6 +165,7 @@ export function DayTimeline({
   externalEvents = [],
   executionRuntimes: _executionRuntimes,
   defaultExecutionRuntime,
+  availableAiClients,
   isPending,
   onScheduleDrop,
   onCreateTaskBlock,
@@ -178,6 +183,7 @@ export function DayTimeline({
   externalEvents?: PlanningBusyBlock[];
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
+  availableAiClients?: TaskConfigAiClient[];
   isPending: boolean;
   onScheduleDrop: (
     item: TimelineDragItem,
@@ -808,6 +814,7 @@ export function DayTimeline({
           <TimelineComposer
             draft={composerDraft}
             defaultExecutionRuntime={defaultExecutionRuntime}
+            availableAiClients={availableAiClients}
             isPending={isPending}
             onClose={closeComposer}
             onCreate={async (input) => {

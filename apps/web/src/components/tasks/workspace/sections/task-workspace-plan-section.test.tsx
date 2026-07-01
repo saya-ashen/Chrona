@@ -317,6 +317,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(commandCenter).queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
     expect(onGeneratePlan).not.toHaveBeenCalled();
   });
+
   it("shows a retry action when the task is blocked by a failed run even if graph nodes are stale", () => {
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Retry queued" });
     const acceptedPlan = {
@@ -660,7 +661,7 @@ describe("TaskWorkspacePlanSection", () => {
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
     // A completed plan reports full progress and exposes no pending action input.
-    expect(within(commandCenter).getByText("1/1")).toBeInTheDocument();
+    expect(within(commandCenter).getByText((_content, element) => element?.textContent === "1/1 steps")).toBeInTheDocument();
     expect(within(commandCenter).queryByText("Ready to run")).not.toBeInTheDocument();
     expect(within(commandCenter).queryByRole("button", { name: "Send input" })).not.toBeInTheDocument();
     expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();

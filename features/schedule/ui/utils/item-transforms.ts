@@ -190,6 +190,7 @@ export function applyTaskConfigToItem<
     scheduledEndAt: input.scheduledEndAt,
     executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
+    aiClientId: input.aiClientId,
     autoPlanGeneration: input.autoPlanGeneration,
     autoExecute: input.autoExecute,
     isRunnable: runnability.isRunnable,
@@ -211,6 +212,7 @@ export function toTaskConfigInitialValues(item: {
   priority: string;
   executionRuntime?: string | null;
   executionConfig?: unknown;
+  aiClientId?: string | null;
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
@@ -225,6 +227,7 @@ export function toTaskConfigInitialValues(item: {
     scheduledEndAt: item.scheduledEndAt ?? null,
     executionRuntime: item.executionRuntime ?? null,
     executionConfig: item.executionConfig,
+    aiClientId: item.aiClientId ?? null,
     dueAt: item.dueAt ?? null,
     autoPlanGeneration: item.autoPlanGeneration ?? false,
     autoExecute: item.autoExecute ?? false,

@@ -8,6 +8,12 @@ export interface CommandCenterArtifactInput {
   type: string;
   uri?: string;
   sourceNodeId?: string;
+  displayPath?: string;
+  contentKind?: "markdown" | "json" | "text" | "csv";
+  contentPreview?: string;
+  contentTruncated?: boolean;
+  contentBytes?: number;
+  previewError?: "unsafe_path" | "not_found" | "unsupported_type" | "read_failed";
 }
 
 export interface CommandCenterCopyInput {
@@ -225,6 +231,12 @@ export function buildCommandCenterArtifactsSpec(input: {
         title: artifact.title,
         type: artifact.type,
         uri: artifact.uri,
+        displayPath: artifact.displayPath,
+        contentKind: artifact.contentKind,
+        contentPreview: artifact.contentPreview,
+        contentTruncated: artifact.contentTruncated,
+        contentBytes: artifact.contentBytes,
+        previewError: artifact.previewError,
         locateLabel: input.copy?.locateSourceNode ?? "Locate source node",
       },
       ...(artifact.sourceNodeId

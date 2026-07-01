@@ -128,7 +128,7 @@ Request fields:
 
 ### POST /api/tasks/:taskId/plan
 
-Applies plan patch operations. The route accepts the plan patch schema used by the task workspace and Work page. Common operations include adding, deleting, updating, and reordering nodes or edges.
+Applies plan patch operations. The route accepts the plan patch schema used by the task workspace. Common operations include adding, deleting, updating, and reordering nodes or edges.
 
 ## Task execution
 
@@ -211,17 +211,18 @@ Inbox projection: pending approvals, schedule proposals, waiting inputs, failed/
 
 Memory console projection.
 
-### GET /api/work/:taskId
-
-Work page projection for a task: task shell, latest result, plan graph, execution records, metadata, and conversation context.
-
 ### POST /api/work/:taskId/commands
 
-Submits a Work page command asynchronously. Command types include plan generation, plan acceptance, execution actions, and checkpoint actions. Returns `202` with a `commandId`; subscribe to Work events for updates.
+Submits a task workspace command asynchronously. Command types include plan generation, plan acceptance, execution actions, and checkpoint actions. Returns `202` with a `commandId`; subscribe to task workspace events for updates.
 
 ### GET /api/work/:taskId/events
 
-Subscribes to Work page projection events over SSE.
+Subscribes to task workspace projection events over SSE.
+
+### GET /api/dashboard?workspaceId=...
+
+Dashboard projection for workspace-level overview data.
+
 
 ### GET /api/dashboard?workspaceId=...
 

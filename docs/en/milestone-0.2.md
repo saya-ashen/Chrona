@@ -78,7 +78,7 @@ AND   Chrona auto-starts execution when the block becomes due and eligible
 AND   if a node blocks / needs approval, an Inbox item explains WHY and offers
       the recovery action
 AND   when I resolve the Inbox item, execution resumes to completion
-AND   the final result is persisted and inspectable from the Work page
+AND   the final result is persisted and inspectable from the task workspace
 AND   at no point did I need to read a log file to understand current state
 ```
 

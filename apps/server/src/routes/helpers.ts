@@ -1,16 +1,11 @@
 import { createLogger } from "@chrona/logging";
 import { ENGINE_ERROR_CODES } from "@chrona/engine";
 import { getApiMessages, type Locale } from "@chrona/i18n";
+import { AI_FEATURES } from "@chrona/contracts";
 
 import { HttpError } from "../lib/http";
 
-export const VALID_AI_FEATURES = [
-  "suggest",
-  "generate_plan",
-  "conflicts",
-  "timeslots",
-  "chat",
-] as const;
+export const VALID_AI_FEATURES = AI_FEATURES;
 export const logger = createLogger("apps.server.api");
 
 export function toDateOrNull(value: unknown) {

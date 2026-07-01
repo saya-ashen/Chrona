@@ -1,5 +1,6 @@
 import type { ScheduleRecord } from "../../schedule-page-types";
 import type {
+  TaskConfigAiClient,
   TaskConfigExecutionRuntime,
   TaskConfigFormInput,
 } from "../../forms/task-config-form";
@@ -9,6 +10,7 @@ export interface SelectedBlockSheetProps {
   selectedDay: string;
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
+  availableAiClients?: TaskConfigAiClient[];
   isPending: boolean;
   onClose: () => void;
   onSaveTaskConfigAction: (

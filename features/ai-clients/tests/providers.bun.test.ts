@@ -40,7 +40,6 @@ describe("AI provider availability — claude_code wireup (T10)", () => {
         config: {
           mcpBaseUrl: "http://localhost:3000",
           model: "claude-sonnet-4-6",
-          binaryPath: "/usr/local/bin/claude",
           timeoutSeconds: 60,
         },
       });
@@ -92,7 +91,6 @@ describe("AI provider availability — claude_code wireup (T10)", () => {
         config: {
           mcpBaseUrl: "http://localhost:3000",
           model: "claude-sonnet-4-6",
-          binaryPath: "/usr/local/bin/claude",
           timeoutSeconds: 60,
         },
       });

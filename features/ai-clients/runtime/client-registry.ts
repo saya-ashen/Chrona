@@ -13,6 +13,7 @@ import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type {
   AgentProviderClientConfig,
   AiClientRecord,
+  AiFeature,
   AiClientType,
   ClaudeCodeClientConfig,
   HermesClientConfig,
@@ -66,6 +67,7 @@ export type EngineClaudeCodeClient = EngineAiClient & {
 };
 
 const clients = new Map<string, EngineAiClient>();
+const featureClientIds = new Map<AiFeature, string>();
 let defaultClientId: string | null = null;
 let loaded = false;
 
@@ -158,6 +160,7 @@ async function refreshAiClientRegistry() {
 
   clients.clear();
   defaultClientId = null;
+  featureClientIds.clear();
 
   for (const client of records) {
     const record = toAiClientRecord(client);
@@ -168,6 +171,15 @@ async function refreshAiClientRegistry() {
     if (record.isDefault && !defaultClientId) {
       defaultClientId = record.id;
     }
+  }
+
+  const bindings = await db.aiFeatureBinding.findMany({
+    where: { clientId: { in: [...clients.keys()] } },
+    orderBy: { createdAt: "asc" },
+  });
+
+  for (const binding of bindings) {
+    featureClientIds.set(binding.feature as AiFeature, binding.clientId);
   }
 
   loaded = true;
@@ -189,6 +201,12 @@ async function getAiClient(
   }
 
   return defaultClientId ? (clients.get(defaultClientId) ?? null) : null;
+}
+
+async function getAiClientForFeature(feature: AiFeature): Promise<EngineAiClient | null> {
+  await ensureAiClientRegistryLoaded();
+  const clientId = featureClientIds.get(feature);
+  return clientId ? (clients.get(clientId) ?? getAiClient()) : getAiClient();
 }
 
 function requireProviderClient(client: EngineAiClient): EngineProviderClient {
@@ -227,6 +245,10 @@ export class AiClientRegistry {
 
   get(clientId?: string | null) {
     return getAiClient(clientId);
+  }
+
+  getForFeature(feature: AiFeature) {
+    return getAiClientForFeature(feature);
   }
 
   requireProviderClient(client: EngineAiClient) {

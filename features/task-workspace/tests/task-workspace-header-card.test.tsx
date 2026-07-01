@@ -178,4 +178,26 @@ describe("TaskWorkspaceHeaderCard", () => {
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });
+
+  it("announces sent action without adding visible header height", async () => {
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    renderHeader(createHeaderSpecFixture({
+      title: task.title,
+      status: "waiting",
+      priority: "Medium",
+      progressLabel: "1 steps · 0 accepted · 0%",
+      actions: [{ id: "start", label: "Start" }],
+    }), {
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/can-start": true,
+      "/execution/start-disabled": false,
+    }, onAction);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    const status = await screen.findByRole("status");
+    await waitFor(() => expect(status).toHaveTextContent("Start request sent."));
+    expect(status).toHaveClass("sr-only");
+  });
 });

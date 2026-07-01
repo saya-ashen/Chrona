@@ -205,6 +205,7 @@ export async function updateTask(
     input.executionConfig !== undefined ? "executionConfig" : null,
     input.sessionStrategy !== undefined ? "executionConfig" : null,
     input.recurrenceRule !== undefined ? "recurrenceRule" : null,
+    input.aiClientId !== undefined ? "aiClientId" : null,
   ].filter((field): field is string => field !== null);
 
   const task = await db.task.update({
@@ -241,6 +242,7 @@ export async function updateTask(
           ? null
           : undefined,
       seriesExternalUid: input.recurrenceRule !== undefined ? null : undefined,
+      aiClientId: input.aiClientId !== undefined ? input.aiClientId : undefined,
     },
   });
 

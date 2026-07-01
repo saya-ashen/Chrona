@@ -49,26 +49,18 @@ function collectPlanGenerationGroup(items: WorkspaceActivityItem[], startIndex: 
 }
 
 function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
-  const sameTool = left.tool?.name === right.tool?.name || !left.tool?.name;
-  return Boolean(left.tool && right.tool)
-    && sameTool
+  const sameName = left.tool?.name === right.tool?.name || !left.tool?.name;
+  return left.sourceNodeId === right.sourceNodeId
     && left.runId === right.runId
-    && left.sourceNodeId === right.sourceNodeId;
+    && left.nativeRunId === right.nativeRunId
+    && sameName;
 }
 
 function getToolPair(items: WorkspaceActivityItem[], item: WorkspaceActivityItem, index: number) {
   if (item.kind !== "tool_started") return undefined;
   const next = items.at(index + 1);
   if (next?.kind === "tool_completed" && isSameToolActivity(item, next)) return next;
-  return undefined;
-}
-
-function hasCompletedToolActivity(item: WorkspaceActivityItem, entries: RenderEntry[]) {
-  return entries.some((entry) => {
-    if (entry.type === "tool_pair" && entry.completed) return isSameToolActivity(item, entry.completed);
-    if (entry.type === "single" && entry.item.kind === "tool_completed") return isSameToolActivity(item, entry.item);
-    return false;
-  });
+  return items.find((candidate) => candidate.kind === "tool_completed" && isSameToolActivity(item, candidate));
 }
 
 /**
@@ -552,10 +544,10 @@ function railDotClass(tone: Tone) {
   if (tone === "info") return "border-primary bg-primary shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_18%,transparent)]";
   return "border-muted-foreground/50 bg-muted-foreground/70";
 }
-function isConcreteRunningEntry(entry: RenderEntry, entries: RenderEntry[]) {
+function isConcreteRunningEntry(entry: RenderEntry) {
   if (entry.type === "tool_pair") return !entry.completed;
   if (entry.type === "plan_phase") return summarizePlanPhase(entry.items) === "running";
-  if (entry.type === "single" && entry.item.tool?.state === "started") return !hasCompletedToolActivity(entry.item, entries);
+  if (entry.type === "single") return entry.item.tool?.state === "started";
   return false;
 }
 
@@ -564,7 +556,7 @@ function isProviderRunFallback(entry: RenderEntry) {
 }
 
 function activeRailEntryIndex(entries: RenderEntry[]) {
-  const concreteIndex = entries.findIndex((entry) => isConcreteRunningEntry(entry, entries));
+  const concreteIndex = entries.findIndex(isConcreteRunningEntry);
   return concreteIndex >= 0 ? concreteIndex : entries.findIndex(isProviderRunFallback);
 }
 
