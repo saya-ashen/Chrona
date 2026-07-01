@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chronaCatalog, validateChronaSpec, type ValidateResult } from "../index";
+import { chronaCatalog, chronaPlanOutputCatalogPrompt, validateChronaSpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
@@ -52,6 +52,14 @@ describe("validateChronaSpec", () => {
     expect(prompt).toContain("threshold MUST be a JSON number such as 800");
   });
 
+  test("plan-output prompt discourages raw JsonView reports", () => {
+    const prompt = chronaPlanOutputCatalogPrompt();
+
+    expect(prompt).toContain("Card containers");
+    expect(prompt).toContain("Use JsonView sparingly");
+    expect(prompt).toContain("remove elements no longer reachable from root");
+    expect(prompt).toContain(".chrona/outputs/<node-ref>/");
+  });
 
   test("allows omitting optional/nullable props", () => {
     const spec: UiDocument = {

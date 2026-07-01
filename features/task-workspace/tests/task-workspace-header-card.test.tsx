@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStateStore } from "@json-render/core";
@@ -47,13 +47,18 @@ const task = {
   blockReason: null,
   dependencies: [],
 } satisfies TaskData;
-function renderHeader(spec = createHeaderSpecFixture({
-  title: task.title,
-  priority: "Medium",
-  progressLabel: "1 steps · 0 accepted · 0%",
-  occurrenceLabel: "Occurrence · Wed, May 27 04:30 AM-05:30 AM",
-  actions: [{ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
-}), state: Record<string, unknown> = {}) {
+function renderHeader(
+  spec = createHeaderSpecFixture({
+    title: task.title,
+    priority: "Medium",
+    progressLabel: "1 steps · 0 accepted · 0%",
+    occurrenceLabel: "Occurrence · Wed, May 27 04:30 AM-05:30 AM",
+    actions: [{ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }],
+  }),
+  state: Record<string, unknown> = {},
+  onAction = vi.fn(),
+  onStopPlanGeneration = vi.fn(),
+) {
   const store = createStateStore(spec.state ?? {});
   store.update(state);
   return render(
@@ -61,9 +66,10 @@ function renderHeader(spec = createHeaderSpecFixture({
       task={task}
       spec={spec}
       store={store}
-      onAction={vi.fn()}
+      onAction={onAction}
       onAcceptPlan={vi.fn()}
       onGeneratePlan={vi.fn()}
+      onStopPlanGeneration={onStopPlanGeneration}
       onEdit={vi.fn()}
       showDeleteConfirm={false}
       isDeleting={false}
@@ -117,6 +123,27 @@ describe("TaskWorkspaceHeaderCard", () => {
 
     expect(screen.getByRole("button", { name: "Accept plan" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("shows Stop generation in header actions while plan generation runs", async () => {
+    const onStopPlanGeneration = vi.fn().mockResolvedValue(undefined);
+    renderHeader(undefined, {
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": true,
+      "/execution/can-start": false,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/plan/generation/is-running": true,
+      "/plan/generation/header-action-disabled": true,
+      "/plan/generation/stop-disabled": false,
+    }, vi.fn(), onStopPlanGeneration);
+
+    expect(screen.getByRole("button", { name: "Generate plan" })).toBeDisabled();
+    const stop = screen.getByRole("button", { name: "Stop generation" });
+    expect(stop).toBeEnabled();
+    fireEvent.click(stop);
+
+    await waitFor(() => expect(onStopPlanGeneration).toHaveBeenCalledTimes(1));
   });
 
   it("switches from Accept plan to enabled Start after accepted-plan state", () => {

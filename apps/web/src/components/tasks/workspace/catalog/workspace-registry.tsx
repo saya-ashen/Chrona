@@ -204,6 +204,40 @@ function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?:
   );
 }
 
+function WorkspaceTable({ props }: { props: { columns?: string[] | null; rows?: string[][] | null; caption?: string | null } }) {
+  const columns = props.columns ?? [];
+  const rows = (props.rows ?? []).map((row) => row.map(String));
+
+  return (
+    <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border">
+      <table className="w-full table-fixed caption-bottom text-sm">
+        {props.caption ? <caption className="mt-4 text-sm text-muted-foreground">{props.caption}</caption> : null}
+        <thead className="[&_tr]:border-b">
+          <tr className="border-b transition-colors hover:bg-muted/50">
+            {columns.map((column) => (
+              <th key={column} className="h-10 min-w-0 px-2 text-left align-middle font-medium text-foreground">
+                <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-snug">{column}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="[&_tr:last-child]:border-0">
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-b transition-colors hover:bg-muted/50">
+              {row.map((cell, cellIndex) => (
+                <td key={cellIndex} className="min-w-0 p-2 align-top text-foreground/80">
+                  <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-5">{cell}</span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
 
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt
@@ -219,7 +253,7 @@ function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?:
 export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
     // standard primitives (shadcn)
-    Card: shadcnComponents.Card,
+    Card: (input) => shadcnComponents.Card({ ...input, props: { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-none") } }),
     Stack: shadcnComponents.Stack,
     Separator: shadcnComponents.Separator,
     Text: shadcnComponents.Text,
@@ -232,11 +266,11 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Textarea: shadcnComponents.Textarea,
     Select: shadcnComponents.Select,
     Tabs: shadcnComponents.Tabs,
-    Table: shadcnComponents.Table,
+    Table: WorkspaceTable,
     heading: shadcnComponents.Heading,
     DropdownMenu: shadcnComponents.DropdownMenu,
     paragraph: ({ props }) => <p className="text-sm leading-6 text-foreground/85">{props.text ?? props.content}</p>,
-    table: shadcnComponents.Table,
+    table: WorkspaceTable,
     section: ({ props, children }) => (
       <section className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3">
         {props.title ? <h3 className="font-heading text-sm font-semibold text-foreground">{props.title}</h3> : null}
@@ -262,9 +296,12 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       </article>
     ),
     JsonView: ({ props }) => (
-      <pre className="overflow-x-auto rounded-lg bg-muted/50 p-2 text-xs leading-5 text-foreground/80">
-        {typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2)}
-      </pre>
+      <section className="min-w-0 rounded-xl border border-border/70 bg-background/95 p-3 shadow-sm">
+        {props.title ? <p className="mb-2 text-sm font-semibold text-foreground">{props.title}</p> : null}
+        <pre className="min-w-0 overflow-x-auto rounded-lg bg-muted/50 p-2 text-xs leading-5 text-foreground/80">
+          {typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2)}
+        </pre>
+      </section>
     ),
     FileRef: ({ props }) => (
       <div className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm">
@@ -273,8 +310,11 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         {props.description ? <p className="mt-0.5 text-xs text-muted-foreground">{props.description}</p> : null}
       </div>
     ),
-    ResultSummary: ({ props }) =>
-      props.text ? <p className="text-sm leading-5 text-foreground/80">{props.text}</p> : null,
+    ResultSummary: ({ props }) => props.text ? (
+      <section className="rounded-xl border border-primary/20 bg-primary-soft/45 px-3 py-2 text-sm leading-5 text-foreground/80">
+        {props.text}
+      </section>
+    ) : null,
     ActivityRow: ({ props, children }) => {
       const tone = props.tone as Tone;
       const Icon = activityIcon(props.kind, tone);

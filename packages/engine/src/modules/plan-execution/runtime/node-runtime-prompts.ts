@@ -32,6 +32,11 @@ After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chron
 
 const PLAN_OUTPUT_CATALOG_PROMPT = chronaPlanOutputCatalogPrompt();
 
+function resultArtifactGuidance(runtimeInput: NodeRuntimeInput): string {
+  const outputDir = `.chrona/outputs/${runtimeInput.node.ref}/`;
+  return `For generated result artifacts not explicitly requested as repo/code changes, treat the current working directory as the workspace root and write only under ${outputDir}. For long Markdown reports or large evidence, prefer writing a .md/.txt/.json/.csv file there, then reference it from plan output with FileView or FileRef using the same repo-relative path. Keep ResultSummary/Card/Markdown/Table as the readable summary; do not dump long report bodies directly into chrona_plan_output patches. Do not use absolute paths, .. segments, secrets/tokens/credentials/key paths, or backend IDs in file paths.`;
+}
+
 
 function nodeTypeInstructions(node: EffectivePlanNode): string {
   switch (node.type) {
@@ -69,7 +74,7 @@ export function buildNodeRuntimePrompt(input: {
   });
 
   const catalogSection = input.node.type === "task"
-    ? [PLAN_OUTPUT_CATALOG_PROMPT]
+    ? [resultArtifactGuidance(runtimeInput), PLAN_OUTPUT_CATALOG_PROMPT]
     : [];
 
   const instructions = [

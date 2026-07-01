@@ -273,17 +273,36 @@ async function* agentProviderStream(
         stream: true,
         signal: input.signal,
       });
+      let cancelled = false;
+      const cancelProviderRun = async () => {
+        if (cancelled) return;
+        cancelled = true;
+        await agentClient.providerClient.cancelRun?.({
+          runId: run.runId,
+          sessionId: run.sessionId,
+          reason: "Provider stream aborted",
+        }).catch(() => undefined);
+      };
 
       for await (const event of agentClient.providerClient.streamRun({
         runId: run.runId,
+        sessionId: run.sessionId,
         signal: input.signal,
       })) {
+        if (input.signal?.aborted) {
+          await cancelProviderRun();
+          return;
+        }
         const parsed = convertProviderEvent(event);
         if (!parsed) continue;
         if (parsed.type === "partial") {
           fullText += parsed.text;
         }
         yield parsed;
+        if (input.signal?.aborted) {
+          await cancelProviderRun();
+          return;
+        }
         if (parsed.type === "error" || parsed.type === "done") {
           return;
         }

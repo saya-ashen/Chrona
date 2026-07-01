@@ -373,7 +373,7 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
         description: z.string().optional(),
       }),
       description:
-        "Reference to a produced or changed file artifact. path must be a repo-relative path when possible.",
+        "Reference to a produced or changed file artifact. path must be repo-relative; generated result artifacts should use .chrona/outputs/<node-ref>/ when not explicit repo/code changes.",
       example: {
         path: "packages/ui-protocol/src/catalog/components.ts",
         title: "Updated catalog",
@@ -452,6 +452,9 @@ export function chronaPlanOutputCatalogPrompt() {
   return chronaPlanOutputCatalog.prompt({
     editModes: ["patch"],
     customRules: [
+      "Prefer Card containers around generated sections so results adapt to panel width.",
+      "Use JsonView sparingly; prefer Markdown, Table, ResultSummary, FileRef, and FileView for user-facing reports.",
+      "remove elements no longer reachable from root when replacing result structure.",
       "Each patch is a JSON Patch operation over Current Node Context JSON.context.planOutput.spec.",
       "Chrona does not accept raw JSONL text. Put the generated RFC 6902 patch objects in chrona_plan_output.patches.",
       "Use chrona_plan_output for shared plan-level user-visible output only.",

@@ -293,6 +293,30 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps stop generation out of the command center while plan generation is running", () => {
+    const onGeneratePlan = vi.fn();
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([])}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { aiPlanGenerationStatus: "generating" } })}
+        plan={null}
+        planGenerationStatus="generating"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    expect(within(commandCenter).queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
+    expect(within(commandCenter).queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
+    expect(onGeneratePlan).not.toHaveBeenCalled();
+  });
   it("shows a retry action when the task is blocked by a failed run even if graph nodes are stale", () => {
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Retry queued" });
     const acceptedPlan = {

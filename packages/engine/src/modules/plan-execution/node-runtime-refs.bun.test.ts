@@ -249,6 +249,10 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).not.toContain("SCHEMA LAB OVERRIDE:");
     expect(runtime.instructions).not.toContain("Submit the complete Spec as the chrona_plan_output tool argument");
     expect(runtime.runtimeInput.context.planOutput).toEqual({ revision: 0, spec: null, updatedAt: null });
+    expect(runtime.instructions).toContain("current working directory as the workspace root");
+    expect(runtime.instructions).toContain(".chrona/outputs/N20260516-01/");
+    expect(runtime.instructions).toContain("FileView or FileRef");
+    expect(runtime.instructions).toContain("Do not use absolute paths, .. segments");
   });
   it("spells out literal array and number props for json-render outputs", () => {
     const current = node({

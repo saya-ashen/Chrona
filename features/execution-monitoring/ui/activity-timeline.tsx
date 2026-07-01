@@ -48,12 +48,27 @@ function collectPlanGenerationGroup(items: WorkspaceActivityItem[], startIndex: 
   return group;
 }
 
+function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
+  const sameTool = left.tool?.name === right.tool?.name || !left.tool?.name;
+  return Boolean(left.tool && right.tool)
+    && sameTool
+    && left.runId === right.runId
+    && left.sourceNodeId === right.sourceNodeId;
+}
+
 function getToolPair(items: WorkspaceActivityItem[], item: WorkspaceActivityItem, index: number) {
   if (item.kind !== "tool_started") return undefined;
   const next = items.at(index + 1);
-  const sameTool = next?.tool?.name === item.tool?.name || !item.tool?.name;
-  if (next?.kind === "tool_completed" && next.sourceNodeId === item.sourceNodeId && sameTool) return next;
+  if (next?.kind === "tool_completed" && isSameToolActivity(item, next)) return next;
   return undefined;
+}
+
+function hasCompletedToolActivity(item: WorkspaceActivityItem, entries: RenderEntry[]) {
+  return entries.some((entry) => {
+    if (entry.type === "tool_pair" && entry.completed) return isSameToolActivity(item, entry.completed);
+    if (entry.type === "single" && entry.item.kind === "tool_completed") return isSameToolActivity(item, entry.item);
+    return false;
+  });
 }
 
 /**
@@ -537,11 +552,20 @@ function railDotClass(tone: Tone) {
   if (tone === "info") return "border-primary bg-primary shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_18%,transparent)]";
   return "border-muted-foreground/50 bg-muted-foreground/70";
 }
-function isRailEntryActive(entry: RenderEntry) {
+function isConcreteRunningEntry(entry: RenderEntry, entries: RenderEntry[]) {
   if (entry.type === "tool_pair") return !entry.completed;
   if (entry.type === "plan_phase") return summarizePlanPhase(entry.items) === "running";
-  if (entry.type === "single") return entry.item.tool?.state === "started" || entry.item.tone === "info" || entry.item.kind === "provider_run";
+  if (entry.type === "single" && entry.item.tool?.state === "started") return !hasCompletedToolActivity(entry.item, entries);
   return false;
+}
+
+function isProviderRunFallback(entry: RenderEntry) {
+  return entry.type === "single" && entry.item.kind === "provider_run" && entry.item.tone === "info";
+}
+
+function activeRailEntryIndex(entries: RenderEntry[]) {
+  const concreteIndex = entries.findIndex((entry) => isConcreteRunningEntry(entry, entries));
+  return concreteIndex >= 0 ? concreteIndex : entries.findIndex(isProviderRunFallback);
 }
 
 
@@ -554,15 +578,16 @@ function railLineClass(tone: Tone) {
 }
 
 
-function ActivityRailTimeline({ entries }: { entries: RenderEntry[] }) {
+function ActivityRailTimeline({ entries, active }: { entries: RenderEntry[]; active: boolean }) {
   const lastIdx = entries.length - 1;
+  const activeIdx = active ? activeRailEntryIndex(entries) : -1;
   return (
     <div className="space-y-0.5">
       {entries.map((entry, index) => {
         const tone = railTone(entry);
         const detail = railDetail(entry);
         const isLast = index === lastIdx;
-        const isActiveLatest = isLast && isRailEntryActive(entry);
+        const isActiveLatest = index === activeIdx;
         return (
           <article key={entry.key} className="relative grid grid-cols-[1rem_minmax(0,1fr)] gap-x-2 py-1.5">
             <div className="relative flex justify-center">
@@ -587,14 +612,16 @@ function ActivityRailTimeline({ entries }: { entries: RenderEntry[] }) {
 export function ActivityTimeline({
   items,
   density = "detailed",
+  active = false,
 }: {
   items: WorkspaceActivityItem[];
   density?: "compact" | "detailed" | "rail";
+  active?: boolean;
 }) {
   const renderList = buildRenderList(items);
   const rail = density === "rail";
   const compact = density === "compact";
-  if (rail) return <ActivityRailTimeline entries={renderList} />;
+  if (rail) return <ActivityRailTimeline entries={renderList} active={active} />;
   const lastIdx = renderList.length - 1;
 
   return (

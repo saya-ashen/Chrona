@@ -68,7 +68,7 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
       };
     });
 
-  const focusIds = [...plan.analytics.activeNodeIds, ...plan.analytics.blockedNodeIds, ...plan.analytics.criticalPathNodeIds].filter((id, index, source) => source.indexOf(id) === index);
+  const focusIds = [...plan.analytics.criticalPathNodeIds, ...plan.analytics.blockedNodeIds, ...plan.analytics.activeNodeIds].filter((id, index, source) => source.indexOf(id) === index);
   const focusItems = focusIds.slice(0, 7).map((id) => {
     const node = nodesById.get(id);
     const upstreamCount = new Set(upstreamByNodeId[id] ?? []).size;
@@ -86,6 +86,8 @@ export function buildCompactViewModel(plan: TaskPlanGraphPlan, graphCopy: GraphC
       phase: node?.phase ?? null,
       nextAction: node?.nextAction ?? null,
       estimatedMinutes: node?.estimatedMinutes ?? null,
+      isDone: node?.status === "done" || node?.status === "skipped",
+      isSkipped: node?.status === "skipped",
     };
   });
 
@@ -190,22 +192,22 @@ export function CompactFocusStack({
             data-node-current={item.isCurrent ? "true" : "false"}
             data-node-tone={item.displayTone}
             className={cn(
-              "w-full rounded-[20px] border px-3 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-accent/30",
-              toneStyle.border,
-              toneStyle.bg,
+              "w-full rounded-[20px] border px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-accent/30",
+              item.isDone ? "border-border/70 bg-muted/35 opacity-75 shadow-none" : [toneStyle.border, toneStyle.bg, "shadow-sm"],
+              item.isCurrent && !item.isDone && "border-primary/60 bg-primary-soft/80 shadow-md ring-1 ring-primary/25",
               isSelected && "ring-2 ring-primary/35",
             )}
           >
-            <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-              <span className={cn("size-2 rounded-full", toneStyle.dot)} />
+            <div className={cn("flex flex-wrap items-center gap-2 text-[10px]", item.isDone ? "text-muted-foreground/75" : "text-muted-foreground")}>
+              <span className={cn("size-2 rounded-full", item.isSkipped ? "bg-muted-foreground/45" : item.isDone ? "bg-success" : toneStyle.dot)} />
               <span>{item.statusLabel}</span>
               {item.phase ? <span>{item.phase}</span> : null}
               {item.isCurrent ? <span className="text-primary">{graphCopy.compactCurrentNode}</span> : null}
               {item.displayTone === "waiting" ? <span className="text-primary">{graphCopy.compactNeedsAction}</span> : null}
               {item.hasLinkedTask ? <span className="text-muted-foreground">{graphCopy.compactLinkedTask}</span> : null}
             </div>
-            <p className="mt-1.5 break-words text-sm font-semibold text-foreground">{item.title}</p>
-            <p className="mt-1 break-words text-xs leading-5 text-muted-foreground line-clamp-3">{item.summary}</p>
+            <p className={cn("mt-1.5 break-words text-sm font-semibold", item.isDone ? "text-muted-foreground line-through decoration-muted-foreground/40" : "text-foreground")}>{item.title}</p>
+            <p className={cn("mt-1 break-words text-xs leading-5 line-clamp-3", item.isDone ? "text-muted-foreground/70" : "text-muted-foreground")}>{item.summary}</p>
             <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
               {item.nextAction ? <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1">{item.nextAction}</span> : null}
               {item.estimatedMinutes ? <span className="rounded-full border border-border/70 bg-background/70 px-2 py-1">{item.estimatedMinutes}m</span> : null}

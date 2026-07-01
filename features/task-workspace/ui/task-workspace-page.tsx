@@ -33,6 +33,7 @@ type TaskWorkspaceHeaderEditorProps = {
   onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
   onAcceptPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAcceptPlan"];
   onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
+  onStopPlanGeneration: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onStopPlanGeneration"];
   onRecoveryRetry: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryRetry"];
   onRecoveryEditInstruction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryEditInstruction"];
   onRecoveryCancel: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryCancel"];
@@ -89,6 +90,7 @@ function TaskWorkspaceHeaderEditor({
   onAction,
   onAcceptPlan,
   onGeneratePlan,
+  onStopPlanGeneration,
   onRecoveryRetry,
   onRecoveryEditInstruction,
   onRecoveryCancel,
@@ -110,6 +112,7 @@ function TaskWorkspaceHeaderEditor({
         onAction={onAction}
         onAcceptPlan={onAcceptPlan}
         onGeneratePlan={onGeneratePlan}
+        onStopPlanGeneration={onStopPlanGeneration}
         onEdit={onToggleEditExpanded}
         showDeleteConfirm={showDeleteConfirm}
         isDeleting={isDeleting}
@@ -180,6 +183,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     dispatchExecutionAction,
     submitCheckpointAction,
     handleGeneratePlanFromHeader,
+    handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
   const consoleView = useMemo(
     () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
@@ -244,6 +248,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           store={headerStore}
           onAcceptPlan={() => acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById })}
           onGeneratePlan={handleGeneratePlanFromHeader}
+          onStopPlanGeneration={handleStopPlanGeneration}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });

@@ -18,6 +18,7 @@ type StreamHandle = {
 const state = {
   capturedEvents: [] as TaskProjectionEvent[],
   currentStream: null as StreamHandle | null,
+  stopInputs: [] as Array<{ taskId: string; workBlockId?: string | null }>,
 };
 
 function makeFakeEngine(): ChronaEngine {
@@ -104,7 +105,10 @@ function makeFakeEngine(): ChronaEngine {
         subscribeToGeneration: () => ({
           unsubscribe: () => undefined,
         }),
-        stopGeneration: () => ({ stopped: false }),
+        stopGeneration: (input: { taskId: string; workBlockId?: string | null }) => {
+          state.stopInputs.push(input);
+          return { taskId: input.taskId, stopped: true };
+        },
       },
       execution: {
         dispatch: async () => {
@@ -147,48 +151,40 @@ async function waitForEventMatching(
 beforeEach(() => {
   state.capturedEvents = [];
   state.currentStream = null;
+  state.stopInputs = [];
 });
 
 afterEach(() => {
   state.currentStream = null;
 });
 
-type SpecPatchEvent = TaskProjectionEvent & {
-  document: string;
-  patches: Array<{ op: string; path: string; value?: unknown; from?: string }>;
+type StateUpdateEvent = TaskProjectionEvent & {
+  updates: Record<string, unknown>;
 };
 
-function isSpecPatch(event: TaskProjectionEvent): event is SpecPatchEvent {
-  return (
-    event.type === "spec.patch"
-    && (event as TaskProjectionEvent & { document?: string }).document === "header"
-    && Array.isArray((event as TaskProjectionEvent & { patches?: unknown[] }).patches)
-  );
+function isStateUpdate(event: TaskProjectionEvent): event is StateUpdateEvent {
+  return event.type === "state.update" && typeof (event as { updates?: unknown }).updates === "object";
 }
 
-describe("POST /work/:taskId/commands — plan.generate spec.patch lifecycle", () => {
-  it("emits a reset spec.patch after the plan generation stream finishes successfully", async () => {
+describe("POST /work/:taskId/commands — plan.generate header state lifecycle", () => {
+  it("toggles generation header actions through state updates", async () => {
     const taskId = "task-1";
 
-    const disableReceived = waitForEventMatching(taskId, (event) => {
-      if (!isSpecPatch(event)) return false;
-      return event.patches.some((patch) =>
-        patch.path === "/elements/action:generate-plan/props/disabled" && patch.value === true
-      );
-    });
-    const resetReceived = waitForEventMatching(taskId, (event) => {
-      if (!isSpecPatch(event)) return false;
-      return event.patches.some((patch) =>
-        patch.path === "/elements/action:generate-plan/props/label" && patch.value === "Generate plan"
-      );
-    });
+    const runningReceived = waitForEventMatching(taskId, (event) => (
+      isStateUpdate(event)
+      && event.updates["/plan/generation/is-running"] === true
+      && event.updates["/plan/generation/header-action-disabled"] === true
+    ));
+    const resetReceived = waitForEventMatching(taskId, (event) => (
+      isStateUpdate(event)
+      && event.updates["/plan/generation/is-running"] === false
+      && event.updates["/plan/generation/header-action-disabled"] === false
+    ));
 
     const res = await postCommand(taskId, { type: "plan.generate", forceRefresh: true });
     expect(res.status).toBe(202);
 
-    // Wait until the route's for-await is parked on the fake stream before
-    // driving events into it.
-    await disableReceived;
+    await runningReceived;
 
     const stream = state.currentStream;
     if (!stream) throw new Error("fake plan stream was never registered");
@@ -199,12 +195,26 @@ describe("POST /work/:taskId/commands — plan.generate spec.patch lifecycle", (
 
     const resetEvent = await resetReceived;
     expect(resetEvent).toBeDefined();
-    const patches = (resetEvent as SpecPatchEvent).patches;
-    expect(patches).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generate plan" }),
-        expect.objectContaining({ op: "remove", path: "/elements/action:generate-plan/props/disabled" }),
-      ]),
-    );
+    expect((resetEvent as StateUpdateEvent).updates).toMatchObject({
+      "/plan/generation/is-running": false,
+      "/plan/generation/header-action-disabled": false,
+    });
+  });
+});
+
+describe("POST /work/:taskId/commands — plan.stop_generation", () => {
+  it("stops active plan generation and resets header actions", async () => {
+    const taskId = "task-1";
+    const resetReceived = waitForEventMatching(taskId, (event) => (
+      isStateUpdate(event)
+      && event.updates["/plan/generation/is-running"] === false
+      && event.updates["/plan/generation/header-action-disabled"] === false
+    ));
+
+    const res = await postCommand(taskId, { type: "plan.stop_generation", workBlockId: "block-1" });
+
+    expect(res.status).toBe(202);
+    expect(state.stopInputs).toEqual([{ taskId, workBlockId: "block-1" }]);
+    await resetReceived;
   });
 });

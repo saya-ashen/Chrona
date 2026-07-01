@@ -87,8 +87,8 @@ describe("useTaskWorkspacePageState — spec.patch dispatch (regression for plan
     await waitFor(() => expect(mocks.streamOpened).toBe(true));
     const beforeSpec = result.current.headerSpec;
     expect(
-      (beforeSpec.elements["action:generate-plan"]?.props as { disabled?: boolean } | undefined)?.disabled,
-    ).toBeFalsy();
+      (beforeSpec.elements["action:generate-plan"]?.props as { disabled?: unknown } | undefined)?.disabled,
+    ).toEqual({ $state: "/plan/generation/header-action-disabled" });
 
     const patch: TaskWorkspaceSseEvent = {
       type: "spec.patch",

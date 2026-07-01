@@ -33,7 +33,7 @@ type PlanMetadata = {
   inputFields?: Array<{ key?: string; label?: string; type?: string; required?: boolean; options?: string[] }>;
   condition?: string;
   evaluationBy?: string;
-  branches?: Array<{ label?: string }>;
+  branches?: Array<{ label?: string; nextNodeId?: string }>;
   defaultNextNodeId?: string;
   waitFor?: string;
   timeout?: { minutes?: number };
@@ -744,6 +744,54 @@ function pickCurrentStepId(nodes: PlanNodeDataModel[]) {
     ?? null;
 }
 
+function isConditionBranch(value: unknown): value is { label?: string; nextNodeId?: string } {
+  return typeof value === "object" && value !== null
+    && (!("label" in value) || typeof value.label === "string")
+    && (!("nextNodeId" in value) || typeof value.nextNodeId === "string");
+}
+
+function addConditionBranchEdges(input: {
+  nodes: PlanNodeDataModel[];
+  rawEdges: Array<{ id: string; from: string; to: string; label?: string | null; active?: boolean }>;
+}) {
+  const nodeIds = new Set(input.nodes.map((node) => node.id));
+  const edgeKeys = new Set(input.rawEdges.map((edge) => `${edge.from}\u0000${edge.to}\u0000${edge.label ?? ""}`));
+  const edges = [...input.rawEdges];
+
+  for (const node of input.nodes) {
+    if (node.kind !== "condition") continue;
+    const branches = Array.isArray(node.metadata?.branches) ? node.metadata.branches.filter(isConditionBranch) : [];
+    for (const [index, branch] of branches.entries()) {
+      const target = branch.nextNodeId;
+      if (!target || !nodeIds.has(target)) continue;
+      const label = branch.label ?? null;
+      const key = `${node.id}\u0000${target}\u0000${label ?? ""}`;
+      if (edgeKeys.has(key)) continue;
+      edgeKeys.add(key);
+      edges.push({
+        id: `branch-${node.id}-${target}-${index}`,
+        from: node.id,
+        to: target,
+        label,
+      });
+    }
+
+    const defaultTarget = typeof node.metadata?.defaultNextNodeId === "string" ? node.metadata.defaultNextNodeId : null;
+    if (!defaultTarget || !nodeIds.has(defaultTarget)) continue;
+    const key = `${node.id}\u0000${defaultTarget}\u0000default`;
+    if (edgeKeys.has(key)) continue;
+    edgeKeys.add(key);
+    edges.push({
+      id: `branch-${node.id}-${defaultTarget}-default`,
+      from: node.id,
+      to: defaultTarget,
+      label: "default",
+    });
+  }
+
+  return edges;
+}
+
 function buildGraphPlan(input: {
   title?: string | null;
   summary?: string | null;
@@ -754,7 +802,8 @@ function buildGraphPlan(input: {
   rawEdges: Array<{ id: string; from: string; to: string; label?: string | null; active?: boolean }>;
 }): TaskPlanGraphPlan {
   const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
-  const provisionalEdges = input.rawEdges.map((edge) => {
+  const rawEdges = addConditionBranchEdges(input);
+  const provisionalEdges = rawEdges.map((edge) => {
     const source = nodeById.get(edge.from);
     return {
       id: edge.id,

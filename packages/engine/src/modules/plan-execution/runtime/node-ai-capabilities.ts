@@ -434,6 +434,7 @@ export async function runTaskNodeFeature(
       return failedResult;
     }
 
+    const requiresTerminalAction = invocation.providerName === "claude_code" || (input.controlPlane ?? "mcp") === "skill";
     const terminalNodeResult = invocation.response.status === "completed"
       ? await resolveTerminalNodeResult({
           invocation,
@@ -446,7 +447,7 @@ export async function runTaskNodeFeature(
           nodeAttemptId: input.attempt.id,
         })
       : undefined;
-    const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed"
+    const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed" && requiresTerminalAction
       ? missingTerminalToolResult({
           invocation,
           node: input.node,

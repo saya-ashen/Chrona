@@ -256,6 +256,7 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
     sessionKey: request.sessionKey,
     instructions: request.instructions,
     input: request.input as ProviderRunInput,
+    terminalToolName: request.terminalToolName,
     maxOutputTokens: request.maxOutputTokens,
     ...(request.resumeSessionRef
       ? { resumeSessionRef: request.resumeSessionRef }
@@ -306,8 +307,33 @@ export async function runProviderRequest(
     status: run.status ?? "running",
   });
 
+  const cancelProviderRun = async (): Promise<ProviderRunSnapshot> => {
+    const snapshot = await providerClient.cancelRun?.({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      reason: "Execution stopped",
+    }).catch(() => null);
+    const cancelledSnapshot: ProviderRunSnapshot = snapshot ?? {
+      provider: providerClient.provider,
+      runId: run.runId,
+      nativeRunId: run.nativeRunId,
+      sessionId: run.sessionId,
+      status: "cancelled",
+      error: null,
+    };
+    await updateProviderRunRecord(options.providerRunRecordId, {
+      status: "cancelled",
+      finishedAt: new Date(),
+    });
+    return { ...cancelledSnapshot, status: "cancelled", error: cancelledSnapshot.error ?? null };
+  };
+
+  if (options.signal?.aborted) {
+    return cancelProviderRun();
+  }
+
   try {
-    return await collectProviderRunSnapshot(
+    const snapshot = await collectProviderRunSnapshot(
       providerClient.provider,
       providerClient.streamRun({
         runId: run.runId,
@@ -319,12 +345,13 @@ export async function runProviderRequest(
       run,
       options,
     );
+    return options.signal?.aborted ? cancelProviderRun() : snapshot;
   } catch (error) {
     if (!isTransientProviderError(error)) throw error;
     await delay(PROVIDER_RETRY_BACKOFF_MS);
 
     try {
-      return await collectProviderRunSnapshot(
+      const snapshot = await collectProviderRunSnapshot(
         providerClient.provider,
         providerClient.streamRun({
           runId: run.runId,
@@ -336,6 +363,7 @@ export async function runProviderRequest(
         run,
         options,
       );
+      return options.signal?.aborted ? cancelProviderRun() : snapshot;
     } catch (resumeError) {
       if (!isTransientProviderError(resumeError)) throw resumeError;
     }
@@ -554,7 +582,7 @@ async function collectProviderRunSnapshot(
 ): Promise<ProviderRunSnapshot> {
   let snapshot: ProviderRunSnapshot | null = null;
   let eventIndex = 0;
-  let terminalToolName: string | undefined = options.terminalToolName;
+  let terminalToolName: string | undefined;
   for await (const event of events) {
     eventIndex += 1;
     await options.onRuntimeEvent?.(event);
@@ -573,7 +601,7 @@ async function collectProviderRunSnapshot(
         runId: event.run.runId,
         nativeRunId: event.run.nativeRunId,
         sessionId,
-        status: event.run.status ?? "completed",
+        status: "completed",
         outputText: event.outputText,
         structuredPayload: event.structuredPayload,
         usage: event.usage,
@@ -585,6 +613,9 @@ async function collectProviderRunSnapshot(
     }
     if (event.type === "tool_completed") {
       terminalToolName = event.toolName ?? terminalToolName;
+    }
+    if (event.type === "tool_call" && event.status === "completed") {
+      terminalToolName = event.tool ?? terminalToolName;
     }
     if (event.type === "run_failed") {
       const run = event.run ?? fallbackRun;
@@ -864,10 +895,22 @@ async function updateProviderRunAuditRefs(input: {
       lastRawEventId: input.rawEventId,
       completedByEventId: input.eventType === "run_completed" ? input.eventId : undefined,
       failedByEventId: input.eventType === "run_failed" ? input.eventId : undefined,
-      status: input.eventType === "approval_required" ? "waiting_for_approval" : undefined,
+      status: providerRunStatusForEvent(input.eventType),
+      finishedAt: providerRunFinishedAtForEvent(input.eventType),
       correlationId: input.correlationId,
     },
   });
+}
+
+function providerRunStatusForEvent(eventType: string) {
+  if (eventType === "run_completed") return "completed";
+  if (eventType === "run_failed") return "failed";
+  if (eventType === "approval_required") return "waiting_for_approval";
+  return undefined;
+}
+
+function providerRunFinishedAtForEvent(eventType: string) {
+  return eventType === "run_completed" || eventType === "run_failed" ? new Date() : undefined;
 }
 
 function summaryForProviderEvent(event: ProviderRunEvent) {

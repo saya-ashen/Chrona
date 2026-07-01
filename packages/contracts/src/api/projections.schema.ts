@@ -39,6 +39,10 @@ export const workCommandBodySchema = z.union([
     userInstruction: z.string().optional().nullable(),
   }),
   workspaceCommandBaseSchema.extend({
+    type: z.literal("plan.stop_generation"),
+    workBlockId: z.string().min(1).nullable().optional(),
+  }),
+  workspaceCommandBaseSchema.extend({
     type: z.literal("plan.accept"),
     planId: z.string().min(1),
     workBlockId: z.string().min(1).nullable().optional(),

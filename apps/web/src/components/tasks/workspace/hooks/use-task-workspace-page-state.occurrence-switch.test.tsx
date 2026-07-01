@@ -132,9 +132,9 @@ describe("useTaskWorkspacePageState — occurrence switch resets header", () => 
     // first-occurrence spec.
     await waitFor(() => {
       const props = result.current.headerSpec.elements["action:generate-plan"]?.props as
-        | { disabled?: boolean; label?: string }
+        | { disabled?: unknown; label?: string }
         | undefined;
-      expect(props?.disabled).toBeFalsy();
+      expect(props?.disabled).toEqual({ $state: "/plan/generation/header-action-disabled" });
       expect(props?.label).toBe("Generate plan");
     });
     expect(result.current.pageData.task.currentWorkBlock?.id).toBe("block-B");
