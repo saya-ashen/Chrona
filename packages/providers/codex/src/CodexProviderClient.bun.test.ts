@@ -249,7 +249,11 @@ describe("CodexProviderClient", () => {
       runner: new AcpCodexRunner({ mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }, transport),
     });
 
-    const run = await client.startRun(baseInput({ terminalToolName: "chrona_node_complete" }));
+    const run = await client.startRun(baseInput({
+      sessionId: "chrona-session",
+      sessionKey: "chrona:task:task-1:plan-generation",
+      terminalToolName: "chrona_node_complete",
+    }));
     const streamed = [];
     for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
 
@@ -260,7 +264,7 @@ describe("CodexProviderClient", () => {
         {
           type: "http",
           name: "chrona",
-          url: "http://chrona.test/api/mcp",
+          url: "http://chrona.test/api/mcp?session_id=chrona%3Atask%3Atask-1%3Aplan-generation",
           headers: [{ name: "Authorization", value: "Bearer run-token" }],
         },
       ],

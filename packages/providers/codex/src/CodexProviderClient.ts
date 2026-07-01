@@ -121,6 +121,13 @@ function defaultMcpBaseUrl() {
   return `http://localhost:${port}`;
 }
 
+function mcpUrlForSession(baseUrl: string, sessionId?: string | null): string {
+  const url = new URL(`${stripTrailingSlash(baseUrl)}/api/mcp`);
+  const trimmedSessionId = typeof sessionId === "string" ? sessionId.trim() : "";
+  if (trimmedSessionId) url.searchParams.set("session_id", trimmedSessionId);
+  return url.toString();
+}
+
 function providerRunRef(handle: CodexRunHandle, status = handle.status): ProviderRunRef {
   return {
     ...handle.ref,
@@ -529,7 +536,7 @@ function newSessionRequest(config: CodexProviderConfig, input: StartRunInput): N
   const control = (input as StartRunInputWithControl).control;
   const mcpBaseUrl = stripTrailingSlash(control?.baseUrl ?? config.mcpBaseUrl ?? process.env.CHRONA_MCP_BASE_URL ?? defaultMcpBaseUrl());
   const mcpRunToken = control?.runToken ?? config.mcpRunToken ?? process.env.CHRONA_API_KEY ?? process.env.CHRONA_MCP_BEARER_TOKEN ?? "";
-  const url = `${mcpBaseUrl}/api/mcp`;
+  const url = mcpUrlForSession(mcpBaseUrl, input.sessionKey ?? input.sessionId);
   const headers = mcpRunToken ? [{ name: "Authorization", value: `Bearer ${mcpRunToken}` }] : [];
   return {
     cwd: config.cwd ?? process.cwd(),
