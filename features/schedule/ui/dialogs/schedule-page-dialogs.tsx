@@ -21,6 +21,7 @@ export function SchedulePageDialogs({
   actionFailedMessage,
   onCloseQuickAdd,
   handleCreateTaskBlock,
+  availableAiClients,
 }: {
   showQuickAddDialog: boolean;
   isPending: boolean;
@@ -40,6 +41,7 @@ buildScheduleViewHref: (...args: any[]) => string;
   actionFailedMessage: string;
   onCloseQuickAdd: () => void;
   handleCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
+  availableAiClients?: SchedulePageData["availableAiClients"];
 }) {
 
   void data;
@@ -58,6 +60,7 @@ buildScheduleViewHref: (...args: any[]) => string;
       initialStartAt={new Date(new Date().setHours(9, 0, 0, 0))}
       initialEndAt={new Date(new Date().setHours(10, 0, 0, 0))}
       isPending={isPending}
+      availableAiClients={availableAiClients ?? data.availableAiClients}
       onClose={onCloseQuickAdd}
       onSubmit={async (input) => {
         await handleCreateTaskBlock({
@@ -76,6 +79,7 @@ buildScheduleViewHref: (...args: any[]) => string;
           recurrenceRule: input.recurrenceRule,
           recurrenceAnchorStartAt: input.recurrenceAnchorStartAt,
           recurrenceAnchorEndAt: input.recurrenceAnchorEndAt,
+          aiClientId: input.aiClientId,
         });
         onCloseQuickAdd();
       }}

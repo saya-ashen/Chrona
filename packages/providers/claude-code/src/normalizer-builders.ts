@@ -90,7 +90,7 @@ export const builders = {
   }): ProviderRunEvent {
     return stamp(ctx, options, {
       type: "run_completed",
-      run: args.run,
+      run: { ...args.run, status: "completed" },
       outputText: args.outputText,
       output: args.output,
       usage: args.usage,
@@ -102,14 +102,14 @@ export const builders = {
   }): ProviderRunEvent {
     return stamp(ctx, options, {
       type: "run_failed",
-      run: args.run,
+      run: args.run ? { ...args.run, status: "failed" } : undefined,
       error: args.error,
     });
   },
   run_cancelled(ctx: NormalizerContext, options: NormalizerOptions, args: {
     run?: ProviderRunRef;
   }): ProviderRunEvent {
-    return stamp(ctx, options, { type: "run_cancelled", run: args.run });
+    return stamp(ctx, options, { type: "run_cancelled", run: args.run ? { ...args.run, status: "cancelled" } : undefined });
   },
   raw_event(ctx: NormalizerContext, options: NormalizerOptions, args: {
     rawEventType?: string;

@@ -1,2 +1,2 @@
 export { PageQuery, pageQuery } from "./page-query";
-export { WorkPageTaskNotFoundError } from "./work-page";
+export { generateDashboardBrief } from "./dashboard-ai-surface";

@@ -1,4 +1,5 @@
 import type { UiDocument } from "@chrona/ui-protocol";
+import type { PlanExecutionResult } from "@chrona/contracts/ai";
 import type { WorkspaceActivityItem } from "../../task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import type { createTaskWorkspaceExecutionConsoleView } from "../../task-workspace";
@@ -21,6 +22,7 @@ export function TaskWorkspaceInspector({
   commandCenterActionHandlers,
   runtimeEvents,
   liveActivity,
+  currentExecution,
   commandCenterCopy,
   copy,
   onAction,
@@ -33,6 +35,7 @@ export function TaskWorkspaceInspector({
   commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
   runtimeEvents: WorkspaceRuntimeEvent[];
   liveActivity: WorkspaceActivityItem[];
+  currentExecution?: PlanExecutionResult | null;
   commandCenterCopy?: Partial<CommandCenterCopy>;
   copy: WorkspaceCopy;
   isPlanCompact?: boolean;
@@ -79,6 +82,7 @@ export function TaskWorkspaceInspector({
           commandCenter={commandCenter}
           runtimeEvents={runtimeEvents}
           liveActivity={liveActivity}
+          currentExecution={currentExecution}
           primaryAction={primaryAction}
           copy={commandCenterCopy}
           activityLayout={isPlanCompact ? "side" : "below"}

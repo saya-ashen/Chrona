@@ -235,6 +235,12 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     uri: artifact.uri,
   }));
 
+  const availableAiClients = await db.aiClient.findMany({
+    where: { enabled: true },
+    select: { id: true, name: true, enabled: true },
+    orderBy: { createdAt: "asc" },
+  });
+
   return {
     defaultExecutionRuntime: task.workspace.defaultRuntime,
     executionRuntimes: listExecutionRuntimes().map((key) => ({
@@ -242,6 +248,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       label: key,
       spec: getRuntimeTaskConfigSpec(key),
     })),
+    availableAiClients,
     task: {
       id: task.id,
       workspaceId: task.workspaceId,
@@ -250,6 +257,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       sourceManaged,
       executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig,
+      aiClientId: task.aiClientId,
       autoPlanGeneration: task.autoPlanGeneration,
       autoExecute: task.autoExecute,
       autoPlanGenerationTiming: task.autoPlanGenerationTiming,

@@ -77,6 +77,7 @@ export type CreateTaskInput = {
   autoExecute?: boolean;
   autoPlanGenerationTiming?: AutomationTimingPreset;
   autoExecuteTiming?: AutomationTimingPreset;
+  aiClientId?: string | null;
   parentTaskId?: string | null;
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
@@ -93,6 +94,7 @@ export type UpdateTaskInput = {
   autoPlanGenerationTiming?: AutomationTimingPreset;
   autoExecuteTiming?: AutomationTimingPreset;
   status?: TaskStatus;
+  aiClientId?: string | null;
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;

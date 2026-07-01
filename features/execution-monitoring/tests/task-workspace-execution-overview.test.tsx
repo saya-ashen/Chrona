@@ -72,6 +72,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("AI generated")).toBeInTheDocument();
     expect(screen.getAllByText("Runtime state").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("region", { name: "Execution progress" })).not.toBeInTheDocument();
   });
 
   it("renders Activity as a side timeline in compact plan mode", () => {
@@ -197,7 +198,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
       event: { type: "tool_started" as const, toolName: "chrona_plan_read", label: "正在读取计划" },
     };
 
-    const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [] });
+    const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [], currentExecution: { status: "running" } });
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
 
@@ -212,12 +213,13 @@ describe("TaskWorkspaceExecutionOverview", () => {
         artifacts={view.artifacts}
         activity={view.activity}
         commandCenter={commandCenter}
+        currentExecution={{ status: "running" }}
         runtimeEvents={[liveEvent]}
       />,
     );
     expect(screen.getByText("Activity")).toBeInTheDocument();
 
-    return waitFor(() => expect(screen.getByText("正在读取计划")).toBeInTheDocument());
+    return waitFor(() => expect(screen.getAllByText("正在读取计划").length).toBeGreaterThan(0));
   });
 
   it("streams live workspace events into a server-driven Trail document", () => {

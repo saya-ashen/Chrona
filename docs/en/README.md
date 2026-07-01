@@ -1,13 +1,13 @@
 # Chrona Documentation — English
 
-Chrona is a local-first AI task control plane. It helps you turn intent into tasks, generate editable graph plans, schedule work, run execution nodes through AI/runtime providers, and observe the result from a task-focused Work page.
+Chrona is a local-first AI task control plane. It helps you turn intent into tasks, generate editable graph plans, schedule work, run execution nodes through AI/runtime providers, and observe results from the task workspace and Dashboard.
 
 ## What you can do today
 
 - Manage tasks: create, edit, complete, reopen, delete, prioritize, tag, nest, and relate tasks.
 - Generate plans: ask AI for a PlanBlueprint, stream generation progress, review the plan, edit it, and accept it.
 - Execute graph plans: run task/checkpoint/condition/wait nodes, pause for input or approval, retry, block, fail, or complete nodes.
-- Use the Work page: inspect latest result, plan graph, execution records, task metadata, conversation context, and command composer in one place.
+- Use the task workspace: inspect latest result, plan graph, execution records, task metadata, conversation context, and command center in one place.
 - Use the Schedule page: view time blocks, inspect conflicts, create schedule proposals, accept proposals, and auto-start due work.
 - Triage operational state: Inbox aggregates approvals, schedule proposals, waiting inputs, failed runs, and cancelled runs.
 - Configure AI: Settings / AI Clients stores clients and feature bindings in the database.
@@ -31,12 +31,12 @@ Chrona is a local-first AI task control plane. It helps you turn intent into tas
 ### 1. Task → plan → execution
 
 1. Create or update a task.
-2. Generate an AI plan from the task workspace or Work page.
+2. Generate an AI plan from the task workspace.
 3. Review and optionally edit the generated graph.
 4. Accept the plan.
 5. Start execution manually or let the scheduler trigger it.
 6. Respond to checkpoints, inputs, approvals, blocks, or failures when needed.
-7. Review the latest result and execution record in the Work page.
+7. Review the latest result and execution record in the task workspace.
 
 ### 2. Schedule-driven execution
 

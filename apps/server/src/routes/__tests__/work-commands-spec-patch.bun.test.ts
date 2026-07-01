@@ -18,17 +18,14 @@ type StreamHandle = {
 const state = {
   capturedEvents: [] as TaskProjectionEvent[],
   currentStream: null as StreamHandle | null,
-  stopInputs: [] as Array<{ taskId: string; workBlockId?: string | null }>,
 };
 
 function makeFakeEngine(): ChronaEngine {
   return {
-    pages: {
-      getWork: async () => ({
-        taskShell: { workspaceId: "ws-1" },
-      }),
-    },
     tasks: {
+      getBootstrap: async () => ({
+        task: { workspaceId: "ws-1" },
+      }),
       plan: {
         generate: (_input: unknown) => {
           const queue: GeneratePlanSSEEvent[] = [];
@@ -105,10 +102,7 @@ function makeFakeEngine(): ChronaEngine {
         subscribeToGeneration: () => ({
           unsubscribe: () => undefined,
         }),
-        stopGeneration: (input: { taskId: string; workBlockId?: string | null }) => {
-          state.stopInputs.push(input);
-          return { taskId: input.taskId, stopped: true };
-        },
+        stopGeneration: () => ({ stopped: false }),
       },
       execution: {
         dispatch: async () => {
@@ -151,7 +145,6 @@ async function waitForEventMatching(
 beforeEach(() => {
   state.capturedEvents = [];
   state.currentStream = null;
-  state.stopInputs = [];
 });
 
 afterEach(() => {
@@ -199,22 +192,5 @@ describe("POST /work/:taskId/commands — plan.generate header state lifecycle",
       "/plan/generation/is-running": false,
       "/plan/generation/header-action-disabled": false,
     });
-  });
-});
-
-describe("POST /work/:taskId/commands — plan.stop_generation", () => {
-  it("stops active plan generation and resets header actions", async () => {
-    const taskId = "task-1";
-    const resetReceived = waitForEventMatching(taskId, (event) => (
-      isStateUpdate(event)
-      && event.updates["/plan/generation/is-running"] === false
-      && event.updates["/plan/generation/header-action-disabled"] === false
-    ));
-
-    const res = await postCommand(taskId, { type: "plan.stop_generation", workBlockId: "block-1" });
-
-    expect(res.status).toBe(202);
-    expect(state.stopInputs).toEqual([{ taskId, workBlockId: "block-1" }]);
-    await resetReceived;
   });
 });

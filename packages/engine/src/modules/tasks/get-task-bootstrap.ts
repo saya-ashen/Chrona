@@ -202,6 +202,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
       sourceManaged,
       executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig,
+      aiClientId: task.aiClientId,
       autoPlanGeneration: task.autoPlanGeneration,
       autoExecute: task.autoExecute,
       autoPlanGenerationTiming: task.autoPlanGenerationTiming,

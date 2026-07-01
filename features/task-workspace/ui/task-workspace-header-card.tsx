@@ -159,11 +159,9 @@ export function TaskWorkspaceHeaderCard({
   return (
     <>
       <SpecRenderer spec={spec} handlers={handlers} store={store} />
-      {actionStatus ? (
-        <p className="mt-1 px-2 text-xs text-muted-foreground" role="status">
-          {actionStatus}
-        </p>
-      ) : null}
+      <p className="sr-only" role="status" aria-live="polite">
+        {actionStatus ?? ""}
+      </p>
       <Dialog
         open={showDeleteConfirm}
         onOpenChange={(open) => {

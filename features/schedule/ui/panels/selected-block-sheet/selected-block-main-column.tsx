@@ -23,6 +23,7 @@ export function SelectedBlockMainColumn({
   copy,
   executionRuntimes,
   defaultExecutionRuntime,
+  availableAiClients,
   isPending,
   planningTaskDraft,
   savedPlan,
@@ -41,6 +42,7 @@ export function SelectedBlockMainColumn({
   copy: SchedulePageCopy;
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
+  availableAiClients?: Parameters<typeof TaskConfigForm>[0]["availableAiClients"];
   isPending: boolean;
   planningTaskDraft: TaskConfigFormDraft;
   savedPlan: SavedTaskPlan | null;
@@ -72,6 +74,7 @@ export function SelectedBlockMainColumn({
             lockedFields={item.sourceManaged?.immutableFields}
             lockedFieldsHint={item.sourceManaged ? `Synced from ${item.sourceManaged.sourceName}. Title and time are managed by the calendar source.` : undefined}
             sourceDescription={item.sourceManaged?.description ?? null}
+            availableAiClients={availableAiClients}
             submitLabel={copy.saveTaskConfig}
             pendingLabel={copy.saving}
             footerActions={onDeleteTask ? (

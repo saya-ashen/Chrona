@@ -19,6 +19,7 @@ export async function resetTestDb() {
   await db.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
   try {
     await db.aiFeatureBinding.deleteMany();
+    await db.workspaceAiSurface.deleteMany();
     await db.aiClient.deleteMany();
     await db.importedCalendarEvent.deleteMany();
     await db.calendarSource.deleteMany();

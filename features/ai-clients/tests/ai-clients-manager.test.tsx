@@ -64,22 +64,22 @@ const providersResponse = {
     {
       key: "hermes",
       label: "Hermes",
-      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
+      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
     {
       key: "llm",
       label: "LLM (OpenAI Compatible)",
-      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
+      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
     {
       key: "claude_code",
       label: "Claude Code",
-      features: ["generatePlan", "chat"],
+      features: ["generatePlan", "chat", "task.plan", "task.execution"],
     },
     {
       key: "debug",
       label: "Debug Provider",
-      features: ["suggest", "generatePlan", "chat"],
+      features: ["suggest", "generatePlan", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
   ],
 };
@@ -169,6 +169,10 @@ describe("AiClientsManager", () => {
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      json: async () => ({ bindings: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
       json: async () => ({ clients: [] }),
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
@@ -222,12 +226,14 @@ describe("AiClientsManager", () => {
     fireEvent.change(screen.getByLabelText("ANTHROPIC_AUTH_TOKEN"), {
       target: { value: "sk-aaa" },
     });
-    await user.click(screen.getByRole("combobox", { name: "Control plane" }));
-    await user.click(within(screen.getByRole("listbox")).getByText("Skill"));
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ client: { id: "client_claude_code" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ bindings: [] }),
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -251,7 +257,6 @@ describe("AiClientsManager", () => {
       config: {
         model: "cx/gpt-5.5",
         timeoutMs: 120000,
-        controlPlane: "skill",
         env: {
           ANTHROPIC_MODEL: "cx/gpt-5.5",
           ANTHROPIC_BASE_URL: "https://9router.saya.love/v1",
@@ -287,6 +292,10 @@ describe("AiClientsManager", () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ client: { id: "client_debug" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ bindings: [] }),
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -338,6 +347,10 @@ describe("AiClientsManager", () => {
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      json: async () => ({ bindings: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
       json: async () => ({ clients: [] }),
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
@@ -372,7 +385,7 @@ describe("AiClientsManager", () => {
             config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
             isDefault: true,
             enabled: true,
-            bindings: [],
+            bindings: ["dashboard.brief"],
             createdAt: new Date().toISOString(),
           },
         ],
@@ -389,10 +402,15 @@ describe("AiClientsManager", () => {
     fireEvent.change(screen.getByPlaceholderText("http://127.0.0.1:8642"), {
       target: { value: "http://localhost:8642" },
     });
+    expect(screen.getByText("Dashboard Brief")).toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ client: { id: "client_hermes", type: "hermes" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ bindings: ["dashboard.brief"] }),
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -419,6 +437,9 @@ describe("AiClientsManager", () => {
         timeoutMs: 120000,
       },
     });
+
+    const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_hermes/bindings" && call[1]?.method === "PUT");
+    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["dashboard.brief"] });
   });
 
   it("shows remote Hermes guidance without local auto-configuration", async () => {
@@ -469,6 +490,7 @@ describe("AiClientsManager", () => {
     await screen.findByText("Restart Hermes.");
 
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ client: { id: "client_hermes" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ bindings: [] }) });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 

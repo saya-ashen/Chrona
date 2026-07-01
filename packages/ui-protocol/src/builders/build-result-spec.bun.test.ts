@@ -80,6 +80,17 @@ describe("buildResultSpec", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("maps a fileView output to a FileView element", () => {
+    const doc = buildResultSpec([{ kind: "fileView", path: ".chrona/reports/report.md", title: "Report" }]);
+    const key = Object.keys(doc.elements).find((k) => k.startsWith("out:0:fileView"))!;
+    expect(doc.elements[key].type).toBe("FileView");
+    const props = doc.elements[key].props as Record<string, unknown>;
+    expect(props.path).toBe(".chrona/reports/report.md");
+    expect(props.title).toBe("Report");
+    const result = validateChronaSpec(doc);
+    expect(result.ok).toBe(true);
+  });
+
   it("maps a link output to a Link element", () => {
     const doc = buildResultSpec([{ kind: "link", href: "https://example.com", title: "View output" }]);
     const key = Object.keys(doc.elements).find((k) => k.startsWith("out:0:link"))!;

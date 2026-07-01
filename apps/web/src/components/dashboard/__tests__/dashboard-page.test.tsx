@@ -1,38 +1,54 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/i18n/localized-link", () => ({
-  LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
+  LocalizedLink: ({ children, href, ...props }: { children: ReactNode; href: string } & Omit<ComponentPropsWithoutRef<"a">, "href">) => <a href={`/en${href}`} {...props}>{children}</a>,
 }));
 
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, asChild, ...props }: any) => (asChild && children ? <>{children}</> : <button {...props}>{children}</button>),
+  Button: ({ children, asChild, ...props }: { children?: ReactNode; asChild?: boolean } & ComponentPropsWithoutRef<"button">) => (asChild && children ? <>{children}</> : <button {...props}>{children}</button>),
 }));
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: ({ children }: any) => <span>{children}</span>,
+  Badge: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
 }));
 
 vi.mock("@/components/ui/separator", () => ({
-  Separator: (props: any) => <hr {...props} />,
+  Separator: (props: ComponentPropsWithoutRef<"hr">) => <hr {...props} />,
 }));
 
 vi.mock("@/components/ui/tabs", () => ({
-  Tabs: ({ children }: any) => <div>{children}</div>,
-  TabsList: ({ children }: any) => <div>{children}</div>,
-  TabsTrigger: ({ children, value }: any) => <button data-value={value}>{children}</button>,
+  Tabs: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  TabsList: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  TabsTrigger: ({ children, value }: { children?: ReactNode; value: string } & ComponentPropsWithoutRef<"button">) => <button data-value={value}>{children}</button>,
 }));
 
 vi.mock("@/components/ui/card", () => ({
-  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardDescription: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  Card: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  CardContent: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  CardDescription: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  CardHeader: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  CardTitle: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
 }));
 
+vi.mock("@/components/tasks/workspace/catalog/spec-renderer", () => ({
+  SpecRenderer: ({ spec }: { spec: unknown }) => <div>{spec ? "AI brief spec rendered" : null}</div>,
+}));
+
+
+vi.mock("react-router-dom", () => ({
+  useRevalidator: () => ({ revalidate: vi.fn() }),
+}));
+
+vi.mock("@/api", () => ({
+  apiJson: vi.fn(),
+}));
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import type { DashboardData } from "@/components/dashboard/dashboard-types";
+import { apiJson } from "@/api";
+import type { Dictionary } from "@/pages";
+import type { UiDocument } from "@chrona/ui-protocol";
 
 const COPY = {
   title: "Chrona workspace",
@@ -72,8 +88,8 @@ const COPY = {
   inProgress: { title: "In progress", description: "desc", empty: "Nothing is running right now." },
   completed: { title: "Recently completed", totalLabel: "{n} completed all-time", empty: "No completed tasks yet." },
   digest: {
-    title: "Auto-completion overview",
-    description: "Daily report.",
+    title: "AI summary",
+    description: "AI-generated readout.",
     todayHeadline: "{n} tasks auto-completed today",
     weekHeadline: "{n} tasks auto-completed this week",
     allTimeHeadline: "{n} tasks auto-completed all-time",
@@ -83,7 +99,7 @@ const COPY = {
     breakdownTitle: "What got done",
     recentTitle: "Recently auto-completed",
     viewAll: "View all completed tasks",
-    empty: "Chrona hasn't auto-completed any tasks yet.",
+    empty: "AI summary will appear here after Chrona generates it from dashboard facts.",
     outputLabel: "Output",
     category: {
       report: "Reports generated",
@@ -96,6 +112,13 @@ const COPY = {
       research: "{n} summaries",
       code: "{n} checks",
       automation: "{n} updates",
+    },
+    aiBrief: {
+      generating: "AI brief updating",
+      dirty: "AI brief ready to update",
+      failed: "AI brief update failed",
+      unconfigured: "Dashboard AI provider not configured",
+      regenerate: "Regenerate",
     },
   },
   feed: {
@@ -122,7 +145,7 @@ const COPY = {
     lane: { attention: "Needs you", inProgress: "In progress", autoCompleted: "Auto-completed" },
   },
   time: { justNow: "just now", minutes: "{n}m ago", hours: "{n}h ago", days: "{n}d ago" },
-} as any;
+} satisfies Dictionary["pages"]["dashboard"];
 
 function makeData(overrides?: Partial<DashboardData>): DashboardData {
   return {
@@ -133,6 +156,7 @@ function makeData(overrides?: Partial<DashboardData>): DashboardData {
     autoCompleted: [],
     totalAutoCompleted: 0,
     recentEvents: [],
+    aiBrief: null,
     ...overrides,
   } as DashboardData;
 }
@@ -149,6 +173,34 @@ function completed(overrides: Partial<DashboardData["autoCompleted"][number]> = 
   } as DashboardData["autoCompleted"][number];
 }
 
+
+function renderDashboard(data: DashboardData = makeData()) {
+  return render(<DashboardPage data={data} copy={COPY} workspaceId="workspace-1" />);
+}
+
+function generatingAiBrief(): NonNullable<DashboardData["aiBrief"]> {
+  return {
+    status: "generating",
+    spec: null,
+    generatedAt: null,
+    providerClientId: "client-1",
+    canGenerate: false,
+    errorMessage: null,
+    inputFingerprint: "fingerprint-1",
+  };
+}
+
+function dirtyAiBrief(): NonNullable<DashboardData["aiBrief"]> {
+  return {
+    status: "dirty",
+    spec: null,
+    generatedAt: null,
+    providerClientId: "client-1",
+    canGenerate: true,
+    errorMessage: null,
+    inputFingerprint: "fingerprint-1",
+  };
+}
 afterEach(() => cleanup());
 
 describe("DashboardPage", () => {
@@ -234,7 +286,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Waiting for approval")).toBeTruthy();
   });
 
-  it("renders the auto-completion digest headline and category breakdown", () => {
+  it("shows the AI summary placeholder until a generated spec exists", () => {
     render(
       <DashboardPage
         data={makeData({
@@ -247,22 +299,46 @@ describe("DashboardPage", () => {
         copy={COPY}
       />,
     );
-    expect(screen.getByText("Auto-completion overview")).toBeTruthy();
-    expect(screen.getByText("2 tasks auto-completed today")).toBeTruthy();
-    expect(screen.getByText("Reports generated")).toBeTruthy();
-    expect(screen.getByText("Research & summaries")).toBeTruthy();
-    // Title appears in both the digest recent list and the task stream.
-    expect(screen.getAllByText("Report A").length).toBeGreaterThan(0);
-    expect(screen.getByRole("region", { name: "Auto-completion overview" })).toHaveAttribute("data-ui-surface-kind", "ai-authored");
+
+    expect(screen.getByText("AI summary")).toBeTruthy();
+    expect(screen.getByText("AI summary will appear here after Chrona generates it from dashboard facts.")).toBeTruthy();
+    expect(screen.queryByText("2 tasks auto-completed today")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reports generated")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "AI summary" })).not.toBeInTheDocument();
+    expect(screen.queryByText("AI generated")).not.toBeInTheDocument();
+  });
+
+  it("labels rendered AI summary specs as AI generated", () => {
+    const aiBriefSpec = {
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, children: [] },
+      },
+    } satisfies UiDocument;
+
+    render(
+      <DashboardPage
+        data={makeData({
+          aiBrief: {
+            status: "ready",
+            spec: aiBriefSpec,
+            generatedAt: new Date().toISOString(),
+            providerClientId: "client-1",
+            canGenerate: true,
+            errorMessage: null,
+            inputFingerprint: "fingerprint-1",
+          },
+        })}
+        copy={COPY}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "AI summary" })).toHaveAttribute("data-ui-surface-kind", "ai-authored");
     expect(screen.getByText("AI generated")).toBeTruthy();
+    expect(screen.getByText("AI brief spec rendered")).toBeTruthy();
   });
 
-  it("shows the digest empty state when nothing has auto-completed", () => {
-    render(<DashboardPage data={makeData()} copy={COPY} />);
-    expect(screen.getByText("Chrona hasn't auto-completed any tasks yet.")).toBeTruthy();
-  });
-
-  it("renders the recent activity feed linked to each task", () => {
+  it("keeps recent activity out of the dashboard chrome", () => {
     render(
       <DashboardPage
         data={makeData({
@@ -280,11 +356,11 @@ describe("DashboardPage", () => {
         copy={COPY}
       />,
     );
-    expect(screen.getByText("Daily digest")).toBeTruthy();
-    expect(screen.getByText(/Produced the daily digest/)).toBeTruthy();
+    expect(screen.queryByText("Daily digest")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Produced the daily digest/)).not.toBeInTheDocument();
   });
 
-  it("renders the task stream with lane labels for each item", () => {
+  it("renders attention items directly in needs-you", () => {
     render(
       <DashboardPage
         data={makeData({
@@ -306,11 +382,28 @@ describe("DashboardPage", () => {
         copy={COPY}
       />,
     );
-    expect(screen.getByText("Task stream")).toBeTruthy();
-    // Blocked task title surfaces only in the stream (focus is null, needs-you shows kind).
     expect(screen.getByText("Blocked task")).toBeTruthy();
-    expect(screen.getAllByText("Done task").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Needs you").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Auto-completed").length).toBeGreaterThan(0);
+    expect(screen.getByText("Waiting on confirmation")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Resolve/ })).toHaveAttribute("href", "/en/tasks/s1");
+    expect(screen.queryByText("Task stream")).not.toBeInTheDocument();
+  });
+
+  it("shows a spinner while AI summary is generating", () => {
+    renderDashboard(makeData({ aiBrief: generatingAiBrief() }));
+
+    expect(screen.getAllByText("AI brief updating").length).toBe(2);
+    expect(screen.queryByText("AI summary will appear here after Chrona generates it from dashboard facts.")).not.toBeInTheDocument();
+  });
+
+
+  it("lazily requests AI brief generation for dirty surfaces", async () => {
+    renderDashboard(makeData({ aiBrief: dirtyAiBrief() }));
+
+    await waitFor(() => {
+      expect(apiJson).toHaveBeenCalledWith(
+        "/api/pages/dashboard/ai-brief/generate?workspaceId=workspace-1",
+        { method: "POST", body: JSON.stringify({ force: false }) },
+      );
+    });
   });
 });

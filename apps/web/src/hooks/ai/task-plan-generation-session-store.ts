@@ -7,6 +7,7 @@ import type {
   TaskPlanGenerationSessionReadModel,
   TaskPlanReadModel,
 } from "@chrona/contracts/ai";
+import { getByPath } from "@json-render/core";
 import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 
@@ -342,7 +343,7 @@ export function bindTaskPlanSessionToStateStore(
 type AiPlanGenerationStatus = "accepted" | "generating" | "idle" | "waiting_acceptance";
 
 function applyStateSnapshotToSession(key: string, snapshot: Record<string, unknown>) {
-  const get = (path: string): unknown => (path in snapshot ? snapshot[path] : undefined);
+  const get = (path: string): unknown => (path in snapshot ? snapshot[path] : getByPath(snapshot, path));
   const planStatus = (get("/plan/status") as AiPlanGenerationStatus | null | undefined) ?? null;
   const generationId = (get("/plan/generation/id") as string | null | undefined) ?? null;
   const phase = (get("/plan/generation/phase") as TaskPlanSessionState["phase"] | null | undefined) ?? null;

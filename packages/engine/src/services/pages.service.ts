@@ -1,5 +1,5 @@
-import { ENGINE_ERROR_CODES, EngineError, engineErrorFromUnknown } from "../errors";
-import { pageQuery, WorkPageTaskNotFoundError } from "../modules/pages";
+import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
+import { generateDashboardBrief, pageQuery } from "../modules/pages";
 
 export function createPagesService() {
   return {
@@ -24,21 +24,29 @@ export function createPagesService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get dashboard");
       }
     },
+    async generateDashboardBrief(input: { workspaceId: string; force?: boolean }) {
+      try {
+        const dashboard = await pageQuery.getDashboard(input);
+        return await generateDashboardBrief({
+          workspaceId: input.workspaceId,
+          force: input.force,
+          fingerprintInput: {
+            needsAttention: dashboard.needsAttention,
+            inProgress: dashboard.inProgress,
+            autoCompleted: dashboard.autoCompleted,
+            recentEvents: dashboard.recentEvents,
+            totalAutoCompleted: dashboard.totalAutoCompleted,
+          },
+        });
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to generate dashboard AI brief");
+      }
+    },
     async getMemory(input: { workspaceId: string }) {
       try {
         return await pageQuery.getMemory(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get memory console");
-      }
-    },
-    async getWork(input: { taskId: string }) {
-      try {
-        return await pageQuery.getWork(input);
-      } catch (cause) {
-        if (cause instanceof WorkPageTaskNotFoundError) {
-          throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found", { cause });
-        }
-        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get work page");
       }
     },
   };

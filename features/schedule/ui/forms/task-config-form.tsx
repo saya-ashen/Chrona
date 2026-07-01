@@ -31,7 +31,7 @@ import {
   AUTOMATION_TIMING_PRESETS,
   normalizeAutomationTiming,
 } from "@chrona/contracts";
-import type { AutomationTimingPreset } from "@chrona/contracts";
+import type { AutomationTimingPreset, AiClientRecord } from "@chrona/contracts";
 
 import { RECURRENCE_PRESETS, recurrencePresetFromRule, recurrenceRuleFromState, type RecurrencePreset } from "@/lib/recurrence-presets";
 
@@ -47,6 +47,7 @@ export type TaskConfigFormDraft = {
 export type TaskConfigFormInput = TaskConfigFormDraft & {
   executionRuntime: string;
   executionConfig: RuntimeInput;
+  aiClientId: string | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
   autoPlanGenerationTiming: AutomationTimingPreset;
@@ -61,6 +62,8 @@ export type TaskConfigExecutionRuntime = {
   label: string;
   spec: RuntimeTaskConfigSpec;
 };
+
+export type TaskConfigAiClient = Pick<AiClientRecord, "id" | "name" | "enabled">;
 
 type TaskConfigPreset = {
   id: string;
@@ -80,6 +83,7 @@ type TaskConfigFormState = {
   executionRuntime: string;
   fieldExecutionConfig: RuntimeInput;
   extraExecutionConfig: string;
+  aiClientId: string;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
   autoPlanGenerationTiming: AutomationTimingPreset;
@@ -106,6 +110,7 @@ type TaskConfigFormProps = {
     scheduledEndAt?: Date | null;
     executionRuntime?: string | null;
     executionConfig?: unknown;
+    aiClientId?: string | null;
     autoPlanGeneration?: boolean;
     autoExecute?: boolean;
     autoPlanGenerationTiming?: AutomationTimingPreset | string | null;
@@ -116,6 +121,9 @@ type TaskConfigFormProps = {
   lockedFieldsHint?: string;
   sourceDescription?: string | null;
   sourceDescriptionLabel?: string;
+  availableAiClients?: TaskConfigAiClient[];
+  disableAiClientSelection?: boolean;
+  aiClientSelectionDisabledHint?: string;
   submitLabel: string;
   pendingLabel: string;
   isPending?: boolean;
@@ -129,6 +137,7 @@ type TaskConfigSelectOption = {
   value: string;
   label: string;
 };
+const EMPTY_SELECT_OPTION_VALUE = "__chrona_empty_select_value__";
 
 export function TaskConfigField({
   label,
@@ -239,15 +248,16 @@ export function TaskConfigSelect({
   const triggerId = id ?? `task-config-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find((option) => option.value === value);
+  const selectValue = value === "" ? EMPTY_SELECT_OPTION_VALUE : value;
 
   return (
     <>
       <Input type="hidden" name={name} value={value} />
       <Select
         open={isOpen}
-        value={value || undefined}
+        value={selectValue}
         onOpenChange={(nextOpen) => setIsOpen(disabled ? false : nextOpen)}
-        onValueChange={onValueChange}
+        onValueChange={(nextValue) => onValueChange(nextValue === EMPTY_SELECT_OPTION_VALUE ? "" : nextValue)}
         disabled={disabled}
       >
         <SelectTrigger id={triggerId} className="w-full" disabled={disabled}>
@@ -258,11 +268,15 @@ export function TaskConfigSelect({
         {isOpen ? (
           <SelectContent position="popper" className="z-[160] max-h-72">
             <SelectGroup>
-              {options.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              {options.map((option) => {
+                const itemValue = option.value === "" ? EMPTY_SELECT_OPTION_VALUE : option.value;
+
+                return (
+                  <SelectItem key={itemValue} value={itemValue}>
+                    {option.label}
+                  </SelectItem>
+                );
+              })}
             </SelectGroup>
           </SelectContent>
         ) : null}
@@ -488,6 +502,9 @@ const DEFAULT_COPY = {
   recurrenceCustomLabel: "RRULE",
   recurrenceCustomPlaceholder: "e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR",
   adapter: "Adapter",
+  aiProvider: "AI provider",
+  defaultAiProvider: "Default provider",
+  aiProviderHint: "Override provider for this task.",
   advancedFields: "Advanced fields",
   description: "Description",
   chronaNotes: "Chrona notes",
@@ -723,6 +740,7 @@ function toFormState(
     scheduledDate: formatLocalDateInput(initialValues?.scheduledStartAt),
     scheduledStartTime: formatLocalTimeInput(initialValues?.scheduledStartAt),
     scheduledEndTime: formatLocalTimeInput(initialValues?.scheduledEndAt),
+    aiClientId: initialValues?.aiClientId ?? "",
     autoPlanGeneration: initialValues?.autoExecute || (initialValues?.autoPlanGeneration ?? false),
     autoExecute: initialValues?.autoExecute ?? false,
     autoPlanGenerationTiming: normalizeAutomationTiming(initialValues?.autoPlanGenerationTiming),
@@ -787,6 +805,7 @@ function buildTaskConfigFormInput(
     scheduledEndAt,
     executionRuntime: executionRuntime.key,
     executionConfig,
+    aiClientId: formState.aiClientId || null,
     autoPlanGeneration: formState.autoExecute || formState.autoPlanGeneration,
     autoExecute: formState.autoExecute,
     autoPlanGenerationTiming: normalizeAutomationTiming(formState.autoPlanGenerationTiming),
@@ -889,6 +908,10 @@ function applyPresetValues(
     };
   }
 
+
+  if ("aiClientId" in values) {
+    next.aiClientId = values.aiClientId ?? "";
+  }
   return next;
 }
 
@@ -942,6 +965,9 @@ export function TaskConfigForm({
   lockedFieldsHint,
   sourceDescription,
   sourceDescriptionLabel,
+  availableAiClients = [],
+  disableAiClientSelection = false,
+  aiClientSelectionDisabledHint,
   submitLabel,
   pendingLabel,
   isPending = false,
@@ -984,6 +1010,7 @@ export function TaskConfigForm({
   const initialScheduledEndAt = initialValues?.scheduledEndAt;
   const initialExecutionRuntime = initialValues?.executionRuntime;
   const initialExecutionConfig = initialValues?.executionConfig;
+  const initialAiClientId = initialValues?.aiClientId;
   const initialAutoPlanGeneration = initialValues?.autoPlanGeneration;
   const initialAutoExecute = initialValues?.autoExecute;
   const initialAutoPlanGenerationTiming = initialValues?.autoPlanGenerationTiming;
@@ -1001,6 +1028,7 @@ export function TaskConfigForm({
           scheduledEndAt: initialScheduledEndAt,
           executionRuntime: initialExecutionRuntime,
           executionConfig: initialExecutionConfig,
+          aiClientId: initialAiClientId,
           autoPlanGeneration: initialAutoPlanGeneration,
           autoExecute: initialAutoExecute,
           autoPlanGenerationTiming: initialAutoPlanGenerationTiming,
@@ -1021,6 +1049,7 @@ export function TaskConfigForm({
       initialScheduledEndAt,
       initialExecutionRuntime,
       initialExecutionConfig,
+      initialAiClientId,
       initialAutoPlanGeneration,
       initialAutoExecute,
       initialAutoPlanGenerationTiming,
@@ -1092,6 +1121,16 @@ export function TaskConfigForm({
   );
   const optionalRuntimeFields = visibleStandardFields.filter(
     (field) => !selectedExecutionRuntime.spec.runnability.requiredPaths.includes(field.path),
+  );
+  const aiClientOptions = useMemo(
+    () => [
+      { value: "", label: copy.defaultAiProvider },
+      ...availableAiClients.map((client) => ({
+        value: client.id,
+        label: client.enabled ? client.name : `${client.name} (disabled)`,
+      })),
+    ],
+    [availableAiClients, copy.defaultAiProvider],
   );
 
   function updateRuntimeField(field: RuntimeTaskConfigField, nextValue: unknown) {
@@ -1324,6 +1363,21 @@ export function TaskConfigForm({
                   onAutoPlanGenerationTimingChange={(value) => setValue("autoPlanGenerationTiming", value, { shouldDirty: true })}
                   onAutoExecuteTimingChange={(value) => setValue("autoExecuteTiming", value, { shouldDirty: true })}
                 />
+
+                {aiClientOptions.length > 1 ? (
+                  <TaskConfigSection title={copy.aiProvider} info={aiClientSelectionDisabledHint}>
+                    <TaskConfigField label={copy.aiProvider} hint={copy.aiProviderHint} className="text-xs text-foreground">
+                      <TaskConfigSelect
+                        name="aiClientId"
+                        id="task-config-ai-client"
+                        value={formState.aiClientId}
+                        options={aiClientOptions}
+                        disabled={isPending || disableAiClientSelection}
+                        onValueChange={(value) => setValue("aiClientId", value, { shouldDirty: true })}
+                      />
+                    </TaskConfigField>
+                  </TaskConfigSection>
+                ) : null}
             </div>
           </div>
         ) : null}
@@ -1488,6 +1542,18 @@ export function TaskConfigForm({
                   onAutoPlanGenerationTimingChange={(value) => setValue("autoPlanGenerationTiming", value, { shouldDirty: true })}
                   onAutoExecuteTimingChange={(value) => setValue("autoExecuteTiming", value, { shouldDirty: true })}
                 />
+
+                {aiClientOptions.length > 1 ? (
+                  <TaskConfigField label={copy.aiProvider} hint={aiClientSelectionDisabledHint ?? copy.aiProviderHint} className="text-xs text-foreground">
+                    <TaskConfigSelect
+                      name="aiClientId"
+                      value={formState.aiClientId}
+                      options={aiClientOptions}
+                      disabled={isPending || disableAiClientSelection}
+                      onValueChange={(value) => setValue("aiClientId", value, { shouldDirty: true })}
+                    />
+                  </TaskConfigField>
+                ) : null}
               </>
 
               {optionalRuntimeFields.map((field) => {
