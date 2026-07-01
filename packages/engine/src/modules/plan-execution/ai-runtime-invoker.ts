@@ -96,6 +96,10 @@ class IncompleteRunStreamError extends Error {
     this.name = "IncompleteRunStreamError";
   }
 }
+function usesChronaControlPlane(providerName: string) {
+  return providerName === "claude_code" || providerName === "codex";
+}
+
 
 export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
@@ -125,7 +129,7 @@ export class AiRuntimeInvoker {
         );
       }
       const providerName = client.providerClient.provider;
-      const useSkillControl = providerName === "claude_code";
+      const useSkillControl = usesChronaControlPlane(providerName);
       let controlRunToken: string | null = null;
       if (useSkillControl) {
         controlRunToken = await mintRunToken({
@@ -286,7 +290,7 @@ export async function runProviderRequest(
   const idempotencyKey = options.idempotencyKey ?? (options.runId
     ? `chrona-runtime:${options.runId}`
     : undefined);
-  const controlPlane = providerClient.provider === "claude_code" && options.controlRunToken
+  const controlPlane = usesChronaControlPlane(providerClient.provider) && options.controlRunToken
     ? {
         baseUrl: process.env.CHRONA_BASE_URL ?? "",
         runToken: options.controlRunToken,

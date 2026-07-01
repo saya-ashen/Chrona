@@ -338,6 +338,7 @@ export type {
   HermesClientConfig,
   DebugClientConfig,
   ClaudeCodeClientConfig,
+  CodexClientConfig,
   LLMClientConfig,
   AgentProviderClientConfig,
   SmartSuggestRequest,

@@ -1,0 +1,14 @@
+{
+  "name": "@chrona/codex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/contracts": "workspace:*",
+    "@chrona/providers-foundation": "workspace:*",
+    "@openai/codex-sdk": "^0.142.5"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -1,5 +1,6 @@
 import { HermesProviderClient } from "@chrona/hermes";
 import { CHRONA_CLAUDE_CODE_PROVIDER_TYPE, ClaudeCodeProviderClient } from "@chrona/claude-code";
+import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
 import { CHRONA_DEBUG_PROVIDER_TYPE, normalizeDebugProviderProfile } from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
@@ -11,6 +12,7 @@ import type {
   AiClientRecord,
   AiFeature,
   ClaudeCodeClientConfig,
+  CodexClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
@@ -144,6 +146,21 @@ async function checkClientHealth(
       return {
         available: true,
         reason: health.reason ?? health.message ?? "Claude Code CLI is reachable",
+      };
+    }
+
+    if (client.type === CHRONA_CODEX_PROVIDER_TYPE) {
+      const config = client.config as CodexClientConfig;
+      const health = await new CodexProviderClient({ config }).checkHealth();
+      if (!health.ok) {
+        return {
+          available: false,
+          reason: health.reason ?? health.message ?? "Codex health check failed",
+        };
+      }
+      return {
+        available: true,
+        reason: health.reason ?? health.message ?? "Codex SDK provider is configured",
       };
     }
 

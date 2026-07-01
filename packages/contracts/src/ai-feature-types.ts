@@ -5,7 +5,7 @@
 import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
-export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | (string & {});
+export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
 export type AiFeature =
   | "suggest"
   | "generate_plan"
@@ -21,7 +21,7 @@ export interface AiClientRecord {
   id: string;
   name: string;
   type: AiClientType;
-  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig;
+  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig | CodexClientConfig;
   isDefault: boolean;
   enabled: boolean;
 }
@@ -117,6 +117,23 @@ export interface ClaudeCodeClientConfig {
    * Optional: working directory for the Claude Code run. Defaults to
    * `process.cwd()`. Use this to constrain the agent's filesystem scope.
    */
+  cwd?: string;
+}
+
+export interface CodexClientConfig {
+  /** Override the Codex CLI location. Defaults to SDK bundled executable. */
+  binaryPath?: string;
+  /** Model ID passed to Codex. */
+  model?: string;
+  /** Total run timeout in milliseconds. */
+  timeoutMs?: number;
+  /** OpenAI/Codex API key. */
+  apiKey?: string;
+  /** OpenAI-compatible base URL. */
+  baseUrl?: string;
+  /** Optional pass-through env vars for Codex CLI. */
+  env?: Record<string, string>;
+  /** Optional working directory for Codex. */
   cwd?: string;
 }
 

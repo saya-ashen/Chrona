@@ -15,7 +15,7 @@ import { api } from "@/lib/rpc-client";
 
 const DEFAULT_PROVIDER_IDLE_TIMEOUT_MS = 120 * 1000;
 
-type AiClientType = "llm" | "hermes" | "debug" | (string & {});
+type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
 
 interface AiClientInfo {
   id: string;
@@ -147,6 +147,22 @@ function buildClaudeCodeConfig(input: {
   };
 }
 
+function buildCodexConfig(input: {
+  timeoutSeconds: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  binaryPath: string;
+}): Record<string, unknown> {
+  return {
+    model: nonEmptyEnvValue(input.model),
+    baseUrl: nonEmptyEnvValue(input.baseUrl),
+    apiKey: nonEmptyEnvValue(input.apiKey),
+    binaryPath: nonEmptyEnvValue(input.binaryPath),
+    timeoutMs: Number(input.timeoutSeconds) * 1000,
+  };
+}
+
 function buildClientPayload(input: {
   name: string;
   type: AiClientType;
@@ -174,6 +190,15 @@ function buildClientPayload(input: {
       name: input.name,
       type: input.type,
       config: buildClaudeCodeConfig(input),
+      isDefault: input.isDefault,
+    };
+  }
+
+  if (input.type === "codex") {
+    return {
+      name: input.name,
+      type: input.type,
+      config: buildCodexConfig(input),
       isDefault: input.isDefault,
     };
   }
@@ -379,6 +404,7 @@ function ClientForm({
   const isDebugClient = values.type === "debug";
   const isHermesClient = values.type === "hermes";
   const isClaudeCodeClient = values.type === "claude_code";
+  const isCodexClient = values.type === "codex";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
@@ -602,7 +628,7 @@ function ClientForm({
               </Card>
             )}
 
-            {!isDebugClient && !isClaudeCodeClient && (
+            {!isDebugClient && !isClaudeCodeClient && !isCodexClient && (
               <>
                 <Field>
                   <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
@@ -717,6 +743,64 @@ function ClientForm({
                   MCP base URL is set automatically by the engine. Pass an
                   Anthropic API key for production usage to avoid the SDK
                   subscription quota (2026-06-15 onward).
+                </p>
+              </>
+            )}
+            {isCodexClient && (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-model">Model</FieldLabel>
+                    <Input
+                      {...form.register("model")}
+                      id="ai-client-model"
+                      placeholder="optional model override"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
+                    <Input
+                      {...form.register("baseUrl")}
+                      id="ai-client-base-url"
+                      placeholder="optional OpenAI-compatible base URL"
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-api-key">API Key</FieldLabel>
+                    <Input
+                      {...form.register("apiKey")}
+                      id="ai-client-api-key"
+                      type="password"
+                      placeholder="optional API key"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-binary-path">Binary path</FieldLabel>
+                    <Input
+                      {...form.register("binaryPath")}
+                      id="ai-client-binary-path"
+                      placeholder="codex"
+                    />
+                  </Field>
+                </div>
+                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    {...form.register("timeoutSeconds", {
+                      required: copy.timeoutSeconds,
+                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                    })}
+                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                    id="ai-client-timeout"
+                    type="number"
+                  />
+                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  Uses OpenAI Codex SDK server-side. MCP base URL is reserved
+                  for runtime control wiring.
                 </p>
               </>
             )}
