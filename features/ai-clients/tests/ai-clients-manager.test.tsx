@@ -222,8 +222,6 @@ describe("AiClientsManager", () => {
     fireEvent.change(screen.getByLabelText("ANTHROPIC_AUTH_TOKEN"), {
       target: { value: "sk-aaa" },
     });
-    await user.click(screen.getByRole("combobox", { name: "Control plane" }));
-    await user.click(within(screen.getByRole("listbox")).getByText("Skill"));
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -251,7 +249,6 @@ describe("AiClientsManager", () => {
       config: {
         model: "cx/gpt-5.5",
         timeoutMs: 120000,
-        controlPlane: "skill",
         env: {
           ANTHROPIC_MODEL: "cx/gpt-5.5",
           ANTHROPIC_BASE_URL: "https://9router.saya.love/v1",

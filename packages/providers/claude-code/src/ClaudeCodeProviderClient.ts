@@ -26,15 +26,14 @@ import {
   type StartRunInput,
   type StreamRunInput,
 } from "@chrona/providers-foundation";
-import type { ControlPlaneMode } from "@chrona/contracts";
 
 import {
   createClaudeCodeRunner,
+  probeClaudeCodeSdk,
   type ClaudeCodeRunHandle,
   type ClaudeCodeRunner,
   type ClaudeCodeRunnerConfig,
 } from "./runner";
-import { resolveClaudeBinary } from "./claude-binary";
 import { ClaudeCodeProviderError } from "./types";
 
 export interface ClaudeCodeProviderOptions {
@@ -80,17 +79,9 @@ export interface ClaudeCodeProviderConfig {
   apiKey?: string;
   cwd?: string;
   env?: Record<string, string>;
-  /**
-   * Skill-mode selector (Spec 018). Defaults to "mcp".
-   * Mirrors the contracts-level `ClaudeCodeClientConfig.controlPlane`.
-   * Hermes is MCP-only and ignores this field.
-   */
-  controlPlane?: ControlPlaneMode;
-  /**
-   * Skill directory mounted into the spawned run when
-   * `controlPlane === "skill"`. Optional; can be overridden per-run via
-   * `StartRunInput.control.skillsDir`.
-   */
+  /** Deprecated: skill mode has been removed; Claude Code uses MCP control. */
+  controlPlane?: "mcp";
+  /** Deprecated: skill mode has been removed; ignored. */
   skillDir?: string;
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
@@ -227,6 +218,12 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      approval: {
+        supported: false,
+        choices: [],
+        scopes: [],
+        resolveAll: false,
+      },
     };
   }
 
@@ -470,14 +467,12 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       this.opts.config.mcpBaseUrl ??
       readEnv("CHRONA_MCP_BASE_URL") ??
       defaultMcpBaseUrl();
-    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
     // The MCP server at /api/mcp sits behind the same `apiKeyAuth()`
     // middleware as every other /api/* route (apps/server/src/middleware/
     // auth.ts), so the Bearer token we hand the SDK here MUST be the
     // server's static `API_KEY` (the same one operators set in
-    // apps/server/.env). Skill mode overrides this via `input.control.
-    // runToken` (see runner start()), but the per-run token is a separate
-    // scope (per node attempt), not the MCP transport credential.
+    // apps/server/.env).
+    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
     const mcpRunToken =
       this.opts.config.mcpRunToken ??
       readEnv("CHRONA_API_KEY") ??
@@ -497,47 +492,49 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       cwd: this.opts.config.cwd,
       recordDir,
       strictUnknownEvents: strict,
-      controlPlane: this.opts.config.controlPlane,
       controlBaseUrl,
-      skillDir: this.opts.config.skillDir,
       sdkOptions: this.opts.config.sdkOptions,
     };
     return createClaudeCodeRunner(cfg);
   }
 
   /**
-   * Cheap probe: if we own a runner, just construct it (which will fail if
-   * the SDK can't be loaded; `createClaudeCodeRunner` never throws on
-   * construction — only on first `start`). We additionally run a
-   * `claude --version` probe for binary availability.
-   *
-   * The binary resolves to (in order): an explicit `config.binaryPath`, the
-   * `claude` executable bundled inside the `@anthropic-ai/claude-agent-sdk`
-   * platform package, or a `claude` on PATH. Chrona never requires a
-   * system-installed Claude Code CLI — the SDK ships the binary.
-   *
-   * Reason strings are actionable per the spec.
+   * Health uses the Claude Agent SDK startup path, not `claude --version`.
+   * `startup()` spawns the configured SDK process and waits for initialize,
+   * so it verifies the same integration layer real runs use.
    */
   private async probe(): Promise<string | null> {
     if (this.opts.runner) return null; // user provided runner → trust it
     if (readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR")) return null; // record-only
-    const binary = this.opts.config.binaryPath ?? resolveClaudeBinary();
-    if (!binary) {
-      return "Claude Code binary not found: the @anthropic-ai/claude-agent-sdk platform package is missing and no 'claude' is on PATH. Reinstall dependencies or set config.binaryPath.";
-    }
-    try {
-      const proc = Bun.spawn([binary, "--version"], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      const exit = await proc.exited;
-      if (exit !== 0) {
-        return `Claude Code binary exited with code ${exit}; '${binary}' is not runnable.`;
-      }
-      return null;
-    } catch (err) {
-      return `Claude Code binary failed to spawn (binary='${binary}'): ${errorMessage(err)}.`;
-    }
+    return probeClaudeCodeSdk({
+      config: await this.buildRunnerConfig(),
+      timeoutMs: this.opts.config.timeoutMs,
+    });
+  }
+
+  private async buildRunnerConfig(): Promise<ClaudeCodeRunnerConfig> {
+    const recordDir = this.opts.recordDir ?? readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR");
+    const strict = this.opts.strictUnknownEvents ?? readEnv("CHRONA_CLAUDE_CODE_STRICT_UNKNOWN_EVENTS") === "1";
+    const mcpBaseUrl = this.opts.config.mcpBaseUrl ?? readEnv("CHRONA_MCP_BASE_URL") ?? defaultMcpBaseUrl();
+    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
+    const mcpRunToken = this.opts.config.mcpRunToken ?? readEnv("CHRONA_API_KEY") ?? readEnv("CHRONA_MCP_BEARER_TOKEN") ?? "";
+    const env: Record<string, string> = {
+      ...(this.opts.config.env ?? {}),
+      ...(this.opts.config.apiKey ? { ANTHROPIC_API_KEY: this.opts.config.apiKey } : {}),
+    };
+    return {
+      model: this.opts.config.model ?? DEFAULT_MODEL,
+      timeoutMs: this.opts.config.timeoutMs,
+      mcpBaseUrl,
+      mcpRunToken,
+      env: Object.keys(env).length > 0 ? env : undefined,
+      binaryPath: this.opts.config.binaryPath,
+      cwd: this.opts.config.cwd,
+      recordDir,
+      strictUnknownEvents: strict,
+      controlBaseUrl,
+      sdkOptions: this.opts.config.sdkOptions,
+    };
   }
 
   private async recordFinalSnapshot(

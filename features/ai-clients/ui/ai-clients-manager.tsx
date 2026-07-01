@@ -51,13 +51,11 @@ type ClientFormValues = {
   binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
-  controlPlane: ControlPlaneMode;
 };
 
 type HermesClientScope = "local" | "remote";
 
 type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
-type ControlPlaneMode = "mcp" | "skill";
 
 const DEBUG_PROVIDER_PROFILES = [
   "deterministic",
@@ -126,7 +124,6 @@ function buildClaudeCodeConfig(input: {
   apiKey: string;
   model: string;
   binaryPath: string;
-  controlPlane: ControlPlaneMode;
 }): Record<string, unknown> {
   const model = nonEmptyEnvValue(input.model);
   const baseUrl = nonEmptyEnvValue(input.baseUrl);
@@ -142,7 +139,6 @@ function buildClaudeCodeConfig(input: {
     model,
     binaryPath,
     timeoutMs: Number(input.timeoutSeconds) * 1000,
-    controlPlane: input.controlPlane,
     env: Object.keys(env).length > 0 ? env : undefined,
   };
 }
@@ -174,7 +170,6 @@ function buildClientPayload(input: {
   binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
-  controlPlane: ControlPlaneMode;
 }): ClientFormPayload {
   if (input.type === "debug") {
     return {
@@ -394,7 +389,6 @@ function ClientForm({
     binaryPath: (initialConfig as { binaryPath?: string } | undefined)?.binaryPath ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
-    controlPlane: ((initialConfig as { controlPlane?: ControlPlaneMode } | undefined)?.controlPlane === "skill" ? "skill" : "mcp"),
   }), [fallbackType, initial, initialConfig, providers]);
   const form = useForm<ClientFormValues>({
     defaultValues,
@@ -706,26 +700,6 @@ function ClientForm({
                     />
                   </Field>
                 </div>
-                <Field>
-                  <FieldLabel>Control plane</FieldLabel>
-                  <Controller
-                    name="controlPlane"
-                    control={form.control}
-                    render={({ field, fieldState }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger className="w-full" aria-invalid={fieldState.invalid} aria-label="Control plane">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="mcp">MCP</SelectItem>
-                            <SelectItem value="skill">Skill</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input

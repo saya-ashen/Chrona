@@ -6,7 +6,6 @@
  * adaptation layer (milestone §5 rule 3).
  */
 
-import type { ControlPlaneMode } from "@chrona/contracts";
 
 /** Constructed from `ClaudeCodeClientConfig` plus runner env state. */
 export interface ClaudeCodeProviderConfig {
@@ -24,8 +23,7 @@ export interface ClaudeCodeProviderConfig {
   /**
    * Static Bearer token presented to the MCP server at `/api/mcp`. MUST
    * equal the server's `API_KEY` (or be supplied via the
-   * `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars). Required
-   * unless the MCP transport is disabled (skill mode only).
+   * `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars).
    */
   mcpRunToken: string;
   apiKey?: string;
@@ -35,21 +33,9 @@ export interface ClaudeCodeProviderConfig {
   cwd?: string;
   /** Resolved at construction: which runner back-end to use. */
   mode?: ClaudeCodeRunnerMode;
-  /**
-   * Skill-mode selector (Spec 018). Defaults to "mcp".
-   * - "mcp": register Chrona's `/api/mcp` server on the spawned run (legacy).
-   * - "skill": inject `CHRONA_BASE_URL` + `CHRONA_RUN_TOKEN` env; the agent
-   *   drives control via the bundled `chrona` CLI from a mounted skill dir
-   *   (see `skillDir`). No MCP server is registered.
-   */
-  controlPlane?: ControlPlaneMode;
-  /**
-   * Skill directory mounted into the spawned run. Only honored when
-   * `controlPlane === "skill"`. The provider passes `--add-dir <skillDir>` to
-   * the `claude` CLI invocation so the agent can `Bash` the bundled `chrona`
-   * CLI. Optional at this layer; can be overridden per-run via
-   * `StartRunInput.control.skillsDir`.
-   */
+  /** Deprecated: skill mode has been removed; Claude Code uses MCP control. */
+  controlPlane?: "mcp";
+  /** Deprecated: skill mode has been removed; ignored. */
   skillDir?: string;
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: Partial<import("@anthropic-ai/claude-agent-sdk").Options>;

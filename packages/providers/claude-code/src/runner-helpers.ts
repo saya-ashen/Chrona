@@ -1,19 +1,8 @@
 /**
  * runner-helpers — small, pure helpers used by `runner.ts`.
- *
- * Pulled out of the main runner file to keep each module under the lint
- * `max-lines` cap (500 lines). All helpers here are side-effect-free
- * (except `mountChronaNodeSkill`, which copies the bundled skill into a
- * per-run directory and returns its path).
  */
 
-import { cp, mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import type { ProviderRunRef, ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
-
-import type { ClaudeCodeRunnerConfig } from "./runner";
 
 export interface BaseRefOptions {
   provider?: string;
@@ -61,22 +50,10 @@ function renderInputPayload(input: StartRunInput["input"]): string | undefined {
   return JSON.stringify(Object.fromEntries(entries), null, 2);
 }
 
-const CHRONA_NODE_SKILL_SOURCE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "..",
-  "skills",
-  "chrona-node",
-);
-
-export async function mountChronaNodeSkill(cfg: ClaudeCodeRunnerConfig, source = cfg.skillDir): Promise<string> {
-  const dir = join(cfg.recordDir ?? join(process.cwd(), ".claude-code-mcp"), `skill-${crypto.randomUUID()}`);
-  const target = join(dir, ".claude", "skills", "chrona-node");
-  await mkdir(target, { recursive: true });
-  await cp(source ?? CHRONA_NODE_SKILL_SOURCE, target, { recursive: true, force: true });
-  return dir;
+export function runnerEnv(cfg: { env?: Record<string, string> }): NodeJS.ProcessEnv {
+  return { ...process.env, ...(cfg.env ?? {}) };
 }
+
 
 export function snapshotFromRef(
   handle: { runId: string; ref: ProviderRunRef },

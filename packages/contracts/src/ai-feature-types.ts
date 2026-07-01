@@ -54,12 +54,10 @@ export interface HermesClientConfig {
 /**
  * Config for the Claude Code execution provider (Spec 017 / WS-B).
  *
- * The provider launches a local Claude Code headless run (Agent SDK preferred,
- * `claude -p` subprocess fallback) per `startRun` and registers Chrona's
- * `/api/mcp` server scoped to that run. See `plan.md` §0 for the
- * research-gate decisions behind these fields.
+ * The provider launches a local Claude Code headless run through the Agent SDK
+ * and registers Chrona's `/api/mcp` server scoped to that run.
  */
-export type ControlPlaneMode = "mcp" | "skill";
+export type ControlPlaneMode = "mcp";
 
 export interface ClaudeCodeClientConfig {
   /** Override the Claude Code CLI location (CLI fallback path only). */
@@ -75,11 +73,10 @@ export interface ClaudeCodeClientConfig {
    * server sits behind the same `apiKeyAuth()` middleware as every other
    * `/api/*` route, so this MUST equal the server's `API_KEY` (or be
    * supplied via `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars).
-   * Skill mode is unaffected — the skill path uses a separate per-run
-   * token injected at `start()` time via `input.control.runToken`.
+   * Skill mode has been removed; Claude Code always uses MCP control.
    */
   mcpRunToken?: string;
-  /** Control transport for node execution. Defaults to "mcp". Skill mode is supported for claude_code only. */
+  /** Deprecated: Claude Code now always uses MCP control. */
   controlPlane?: ControlPlaneMode;
   /** Anthropic API key (recommended for production; subscription quota may otherwise apply). */
   apiKey?: string;
