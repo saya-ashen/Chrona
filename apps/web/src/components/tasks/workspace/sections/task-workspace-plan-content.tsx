@@ -85,14 +85,13 @@ export function TaskWorkspacePlanContent({
   const generatePlanButton = isGeneratingPlan ? null : (
     <Button
       type="button"
-      disabled={isGeneratingPlan}
       onClick={onGeneratePlan}
-      variant="secondary" size="sm" className="rounded-xl"
+      variant="secondary"
+      size="sm"
+      className="rounded-xl"
     >
       <Sparkles className="size-4" />
-      {plan
-        ? copy.regeneratePlan
-        : copy.generatePlan}
+      {plan ? copy.regeneratePlan : copy.generatePlan}
     </Button>
   );
 

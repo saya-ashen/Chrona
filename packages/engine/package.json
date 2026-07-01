@@ -4,17 +4,19 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@chrona/claude-code": "workspace:*",
+    "@chrona/codex": "workspace:*",
     "@chrona/contracts": "workspace:*",
     "@chrona/db": "workspace:*",
     "@chrona/domain": "workspace:*",
     "@chrona/graph-runtime": "workspace:*",
-    "@chrona/integrations": "workspace:*",
     "@chrona/hermes": "workspace:*",
+    "@chrona/integrations": "workspace:*",
+    "@chrona/logging": "workspace:*",
     "@chrona/providers-debug": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
-    "@chrona/logging": "workspace:*",
-    "@chrona/shared": "workspace:*",
     "@chrona/runtime-core": "workspace:*",
+    "@chrona/shared": "workspace:*",
     "@chrona/ui-protocol": "workspace:*"
   },
   "exports": {

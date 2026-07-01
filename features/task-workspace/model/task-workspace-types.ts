@@ -1,4 +1,4 @@
-import type { TaskConfigExecutionRuntime } from "@features/schedule";
+import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "@features/schedule";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 import type { GraphNodeState, ReconciliationResult, TaskExecutionSummary } from "@chrona/contracts";
@@ -13,6 +13,7 @@ export type TaskData = {
   description: string | null;
   executionRuntime: string;
   executionConfig: unknown;
+  aiClientId?: string | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
   autoPlanGenerationTiming: string;
@@ -76,6 +77,7 @@ export type TaskData = {
 export type TaskPageData = {
   defaultExecutionRuntime: string;
   executionRuntimes: TaskConfigExecutionRuntime[];
+  availableAiClients?: TaskConfigAiClient[];
   task: TaskData;
   reconciliation?: ReconciliationResult | null;
   latestRunSummary: {
@@ -126,7 +128,7 @@ export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
   "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "commandCenter" | "header"
 >;
 
-export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes">;
+export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes" | "availableAiClients">;
 
 export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "scheduleProposals" | "approvals">;
 
@@ -144,6 +146,7 @@ export type EditableTask = {
   scheduleStatus: string;
   executionRuntime: string;
   executionConfig: unknown;
+  aiClientId: string | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
   recurrenceRule: string | null;

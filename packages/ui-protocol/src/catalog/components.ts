@@ -93,6 +93,29 @@ const toolDetailLabelsSchema = z.object({
   duration: z.string(),
   error: z.string(),
 });
+const filePreviewKindSchema = z.enum(["markdown", "json", "text", "csv"]);
+
+const filePreviewErrorSchema = z.enum([
+  "unsafe_path",
+  "not_found",
+  "unsupported_type",
+  "read_failed",
+]);
+
+const fileViewPropsSchema = z.object({
+  title: z.string().optional(),
+  uri: z.string().optional(),
+  path: z.string().optional(),
+  displayPath: z.string().optional(),
+  contentKind: filePreviewKindSchema.optional(),
+  contentPreview: z.string().optional(),
+  contentTruncated: z.boolean().optional(),
+  contentBytes: z.number().optional(),
+  previewError: filePreviewErrorSchema.optional(),
+  description: z.string().optional(),
+  language: z.string().optional(),
+});
+
 
 const bindableNumberSchema = z
   .union([z.number(), stateBindingSchema])
@@ -166,13 +189,12 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       description: "Pretty-printed JSON result value.",
     },
     FileRef: {
-      props: z.object({
-        path: z.string(),
-        title: z.string().optional(),
-        language: z.string().optional(),
-        description: z.string().optional(),
-      }),
-      description: "Reference to a produced file artifact.",
+      props: fileViewPropsSchema,
+      description: "Reference to a produced file artifact, optionally hydrated with a safe server-side preview.",
+    },
+    FileView: {
+      props: fileViewPropsSchema,
+      description: "Produced file artifact preview hydrated server-side before browser rendering.",
     },
     ResultSummary: {
       props: z.object({
@@ -206,6 +228,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         emptyMessage: z.string().optional(),
         toolLabels: toolDetailLabelsSchema,
         density: z.enum(["rail"]).optional(),
+        active: z.boolean().optional(),
       }),
       description: "Streaming activity feed backed by json-render state.",
     },
@@ -244,13 +267,12 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         "Collapsible artifact index used by the task workspace command center.",
     },
     WorkspaceArtifactItem: {
-      props: z.object({
+      props: fileViewPropsSchema.extend({
         title: z.string(),
         type: z.string(),
-        uri: z.string().optional(),
         locateLabel: z.string().optional(),
       }),
-      description: "One workspace artifact row with an optional locate action.",
+      description: "One workspace artifact row with an optional locate action and server-hydrated preview.",
     },
     WorkspaceActionGroup: {
       props: z.object({
@@ -362,8 +384,8 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
     JsonView: {
       props: z.object({ value: z.unknown(), title: z.string().optional() }),
       description:
-        "Pretty-printed JSON result value. Use for structured output, diagnostics, API payloads, or machine-readable results.",
-      example: { title: "Result", value: { status: "ok" } },
+        "Pretty-printed JSON result value. Use only for diagnostics, API payloads, machine-readable evidence, or debugging details; prefer Markdown/Table/Card for user-facing reports and summaries.",
+      example: { title: "Diagnostic payload", value: { status: "ok" } },
     },
     FileRef: {
       props: z.object({
@@ -452,14 +474,13 @@ export function chronaPlanOutputCatalogPrompt() {
   return chronaPlanOutputCatalog.prompt({
     editModes: ["patch"],
     customRules: [
-      "Prefer Card containers around generated sections so results adapt to panel width.",
-      "Use JsonView sparingly; prefer Markdown, Table, ResultSummary, FileRef, and FileView for user-facing reports.",
-      "remove elements no longer reachable from root when replacing result structure.",
       "Each patch is a JSON Patch operation over Current Node Context JSON.context.planOutput.spec.",
       "Chrona does not accept raw JSONL text. Put the generated RFC 6902 patch objects in chrona_plan_output.patches.",
       "Use chrona_plan_output for shared plan-level user-visible output only.",
       "When planOutput.spec is null, bootstrap with /root and every referenced /elements/<id> entry in one tool call.",
-      "Patch narrowly when output already exists; prefer /elements/<id>/props/<prop> for small text updates.",
+      "User-facing reports should compose clear sections with Card containers around Markdown/Table/ResultSummary content so each major block has a visible background.",
+      "Use JsonView sparingly: only for diagnostics, API payloads, machine-readable evidence, or debugging details. Do not show source data or report rationale as raw JSON when Markdown or Table would be readable.",
+      "When replacing prior output, remove elements no longer reachable from root so stale sections do not remain in the shared spec.",
       "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, or node-local outputs.",
     ],
   });

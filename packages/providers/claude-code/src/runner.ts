@@ -133,11 +133,6 @@ function buildDebugHooks(logger: ChronaLogger): SdkHooksOption {
 }
 
 export interface ClaudeCodeRunnerConfig {
-   /**
-   * Path to the `claude` executable handed to the SDK
-   * (`pathToClaudeCodeExecutable`). Default: the SDK's built-in executable.
-   */
-  binaryPath?: string;
   /** Default "claude-opus-4-8". */
   model?: string;
   /** Idle timeout (ms). Aborts only when SDK produces no events within this window. */
@@ -146,8 +141,7 @@ export interface ClaudeCodeRunnerConfig {
   mcpBaseUrl: string;
   /** Per-run Bearer token sent in the MCP `Authorization` header. */
   mcpRunToken: string;
-  /** Chrona /agent/control base URL. Deprecated; skill mode has been removed. */
-  controlBaseUrl?: string;
+
   /** CWD for the spawned process. Default: `process.cwd()`. */
   cwd?: string;
   /** Pass-through env (merged on top of `process.env`). */
@@ -162,6 +156,8 @@ export interface ClaudeCodeRunnerConfig {
   strictUnknownEvents?: boolean;
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: Partial<SdkQueryOptions>;
+  /** Optional Claude binary override. Hidden from normal UI. */
+  binaryPath?: string;
 }
 
 export interface ClaudeCodeRunnerDiagnostics {
@@ -322,8 +318,11 @@ function resolveSelfChronaPath(): string | undefined {
 
 /**
  * Build the env passed to a spawned `claude` process. Always sets
- * `CHRONA_CLI` to a value the spawned process can resolve unless caller
- * already supplied one.
+ * `CHRONA_CLI` value spawned process can resolve:
+ * - Caller env override (`cfg.env.CHRONA_CLI`)
+ * - Real path current chrona binary (e.g. launcher cache ELF
+ *   in production, `packages/cli/src/index.ts` in dev)
+ * - Bare `chrona` (PATH lookup) final fallback
  *
  * Exported for unit testing the env-construction seam without spawning
  * a real `claude` process.
@@ -419,11 +418,10 @@ class ReplayRunner implements ClaudeCodeRunner {
 /*                                  SDK runner                                 */
 /* -------------------------------------------------------------------------- */
 
-/** SDK option fragment that pins the `claude` executable, when overridden. */
-function binaryOption(
-  cfg: ClaudeCodeRunnerConfig,
-): { pathToClaudeCodeExecutable?: string } {
-  return cfg.binaryPath ? { pathToClaudeCodeExecutable: cfg.binaryPath } : {};
+
+function binaryOption(cfg: ClaudeCodeRunnerConfig): Partial<SdkQueryOptions> {
+  const path = cfg.binaryPath?.trim();
+  return path ? ({ executable: path } as Partial<SdkQueryOptions>) : {};
 }
 
 export async function probeClaudeCodeSdk(input: {
@@ -776,7 +774,7 @@ class SdkRunner implements ClaudeCodeRunner {
     // to be reachable BEFORE it can call `mcp__chrona__chrona_plan_generate`.
     // The 401 we keep hitting in dev comes from this transport being
     // registered with a stale/invalid token — the agent would only
-    // notice mid-session (wasting a model turn). Probe the MCP server once
+    // notice mid-session (wasting model turn). Probe MCP server once
     // here so a bad token / wrong URL is reported at start() time.
     await probeMcpServer({
       baseUrl: mcpBaseUrl,
@@ -794,7 +792,6 @@ class SdkRunner implements ClaudeCodeRunner {
       runId,
       sessionId: input.sessionId,
       sessionKey: input.sessionKey ?? null,
-      controlPlane: "mcp",
     });
     const debugEnabled = isProviderDebugEnabled(log);
     const debugFile = debugEnabled
@@ -809,10 +806,9 @@ class SdkRunner implements ClaudeCodeRunner {
       cwd: cfg.cwd,
       env: claudeRunEnv(cfg),
       ...(resumedSdkSessionId ? { resume: resumedSdkSessionId } : {}),
-      // Honor an explicit binary override; otherwise the SDK uses its
+      // Honor an explicit binary override; otherwise SDK uses its
       // built-in `claude` executable.
       ...binaryOption(cfg),
-
       ...(debugEnabled ? { hooks: buildDebugHooks(log) } : {}),
       ...(debugFile ? { debugFile } : {}),
     } as Parameters<typeof sdkQuery>[0]["options"];
@@ -825,7 +821,6 @@ class SdkRunner implements ClaudeCodeRunner {
     });
     logProviderDebug(log, "claude_code.run_options", {
       cwd: cfg.cwd,
-      binaryPath: cfg.binaryPath ?? null,
       timeoutMs: cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       timeoutMode: "idle",
       mcpBaseUrl,

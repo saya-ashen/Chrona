@@ -6,16 +6,22 @@ import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
 export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
-export type AiFeature =
-  | "suggest"
-  | "generate_plan"
-  | "conflicts"
-  | "timeslots"
-  | "chat"
-  | "dispatch_task"
-  | "execute_task_node"
-  | "evaluate_condition_node"
-  | "review_checkpoint_node";
+export const AI_FEATURES = [
+  "suggest",
+  "generate_plan",
+  "conflicts",
+  "timeslots",
+  "chat",
+  "dispatch_task",
+  "execute_task_node",
+  "evaluate_condition_node",
+  "review_checkpoint_node",
+  "dashboard.brief",
+  "task.plan",
+  "task.execution",
+] as const;
+
+export type AiFeature = (typeof AI_FEATURES)[number];
 
 export interface AiClientRecord {
   id: string;
@@ -47,8 +53,6 @@ export interface HermesClientConfig {
   baseUrl?: string;
   apiKey?: string;
   timeoutMs?: number;
-  /** Hermes gateway stays MCP-only until a future safe per-run skill/env handoff exists. */
-  controlPlane?: "mcp";
 }
 
 /**
@@ -57,14 +61,11 @@ export interface HermesClientConfig {
  * The provider launches a local Claude Code headless run through the Agent SDK
  * and registers Chrona's `/api/mcp` server scoped to that run.
  */
-export type ControlPlaneMode = "mcp";
 
 export interface ClaudeCodeClientConfig {
-  /** Override the Claude Code CLI location (CLI fallback path only). */
-  binaryPath?: string;
   /** Model ID passed to Claude Code. Defaults to "claude-opus-4-8". */
   model?: string;
-  /** Total run timeout. SDK uses this as the overall bound; CLI uses it as SIGKILL fallback. */
+  /** Total run timeout. SDK uses this as the overall bound. */
   timeoutMs?: number;
   /** Chrona /api/mcp base URL. Defaults to the hosting Chrona server. */
   mcpBaseUrl?: string;
@@ -73,11 +74,8 @@ export interface ClaudeCodeClientConfig {
    * server sits behind the same `apiKeyAuth()` middleware as every other
    * `/api/*` route, so this MUST equal the server's `API_KEY` (or be
    * supplied via `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars).
-   * Skill mode has been removed; Claude Code always uses MCP control.
    */
   mcpRunToken?: string;
-  /** Deprecated: Claude Code now always uses MCP control. */
-  controlPlane?: ControlPlaneMode;
   /** Anthropic API key (recommended for production; subscription quota may otherwise apply). */
   apiKey?: string;
   /** Optional: pass-through env vars to the Claude Code subprocess. */
@@ -89,36 +87,9 @@ export interface ClaudeCodeClientConfig {
   cwd?: string;
 }
 
-/**
- * Config for the Claude Code execution provider (Spec 017 / WS-B).
- *
- * The provider launches a local Claude Code headless run (Agent SDK preferred,
- * `claude -p` subprocess fallback) per `startRun` and registers Chrona's
- * `/api/mcp` server scoped to that run. See `plan.md` §0 for the
- * research-gate decisions behind these fields.
- */
-export interface ClaudeCodeClientConfig {
-  /** Override the Claude Code CLI location (CLI fallback path only). */
-  binaryPath?: string;
-  /** Model ID passed to Claude Code. Defaults to "claude-opus-4-8". */
-  model?: string;
-  /** Total run timeout. SDK uses this as the overall bound; CLI uses it as SIGKILL fallback. */
-  timeoutMs?: number;
-  /** Chrona /api/mcp base URL. Defaults to the hosting Chrona server. */
-  mcpBaseUrl?: string;
-  /** Anthropic API key (recommended for production; subscription quota may otherwise apply). */
-  apiKey?: string;
-  /** Optional: pass-through env vars to the Claude Code subprocess. */
-  env?: Record<string, string>;
-  /**
-   * Optional: working directory for the Claude Code run. Defaults to
-   * `process.cwd()`. Use this to constrain the agent's filesystem scope.
-   */
-  cwd?: string;
-}
 
 export interface CodexClientConfig {
-  /** Override the Codex CLI location. Defaults to SDK bundled executable. */
+  /** Internal codex-acp executable override. Not user-facing. */
   binaryPath?: string;
   /** Model ID passed to Codex. */
   model?: string;
@@ -128,10 +99,16 @@ export interface CodexClientConfig {
   apiKey?: string;
   /** OpenAI-compatible base URL. */
   baseUrl?: string;
-  /** Optional pass-through env vars for Codex CLI. */
+  /** Optional pass-through env vars for codex-acp. */
   env?: Record<string, string>;
   /** Optional working directory for Codex. */
   cwd?: string;
+  /** Internal Codex CLI executable used by codex-acp. Not user-facing. */
+  codexPath?: string;
+  /** Chrona /api/mcp base URL. Defaults to the hosting Chrona server. */
+  mcpBaseUrl?: string;
+  /** Static Bearer token presented to the MCP server at `/api/mcp`. */
+  mcpRunToken?: string;
 }
 
 export type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";

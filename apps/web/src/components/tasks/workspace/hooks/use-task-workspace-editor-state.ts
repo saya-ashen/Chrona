@@ -30,6 +30,7 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
     task.autoPlanGeneration,
     task.autoExecute,
     task.recurrenceRule,
+    task.aiClientId,
   ]);
   const originalEditableTask = useMemo(() => taskToEditableTask(task), [task]);
   const draftEditableTask = useMemo(
@@ -79,6 +80,7 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
         priority: input.priority,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
+        aiClientId: input.aiClientId,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
         recurrenceRule: input.recurrenceRule,
@@ -137,6 +139,7 @@ export function useTaskWorkspaceEditorState(task: TaskData, setTask: (value: Set
         scheduleStatus: prev.scheduleStatus,
         executionRuntime: input.executionRuntime,
         executionConfig: input.executionConfig,
+        aiClientId: input.aiClientId,
         autoPlanGeneration: input.autoPlanGeneration,
         autoExecute: input.autoExecute,
         recurrenceRule: input.recurrenceRule,

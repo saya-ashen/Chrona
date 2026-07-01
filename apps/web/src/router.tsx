@@ -6,27 +6,20 @@ import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import {
   DashboardRoutePage,
-  InboxRoutePage,
   LocaleLandingPage,
-  MemoryRoutePage,
   ScheduleRoutePage,
   SettingsRoutePage,
   TaskDetailRoutePage,
   TaskListRoutePage,
-  WorkRoutePage,
 } from "./pages";
 import { NotFoundPage } from "@/components/not-found-page";
 import {
   loadAppBootData,
   loadDashboardRouteData,
-  loadInboxRouteData,
-  loadMemoryRouteData,
   loadScheduleRouteData,
   loadTaskListData,
   loadTaskPageData,
-  loadWorkPageData,
 } from "./loaders";
-
 function redirectToDefaultLocale(pathname: string, search: string, hash: string) {
   return `${window.location.origin}/${defaultLocale}${pathname}${search}${hash}`;
 }
@@ -64,16 +57,9 @@ export function createAppRouter() {
           loader: loadScheduleRouteData,
           element: <ScheduleRoutePage />,
         },
-        {
-          path: "inbox",
-          loader: loadInboxRouteData,
-          element: <InboxRoutePage />,
-        },
-        {
-          path: "memory",
-          loader: loadMemoryRouteData,
-          element: <MemoryRoutePage />,
-        },
+        // Inbox and Memory routes intentionally hidden. Dashboard owns concise
+        // attention/recovery visibility; do not re-add standalone routes without
+        // actionable controls and a clear product role.
         {
           path: "tasks",
           loader: loadTaskListData,
@@ -87,11 +73,6 @@ export function createAppRouter() {
           path: "tasks/:taskId",
           loader: loadTaskPageData,
           element: <TaskDetailRoutePage />,
-        },
-        {
-          path: "work/:taskId",
-          loader: loadWorkPageData,
-          element: <WorkRoutePage />,
         },
         {
           path: "*",

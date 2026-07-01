@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getDashboardAiBriefState } from "./dashboard-ai-surface";
 
 /**
  * Dashboard "task news homepage" projection.
@@ -336,13 +337,27 @@ export async function getDashboard(workspaceId: string) {
       };
     });
 
+  const totalAutoCompleted = completedTotalGroups.reduce((sum, group) => sum + group._count._all, 0);
+  const aiBrief = await getDashboardAiBriefState({
+    workspaceId,
+    fingerprintInput: {
+      needsAttention,
+      inProgress,
+      autoCompleted,
+      recentEvents,
+      totalAutoCompleted,
+    },
+  });
+
   return {
     generatedAt: new Date(now).toISOString(),
+    workspaceId,
     focusTask: buildFocusTask(projections, outputs, now),
     needsAttention,
     inProgress,
     autoCompleted,
-    totalAutoCompleted: completedTotalGroups.reduce((sum, group) => sum + group._count._all, 0),
+    totalAutoCompleted,
     recentEvents,
+    aiBrief,
   };
 }

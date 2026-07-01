@@ -19,6 +19,7 @@ export function SelectedBlockSheet({
   selectedDay: _selectedDay,
   executionRuntimes,
   defaultExecutionRuntime,
+  availableAiClients,
   isPending,
   onClose,
   onSaveTaskConfigAction,
@@ -72,6 +73,7 @@ export function SelectedBlockSheet({
                 copy={copy}
                 executionRuntimes={executionRuntimes}
                 defaultExecutionRuntime={defaultExecutionRuntime}
+                availableAiClients={availableAiClients}
                 isPending={isPending}
                 planningTaskDraft={planningTaskDraft}
                 savedPlan={displayedSavedPlan}

@@ -7,6 +7,7 @@ import {
   orderActivityNewestFirst,
 } from "./task-activity";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
+import { hydrateFilePreviewSpec, resolveFilePreview } from "./file-preview";
 
 function nowTone(status: string) {
   if (status === "completed") return "success" as const;
@@ -66,12 +67,13 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
   if (!task) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
-  const artifacts = task.artifacts.map((artifact) => ({
+  const artifacts = await Promise.all(task.artifacts.map(async (artifact) => ({
     id: artifact.id,
     title: artifact.title,
     type: artifact.type,
     uri: artifact.uri,
-  }));
+    ...(await resolveFilePreview(artifact.uri)),
+  })));
   const activityTimeline = task.timelineItems.length > 0
     ? orderActivityNewestFirst([
         ...task.timelineItems.map(mapTimelineItemToActivity),
@@ -88,7 +90,7 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
         tone: nowTone(currentExecution.status),
         currentOperationSpec: currentExecution.ui?.currentOperationSpec ?? null,
       }),
-      output: (currentExecution.planOutput?.spec as UiDocument | null | undefined) ?? buildCommandCenterArtifactsSpec({ artifacts }),
+      output: await hydrateFilePreviewSpec((currentExecution.planOutput?.spec as UiDocument | null | undefined) ?? buildCommandCenterArtifactsSpec({ artifacts })),
       trail: buildCommandCenterTrailSpec({
         activity: activityTimeline,
         savedCount: activityTimeline.length,

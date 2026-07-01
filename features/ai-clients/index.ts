@@ -9,7 +9,7 @@ export type {
   HermesClientConfig,
   LLMClientConfig,
 } from "@chrona/contracts";
-export { AiClientError } from "@chrona/contracts";
+export { AI_FEATURES, AiClientError } from "@chrona/contracts";
 
 export type {
   DebugProfiledProviderClient,

@@ -133,8 +133,6 @@ export {
   taskRecoveryActionTypeSchema,
 } from "./task-orchestrator";
 
-export type { ControlPlaneMode } from "./ai-feature-types";
-
 export type {
   ChronaToolExpectedState,
   ChronaToolIdempotencyStatus,
@@ -371,7 +369,7 @@ export type {
   StructuredResponseMeta,
 } from "./ai-feature-types";
 
-export { AiClientError, DEFAULT_AGENT_PROVIDER_MODEL } from "./ai-feature-types";
+export { AI_FEATURES, AiClientError, DEFAULT_AGENT_PROVIDER_MODEL } from "./ai-feature-types";
 
 export type {
   TaskDispatchAction,

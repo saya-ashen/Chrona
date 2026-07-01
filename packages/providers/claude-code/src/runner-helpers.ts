@@ -3,7 +3,6 @@
  */
 
 import type { ProviderRunRef, ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
-
 export interface BaseRefOptions {
   provider?: string;
   baseRef?: ProviderRunRef;

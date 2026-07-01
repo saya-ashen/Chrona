@@ -140,6 +140,7 @@ export function SchedulePageMainPanel({
   externalEvents,
   executionRuntimes,
   defaultExecutionRuntime,
+  availableAiClients,
   isPending,
   onScheduleDrop,
   onCreateTaskBlock,
@@ -159,6 +160,7 @@ export function SchedulePageMainPanel({
   externalEvents: PlanningBusyBlock[];
   executionRuntimes: SchedulePageData["executionRuntimes"];
   defaultExecutionRuntime: string;
+  availableAiClients?: SchedulePageData["availableAiClients"];
   isPending: boolean;
   onScheduleDrop: (
     item: TimelineDragItem,
@@ -206,6 +208,7 @@ export function SchedulePageMainPanel({
                 draggedItem={draggedItem}
                 executionRuntimes={executionRuntimes}
                 defaultExecutionRuntime={defaultExecutionRuntime}
+                availableAiClients={availableAiClients}
                 isPending={isPending}
                 onScheduleDrop={onScheduleDrop}
                 onCreateTaskBlock={onCreateTaskBlock}
@@ -222,6 +225,7 @@ export function SchedulePageMainPanel({
                 items={listItems}
                 executionRuntimes={executionRuntimes}
                 defaultExecutionRuntime={defaultExecutionRuntime}
+                availableAiClients={availableAiClients}
                 onSaveTaskConfigAction={onSaveTaskConfigAction}
                 isPending={isPending}
               />

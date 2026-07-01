@@ -93,9 +93,11 @@ describe("execution-runtime registry", () => {
     expect(resolveExecutionRuntime({ executionRuntime: "  " })).toBe("hermes");
   });
 
-  it("listExecutionRuntimes surfaces hermes and debug", () => {
+  it("listExecutionRuntimes surfaces agent runtimes", () => {
     const runtimes = listExecutionRuntimes();
     expect(runtimes).toContain("hermes");
+    expect(runtimes).toContain("claude_code");
+    expect(runtimes).toContain("codex");
     expect(runtimes).toContain("debug");
   });
 

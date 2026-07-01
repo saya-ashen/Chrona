@@ -95,7 +95,7 @@ Rules:
 Put here:
 
 - route components and page shells
-- Schedule, Inbox, task workspace, Work page, Settings UI
+- Schedule, Inbox, task workspace, Dashboard, Settings UI
 - frontend hooks for API/page projections
 - client-side formatting and presentation helpers
 - i18n usage and UI composition

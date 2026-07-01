@@ -22,8 +22,8 @@ function writeWorkEvent(stream: SseStream, event: TaskProjectionEvent) {
 }
 
 async function getWorkspaceId(engine: ChronaEngine, taskId: string) {
-  const work = await engine.pages.getWork({ taskId });
-  return work.taskShell.workspaceId;
+  const page = await engine.tasks.getBootstrap({ taskId });
+  return page.task.workspaceId;
 }
 
 function publishCommandEvent(input: {
@@ -194,16 +194,20 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
   switch (event.type) {
     case "status":
       return {
+        "/plan/status": "generating",
+        "/plan/generation/status": "running",
         "/plan/generation/phase": event.phase,
         "/plan/generation/statusMessage": event.message,
       };
     case "tool_call":
       return {
+        "/plan/status": "generating",
+        "/plan/generation/status": "running",
         "/plan/generation/lastTool": event.tool,
         "/plan/generation/lastToolAt": new Date().toISOString(),
       };
     case "partial":
-      return { "/plan/generation/partialText": event.text };
+      return { "/plan/status": "generating", "/plan/generation/status": "running", "/plan/generation/partialText": event.text };
     case "result":
       return {
         "/plan/saved/id": event.result.id,
@@ -216,6 +220,7 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/execution/can-start": false,
         "/execution/start-disabled": true,
         "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
+        "/plan/status": "waiting_acceptance",
         "/plan/generation/status": "completed",
         "/plan/generation/is-running": false,
         "/plan/generation/header-action-disabled": false,
@@ -236,6 +241,7 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
       // which ones are appropriate for the failure class.
       const retryable = event.code !== "TASK_NOT_FOUND";
       return {
+        "/plan/status": "idle",
         "/plan/generation/error/code": event.code,
         "/plan/generation/error/message": event.message,
         "/plan/generation/error/buttonRetry": retryable,
@@ -538,18 +544,6 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
 
 export function createWorkRoutes(engine: ChronaEngine) {
   return new Hono()
-    .get("/work/:taskId", zValidator("param", workProjectionParamSchema), async (c) => {
-      try {
-        const { taskId } = c.req.valid("param");
-        return json(c, await engine.pages.getWork({ taskId }));
-      } catch (cause) {
-        const httpError = toHttpError(cause);
-        if (httpError) {
-          return error(c, httpError.message, httpError.status);
-        }
-        return internalServerError(c, "GET /api/work/:taskId", cause, "Failed to get work page");
-      }
-    })
     .post(
       "/work/:taskId/commands",
       zValidator("param", workProjectionParamSchema),

@@ -16,9 +16,12 @@ for the system as a whole, see [Architecture](./architecture.md).
 | `src/pages.tsx` | Top-level route page components wired in `router.tsx` |
 | `src/app-shell.tsx` | `AppShell` layout (nav/chrome) wrapping all locale routes |
 
-Routes today: `/:lang` landing, `schedule`, `inbox`, `memory`, `tasks`,
-`tasks/:taskId` (task workspace), `settings`. Routing is locale-prefixed; the
-default locale redirects from `/`.
+Routes today: `/:lang` landing, `schedule`, `tasks`, `tasks/:taskId` (task workspace),
+`settings`. Routing is locale-prefixed; the default locale redirects from `/`.
+`inbox` and `memory` are intentionally hidden until they have actionable product
+roles beyond read-only/duplicative record display; Dashboard owns concise
+attention/recovery visibility. Do not re-add them to primary navigation or routes
+without implementing those controls first.
 
 ## Directories
 
@@ -42,8 +45,6 @@ A feature dir (e.g. `components/tasks/`) is self-contained and exposes a public
   `shared/`, `ai/`)
 - `*.test.tsx` next to the component it covers
 
-`components/work/` (the Work page execution cockpit) follows the same pattern:
-page client, timeline, inspector, side panels, each with adjacent tests.
 
 ## Server communication (`src/lib`)
 
@@ -86,4 +87,4 @@ These are the rules an agent must follow when editing `apps/web` (mirrored from
 | Add/change a page | `router.tsx` + `loaders.ts` + the matching `components/<feature>/` dir |
 | Change how the app talks to the server | `src/api.ts`, `lib/rpc-client.ts`, `lib/fetch-json-event-source.ts` |
 | Add a reusable control | `components/ui/` (shadcn) first, then compose in the feature |
-| Task workspace / Work page work | `components/tasks/workspace/`, `components/work/` |
+| Task workspace work | `components/tasks/workspace/` |

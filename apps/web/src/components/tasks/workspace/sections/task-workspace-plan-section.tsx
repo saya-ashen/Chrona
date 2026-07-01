@@ -361,10 +361,11 @@ export function TaskWorkspacePlanSection({
           taskId={pageData.task.id}
           consoleView={consoleView}
           primaryAction={primaryAction}
-          commandCenter={commandCenter ?? null}
+          commandCenter={isGeneratingPlan ? null : commandCenter ?? null}
           commandCenterActionHandlers={commandCenterActionHandlers}
           runtimeEvents={runtimeEvents}
           liveActivity={liveActivity}
+          currentExecution={currentExecution}
           commandCenterCopy={commandCenterCopy}
           isPlanCompact={graphMode === "compact"}
           copy={copy}

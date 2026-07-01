@@ -56,9 +56,9 @@ per-package "put here / don't put here" rules, dependency direction, and enforce
 
 The task workspace is the planning and editing surface. It supports task detail editing, AI plan generation, generated-plan review, plan acceptance, and execution overview.
 
-### Work page
+### Task workspace execution
 
-The Work page is the task execution cockpit. It combines latest result, plan graph, execution record, task metadata, right-side inspector/rail context, and a command composer. Work commands are submitted through `/api/work/:taskId/commands` and updates arrive through `/api/work/:taskId/events`.
+Task execution now lives inside the task workspace. Runtime commands use `/api/work/:taskId/commands` and live updates use `/api/work/:taskId/events`; there is no separate Work page route.
 
 ### Schedule page
 
@@ -98,7 +98,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-  participant UI as Task workspace / Work page
+  participant UI as Task workspace
   participant API as Plan routes
   participant E as Engine plan module
   participant AI as Configured AI client

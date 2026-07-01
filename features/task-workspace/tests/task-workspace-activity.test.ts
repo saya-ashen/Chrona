@@ -219,4 +219,22 @@ describe("workspace activity helpers", () => {
       activityGroup: { kind: "plan_generation", id: "generation-1" },
     });
   });
+
+  it("uses receive timestamp fallback for command activity without server timestamp", () => {
+    const item = workspaceEventToWorkspaceActivity({
+      type: "command.accepted",
+      sequence: 7,
+      commandType: "execution.action",
+    }, 7, "2026-05-21T00:02:00.000Z");
+
+    expect(item).toMatchObject({
+      title: "Command accepted",
+      timestamp: "2026-05-21T00:02:00.000Z",
+      sequence: 7,
+    });
+    expect(orderWorkspaceActivity([
+      activity({ id: "older", kind: "task", timestamp: "2026-05-21T00:01:00.000Z", sequence: 8 }),
+      item!,
+    ]).map((entry) => entry.title)).toEqual(["Command accepted", "older"]);
+  });
 });

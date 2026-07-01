@@ -369,6 +369,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(reloaded.status).toBe("cancelled");
     expect(reloaded.finishedAt).toBeInstanceOf(Date);
   });
+
 });
 
 describe("runProviderRequest resume threading", () => {

@@ -4,7 +4,7 @@ import { api } from "@/lib/rpc-client";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../../../../../../../features/task-workspace";
-import { useTaskPlanGenerationSession, type TaskPlanSessionState } from "@/hooks/ai/task-plan-generation-session-store";
+import { stopTaskPlanGenerationSession, useTaskPlanGenerationSession, type TaskPlanSessionState } from "@/hooks/ai/task-plan-generation-session-store";
 import {
   canAcceptPlanFromFlow,
   clearPlanFlowError,
@@ -472,7 +472,7 @@ export function useTaskWorkspacePlanState(
 
     for (const event of nextEvents) {
       if (!isWorkspaceEventInSelectedScope(event, selectedWorkBlockId)) continue;
-      const activityItem = workspaceEventToWorkspaceActivity(event, event.sequence ?? 0);
+      const activityItem = workspaceEventToWorkspaceActivity(event, event.sequence ?? 0, new Date().toISOString());
       if (activityItem) {
         setLiveActivity((current) => mergeWorkspaceActivity([activityItem, ...current]));
       }
@@ -582,20 +582,16 @@ export function useTaskWorkspacePlanState(
   }, [acceptPlanById, plan?.id]);
 
   const handleGeneratePlanFromHeader = useCallback((request?: PlanGenerationRequest) => {
+    if (isGeneratingPlan) return;
     const userInstruction = request?.userInstruction?.trim() || null;
     setGenerationUserInstruction(userInstruction);
-    // Server pushes `state.update` to the shared session store immediately
-    // after the command is accepted; `isGeneratingPlan` is derived from
-    // that store, so an optimistic flip is no longer needed. A transport
-    // failure bubbles as a rejected promise and is handled upstream; the
-    // session store surfaces any server-side error via `sessionStatus`.
     void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction });
-  }, [selectedWorkBlockId, task.id]);
+  }, [isGeneratingPlan, selectedWorkBlockId, task.id]);
 
   const handleStopPlanGeneration = useCallback(async () => {
-    await dispatchWorkspaceCommand(task.id, { type: "plan.stop_generation", workBlockId: selectedWorkBlockId });
-    void refreshExecutionQueries();
-  }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
+    await stopTaskPlanGenerationSession(task.id, selectedWorkBlockId);
+    await planStateQuery.refetch();
+  }, [planStateQuery, selectedWorkBlockId, task.id]);
 
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);

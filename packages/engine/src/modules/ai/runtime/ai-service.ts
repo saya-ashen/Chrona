@@ -12,7 +12,7 @@ import type {
 
 import { chat } from "@/modules/ai/feature-normalizers";
 import { generatePlanStream } from "@/modules/ai/features/generate-plan";
-import { getAiClient } from "./client-resolution";
+import { getAiClient, getAiClientForTask } from "./client-resolution";
 
 export async function aiChat(
   request: ChatRequest,
@@ -25,7 +25,9 @@ export async function aiChat(
 export async function* aiGeneratePlanStream(
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
-  const client = await getAiClient();
+  const client = request.taskId
+    ? await getAiClientForTask({ taskId: request.taskId, purpose: "task.plan" })
+    : await getAiClient();
   if (!client) {
     yield {
       type: "error",

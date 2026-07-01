@@ -65,7 +65,6 @@ interface InternalRun {
 
 /** Public constructor-friendly config (subset of contracts config). */
 export interface ClaudeCodeProviderConfig {
-  binaryPath?: string;
   model?: string;
   timeoutMs?: number;
   mcpBaseUrl?: string;
@@ -78,11 +77,10 @@ export interface ClaudeCodeProviderConfig {
   mcpRunToken?: string;
   apiKey?: string;
   cwd?: string;
+  /** Optional Claude binary override. Hidden from normal UI. */
+  binaryPath?: string;
   env?: Record<string, string>;
-  /** Deprecated: skill mode has been removed; Claude Code uses MCP control. */
-  controlPlane?: "mcp";
-  /** Deprecated: skill mode has been removed; ignored. */
-  skillDir?: string;
+
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
 }
@@ -472,7 +470,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     // auth.ts), so the Bearer token we hand the SDK here MUST be the
     // server's static `API_KEY` (the same one operators set in
     // apps/server/.env).
-    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
+
     const mcpRunToken =
       this.opts.config.mcpRunToken ??
       readEnv("CHRONA_API_KEY") ??
@@ -488,11 +486,10 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       mcpBaseUrl,
       mcpRunToken,
       env: Object.keys(env).length > 0 ? env : undefined,
-      binaryPath: this.opts.config.binaryPath,
       cwd: this.opts.config.cwd,
       recordDir,
       strictUnknownEvents: strict,
-      controlBaseUrl,
+
       sdkOptions: this.opts.config.sdkOptions,
     };
     return createClaudeCodeRunner(cfg);
@@ -516,7 +513,6 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     const recordDir = this.opts.recordDir ?? readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR");
     const strict = this.opts.strictUnknownEvents ?? readEnv("CHRONA_CLAUDE_CODE_STRICT_UNKNOWN_EVENTS") === "1";
     const mcpBaseUrl = this.opts.config.mcpBaseUrl ?? readEnv("CHRONA_MCP_BASE_URL") ?? defaultMcpBaseUrl();
-    const controlBaseUrl = readEnv("CHRONA_BASE_URL") ?? mcpBaseUrl;
     const mcpRunToken = this.opts.config.mcpRunToken ?? readEnv("CHRONA_API_KEY") ?? readEnv("CHRONA_MCP_BEARER_TOKEN") ?? "";
     const env: Record<string, string> = {
       ...(this.opts.config.env ?? {}),
@@ -532,7 +528,6 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       cwd: this.opts.config.cwd,
       recordDir,
       strictUnknownEvents: strict,
-      controlBaseUrl,
       sdkOptions: this.opts.config.sdkOptions,
     };
   }

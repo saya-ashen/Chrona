@@ -9,11 +9,6 @@
 
 /** Constructed from `ClaudeCodeClientConfig` plus runner env state. */
 export interface ClaudeCodeProviderConfig {
-  /**
-   * Path to the `claude` executable handed to the SDK
-   * (`pathToClaudeCodeExecutable`). Default: the SDK's built-in executable.
-   */
-  binaryPath?: string;
   /** Default "claude-opus-4-8". */
   model?: string;
   /** Total run timeout (ms). Overall wall-clock bound on the SDK run. */
@@ -33,10 +28,7 @@ export interface ClaudeCodeProviderConfig {
   cwd?: string;
   /** Resolved at construction: which runner back-end to use. */
   mode?: ClaudeCodeRunnerMode;
-  /** Deprecated: skill mode has been removed; Claude Code uses MCP control. */
-  controlPlane?: "mcp";
-  /** Deprecated: skill mode has been removed; ignored. */
-  skillDir?: string;
+
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: Partial<import("@anthropic-ai/claude-agent-sdk").Options>;
 }

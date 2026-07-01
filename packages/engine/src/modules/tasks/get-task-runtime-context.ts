@@ -11,6 +11,12 @@ export async function getTaskRuntimeContext(input: { taskId: string }) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
 
+  const availableAiClients = await db.aiClient.findMany({
+    where: { enabled: true },
+    select: { id: true, name: true, enabled: true },
+    orderBy: { createdAt: "asc" },
+  });
+
   return {
     defaultExecutionRuntime: task.workspace.defaultRuntime,
     executionRuntimes: listExecutionRuntimes().map((key) => ({
@@ -18,5 +24,6 @@ export async function getTaskRuntimeContext(input: { taskId: string }) {
       label: key,
       spec: getRuntimeTaskConfigSpec(key),
     })),
+    availableAiClients,
   };
 }

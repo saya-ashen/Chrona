@@ -117,7 +117,7 @@ Solid and extensible — **no large refactor needed**. Only adjust:
 `PRODUCT.md` design principles are right and anti-debugger-panel. The gap is
 **delivery**, not direction:
 
-- **"What is it waiting on?"** — the Work page "Current operation" card is a
+- **"What is it waiting on?"** — the task workspace "Current operation" card is a
   static `attention ?? readiness` fallback that does not distinguish the 4 plan
   states (diagnosed in spec 019 §1). **Spec 019 fixes this — finish it.**
 - **"Why is it stuck?"** — `derive-auto-start-eligibility` reasons are not

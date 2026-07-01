@@ -38,6 +38,7 @@ type ClientFormPayload = {
 type RuntimeProviderInput = {
   key?: unknown;
   label?: string;
+  features?: unknown;
 };
 
 type ClientFormValues = {
@@ -48,9 +49,9 @@ type ClientFormValues = {
   baseUrl: string;
   apiKey: string;
   model: string;
-  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
+  bindings: string[];
 };
 
 type HermesClientScope = "local" | "remote";
@@ -79,6 +80,7 @@ type TestResult = {
 type RuntimeProviderOption = {
   key: AiClientType;
   label: string;
+  features: string[];
 };
 
 const LOCAL_HERMES_BASE_URL = "http://127.0.0.1:8642";
@@ -123,12 +125,11 @@ function buildClaudeCodeConfig(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
-  binaryPath: string;
+
 }): Record<string, unknown> {
   const model = nonEmptyEnvValue(input.model);
   const baseUrl = nonEmptyEnvValue(input.baseUrl);
   const authToken = nonEmptyEnvValue(input.apiKey);
-  const binaryPath = nonEmptyEnvValue(input.binaryPath);
   const env: Record<string, string> = {};
 
   if (model) env.ANTHROPIC_MODEL = model;
@@ -137,7 +138,6 @@ function buildClaudeCodeConfig(input: {
 
   return {
     model,
-    binaryPath,
     timeoutMs: Number(input.timeoutSeconds) * 1000,
     env: Object.keys(env).length > 0 ? env : undefined,
   };
@@ -148,13 +148,11 @@ function buildCodexConfig(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
-  binaryPath: string;
 }): Record<string, unknown> {
   return {
     model: nonEmptyEnvValue(input.model),
     baseUrl: nonEmptyEnvValue(input.baseUrl),
     apiKey: nonEmptyEnvValue(input.apiKey),
-    binaryPath: nonEmptyEnvValue(input.binaryPath),
     timeoutMs: Number(input.timeoutSeconds) * 1000,
   };
 }
@@ -167,7 +165,6 @@ function buildClientPayload(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
-  binaryPath: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
 }): ClientFormPayload {
@@ -228,6 +225,7 @@ function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
     .map((provider) => ({
       key: provider.key,
       label: typeof provider.label === "string" ? provider.label : provider.key,
+      features: Array.isArray(provider.features) ? provider.features.filter((feature): feature is string => typeof feature === "string") : [],
     }));
 }
 
@@ -300,6 +298,61 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
   }
 }
 
+const FEATURE_COPY: Record<string, { label: string; description: string }> = {
+  suggest: {
+    label: "Smart Suggestions",
+    description: "Generate task and schedule suggestions.",
+  },
+  generate_plan: {
+    label: "Task Plan Generation",
+    description: "Generate structured task plans.",
+  },
+  generatePlan: {
+    label: "Task Plan Generation",
+    description: "Generate structured task plans.",
+  },
+  conflicts: {
+    label: "Conflict Analysis",
+    description: "Analyze schedule conflicts.",
+  },
+  timeslots: {
+    label: "Timeslot Recommendations",
+    description: "Recommend scheduling windows.",
+  },
+  chat: {
+    label: "Chat / Plan Generation",
+    description: "Answer task planning chat prompts.",
+  },
+  "dashboard.brief": {
+    label: "Dashboard Brief",
+    description: "Generate dashboard summaries and focus recommendations.",
+  },
+  "task.plan": {
+    label: "Task Planning",
+    description: "Generate or refine task plans.",
+  },
+  "task.execution": {
+    label: "Task Execution",
+    description: "Execute approved task steps.",
+  },
+};
+
+function getFeatureCopy(feature: string) {
+  return FEATURE_COPY[feature] ?? { label: feature, description: feature };
+}
+
+function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientType) {
+  return providers.find((provider) => provider.key === type)?.features ?? [];
+}
+
+async function updateClientBindings(clientId: string, features: string[]) {
+  const res = await api.ai.clients[":clientId"].bindings.$put({
+    param: { clientId },
+    json: { features },
+  });
+  const data = (await res.json()) as { bindings?: string[] };
+  return data.bindings ?? features;
+}
 const DEFAULTS: Record<string, string> = {
   title: "AI Clients",
   subtitle: "Connect Hermes so Chrona can plan tasks and safely execute approved work.",
@@ -362,7 +415,7 @@ function ClientForm({
   providers,
 }: {
   initial?: AiClientInfo;
-  onSave: (data: ClientFormPayload) => void;
+  onSave: (data: { payload: ClientFormPayload; bindings: string[] }) => void;
   onCancel: () => void;
   copy: Record<string, string>;
   providers: RuntimeProviderOption[];
@@ -386,9 +439,9 @@ function ClientForm({
     model: (initialConfig as { model?: string; env?: Record<string, string> } | undefined)?.model
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_MODEL
       ?? "",
-    binaryPath: (initialConfig as { binaryPath?: string } | undefined)?.binaryPath ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
+    bindings: initial?.bindings ?? [],
   }), [fallbackType, initial, initialConfig, providers]);
   const form = useForm<ClientFormValues>({
     defaultValues,
@@ -400,6 +453,7 @@ function ClientForm({
   const isClaudeCodeClient = values.type === "claude_code";
   const isCodexClient = values.type === "codex";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
+  const availableFeatures = getProviderFeatures(providers, values.type);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
   const [hermesResult, setHermesResult] = useState<HermesIntegrationResult | null>(null);
@@ -418,7 +472,7 @@ function ClientForm({
   }, [form, values.baseUrl, values.hermesScope, values.type]);
 
   function handleSave(nextValues: ClientFormValues) {
-    onSave(buildClientPayload(nextValues));
+    onSave({ payload: buildClientPayload(nextValues), bindings: nextValues.bindings });
   }
 
   return (
@@ -501,7 +555,6 @@ function ClientForm({
                   <p className="text-sm text-muted-foreground">
                     {isLocalHermes ? copy.hermesLocalDescription : copy.hermesRemoteDescription}
                   </p>
-                  <p className="text-xs text-muted-foreground">Hermes control plane: MCP only. Skill mode is unsupported for Hermes this milestone.</p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -681,25 +734,15 @@ function ClientForm({
                     />
                   </Field>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-api-key">ANTHROPIC_AUTH_TOKEN</FieldLabel>
-                    <Input
-                      {...form.register("apiKey")}
-                      id="ai-client-api-key"
-                      type="password"
-                      placeholder="optional auth token"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-binary-path">Binary path</FieldLabel>
-                    <Input
-                      {...form.register("binaryPath")}
-                      id="ai-client-binary-path"
-                      placeholder="claude"
-                    />
-                  </Field>
-                </div>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-api-key">ANTHROPIC_AUTH_TOKEN</FieldLabel>
+                  <Input
+                    {...form.register("apiKey")}
+                    id="ai-client-api-key"
+                    type="password"
+                    placeholder="optional auth token"
+                  />
+                </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input
@@ -740,25 +783,15 @@ function ClientForm({
                     />
                   </Field>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-api-key">API Key</FieldLabel>
-                    <Input
-                      {...form.register("apiKey")}
-                      id="ai-client-api-key"
-                      type="password"
-                      placeholder="optional API key"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-binary-path">Binary path</FieldLabel>
-                    <Input
-                      {...form.register("binaryPath")}
-                      id="ai-client-binary-path"
-                      placeholder="codex"
-                    />
-                  </Field>
-                </div>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-api-key">OPENAI_API_KEY</FieldLabel>
+                  <Input
+                    {...form.register("apiKey")}
+                    id="ai-client-api-key"
+                    type="password"
+                    placeholder="optional API key"
+                  />
+                </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input
@@ -802,6 +835,43 @@ function ClientForm({
                 />
               </Field>
             )}
+
+            {availableFeatures.length > 0 && (
+              <Field>
+                <FieldLabel>Feature bindings</FieldLabel>
+                <div className="grid gap-3 rounded-md border p-3">
+                  {availableFeatures.map((feature) => {
+                    const featureCopy = getFeatureCopy(feature);
+                    return (
+                      <Controller
+                        key={feature}
+                        name="bindings"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Field orientation="horizontal" className="items-start gap-3">
+                            <Checkbox
+                              checked={field.value.includes(feature)}
+                              onCheckedChange={(checked) => {
+                                field.onChange(
+                                  checked === true
+                                    ? [...new Set([...field.value, feature])]
+                                    : field.value.filter((value) => value !== feature),
+                                );
+                              }}
+                            />
+                            <FieldContent>
+                              <FieldLabel>{featureCopy.label}</FieldLabel>
+                              <p className="text-xs text-muted-foreground">{featureCopy.description}</p>
+                            </FieldContent>
+                          </Field>
+                        )}
+                      />
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
+
 
             <Controller
               name="isDefault"
@@ -890,17 +960,22 @@ export function AiClientsManager() {
     void fetchClients();
   }, [fetchClients]);
 
-  const handleCreate = async (data: ClientFormPayload) => {
-    await api.ai.clients.$post({ json: data });
+  const handleCreate = async (data: { payload: ClientFormPayload; bindings: string[] }) => {
+    const res = await api.ai.clients.$post({ json: data.payload });
+    const result = (await res.json()) as { client?: { id?: string } };
+    if (result.client?.id) {
+      await updateClientBindings(result.client.id, data.bindings);
+    }
     setShowForm(false);
     void fetchClients();
   };
 
-  const handleUpdate = async (id: string, data: ClientFormPayload) => {
+  const handleUpdate = async (id: string, data: { payload: ClientFormPayload; bindings: string[] }) => {
     await api.ai.clients[":clientId"].$patch({
       param: { clientId: id },
-      json: data,
+      json: data.payload,
     });
+    await updateClientBindings(id, data.bindings);
     setEditingId(null);
     void fetchClients();
   };
@@ -1007,6 +1082,13 @@ export function AiClientsManager() {
                         {(client.config as { baseUrl?: string }).baseUrl ?? "—"} · {(client.config as { model?: string }).model ?? "default"}
                       </span>
                     )}
+                  {client.bindings.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {client.bindings.map((feature) => (
+                        <Badge key={feature} variant="outline">{getFeatureCopy(feature).label}</Badge>
+                      ))}
+                    </div>
+                  )}
                   </CardDescription>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <Button

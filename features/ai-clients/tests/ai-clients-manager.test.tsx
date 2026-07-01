@@ -64,22 +64,27 @@ const providersResponse = {
     {
       key: "hermes",
       label: "Hermes",
-      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
+      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
     {
       key: "llm",
       label: "LLM (OpenAI Compatible)",
-      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat"],
+      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
     {
       key: "claude_code",
       label: "Claude Code",
-      features: ["generatePlan", "chat"],
+      features: ["generatePlan", "chat", "task.plan", "task.execution"],
+    },
+    {
+      key: "codex",
+      label: "Codex",
+      features: ["generatePlan", "chat", "task.plan", "task.execution"],
     },
     {
       key: "debug",
       label: "Debug Provider",
-      features: ["suggest", "generatePlan", "chat"],
+      features: ["suggest", "generatePlan", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
   ],
 };
@@ -169,6 +174,10 @@ describe("AiClientsManager", () => {
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      json: async () => ({ bindings: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
       json: async () => ({ clients: [] }),
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
@@ -229,6 +238,10 @@ describe("AiClientsManager", () => {
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      json: async () => ({ bindings: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
       json: async () => ({ clients: [] }),
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
@@ -258,6 +271,70 @@ describe("AiClientsManager", () => {
     });
   });
 
+  it("creates a Codex client without path configuration", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+
+    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+      target: { value: "Codex" },
+    });
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Codex"));
+
+    expect(screen.queryByText("Binary path")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Model"), {
+      target: { value: "gpt-5-codex" },
+    });
+    fireEvent.change(screen.getByLabelText("OPENAI_API_KEY"), {
+      target: { value: "sk-codex" },
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ client: { id: "client_codex" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ bindings: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const createCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients" && call[1]?.method === "POST");
+    const payload = JSON.parse(createCall?.[1]?.body as string);
+    expect(payload).toMatchObject({
+      name: "Codex",
+      type: "codex",
+      config: {
+        model: "gpt-5-codex",
+        apiKey: "sk-codex",
+        timeoutMs: 120000,
+      },
+    });
+    expect(payload.config).not.toHaveProperty("binaryPath");
+  });
+
   it("creates a debug client with the deterministic profile by default", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce({
@@ -284,6 +361,10 @@ describe("AiClientsManager", () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ client: { id: "client_debug" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ bindings: [] }),
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -335,6 +416,10 @@ describe("AiClientsManager", () => {
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
+      json: async () => ({ bindings: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
       json: async () => ({ clients: [] }),
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
@@ -369,7 +454,7 @@ describe("AiClientsManager", () => {
             config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
             isDefault: true,
             enabled: true,
-            bindings: [],
+            bindings: ["dashboard.brief"],
             createdAt: new Date().toISOString(),
           },
         ],
@@ -386,10 +471,15 @@ describe("AiClientsManager", () => {
     fireEvent.change(screen.getByPlaceholderText("http://127.0.0.1:8642"), {
       target: { value: "http://localhost:8642" },
     });
+    expect(screen.getByText("Dashboard Brief")).toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ client: { id: "client_hermes", type: "hermes" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ bindings: ["dashboard.brief"] }),
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -416,6 +506,9 @@ describe("AiClientsManager", () => {
         timeoutMs: 120000,
       },
     });
+
+    const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_hermes/bindings" && call[1]?.method === "PUT");
+    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["dashboard.brief"] });
   });
 
   it("shows remote Hermes guidance without local auto-configuration", async () => {
@@ -466,6 +559,7 @@ describe("AiClientsManager", () => {
     await screen.findByText("Restart Hermes.");
 
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ client: { id: "client_hermes" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ bindings: [] }) });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
 

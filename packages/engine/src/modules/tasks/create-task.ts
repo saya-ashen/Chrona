@@ -136,6 +136,7 @@ export async function createTask(input: CreateTaskInput) {
       autoExecuteTiming,
       status,
       parentTaskId: input.parentTaskId ?? null,
+      aiClientId: input.aiClientId ?? null,
     },
   });
 

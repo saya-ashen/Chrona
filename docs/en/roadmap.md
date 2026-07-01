@@ -24,13 +24,12 @@ These capabilities exist in the current codebase and should be treated as produc
 | AI planning | Streaming plan generation, generated-plan persistence, plan review/edit/accept flows, and materialization into task plan layers. |
 | Graph plans | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with graph state resolution. |
 | AI node runtime | AI-visible refs for node completion, condition selection, block/fail, and wait completion; backend IDs stay behind server-side mapping. |
-| Work page | Latest result, plan graph, execution records, task details, right rail/inspector, and bottom composer surface. |
-| Task Workspace | Task editing, plan generation/acceptance, execution overview, and node detail inspection. |
+| Task Workspace | Task editing, plan generation/acceptance, execution overview, latest result, plan graph, execution records, and node detail inspection. |
 | Schedule page | Timeline, task list, AI insights, conflicts, schedule proposals, task creation, and configuration surfaces. |
 | Inbox | Pending approvals, schedule proposals, waiting inputs, and failed/cancelled run surfaces. |
 | Memory console | Workspace/task memory display surfaces. |
 | AI clients | Database-backed AI clients and feature bindings through Settings / AI Clients. |
-| Backend API | Task CRUD/lifecycle routes, plan generation/acceptance routes, task-scoped execution routes, work/schedule page projections, runtime provider routes, and AI client routes. |
+| Backend API | Task CRUD/lifecycle routes, plan generation/acceptance routes, task-scoped execution routes, workspace command/event transport, schedule page projections, runtime provider routes, and AI client routes. |
 | MCP / Hermes | Streamable HTTP MCP tools for Chrona execution/plan/node operations and Hermes provider/plugin integration for agent-style execution. |
 | External calendars | Read-only subscription sources, source validation/management, imported busy events, refresh status, and schedule context. |
 
@@ -38,7 +37,7 @@ These capabilities exist in the current codebase and should be treated as produc
 
 Near-term work should make the existing schedule-to-execution product dependable and understandable before broadening the surface area too far.
 
-### 1. Make the Work page execution record practical
+### 1. Make the task workspace execution record practical
 
 - Keep the composer fixed at the bottom and the middle record area scrollable.
 - Keep conversation history across all task runs, not only the latest run.
@@ -81,7 +80,7 @@ Near-term work should make the existing schedule-to-execution product dependable
 
 - Let a single task execution use multiple sessions when a provider, task scope, or recovery path requires it.
 - Make session reuse, isolation, refresh-after-error, and recovery behavior explicit.
-- Keep per-session events inspectable from the Work page and execution timeline.
+- Keep per-session events inspectable from the task workspace execution timeline.
 - Prevent multi-session execution from duplicating node completion or corrupting graph state.
 
 ### 7. Finish external calendar ecosystem
@@ -99,7 +98,7 @@ Near-term work should make the existing schedule-to-execution product dependable
 
 ## Mid-term evolution
 
-Mid-term work should extend the current loops once Work, execution, and schedule behavior are stable.
+Mid-term work should extend the current loops once task workspace execution and schedule behavior are stable.
 
 | Theme | Direction |
 | --- | --- |
@@ -109,8 +108,8 @@ Mid-term work should extend the current loops once Work, execution, and schedule
 | Multi-session execution | Coordinate multiple provider/runtime sessions for one task while preserving graph correctness and auditability. |
 | Calendar ecosystem | Sync with external calendar software while keeping Chrona's task, plan, and execution state authoritative. |
 | Richer memory | Use task and workspace memory more deliberately in planning, node execution, and summaries. |
-| Better projections | Make page projections fast, task-scoped where possible, and consistent across Work, Schedule, Inbox, and Task Workspace. |
-| Test coverage | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP tools, Work projections, and schedule proposal decisions. |
+| Better projections | Make page projections fast, task-scoped where possible, and consistent across Schedule, Inbox, Dashboard, and Task Workspace. |
+| Test coverage | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP tools, task workspace projections, and schedule proposal decisions. |
 
 ## Long-term direction
 
@@ -129,7 +128,7 @@ Long-term work should be treated as strategic direction, not near-term promise.
 Good areas to improve now:
 
 - Keep documentation and examples aligned with actual route/schema behavior.
-- Add narrow tests around task plans, execution actions, Work page projections, schedule decisions, and MCP tools.
-- Improve UI clarity in Work, Schedule, Inbox, Task Workspace, and Settings / AI Clients.
+- Add narrow tests around task plans, execution actions, task workspace projections, schedule decisions, and MCP tools.
+- Improve UI clarity in Schedule, Inbox, Task Workspace, Dashboard, and Settings / AI Clients.
 - Tighten package boundaries when code drifts into the wrong layer.
 - Prefer small, verifiable changes over broad rewrites.
