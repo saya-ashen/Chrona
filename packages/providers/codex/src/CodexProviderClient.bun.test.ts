@@ -9,6 +9,7 @@ import {
   type CodexRunHandle,
   type CodexRunner,
 } from "./CodexProviderClient";
+import { codexAcpEnv } from "./types";
 
 function baseInput(overrides: Partial<StartRunInput> = {}): StartRunInput {
   return {
@@ -137,6 +138,41 @@ class FakeAcpTransport implements AcpTransport {
     return op({ context, close() {}, closed: Promise.resolve() } as never);
   }
 }
+
+describe("codexAcpEnv", () => {
+  it("passes API key auth as default ACP auth request", () => {
+    const env = codexAcpEnv({ apiKey: " sk-openai " });
+    expect(env.CODEX_API_KEY).toBe("sk-openai");
+    expect(env.OPENAI_API_KEY).toBe("sk-openai");
+    expect(JSON.parse(env.DEFAULT_AUTH_REQUEST ?? "{}")).toEqual({
+      methodId: "api-key",
+      _meta: { "api-key": { apiKey: "sk-openai" } },
+    });
+  });
+
+  it("passes gateway auth request when base URL is configured", () => {
+    const env = codexAcpEnv({
+      apiKey: "sk-gateway",
+      baseUrl: " https://gateway.example/v1 ",
+      model: "gpt-5-codex",
+    });
+
+    expect(JSON.parse(env.CODEX_CONFIG ?? "{}")).toMatchObject({
+      baseUrl: " https://gateway.example/v1 ",
+      model: "gpt-5-codex",
+    });
+    expect(JSON.parse(env.DEFAULT_AUTH_REQUEST ?? "{}")).toEqual({
+      methodId: "gateway",
+      _meta: {
+        gateway: {
+          baseUrl: "https://gateway.example/v1",
+          providerName: "Chrona Codex Gateway",
+          headers: { Authorization: "Bearer sk-gateway" },
+        },
+      },
+    });
+  });
+});
 
 describe("CodexProviderClient", () => {
   it("exposes ACP execution provider capabilities", async () => {

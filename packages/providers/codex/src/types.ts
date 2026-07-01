@@ -54,7 +54,11 @@ export function codexAcpCommand(config: CodexProviderConfig): string {
 
 export function codexAcpEnv(config: CodexProviderConfig): Record<string, string> {
   const env = { ...process.env, ...(config.env ?? {}) } as Record<string, string>;
-  if (config.apiKey) env.CODEX_API_KEY = config.apiKey;
+  const apiKey = config.apiKey?.trim();
+  if (apiKey) {
+    env.CODEX_API_KEY = apiKey;
+    env.OPENAI_API_KEY = apiKey;
+  }
   if (config.codexPath) env.CODEX_PATH = config.codexPath;
   if (config.initialAgentMode) env.INITIAL_AGENT_MODE = config.initialAgentMode;
   if (config.noBrowser) env.NO_BROWSER = "1";
@@ -62,7 +66,34 @@ export function codexAcpEnv(config: CodexProviderConfig): Record<string, string>
   if (Object.keys(codexConfig).length > 0) {
     env.CODEX_CONFIG = JSON.stringify(codexConfig);
   }
+  const authRequest = buildDefaultAuthRequest(config, apiKey);
+  if (authRequest) {
+    env.DEFAULT_AUTH_REQUEST = JSON.stringify(authRequest);
+  }
   return env;
+}
+
+function buildDefaultAuthRequest(config: CodexProviderConfig, apiKey?: string): Record<string, unknown> | null {
+  const baseUrl = config.baseUrl?.trim();
+  if (baseUrl) {
+    return {
+      methodId: "gateway",
+      _meta: {
+        gateway: {
+          baseUrl,
+          providerName: "Chrona Codex Gateway",
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+        },
+      },
+    };
+  }
+  if (apiKey) {
+    return {
+      methodId: "api-key",
+      _meta: { "api-key": { apiKey } },
+    };
+  }
+  return null;
 }
 
 function buildCodexConfig(config: CodexProviderConfig): Record<string, unknown> {
