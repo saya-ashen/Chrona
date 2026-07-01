@@ -1,50 +1,37 @@
-import type {
-  ApprovalMode,
-  CodexOptions,
-  ModelReasoningEffort,
-  SandboxMode,
-  ThreadOptions,
-  WebSearchMode,
-} from "@openai/codex-sdk";
+import type { ProviderUsage } from "@chrona/providers-foundation";
 
 export interface CodexProviderConfig {
-  /** Override Codex CLI executable. Defaults to SDK bundled executable. */
+  /** Override codex-acp executable. Defaults to package binary on PATH. */
   binaryPath?: string;
-  /** Model ID passed to Codex. */
+  /** Model ID passed to codex-acp through CODEX_CONFIG. */
   model?: string;
-  /** Total turn timeout in milliseconds. */
+  /** Total prompt turn timeout in milliseconds. */
   timeoutMs?: number;
-  /** OpenAI/Codex API key. Passed as CODEX_API_KEY by the SDK. */
+  /** OpenAI/Codex API key. Passed as CODEX_API_KEY. */
   apiKey?: string;
-  /** OpenAI-compatible base URL passed through Codex SDK. */
+  /** OpenAI-compatible base URL passed through CODEX_CONFIG. */
   baseUrl?: string;
   /** Working directory for Codex. Defaults to current process cwd. */
   cwd?: string;
-  /** Pass-through environment for Codex CLI. SDK does not inherit process.env when set. */
+  /** Pass-through environment for codex-acp. */
   env?: Record<string, string>;
-  /** Codex sandbox mode. Defaults to SDK/CLI configuration. */
-  sandboxMode?: SandboxMode;
-  /** Codex approval policy. Defaults to SDK/CLI configuration. */
-  approvalPolicy?: ApprovalMode;
-  /** Optional model reasoning effort. */
-  modelReasoningEffort?: ModelReasoningEffort;
-  /** Optional web search mode. */
-  webSearchMode?: WebSearchMode;
-  /** Enable or disable Codex network access in workspace-write sandbox. */
-  networkAccessEnabled?: boolean;
-  /** Skip Codex git repository check. */
-  skipGitRepoCheck?: boolean;
-  /** Extra writable/readable roots passed to Codex. */
+  /** Override Codex CLI executable used by codex-acp. */
+  codexPath?: string;
+  /** Initial codex-acp mode. */
+  initialAgentMode?: "read-only" | "agent" | "agent-full-access";
+  /** Hide browser-based ChatGPT auth in headless environments. */
+  noBrowser?: boolean;
+  /** Advanced Codex config merged into CODEX_CONFIG. */
+  codexConfig?: Record<string, unknown>;
+  /** Extra workspace roots passed to ACP session setup. */
   additionalDirectories?: string[];
-  /** Advanced Codex CLI config overrides. */
-  sdkOptions?: CodexOptions["config"];
-  /** Chrona /api/mcp base URL reserved for future Codex MCP wiring. */
+  /** Chrona /api/mcp base URL. */
   mcpBaseUrl?: string;
-  /** Chrona /api/mcp bearer token reserved for future Codex MCP wiring. */
+  /** Chrona /api/mcp bearer token. */
   mcpRunToken?: string;
 }
 
-export type CodexRunnerMode = "sdk";
+export type CodexRunnerMode = "acp";
 
 export class CodexProviderError extends Error {
   readonly retryable: boolean;
@@ -61,26 +48,37 @@ export class CodexProviderError extends Error {
   }
 }
 
-export function toCodexOptions(config: CodexProviderConfig): CodexOptions {
+export function codexAcpCommand(config: CodexProviderConfig): string {
+  return config.binaryPath?.trim() || "codex-acp";
+}
+
+export function codexAcpEnv(config: CodexProviderConfig): Record<string, string> {
+  const env = { ...process.env, ...(config.env ?? {}) } as Record<string, string>;
+  if (config.apiKey) env.CODEX_API_KEY = config.apiKey;
+  if (config.codexPath) env.CODEX_PATH = config.codexPath;
+  if (config.initialAgentMode) env.INITIAL_AGENT_MODE = config.initialAgentMode;
+  if (config.noBrowser) env.NO_BROWSER = "1";
+  const codexConfig = buildCodexConfig(config);
+  if (Object.keys(codexConfig).length > 0) {
+    env.CODEX_CONFIG = JSON.stringify(codexConfig);
+  }
+  return env;
+}
+
+function buildCodexConfig(config: CodexProviderConfig): Record<string, unknown> {
   return {
-    codexPathOverride: config.binaryPath,
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
-    config: config.sdkOptions,
-    env: config.env,
+    ...(config.codexConfig ?? {}),
+    ...(config.model ? { model: config.model } : {}),
+    ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
   };
 }
 
-export function toThreadOptions(config: CodexProviderConfig): ThreadOptions {
+export function usageFromAcp(used?: number, size?: number): ProviderUsage | null {
+  if (typeof used !== "number" && typeof size !== "number") return null;
+  const inputTokens = typeof used === "number" ? used : 0;
   return {
-    model: config.model,
-    sandboxMode: config.sandboxMode,
-    workingDirectory: config.cwd,
-    skipGitRepoCheck: config.skipGitRepoCheck,
-    modelReasoningEffort: config.modelReasoningEffort,
-    networkAccessEnabled: config.networkAccessEnabled,
-    webSearchMode: config.webSearchMode,
-    approvalPolicy: config.approvalPolicy,
-    additionalDirectories: config.additionalDirectories,
+    inputTokens,
+    outputTokens: 0,
+    totalTokens: inputTokens,
   };
 }

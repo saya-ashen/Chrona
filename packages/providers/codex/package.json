@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@agentclientprotocol/codex-acp": "^1.0.2",
+    "@agentclientprotocol/sdk": "^1.1.0",
     "@chrona/contracts": "workspace:*",
-    "@chrona/providers-foundation": "workspace:*",
-    "@openai/codex-sdk": "^0.142.5"
+    "@chrona/providers-foundation": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts"

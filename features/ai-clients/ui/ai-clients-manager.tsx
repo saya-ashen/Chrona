@@ -773,8 +773,8 @@ function ClientForm({
                   {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
                 </Field>
                 <p className="text-xs text-muted-foreground">
-                  Uses OpenAI Codex SDK server-side. MCP base URL is reserved
-                  for runtime control wiring.
+                  Uses codex-acp through Agent Client Protocol. Chrona passes
+                  scoped MCP control tools at runtime.
                 </p>
               </>
             )}

@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test";
 import type { ProviderRunEvent, StartRunInput } from "@chrona/providers-foundation";
 
 import {
+  AcpCodexRunner,
   CodexProviderClient,
+  type AcpClientHandlers,
+  type AcpTransport,
   type CodexRunHandle,
   type CodexRunner,
 } from "./CodexProviderClient";
@@ -15,10 +18,6 @@ function baseInput(overrides: Partial<StartRunInput> = {}): StartRunInput {
     stream: true,
     ...overrides,
   };
-}
-
-function fakeThread(id: string | null) {
-  return { id } as CodexRunHandle["thread"];
 }
 
 function makeHandle(input: StartRunInput, events: ProviderRunEvent[]): CodexRunHandle {
@@ -35,8 +34,7 @@ function makeHandle(input: StartRunInput, events: ProviderRunEvent[]): CodexRunH
     },
     input,
     abort: new AbortController(),
-    events: (async function* () {})(),
-    thread: fakeThread(input.sessionId ?? "codex-session-1"),
+    sessionId: input.sessionId ?? "codex-session-1",
     outputText: "done",
     usage: null,
     status: "running",
@@ -46,12 +44,9 @@ function makeHandle(input: StartRunInput, events: ProviderRunEvent[]): CodexRunH
 }
 
 function makeRunner(events: ProviderRunEvent[]): CodexRunner {
-  const handles = new Map<string, CodexRunHandle & { testEvents: ProviderRunEvent[] }>();
   return {
     async start(input) {
-      const handle = makeHandle(input, events) as CodexRunHandle & { testEvents: ProviderRunEvent[] };
-      handles.set(handle.ref.runId, handle);
-      return handle;
+      return makeHandle(input, events);
     },
     async *stream(handle) {
       const typed = handle as CodexRunHandle & { testEvents: ProviderRunEvent[] };
@@ -63,8 +58,8 @@ function makeRunner(events: ProviderRunEvent[]): CodexRunner {
         provider: "codex",
         runId: handle.ref.runId,
         nativeRunId: handle.ref.nativeRunId,
-        sessionId: handle.thread.id ?? handle.ref.sessionId,
-        status: handle.status ?? "running",
+        sessionId: handle.sessionId,
+        status: handle.status,
         outputText: handle.outputText,
         error: handle.error ?? null,
       };
@@ -72,11 +67,79 @@ function makeRunner(events: ProviderRunEvent[]): CodexRunner {
     async cancel(handle) {
       handle.status = "cancelled";
     },
+    async checkHealth() {
+      return {
+        provider: "codex",
+        ok: true,
+        checkedAt: new Date().toISOString(),
+        latencyMs: 0,
+        status: "ok",
+        reason: "fake",
+      };
+    },
   };
 }
 
+type RequestRecord = { method: string; params: unknown };
+
+type FakeSession = {
+  sessionId: string;
+  promptBlocks?: unknown;
+  updates: Array<{ kind: "session_update"; update: unknown } | { kind: "stop"; stopReason: string; response: unknown }>;
+  prompt(input: unknown): Promise<unknown>;
+  nextUpdate(): Promise<FakeSession["updates"][number] | undefined>;
+  dispose(): void;
+};
+
+class FakeAcpTransport implements AcpTransport {
+  readonly requests: RequestRecord[] = [];
+  readonly session: FakeSession;
+  readonly init: unknown;
+  handlers?: AcpClientHandlers;
+
+  constructor(input: { init?: unknown; updates?: FakeSession["updates"] } = {}) {
+    this.init = input.init ?? {
+      protocolVersion: 1,
+      agentCapabilities: { mcpCapabilities: { http: true } },
+    };
+    this.session = {
+      sessionId: "acp-session-1",
+      updates: input.updates ?? [],
+      async prompt(promptInput) {
+        this.promptBlocks = promptInput;
+        return { stopReason: "end_turn" };
+      },
+      async nextUpdate() {
+        return this.updates.shift();
+      },
+      dispose() {},
+    };
+  }
+
+  async connect<T>(_config: unknown, handlers: AcpClientHandlers, op: (connection: Parameters<Parameters<AcpTransport["connect"]>[2]>[0]) => Promise<T>): Promise<T> {
+    this.handlers = handlers;
+    const context = {
+      request: async (method: string, params: unknown) => {
+        this.requests.push({ method, params });
+        if (method === "initialize") return this.init;
+        throw new Error(`unexpected request ${method}`);
+      },
+      buildSession: (params: unknown) => {
+        this.requests.push({ method: "session/new", params });
+        return {
+          start: async () => this.session,
+        };
+      },
+      notify: async (method: string, params: unknown) => {
+        this.requests.push({ method, params });
+      },
+    };
+    return op({ context, close() {}, closed: Promise.resolve() } as never);
+  }
+}
+
 describe("CodexProviderClient", () => {
-  it("exposes execution provider capabilities", async () => {
+  it("exposes ACP execution provider capabilities", async () => {
     const client = new CodexProviderClient({ runner: makeRunner([]) });
 
     await expect(client.checkHealth()).resolves.toMatchObject({
@@ -86,9 +149,10 @@ describe("CodexProviderClient", () => {
     expect(client.getCapabilities()).toMatchObject({
       supportsSessions: true,
       supportsStreaming: true,
-      supportsRunLookup: true,
+      supportsRunLookup: false,
       supportsCancellation: true,
       supportsToolCalls: true,
+      approval: { supported: false },
     });
   });
 
@@ -141,6 +205,31 @@ describe("CodexProviderClient", () => {
       "run_completed",
     ]);
     expect(streamed.some((event) => event.type === "tool_completed" && event.toolName === terminalTool)).toBe(true);
+  });
+
+  it("sends Chrona HTTP MCP server through ACP session setup", async () => {
+    const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
+    const client = new CodexProviderClient({
+      runner: new AcpCodexRunner({ mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }, transport),
+    });
+
+    const run = await client.startRun(baseInput({ terminalToolName: "chrona_node_complete" }));
+    const streamed = [];
+    for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
+
+    const sessionNew = transport.requests.find((request) => request.method === "session/new");
+    expect(sessionNew?.params).toMatchObject({
+      cwd: process.cwd(),
+      mcpServers: [
+        {
+          type: "http",
+          name: "chrona",
+          url: "http://chrona.test/api/mcp",
+          headers: [{ name: "Authorization", value: "Bearer run-token" }],
+        },
+      ],
+    });
+    expect(streamed.at(-1)).toMatchObject({ type: "run_completed" });
   });
 
   it("cancels known runs through the runner", async () => {

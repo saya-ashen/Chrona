@@ -1,4 +1,20 @@
-import { Codex, type Thread, type ThreadEvent, type Usage } from "@openai/codex-sdk";
+import { spawn } from "node:child_process";
+import { Readable, Writable } from "node:stream";
+import * as acp from "@agentclientprotocol/sdk";
+import type {
+  ActiveSession,
+  ClientContext,
+  ContentBlock,
+  InitializeResponse,
+  McpServer,
+  NewSessionRequest,
+  PermissionOption,
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+  SessionUpdate,
+  ToolCall,
+  ToolCallUpdate,
+} from "@agentclientprotocol/sdk";
 import type {
   AgentProviderClient,
   CancelRunInput,
@@ -14,15 +30,42 @@ import type {
   StartRunInput,
   StreamRunInput,
 } from "@chrona/providers-foundation";
-import { CodexProviderError, type CodexProviderConfig, toCodexOptions, toThreadOptions } from "./types";
+import {
+  CodexProviderError,
+  codexAcpCommand,
+  codexAcpEnv,
+  type CodexProviderConfig,
+  usageFromAcp,
+} from "./types";
 
 const PROVIDER_NAME = "codex";
+
+type Timer = Parameters<typeof clearTimeout>[0];
+
+type AcpConnection = {
+  context: ClientContext;
+  close(error?: unknown): void;
+  closed: Promise<void>;
+};
+
+export type AcpTransport = {
+  connect<T>(
+    config: CodexProviderConfig,
+    handlers: AcpClientHandlers,
+    op: (connection: AcpConnection) => Promise<T>,
+  ): Promise<T>;
+};
+
+export type AcpClientHandlers = {
+  requestPermission(params: RequestPermissionRequest): Promise<RequestPermissionResponse>;
+};
 
 export type CodexRunner = {
   start(input: StartRunInput): Promise<CodexRunHandle>;
   stream(handle: CodexRunHandle): AsyncIterable<ProviderRunEvent>;
   snapshot(handle: CodexRunHandle): Promise<ProviderRunSnapshot>;
   cancel(handle: CodexRunHandle): Promise<void>;
+  checkHealth(input?: HealthCheckInput): Promise<ProviderHealth>;
 };
 
 export type CodexProviderOptions = {
@@ -34,13 +77,16 @@ export type CodexRunHandle = {
   ref: ProviderRunRef;
   input: StartRunInput;
   abort: AbortController;
-  events: AsyncGenerator<ThreadEvent>;
-  thread: Thread;
+  connection?: AcpConnection;
+  sessionId: string;
+  session?: ActiveSession;
+  prompt?: Promise<unknown>;
   outputText: string;
   usage: ProviderRunSnapshot["usage"];
-  status: ProviderRunRef["status"];
+  status: NonNullable<ProviderRunRef["status"]>;
   error?: string;
-  timeoutId?: Timer;
+  timer?: Timer;
+  ready?: Promise<void>;
   sequence: number;
 };
 
@@ -50,62 +96,37 @@ type InternalRun = {
   input: StartRunInput;
 };
 
+type StartRunInputWithControl = StartRunInput & {
+  control?: { baseUrl: string; runToken: string };
+};
+
 function now() {
   return new Date().toISOString();
+}
+
+function clearTimer(timer: Timer | undefined) {
+  clearTimeout(timer);
 }
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function stripTrailingSlash(value: string) {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+function defaultMcpBaseUrl() {
+  const port = process.env.PORT ?? "3101";
+  return `http://localhost:${port}`;
+}
+
 function providerRunRef(handle: CodexRunHandle, status = handle.status): ProviderRunRef {
-  const threadId = handle.thread.id ?? handle.ref.sessionId;
   return {
     ...handle.ref,
-    sessionId: threadId,
-    nativeRunId: handle.ref.nativeRunId,
-    providerRunId: handle.ref.providerRunId,
+    sessionId: handle.sessionId,
     status,
   };
-}
-
-function usageFromCodex(usage: Usage | null): ProviderRunSnapshot["usage"] {
-  if (!usage) return null;
-  const inputTokens = usage.input_tokens;
-  const outputTokens = usage.output_tokens;
-  return {
-    inputTokens,
-    outputTokens,
-    totalTokens: inputTokens + outputTokens,
-  };
-}
-
-function inputToPrompt(input: StartRunInput): string {
-  return [input.instructions, terminalToolInstruction(input), renderProviderInput(input.input)]
-    .filter((part) => part.trim().length > 0)
-    .join("\n\n");
-}
-
-function terminalToolInstruction(input: StartRunInput): string {
-  return input.terminalToolName
-    ? `When done, call MCP tool ${input.terminalToolName} with final structured result.`
-    : "";
-}
-
-function renderProviderInput(input: ProviderRunInput): string {
-  if (typeof input === "string") return input;
-  if (input && typeof input === "object" && !Array.isArray(input)) {
-    if ("type" in input && input.type === "text" && typeof input.text === "string") {
-      return input.text;
-    }
-  }
-  return JSON.stringify(input, null, 2);
-}
-
-function structuredOutputSchema(input: StartRunInput): unknown {
-  const schema = input.structuredOutputSchema;
-  if (!schema) return undefined;
-  return schema.schema;
 }
 
 function eventBase(handle: CodexRunHandle, rawEventType?: string) {
@@ -113,241 +134,45 @@ function eventBase(handle: CodexRunHandle, rawEventType?: string) {
     provider: PROVIDER_NAME,
     runId: handle.ref.runId,
     nativeRunId: handle.ref.nativeRunId,
-    sessionId: handle.thread.id ?? handle.ref.sessionId,
+    sessionId: handle.sessionId,
     sequence: handle.sequence++,
     timestamp: now(),
     rawEventType,
   };
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+function renderProviderInput(input: ProviderRunInput): string {
+  if (typeof input === "string") return input;
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      if (item && typeof item === "object" && "type" in item && item.type === "text" && typeof item.text === "string") {
+        return item.text;
+      }
+    }
+  }
+  return JSON.stringify(input, null, 2);
 }
 
-function toolInput(value: unknown): Record<string, unknown> {
-  return asRecord(value);
+function terminalToolInstruction(input: StartRunInput): string | undefined {
+  if (!input.terminalToolName) return undefined;
+  return [
+    `When finished, call the MCP tool \`${input.terminalToolName}\` to submit the final Chrona node result.`,
+    "Do not treat this instruction itself as evidence that the tool has run.",
+  ].join("\n");
 }
 
-function normalizeItemEvent(handle: CodexRunHandle, event: Extract<ThreadEvent, { type: "item.started" | "item.updated" | "item.completed" }>): ProviderRunEvent[] {
-  const item = event.item;
-  const base = eventBase(handle, event.type);
-  if (item.type === "agent_message") {
-    if (event.type === "item.completed") {
-      handle.outputText = item.text;
-    }
-    return [{ ...base, type: "text_delta", text: item.text }];
-  }
-  if (item.type === "reasoning") {
-    return [{ ...base, type: "reasoning_delta", text: item.text, raw: event }];
-  }
-  if (item.type === "mcp_tool_call") {
-    const status = item.status === "failed" ? "error" : item.status === "completed" ? "completed" : "pending";
-    const events: ProviderRunEvent[] = [
-      {
-        ...base,
-        type: "tool_call",
-        tool: item.tool,
-        callId: item.id,
-        input: toolInput(item.arguments),
-        status,
-      },
-    ];
-    if (event.type === "item.started") {
-      events.push({
-        ...eventBase(handle, event.type),
-        type: "tool_started",
-        toolName: item.tool,
-        input: item.arguments,
-        raw: event,
-      });
-    }
-    if (event.type === "item.completed") {
-      events.push({
-        ...eventBase(handle, event.type),
-        type: "tool_completed",
-        toolName: item.tool,
-        error: item.error ? { message: item.error.message } : undefined,
-        raw: event,
-      });
-      if (item.result !== undefined) {
-        events.push({
-          ...eventBase(handle, event.type),
-          type: "tool_result",
-          tool: item.tool,
-          callId: item.id,
-          result: item.result,
-        });
-      }
-    }
-    return events;
-  }
-  if (item.type === "command_execution") {
-    const events: ProviderRunEvent[] = [];
-    if (event.type === "item.started") {
-      events.push({
-        ...base,
-        type: "tool_started",
-        toolName: "command_execution",
-        preview: item.command,
-        input: { command: item.command },
-        raw: event,
-      });
-    }
-    if (event.type === "item.completed") {
-      events.push({
-        ...base,
-        type: "tool_completed",
-        toolName: "command_execution",
-        error: item.status === "failed" ? { message: `Command failed${typeof item.exit_code === "number" ? ` with exit code ${item.exit_code}` : ""}` } : undefined,
-        raw: event,
-      });
-      if (item.aggregated_output) {
-        events.push({ ...eventBase(handle, event.type), type: "text_delta", text: item.aggregated_output });
-      }
-    }
-    return events;
-  }
-  if (item.type === "error") {
-    return [{ ...base, type: "run_failed", run: providerRunRef(handle, "failed"), error: item.message, raw: event }];
-  }
-  return [{ ...base, type: "raw_event", raw: event }];
-}
-type Timer = Parameters<typeof clearTimeout>[0];
-
-function clearTimer(timer: Timer | undefined) {
-  clearTimeout(timer);
-}
-
-class SdkCodexRunner implements CodexRunner {
-  private readonly codex: Codex;
-  private readonly config: CodexProviderConfig;
-
-  constructor(config: CodexProviderConfig = {}) {
-    this.config = config;
-    this.codex = new Codex(toCodexOptions(config));
-  }
-
-  async start(input: StartRunInput): Promise<CodexRunHandle> {
-    const abort = new AbortController();
-    const timeout = input.timeoutMs ?? this.config.timeoutMs;
-    let timeoutId: Timer | undefined;
-    if (timeout && timeout > 0) {
-      timeoutId = setTimeout(() => abort.abort(), timeout);
-    }
-    input.signal?.addEventListener("abort", () => abort.abort(), { once: true });
-
-    const thread = input.resumeSessionRef
-      ? this.codex.resumeThread(input.resumeSessionRef, toThreadOptions(this.config))
-      : this.codex.startThread(toThreadOptions(this.config));
-    const streamed = await thread.runStreamed(inputToPrompt(input), {
-      outputSchema: structuredOutputSchema(input),
-      signal: abort.signal,
-    });
-    const runId = `codex-run-${crypto.randomUUID()}`;
-    const sessionId = input.resumeSessionRef ?? input.sessionId ?? `codex-session-${crypto.randomUUID()}`;
-    const handle: CodexRunHandle = {
-      ref: {
-        provider: PROVIDER_NAME,
-        runId,
-        nativeRunId: runId,
-        providerRunId: runId,
-        sessionId,
-        status: "running",
-        startedAt: now(),
-        stream: { supported: true, reconnectable: false },
-      },
-      input,
-      abort,
-      events: streamed.events,
-      thread,
-      outputText: "",
-      usage: null,
-      status: "running",
-      sequence: 0,
-      timeoutId,
-    };
-    return handle;
-  }
-
-  async *stream(handle: CodexRunHandle): AsyncIterable<ProviderRunEvent> {
-    yield { ...eventBase(handle, "run_started"), type: "run_started", run: providerRunRef(handle) };
-    try {
-      for await (const event of handle.events) {
-        if (event.type === "thread.started") {
-          handle.ref.sessionId = event.thread_id;
-          continue;
-        }
-        if (event.type === "turn.completed") {
-          handle.usage = usageFromCodex(event.usage);
-          continue;
-        }
-        if (event.type === "turn.failed") {
-          clearTimer(handle.timeoutId);
-          handle.status = "failed";
-          handle.error = event.error.message;
-          yield { ...eventBase(handle, event.type), type: "run_failed", run: providerRunRef(handle, "failed"), error: event.error.message, raw: event };
-          return;
-        }
-        if (event.type === "error") {
-          clearTimer(handle.timeoutId);
-          handle.status = "failed";
-          handle.error = event.message;
-          yield { ...eventBase(handle, event.type), type: "run_failed", run: providerRunRef(handle, "failed"), error: event.message, raw: event };
-          return;
-        }
-        if (event.type === "item.started" || event.type === "item.updated" || event.type === "item.completed") {
-          for (const providerEvent of normalizeItemEvent(handle, event)) {
-            yield providerEvent;
-          }
-        }
-      }
-      clearTimer(handle.timeoutId);
-      handle.status = handle.abort.signal.aborted ? "cancelled" : "completed";
-      if (handle.status === "cancelled") {
-        yield { ...eventBase(handle, "cancelled"), type: "run_cancelled", run: providerRunRef(handle, "cancelled") };
-        return;
-      }
-      yield {
-        ...eventBase(handle, "completed"),
-        type: "run_completed",
-        run: providerRunRef(handle, "completed"),
-        outputText: handle.outputText,
-        output: { text: handle.outputText },
-        structuredPayload: parseStructuredPayload(handle.outputText),
-        usage: handle.usage,
-      };
-    } catch (error) {
-      clearTimer(handle.timeoutId);
-      handle.status = handle.abort.signal.aborted ? "cancelled" : "failed";
-      if (handle.status === "cancelled") {
-        yield { ...eventBase(handle, "cancelled"), type: "run_cancelled", run: providerRunRef(handle, "cancelled") };
-        return;
-      }
-      handle.error = errorMessage(error);
-      yield { ...eventBase(handle, "error"), type: "run_failed", run: providerRunRef(handle, "failed"), error: handle.error, raw: error };
-    }
-  }
-
-  async snapshot(handle: CodexRunHandle): Promise<ProviderRunSnapshot> {
-    return {
-      provider: PROVIDER_NAME,
-      runId: handle.ref.runId,
-      nativeRunId: handle.ref.nativeRunId,
-      sessionId: handle.thread.id ?? handle.ref.sessionId,
-      status: handle.status ?? "running",
-      outputText: handle.outputText,
-      structuredPayload: parseStructuredPayload(handle.outputText),
-      usage: handle.usage,
-      error: handle.error ?? null,
-    };
-  }
-
-  async cancel(handle: CodexRunHandle): Promise<void> {
-    handle.status = "cancelled";
-    handle.abort.abort();
-  }
+function inputToPrompt(input: StartRunInput): ContentBlock[] {
+  const text = [
+    input.instructions,
+    terminalToolInstruction(input),
+    renderProviderInput(input.input),
+    input.structuredOutputSchema
+      ? `Structured output schema:\n${JSON.stringify(input.structuredOutputSchema.schema, null, 2)}`
+      : undefined,
+  ]
+    .filter((part): part is string => typeof part === "string" && part.length > 0)
+    .join("\n\n");
+  return [{ type: "text", text }];
 }
 
 function parseStructuredPayload(text: string): unknown {
@@ -360,37 +185,397 @@ function parseStructuredPayload(text: string): unknown {
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function toolNameFrom(update: Pick<ToolCall | ToolCallUpdate, "title" | "toolCallId" | "rawInput" | "_meta">) {
+  const meta = asRecord(update._meta);
+  const chronaMeta = asRecord(meta.chrona);
+  const rawInput = asRecord(update.rawInput);
+  return (
+    stringValue(chronaMeta.toolName) ??
+    stringValue(rawInput.tool) ??
+    stringValue(rawInput.toolName) ??
+    stringValue(rawInput.name) ??
+    update.title ??
+    update.toolCallId
+  );
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function mapToolStatus(status: ToolCall["status"] | ToolCallUpdate["status"]): "pending" | "completed" | "error" {
+  if (status === "completed") return "completed";
+  if (status === "failed") return "error";
+  return "pending";
+}
+
+function textFromContent(content: ContentBlock): string | undefined {
+  if (content.type === "text") return content.text;
+  return undefined;
+}
+
+function normalizeUpdate(handle: CodexRunHandle, update: SessionUpdate): ProviderRunEvent[] {
+  const base = eventBase(handle, update.sessionUpdate);
+  if (update.sessionUpdate === "agent_message_chunk") {
+    const text = textFromContent(update.content);
+    if (text) handle.outputText += text;
+    return text ? [{ ...base, type: "text_delta", text }] : [{ ...base, type: "raw_event", raw: update }];
+  }
+  if (update.sessionUpdate === "agent_thought_chunk") {
+    const text = textFromContent(update.content);
+    return text ? [{ ...base, type: "reasoning_delta", text, raw: update }] : [{ ...base, type: "raw_event", raw: update }];
+  }
+  if (update.sessionUpdate === "usage_update") {
+    handle.usage = usageFromAcp(update.used, update.size);
+    return [{ ...base, type: "raw_event", raw: update }];
+  }
+  if (update.sessionUpdate === "tool_call") {
+    const tool = toolNameFrom(update);
+    return [
+      {
+        ...base,
+        type: "tool_call",
+        tool,
+        callId: update.toolCallId,
+        input: asRecord(update.rawInput),
+        status: mapToolStatus(update.status),
+      },
+    ];
+  }
+  if (update.sessionUpdate === "tool_call_update") {
+    const tool = toolNameFrom(update);
+    const events: ProviderRunEvent[] = [
+      {
+        ...base,
+        type: "tool_call",
+        tool,
+        callId: update.toolCallId,
+        input: asRecord(update.rawInput),
+        status: mapToolStatus(update.status),
+      },
+    ];
+    if (update.status === "in_progress") {
+      events.push({ ...eventBase(handle, update.sessionUpdate), type: "tool_started", toolName: tool, input: update.rawInput, raw: update });
+    }
+    if (update.status === "completed" || update.status === "failed") {
+      events.push({
+        ...eventBase(handle, update.sessionUpdate),
+        type: "tool_completed",
+        toolName: tool,
+        error: update.status === "failed" ? { message: "ACP tool call failed", raw: update.rawOutput } : undefined,
+        raw: update,
+      });
+    }
+    return events;
+  }
+  return [{ ...base, type: "raw_event", raw: update }];
+}
+
+function permissionOption(options: PermissionOption[]): PermissionOption | undefined {
+  return (
+    options.find((option) => option.kind === "allow_once") ??
+    options.find((option) => option.kind === "allow_always") ??
+    options.find((option) => option.kind === "reject_once") ??
+    options.at(0)
+  );
+}
+
+class StdioAcpTransport implements AcpTransport {
+  async connect<T>(
+    config: CodexProviderConfig,
+    handlers: AcpClientHandlers,
+    op: (connection: AcpConnection) => Promise<T>,
+  ): Promise<T> {
+    const subprocess = spawn(codexAcpCommand(config), [], {
+      cwd: config.cwd,
+      env: codexAcpEnv(config),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stderr = "";
+    subprocess.stderr.on("data", (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-4000);
+    });
+    const stream = acp.ndJsonStream(
+      WritableStreamFromNode(subprocess.stdin),
+      ReadableStreamFromNode(subprocess.stdout),
+    );
+    const app = acp.client({ name: "chrona" }).onRequest(
+      acp.methods.client.session.requestPermission,
+      (ctx) => handlers.requestPermission(ctx.params),
+    );
+    try {
+      return await app.connectWith(stream, async (context) => {
+        const connection = {
+          context,
+          close(error?: unknown) {
+            subprocess.kill();
+            if (error) throw error;
+          },
+          closed: new Promise<void>((resolve) => subprocess.once("exit", () => resolve())),
+        };
+        return op(connection);
+      });
+    } catch (error) {
+      throw new CodexProviderError(`Codex ACP process failed: ${errorMessage(error)}${stderr ? `\n${stderr}` : ""}`, {
+        cause: error,
+        retryable: false,
+      });
+    } finally {
+      subprocess.kill();
+    }
+  }
+}
+
+function WritableStreamFromNode(stream: NodeJS.WritableStream): WritableStream<Uint8Array> {
+  return Writable.toWeb(stream as import("node:stream").Writable) as WritableStream<Uint8Array>;
+}
+
+function ReadableStreamFromNode(stream: NodeJS.ReadableStream): ReadableStream<Uint8Array> {
+  return Readable.toWeb(stream as import("node:stream").Readable) as unknown as ReadableStream<Uint8Array>;
+}
+
+export class AcpCodexRunner implements CodexRunner {
+  private readonly config: CodexProviderConfig;
+  private readonly transport: AcpTransport;
+
+  constructor(config: CodexProviderConfig = {}, transport: AcpTransport = new StdioAcpTransport()) {
+    this.config = config;
+    this.transport = transport;
+  }
+
+  async checkHealth(input: HealthCheckInput = {}): Promise<ProviderHealth> {
+    const started = Date.now();
+    const checkedAt = now();
+    try {
+      await this.transport.connect(this.config, handlers(), async (connection) => {
+        const init = await initialize(connection.context, input.signal);
+        assertHttpMcp(init);
+      });
+      return {
+        provider: PROVIDER_NAME,
+        ok: true,
+        checkedAt,
+        latencyMs: Date.now() - started,
+        status: "ok",
+        reason: "Codex ACP agent initialized",
+      };
+    } catch (error) {
+      return {
+        provider: PROVIDER_NAME,
+        ok: false,
+        checkedAt,
+        latencyMs: Date.now() - started,
+        status: "error",
+        reason: errorMessage(error),
+      };
+    }
+  }
+
+  async start(input: StartRunInput): Promise<CodexRunHandle> {
+    const abort = new AbortController();
+    input.signal?.addEventListener("abort", () => abort.abort(), { once: true });
+    const timeout = input.timeoutMs ?? this.config.timeoutMs;
+    const timer = timeout && timeout > 0 ? setTimeout(() => abort.abort(), timeout) : undefined;
+    const runId = `codex-run-${crypto.randomUUID()}`;
+    const handle: CodexRunHandle = {
+      ref: {
+        provider: PROVIDER_NAME,
+        runId,
+        nativeRunId: runId,
+        providerRunId: runId,
+        sessionId: input.sessionId,
+        status: "running",
+        stream: { supported: true, reconnectable: false },
+      },
+      input,
+      abort,
+      sessionId: input.sessionId,
+      outputText: "",
+      usage: null,
+      status: "running",
+      timer,
+      sequence: 0,
+    };
+
+    let resolveReady!: () => void;
+    let rejectReady!: (error: unknown) => void;
+    handle.ready = new Promise<void>((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    });
+    handle.prompt = this.transport.connect(this.config, handlers(), async (connection) => {
+      try {
+        handle.connection = connection;
+        const init = await initialize(connection.context, abort.signal);
+        assertHttpMcp(init);
+        const session = await connection.context.buildSession(newSessionRequest(this.config, input)).start({ cancellationSignal: abort.signal });
+        handle.session = session;
+        handle.sessionId = session.sessionId;
+        handle.ref.sessionId = session.sessionId;
+        resolveReady();
+        return session.prompt(inputToPrompt(input), { cancellationSignal: abort.signal });
+      } catch (error) {
+        rejectReady(error);
+        throw error;
+      }
+    });
+
+    return handle;
+  }
+
+  async *stream(handle: CodexRunHandle): AsyncIterable<ProviderRunEvent> {
+    await handle.ready;
+    yield { ...eventBase(handle, "run_started"), type: "run_started", run: providerRunRef(handle) };
+    try {
+      for (;;) {
+        const message = await handle.session?.nextUpdate();
+        if (!message) break;
+        if (message.kind === "stop") {
+          clearTimer(handle.timer);
+          if (message.stopReason === "cancelled" || handle.abort.signal.aborted) {
+            handle.status = "cancelled";
+            yield { ...eventBase(handle, "cancelled"), type: "run_cancelled", run: providerRunRef(handle, "cancelled") };
+            return;
+          }
+          handle.status = "completed";
+          yield {
+            ...eventBase(handle, "completed"),
+            type: "run_completed",
+            run: providerRunRef(handle, "completed"),
+            outputText: handle.outputText,
+            output: { text: handle.outputText },
+            structuredPayload: parseStructuredPayload(handle.outputText),
+            usage: handle.usage,
+            raw: message.response,
+          };
+          return;
+        }
+        for (const event of normalizeUpdate(handle, message.update)) yield event;
+      }
+      await handle.prompt;
+    } catch (error) {
+      clearTimer(handle.timer);
+      handle.status = handle.abort.signal.aborted ? "cancelled" : "failed";
+      if (handle.status === "cancelled") {
+        yield { ...eventBase(handle, "cancelled"), type: "run_cancelled", run: providerRunRef(handle, "cancelled") };
+        return;
+      }
+      handle.error = errorMessage(error);
+      yield { ...eventBase(handle, "error"), type: "run_failed", run: providerRunRef(handle, "failed"), error: handle.error };
+    } finally {
+      clearTimer(handle.timer);
+      handle.session?.dispose();
+    }
+  }
+
+  async snapshot(handle: CodexRunHandle): Promise<ProviderRunSnapshot> {
+    return {
+      provider: PROVIDER_NAME,
+      runId: handle.ref.runId,
+      nativeRunId: handle.ref.nativeRunId,
+      providerRunId: handle.ref.providerRunId,
+      sessionId: handle.sessionId,
+      status: handle.status,
+      outputText: handle.outputText,
+      output: { text: handle.outputText },
+      structuredPayload: parseStructuredPayload(handle.outputText),
+      usage: handle.usage,
+      error: handle.error ?? null,
+    };
+  }
+
+  async cancel(handle: CodexRunHandle): Promise<void> {
+    handle.abort.abort();
+    if (handle.connection) {
+      await handle.connection.context.notify(acp.methods.agent.session.cancel, { sessionId: handle.sessionId });
+    }
+    handle.status = "cancelled";
+  }
+}
+
+function handlers(): AcpClientHandlers {
+  return {
+    async requestPermission(params) {
+      const option = permissionOption(params.options);
+      if (!option) return { outcome: { outcome: "cancelled" } };
+      return { outcome: { outcome: "selected", optionId: option.optionId } };
+    },
+  };
+}
+
+async function initialize(context: ClientContext, signal?: AbortSignal): Promise<InitializeResponse> {
+  return context.request(
+    acp.methods.agent.initialize,
+    {
+      protocolVersion: acp.PROTOCOL_VERSION,
+      clientCapabilities: {},
+      clientInfo: { name: "chrona", title: "Chrona", version: "0.1.0" },
+    },
+    { cancellationSignal: signal },
+  );
+}
+
+function assertHttpMcp(init: InitializeResponse) {
+  if (init.agentCapabilities?.mcpCapabilities?.http !== true) {
+    throw new CodexProviderError("Codex ACP agent does not support HTTP MCP servers", { retryable: false });
+  }
+}
+
+function newSessionRequest(config: CodexProviderConfig, input: StartRunInput): NewSessionRequest {
+  const control = (input as StartRunInputWithControl).control;
+  const mcpBaseUrl = stripTrailingSlash(control?.baseUrl ?? config.mcpBaseUrl ?? process.env.CHRONA_MCP_BASE_URL ?? defaultMcpBaseUrl());
+  const mcpRunToken = control?.runToken ?? config.mcpRunToken ?? process.env.CHRONA_API_KEY ?? process.env.CHRONA_MCP_BEARER_TOKEN ?? "";
+  const url = `${mcpBaseUrl}/api/mcp`;
+  const headers = mcpRunToken ? [{ name: "Authorization", value: `Bearer ${mcpRunToken}` }] : [];
+  return {
+    cwd: config.cwd ?? process.cwd(),
+    additionalDirectories: config.additionalDirectories,
+    mcpServers: [
+      {
+        type: "http",
+        name: "chrona",
+        url,
+        headers,
+      } satisfies McpServer,
+    ],
+    _meta: {
+      chrona: {
+        sessionId: input.sessionId,
+        sessionKey: input.sessionKey,
+        terminalToolName: input.terminalToolName,
+      },
+    },
+  };
+}
+
 export class CodexProviderClient implements AgentProviderClient {
   readonly provider = PROVIDER_NAME;
   private readonly runner: CodexRunner;
   private readonly runs = new Map<string, InternalRun>();
 
   constructor(opts: CodexProviderOptions = {}) {
-    this.runner = opts.runner ?? new SdkCodexRunner(opts.config ?? {});
+    this.runner = opts.runner ?? new AcpCodexRunner(opts.config ?? {});
   }
 
   getCapabilities(): ProviderCapabilities {
     return {
       supportsSessions: true,
       supportsStreaming: true,
-      supportsRunLookup: true,
+      supportsRunLookup: false,
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
-      reason: "OpenAI Codex SDK provider",
+      approval: { supported: false, choices: [], scopes: [], resolveAll: false },
+      reason: "OpenAI Codex ACP provider",
     };
   }
 
-  async checkHealth(_input: HealthCheckInput = {}): Promise<ProviderHealth> {
-    const checkedAt = now();
-    return {
-      provider: this.provider,
-      ok: true,
-      checkedAt,
-      latencyMs: 0,
-      status: "ok",
-      reason: "Codex SDK provider configured",
-    };
+  checkHealth(input: HealthCheckInput = {}): Promise<ProviderHealth> {
+    return this.runner.checkHealth(input);
   }
 
   async createSession(input: CreateSessionInput = {}) {
@@ -400,7 +585,7 @@ export class CodexProviderClient implements AgentProviderClient {
       sessionId,
       nativeSessionId: sessionId,
       providerSessionId: sessionId,
-      state: "virtual",
+      state: "virtual" as const,
       sessionKey: input.sessionKey,
       createdAt: now(),
     };
@@ -423,9 +608,6 @@ export class CodexProviderClient implements AgentProviderClient {
     const handle = await this.resolveStreamHandle(input);
     for await (const event of this.runner.stream(handle)) {
       yield event;
-      if (event.type === "run_completed" || event.type === "run_failed" || event.type === "run_cancelled") {
-        return;
-      }
     }
   }
 
