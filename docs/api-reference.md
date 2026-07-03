@@ -224,10 +224,6 @@ Subscribes to task workspace projection events over SSE.
 Dashboard projection for workspace-level overview data.
 
 
-### GET /api/dashboard?workspaceId=...
-
-Dashboard projection for workspace-level overview data.
-
 
 ## Workspaces
 

@@ -40,11 +40,12 @@ import {
   type MockLlm,
 } from "./__live__/aimock-live";
 
-const HAS_CLAUDE = claudeBinaryAvailable();
+const RUN_LIVE_CLAUDE_TESTS = process.env.CHRONA_RUN_LIVE_CLAUDE_TESTS === "1";
+const HAS_CLAUDE = RUN_LIVE_CLAUDE_TESTS && claudeBinaryAvailable();
 const TEST_TIMEOUT_MS = 90_000;
 
-// `describe.skipIf` keeps the file green on the rare machine with no
-// SDK-bundled binary and no `claude` on PATH.
+// Live SDK tests spawn the real `claude` binary. Keep default CI deterministic;
+// run with CHRONA_RUN_LIVE_CLAUDE_TESTS=1 when validating the installed SDK.
 describe.skipIf(!HAS_CLAUDE)(
   // eslint-disable-next-line max-lines-per-function -- test file; outer arrow aggregates 3 sub-describes.
   () => {

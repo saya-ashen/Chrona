@@ -32,7 +32,8 @@ import {
   type MockLlm,
 } from "./__live__/aimock-live";
 
-const HAS_CLAUDE = claudeBinaryAvailable();
+const RUN_LIVE_CLAUDE_TESTS = process.env.CHRONA_RUN_LIVE_CLAUDE_TESTS === "1";
+const HAS_CLAUDE = RUN_LIVE_CLAUDE_TESTS && claudeBinaryAvailable();
 const TEST_TIMEOUT_MS = 90_000;
 describe.skipIf(!HAS_CLAUDE)(
   "ClaudeCodeProviderClient — live extras (real claude + mocked LLM)",

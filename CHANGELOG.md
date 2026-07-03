@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.9 — Alpha public-readiness polish
+
+Date: 2026-07-03
+
+### Status
+- Alpha release for local-first dogfood, early adopters, and contributor review.
+- Not a stable production release; runtime contracts, provider behavior, recovery flows, and packaging may still change.
+
+### Highlights
+- Consolidated current product docs around the active task workspace execution surface.
+- Documented Vite + Hono + Bun architecture, package boundaries, API surface, data model, and provider boundary as stable contributor entry points.
+- Added multi-platform release workflow and binary smoke coverage for packaged archives.
+- Expanded focused tests across engine, server, web, providers, feature slices, and Playwright flows.
+- Added open-source maintenance files for security reporting, support, code of conduct, and issue intake.
+
+### Known limitations
+- Task workspace execution records, schedule-to-execution reliability, recovery diagnostics, and multi-session execution remain active hardening areas.
+- Hermes is the primary supported execution provider; additional providers are still evolving behind provider contracts.
+- Production readiness work such as backup/restore, deployment runbooks, observability, and migration safety remains future work.
+
 ## 0.1.4-rc.1 — First MVP release candidate
 
 Date: 2026-05-26

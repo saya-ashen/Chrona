@@ -1,0 +1,61 @@
+name: Setup or provider issue
+description: Report install, launch, AI client, Hermes, or provider setup trouble
+title: "setup: "
+labels: [setup]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove API keys, `API_SERVER_KEY`, bearer tokens, private URLs, database contents, and raw provider payloads before submitting.
+  - type: input
+    id: version
+    attributes:
+      label: Chrona version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - Packaged release
+        - Source checkout
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS / architecture / Bun version
+      placeholder: "macOS arm64, Bun 1.3.11"
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider path
+      options:
+        - Local Hermes
+        - Remote Hermes
+        - Debug provider
+        - No provider yet
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or UI action that failed
+      placeholder: "chrona start / bun run dev / Diagnose Hermes / Test availability"
+    validations:
+      required: true
+  - type: textarea
+    id: diagnosis
+    attributes:
+      label: Diagnosis output or logs
+      description: Paste relevant output with secrets redacted. For Hermes, include `chrona hermes doctor` output when possible.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true

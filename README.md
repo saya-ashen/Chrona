@@ -136,10 +136,10 @@ the Vite web app.
    schedule.
 6. Generate a plan from the task workspace, review or edit the generated graph,
    then accept it.
-7. Start execution manually from the task workspace or Work page, or let Chrona
-   move scheduled work forward when auto-execution is configured.
+7. Start execution manually from the task workspace, or let Chrona move
+   scheduled work forward when auto-execution is configured.
 8. Review progress, blockers, approvals, tool activity, and outputs from the
-   task workspace, Work page, or Inbox.
+   task workspace or Inbox.
 
 See the [full quick start](./docs/en/quick-start.md) for data directories, AI
 client details, and troubleshooting.
@@ -230,9 +230,9 @@ report progress through Chrona commands such as `chrona.task.complete`,
 
 ### Resume with context
 
-Use the Work page, task workspace, memory console, assistant surfaces,
-conversation history, tool traces, and persisted outputs to understand and
-continue long-running work.
+Use the task workspace, memory console, assistant surfaces, conversation
+history, tool traces, and persisted outputs to understand and continue
+long-running work.
 
 ## Roadmap
 
@@ -247,7 +247,7 @@ This is a short summary of the project roadmap. See the full
 | Done   | Execution runtime       | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with AI-visible refs and persisted execution state.                      |
 | Done   | Review loops            | Inbox surfaces for pending approvals, schedule proposals, waiting inputs, and failed/cancelled runs.                                    |
 | Done   | External calendars      | Read-only calendar subscriptions, imported busy events, source management, refresh status, and schedule context.                       |
-| Next   | Polish existing flows   | Make Work, Schedule, Inbox, Task Workspace, and execution records more reliable and easier to understand.                               |
+| Next   | Polish existing flows   | Make Schedule, Inbox, Task Workspace, and execution records more reliable and easier to understand.                                    |
 | Next   | Reliable auto execution | Start due scheduled work only when configured and safe, with clear recovery when execution blocks or fails.                             |
 | Next   | More providers          | Add more execution/provider integrations beyond the current provider set while keeping provider boundaries explicit.                    |
 | Next   | Multi-session execution | Let task execution use multiple sessions where needed, with clear isolation, reuse, recovery, and diagnostics.                          |
