@@ -290,9 +290,6 @@ function buildFocusTask(
   }
   if (!best) return null;
 
-  const stateView = stateViewFor(best);
-  const kind = attentionKind(stateView);
-  const step = kind ?? (stateView.state === "running" ? "running" : "ready");
   return mapDashboardTask(best, outputs);
 }
 

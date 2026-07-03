@@ -139,11 +139,6 @@ export function SchedulePage({
   });
 
   const dialogDefaults = getQuickCreateDefaults(data);
-  const isEmptyWorkspace =
-    viewData.scheduled.length === 0 &&
-    viewData.unscheduled.length === 0 &&
-    viewData.listItems.length === 0 &&
-    viewData.proposals.length === 0;
 
   useEffect(() => {
     const { context, actions } = createScheduleAiSidebarContext({
