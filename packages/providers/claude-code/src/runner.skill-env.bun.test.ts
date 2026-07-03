@@ -1,24 +1,23 @@
 /**
- * skillEnv — env construction for spawned `claude` processes.
+ * claudeRunEnv — env construction spawned `claude` processes.
  *
- * Drives the pure env-builder without spawning `claude`. The contract is:
- *   - `CHRONA_CLI` is ALWAYS set:
- *     - caller env override wins
- *     - otherwise realpath of the running chrona entry
- *   - caller-passed `cfg.env` overrides are respected.
+ * Drives pure env-builder without spawning `claude`. contract is:
+ * - `CHRONA_CLI` ALWAYS set:
+ * - caller env override wins
+ * - otherwise realpath running chrona entry
+ * - caller-passed `cfg.env` overrides respected.
  */
 
 import { describe, expect, test } from "bun:test";
 
-import { skillEnv } from "./runner";
+import { claudeRunEnv } from "./runner";
 
-describe("skillEnv — CHRONA_CLI is always set", () => {
-  test("defaults CHRONA_CLI to the realpath of the current chrona entry", () => {
-    const env = skillEnv({
+describe("claudeRunEnv — CHRONA_CLI always set", () => {
+  test("defaults CHRONA_CLI realpath current chrona entry", () => {
+    const env = claudeRunEnv({
       mcpBaseUrl: "http://127.0.0.1:3101",
       mcpRunToken: "tok",
     });
-
     expect(env.CHRONA_CLI).toBeDefined();
     expect(env.CHRONA_CLI).not.toBe("chrona");
     expect(env.CHRONA_CLI?.startsWith("/")).toBe(true);
@@ -27,24 +26,22 @@ describe("skillEnv — CHRONA_CLI is always set", () => {
   });
 
   test("caller-passed env overrides process.env", () => {
-    const env = skillEnv({
+    const env = claudeRunEnv({
       mcpBaseUrl: "http://127.0.0.1:3101",
       mcpRunToken: "tok",
-      env: { HOME: "/sandbox" },
+      env: { HOME: "/sandbox", CHRONA_CLI: "/custom/chrona" },
     });
-
     expect(env.HOME).toBe("/sandbox");
-    expect(env.CHRONA_CLI).toBeDefined();
-    expect(env.CHRONA_CLI?.startsWith("/")).toBe(true);
+    expect(env.CHRONA_CLI).toBe("/custom/chrona");
   });
 
-  test("caller-passed CHRONA_CLI is preserved", () => {
-    const env = skillEnv({
+  test("caller-passed Claude config directory reaches spawned env", () => {
+    const env = claudeRunEnv({
       mcpBaseUrl: "http://127.0.0.1:3101",
       mcpRunToken: "tok",
-      env: { CHRONA_CLI: "/custom/chrona" },
+      env: { CLAUDE_CONFIG_DIR: "/tmp/chrona-claude-profile" },
     });
 
-    expect(env.CHRONA_CLI).toBe("/custom/chrona");
+    expect(env.CLAUDE_CONFIG_DIR).toBe("/tmp/chrona-claude-profile");
   });
 });

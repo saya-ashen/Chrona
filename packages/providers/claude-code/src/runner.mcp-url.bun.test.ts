@@ -16,6 +16,7 @@ mock.module("@anthropic-ai/claude-agent-sdk", () => ({
     capturedOptions = input.options ?? null;
     return Object.assign((async function* () {})(), { interrupt: async () => {} });
   }),
+  startup: mock(async () => ({ close: () => {} })),
 }));
 
 const ORIGINAL_FETCH = globalThis.fetch;

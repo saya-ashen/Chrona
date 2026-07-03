@@ -4,6 +4,7 @@ import {
   agentControlActionPayloadSchemas,
   chronaToolInputSchema,
   chronaToolOperationSchema,
+  describeChronaPlanOutputPublicTool,
   chronaToolResultSchema,
   isChronaToolMutating,
   parseChronaToolPayload,
@@ -164,6 +165,10 @@ describe("MCP task tool contracts", () => {
     });
 
     expect(parseChronaToolPayload("chrona.node.read", undefined)).toEqual({});
+    expect(parseChronaToolPayload("chrona.dashboard.brief", {
+      summaryText: "Needs review",
+      spec: { root: "root", elements: { root: { type: "Text", props: { text: "One task needs review." }, children: [] } } },
+    })).toMatchObject({ summaryText: "Needs review" });
     expect(() => parseChronaToolPayload("chrona.plan.output", { outputs: [{ kind: "markdown", content: "Done" }] })).toThrow();
     expect(() => parseChronaToolPayload("chrona.plan.output", { outputs: [{ kind: "json", value: { foo: "bar" } }] })).toThrow();
     expect(parseChronaToolPayload("chrona.plan.output", {
@@ -224,6 +229,16 @@ describe("MCP task tool contracts", () => {
       spec: { root: "root", elements: { root: { type: "Stack", props: {}, children: [] } } },
       mode: "replace",
     })).toThrow();
+  });
+  it("describes plan output against summarized runtime context", () => {
+    const description = describeChronaPlanOutputPublicTool().description;
+
+    expect(description).toContain("planOutput.hasSpec is false");
+    expect(description).toContain("planOutput.root");
+    expect(description).toContain("planOutput.elementIds");
+    expect(description).toContain("planOutput.rootChildren");
+    expect(description).not.toContain("planOutput.spec is null");
+    expect(description).not.toContain("planOutput.spec is not null");
   });
   it("defines agent control actions from public MCP payload contracts", () => {
     expect(agentControlActionPayloadSchemas.plan_output).toBeDefined();

@@ -3,6 +3,7 @@ import {
   CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
   ClaudeCodeProviderClient,
 } from "@chrona/claude-code";
+import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
 import {
   CHRONA_DEBUG_PROVIDER_TYPE,
   ChronaDebugProviderClient,
@@ -16,6 +17,7 @@ import type {
   AiFeature,
   AiClientType,
   ClaudeCodeClientConfig,
+  CodexClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   DebugClientConfig,
@@ -63,6 +65,11 @@ export type EngineDebugClient = EngineAiClient & {
 
 export type EngineClaudeCodeClient = EngineAiClient & {
   record: AiClientRecord & { type: "claude_code"; config: ClaudeCodeClientConfig };
+  providerClient: AgentProviderClient;
+};
+
+export type EngineCodexClient = EngineAiClient & {
+  record: AiClientRecord & { type: "codex"; config: CodexClientConfig };
   providerClient: AgentProviderClient;
 };
 
@@ -137,6 +144,16 @@ function createProviderClient(
         // own fallback (localhost:3000) is still consulted inside the
         // client for `runner` tests; production paths go through here.
         mcpBaseUrl: config.mcpBaseUrl ?? engineBaseUrl(),
+      },
+    });
+  }
+
+  if (record.type === CHRONA_CODEX_PROVIDER_TYPE) {
+    const config = record.config as CodexClientConfig;
+    return new CodexProviderClient({
+      config: {
+        ...config,
+        mcpBaseUrl: engineBaseUrl(),
       },
     });
   }

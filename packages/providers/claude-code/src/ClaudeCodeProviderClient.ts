@@ -26,13 +26,14 @@ import {
   type StartRunInput,
   type StreamRunInput,
 } from "@chrona/providers-foundation";
+
 import {
   createClaudeCodeRunner,
+  probeClaudeCodeSdk,
   type ClaudeCodeRunHandle,
   type ClaudeCodeRunner,
   type ClaudeCodeRunnerConfig,
 } from "./runner";
-import { resolveClaudeBinary } from "./claude-binary";
 import { ClaudeCodeProviderError } from "./types";
 
 export interface ClaudeCodeProviderOptions {
@@ -76,7 +77,14 @@ export interface ClaudeCodeProviderConfig {
   mcpRunToken?: string;
   apiKey?: string;
   cwd?: string;
+  /** Optional Claude binary override. Hidden from normal UI. */
+  binaryPath?: string;
   env?: Record<string, string>;
+  /** Optional config/state directory. Omitted means Claude Code default user-level config. */
+  configDirectory?: string;
+  /** Reserved named profile selector. */
+  profileName?: string;
+
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
 }
@@ -212,6 +220,12 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      approval: {
+        supported: false,
+        choices: [],
+        scopes: [],
+        resolveAll: false,
+      },
     };
   }
 
@@ -460,6 +474,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     // auth.ts), so the Bearer token we hand the SDK here MUST be the
     // server's static `API_KEY` (the same one operators set in
     // apps/server/.env).
+
     const mcpRunToken =
       this.opts.config.mcpRunToken ??
       readEnv("CHRONA_API_KEY") ??
@@ -468,6 +483,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     const env: Record<string, string> = {
       ...(this.opts.config.env ?? {}),
       ...(this.opts.config.apiKey ? { ANTHROPIC_API_KEY: this.opts.config.apiKey } : {}),
+      ...(this.opts.config.configDirectory ? { CLAUDE_CONFIG_DIR: this.opts.config.configDirectory } : {}),
     };
     const cfg: ClaudeCodeRunnerConfig = {
       model: this.opts.config.model ?? DEFAULT_MODEL,
@@ -478,44 +494,47 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       cwd: this.opts.config.cwd,
       recordDir,
       strictUnknownEvents: strict,
+
       sdkOptions: this.opts.config.sdkOptions,
     };
     return createClaudeCodeRunner(cfg);
   }
 
   /**
-   * Cheap probe: if we own a runner, just construct it (which will fail if
-   * the SDK can't be loaded; `createClaudeCodeRunner` never throws on
-   * construction — only on first `start`). We additionally run a
-   * `claude --version` probe for binary availability.
-   *
-   * The binary resolves to the `claude` executable bundled inside the
-   * `@anthropic-ai/claude-agent-sdk` platform package, or a `claude` on PATH.
-   * Chrona never requires a system-installed Claude Code CLI — the SDK ships
-   * the binary.
-   *
-   * Reason strings are actionable per the spec.
+   * Health uses the Claude Agent SDK startup path, not `claude --version`.
+   * `startup()` spawns the configured SDK process and waits for initialize,
+   * so it verifies the same integration layer real runs use.
    */
   private async probe(): Promise<string | null> {
     if (this.opts.runner) return null; // user provided runner → trust it
     if (readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR")) return null; // record-only
-    const binary = resolveClaudeBinary();
-    if (!binary) {
-      return "Claude Code binary not found: the @anthropic-ai/claude-agent-sdk platform package is missing and no 'claude' is on PATH. Reinstall dependencies.";
-    }
-    try {
-      const proc = Bun.spawn([binary, "--version"], {
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      const exit = await proc.exited;
-      if (exit !== 0) {
-        return `Claude Code binary exited with code ${exit}; '${binary}' is not runnable.`;
-      }
-      return null;
-    } catch (err) {
-      return `Claude Code binary failed to spawn (binary='${binary}'): ${errorMessage(err)}.`;
-    }
+    return probeClaudeCodeSdk({
+      config: await this.buildRunnerConfig(),
+      timeoutMs: this.opts.config.timeoutMs,
+    });
+  }
+
+  private async buildRunnerConfig(): Promise<ClaudeCodeRunnerConfig> {
+    const recordDir = this.opts.recordDir ?? readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR");
+    const strict = this.opts.strictUnknownEvents ?? readEnv("CHRONA_CLAUDE_CODE_STRICT_UNKNOWN_EVENTS") === "1";
+    const mcpBaseUrl = this.opts.config.mcpBaseUrl ?? readEnv("CHRONA_MCP_BASE_URL") ?? defaultMcpBaseUrl();
+    const mcpRunToken = this.opts.config.mcpRunToken ?? readEnv("CHRONA_API_KEY") ?? readEnv("CHRONA_MCP_BEARER_TOKEN") ?? "";
+    const env: Record<string, string> = {
+      ...(this.opts.config.env ?? {}),
+      ...(this.opts.config.apiKey ? { ANTHROPIC_API_KEY: this.opts.config.apiKey } : {}),
+    };
+    return {
+      model: this.opts.config.model ?? DEFAULT_MODEL,
+      timeoutMs: this.opts.config.timeoutMs,
+      mcpBaseUrl,
+      mcpRunToken,
+      env: Object.keys(env).length > 0 ? env : undefined,
+      binaryPath: this.opts.config.binaryPath,
+      cwd: this.opts.config.cwd,
+      recordDir,
+      strictUnknownEvents: strict,
+      sdkOptions: this.opts.config.sdkOptions,
+    };
   }
 
   private async recordFinalSnapshot(

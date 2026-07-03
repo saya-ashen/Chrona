@@ -4,6 +4,7 @@ import {
   type EffectivePlanGraph,
   type EffectivePlanNode,
   type NodeAttempt,
+  type PlanOutputState,
   type PreparedAiFeatureSpec,
 } from "@chrona/contracts/ai";
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "../ai-runtime-invoker";
@@ -27,6 +28,7 @@ export type NodeAiCapabilityInput = {
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
   attempt: NodeAttempt;
+  planOutput?: PlanOutputState;
   runtimeName: string;
   aiRuntimeInvoker: AiRuntimeInvoker;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
@@ -286,6 +288,24 @@ export async function runTaskNodeFeature(
     const structuredSummary = recordValue(structured, "summary");
     const summary = invocation.response.outputText?.trim() ||
       (typeof structuredSummary === "string" ? structuredSummary.trim() : undefined);
+    if (invocation.response.status === "cancelled") {
+      const message = `Provider cancelled runtime run ${invocation.runtimeRunRef ?? invocation.runId}`;
+      const cancelledResult: NodeExecutionResult = {
+        status: "failed",
+        error: message,
+        evidence,
+        details: buildFailureDetails({
+          node: input.node,
+          runtimeName: input.runtimeName,
+          provider: invocation.providerName,
+          runtimeSessionKey: input.mainSession.sessionKey,
+          message,
+        }),
+      };
+      await updateInvocationRunFromNodeResult(invocation, cancelledResult);
+      return cancelledResult;
+    }
+
     if (invocation.response.status === "failed") {
       const errorMessage = invocation.response.error
         || `Provider run ${invocation.runtimeRunRef ?? invocation.runId} failed`;
@@ -362,12 +382,12 @@ async function updateInvocationRunFromNodeResult(
   invocation: AiRuntimeInvocation,
   result: NodeExecutionResult,
 ) {
-  const status = runStatusFromNodeResult(result);
+  const status = invocation.response.status === "cancelled" ? RunStatus.Cancelled : runStatusFromNodeResult(result);
   await db.run.update({
     where: { id: invocation.runId },
     data: {
       status,
-      endedAt: status === RunStatus.Completed ? new Date() : null,
+      endedAt: status === RunStatus.Completed || status === RunStatus.Cancelled ? new Date() : null,
       errorSummary: errorSummaryFromNodeResult(result),
     },
   });

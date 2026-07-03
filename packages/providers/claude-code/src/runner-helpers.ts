@@ -1,14 +1,8 @@
 /**
  * runner-helpers — small, pure helpers used by `runner.ts`.
- *
- * Pulled out of the main runner file to keep each module under the lint
- * `max-lines` cap (500 lines). All helpers here are side-effect-free.
  */
 
-
 import type { ProviderRunRef, ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
-
-
 export interface BaseRefOptions {
   provider?: string;
   baseRef?: ProviderRunRef;
@@ -53,6 +47,10 @@ function renderInputPayload(input: StartRunInput["input"]): string | undefined {
   const entries = Object.entries(input).filter(([key]) => key !== "signal");
   if (entries.length === 0) return undefined;
   return JSON.stringify(Object.fromEntries(entries), null, 2);
+}
+
+export function runnerEnv(cfg: { env?: Record<string, string> }): NodeJS.ProcessEnv {
+  return { ...process.env, ...(cfg.env ?? {}) };
 }
 
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@chrona/db";
 
 import { db } from "@/lib/db";
-import { dispatch, extractJSON, getAiClientForFeature } from "@/modules/ai";
+import { buildProviderFeatureRequest, dispatchFeaturePayload, getAiClientForFeature, providerCall } from "@/modules/ai";
 import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
 
 export const DASHBOARD_BRIEF_SURFACE = "dashboard.brief" as const;
@@ -61,27 +61,54 @@ type DashboardFingerprintInput = {
 };
 
 const DASHBOARD_BRIEF_RETRY_COOLDOWN_MS = 30_000;
-const DASHBOARD_BRIEF_PROMPT_VERSION = 3;
+const DASHBOARD_BRIEF_PROMPT_VERSION = 4;
 
 const dashboardAiBriefResultSchema = z.object({
   summaryText: z.string().trim().min(1).max(500).optional(),
-  spec: z.unknown(),
+  spec: z.custom<unknown>((value) => value !== undefined),
 });
 
+const acceptedDashboardBriefToolResultSchema = z.object({
+  state: z.object({
+    result: dashboardAiBriefResultSchema,
+  }),
+});
+
+export function parseDashboardBriefPayload(input: unknown) {
+  const parsed = dashboardAiBriefResultSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error("Generated dashboard brief response invalid: expected JSON object with spec");
+  }
+  return parsed.data;
+}
 
 
-function buildPromptInput(input: DashboardFingerprintInput) {
+
+export function buildDashboardBriefPromptInput(input: DashboardFingerprintInput) {
   return {
     role: "dashboard.brief",
     rules: [
       "Generate a compact json-render Chrona UI spec for the Dashboard AI summary card.",
-      "Return JSON only with summaryText and spec.",
+      "Treat this as an executive operating brief for Chrona Dashboard, not a task list or duplicate of the side modules.",
+      "Use an attention-first structure: one heading, one situation summary, up to three signal highlights, and one informational recommended next step.",
+      "If needsAttention has items, lead with what needs user action and why; prioritize approval, input, blocked, failed, then schedule risk.",
+      "If needsAttention is empty, state the all-clear briefly; do not repeat large 'nothing needs you' copy or manufacture urgency.",
+      "Use running work, recent completions, and recent events only to explain momentum, value delivered, or meaningful change patterns.",
+      "Do not list every task. Summarize implications and only mention task titles when they clarify a user decision.",
+      "Recommended next step must be plain informational text, not an action control or command.",
+      "Submit the final brief by calling the MCP tool chrona_dashboard_brief with { summaryText, spec }.",
+      "Do not rely on assistant text as the final answer; Chrona persists only the chrona_dashboard_brief tool payload.",
       "spec may use ONLY these component types: Stack, Card, Heading, Text, Alert, Badge, Separator, Table.",
       "All props must be literal JSON values. No actions, links, buttons, forms, inputs, repeat, state, dynamic expressions, or custom components.",
-      "Keep output short: one heading, one concise summary, up to three highlights, and optional next-step text.",
       "Do not invent task IDs, counts, statuses, hrefs, approval actions, destructive actions, secrets, provider payloads, or raw task context.",
       "Do not include buttons, links, forms, inputs, tool payloads, tokens, or backend IDs.",
     ],
+    presentationContract: {
+      purpose: "Operational brief above dashboard modules",
+      sections: ["heading", "situation", "signals", "recommendedNextStep"],
+      attentionPolicy: "needsAttention first; quiet all-clear when empty",
+      duplicationPolicy: "summarize patterns; do not recreate Focus queue, Running now, Recent completions, or Recent activity lists",
+    },
     facts: {
       needsAttention: input.needsAttention,
       inProgress: input.inProgress,
@@ -99,6 +126,24 @@ function shouldDelayRetry(lastAttemptAt: Date | null, now = Date.now()) {
 function errorMessage(cause: unknown) {
   return cause instanceof Error ? cause.message : String(cause);
 }
+
+export async function dashboardBriefFromTool(scope: string) {
+  const rawEvent = await db.rawEventLog.findFirst({
+    where: { source: "chrona_tool", rawType: "chrona.dashboard.brief", taskSessionId: scope },
+    orderBy: { receivedAt: "desc" },
+    select: { correlationId: true },
+  });
+  const invocation = rawEvent?.correlationId
+    ? await db.toolInvocation.findFirst({
+        where: { toolName: "chrona.dashboard.brief", status: "accepted", correlationId: rawEvent.correlationId },
+        orderBy: { completedAt: "desc" },
+        select: { outputPayload: true },
+      })
+    : null;
+  const parsed = acceptedDashboardBriefToolResultSchema.safeParse(invocation?.outputPayload);
+  return parsed.success ? parsed.data.state.result : null;
+}
+
 
 
 function stableJson(value: unknown): string {
@@ -315,13 +360,24 @@ export async function generateDashboardBrief(input: {
   });
 
   try {
-    const rawText = await dispatch(
-      provider,
-      DASHBOARD_BRIEF_SURFACE,
-      buildPromptInput(input.fingerprintInput),
-      `workspace:${input.workspaceId}:dashboard.brief:${inputFingerprint}`,
-    );
-    const parsed = dashboardAiBriefResultSchema.parse(extractJSON(rawText));
+    const scope = `workspace:${input.workspaceId}:dashboard.brief:${inputFingerprint}`;
+    const parsed = provider.providerClient
+      ? parseDashboardBriefPayload(await (async () => {
+          await providerCall(provider, buildProviderFeatureRequest({
+            sessionKey: scope,
+            instructions: "Feature: dashboard.brief",
+            input: buildDashboardBriefPromptInput(input.fingerprintInput),
+            stream: false,
+            terminalToolName: "chrona_dashboard_brief",
+          }));
+          return dashboardBriefFromTool(scope);
+        })())
+      : parseDashboardBriefPayload((await dispatchFeaturePayload(
+          provider,
+          DASHBOARD_BRIEF_SURFACE,
+          buildDashboardBriefPromptInput(input.fingerprintInput),
+          scope,
+        )).parsed);
     const validation = validateDashboardSummarySpec(parsed.spec);
     if (!validation.ok) {
       throw new Error(`Generated dashboard brief spec invalid: ${validation.issues[0]?.message ?? "unknown issue"}`);

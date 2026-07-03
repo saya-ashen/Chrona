@@ -30,6 +30,15 @@ describe("GET /api/runtime/providers", () => {
     expect(hermes?.label).toBe("Hermes");
   });
 
+  it("exposes Codex runtime with a human label", async () => {
+    const res = await app().request("http://local/api/runtime/providers");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { providers: Array<{ key: string; label: string }> };
+    const codex = body.providers.find((p) => p.key === "codex");
+    expect(codex).toBeDefined();
+    expect(codex?.label).toBe("Codex");
+  });
+
   it("hides the debug provider when no env flag is set", async () => {
     const previous = process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
     delete process.env.CHRONA_ENABLE_DEBUG_PROVIDER;

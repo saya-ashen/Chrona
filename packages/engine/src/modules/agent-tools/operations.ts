@@ -39,6 +39,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.execution.read": "Read execution state summary.",
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
   "chrona.node.read": "Read current execution node state.",
+  "chrona.dashboard.brief": "Submit validated dashboard AI summary spec.",
   "chrona.plan.output": "Patch shared plan-level user-visible output.",
   "chrona.node.complete": "Complete the current task node.",
   "chrona.node.condition_select": "Select the current condition node branch.",
@@ -83,6 +84,17 @@ function operationEvidence(input: ChronaToolOperation["input"]) {
     toolOutputs: input.evidence?.toolOutputs,
     structuredOutput: input.evidence?.structuredOutput,
   };
+}
+
+function taskIdFromResult(result: unknown) {
+  if (!result || typeof result !== "object" || !("task" in result)) return undefined;
+  const task = result.task;
+  if (!task || typeof task !== "object" || !("id" in task)) return undefined;
+  return typeof task.id === "string" ? task.id : undefined;
+}
+
+function acceptedStateFor(toolName: ChronaToolName, state: Record<string, unknown>, result: unknown) {
+  return toolName === "chrona.dashboard.brief" ? { ...state, result } : state;
 }
 
 function ensureExpectedState(operation: ChronaToolOperation, state: Record<string, unknown>) {
@@ -324,9 +336,9 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
           message: `${toolName} completed through Chrona-owned state.`,
           affected: affectedFrom({
             workspaceId: input.workspaceId,
-            taskId: input.taskId ?? (result as { task?: { id?: string } }).task?.id,
+            taskId: input.taskId ?? taskIdFromResult(result),
           }),
-          state,
+          state: acceptedStateFor(toolName, state, result),
           auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
           evidence: operationEvidence(input),
         });

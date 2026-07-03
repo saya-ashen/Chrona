@@ -1362,16 +1362,16 @@
   },
   "pages": {
     "dashboard": {
-      "title": "Chrona workspace",
+      "title": "Chrona Dashboard",
       "subtitle": "What Chrona did, what it is doing, and what needs you — your tasks as a live feed.",
       "viewAllTasks": "All tasks",
       "newTask": "New task",
       "openTask": "Open",
       "headline": {
         "both": "Today Chrona auto-completed {completed} tasks, and {attention} need you.",
-        "completedOnly": "Today Chrona auto-completed {completed} tasks — nothing needs you right now.",
-        "attentionOnly": "Nothing auto-completed yet today, and {attention} tasks need you.",
-        "idle": "Chrona is standing by. Create a task and it will start working for you."
+        "completedOnly": "Today Chrona auto-completed {completed} tasks. No task needs you right now.",
+        "attentionOnly": "Nothing auto-completed yet today. {attention} tasks need you.",
+        "idle": "Chrona is ready. Add a task, start work, or review recent activity here."
       },
       "summary": {
         "title": "Needs you",
@@ -1388,13 +1388,13 @@
         "review_result": "Review result"
       },
       "focus": {
-        "eyebrow": "Focus now",
-        "empty": "Nothing needs your focus right now. Create a task to get started."
+        "eyebrow": "Focus queue",
+        "empty": "No task needs priority focus. Use New task when you are ready to queue more work."
       },
       "attention": {
-        "title": "Needs you",
+        "title": "Focus queue",
         "description": "Tasks waiting on approval, input, blocked, failed, or at schedule risk.",
-        "empty": "Nothing needs you right now.",
+        "empty": "All clear — no approvals, input requests, blockers, failed runs, or schedule risks need you.",
         "kind": {
           "approval": "Waiting for approval",
           "input": "Waiting for your input",
@@ -1404,14 +1404,14 @@
         }
       },
       "inProgress": {
-        "title": "In progress",
+        "title": "Running now",
         "description": "Tasks Chrona is actively advancing.",
-        "empty": "Nothing is running right now."
+        "empty": "Nothing is running. Start a task from the schedule or create a new one when you want Chrona to move."
       },
       "completed": {
-        "title": "Recently completed",
-        "totalLabel": "{n} completed all-time",
-        "empty": "No completed tasks yet."
+        "title": "Recent completions",
+        "totalLabel": "{n} recent completions shown",
+        "empty": "Completed task outputs will collect here once Chrona finishes work."
       },
       "digest": {
         "title": "AI summary",
@@ -1448,9 +1448,9 @@
         }
       },
       "feed": {
-        "title": "Latest activity",
-        "description": "The latest things that happened across your tasks.",
-        "empty": "No activity yet.",
+        "title": "Recent activity",
+        "description": "Latest task events after the AI summary, so you can see what changed without opening every task.",
+        "empty": "No recent task activity yet. New plans, starts, completions, blockers, and approvals will appear here.",
         "category": {
           "created": "Created",
           "plan": "Planned",

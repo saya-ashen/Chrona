@@ -15,6 +15,7 @@ import type {
   StartRunInput,
 } from "@chrona/providers-foundation";
 import { requireAiClient } from "@/modules/ai";
+import { mintRunToken } from "./runtime/agent-control-store";
 type ProviderChatHistory = {
   messages: Array<{ role: string; content: string }>;
 };
@@ -87,6 +88,10 @@ class IncompleteRunStreamError extends Error {
     this.name = "IncompleteRunStreamError";
   }
 }
+function usesChronaControlPlane(providerName: string) {
+  return providerName === "claude_code" || providerName === "codex";
+}
+
 
 export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
@@ -116,6 +121,19 @@ export class AiRuntimeInvoker {
         );
       }
       const providerName = client.providerClient.provider;
+      const useChronaControl = usesChronaControlPlane(providerName);
+      let controlRunToken: string | null = null;
+      if (useChronaControl) {
+        controlRunToken = await mintRunToken({
+          taskId: input.taskId,
+          workspaceId: task.workspaceId,
+          taskSessionId: input.taskSessionId,
+          runId: run.id,
+          runtimeSessionKey: input.runtimeSessionKey,
+          nodeId: input.nodeContext?.nodeId,
+          nodeAttemptId: input.nodeAttemptId,
+        });
+      }
 
       // Resume the prior provider conversation across process restarts: the
       // runner's in-process SDK-session cache is empty on a fresh process, so
@@ -146,6 +164,7 @@ export class AiRuntimeInvoker {
         providerRunRecordId: providerRun?.id,
         onRuntimeEvent: input.onRuntimeEvent,
         terminalToolName,
+        controlRunToken,
         eventPersistence: {
           workspaceId: task.workspaceId,
           taskId: input.taskId,
@@ -177,7 +196,7 @@ export class AiRuntimeInvoker {
         data: {
           runtimeRunRef,
           runtimeSessionRef: runtimeSessionKey,
-          status: response.error ? RunStatus.Failed : RunStatus.Running,
+          status: runStatusFromProviderSnapshot(response),
           syncStatus: "healthy",
           errorSummary: response.error,
         },
@@ -194,7 +213,7 @@ export class AiRuntimeInvoker {
         runtimeName: input.runtimeName,
         nativeRunId: response.nativeRunId ?? null,
         status: response.error ? "failed" : response.status,
-        finishedAt: response.status === "completed" || response.error ? new Date() : null,
+        finishedAt: isTerminalProviderSnapshot(response) ? new Date() : null,
       });
 
       return {
@@ -226,6 +245,16 @@ export class AiRuntimeInvoker {
   }
 }
 
+function runStatusFromProviderSnapshot(response: ProviderRunSnapshot): RunStatus {
+  if (response.status === "cancelled") return RunStatus.Cancelled;
+  if (response.error || response.status === "failed") return RunStatus.Failed;
+  return RunStatus.Running;
+}
+
+function isTerminalProviderSnapshot(response: ProviderRunSnapshot): boolean {
+  return response.status === "completed" || response.status === "failed" || response.status === "cancelled" || Boolean(response.error);
+}
+
 function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
   return {
     sessionId: request.sessionId,
@@ -255,16 +284,24 @@ export async function runProviderRequest(
     terminalToolName?: string;
     eventPersistence?: RuntimeEventPersistenceContext;
     signal?: AbortSignal;
+    controlRunToken?: string | null;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = toStartRunInput(request);
   const idempotencyKey = options.idempotencyKey ?? (options.runId
     ? `chrona-runtime:${options.runId}`
     : undefined);
+  const control = usesChronaControlPlane(providerClient.provider) && options.controlRunToken
+    ? {
+        baseUrl: process.env.CHRONA_BASE_URL ?? "",
+        runToken: options.controlRunToken,
+      }
+    : undefined;
   const run = await providerClient.startRun({
     ...startInput,
     signal: options.signal,
     idempotencyKey,
+    control,
   } as StartRunInput & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
   await updateProviderRunRecord(options.providerRunRecordId, {
@@ -577,6 +614,9 @@ async function collectProviderRunSnapshot(
           : { raw: event.raw, terminalToolName },
       };
     }
+    if (event.type === "tool_call") {
+      terminalToolName = event.tool ?? terminalToolName;
+    }
     if (event.type === "tool_completed") {
       terminalToolName = event.toolName ?? terminalToolName;
     }
@@ -589,6 +629,18 @@ async function collectProviderRunSnapshot(
         sessionId: run?.sessionId ?? fallbackSessionId,
         status: "failed",
         error: event.error,
+        raw: event.raw,
+      };
+    }
+    if (event.type === "run_cancelled") {
+      const run = event.run ?? fallbackRun;
+      snapshot = {
+        provider,
+        runId: run?.runId ?? crypto.randomUUID(),
+        nativeRunId: run?.nativeRunId,
+        sessionId: run?.sessionId ?? fallbackSessionId,
+        status: "cancelled",
+        error: null,
         raw: event.raw,
       };
     }

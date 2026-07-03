@@ -1,5 +1,6 @@
 import { HermesProviderClient } from "@chrona/hermes";
 import { CHRONA_CLAUDE_CODE_PROVIDER_TYPE, ClaudeCodeProviderClient } from "@chrona/claude-code";
+import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
 import { CHRONA_DEBUG_PROVIDER_TYPE, normalizeDebugProviderProfile } from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
@@ -11,6 +12,7 @@ import type {
   AiClientRecord,
   AiFeature,
   ClaudeCodeClientConfig,
+  CodexClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
@@ -147,6 +149,21 @@ async function checkClientHealth(
       };
     }
 
+    if (client.type === CHRONA_CODEX_PROVIDER_TYPE) {
+      const config = client.config as CodexClientConfig;
+      const health = await new CodexProviderClient({ config }).checkHealth();
+      if (!health.ok) {
+        return {
+          available: false,
+          reason: health.reason ?? health.message ?? "Codex health check failed",
+        };
+      }
+      return {
+        available: true,
+        reason: health.reason ?? health.message ?? "Codex ACP provider is configured",
+      };
+    }
+
     return {
       available: false,
       reason: `Provider availability check is not configured for ${client.type}`,
@@ -210,6 +227,7 @@ export type ProviderFeatureRequest = {
   instructions: string;
   input: unknown;
   structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
+  terminalToolName?: string;
   stream: boolean;
   maxOutputTokens?: number;
   timeoutSeconds?: number;
@@ -234,6 +252,7 @@ function toStartRunInput(request: ProviderFeatureRequest): StartRunInput {
     instructions: request.instructions,
     input: request.input as ProviderRunInput,
     structuredOutputSchema: request.structuredOutputSchema,
+    terminalToolName: request.terminalToolName,
     maxOutputTokens: request.maxOutputTokens,
     timeoutMs: request.timeoutSeconds
       ? request.timeoutSeconds * 1000
@@ -409,6 +428,7 @@ export function buildProviderFeatureRequest(input: {
   timeoutSeconds?: number;
   stream: boolean;
   maxOutputTokens?: number;
+  terminalToolName?: string;
 }): ProviderFeatureRequest {
   const fallbackInstructions =
     input.instructions ??
@@ -424,6 +444,7 @@ export function buildProviderFeatureRequest(input: {
     instructions: input.featureSpec?.instructions ?? fallbackInstructions,
     input: providerInput,
     structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
+    terminalToolName: input.terminalToolName,
     stream: input.stream,
     maxOutputTokens: input.maxOutputTokens,
     timeoutSeconds: input.timeoutSeconds,

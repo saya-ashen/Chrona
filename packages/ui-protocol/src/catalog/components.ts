@@ -474,14 +474,16 @@ export function chronaPlanOutputCatalogPrompt() {
   return chronaPlanOutputCatalog.prompt({
     editModes: ["patch"],
     customRules: [
-      "Each patch is a JSON Patch operation over Current Node Context JSON.context.planOutput.spec.",
+      "Each patch is a JSON Patch operation over the accumulated plan output Spec summarized by Current Node Context JSON.context.planOutput.",
+      "planOutput is task-level storage shared by every node in this task run; every chrona_plan_output call modifies the same accumulated user-visible result, not a node-local document.",
       "Chrona does not accept raw JSONL text. Put the generated RFC 6902 patch objects in chrona_plan_output.patches.",
-      "Use chrona_plan_output for shared plan-level user-visible output only.",
-      "When planOutput.spec is null, bootstrap with /root and every referenced /elements/<id> entry in one tool call.",
+      "Use chrona_plan_output for shared task-level user-visible output only.",
+      "Bootstrap /root only when Current Node Context JSON.context.planOutput.hasSpec is false. In that first call only, add /root and all referenced /elements/<id> entries together.",
+      "When planOutput.hasSpec is true, never patch /root, /elements, or the existing root element as a replacement. Preserve the current root id from context.planOutput.root.",
+      "For later updates, add node-specific sections under stable /elements/<id> paths, then append/reorder those ids inside an existing children array such as /elements/<currentRootId>/children/-. Use context.planOutput.rootChildren and context.planOutput.elementIds to avoid duplicate ids and preserve prior sections unless the user explicitly asks to remove them.",
       "User-facing reports should compose clear sections with Card containers around Markdown/Table/ResultSummary content so each major block has a visible background.",
       "Use JsonView sparingly: only for diagnostics, API payloads, machine-readable evidence, or debugging details. Do not show source data or report rationale as raw JSON when Markdown or Table would be readable.",
-      "When replacing prior output, remove elements no longer reachable from root so stale sections do not remain in the shared spec.",
-      "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, or node-local outputs.",
+      "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, node-local outputs, or complete replacement Specs after bootstrap.",
     ],
   });
 }
@@ -519,7 +521,7 @@ export function chronaPlanOutputElementJsonSchema(): z.core.JSONSchema.JSONSchem
 export function chronaPlanOutputPatchValueJsonSchema(): z.core.JSONSchema.JSONSchema {
   return {
     description:
-      "Patch value. Required for add/replace/test; omit for remove/move/copy. Use string for /root or scalar props, string[] for children, element object for /elements/<id>, object for props/state/JsonView, or number/boolean/null for scalar values.",
+      "Patch value. Required for add/replace/test; omit for remove/move/copy. Use element object for /elements/<id>, string[] for children arrays, string for scalar props or element ids appended to children, object for props/state/JsonView, or number/boolean/null for scalar values.",
   };
 }
 
@@ -544,7 +546,7 @@ export function chronaPlanOutputPatchJsonSchema(): z.core.JSONSchema.JSONSchema 
     type: "string",
     minLength: 1,
     description:
-      "JSON Pointer into the plan-output Spec. Use /root, /elements/<id>, /elements/<id>/children, /elements/<id>/children/<index>, or /elements/<id>/props/<prop>. Use /state/<key> only when the element uses json-render state expressions.",
+      "JSON Pointer into the plan-output Spec. Common update paths: /elements/<id>, /elements/<id>/children, /elements/<id>/children/<index>, /elements/<id>/children/-, or /elements/<id>/props/<prop>. Use /state/<key> only when the element uses json-render state expressions.",
   };
   const from: z.core.JSONSchema.JSONSchema = {
     ...path,

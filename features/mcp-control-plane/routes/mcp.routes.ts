@@ -145,6 +145,12 @@ const externalTools = {
     description: "Read current execution node state through AI-visible refs.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.read"]),
   },
+  chrona_dashboard_brief: {
+    internalName: "chrona.dashboard.brief",
+    title: "Chrona Dashboard Brief",
+    description: "Submit Dashboard AI summary as { summaryText, spec }. Chrona validates and stores the compact dashboard brief spec; use only Stack, Card, Heading, Text, Alert, Badge, Separator, Table.",
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.dashboard.brief"]),
+  },
   chrona_plan_output: {
     internalName: "chrona.plan.output",
     title: "Chrona Plan Output",
@@ -346,8 +352,13 @@ const executionTools = new Set<ChronaToolName>([
   "chrona.node.wait_complete",
 ]);
 
-function toolSessionPurpose(sessionId?: string | null): "plan_generation" | "execution" | "unknown" {
+const dashboardBriefTools = new Set<ChronaToolName>([
+  "chrona.dashboard.brief",
+]);
+
+function toolSessionPurpose(sessionId?: string | null): "plan_generation" | "execution" | "dashboard_brief" | "unknown" {
   if (!sessionId) return "unknown";
+  if (sessionId.includes(":dashboard.brief:")) return "dashboard_brief";
   if (
     sessionId.endsWith(":pg") ||
     sessionId.endsWith(":plan-graph") ||
@@ -370,6 +381,7 @@ function isToolAllowedForSession(toolName: ChronaToolName, sessionId?: string | 
   const purpose = toolSessionPurpose(sessionId);
   if (purpose === "plan_generation") return planGenerationTools.has(toolName);
   if (purpose === "execution") return executionTools.has(toolName);
+  if (purpose === "dashboard_brief") return dashboardBriefTools.has(toolName);
   return toolName.endsWith(".read");
 }
 

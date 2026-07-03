@@ -33,6 +33,7 @@ Those decisions belong in `packages/engine`.
 | `packages/providers/hermes` | Hermes-specific transport, session, event, and tool-call adaptation |
 | `packages/providers/debug` | Development/debug execution runtime, hidden unless explicitly enabled |
 | `packages/providers/claude-code` | Claude Code CLI transport, session, stream, and tool-call adaptation |
+| `packages/providers/codex` | OpenAI Codex via Agent Client Protocol `codex-acp`, session, stream, MCP, and tool-call adaptation |
 
 ## Integration packages
 
@@ -93,6 +94,25 @@ Hermes may expose native concepts such as session keys, run refs, native run IDs
 Hermes code should not expose a high-level `executeTask()` abstraction that embeds Chrona task lifecycle decisions. The engine starts/continues execution and decides what to do with provider events.
 
 Hermes local setup belongs in `packages/integrations/hermes`, not `packages/providers/hermes`. Examples include checking `~/.hermes/.env`, installing the Chrona Hermes plugin, writing the plugin MCP URL, planning restart requirements, and starting `hermes gateway restart` after an explicit user action.
+
+## Codex-specific notes
+
+Codex uses `codex-acp` over stdio, not `@openai/codex-sdk`. Chrona starts the ACP adapter, initializes the agent, then creates a session with a Chrona HTTP MCP server entry pointing at `/api/mcp`.
+
+The provider requires ACP HTTP MCP capability during health/startup. If `agentCapabilities.mcpCapabilities.http` is not true, the provider should fail before a run consumes model turns.
+
+`binaryPath` and `codexPath` are operator escape hatches only. They are not AI Clients UI settings. Normal users configure model, API key, base URL, and timeout.
+
+Codex capabilities currently mirror ACP stdio limits:
+
+- sessions: supported
+- streaming: supported
+- cancellation: supported
+- tool calls: supported
+- run lookup/reconnect: unsupported
+- Chrona provider approval bridge: unsupported
+
+Terminal evidence remains event-based. `terminalToolName` is only prompt guidance; Chrona records completion only from actual completed/failed ACP tool updates.
 
 ## Boundary with AI clients
 

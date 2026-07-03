@@ -23,8 +23,8 @@
  * Plan:  specs/017-provider-claude-code/plan.md §0.1, §0.5
  */
 
-import { realpathSync } from "node:fs";
 import { join } from "node:path";
+import { realpathSync } from "node:fs";
 import {
   appendProviderReplayRecord,
   providerReplayRecord,
@@ -40,7 +40,7 @@ import type {
   ProviderRunSnapshot,
   StartRunInput,
 } from "@chrona/providers-foundation";
-import { query as sdkQuery, type HookInput } from "@anthropic-ai/claude-agent-sdk";
+import { query as sdkQuery, startup as sdkStartup, type HookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
   createNormalizerContext,
   mapClaudeCodeStreamItems,
@@ -49,6 +49,7 @@ import {
 } from "./normalizers";
 import {
   renderPrompt,
+  runnerEnv,
   snapshotFromRef,
   stripTrailingSlash,
 } from "./runner-helpers";
@@ -140,6 +141,7 @@ export interface ClaudeCodeRunnerConfig {
   mcpBaseUrl: string;
   /** Per-run Bearer token sent in the MCP `Authorization` header. */
   mcpRunToken: string;
+
   /** CWD for the spawned process. Default: `process.cwd()`. */
   cwd?: string;
   /** Pass-through env (merged on top of `process.env`). */
@@ -154,6 +156,8 @@ export interface ClaudeCodeRunnerConfig {
   strictUnknownEvents?: boolean;
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: Partial<SdkQueryOptions>;
+  /** Optional Claude binary override. Hidden from normal UI. */
+  binaryPath?: string;
 }
 
 export interface ClaudeCodeRunnerDiagnostics {
@@ -314,22 +318,22 @@ function resolveSelfChronaPath(): string | undefined {
 
 /**
  * Build the env passed to a spawned `claude` process. Always sets
- * `CHRONA_CLI` to a value the spawned process can resolve:
- *   - Caller env override (`cfg.env.CHRONA_CLI`)
- *   - Real path of the current chrona binary (e.g. launcher cache ELF
- *     in production, `packages/cli/src/index.ts` in dev)
- *   - Bare `chrona` (PATH lookup) as final fallback
+ * `CHRONA_CLI` value spawned process can resolve:
+ * - Caller env override (`cfg.env.CHRONA_CLI`)
+ * - Real path current chrona binary (e.g. launcher cache ELF
+ *   in production, `packages/cli/src/index.ts` in dev)
+ * - Bare `chrona` (PATH lookup) final fallback
  *
  * Exported for unit testing the env-construction seam without spawning
  * a real `claude` process.
  */
-export function skillEnv(cfg: ClaudeCodeRunnerConfig): NodeJS.ProcessEnv {
-  const env = { ...process.env, ...(cfg.env ?? {}) };
-  if (env.CHRONA_CLI === undefined) {
-    const resolved = resolveSelfChronaPath();
-    env.CHRONA_CLI = resolved ?? "chrona";
-  }
-  return env;
+export function claudeRunEnv(cfg: ClaudeCodeRunnerConfig): NodeJS.ProcessEnv {
+  return runnerEnv({
+    env: {
+      ...(cfg.env ?? {}),
+      CHRONA_CLI: cfg.env?.CHRONA_CLI ?? resolveSelfChronaPath() ?? "chrona",
+    },
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -414,6 +418,35 @@ class ReplayRunner implements ClaudeCodeRunner {
 /*                                  SDK runner                                 */
 /* -------------------------------------------------------------------------- */
 
+
+function binaryOption(cfg: ClaudeCodeRunnerConfig): Partial<SdkQueryOptions> {
+  const path = cfg.binaryPath?.trim();
+  return path ? ({ executable: path } as Partial<SdkQueryOptions>) : {};
+}
+
+export async function probeClaudeCodeSdk(input: {
+  config: ClaudeCodeRunnerConfig;
+  timeoutMs?: number;
+}): Promise<string | null> {
+  let warm: Awaited<ReturnType<typeof sdkStartup>> | null = null;
+  try {
+    warm = await sdkStartup({
+      options: {
+        ...(input.config.sdkOptions ?? {}),
+        model: input.config.model,
+        cwd: input.config.cwd,
+        env: claudeRunEnv(input.config),
+        ...binaryOption(input.config),
+      },
+      initializeTimeoutMs: input.timeoutMs,
+    });
+    return null;
+  } catch (err) {
+    return `Claude Code SDK startup failed: ${err instanceof Error ? err.message : String(err)}`;
+  } finally {
+    warm?.close();
+  }
+}
 
 /**
  * Thrown by `probeMcpServer` when the MCP transport the SDK is about to
@@ -734,17 +767,14 @@ class SdkRunner implements ClaudeCodeRunner {
         // configured: a server running without `API_KEY` accepts
         // unauthenticated requests, and sending `Bearer ` (empty)
         // would be a malformed header rather than "no auth".
-        headers: cfg.mcpRunToken
-          ? { Authorization: `Bearer ${cfg.mcpRunToken}` }
-          : {},
+        headers: cfg.mcpRunToken ? { Authorization: `Bearer ${cfg.mcpRunToken}` } : {},
       },
     };
     // Fail-fast: the agent model needs the `mcp__chrona__*` tool group
     // to be reachable BEFORE it can call `mcp__chrona__chrona_plan_generate`.
     // The 401 we keep hitting in dev comes from this transport being
     // registered with a stale/invalid token — the agent would only
-    // notice mid-session (wasting a model turn + scraping the OMC skill
-    // catalog instead of running the task). Probe the MCP server once
+    // notice mid-session (wasting model turn). Probe MCP server once
     // here so a bad token / wrong URL is reported at start() time.
     await probeMcpServer({
       baseUrl: mcpBaseUrl,
@@ -771,20 +801,21 @@ class SdkRunner implements ClaudeCodeRunner {
       ...(cfg.sdkOptions ?? {}),
       model,
       mcpServers,
-      allowedTools: ["mcp__chrona__*"],
       permissionMode: "bypassPermissions",
       abortController,
       cwd: cfg.cwd,
-      env: skillEnv(cfg),
+      env: claudeRunEnv(cfg),
       ...(resumedSdkSessionId ? { resume: resumedSdkSessionId } : {}),
+      // Honor an explicit binary override; otherwise SDK uses its
+      // built-in `claude` executable.
+      ...binaryOption(cfg),
       ...(debugEnabled ? { hooks: buildDebugHooks(log) } : {}),
       ...(debugFile ? { debugFile } : {}),
     } as Parameters<typeof sdkQuery>[0]["options"];
 
     const prompt = renderPrompt(input) ?? "";
     log.info("claude_code.run_start", {
-      model,
-      allowedTools: options?.allowedTools,
+      controlPlane: "mcp",
       hasDebugFile: Boolean(debugFile),
       resumedSdkSessionId: resumedSdkSessionId ?? null,
     });

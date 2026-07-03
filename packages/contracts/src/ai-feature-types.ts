@@ -5,7 +5,7 @@
 import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
-export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | (string & {});
+export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
 export const AI_FEATURES = [
   "suggest",
   "generate_plan",
@@ -27,7 +27,7 @@ export interface AiClientRecord {
   id: string;
   name: string;
   type: AiClientType;
-  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig;
+  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig | CodexClientConfig;
   isDefault: boolean;
   enabled: boolean;
 }
@@ -61,6 +61,7 @@ export interface HermesClientConfig {
  * The provider launches a local Claude Code headless run through the Agent SDK
  * and registers Chrona's `/api/mcp` server scoped to that run.
  */
+
 export interface ClaudeCodeClientConfig {
   /** Model ID passed to Claude Code. Defaults to "claude-opus-4-8". */
   model?: string;
@@ -79,6 +80,10 @@ export interface ClaudeCodeClientConfig {
   apiKey?: string;
   /** Optional: pass-through env vars to the Claude Code subprocess. */
   env?: Record<string, string>;
+  /** Optional config/state directory. Omitted means provider default user-level config. */
+  configDirectory?: string;
+  /** Reserved named profile selector. Runtime support depends on provider. */
+  profileName?: string;
   /**
    * Optional: working directory for the Claude Code run. Defaults to
    * `process.cwd()`. Use this to constrain the agent's filesystem scope.
@@ -86,6 +91,33 @@ export interface ClaudeCodeClientConfig {
   cwd?: string;
 }
 
+
+export interface CodexClientConfig {
+  /** Internal codex-acp executable override. Not user-facing. */
+  binaryPath?: string;
+  /** Model ID passed to Codex. */
+  model?: string;
+  /** Total run timeout in milliseconds. */
+  timeoutMs?: number;
+  /** OpenAI/Codex API key. */
+  apiKey?: string;
+  /** OpenAI-compatible base URL. */
+  baseUrl?: string;
+  /** Optional pass-through env vars for codex-acp. */
+  env?: Record<string, string>;
+  /** Optional Codex home directory. Omitted means default user-level CODEX_HOME (~/.codex). */
+  configDirectory?: string;
+  /** Reserved Codex named profile selector. codex-acp cannot apply it yet. */
+  profileName?: string;
+  /** Optional working directory for Codex. */
+  cwd?: string;
+  /** Internal Codex CLI executable used by codex-acp. Not user-facing. */
+  codexPath?: string;
+  /** Chrona /api/mcp base URL. Defaults to the hosting Chrona server. */
+  mcpBaseUrl?: string;
+  /** Static Bearer token presented to the MCP server at `/api/mcp`. */
+  mcpRunToken?: string;
+}
 
 export type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
 

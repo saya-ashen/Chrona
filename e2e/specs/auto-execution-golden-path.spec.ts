@@ -55,12 +55,6 @@ type TaskPlanBody = {
   savedPlan?: { id?: string; status?: string } | null;
 };
 
-type WorkBody = {
-  taskShell?: {
-    status?: string;
-  };
-  currentRun?: { status?: string };
-};
 
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -387,12 +381,14 @@ test.describe("Auto-execution golden path (§1.3)", () => {
         await expect
           .poll(
             async () => {
-              const res = await request.get(`/api/work/${taskId}`);
+              const res = await request.get(
+                `/api/tasks/${taskId}/execution/current?workBlockId=${workBlockId}`,
+              );
               if (!res.ok()) return null;
-              const body = (await res.json()) as WorkBody;
-              if (body.currentRun?.status === "Completed") return "Completed";
+              const body = (await res.json()) as ExecutionCurrentBody;
+              if (body.status === "completed") return "Completed";
               await triggerOrchestratorTick(request);
-              return body.currentRun?.status ?? body.taskShell?.status ?? null;
+              return body.status ?? null;
             },
             { timeout: 30_000, intervals: [300, 500, 1_000] },
           )
@@ -402,7 +398,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
       // ── 12. Work page Badge renders "completed" ─────────────────────────────
       // Badge uses data-slot="badge" (shadcn Badge component), not role="status".
       await test.step("Work page Badge shows 'completed'", async () => {
-        await page.goto(`/en/work/${taskId}`);
+        await page.goto(`/en/tasks/${taskId}`);
         await expect(
           page.locator('[data-slot="badge"]').filter({ hasText: /^completed$/i }),
         ).toBeVisible({ timeout: 15_000 });

@@ -1,5 +1,4 @@
 import type { ConditionEvaluator, TaskExecutor, TaskMode } from "../ai-plan-blueprint";
-import type { Spec } from "@chrona/ui-protocol";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
@@ -143,7 +142,10 @@ export interface NodeRuntimeInput {
     globalSummary?: string;
     planOutput: {
       revision: number;
-      spec: Spec | null;
+      hasSpec: boolean;
+      root: string | null;
+      rootChildren: string[];
+      elementIds: string[];
       updatedAt: string | null;
       lastSummary?: string;
     };

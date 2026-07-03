@@ -2,6 +2,7 @@ import type {
   EffectivePlanGraph,
   EffectivePlanNode,
   NodeRuntimeInput,
+  PlanOutputState,
 } from "@chrona/contracts/ai";
 import { chronaPlanOutputCatalogPrompt } from "@chrona/ui-protocol";
 
@@ -41,11 +42,13 @@ function resultArtifactGuidance(runtimeInput: NodeRuntimeInput): string {
 function nodeTypeInstructions(node: EffectivePlanNode): string {
   switch (node.type) {
     case "task":
-      return `When the current task-node has user-visible deliverables, call chrona_plan_output with RFC 6902 SpecStream patches before completion. Generate UI using only the Chrona plan-output catalog (see CATALOG_UI_SPEC below). chrona_plan_output may be called multiple times to update the shared plan-level output. Call chrona_node_complete only when the current task-node objective is fully satisfied and required output patches have succeeded. If the objective requires filesystem, shell, browser, network, or code execution capability and that capability is unavailable, call chrona_node_block instead of chrona_node_complete. Call chrona_node_fail for unrecoverable errors.
+      return `When the current task-node has user-visible deliverables, call chrona_plan_output with RFC 6902 SpecStream patches before completion. Generate UI using only the Chrona plan-output catalog (see CATALOG_UI_SPEC below). chrona_plan_output edits one task-level plan output shared by every node in this task run; each call patches the same accumulated result, not a node-local document. Call chrona_node_complete only when the current task-node objective is fully satisfied and required output patches have succeeded. If the objective requires filesystem, shell, browser, network, or code execution capability you do not have, block instead of pretending completion.
 
-      For user-visible deliverables, pass "patches" as JSON Patch operations. Example bootstrap call: { patches: [{ "op": "add", "path": "/root", "value": "root" }, { "op": "add", "path": "/elements/root", "value": { "type": "Stack", "props": { "direction": "vertical", "gap": "md" }, "children": ["title", "body"] } }, { "op": "add", "path": "/elements/title", "value": { "type": "Heading", "props": { "text": "Result", "level": "h3" }, "children": [] } }, { "op": "add", "path": "/elements/body", "value": { "type": "Markdown", "props": { "content": "details" }, "children": [] } }], summary: "Updated plan output" }
+      Read Current Node Context JSON.context.planOutput before patching. If context.planOutput.hasSpec is false, bootstrap once with /root and every required /elements/<id> entry in the same chrona_plan_output call. If context.planOutput.hasSpec is true, NEVER patch /root, /elements, or replace the existing root element; preserve context.planOutput.root and append node-specific sections under that existing layout. Existing element ids are summarized in context.planOutput.elementIds; existing root children are summarized in context.planOutput.rootChildren.
 
-      Final Spec after applying patches must be self-contained and closed: root must reference an existing element id, every child id referenced in any children array must exist as an element id, every element id must be unique, and no element may be omitted as a placeholder unless that element is also declared in elements.
+      For later user-visible deliverables, pass "patches" as incremental JSON Patch operations. Example later update call: { patches: [{ "op": "add", "path": "/elements/marketSummary", "value": { "type": "Card", "props": { "title": "Market summary" }, "children": ["marketSummaryBody"] } }, { "op": "add", "path": "/elements/marketSummaryBody", "value": { "type": "Markdown", "props": { "content": "Key findings and next steps." }, "children": [] } }, { "op": "add", "path": "/elements/<currentRootId>/children/-", "value": "marketSummary" }], summary: "Added market summary section" }
+
+      Final Spec after applying patches must be valid and closed: root must reference an existing element id, every child id referenced in any children array must exist as an element id, every element id must be unique, and no element may be omitted as a placeholder unless that element is also declared in elements. For existing plan output, satisfy these rules by preserving the current root and adding/appending elements; do not rebuild the whole Spec.
 
       Spec hard rules, all enforced by validation: (1) root MUST equal one element id. (2) Leaf elements use children: []. (3) children contains child element-id strings only. (4) Every child id MUST exist in elements. (5) No element may include itself or create a cycle. (6) Component type MUST be from CATALOG_UI_SPEC. (7) props MUST match that component schema exactly. (8) visible is an element-level field, not a prop. (9) The plan-output catalog is intentionally small: use Stack/Card/Heading/Text/Markdown/Table/Badge/Alert/FileRef/JsonView/ResultSummary/CollapsibleText/Separator only.`
     case "condition":
@@ -64,6 +67,7 @@ function runtimeJson(runtimeInput: NodeRuntimeInput): string {
 export function buildNodeRuntimePrompt(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
+  planOutput?: PlanOutputState | NodeRuntimeInput["context"]["planOutput"];
 }): { instructions: string; runtimeInput: NodeRuntimeInput } {
   const currentNodeResultActionNames = [
     ...NODE_RUNTIME_TERMINAL_TOOLS[input.node.type],
@@ -71,6 +75,7 @@ export function buildNodeRuntimePrompt(input: {
   const runtimeInput = buildNodeRuntimeInput({
     plan: input.plan,
     node: input.node,
+    planOutput: input.planOutput,
   });
 
   const catalogSection = input.node.type === "task"

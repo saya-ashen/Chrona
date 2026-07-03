@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { EffectivePlanGraph, EffectivePlanNode, NodeAttempt } from "@chrona/contracts/ai";
-import { runTaskNodeFeature } from "./runtime/node-ai-capabilities";
+import { executeTaskNodeCapability, runTaskNodeFeature } from "./runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "./ai-runtime-invoker";
 
 function makeTaskNode(): EffectivePlanNode {
@@ -240,6 +240,181 @@ describe("runTaskNodeFeature", () => {
       status: "Failed",
       errorSummary: "Runtime run runtime-first-entry completed without a Chrona terminal result action for node first_entry: Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
     });
+  });
+
+  it("marks provider-cancelled task snapshots terminal instead of started", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Node AI cancelled workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-cancelled-provider",
+        workspaceId: workspace.id,
+        title: "Node AI cancelled task",
+        status: TaskStatus.Running,
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "local-run-cancelled",
+        taskId: task.id,
+        runtimeName: "hermes",
+        runtimeRunRef: "runtime-cancelled",
+        runtimeSessionRef: "main-session",
+        status: "Running",
+        syncStatus: "healthy",
+        triggeredBy: "system",
+        startedAt: new Date(),
+      },
+    });
+
+    const node = makeTaskNode();
+    const aiRuntimeInvoker = {
+      invoke: async () => ({
+        runId: "local-run-cancelled",
+        runtimeRunRef: "runtime-cancelled",
+        runtimeSessionKey: "main-session",
+        conversationEntryIds: ["conversation-entry-cancelled"],
+        providerName: "codex",
+        response: {
+          provider: "codex",
+          runId: "runtime-cancelled",
+          nativeRunId: "runtime-cancelled",
+          sessionId: "main-session",
+          status: "cancelled" as const,
+          error: null,
+        },
+      }),
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+
+    const plan = makePlan(node);
+    const result = await runTaskNodeFeature({
+      taskId: task.id,
+      mainSession: { id: "main-session", taskId: task.id, sessionKey: "chrona:task:task-cancelled-provider:plan-1" },
+      node,
+      plan,
+      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+      featureSpec: {
+        feature: "execute_task_node",
+        instructions: "Execute the current task node.",
+        inputText: "{}",
+        terminalToolName: "chrona_node_complete",
+        structuredOutputSchema: undefined,
+      },
+      providerInput: {},
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error: "Provider cancelled runtime run runtime-cancelled",
+    });
+    const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-cancelled" } });
+    expect(run.status).toBe("Cancelled");
+    expect(run.endedAt).toBeInstanceOf(Date);
+  });
+
+  it("sends non-null accumulated plan output to the runtime invoker", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Node AI plan output workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-plan-output-context",
+        workspaceId: workspace.id,
+        title: "Node AI plan output task",
+        status: TaskStatus.Running,
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "local-run-plan-output-context",
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date(),
+        syncStatus: "healthy",
+      },
+    });
+    const planOutput = {
+      revision: 1,
+      spec: {
+        root: "existingRoot",
+        elements: {
+          existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
+          firstSection: { type: "Markdown", props: { content: "First section" }, children: [] },
+        },
+      },
+      updatedAt: "2026-05-22T00:01:00.000Z",
+      updatedByNodeId: "first_entry",
+      history: [
+        {
+          id: "plan_output_1",
+          nodeId: "first_entry",
+          summary: "First section",
+          patches: [{ op: "add" as const, path: "/root", value: "existingRoot" }],
+          createdAt: "2026-05-22T00:01:00.000Z",
+        },
+      ],
+    };
+    const invocations: unknown[] = [];
+    const aiRuntimeInvoker = {
+      invoke: async (input) => {
+        invocations.push(input);
+        return {
+          runId: "local-run-plan-output-context",
+          runtimeRunRef: "runtime-plan-output-context",
+          runtimeSessionKey: "main-session",
+          conversationEntryIds: ["conversation-entry-plan-output-context"],
+          providerName: "codex",
+          response: {
+            provider: "codex",
+            runId: "runtime-plan-output-context",
+            nativeRunId: "runtime-plan-output-context",
+            sessionId: "main-session",
+            status: "running" as const,
+            error: null,
+          },
+        };
+      },
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+    const node = makeTaskNode();
+    const plan = makePlan(node);
+
+    await executeTaskNodeCapability({
+      taskId: task.id,
+      mainSession: { id: "main-session", taskId: task.id, sessionKey: "chrona:task:task-plan-output-context:plan-1" },
+      node,
+      plan,
+      planOutput,
+      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+    });
+
+    const expectedPlanOutput = {
+      revision: 1,
+      hasSpec: true,
+      root: "existingRoot",
+      rootChildren: ["firstSection"],
+      elementIds: ["existingRoot", "firstSection"],
+      updatedAt: "2026-05-22T00:01:00.000Z",
+      lastSummary: "First section",
+    };
+    const invocation = invocations[0] as { runtimeInput: { context: { planOutput: unknown } }; instructions: string; featureSpec: { inputText: string } };
+    expect(invocation.runtimeInput.context.planOutput).toEqual(expectedPlanOutput);
+    expect(JSON.parse(invocation.featureSpec.inputText).context.planOutput).toEqual(expectedPlanOutput);
+    expect(invocation.instructions).toContain('"revision": 1');
+    expect(invocation.instructions).toContain('"root": "existingRoot"');
+    expect(invocation.instructions).not.toContain('"spec":');
   });
 
 

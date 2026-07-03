@@ -38,14 +38,14 @@ async function createTask(
 }
 
 test.describe("Task Workspace Assistant Surface", () => {
-  test("opens task-aware assistant surface", async ({
+  test("shows disabled task-aware assistant status while drawer is unavailable", async ({
     page,
     request,
   }) => {
     const createdTask = await createTask(
       request,
       "E2E Assistant Surface Task",
-      "Verify the page-aware assistant surface.",
+      "Verify the page-aware assistant surface status.",
     );
 
     await page.goto(`/en/tasks/${createdTask.taskId}`);
@@ -58,7 +58,10 @@ test.describe("Task Workspace Assistant Surface", () => {
     }
 
     const trigger = page.getByRole("button", { name: "Open Chrona AI dropdown" });
-    await trigger.click();
-    await expect(page.getByRole("dialog", { name: "Task context" })).toBeVisible();
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toBeDisabled();
+    await expect(page.getByText("Next")).toBeVisible();
+    await expect(page.getByText("Continue task")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Task context" })).toHaveCount(0);
   });
 });

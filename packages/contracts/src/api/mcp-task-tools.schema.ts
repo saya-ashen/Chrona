@@ -25,6 +25,7 @@ export const chronaToolNames = [
   "chrona.execution.read",
   "chrona.execution.dispatch",
   "chrona.node.read",
+  "chrona.dashboard.brief",
   "chrona.plan.output",
   "chrona.node.complete",
   "chrona.node.condition_select",
@@ -118,7 +119,7 @@ const planOutputPayloadShape = {
   summary: z.string().min(1).optional(),
 };
 
-export const CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION = "Patch shared plan-level user-visible output as json-render SpecStream patches. Submit { patches, summary }. Patches are RFC 6902 JSON Patch operations over the current plan output Spec. Use paths like /root, /elements/root, /elements/root/children, /elements/summary/props/text. Do not submit complete node-local outputs, markdown-only text, legacy spec/mode fields, or backend IDs. Final Spec after applying patches must be valid against Chrona plan-output catalog.";
+export const CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION = "Patch task-level shared user-visible plan output as json-render SpecStream patches. Submit { patches, summary }. Patches are RFC 6902 JSON Patch operations over the current accumulated plan output Spec for the whole task run; every chrona_plan_output call modifies the same result, not a node-local output. If current planOutput.hasSpec is false, bootstrap once with /root plus all required /elements/<id> entries. If current planOutput.hasSpec is true, do not patch /root, /elements, or replace the existing root element; preserve current root from planOutput.root and add node-specific sections under stable /elements/<id> paths, then append/reorder ids in existing children arrays such as /elements/<currentRootId>/children/-. Use planOutput.elementIds and planOutput.rootChildren to avoid duplicate ids and preserve prior sections. Do not submit complete replacement Specs after bootstrap, markdown-only text, legacy spec/mode fields, or backend IDs. Final Spec after applying patches must be valid against Chrona plan-output catalog.";
 
 export function describeChronaPlanOutputPublicTool() {
   return { name: "chrona_plan_output", internalName: "chrona.plan.output", description: CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION, visibleArguments: ["patches", "summary"] };
@@ -141,6 +142,11 @@ export const blockPayloadSchema = z.object({ reason: z.string().min(1), actionFo
 export const failPayloadSchema = z.object({ error: z.string().min(1), retryable: z.boolean().optional(), diagnostics: z.unknown().optional(), evidence: nodeEvidencePayloadSchema }).strict();
 
 export const waitCompletePayloadSchema = z.object({ summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
+export const dashboardBriefPayloadSchema = z.object({
+  summaryText: z.string().trim().min(1).max(500).optional(),
+  spec: z.unknown(),
+}).strict();
+
 
 export const chronaToolPayloadSchemas = {
   "chrona.task.read": readPayloadSchema,
@@ -156,6 +162,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
   "chrona.node.read": readPayloadSchema,
+  "chrona.dashboard.brief": dashboardBriefPayloadSchema,
   "chrona.plan.output": planOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
@@ -171,6 +178,7 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
   "chrona.node.read": publicReadPayloadSchema,
+  "chrona.dashboard.brief": dashboardBriefPayloadSchema,
   "chrona.plan.output": publicPlanOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),

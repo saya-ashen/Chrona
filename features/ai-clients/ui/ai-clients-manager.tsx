@@ -13,9 +13,9 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
 
-const DEFAULT_PROVIDER_IDLE_TIMEOUT_MS = 120 * 1000;
+const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 
-type AiClientType = "llm" | "hermes" | "debug" | (string & {});
+type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
 
 interface AiClientInfo {
   id: string;
@@ -49,6 +49,8 @@ type ClientFormValues = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  configDirectory: string;
+  profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
   bindings: string[];
@@ -125,20 +127,51 @@ function buildClaudeCodeConfig(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
+  configDirectory: string;
+  profileName: string;
 }): Record<string, unknown> {
   const model = nonEmptyEnvValue(input.model);
   const baseUrl = nonEmptyEnvValue(input.baseUrl);
   const authToken = nonEmptyEnvValue(input.apiKey);
+  const configDirectory = nonEmptyEnvValue(input.configDirectory);
+  const profileName = nonEmptyEnvValue(input.profileName);
   const env: Record<string, string> = {};
 
   if (model) env.ANTHROPIC_MODEL = model;
   if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl;
   if (authToken) env.ANTHROPIC_AUTH_TOKEN = authToken;
+  if (configDirectory) env.CLAUDE_CONFIG_DIR = configDirectory;
 
   return {
     model,
     timeoutMs: Number(input.timeoutSeconds) * 1000,
+    configDirectory,
+    profileName,
     env: Object.keys(env).length > 0 ? env : undefined,
+  };
+}
+
+function buildCodexConfig(input: {
+  timeoutSeconds: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  configDirectory: string;
+  profileName: string;
+}): Record<string, unknown> {
+  const configDirectory = nonEmptyEnvValue(input.configDirectory);
+  const env: Record<string, string> = {};
+
+  if (configDirectory) env.CODEX_HOME = configDirectory;
+
+  return {
+    model: nonEmptyEnvValue(input.model),
+    baseUrl: nonEmptyEnvValue(input.baseUrl),
+    apiKey: nonEmptyEnvValue(input.apiKey),
+    configDirectory,
+    profileName: nonEmptyEnvValue(input.profileName),
+    env: Object.keys(env).length > 0 ? env : undefined,
+    timeoutMs: Number(input.timeoutSeconds) * 1000,
   };
 }
 
@@ -150,6 +183,8 @@ function buildClientPayload(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
+  configDirectory: string;
+  profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
 }): ClientFormPayload {
@@ -167,6 +202,15 @@ function buildClientPayload(input: {
       name: input.name,
       type: input.type,
       config: buildClaudeCodeConfig(input),
+      isDefault: input.isDefault,
+    };
+  }
+
+  if (input.type === "codex") {
+    return {
+      name: input.name,
+      type: input.type,
+      config: buildCodexConfig(input),
       isDefault: input.isDefault,
     };
   }
@@ -321,6 +365,13 @@ function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientT
   return providers.find((provider) => provider.key === type)?.features ?? [];
 }
 
+function getDefaultClientName(type: AiClientType, providers: RuntimeProviderOption[]) {
+  if (type === "llm") return "My OpenAI Compatible Client";
+
+  const label = providers.find((provider) => provider.key === type)?.label ?? type;
+  return `My ${label} Client`;
+}
+
 async function updateClientBindings(clientId: string, features: string[]) {
   const res = await api.ai.clients[":clientId"].bindings.$put({
     param: { clientId },
@@ -404,7 +455,7 @@ function ClientForm({
     isDefault: initial?.isDefault ?? false,
     timeoutSeconds: String(
       (initialConfig as { timeoutSeconds?: number; timeoutMs?: number } | undefined)?.timeoutSeconds
-        ?? (((initialConfig as { timeoutMs?: number } | undefined)?.timeoutMs ?? DEFAULT_PROVIDER_IDLE_TIMEOUT_MS) / 1000),
+        ?? (((initialConfig as { timeoutMs?: number } | undefined)?.timeoutMs ?? DEFAULT_PROVIDER_RUN_TIMEOUT_MS) / 1000),
     ),
     baseUrl: (initialConfig as { baseUrl?: string; env?: Record<string, string> } | undefined)?.baseUrl
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_BASE_URL
@@ -415,6 +466,11 @@ function ClientForm({
     model: (initialConfig as { model?: string; env?: Record<string, string> } | undefined)?.model
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_MODEL
       ?? "",
+    configDirectory: (initialConfig as { configDirectory?: string; env?: Record<string, string> } | undefined)?.configDirectory
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CLAUDE_CONFIG_DIR
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CODEX_HOME
+      ?? "",
+    profileName: (initialConfig as { profileName?: string } | undefined)?.profileName ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
     bindings: initial?.bindings ?? [],
@@ -427,8 +483,10 @@ function ClientForm({
   const isDebugClient = values.type === "debug";
   const isHermesClient = values.type === "hermes";
   const isClaudeCodeClient = values.type === "claude_code";
+  const isCodexClient = values.type === "codex";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const availableFeatures = getProviderFeatures(providers, values.type);
+  const namePlaceholder = getDefaultClientName(values.type, providers);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
   const [hermesResult, setHermesResult] = useState<HermesIntegrationResult | null>(null);
@@ -462,7 +520,7 @@ function ClientForm({
                   {...form.register("name", { required: copy.nameLabel })}
                   aria-invalid={Boolean(form.formState.errors.name)}
                   id="ai-client-name"
-                  placeholder="My Hermes Client"
+                  placeholder={namePlaceholder}
                 />
                 {form.formState.errors.name ? <FieldError errors={[form.formState.errors.name]} /> : null}
               </Field>
@@ -650,7 +708,7 @@ function ClientForm({
               </Card>
             )}
 
-            {!isDebugClient && !isClaudeCodeClient && (
+            {!isDebugClient && !isClaudeCodeClient && !isCodexClient && (
               <>
                 <Field>
                   <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
@@ -718,6 +776,14 @@ function ClientForm({
                     placeholder="optional auth token"
                   />
                 </Field>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-config-directory">Config directory</FieldLabel>
+                  <Input
+                    {...form.register("configDirectory")}
+                    id="ai-client-config-directory"
+                    placeholder="default user-level Claude Code config"
+                  />
+                </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input
@@ -735,6 +801,62 @@ function ClientForm({
                   MCP base URL is set automatically by the engine. Pass an
                   Anthropic API key for production usage to avoid the SDK
                   subscription quota (2026-06-15 onward).
+                </p>
+              </>
+            )}
+            {isCodexClient && (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-model">Model</FieldLabel>
+                    <Input
+                      {...form.register("model")}
+                      id="ai-client-model"
+                      placeholder="optional model override"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
+                    <Input
+                      {...form.register("baseUrl")}
+                      id="ai-client-base-url"
+                      placeholder="optional OpenAI-compatible base URL"
+                    />
+                  </Field>
+                </div>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-api-key">OPENAI_API_KEY</FieldLabel>
+                  <Input
+                    {...form.register("apiKey")}
+                    id="ai-client-api-key"
+                    type="password"
+                    placeholder="optional API key"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-config-directory">CODEX_HOME</FieldLabel>
+                  <Input
+                    {...form.register("configDirectory")}
+                    id="ai-client-config-directory"
+                    placeholder="default user-level Codex home (~/.codex)"
+                  />
+                </Field>
+                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    {...form.register("timeoutSeconds", {
+                      required: copy.timeoutSeconds,
+                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                    })}
+                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                    id="ai-client-timeout"
+                    type="number"
+                  />
+                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  Uses codex-acp through Agent Client Protocol. Chrona passes
+                  scoped MCP control tools at runtime.
                 </p>
               </>
             )}
