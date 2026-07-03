@@ -1,5 +1,4 @@
 import type { ConditionEvaluator, TaskExecutor, TaskMode } from "../ai-plan-blueprint";
-import type { Spec } from "@chrona/ui-protocol";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
