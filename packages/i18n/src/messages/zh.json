@@ -321,7 +321,7 @@
       "selectedBlockAutomationManual": "手动",
       "selectedBlockAutomationPlan": "自动生成计划",
       "selectedBlockAutomationExecute": "自动执行",
-      "selectedBlockProvider": "Provider",
+      "selectedBlockProvider": "提供商",
       "selectedBlockRuntime": "运行时",
       "selectedBlockExecutionStatus": "执行状态",
       "selectedBlockRecovery": "恢复",

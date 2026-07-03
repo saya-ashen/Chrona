@@ -68,6 +68,7 @@ export function stateViewForWorkspaceStatus(input: {
 }
 
 export function mapTaskWorkspaceStatus(status: string): TaskWorkspaceUserStatus {
+  if (status === "degraded") return "blocked";
   const stateView = stateViewForWorkspaceStatus({ taskStatus: status, nodeStatus: status });
   if (stateView.state === "completed" || stateView.state === "cancelled") return "completed";
   if (stateView.state === "running") return "running";

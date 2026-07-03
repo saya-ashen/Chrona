@@ -79,7 +79,7 @@ describe("CalendarSourceSetup", () => {
         redactedUrlLabel: "team.ics",
         color: "#2563eb",
         syncPolicy: "auto_complete_past_events",
-        automationPolicy: "auto_plan",
+        automationPolicy: "manual",
         lifecycleState: "active",
       },
       syncStatus: {
@@ -104,7 +104,7 @@ describe("CalendarSourceSetup", () => {
         url: "https://calendar.example.test/team.ics",
         color: "#2563eb",
         syncPolicy: "auto_complete_past_events",
-        automationPolicy: "auto_plan",
+        automationPolicy: "manual",
         allowBlockedNetwork: undefined,
       });
     });
@@ -124,7 +124,7 @@ describe("CalendarSourceSetup", () => {
         redactedUrlLabel: "calendar.google.com/basic.ics",
         color: "#2563eb",
         syncPolicy: "auto_complete_past_events",
-        automationPolicy: "auto_plan",
+        automationPolicy: "manual",
         lifecycleState: "active",
       },
       syncStatus: { sourceId: "source-1", state: "success", importedCount: 1, skippedCount: 0 },
