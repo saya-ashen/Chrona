@@ -7,6 +7,7 @@
     "zod": "^4.4.3"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./capability-matrix": "./src/provider-capability-matrix.ts"
   }
 }

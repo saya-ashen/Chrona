@@ -35,6 +35,7 @@ import type {
   DashboardInProgressItem,
   DashboardOutput,
 } from "./dashboard-types";
+type DashboardUpcomingItem = NonNullable<DashboardData["upcomingToday"]>[number];
 
 type DashboardCopy = Dictionary["pages"]["dashboard"];
 
@@ -529,6 +530,55 @@ function RecentCompletionsCard({
   );
 }
 
+function formatTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+function UpcomingTodayCard({ copy, items }: { copy: DashboardCopy; items: DashboardUpcomingItem[] }) {
+  const visibleItems = items.slice(0, 5);
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Clock className="size-4 text-sky-500" aria-hidden />
+          {copy.upcomingToday.title}
+        </CardTitle>
+        <CardDescription>{copy.upcomingToday.description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {visibleItems.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="size-4 shrink-0 text-emerald-500/70" aria-hidden />
+            <span>{copy.upcomingToday.empty}</span>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {visibleItems.map((item) => (
+              <li key={item.taskId} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{item.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">{item.stateView.label}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant="outline" className="tabular-nums">
+                    {formatTime(item.scheduledStartAt ?? item.dueAt)}
+                  </Badge>
+                  <Button asChild size="sm" variant="outline" className="shrink-0">
+                    <LocalizedLink href={`/tasks/${item.taskId}`}>{copy.upcomingToday.open}</LocalizedLink>
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 function feedCategoryLabel(copy: DashboardCopy, category: DashboardEvent["category"]) {
   return typeof category === "string" && category in copy.feed.category
     ? copy.feed.category[category as keyof DashboardCopy["feed"]["category"]]
@@ -574,7 +624,7 @@ function RecentActivitySection({ copy, events }: { copy: DashboardCopy; events: 
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: DashboardPageProps) {
-  const { needsAttention, inProgress, autoCompleted, recentEvents, totalAutoCompleted } = data;
+  const { needsAttention, inProgress, upcomingToday, autoCompleted, recentEvents, totalAutoCompleted } = data;
   const { isGenerating, regenerate } = useDashboardAiBriefGeneration({ workspaceId, aiBrief: data.aiBrief });
 
   const completedToday = useMemo(() => {
@@ -585,14 +635,15 @@ export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: Da
   }, [autoCompleted]);
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <HeadlineBanner
-        copy={copy}
-        completedToday={completedToday}
-        attentionCount={needsAttention.length}
-        inProgressCount={inProgress.length}
-        totalAutoCompleted={totalAutoCompleted}
-      />
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/60 p-3 shadow-sm sm:p-4">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+        <HeadlineBanner
+          copy={copy}
+          completedToday={completedToday}
+          attentionCount={needsAttention.length}
+          inProgressCount={inProgress.length}
+          totalAutoCompleted={totalAutoCompleted}
+        />
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
         <div className="min-w-0 space-y-5">
@@ -607,10 +658,12 @@ export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: Da
 
         <aside className="min-w-0 space-y-5 xl:sticky xl:top-6 xl:self-start">
           <NeedsYouCard copy={copy} items={needsAttention} />
+          <UpcomingTodayCard copy={copy} items={upcomingToday} />
           <InProgressCard copy={copy} items={inProgress} />
           <RecentCompletionsCard copy={copy} items={autoCompleted} />
         </aside>
       </div>
+    </div>
     </div>
   );
 }

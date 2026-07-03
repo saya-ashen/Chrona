@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible Chrona bug
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Remove secrets, API keys, tokens, private URLs, and database contents before submitting.
+  - type: input
+    id: version
+    attributes:
+      label: Chrona version or commit
+      placeholder: "0.1.9 or commit SHA"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - Packaged release
+        - Source checkout
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS / architecture / Bun version
+      placeholder: "Linux x64, Bun 1.3.11"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Start Chrona...\n2. Create task...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Redact secrets and private data.

@@ -55,7 +55,7 @@ execute it manually or automatically, and review what happened later.
 
 Chrona is usable for local development and product exploration, but it is not
 stable software yet. The current codebase already includes task, plan, schedule,
-execution, inbox, and AI-client flows; the next major focus is making the
+execution, dashboard, settings, and AI-client flows; the next major focus is making the
 schedule-to-auto-execution loop reliable enough for daily use.
 
 ## Why Chrona
@@ -68,7 +68,7 @@ Chrona combines those loops:
 | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Plan the day around real work               | tasks with priority, status, due dates, estimates, dependencies, and schedule metadata    |
 | Turn a scheduled task into executable steps | AI-generated plan graphs that can be reviewed, patched, accepted, and rerun               |
-| Let due work move forward automatically     | schedule blocks, proposals, waiting states, inbox approvals, and execution actions        |
+| Let due work move forward automatically     | schedule blocks, proposals, waiting states, task workspace approvals, and execution actions |
 | Keep AI execution accountable               | scoped runtime refs, checkpoints, approvals, tool traces, failures, and persisted outputs |
 
 ## Quick Start
@@ -136,10 +136,10 @@ the Vite web app.
    schedule.
 6. Generate a plan from the task workspace, review or edit the generated graph,
    then accept it.
-7. Start execution manually from the task workspace or Work page, or let Chrona
-   move scheduled work forward when auto-execution is configured.
+7. Start execution manually from the task workspace, or let Chrona move
+   scheduled work forward when auto-execution is configured.
 8. Review progress, blockers, approvals, tool activity, and outputs from the
-   task workspace, Work page, or Inbox.
+   task workspace or Dashboard.
 
 See the [full quick start](./docs/en/quick-start.md) for data directories, AI
 client details, and troubleshooting.
@@ -214,7 +214,7 @@ AI, or system executors.
 ### Move scheduled work forward
 
 Use schedule views, AI insights, conflict suggestions, schedule proposals,
-waiting runs, failed runs, cancelled runs, and inbox approvals to move due work
+waiting runs, failed runs, cancelled runs, and task workspace approvals to move due work
 toward execution.
 
 ### Keep AI execution observable
@@ -230,9 +230,8 @@ report progress through Chrona commands such as `chrona.task.complete`,
 
 ### Resume with context
 
-Use the Work page, task workspace, memory console, assistant surfaces,
-conversation history, tool traces, and persisted outputs to understand and
-continue long-running work.
+Use the task workspace, assistant surfaces, conversation history, tool traces,
+and persisted outputs to understand and continue long-running work.
 
 ## Roadmap
 
@@ -245,9 +244,9 @@ This is a short summary of the project roadmap. See the full
 | Done   | Schedule surfaces       | Timeline/task views, AI insights, conflicts, schedule proposals, task creation, and configuration surfaces.                             |
 | Done   | Plan generation         | Streaming AI plan generation, plan persistence, review/edit/accept flows, and materialization into graph nodes.                         |
 | Done   | Execution runtime       | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with AI-visible refs and persisted execution state.                      |
-| Done   | Review loops            | Inbox surfaces for pending approvals, schedule proposals, waiting inputs, and failed/cancelled runs.                                    |
+| Done   | Review loops            | Dashboard and task workspace surfaces for pending approvals, schedule proposals, waiting inputs, and failed/cancelled runs.                 |
 | Done   | External calendars      | Read-only calendar subscriptions, imported busy events, source management, refresh status, and schedule context.                       |
-| Next   | Polish existing flows   | Make Work, Schedule, Inbox, Task Workspace, and execution records more reliable and easier to understand.                               |
+| Next   | Polish existing flows   | Make Dashboard, Schedule, Task Workspace, and execution records more reliable and easier to understand.                                |
 | Next   | Reliable auto execution | Start due scheduled work only when configured and safe, with clear recovery when execution blocks or fails.                             |
 | Next   | More providers          | Add more execution/provider integrations beyond the current provider set while keeping provider boundaries explicit.                    |
 | Next   | Multi-session execution | Let task execution use multiple sessions where needed, with clear isolation, reuse, recovery, and diagnostics.                          |

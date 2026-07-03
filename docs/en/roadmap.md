@@ -2,133 +2,233 @@
 
 Current version: 0.1.9
 
-Chrona is evolving into a task control plane for AI-assisted work. The product connects four loops that should stay visible and recoverable: task capture, graph planning, schedule placement, and runtime execution.
+Chrona is an open-source AI schedule app. Its job is not to compete with models at raw planning, summarization, or tool choice. Those capabilities will keep moving into the model layer. Chrona should compound around what stronger AI makes more important: time-bound execution, human control, provider governance, observable state, recoverable failures, and trusted results.
 
-This roadmap separates shipped capability from intended direction. It is not a commitment to ship every item in order; near-term items are the current product focus, while mid- and long-term items describe likely evolution after the execution and schedule foundations stabilize.
+The product loop is:
 
-## Current product pillars
+```text
+Task -> Plan -> Schedule -> Execute -> Review/Recover
+```
 
-1. Task control: capture work, structure it, prioritize it, and keep status clear.
-2. Plan control: generate, edit, accept, and execute graph plans.
-3. Execution control: run AI/runtime-backed nodes with human checkpoints, explicit actions, and recoverable state.
-4. Schedule control: turn plans into time-bound work and surface conflicts, proposals, and due-work automation.
-5. Agent integration: let external agents create, plan, schedule, and advance Chrona work through safe tool contracts.
+AI-first means every surface should help AI move scheduled work forward safely, and every AI action should remain visible, controllable, and recoverable by the user.
 
-## Completed / available capabilities
+## Strategic thesis: what gets cheaper, what gets more valuable
+
+As AI gets stronger, some Chrona capabilities become entry points rather than durable differentiation:
+
+| Capability | Trend | Roadmap consequence |
+| --- | --- | --- |
+| Raw task decomposition | Gets cheaper | Treat plan generation as an entry point, not the moat. |
+| Generic summaries | Gets cheaper | Dashboard AI should perform action triage, not decorative recap. |
+| Tool/MCP support by itself | Gets cheaper | Expose user value: safe refs, auditability, recovery, and permission boundaries. |
+| Provider count | Gets cheaper | Optimize for provider behavior consistency, not a logo collection. |
+| Generic AI UI generation | Gets cheaper | Make json-render a trusted result layer with validation and fallback. |
+
+Chrona's durable value should grow with AI capability:
+
+| Durable capability | Why it compounds with stronger AI |
+| --- | --- |
+| Schedule-triggered execution | Stronger AI can do more work, but still needs user-owned time constraints. |
+| Human approval and recovery | More capable automation raises the cost of unchecked mistakes. |
+| Observable execution records | Longer AI work needs explainable progress, evidence, and failure causes. |
+| Unified user-facing work state | More dynamic AI behavior creates more internal states; users need one clear status and next action. |
+| Provider capability governance | AI runtimes will multiply; product behavior must stay consistent. |
+| Trusted result surfaces | AI output becomes richer; users need validated, reviewable, fallback-safe artifacts. |
+| Local-first binary control | Schedules, tasks, provider credentials, and work outputs are sensitive user data. |
+
+## Product pillars
+
+1. **Task capture**: capture work, structure it, prioritize it, and keep status clear.
+2. **Plan generation/review**: use AI to create and revise executable plans, but keep review and acceptance explicit.
+3. **Schedule placement**: bind work to time, conflicts, due windows, and automation policy.
+4. **Provider execution**: run AI/runtime-backed work through Hermes, Claude Code, Codex, and future providers without leaking provider quirks into product behavior.
+5. **Result review/recovery**: make outputs, failures, cancellations, approvals, and waiting states inspectable from Dashboard and task workspace.
+6. **Trusted AI surfaces**: use json-render for validated AI-authored results and insights while keeping runtime controls product-authored.
+
+## Current baseline
 
 These capabilities exist in the current codebase and should be treated as product baseline.
 
 | Area | Current capability |
 | --- | --- |
+| Pages | Main user navigation is Dashboard, Schedule, Tasks, and Settings. Inbox and Memory may remain internal/hidden projections, but they are not current primary surfaces. |
 | Tasks | Task create/update/delete, completion/reopen, priority, status, labels, dependencies, parent/child relationships, and task projection rebuilds. |
-| AI planning | Streaming plan generation, generated-plan persistence, plan review/edit/accept flows, and materialization into task plan layers. |
+| AI planning | Streaming plan generation, generated-plan persistence, plan review/edit/accept flows, and materialization into executable task plan layers. |
 | Graph plans | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with graph state resolution. |
 | AI node runtime | AI-visible refs for node completion, condition selection, block/fail, and wait completion; backend IDs stay behind server-side mapping. |
+| Schedule | Timeline, task list, AI insights, conflicts, schedule proposals, task creation, configuration surfaces, and external-calendar busy context. |
+| Dashboard | Today's focus, attention items, active runs, recent results, and recovery links for failed/cancelled/waiting work. |
 | Task Workspace | Task editing, plan generation/acceptance, execution overview, latest result, plan graph, execution records, and node detail inspection. |
-| Schedule page | Timeline, task list, AI insights, conflicts, schedule proposals, task creation, and configuration surfaces. |
-| Inbox | Pending approvals, schedule proposals, waiting inputs, and failed/cancelled run surfaces. |
-| Memory console | Workspace/task memory display surfaces. |
-| AI clients | Database-backed AI clients and feature bindings through Settings / AI Clients. |
-| Backend API | Task CRUD/lifecycle routes, plan generation/acceptance routes, task-scoped execution routes, workspace command/event transport, schedule page projections, runtime provider routes, and AI client routes. |
-| MCP / Hermes | Streamable HTTP MCP tools for Chrona execution/plan/node operations and Hermes provider/plugin integration for agent-style execution. |
+| Settings / AI Clients | Database-backed AI clients and feature bindings for Hermes, Claude Code, Codex, and development/debug flows. |
+| Backend API | Task CRUD/lifecycle routes, plan generation/acceptance routes, task-scoped execution routes, workspace command/event transport, schedule projections, runtime provider routes, and AI client routes. |
+| MCP / provider bridge | Streamable HTTP MCP tools and provider integrations that let external AI runtimes advance Chrona work through safe contracts. |
 | External calendars | Read-only subscription sources, source validation/management, imported busy events, refresh status, and schedule context. |
+| json-render | Validated AI-authored result surfaces and product-controlled runtime boundaries. |
+| Release model | Bun-first development and packaged binary distribution. |
 
-## Near-term priorities
+## AI-first operating principles
 
-Near-term work should make the existing schedule-to-execution product dependable and understandable before broadening the surface area too far.
+1. **Scheduled work is the product center.** Plans, providers, and result surfaces exist to move scheduled work forward.
+2. **AI may propose; Chrona owns state.** Models can suggest plans, patches, summaries, and results, but Chrona owns task, schedule, execution, approval, and recovery state.
+3. **Every non-happy path needs one clear next action.** Waiting, blocked, failed, cancelled, and review states must tell the user what to do next.
+4. **Provider differences stay below the product layer.** Product UI should depend on capabilities and normalized events, not provider names.
+5. **AI-authored UI is never runtime authority.** json-render can present results and insights; cancel, retry, approve, configure, and destructive actions remain product-authored controls.
+6. **Local-first should feel simple.** Release users should not need to know Bun, schema generation, or provider internals to run the product.
 
-### 1. Make the task workspace execution record practical
+## Near-term strategic arcs
 
-- Keep the composer fixed at the bottom and the middle record area scrollable.
-- Keep conversation history across all task runs, not only the latest run.
-- In the collaboration/conversation view, show conversation messages without tool-call and task-event clutter.
-- Simplify message cards so speaker labels are not duplicated.
-- Rework the execution record into a usable layout: left-side stream grouped by run, right-side fixed task cockpit with current state, active node, blockers, and primary actions.
-- Distinguish final outputs, checkpoints, runtime events, tool calls, and assistant/user conversation instead of mixing everything into a raw linear dump.
+Near-term work should make the existing AI schedule loop dependable before expanding product surface area.
 
-### 2. Harden task-scoped execution APIs
+### 1. Make Schedule-to-Execution the primary loop
 
-- Prefer lightweight task-scoped status and action endpoints for execution state checks.
-- Keep execution endpoints explicit instead of routing feature calls and task execution through generic chat semantics.
-- Preserve AI-visible refs as the external contract for agent workers.
-- Make per-task session reuse, isolation, refresh-after-error, and recovery behavior explicit.
-- Use tool inputs/results as execution source of truth instead of relying on ad-hoc structured-result submission paths.
+Chrona should make it obvious how planned work becomes scheduled work, when scheduled work becomes AI execution, and how users recover when execution stops.
 
-### 3. Stabilize schedule-to-execution behavior
+Focus:
 
-- Ensure accepted schedule proposals reliably create or update WorkBlocks.
-- Start due work through the scheduler only when configured and safe.
-- Surface conflicts and automation suggestions without forcing full schedule projection refreshes for lightweight status checks.
-- Keep schedule UI polish focused on the P0 interaction path: find work, understand conflicts, accept proposals, and start due execution.
+- Show whether each scheduled block can auto-plan or auto-execute.
+- Start due work only when configured, safe, and understandable.
+- Keep schedule proposals reviewable, reversible where possible, and tied to visible work state.
+- Connect Dashboard and Schedule directly to recovery actions for waiting, blocked, failed, and cancelled work.
+- Treat external-calendar data as busy context and conflict input unless the user explicitly enables stronger automation.
 
-### 4. Keep provider and package boundaries clean
+Success looks like:
 
-- Keep AI client selection database-driven.
-- Keep feature-specific contracts such as `generate_plan`, `edit_plan`, `dispatch_task`, and `execute_task_node` explicit.
-- Keep provider protocol parsing below `packages/providers/*`.
-- Keep orchestration, plan execution, scheduling, and task lifecycle policy in `packages/engine`.
-- Keep shared schemas and API contracts in `packages/contracts`.
+```text
+Create task -> Generate/review plan -> Schedule -> Execute -> Review result -> Recover if needed
+```
 
-### 5. Add more provider integrations
+works as one visible product flow, not as disconnected backend features.
 
-- Add more execution/provider integrations beyond the current provider set.
-- Keep each provider behind explicit capability contracts instead of leaking provider-specific protocol details into product code.
-- Make provider capability discovery, error handling, and runtime diagnostics visible enough for schedule-driven execution.
-- Preserve the core task/plan/schedule workflow when adding provider-specific behavior.
+### 2. Unify user-facing work state across Dashboard, Schedule, and Tasks
 
-### 6. Support multi-session task execution
+Internal state will keep getting more complex as AI execution becomes more dynamic. Users need one clear state model.
 
-- Let a single task execution use multiple sessions when a provider, task scope, or recovery path requires it.
-- Make session reuse, isolation, refresh-after-error, and recovery behavior explicit.
-- Keep per-session events inspectable from the task workspace execution timeline.
-- Prevent multi-session execution from duplicating node completion or corrupting graph state.
+Focus:
 
-### 7. Finish external calendar ecosystem
+- Derive labels, tones, disabled reasons, and primary actions from one shared state model.
+- Keep `WaitingForInput` and `WaitingForApproval` distinct.
+- Keep `Failed`, `Blocked`, `Cancelled`, `Completed`, and `Done` semantically distinct.
+- Make Dashboard, Schedule, and Task Workspace show the same state and next action for the same work item.
+- Prefer a single user-facing state view over page-specific conditional logic.
 
-- Keep current read-only subscription import reliable across malformed feeds, blocked local URLs, and refresh failures.
-- Add authenticated provider integrations such as Google/Outlook only after subscription behavior remains stable.
-- Keep calendar import/sync behavior explicit, reversible where possible, and safe around conflicts.
-- Surface calendar conflicts and schedule proposals in the same review loop as native Chrona scheduling.
+Success looks like:
 
-### 8. Bring docs in line with the product
+```text
+same task + same execution facts -> same label, same severity, same primary action on every page
+```
 
-- Keep README and quick-start pages focused on the current Vite + Hono + Bun app.
-- Remove or archive stale refactor/audit plans after their content is merged into current docs.
-- Keep API, architecture, data model, provider boundary, and package boundary docs aligned with real routes and schemas.
+### 3. Turn execution records into an AI work cockpit
+
+Raw runtime logs are not a user experience. Stronger AI will produce longer runs, more tools, more approvals, and more failures. Chrona must make that understandable.
+
+Focus:
+
+- Rework task workspace execution into a cockpit: current state, active node, provider, blockers, primary action, and latest result.
+- Group execution history by run/session/step instead of one raw event stream.
+- Separate final outputs, checkpoints, runtime events, tool calls, and assistant/user conversation.
+- Keep conversation history across task runs.
+- Summarize tool activity and failures without hiding evidence.
+
+Success looks like:
+
+```text
+User can answer: what is running, why it stopped, what AI did, what result exists, and what action is safe now.
+```
+
+### 4. Normalize provider capabilities and recovery behavior
+
+Hermes, Claude Code, Codex, and future providers should feel like different engines behind the same schedule execution product.
+
+Focus:
+
+- Maintain a provider capability matrix: health, start, stream, cancel, approval, resume, tool traces, structured output, snapshot recovery.
+- Surface capability readiness in Settings.
+- Normalize provider events before they reach product state.
+- Show actions based on capability, not provider-specific UI branches.
+- Add providers only after existing providers share consistent schedule-driven execution semantics.
+
+Success looks like:
+
+```text
+same scheduled task + different provider -> same running/waiting/failed/completed product behavior
+```
+
+### 5. Make json-render a trusted AI result layer
+
+json-render is a strategic direction when used as validated output, not as uncontrolled runtime authority.
+
+Focus:
+
+- Validate every AI-authored spec.
+- Provide markdown/text fallback for invalid specs.
+- Keep runtime controls product-authored and separate from AI-authored surfaces.
+- Attach source, validation, and review metadata to AI-authored outputs.
+- Use json-render for result review, dashboard action triage, plan explanations, reports, and artifacts.
+
+Success looks like:
+
+```text
+AI output can be rich and structured, but bad specs never break execution controls or hide recovery actions.
+```
+
+### 6. Make first-run and binary release feel local-first, not developer-first
+
+Bun-first is acceptable for development and packaging; release users should experience Chrona as a local app.
+
+Focus:
+
+- Keep packaged binary startup smooth: initialize storage, serve web UI, expose health, and guide provider setup.
+- Provide a first-run path for Provider setup and a demo task flow.
+- Hide Bun, schema generation, and internal ports unless troubleshooting.
+- Keep local bind/auth behavior understandable and safe.
+
+Success looks like:
+
+```text
+Download release -> start binary -> configure provider -> run demo schedule task -> inspect result
+```
 
 ## Mid-term evolution
 
-Mid-term work should extend the current loops once task workspace execution and schedule behavior are stable.
+Mid-term work should deepen the AI schedule loop after near-term state, provider, and cockpit foundations are stable.
 
 | Theme | Direction |
 | --- | --- |
 | Dynamic replanning | Let running tasks request plan changes, route them through review/acceptance, and resume safely after approval. |
-| Execution recovery | Improve retry, resume, cancellation, blocked-state recovery, and run/session diagnostics. |
-| Runtime abstraction | Support additional execution backends and providers without changing the core task/plan/schedule workflow. |
+| Execution recovery | Improve retry, resume, cancellation, blocked-state recovery, stale run reconciliation, and run/session diagnostics. |
+| Provider orchestration | Coordinate provider selection by capability, task context, schedule policy, and recovery needs. |
 | Multi-session execution | Coordinate multiple provider/runtime sessions for one task while preserving graph correctness and auditability. |
-| Calendar ecosystem | Sync with external calendar software while keeping Chrona's task, plan, and execution state authoritative. |
-| Richer memory | Use task and workspace memory more deliberately in planning, node execution, and summaries. |
-| Better projections | Make page projections fast, task-scoped where possible, and consistent across Schedule, Inbox, Dashboard, and Task Workspace. |
-| Test coverage | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP tools, task workspace projections, and schedule proposal decisions. |
+| Calendar intelligence | Use external calendars for busy context, conflict detection, and schedule suggestions while keeping Chrona task/execution state authoritative. |
+| Trusted result artifacts | Make json-render outputs reviewable, source-linked, fallback-safe, and durable across task history. |
+| Memory in service of execution | Use task/workspace memory to improve planning and node execution, not as a separate user-facing destination by default. |
+| Projection consistency | Make page projections fast, task-scoped where possible, and consistent across Schedule, Dashboard, and Task Workspace. |
+| Verification | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP/provider contracts, projections, schedule decisions, and json-render fallback. |
 
 ## Long-term direction
 
-Long-term work should be treated as strategic direction, not near-term promise.
+Long-term direction is strategic intent, not a near-term promise.
 
 | Theme | Direction |
 | --- | --- |
-| External ingestion | Turn conversations, email, notes, and external systems into structured Chrona tasks that can be planned and scheduled. |
-| Collaboration | Add stronger multi-user review, approvals, audit trails, and shared execution context. |
-| Production readiness | Improve authentication, deployment docs, backup/restore, observability, migration safety, and operational runbooks. |
-| Agent ecosystem | Let more agents and tools participate through explicit, inspectable contracts while Chrona remains the control plane. |
-| Organization-scale planning | Connect individual tasks, schedules, dependencies, and execution history into portfolio-level visibility. |
+| Proactive AI scheduling | Let Chrona identify when work should be planned, scheduled, executed, reviewed, or deferred based on task state, user time, and provider capability. |
+| External ingestion | Turn conversations, email, notes, and external systems into structured Chrona tasks that can be planned, scheduled, executed, and reviewed. |
+| Human-governed automation | Support stronger automation while preserving approval boundaries, audit trails, recovery paths, and user-owned schedule policy. |
+| Agent ecosystem | Let more agents and tools participate through explicit, inspectable contracts while Chrona remains the authoritative AI schedule app. |
+| Collaboration | Add stronger multi-user review, approvals, audit trails, and shared execution context when single-user execution governance is solid. |
+| Production hardening | Improve authentication, backup/restore, observability, migration safety, deployment docs, and operational runbooks without abandoning local-first simplicity. |
+| Organization-scale planning | Connect individual tasks, schedules, dependencies, and execution history into project/portfolio visibility. |
 
 ## Contribution focus
 
 Good areas to improve now:
 
-- Keep documentation and examples aligned with actual route/schema behavior.
-- Add narrow tests around task plans, execution actions, task workspace projections, schedule decisions, and MCP tools.
-- Improve UI clarity in Schedule, Inbox, Task Workspace, Dashboard, and Settings / AI Clients.
-- Tighten package boundaries when code drifts into the wrong layer.
+- Keep documentation and examples aligned with the current AI schedule product.
+- Strengthen the Task -> Plan -> Schedule -> Execute -> Review/Recover loop.
+- Add narrow tests around user-facing work state, execution actions, provider contracts, projections, schedule decisions, and json-render fallback.
+- Improve UI clarity in Dashboard, Schedule, Task Workspace, and Settings / AI Clients.
+- Tighten provider/package boundaries when code drifts into the wrong layer.
 - Prefer small, verifiable changes over broad rewrites.
+
+## Guiding sentence
+
+Chrona should not win by being better than future models at thinking. Chrona should win by making stronger AI useful on the user's schedule: visible, bounded, recoverable, and trusted.

@@ -95,6 +95,7 @@ vi.mock("@chrona/i18n/react", () => ({
       return map[key] ?? key;
     },
   }),
+  useLocale: () => "en",
 }));
 
 import {

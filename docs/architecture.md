@@ -31,7 +31,7 @@ flowchart TB
 
 | Layer | Path | Responsibility |
 | --- | --- | --- |
-| Web app | `apps/web` | Browser UX for schedule, inbox, task workspace, work page, settings, and assistant surfaces |
+| Web app | `apps/web` | Browser UX for dashboard, schedule, inbox, task workspace, settings, and assistant surfaces |
 | Server | `apps/server` | HTTP routing, validation glue, SSE streaming, auth/bind safety, static app serving |
 | Engine | `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
 | Domain | `packages/domain` | Pure, IO-free business rules and state/status derivation |

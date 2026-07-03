@@ -7,10 +7,10 @@ const messages = {
   pages: {
     aiClientsPage: {
       title: "AI Clients",
-      subtitle: "Connect Hermes so Chrona can plan tasks and safely execute approved work.",
+      subtitle: "Connect an AI client so Chrona can plan tasks and safely execute approved work.",
       addClient: "+ Add Client",
-      emptyState: "No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.",
-      emptyStateCta: "Connect Hermes",
+      emptyState: "No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.",
+      emptyStateCta: "Connect AI Client",
       hermesIntro: "Hermes is Chrona's local AI bridge. Start with Local Hermes if you run it on this machine, or Remote Hermes if another machine hosts it.",
       loading: "Loading...",
       defaultBadge: "Default",
@@ -114,15 +114,16 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Hermes Client" },
     });
 
     const testButton = screen.getByRole("button", { name: "Test availability" });
     expect(screen.getByText("Not tested")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Claude Code");
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -150,10 +151,10 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Local Hermes" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -202,6 +203,9 @@ describe("AiClientsManager", () => {
         timeoutMs: 45000,
       },
     });
+
+    const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_hermes/bindings" && call[1]?.method === "PUT");
+    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.plan", "task.execution", "dashboard.brief"] });
   });
 
   it("creates a Claude Code client with Anthropic environment variables", async () => {
@@ -214,10 +218,10 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Claude Code via 9router" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -281,10 +285,10 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Codex" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -333,6 +337,9 @@ describe("AiClientsManager", () => {
       },
     });
     expect(payload.config).not.toHaveProperty("binaryPath");
+
+    const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_codex/bindings" && call[1]?.method === "PUT");
+    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.plan", "task.execution"] });
   });
 
   it("creates a debug client with the deterministic profile by default", async () => {
@@ -345,10 +352,10 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Local Debug" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -399,10 +406,10 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Hermes-like Debug" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -518,8 +525,10 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Hermes"));
     await user.click(screen.getByRole("combobox", { name: "Hermes location" }));
     await user.click(within(screen.getByRole("listbox")).getByText("Remote Hermes"));
 
@@ -533,11 +542,13 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
-    fireEvent.change(screen.getByPlaceholderText("My Hermes Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Auto Hermes" },
     });
+    await userEvent.click(screen.getByRole("combobox", { name: "Type" }));
+    await userEvent.click(within(screen.getByRole("listbox")).getByText("Hermes"));
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -589,8 +600,10 @@ describe("AiClientsManager", () => {
 
     render(<AiClientsManager />);
 
-    await screen.findByText("No AI client is connected yet. Add Hermes to unlock planning, suggestions, and approved execution.");
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "Type" }));
+    await userEvent.click(within(screen.getByRole("listbox")).getByText("Hermes"));
 
     expect(screen.getByText(/Chrona can run hermes gateway restart/)).toBeInTheDocument();
 
@@ -640,6 +653,46 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
 
     await screen.findByText("Unavailable");
-    expect(screen.getByText("Bridge health endpoint returned 503")).toBeInTheDocument();
+    expect(screen.getAllByText("Bridge health endpoint returned 503")).toHaveLength(2);
+  });
+
+  it("shows configured, reachable, and capability readiness for providers", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        clients: [
+          {
+            id: "client_codex",
+            name: "Codex Local",
+            type: "codex",
+            config: {},
+            isDefault: true,
+            enabled: true,
+            bindings: ["task.execution"],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("Codex Local");
+    expect(screen.getByLabelText("Provider readiness")).toBeInTheDocument();
+    expect(screen.getByText("Configured")).toBeInTheDocument();
+    expect(screen.getByText("Reachable")).toBeInTheDocument();
+    expect(screen.getByText("Capability-ready")).toBeInTheDocument();
+    expect(screen.getByText("Provider lacks critical capabilities: getRunSnapshot, approvalEvent")).toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true, available: true, reason: "Codex provider is reachable" }),
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
+
+    await screen.findByText("Available");
+    expect(screen.getByText("Health check passed.")).toBeInTheDocument();
   });
 });

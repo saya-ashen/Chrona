@@ -205,11 +205,11 @@ Schedule page projection: timeline, work blocks, task summaries, conflicts, and 
 
 ### GET /api/inbox?workspaceId=...
 
-Inbox projection: pending approvals, schedule proposals, waiting inputs, failed/cancelled runs, and attention items.
+Internal/hidden projection: pending approvals, schedule proposals, waiting inputs, failed/cancelled runs, and attention items. Current primary UI routes surface this state through Dashboard and the task workspace, not an Inbox page.
 
 ### GET /api/memory?workspaceId=...
 
-Memory console projection.
+Internal/hidden projection for memory data. Current primary UI routes do not expose a Memory Console page.
 
 ### POST /api/work/:taskId/commands
 
@@ -223,10 +223,6 @@ Subscribes to task workspace projection events over SSE.
 
 Dashboard projection for workspace-level overview data.
 
-
-### GET /api/dashboard?workspaceId=...
-
-Dashboard projection for workspace-level overview data.
 
 
 ## Workspaces

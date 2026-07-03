@@ -67,3 +67,10 @@ export {
   type ProviderReplayStartRecord,
   type ProviderReplayTape,
 } from "./ProviderClient";
+
+export {
+  providerCapabilityMatrix,
+  summarizeProviderCapabilities,
+  type ProviderCapabilityMatrixEntry,
+  type ProviderCapabilityName,
+} from "./provider-capability-matrix";

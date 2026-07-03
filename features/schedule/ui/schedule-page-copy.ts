@@ -114,7 +114,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   cockpitCreateTask: "Create task",
   cockpitCreateTaskHint: "Add the first task or time block directly from Schedule.",
   cockpitConnectAi: "Connect AI",
-  cockpitConnectAiHint: "Open AI Clients and connect Hermes to unlock planning and execution.",
+  cockpitConnectAiHint: "Open AI Clients and connect a provider to unlock planning and execution.",
   cockpitSummaryTemplate:
     "{scheduled} scheduled · {queue} queued next · {risks} risks to review · {automation} automation candidates",
   cockpitViewsLabel: "Views",
@@ -167,11 +167,11 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
     "Nothing urgent is blocking today. Use the queue to place the next meaningful block.",
   firstRunTitle: "Start with Chrona in three steps",
   firstRunDescription:
-    "Connect Hermes, create a task, then let Chrona turn it into a plan. AI actions stay previewed for your approval before anything changes.",
+    "Connect an AI client, create a task, then let Chrona turn it into a plan. AI actions stay previewed your approval before anything changes.",
   firstRunConnectAi: "Connect AI",
   firstRunCreateTask: "Create first task",
   firstRunAskChrona: "Ask Chrona",
-  firstRunStepConnectAi: "Connect Hermes for local AI planning and execution.",
+  firstRunStepConnectAi: "Connect an AI client for local-first planning and execution.",
   firstRunStepCreateTask: "Capture one real task with enough context for AI to help.",
   firstRunStepReviewPlan: "Review AI suggestions before accepting or running work.",
   focusOverdue: "Overdue",
@@ -198,6 +198,20 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   autoStartRequiresApproval: "Waiting for approval",
   autoStartRuntimeUnsupported: "Runtime doesn't support auto-start",
   autoStartReasonLabel: "Auto-start blocked",
+  selectedBlockOverview: "Block overview",
+  selectedBlockSourceCalendar: "External calendar",
+  selectedBlockSourceAi: "AI scheduled",
+  selectedBlockSourceHuman: "Manually scheduled",
+  selectedBlockAutomationPolicy: "Automation",
+  selectedBlockAutomationManual: "Manual",
+  selectedBlockAutomationPlan: "Auto-plan",
+  selectedBlockAutomationExecute: "Auto-execute",
+  selectedBlockProvider: "Provider",
+  selectedBlockRuntime: "Runtime",
+  selectedBlockExecutionStatus: "Execution status",
+  selectedBlockRecovery: "Recovery",
+  selectedBlockOpenWorkspace: "Open task workspace to recover this run.",
+  selectedBlockReadOnlyCalendar: "Read-only calendar block",
 } as const;
 
 const AUTO_START_REASON_COPY_KEYS = {

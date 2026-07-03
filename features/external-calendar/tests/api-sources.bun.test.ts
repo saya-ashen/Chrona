@@ -72,12 +72,13 @@ describe("External calendar source API", () => {
     });
     expect(createRes.status).toBe(201);
     const created = await json<{
-      source: { name: string; redactedUrlLabel: string; color: string };
+      source: { name: string; redactedUrlLabel: string; color: string; automationPolicy: string };
       syncStatus: { importedCount: number; state: string };
     }>(createRes);
     expect(created.source.name).toBe("Team calendar");
     expect(created.source.redactedUrlLabel).toBe("calendar-fixtures.test/valid.ics");
     expect(created.source.color).toBe("#0f766e");
+    expect(created.source.automationPolicy).toBe("manual");
     expect(created.syncStatus.importedCount).toBeGreaterThan(0);
     expect(created.syncStatus.state).toBe("success");
     expect(JSON.stringify(created)).not.toContain(url);

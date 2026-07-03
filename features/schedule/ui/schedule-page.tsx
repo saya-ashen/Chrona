@@ -18,7 +18,6 @@ import { SchedulePageDialogs } from "./dialogs/schedule-page-dialogs";
 import { CalendarSourceSetup, listExternalCalendarEvents } from "../../external-calendar/ui";
 import { SelectedBlockSheet } from "./panels/schedule-page-panels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 
 import { ScheduleLeftSidebar, ScheduleRightSidebar } from "./panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "./schedule-page-copy";
@@ -140,11 +139,6 @@ export function SchedulePage({
   });
 
   const dialogDefaults = getQuickCreateDefaults(data);
-  const isEmptyWorkspace =
-    viewData.scheduled.length === 0 &&
-    viewData.unscheduled.length === 0 &&
-    viewData.listItems.length === 0 &&
-    viewData.proposals.length === 0;
 
   useEffect(() => {
     const { context, actions } = createScheduleAiSidebarContext({
@@ -216,35 +210,6 @@ export function SchedulePage({
         buildScheduleViewHref={buildScheduleViewHref}
       />
 
-      {isEmptyWorkspace ? (
-        <section className="mx-1 mt-3 rounded-3xl border border-primary/20 bg-primary-soft/70 p-4 text-sm shadow-sm sm:mx-2">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0 space-y-2">
-              <h2 className="text-base font-semibold text-foreground">
-                {copy.firstRunTitle}
-              </h2>
-              <p className="max-w-3xl text-muted-foreground">
-                {copy.firstRunDescription}
-              </p>
-              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                <span>{copy.firstRunStepConnectAi}</span>
-                <span>{copy.firstRunStepCreateTask}</span>
-                <span>{copy.firstRunStepReviewPlan}</span>
-              </div>
-            </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <Button
-                type="button"
-                size="default"
-                onClick={() => router.push(localizeHref(locale, "/settings?panel=ai-clients"))}
-              >
-                {copy.firstRunConnectAi}
-              </Button>
-
-            </div>
-          </div>
-        </section>
-      ) : null}
 
       {errorMessage ? (
         <div className="mx-2 mt-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-sm">

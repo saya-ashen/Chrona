@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { AlertCircle, ExternalLink, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { SchedulePageCopy } from "../../schedule-page-copy";
 import type { ScheduleRecord } from "../../schedule-page-types";
@@ -17,6 +17,23 @@ import { TaskEditPanel } from "@/components/tasks/panels/task-edit-panel";
 import { Button } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";
+
+function sourceLabel(item: ScheduleRecord, copy: SchedulePageCopy) {
+  if (item.sourceManaged) return `${copy.selectedBlockSourceCalendar}: ${item.sourceManaged.sourceName}`;
+  if (item.scheduleSource === "ai") return copy.selectedBlockSourceAi;
+  return copy.selectedBlockSourceHuman;
+}
+
+function automationLabel(item: ScheduleRecord, copy: SchedulePageCopy) {
+  if (item.autoExecute) return copy.selectedBlockAutomationExecute;
+  if (item.autoPlanGeneration) return copy.selectedBlockAutomationPlan;
+  return copy.selectedBlockAutomationManual;
+}
+
+function needsRecovery(item: ScheduleRecord) {
+  const state = item.stateView?.state;
+  return state === "failed" || state === "blocked" || state === "waiting_for_input" || state === "waiting_for_approval";
+}
 
 export function SelectedBlockMainColumn({
   item,
@@ -58,6 +75,11 @@ export function SelectedBlockMainColumn({
   onSaveConfigBeforeRegenerate: () => Promise<void>;
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const providerName = item.aiClientName ?? availableAiClients?.find((client) => client.id === item.aiClientId)?.name ?? null;
+  const runtimeLabel = item.executionRuntimeLabel ?? executionRuntimes.find((runtime) => runtime.key === item.executionRuntime)?.label ?? item.executionRuntime;
+  const executionStatus = item.latestRunStatus ?? item.displayState ?? item.stateView?.label ?? copy.noActiveRun;
+  const recoveryHref = `/tasks/${item.taskId}${item.workBlockId ? `?workBlockId=${encodeURIComponent(item.workBlockId)}` : ""}`;
+
 
   return (
     <div
@@ -65,6 +87,50 @@ export function SelectedBlockMainColumn({
       className="min-w-0 px-5 py-5 text-sm text-muted-foreground md:px-6"
     >
       <div className="space-y-5">
+        <section className="rounded-2xl border border-border/70 bg-muted/20 p-4" aria-label={copy.selectedBlockOverview}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{copy.source}</p>
+              <p className="mt-1 text-sm font-medium text-foreground">{sourceLabel(item, copy)}</p>
+              {item.sourceManaged ? (
+                <p className="mt-1 text-xs text-muted-foreground">{copy.selectedBlockReadOnlyCalendar}</p>
+              ) : null}
+            </div>
+            <div className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground">
+              {automationLabel(item, copy)}
+            </div>
+          </div>
+          <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <dt className="text-muted-foreground">{copy.selectedBlockProvider}</dt>
+              <dd className="mt-1 font-medium text-foreground">{providerName ?? copy.model}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{copy.selectedBlockRuntime}</dt>
+              <dd className="mt-1 font-medium text-foreground">{runtimeLabel}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{copy.selectedBlockExecutionStatus}</dt>
+              <dd className="mt-1 font-medium text-foreground">{executionStatus}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{copy.nextAction}</dt>
+              <dd className="mt-1 font-medium text-foreground">{item.stateView?.primaryAction ?? copy.stayOnPlan}</dd>
+            </div>
+          </dl>
+          {item.autoStartReason ? (
+            <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-700 dark:text-amber-200">
+              <AlertCircle className="size-3.5" />
+              {copy.autoStartReasonLabel}: {item.autoStartReason}
+            </p>
+          ) : null}
+          {needsRecovery(item) ? (
+            <a className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-primary hover:underline" href={recoveryHref}>
+              <ExternalLink className="size-3.5" />
+              {copy.selectedBlockOpenWorkspace}
+            </a>
+          ) : null}
+        </section>
         <TaskEditPanel>
           <TaskConfigForm
             executionRuntimes={executionRuntimes}

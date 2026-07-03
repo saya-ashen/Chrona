@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useI18n } from "@chrona/i18n/react";
+import { providerCapabilityMatrix, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,6 +79,15 @@ type TestResult = {
   status: TestStatus;
   reason: string | null;
 };
+type ReadinessState = "ready" | "warning" | "pending";
+
+type ReadinessItem = {
+  key: "configured" | "reachable" | "capability";
+  label: string;
+  state: ReadinessState;
+  detail: string;
+};
+
 
 type RuntimeProviderOption = {
   key: AiClientType;
@@ -235,6 +245,18 @@ function isDebugProviderVisible() {
   );
 }
 
+const PROVIDER_SORT_RANK: Record<string, number> = {
+  claude_code: 0,
+  codex: 1,
+  llm: 2,
+  debug: 3,
+  hermes: 99,
+};
+
+function providerSortRank(key: string) {
+  return PROVIDER_SORT_RANK[key] ?? 50;
+}
+
 function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
   const providers = (input as { providers?: unknown[] }).providers ?? [];
   return providers
@@ -246,7 +268,8 @@ function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
       key: provider.key,
       label: typeof provider.label === "string" ? provider.label : provider.key,
       features: Array.isArray(provider.features) ? provider.features.filter((feature): feature is string => typeof feature === "string") : [],
-    }));
+    }))
+    .sort((left, right) => providerSortRank(left.key) - providerSortRank(right.key));
 }
 
 async function testClientAvailability(payload: ClientFormPayload): Promise<TestResult> {
@@ -317,6 +340,79 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
       return "outline";
   }
 }
+const CAPABILITY_CHECKS: ProviderCapabilityName[] = [
+  "healthCheck",
+  "startRun",
+  "streamEvents",
+  "getRunSnapshot",
+  "cancelRun",
+  "approvalEvent",
+  "toolTraces",
+  "structuredOutput",
+  "sessionResume",
+];
+
+function providerMatrixEntry(type: AiClientType) {
+  return providerCapabilityMatrix.find((entry) => entry.provider === type);
+}
+
+function hasBasicConfig(type: AiClientType, values: Pick<ClientFormValues, "baseUrl" | "timeoutSeconds" | "hermesScope">) {
+  if (type === "hermes" && values.hermesScope === "remote") return Boolean(values.baseUrl.trim());
+  return Number(values.timeoutSeconds) > 0;
+}
+
+function readinessItems(input: {
+  copy: Record<string, string>;
+  type: AiClientType;
+  configured: boolean;
+  enabled: boolean;
+  testStatus: TestStatus;
+  testReason: string | null;
+}): ReadinessItem[] {
+  const matrix = providerMatrixEntry(input.type);
+  const missingCapabilities = matrix
+    ? CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
+    : [];
+
+  return [
+    {
+      key: "configured",
+      label: input.copy.readinessConfigured,
+      state: input.configured && input.enabled ? "ready" : "pending",
+      detail: input.enabled ? input.copy.readinessConfiguredDetail : input.copy.readinessDisabledDetail,
+    },
+    {
+      key: "reachable",
+      label: input.copy.readinessReachable,
+      state: input.testStatus === "available" ? "ready" : input.testStatus === "unavailable" ? "warning" : "pending",
+      detail: input.testStatus === "available" ? input.copy.readinessReachableDetail : input.testReason ?? input.copy.readinessRunHealthCheck,
+    },
+    {
+      key: "capability",
+      label: input.copy.readinessCapability,
+      state: matrix && missingCapabilities.length === 0 ? "ready" : "warning",
+      detail: matrix
+        ? missingCapabilities.length === 0
+          ? input.copy.readinessCapabilityDetail
+          : `${input.copy.readinessCapabilityLimited}: ${missingCapabilities.join(", ")}`
+        : input.copy.readinessCapabilityUnknown,
+    },
+  ];
+}
+
+function ReadinessChecklist({ items }: { items: ReadinessItem[] }) {
+  return (
+    <div className="grid gap-2 rounded-md border bg-muted/20 p-3" aria-label="Provider readiness">
+      {items.map((item) => (
+        <div key={item.key} className="flex items-start gap-2 text-xs">
+          <Badge variant={item.state === "ready" ? "default" : item.state === "warning" ? "destructive" : "secondary"}>{item.label}</Badge>
+          <span className="min-w-0 text-muted-foreground">{item.detail}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 const FEATURE_COPY: Record<string, { label: string; description: string }> = {
   suggest: {
@@ -365,6 +461,16 @@ function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientT
   return providers.find((provider) => provider.key === type)?.features ?? [];
 }
 
+const RECOMMENDED_FEATURE_ORDER = ["task.plan", "task.execution", "dashboard.brief"];
+
+function recommendedFeatureBindings(features: string[]) {
+  const available = new Set(features);
+  return RECOMMENDED_FEATURE_ORDER.filter((feature) => available.has(feature));
+}
+
+function sameBindings(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
 function getDefaultClientName(type: AiClientType, providers: RuntimeProviderOption[]) {
   if (type === "llm") return "My OpenAI Compatible Client";
 
@@ -382,10 +488,10 @@ async function updateClientBindings(clientId: string, features: string[]) {
 }
 const DEFAULTS: Record<string, string> = {
   title: "AI Clients",
-  subtitle: "Connect Hermes so Chrona can plan tasks and safely execute approved work.",
+  subtitle: "Connect an AI client so Chrona can plan tasks and safely execute approved work.",
   addClient: "+ Add Client",
-  emptyState: "No AI client is connected yet. Start with local Hermes to unlock planning, suggestions, and execution previews.",
-  emptyStateCta: "Connect local Hermes",
+  emptyState: "No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.",
+  emptyStateCta: "Connect AI Client",
   hermesIntro: "Hermes is Chrona's local AI runtime. It generates task plans, proposes schedule changes, and only executes after your approval.",
   loading: "Loading...",
   defaultBadge: "Default",
@@ -427,6 +533,16 @@ const DEFAULTS: Record<string, string> = {
   unavailable: "Unavailable",
   statusUnknown: "Not tested",
   reasonUnknown: "No details yet",
+  readinessConfigured: "Configured",
+  readinessReachable: "Reachable",
+  readinessCapability: "Capability-ready",
+  readinessConfiguredDetail: "Saved settings are present and client is enabled.",
+  readinessDisabledDetail: "Client is disabled or required settings are missing.",
+  readinessReachableDetail: "Health check passed.",
+  readinessRunHealthCheck: "Run health check to confirm provider is reachable.",
+  readinessCapabilityDetail: "Required schedule execution capabilities are available.",
+  readinessCapabilityLimited: "Provider lacks critical capabilities",
+  readinessCapabilityUnknown: "Provider capability matrix is not registered.",
 };
 
 function getCopy(messages: Record<string, unknown>): Record<string, string> {
@@ -447,11 +563,16 @@ function ClientForm({
   copy: Record<string, string>;
   providers: RuntimeProviderOption[];
 }) {
-  const fallbackType = providers[0]?.key ?? "hermes";
+  const fallbackType = providers.find((provider) => provider.key === "claude_code")?.key ?? providers[0]?.key ?? "claude_code";
   const initialConfig = initial?.config;
+  const initialType = initial && providers.some((provider) => provider.key === initial.type) ? initial.type : fallbackType;
+  const initialRecommendedBindings = useMemo(
+    () => recommendedFeatureBindings(getProviderFeatures(providers, initialType)),
+    [providers, initialType],
+  );
   const defaultValues = useMemo<ClientFormValues>(() => ({
     name: initial?.name ?? "",
-    type: initial && providers.some((provider) => provider.key === initial.type) ? initial.type : fallbackType,
+    type: initialType,
     isDefault: initial?.isDefault ?? false,
     timeoutSeconds: String(
       (initialConfig as { timeoutSeconds?: number; timeoutMs?: number } | undefined)?.timeoutSeconds
@@ -473,8 +594,8 @@ function ClientForm({
     profileName: (initialConfig as { profileName?: string } | undefined)?.profileName ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
-    bindings: initial?.bindings ?? [],
-  }), [fallbackType, initial, initialConfig, providers]);
+    bindings: initial?.bindings ?? initialRecommendedBindings,
+  }), [initialType, initial, initialConfig, initialRecommendedBindings]);
   const form = useForm<ClientFormValues>({
     defaultValues,
     mode: "onChange",
@@ -491,18 +612,38 @@ function ClientForm({
   const [testReason, setTestReason] = useState<string | null>(null);
   const [hermesResult, setHermesResult] = useState<HermesIntegrationResult | null>(null);
   const [hermesBusy, setHermesBusy] = useState<"diagnose" | "setup" | "restart" | null>(null);
+  const lastAutoBindings = useRef<string[]>(initialRecommendedBindings);
 
   useEffect(() => {
     form.reset(defaultValues);
   }, [defaultValues, form]);
 
   const payload = buildClientPayload(values);
+  const formReadiness = readinessItems({
+    copy,
+    type: values.type,
+    configured: hasBasicConfig(values.type, values),
+    enabled: true,
+    testStatus,
+    testReason,
+  });
+
 
   useEffect(() => {
     if (values.type === "hermes" && values.hermesScope === "local" && !values.baseUrl) {
       form.setValue("baseUrl", LOCAL_HERMES_BASE_URL, { shouldDirty: true });
     }
   }, [form, values.baseUrl, values.hermesScope, values.type]);
+
+  useEffect(() => {
+    if (initial) return;
+    const recommended = recommendedFeatureBindings(availableFeatures);
+    const current = form.getValues("bindings");
+    if (current.length === 0 || sameBindings(current, lastAutoBindings.current)) {
+      form.setValue("bindings", recommended, { shouldDirty: false });
+      lastAutoBindings.current = recommended;
+    }
+  }, [availableFeatures, form, initial, values.type]);
 
   function handleSave(nextValues: ClientFormValues) {
     onSave({ payload: buildClientPayload(nextValues), bindings: nextValues.bindings });
@@ -855,8 +996,8 @@ function ClientForm({
                   {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
                 </Field>
                 <p className="text-xs text-muted-foreground">
-                  Uses codex-acp through Agent Client Protocol. Chrona passes
-                  scoped MCP control tools at runtime.
+                  Uses the Codex provider adapter with scoped MCP control tools
+                  passed at runtime.
                 </p>
               </>
             )}
@@ -921,6 +1062,8 @@ function ClientForm({
               </Field>
             )}
 
+
+            <ReadinessChecklist items={formReadiness} />
 
             <Controller
               name="isDefault"
@@ -1107,6 +1250,15 @@ export function AiClientsManager() {
 
       {clients.map((client) => {
         const cardTestState = cardTestStates[client.id] ?? { status: "idle", reason: null };
+        const clientReadiness = readinessItems({
+          copy,
+          type: client.type,
+          configured: true,
+          enabled: client.enabled,
+          testStatus: cardTestState.status,
+          testReason: cardTestState.reason,
+        });
+
 
         return (
           <Card key={client.id} size="sm">
@@ -1151,6 +1303,7 @@ export function AiClientsManager() {
                     <Badge variant={getStatusVariant(cardTestState.status)}>{getStatusLabel(copy, cardTestState.status)}</Badge>
                     <span className="text-muted-foreground">{cardTestState.reason ?? copy.reasonUnknown}</span>
                   </div>
+                  <ReadinessChecklist items={clientReadiness} />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">

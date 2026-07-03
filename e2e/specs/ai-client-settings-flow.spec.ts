@@ -2,6 +2,11 @@ import { expect, test } from "@playwright/test";
 
 const SETTINGS_URL = "/en/settings?panel=ai-clients";
 
+async function selectHermesProvider(page: import("@playwright/test").Page) {
+  await page.getByRole("combobox", { name: "Type" }).click();
+  await page.getByRole("option", { name: "Hermes" }).click();
+}
+
 test.describe("AI Client Settings", () => {
   test("create, edit, delete, and duplicate an AI client through the UI", async ({
     page,
@@ -24,6 +29,7 @@ test.describe("AI Client Settings", () => {
 
     await test.step("2. Create a new AI client", async () => {
       await page.getByRole("button", { name: /add client/i }).click();
+      await selectHermesProvider(page);
       await page.getByPlaceholder("My Hermes Client").fill("E2E Settings Client");
       await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://api.mock.ai/v1");
       await page.getByPlaceholder("optional for localhost").fill("sk-test-e2e-settings");
@@ -111,6 +117,7 @@ test.describe("AI Client Settings", () => {
 
     // Client A
     await page.getByRole("button", { name: /add client/i }).click();
+    await selectHermesProvider(page);
     await page.getByPlaceholder("My Hermes Client").fill("Default Client A");
     await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://a.mock.ai/v1");
     await page.getByPlaceholder("optional for localhost").fill("sk-a");
@@ -125,6 +132,7 @@ test.describe("AI Client Settings", () => {
 
     // Client B
     await page.getByRole("button", { name: /add client/i }).click();
+    await selectHermesProvider(page);
     await page.getByPlaceholder("My Hermes Client").fill("Default Client B");
     await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://b.mock.ai/v1");
     await page.getByPlaceholder("optional for localhost").fill("sk-b");
@@ -166,6 +174,7 @@ test.describe("AI Client Settings", () => {
 
     await page.goto(SETTINGS_URL);
     await page.getByRole("button", { name: /add client/i }).click();
+    await selectHermesProvider(page);
 
     // Leave name empty, save should be blocked by frontend or show error
     await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://mock.ai/v1");

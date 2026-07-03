@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import {
   buildPlanningSummary,
+  deriveWorkItemStateView,
   formatDateKey,
   startOfDay,
 } from "@chrona/domain";
@@ -14,6 +15,29 @@ import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persist
 import { getLatestTaskPlanReadModel, resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
 import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
+
+function stateViewFor(item: {
+  persistedStatus: string;
+  displayState: string | null;
+  scheduleStatus: string | null;
+  latestRunStatus: string | null;
+  scheduledStartAt: Date | null;
+  scheduledEndAt: Date | null;
+  isRunnable?: boolean;
+  actionRequired?: string | null;
+  aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
+}) {
+  return deriveWorkItemStateView({
+    taskStatus: item.persistedStatus,
+    scheduleStatus: item.scheduleStatus,
+    planStatus: item.aiPlanGenerationStatus,
+    executionStatus: item.displayState,
+    providerStatus: item.latestRunStatus,
+    isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt),
+    isRunnable: item.isRunnable,
+    disabledReason: item.actionRequired,
+  });
+}
 
 function mapProjectionItem(
   item: Awaited<ReturnType<typeof db.taskProjection.findMany>>[number] & {
@@ -104,6 +128,7 @@ function mapWorkBlockItem(
       autoExecuteTiming: string;
       kind: string;
       recurrenceRule: string | null;
+      aiClient?: { name: string } | null;
       importedCalendarEvents: Array<{
         id: string;
         description: string | null;
@@ -132,7 +157,7 @@ function mapWorkBlockItem(
     actionRequired: null,
     approvalPendingCount: 0,
     scheduleStatus,
-    scheduleSource: "system",
+    scheduleSource: importedEvent ? "calendar" : block.trigger === "scheduled" ? "ai" : "human",
     dueAt: block.task.dueAt,
     scheduledStartAt: block.scheduledStartAt,
     scheduledEndAt: block.scheduledEndAt,
@@ -144,6 +169,8 @@ function mapWorkBlockItem(
     autoPlanGenerationTiming: block.task.autoPlanGenerationTiming,
     autoExecuteTiming: block.task.autoExecuteTiming,
     aiClientId: block.task.aiClientId,
+    aiClientName: block.task.aiClient?.name ?? null,
+    executionRuntimeLabel: block.task.executionRuntime,
     kind: block.task.kind,
     recurrenceRule: block.task.recurrenceRule,
     sourceManaged: importedEvent
@@ -472,11 +499,14 @@ export async function getSchedulePage(workspaceId: string) {
       );
     }),
   );
-  const listItemsWithPlanState = listItems.map((item) => ({
-    ...item,
-    savedPlan: planSnapshots.get(item.taskId) ?? null,
-    aiPlanGenerationStatus: planStatuses.get(item.taskId) ?? "idle",
-  }));
+  const listItemsWithPlanState = listItems.map((item) => {
+    const withPlanState = {
+      ...item,
+      savedPlan: planSnapshots.get(item.taskId) ?? null,
+      aiPlanGenerationStatus: planStatuses.get(item.taskId) ?? "idle",
+    };
+    return { ...withPlanState, stateView: stateViewFor(withPlanState) };
+  });
   const topLevelItems = listItemsWithPlanState.filter(
     (item) => item.parentTaskId === null,
   );
@@ -540,6 +570,7 @@ export async function getSchedulePage(workspaceId: string) {
           autoPlanGenerationTiming: true,
           autoExecuteTiming: true,
           recurrenceRule: true,
+          aiClient: { select: { name: true } },
           parentTaskId: true,
           importedCalendarEvents: {
             include: { calendarSource: { select: { name: true, color: true } } },
@@ -617,13 +648,14 @@ export async function getSchedulePage(workspaceId: string) {
       now: eligibilityNow,
       activeRun: activeRunByTaskId.get(item.taskId) ?? null,
     });
-    return {
+    const withPlanState = {
       ...item,
       savedPlan: snapshot,
       aiPlanGenerationStatus,
       autoStartEligible: eligibility.ok,
       autoStartReason: eligibility.ok ? null : eligibility.reason,
     };
+    return { ...withPlanState, stateView: stateViewFor(withPlanState) };
   }));
   const workBlockScheduledKeys = new Set(
     workBlockScheduledItems.map((item) => `${item.taskId}:${item.scheduledStartAt.getTime()}:${item.scheduledEndAt.getTime()}`),

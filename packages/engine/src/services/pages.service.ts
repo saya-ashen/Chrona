@@ -33,6 +33,7 @@ export function createPagesService() {
           fingerprintInput: {
             needsAttention: dashboard.needsAttention,
             inProgress: dashboard.inProgress,
+            upcomingToday: dashboard.upcomingToday,
             autoCompleted: dashboard.autoCompleted,
             recentEvents: dashboard.recentEvents,
             totalAutoCompleted: dashboard.totalAutoCompleted,

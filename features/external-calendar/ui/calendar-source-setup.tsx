@@ -87,7 +87,7 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
   const [url, setUrl] = useState("");
   const [color, setColor] = useState("#2563eb");
   const [syncPolicy, setSyncPolicy] = useState<CalendarSourceSyncPolicy>("auto_complete_past_events");
-  const [automationPolicy, setAutomationPolicy] = useState<CalendarAutomationPolicy>("auto_plan");
+  const [automationPolicy, setAutomationPolicy] = useState<CalendarAutomationPolicy>("manual");
   const [validation, setValidation] = useState<ValidateCalendarSourceResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -99,7 +99,7 @@ function ConnectCalendarDialog({ workspaceId, open, onOpenChange, onConnected }:
     setUrl("");
     setColor("#2563eb");
     setSyncPolicy("auto_complete_past_events");
-    setAutomationPolicy("auto_plan");
+    setAutomationPolicy("manual");
     setValidation(null);
     setErrorMessage(null);
     setBlockedNetworkAction(null);
