@@ -49,6 +49,7 @@ import type { DashboardData } from "@/components/dashboard/dashboard-types";
 import { apiJson } from "@/api";
 import type { Dictionary } from "@/pages";
 import type { UiDocument } from "@chrona/ui-protocol";
+import { deriveWorkItemStateView } from "@chrona/domain";
 
 const COPY = {
   title: "Chrona Dashboard",
@@ -85,6 +86,7 @@ const COPY = {
       schedule_risk: "At schedule risk",
     },
   },
+  upcomingToday: { title: "Upcoming today", description: "desc", empty: "No more today", open: "Open" },
   inProgress: { title: "Running now", description: "desc", empty: "Nothing is running. Start a task from the schedule or create a new one when you want Chrona to move." },
   completed: { title: "Recent completions", totalLabel: "{n} recent completions shown", empty: "Completed task outputs will collect here once Chrona finishes work." },
   digest: {
@@ -153,6 +155,7 @@ function makeData(overrides?: Partial<DashboardData>): DashboardData {
     focusTask: null,
     needsAttention: [],
     inProgress: [],
+    upcomingToday: [],
     autoCompleted: [],
     totalAutoCompleted: 0,
     recentEvents: [],
@@ -172,6 +175,10 @@ function completed(overrides: Partial<DashboardData["autoCompleted"][number]> = 
     ...overrides,
   } as DashboardData["autoCompleted"][number];
 }
+function stateView(status: string) {
+  return deriveWorkItemStateView({ taskStatus: status });
+}
+
 
 
 function renderDashboard(data: DashboardData = makeData()) {
@@ -218,6 +225,7 @@ describe("DashboardPage", () => {
               kind: "blocked",
               reason: "Waiting",
               nextStep: "resolve_block",
+              stateView: stateView("Blocked"),
               latestOutput: null,
               updatedAt: null,
             },
@@ -243,6 +251,7 @@ describe("DashboardPage", () => {
               kind: "approval",
               reason: "Allow deleting the old branch?",
               nextStep: "approve_or_edit",
+              stateView: stateView("WaitingForApproval"),
               latestOutput: null,
               updatedAt: null,
             },
@@ -344,6 +353,7 @@ describe("DashboardPage", () => {
               kind: "blocked",
               reason: "Waiting on confirmation",
               nextStep: "resolve_block",
+              stateView: stateView("Blocked"),
               latestOutput: null,
               updatedAt: null,
             },

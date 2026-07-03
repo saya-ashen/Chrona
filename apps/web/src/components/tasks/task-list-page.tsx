@@ -36,6 +36,7 @@ import {
 import { TaskActionsMenu, type TaskActionsMenuItem } from "@/components/tasks/shared";
 import { deleteTask, markTaskDone, reopenTask, startExecution } from "@/lib/task-actions-client";
 import type { Dictionary } from "@/pages";
+import type { WorkItemStateView } from "@chrona/domain";
 
 type TaskItem = {
   id: string;
@@ -54,6 +55,7 @@ type TaskItem = {
     runStatus: string | null;
     isRunnable: boolean;
   } | null;
+  stateView: WorkItemStateView;
   source: {
     source: "external_calendar";
     sourceName: string;
@@ -102,12 +104,11 @@ function isFilterKey(value: string | null): value is FilterKey {
   return value !== null && FILTERS.some((f) => f.key === value);
 }
 
-function statusTone(status: string) {
-  if (["Completed", "Done"].includes(status)) return "success" as const;
-  if (["Running"].includes(status)) return "info" as const;
-  if (["Ready", "Queued"].includes(status)) return "secondary" as const;
-  if (["WaitingForInput", "WaitingForApproval"].includes(status)) return "warning" as const;
-  if (["Failed", "Blocked"].includes(status)) return "destructive" as const;
+function statusTone(stateView: WorkItemStateView) {
+  if (stateView.severity === "success") return "success" as const;
+  if (stateView.severity === "info") return "info" as const;
+  if (stateView.severity === "warning") return "warning" as const;
+  if (stateView.severity === "danger") return "destructive" as const;
   return "outline" as const;
 }
 
@@ -138,10 +139,10 @@ function toPreviewText(value: string): string {
 }
 
 function taskAccentClass(task: TaskItem): string {
-  if (["Failed", "Blocked"].includes(task.status)) return "from-destructive to-destructive/60";
-  if (["WaitingForInput", "WaitingForApproval"].includes(task.status)) return "from-warning to-warning/60";
-  if (task.status === "Running") return "from-info to-info/60";
-  if (["Completed", "Done"].includes(task.status)) return "from-success to-success/60";
+  if (task.stateView.severity === "danger") return "from-destructive to-destructive/60";
+  if (task.stateView.severity === "warning") return "from-warning to-warning/60";
+  if (task.stateView.state === "running") return "from-info to-info/60";
+  if (task.stateView.severity === "success") return "from-success to-success/60";
   return "from-primary to-primary/60";
 }
 
@@ -165,15 +166,15 @@ function filterLabel(filter: FilterKey, copy: TaskListCopy): string {
 }
 
 function canStartTask(task: TaskItem): boolean {
-  return task.projection?.isRunnable === true && !["Running", "Completed", "Done"].includes(task.status);
+  return task.stateView.primaryAction === "start_execution";
 }
 
 function canCompleteTask(task: TaskItem): boolean {
-  return !["Completed", "Done"].includes(task.status);
+  return !["completed", "cancelled"].includes(task.stateView.state);
 }
 
 function canReopenTask(task: TaskItem): boolean {
-  return ["Completed", "Done"].includes(task.status);
+  return ["completed", "cancelled"].includes(task.stateView.state);
 }
 
 function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: string; copy: TaskListCopy; activeFilterLabel: string; counts: TaskCounts }) {
@@ -300,7 +301,7 @@ function TaskRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-foreground">{task.title}</h3>
-            <Badge variant={statusTone(task.status)}>{task.status}</Badge>
+            <Badge variant={statusTone(task.stateView)}>{task.stateView.label}</Badge>
             <Badge variant={priorityTone(task.priority)}>{task.priority}</Badge>
             <Badge variant={task.autoExecute ? "info" : task.autoPlanGeneration ? "secondary" : "outline"}>
               {taskAutomationLabel(task, copy)}

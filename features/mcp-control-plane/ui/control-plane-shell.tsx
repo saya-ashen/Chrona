@@ -3,6 +3,7 @@
 import { CalendarDays, ClipboardList, LayoutDashboard, Plus, Settings } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
+import { StartWithChrona } from "@/components/start-with-chrona";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskCreateDialog } from "../../schedule/ui";
 import { createTaskFromSchedule } from "@/lib/task-actions-client";
@@ -95,6 +96,7 @@ export function ControlPlaneShell({
       active: pathname.startsWith("/settings"),
     },
   ];
+  const shouldShowStartWithChrona = ["/dashboard", "/schedule", "/tasks", "/settings"].includes(pathname);
 
   return (
     <SidebarProvider
@@ -207,6 +209,7 @@ export function ControlPlaneShell({
           </div>
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:px-6 xl:px-7 xl:pb-3">
+          {shouldShowStartWithChrona ? <StartWithChrona className="mb-4" /> : null}
           {children}
         </main>
 

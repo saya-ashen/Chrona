@@ -1,6 +1,6 @@
 # Chrona Documentation
 
-Chrona is an AI-native task control plane for turning work intent into scheduled tasks, executable plans, agent runs, and observable results.
+Chrona is an open-source, local-first AI schedule app for turning tasks into planned, scheduled, executable, and inspectable work.
 
 Use this directory as the stable product and developer documentation set. Time-point audits, refactor notes, and design-debt records are removed once their lasting content is merged into stable docs.
 
@@ -24,15 +24,14 @@ Use this directory as the stable product and developer documentation set. Time-p
 
 ## Current product areas
 
-Chrona currently centers on five workflows:
+Chrona currently centers on four active product surfaces:
 
-1. Task management: create, edit, complete, reopen, delete, prioritize, tag, nest, and relate tasks.
-2. Plan generation: ask AI to draft a graph plan, then review, edit, accept, and materialize it.
-3. Plan execution in task workspace: run task/checkpoint/condition/wait nodes with human checkpoints and AI-visible refs.
-4. Schedule cockpit: arrange time blocks, inspect conflicts, accept schedule proposals, and auto-start due work.
-5. Dashboard/Inbox visibility: review workspace status, attention items, latest results, and execution state.
+1. Dashboard: review today’s focus, attention items, active work, latest results, and recoverable execution state.
+2. Schedule: arrange time blocks, inspect conflicts, accept schedule proposals, and make schedule-driven automation visible.
+3. Tasks: create tasks, generate/review/accept plans, execute work, inspect results, and recover blocked or failed runs.
+4. Settings: configure AI clients, feature bindings, provider health, schedule automation defaults, and local diagnostics.
 
-Supporting surfaces include Inbox, Memory Console, Global AI Sidebar, Assistant Surface, Settings / AI Clients, and runtime/provider status.
+Hidden/internal projections include Inbox and Memory. They may still exist as APIs or data sources, but they are not current primary navigation surfaces.
 
 ## Runtime shape
 

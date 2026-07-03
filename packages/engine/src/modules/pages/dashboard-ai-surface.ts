@@ -41,6 +41,15 @@ type DashboardFingerprintInput = {
     latestOutput: OutputRef;
     updatedAt: string | null;
   }>;
+  upcomingToday: Array<{
+    taskId: string;
+    title: string;
+    status: string;
+    scheduledStartAt: string | null;
+    dueAt: string | null;
+    nextStep: string;
+    updatedAt: string | null;
+  }>;
   autoCompleted: Array<{
     taskId: string;
     title: string;

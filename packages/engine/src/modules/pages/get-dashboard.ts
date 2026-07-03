@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { deriveWorkItemStateView, type WorkItemStateView } from "@chrona/domain";
 import { getDashboardAiBriefState } from "./dashboard-ai-surface";
 
 /**
@@ -18,9 +19,9 @@ import { getDashboardAiBriefState } from "./dashboard-ai-surface";
  * one all-time figure the client cannot derive from a capped list.
  */
 
-const ATTENTION_STATUSES = new Set(["Blocked", "Failed", "WaitingForApproval", "WaitingForInput"]);
-const SCHEDULE_RISK_STATUSES = new Set(["AtRisk", "Overdue", "Interrupted"]);
-const TERMINAL_STATUSES = new Set(["Completed", "Done", "Cancelled"]);
+const ATTENTION_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["blocked", "failed", "waiting_for_approval", "waiting_for_input"]);
+const RUNNING_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["running"]);
+const TERMINAL_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["completed", "cancelled"]);
 
 const PRIORITY_WEIGHT: Record<string, number> = { Urgent: 3, High: 2, Medium: 1, Low: 0 };
 
@@ -99,12 +100,22 @@ function reasonFor(item: ProjectionWithTask): string | null {
   );
 }
 
-function attentionKind(item: ProjectionWithTask): DashboardAttentionKind | null {
-  if (item.persistedStatus === "Failed") return "failed";
-  if (item.persistedStatus === "WaitingForApproval" || item.approvalPendingCount > 0) return "approval";
-  if (item.persistedStatus === "WaitingForInput") return "input";
-  if (item.persistedStatus === "Blocked" || item.displayState === "Attention Needed") return "blocked";
-  if (SCHEDULE_RISK_STATUSES.has(item.scheduleStatus ?? "")) return "schedule_risk";
+function stateViewFor(item: ProjectionWithTask): WorkItemStateView {
+  return deriveWorkItemStateView({
+    taskStatus: item.persistedStatus,
+    scheduleStatus: item.scheduleStatus,
+    executionStatus: item.displayState,
+    providerStatus: item.latestRunStatus,
+    isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt),
+    isRunnable: item.actionRequired ? false : undefined,
+  });
+}
+
+function attentionKind(stateView: WorkItemStateView): DashboardAttentionKind | null {
+  if (stateView.state === "failed") return "failed";
+  if (stateView.state === "waiting_for_approval") return "approval";
+  if (stateView.state === "waiting_for_input") return "input";
+  if (stateView.state === "blocked") return "blocked";
   return null;
 }
 
@@ -131,32 +142,56 @@ function toIso(value: Date | null | undefined): string | null {
 }
 
 function isAttention(item: ProjectionWithTask): boolean {
-  return (
-    ATTENTION_STATUSES.has(item.persistedStatus) ||
-    item.displayState === "Attention Needed" ||
-    item.approvalPendingCount > 0 ||
-    SCHEDULE_RISK_STATUSES.has(item.scheduleStatus ?? "")
-  );
+  return ATTENTION_STATES.has(stateViewFor(item).state);
 }
 
 function isInProgress(item: ProjectionWithTask): boolean {
-  return (
-    !isAttention(item) &&
-    (item.persistedStatus === "Running" || item.latestRunStatus === "Running")
-  );
+  return !isAttention(item) && RUNNING_STATES.has(stateViewFor(item).state);
 }
 
 function focusScore(item: ProjectionWithTask, now: number): number {
-  if (TERMINAL_STATUSES.has(item.task.status)) return -1;
+  const stateView = stateViewFor(item);
+  if (TERMINAL_STATES.has(stateView.state)) return -1;
   let score = PRIORITY_WEIGHT[item.task.priority] ?? 0;
-  const kind = attentionKind(item);
+  const kind = attentionKind(stateView);
   if (kind === "failed" || kind === "blocked" || kind === "approval") score += 100;
   else if (kind === "input") score += 90;
-  if (item.scheduleStatus === "Overdue") score += 60;
-  else if (item.scheduleStatus === "AtRisk") score += 40;
+  if (stateView.state === "failed") score += 60;
+  else if (stateView.state === "blocked") score += 40;
   if (item.dueAt && item.dueAt.getTime() - now < 24 * 60 * 60 * 1000) score += 30;
-  if (item.persistedStatus === "Running") score += 20;
+  if (stateView.state === "running") score += 20;
   return score;
+}
+
+function isUpcomingToday(item: ProjectionWithTask, now: number): boolean {
+  if (isAttention(item) || isInProgress(item) || TERMINAL_STATES.has(stateViewFor(item).state)) return false;
+  const start = item.scheduledStartAt ?? item.dueAt;
+  if (!start) return false;
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+  return start.getTime() >= now && start.getTime() <= todayEnd.getTime();
+}
+
+function mapDashboardTask(item: ProjectionWithTask, outputs: Map<string, OutputRef>) {
+  const stateView = stateViewFor(item);
+  const kind = attentionKind(stateView);
+  const step = kind ?? (stateView.state === "running" ? "running" : "ready");
+  return {
+    taskId: item.taskId,
+    title: item.task.title,
+    status: item.persistedStatus,
+    stateView,
+    priority: item.task.priority,
+    scheduleStatus: item.scheduleStatus,
+    scheduledStartAt: toIso(item.scheduledStartAt),
+    scheduledEndAt: toIso(item.scheduledEndAt),
+    dueAt: toIso(item.dueAt),
+    reason: reasonFor(item) ?? stateView.disabledReason ?? stateView.description,
+    stage: item.currentNodeTitle,
+    nextStep: nextStepFor(step),
+    latestOutput: outputs.get(item.taskId) ?? null,
+    updatedAt: toIso(item.lastActivityAt),
+  };
 }
 
 type OutputRef = { id: string; title: string; type: string; taskId: string } | null;
@@ -255,21 +290,10 @@ function buildFocusTask(
   }
   if (!best) return null;
 
-  const kind = attentionKind(best);
-  const step = kind ?? (best.persistedStatus === "Running" ? "running" : "ready");
-  return {
-    taskId: best.taskId,
-    title: best.task.title,
-    status: best.persistedStatus,
-    priority: best.task.priority,
-    scheduleStatus: best.scheduleStatus,
-    reason: reasonFor(best),
-    stage: best.currentNodeTitle,
-    nextStep: nextStepFor(step),
-    latestOutput: outputs.get(best.taskId) ?? null,
-    dueAt: toIso(best.dueAt),
-    updatedAt: toIso(best.lastActivityAt),
-  };
+  const stateView = stateViewFor(best);
+  const kind = attentionKind(stateView);
+  const step = kind ?? (stateView.state === "running" ? "running" : "ready");
+  return mapDashboardTask(best, outputs);
 }
 
 export async function getDashboard(workspaceId: string) {
@@ -289,14 +313,16 @@ export async function getDashboard(workspaceId: string) {
     .filter(isAttention)
     .slice(0, 12)
     .map((item) => {
-      const kind = attentionKind(item) ?? "blocked";
+      const stateView = stateViewFor(item);
+      const kind = attentionKind(stateView) ?? "blocked";
       return {
         taskId: item.taskId,
         title: item.task.title,
         status: item.persistedStatus,
+        stateView,
         priority: item.task.priority,
         kind,
-        reason: reasonFor(item),
+        reason: reasonFor(item) ?? stateView.disabledReason ?? stateView.description,
         nextStep: nextStepFor(kind),
         latestOutput: outputs.get(item.taskId) ?? null,
         updatedAt: toIso(item.lastActivityAt),
@@ -306,16 +332,29 @@ export async function getDashboard(workspaceId: string) {
   const inProgress = projections
     .filter(isInProgress)
     .slice(0, 8)
-    .map((item) => ({
-      taskId: item.taskId,
-      title: item.task.title,
-      status: item.persistedStatus,
-      latestRunStatus: item.latestRunStatus,
-      stage: item.currentNodeTitle,
-      nextStep: nextStepFor("running"),
-      latestOutput: outputs.get(item.taskId) ?? null,
-      updatedAt: toIso(item.lastActivityAt),
-    }));
+    .map((item) => {
+      const stateView = stateViewFor(item);
+      return {
+        taskId: item.taskId,
+        title: item.task.title,
+        status: item.persistedStatus,
+        stateView,
+        latestRunStatus: item.latestRunStatus,
+        stage: item.currentNodeTitle,
+        nextStep: nextStepFor("running"),
+        latestOutput: outputs.get(item.taskId) ?? null,
+        updatedAt: toIso(item.lastActivityAt),
+      };
+    });
+
+  const upcomingToday = projections
+    .filter((item) => isUpcomingToday(item, now))
+    .sort((left, right) =>
+      (left.scheduledStartAt ?? left.dueAt ?? left.updatedAt).getTime() -
+      (right.scheduledStartAt ?? right.dueAt ?? right.updatedAt).getTime(),
+    )
+    .slice(0, 8)
+    .map((item) => mapDashboardTask(item, outputs));
 
   const autoCompleted = projections
     .filter((item) => item.task.status === "Completed" || item.task.status === "Done")
@@ -343,6 +382,7 @@ export async function getDashboard(workspaceId: string) {
     fingerprintInput: {
       needsAttention,
       inProgress,
+      upcomingToday,
       autoCompleted,
       recentEvents,
       totalAutoCompleted,
@@ -355,6 +395,7 @@ export async function getDashboard(workspaceId: string) {
     focusTask: buildFocusTask(projections, outputs, now),
     needsAttention,
     inProgress,
+    upcomingToday,
     autoCompleted,
     totalAutoCompleted,
     recentEvents,

@@ -193,7 +193,7 @@ export function createExternalCalendarService(options: ExternalCalendarServiceOp
         redactedUrlLabel: normalized.redactedUrlLabel,
         color: input.color ?? DEFAULT_SOURCE_COLOR,
         syncPolicy: input.syncPolicy ?? defaultSyncPolicyForUrl(normalized.url),
-        automationPolicy: input.automationPolicy ?? "auto_plan",
+        automationPolicy: input.automationPolicy ?? "manual",
         blockedNetworkConfirmedAt: input.allowBlockedNetwork ? now() : null,
       });
       return await refreshSource(workspaceId, source.id);

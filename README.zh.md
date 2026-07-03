@@ -54,7 +54,7 @@ Task -> Plan -> Schedule -> Auto Execution
 ## 项目状态
 
 Chrona
-当前可用于本地开发和产品探索，但还不是稳定软件。当前代码库已经具备任务、计划、日程、执行、Inbox
+当前可用于本地开发和产品探索，但还不是稳定软件。当前代码库已经具备任务、计划、日程、执行、Dashboard、Settings
 和 AI-client 流程；接下来的重点是让“日程到自动执行”的闭环可靠到可以日常使用。
 
 ## 为什么需要 Chrona
@@ -66,7 +66,7 @@ Chrona
 | ------------------------ | ----------------------------------------------------------------------- |
 | 围绕真实工作安排一天     | 带优先级、状态、截止时间、估时、依赖和日程信息的任务                    |
 | 把日程任务变成可执行步骤 | 可审查、可 patch、可接受、可重新执行的 AI 计划图                        |
-| 让到期工作自动推进       | 日程块、提案、等待状态、Inbox 审批和执行动作                            |
+| 让到期工作自动推进       | 日程块、提案、等待状态、任务工作区审批和执行动作                            |
 | 让 AI 执行可追责         | 作用域受限的 runtime refs、checkpoint、审批、工具轨迹、失败和持久化输出 |
 
 ## 快速开始
@@ -131,9 +131,8 @@ Web 应用。
 4. 将 client 绑定到 `generate_plan`、`suggest`、`chat`、`dispatch_task` 等功能。
 5. 创建任务，补充足够的执行上下文，并把它放入日程。
 6. 在任务工作区生成计划，审查或编辑生成的图结构，然后接受计划。
-7. 从任务工作区或 Work 页面手动开始执行，或在配置自动执行后让 Chrona
-   推进到期日程任务。
-8. 在任务工作区、Work 页面或 Inbox 中查看进度、阻塞、审批、工具活动和输出。
+7. 从任务工作区手动开始执行，或在配置自动执行后让 Chrona 推进到期日程任务。
+8. 在任务工作区或 Dashboard 中查看进度、阻塞、审批、工具活动和输出。
 
 数据目录、AI client 细节和排障说明见[完整快速开始](./docs/zh/quick-start.md)。
 
@@ -204,7 +203,7 @@ manual、assisted 或 automatic，也可以分配给 user、AI 或 system execut
 ### 推进日程上的工作
 
 使用 schedule views、AI insights、冲突建议、日程提案、waiting runs、failed
-runs、cancelled runs 和 inbox approvals，把到期工作推向执行。
+runs、cancelled runs 和任务工作区 approvals，把到期工作推向执行。
 
 ### 保持 AI 执行可观测
 
@@ -218,8 +217,7 @@ AI worker 只接收安全的 runtime refs，不直接接触内部数据库 ID。
 
 ### 带着上下文恢复工作
 
-通过 Work 页面、任务工作区、memory console、assistant surfaces、conversation
-history、tool traces 和持久化输出理解并继续长周期工作。
+通过任务工作区、assistant surfaces、conversation history、tool traces 和持久化输出理解并继续长周期工作。
 
 ## 路线图
 
@@ -231,9 +229,9 @@ history、tool traces 和持久化输出理解并继续长周期工作。
 | 已完成 | 日程界面        | 时间线/任务视图、AI insights、冲突、日程提案、任务创建和配置界面。                          |
 | 已完成 | 计划生成        | 流式 AI 计划生成、计划持久化、审查/编辑/接受流程，以及 materialize 为图节点。               |
 | 已完成 | 执行 runtime    | 可执行的 `task`、`checkpoint`、`condition`、`wait` 节点，AI-visible refs 和持久化执行状态。 |
-| 已完成 | 审查闭环        | Inbox 中的 pending approvals、日程提案、等待输入、失败/取消 run 入口。                      |
+| 已完成 | 审查闭环        | Dashboard 和任务工作区中的 pending approvals、日程提案、等待输入、失败/取消 run 入口。        |
 | 已完成 | 外部日历        | 只读日历订阅、导入忙碌事件、来源管理、刷新状态和日程上下文。                              |
-| 接下来 | 完善现有流程    | 让 Work、Schedule、Inbox、Task Workspace 和执行记录更可靠、更容易理解。                     |
+| 接下来 | 完善现有流程    | 让 Dashboard、Schedule、Task Workspace 和执行记录更可靠、更容易理解。                     |
 | 接下来 | 可靠自动执行    | 仅在配置允许且安全时启动到期日程任务，并在执行阻塞或失败时提供清晰恢复路径。                |
 | 接下来 | 更多 provider   | 在保持 provider boundary 清晰的前提下，接入更多执行/provider 集成。                         |
 | 接下来 | 多 session 执行 | 让任务执行在需要时使用多个 session，并明确隔离、复用、恢复和诊断行为。                      |

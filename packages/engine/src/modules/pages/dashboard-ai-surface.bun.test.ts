@@ -138,6 +138,7 @@ describe("dashboard AI surface state", () => {
     const input = {
       needsAttention: [],
       inProgress: [],
+      upcomingToday: [],
       autoCompleted: [],
       recentEvents: [],
       totalAutoCompleted: 0,
@@ -160,6 +161,7 @@ describe("dashboard AI brief prompt", () => {
         updatedAt: "2026-07-03T00:00:00.000Z",
       }],
       inProgress: [],
+      upcomingToday: [],
       autoCompleted: [],
       recentEvents: [],
       totalAutoCompleted: 0,

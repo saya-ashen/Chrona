@@ -1,6 +1,6 @@
 # Chrona Documentation — English
 
-Chrona is a local-first AI task control plane. It helps you turn intent into tasks, generate editable graph plans, schedule work, run execution nodes through AI/runtime providers, and observe results from the task workspace and Dashboard.
+Chrona is a local-first AI schedule app. It helps you turn tasks into editable plans, place work on a schedule, execute through AI/runtime providers, and review results from the task workspace and Dashboard.
 
 ## What you can do today
 
@@ -9,7 +9,7 @@ Chrona is a local-first AI task control plane. It helps you turn intent into tas
 - Execute graph plans: run task/checkpoint/condition/wait nodes, pause for input or approval, retry, block, fail, or complete nodes.
 - Use the task workspace: inspect latest result, plan graph, execution records, task metadata, conversation context, and command center in one place.
 - Use the Schedule page: view time blocks, inspect conflicts, create schedule proposals, accept proposals, and auto-start due work.
-- Triage operational state: Inbox aggregates approvals, schedule proposals, waiting inputs, failed runs, and cancelled runs.
+- Triage operational state: Dashboard and the task workspace surface approvals, schedule proposals, waiting inputs, failed runs, and cancelled runs.
 - Configure AI: Settings / AI Clients stores clients and feature bindings in the database.
 - Integrate agents: the Hermes plugin exposes Chrona MCP tools using AI-visible refs, not backend IDs.
 
@@ -42,9 +42,9 @@ Chrona is a local-first AI task control plane. It helps you turn intent into tas
 
 1. Create a task and optional due time.
 2. Add a concrete schedule or ask AI for schedule proposals.
-3. Accept or reject proposals from Schedule or Inbox.
-4. The scheduler can start due work blocks.
-5. Execution state and task projection updates flow back into Schedule, Inbox, and Work.
+3. Accept or reject proposals from Schedule.
+4. The scheduler can start due work blocks when auto-execution is explicitly configured.
+5. Execution state and task projection updates flow back into Schedule, Dashboard, and the task workspace.
 
 ### 3. Agent integration
 

@@ -13,6 +13,7 @@ import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/comp
 import { Separator } from "@/components/ui/separator";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
+import type { WorkItemStateView } from "@chrona/domain";
 
 import type { TaskPageData } from "../../../features/task-workspace";
 export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
@@ -59,6 +60,7 @@ export type TaskListRouteData = {
       runStatus: string | null;
       isRunnable: boolean;
     } | null;
+    stateView: WorkItemStateView;
     source: {
       source: "external_calendar";
       sourceName: string;
@@ -137,6 +139,7 @@ export function SettingsRoutePage() {
           </div>
 
           <Separator />
+
 
           <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <Card className="self-start">

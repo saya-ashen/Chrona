@@ -1,3 +1,4 @@
+import { deriveWorkItemStateView, type WorkItemStateView } from "@chrona/domain";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { ExecutionOverviewTone, ProgressSummary, TaskData, TaskHeaderAction, TaskWorkspaceUserStatus } from "./task-workspace-types";
 
@@ -51,12 +52,28 @@ export function deriveTaskStatusFromGraph(
   return taskStatus;
 }
 
+export function stateViewForWorkspaceStatus(input: {
+  taskStatus?: string | null;
+  scheduleStatus?: string | null;
+  planStatus?: string | null;
+  executionStatus?: string | null;
+  nodeStatus?: string | null;
+  providerStatus?: string | null;
+  isScheduled?: boolean;
+  hasPlan?: boolean;
+  isRunnable?: boolean;
+  disabledReason?: string | null;
+}): WorkItemStateView {
+  return deriveWorkItemStateView(input);
+}
+
 export function mapTaskWorkspaceStatus(status: string): TaskWorkspaceUserStatus {
-  if (["done", "completed", "skipped", "cancelled", "invalidated", "Done", "Completed", "Cancelled"].includes(status)) return "completed";
-  if (["active", "in_progress", "running", "Running"].includes(status)) return "running";
-  if (["waiting_for_approval", "WaitingForApproval"].includes(status)) return "approval-needed";
-  if (["waiting_for_user", "WaitingForInput"].includes(status)) return "input-needed";
-  if (["blocked", "failed", "degraded", "Blocked", "Failed", "Degraded"].includes(status)) return "blocked";
+  const stateView = stateViewForWorkspaceStatus({ taskStatus: status, nodeStatus: status });
+  if (stateView.state === "completed" || stateView.state === "cancelled") return "completed";
+  if (stateView.state === "running") return "running";
+  if (stateView.state === "waiting_for_approval") return "approval-needed";
+  if (stateView.state === "waiting_for_input") return "input-needed";
+  if (stateView.state === "blocked" || stateView.state === "failed") return "blocked";
   return "waiting";
 }
 
