@@ -579,7 +579,6 @@ function UpcomingTodayCard({ copy, items }: { copy: DashboardCopy; items: Dashbo
     </Card>
   );
 }
-
 function feedCategoryLabel(copy: DashboardCopy, category: DashboardEvent["category"]) {
   return typeof category === "string" && category in copy.feed.category
     ? copy.feed.category[category as keyof DashboardCopy["feed"]["category"]]

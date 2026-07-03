@@ -471,7 +471,6 @@ function recommendedFeatureBindings(features: string[]) {
 function sameBindings(left: string[], right: string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
-
 function getDefaultClientName(type: AiClientType, providers: RuntimeProviderOption[]) {
   if (type === "llm") return "My OpenAI Compatible Client";
 
