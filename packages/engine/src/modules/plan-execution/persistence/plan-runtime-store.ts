@@ -236,7 +236,7 @@ export async function persistTerminalRuntimeState(input: {
   });
 }
 
-async function syncNormalizedRuntimeState(input: {
+export async function syncNormalizedRuntimeState(input: {
   workspaceId: string;
   taskId: string;
   planId: string;

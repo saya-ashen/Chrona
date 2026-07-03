@@ -244,15 +244,73 @@ describe("node runtime refs", () => {
 
     expect(runtime.instructions).toContain("CATALOG_UI_SPEC");
     expect(runtime.instructions).toContain("RFC 6902 SpecStream patches");
-    expect(runtime.instructions).toContain("Current Node Context JSON.context.planOutput.spec");
+    expect(runtime.instructions).toContain("Current Node Context JSON.context.planOutput");
+    expect(runtime.instructions).toContain("context.planOutput.hasSpec is false");
     expect(runtime.instructions).toContain("root MUST equal one element id");
     expect(runtime.instructions).not.toContain("SCHEMA LAB OVERRIDE:");
     expect(runtime.instructions).not.toContain("Submit the complete Spec as the chrona_plan_output tool argument");
-    expect(runtime.runtimeInput.context.planOutput).toEqual({ revision: 0, spec: null, updatedAt: null });
+    expect(runtime.runtimeInput.context.planOutput).toEqual({
+      revision: 0,
+      hasSpec: false,
+      root: null,
+      rootChildren: [],
+      elementIds: [],
+      updatedAt: null,
+    });
     expect(runtime.instructions).toContain("current working directory as the workspace root");
     expect(runtime.instructions).toContain(".chrona/outputs/N20260516-01/");
     expect(runtime.instructions).toContain("FileView or FileRef");
     expect(runtime.instructions).toContain("Do not use absolute paths, .. segments");
+  });
+  it("passes existing accumulated plan output into task prompts", () => {
+    const current = node({
+      id: "task-real-790",
+      title: "Append result",
+      type: "task",
+      description: "Append to visible result.",
+    });
+    const plan = graph([current]);
+    const planOutput = {
+      revision: 1,
+      spec: {
+        root: "existingRoot",
+        elements: {
+          existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
+          firstSection: { type: "Markdown", props: { content: "First section" }, children: [] },
+        },
+      },
+      updatedAt: "2026-05-16T00:01:00.000Z",
+      updatedByNodeId: "first-task",
+      history: [
+        {
+          id: "plan_output_1",
+          nodeId: "first-task",
+          summary: "First section",
+          patches: [{ op: "add" as const, path: "/root", value: "existingRoot" }],
+          createdAt: "2026-05-16T00:01:00.000Z",
+        },
+      ],
+    };
+
+    const runtime = buildNodeRuntimePrompt({ plan, node: current, planOutput });
+
+    expect(runtime.runtimeInput.context.planOutput).toEqual({
+      revision: 1,
+      hasSpec: true,
+      root: "existingRoot",
+      rootChildren: ["firstSection"],
+      elementIds: ["existingRoot", "firstSection"],
+      updatedAt: "2026-05-16T00:01:00.000Z",
+      lastSummary: "First section",
+    });
+    expect(runtime.instructions).toContain('"revision": 1');
+    expect(runtime.instructions).toContain('"root": "existingRoot"');
+    expect(runtime.instructions).toContain('"rootChildren": [');
+    expect(runtime.instructions).toContain('"lastSummary": "First section"');
+    expect(runtime.instructions).not.toContain('"spec":');
+    expect(runtime.instructions).not.toContain('"revision": 0');
+    expect(runtime.instructions).not.toContain('"history":');
+    expect(runtime.instructions).not.toContain('"patches":');
   });
   it("spells out literal array and number props for json-render outputs", () => {
     const current = node({

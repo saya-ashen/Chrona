@@ -152,6 +152,8 @@
       "name": "@chrona/engine",
       "version": "0.1.0",
       "dependencies": {
+        "@chrona/claude-code": "workspace:*",
+        "@chrona/codex": "workspace:*",
         "@chrona/contracts": "workspace:*",
         "@chrona/db": "workspace:*",
         "@chrona/domain": "workspace:*",
@@ -191,6 +193,14 @@
         "pino": "^10.3.1",
       },
     },
+    "packages/providers/acp": {
+      "name": "@chrona/acp-provider",
+      "version": "0.1.0",
+      "dependencies": {
+        "@agentclientprotocol/sdk": "^1.1.0",
+        "@chrona/providers-foundation": "workspace:*",
+      },
+    },
     "packages/providers/claude-code": {
       "name": "@chrona/claude-code",
       "version": "0.1.0",
@@ -211,8 +221,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@agentclientprotocol/codex-acp": "^1.0.2",
-        "@agentclientprotocol/sdk": "^1.1.0",
-        "@chrona/contracts": "workspace:*",
+        "@chrona/acp-provider": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
       },
     },
@@ -378,6 +387,8 @@
     "@bramus/specificity": ["@bramus/specificity@2.4.2", "", { "dependencies": { "css-tree": "^3.0.0" }, "bin": { "specificity": "bin/cli.js" } }, "sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw=="],
 
     "@chrona-org/agent-cli": ["@chrona-org/agent-cli@workspace:packages/agent-cli"],
+
+    "@chrona/acp-provider": ["@chrona/acp-provider@workspace:packages/providers/acp"],
 
     "@chrona/claude-code": ["@chrona/claude-code@workspace:packages/providers/claude-code"],
 

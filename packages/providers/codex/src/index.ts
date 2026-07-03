@@ -10,7 +10,6 @@ export const CHRONA_CODEX_PROVIDER_TYPE = "codex";
 export {
   CodexProviderClient,
   type CodexProviderOptions,
-  type CodexRunner,
 } from "./CodexProviderClient";
 
-export { CodexProviderError, type CodexProviderConfig } from "./types";
+export { type CodexProviderConfig } from "./types";

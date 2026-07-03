@@ -1,11 +1,10 @@
 {
-  "name": "@chrona/codex",
+  "name": "@chrona/acp-provider",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@agentclientprotocol/codex-acp": "^1.0.2",
-    "@chrona/acp-provider": "workspace:*",
+    "@agentclientprotocol/sdk": "^1.1.0",
     "@chrona/providers-foundation": "workspace:*"
   },
   "exports": {

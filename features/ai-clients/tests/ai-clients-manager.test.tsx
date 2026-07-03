@@ -164,7 +164,7 @@ describe("AiClientsManager", () => {
     fireEvent.change(screen.getByPlaceholderText("optional for localhost"), {
       target: { value: "hermes-token" },
     });
-    fireEvent.change(screen.getByDisplayValue("120"), {
+    fireEvent.change(screen.getByDisplayValue("1800"), {
       target: { value: "45" },
     });
 
@@ -261,7 +261,7 @@ describe("AiClientsManager", () => {
       type: "claude_code",
       config: {
         model: "cx/gpt-5.5",
-        timeoutMs: 120000,
+        timeoutMs: 1800000,
         env: {
           ANTHROPIC_MODEL: "cx/gpt-5.5",
           ANTHROPIC_BASE_URL: "https://9router.saya.love/v1",
@@ -329,7 +329,7 @@ describe("AiClientsManager", () => {
       config: {
         model: "gpt-5-codex",
         apiKey: "sk-codex",
-        timeoutMs: 120000,
+        timeoutMs: 1800000,
       },
     });
     expect(payload.config).not.toHaveProperty("binaryPath");
@@ -503,7 +503,7 @@ describe("AiClientsManager", () => {
       config: {
         baseUrl: "http://localhost:8642",
         scope: "local",
-        timeoutMs: 120000,
+        timeoutMs: 1800000,
       },
     });
 

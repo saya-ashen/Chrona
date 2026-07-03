@@ -10,6 +10,7 @@ import type {
 import { planExecutionNodeExecutors } from "../runtime/node-executor-registry";
 import { markExecutionNodeActive } from "../persistence/task-execution-store";
 import { persistRuntimeState } from "../persistence/plan-runtime-store";
+import { getPlanRun } from "../persistence/plan-run-store";
 import { committedStateIfRunningNodeAdvanced, committedStateForSubmittedNode } from "../runtime/committed-state";
 
 /**
@@ -77,6 +78,7 @@ export function createKernelGraphCallbacks(
         candidate.canExecute(executorInput.node),
       );
       if (!executor) return null;
+      const latest = await getPlanRun(taskId, planId, workBlockId);
       return executor.execute({
         taskId,
         workBlockId,
@@ -84,6 +86,7 @@ export function createKernelGraphCallbacks(
         node: executorInput.node,
         plan: executorInput.plan,
         attempt: executorInput.attempt,
+        planOutput: latest?.planOutput ?? persisted.planOutput,
         trigger: executorInput.trigger,
         runtimeName,
         userInput: executorInput.userInput,

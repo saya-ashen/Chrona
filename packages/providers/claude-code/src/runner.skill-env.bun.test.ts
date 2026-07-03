@@ -34,4 +34,14 @@ describe("claudeRunEnv — CHRONA_CLI always set", () => {
     expect(env.HOME).toBe("/sandbox");
     expect(env.CHRONA_CLI).toBe("/custom/chrona");
   });
+
+  test("caller-passed Claude config directory reaches spawned env", () => {
+    const env = claudeRunEnv({
+      mcpBaseUrl: "http://127.0.0.1:3101",
+      mcpRunToken: "tok",
+      env: { CLAUDE_CONFIG_DIR: "/tmp/chrona-claude-profile" },
+    });
+
+    expect(env.CLAUDE_CONFIG_DIR).toBe("/tmp/chrona-claude-profile");
+  });
 });

@@ -143,7 +143,10 @@ export interface NodeRuntimeInput {
     globalSummary?: string;
     planOutput: {
       revision: number;
-      spec: Spec | null;
+      hasSpec: boolean;
+      root: string | null;
+      rootChildren: string[];
+      elementIds: string[];
       updatedAt: string | null;
       lastSummary?: string;
     };

@@ -80,6 +80,10 @@ export interface ClaudeCodeClientConfig {
   apiKey?: string;
   /** Optional: pass-through env vars to the Claude Code subprocess. */
   env?: Record<string, string>;
+  /** Optional config/state directory. Omitted means provider default user-level config. */
+  configDirectory?: string;
+  /** Reserved named profile selector. Runtime support depends on provider. */
+  profileName?: string;
   /**
    * Optional: working directory for the Claude Code run. Defaults to
    * `process.cwd()`. Use this to constrain the agent's filesystem scope.
@@ -101,6 +105,10 @@ export interface CodexClientConfig {
   baseUrl?: string;
   /** Optional pass-through env vars for codex-acp. */
   env?: Record<string, string>;
+  /** Optional Codex home directory. Omitted means default user-level CODEX_HOME (~/.codex). */
+  configDirectory?: string;
+  /** Reserved Codex named profile selector. codex-acp cannot apply it yet. */
+  profileName?: string;
   /** Optional working directory for Codex. */
   cwd?: string;
   /** Internal Codex CLI executable used by codex-acp. Not user-facing. */

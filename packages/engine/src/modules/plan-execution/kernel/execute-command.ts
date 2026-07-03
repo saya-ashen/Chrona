@@ -23,7 +23,7 @@ import {
   executionTransition,
   graphStatusForExecutionStatus,
 } from "../execution-state-machine";
-import { ensureNativePlanRun, derivePlanRunFromRuntime } from "../persistence/plan-runtime-store";
+import { ensureNativePlanRun, derivePlanRunFromRuntime, syncNormalizedRuntimeState } from "../persistence/plan-runtime-store";
 import { savePlanRunGuarded } from "../persistence/plan-run-store";
 import {
   ensureExecutionSession,
@@ -571,6 +571,13 @@ export async function executeCommand(
     // A concurrent command advanced the run first; surface current state.
     return getCurrentExecution({ taskId, workBlockId: session.workBlockId });
   }
+  await syncNormalizedRuntimeState({
+    workspaceId: runtime.workspaceId,
+    taskId,
+    planId: runtime.planId,
+    attempts: outcome.state.attempts,
+    results: outcome.state.results,
+  });
 
   await appendGraphRuntimeEvents({
     taskId,

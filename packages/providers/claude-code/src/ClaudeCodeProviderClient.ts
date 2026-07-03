@@ -80,6 +80,10 @@ export interface ClaudeCodeProviderConfig {
   /** Optional Claude binary override. Hidden from normal UI. */
   binaryPath?: string;
   env?: Record<string, string>;
+  /** Optional config/state directory. Omitted means Claude Code default user-level config. */
+  configDirectory?: string;
+  /** Reserved named profile selector. */
+  profileName?: string;
 
   /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
   sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
@@ -479,6 +483,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     const env: Record<string, string> = {
       ...(this.opts.config.env ?? {}),
       ...(this.opts.config.apiKey ? { ANTHROPIC_API_KEY: this.opts.config.apiKey } : {}),
+      ...(this.opts.config.configDirectory ? { CLAUDE_CONFIG_DIR: this.opts.config.configDirectory } : {}),
     };
     const cfg: ClaudeCodeRunnerConfig = {
       model: this.opts.config.model ?? DEFAULT_MODEL,

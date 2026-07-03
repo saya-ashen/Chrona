@@ -5,6 +5,7 @@ import type {
   EffectivePlanGraph,
   EffectivePlanNode,
   NodeRuntimeInput,
+  PlanOutputState,
   SemanticRefHistory,
   TaskConfig,
   WaitConfig,
@@ -110,11 +111,36 @@ function runtimeNode(node: EffectivePlanNode, ref: string): NodeRuntimeInput["no
   }
 }
 
+type RuntimeVisiblePlanOutput = NodeRuntimeInput["context"]["planOutput"];
+
+function visiblePlanOutput(
+  planOutput: PlanOutputState | RuntimeVisiblePlanOutput | undefined,
+): RuntimeVisiblePlanOutput {
+  if (!planOutput) {
+    return { revision: 0, hasSpec: false, root: null, rootChildren: [], elementIds: [], updatedAt: null };
+  }
+  if ("hasSpec" in planOutput) return planOutput;
+  const root = planOutput.spec?.root ?? null;
+  const elements = planOutput.spec?.elements ?? {};
+  const rootElement = root ? elements[root] : undefined;
+  const rootChildren = Array.isArray(rootElement?.children) ? rootElement.children : [];
+  const summary = planOutput.history.at(-1)?.summary;
+  return {
+    revision: planOutput.revision,
+    hasSpec: planOutput.spec !== null,
+    root,
+    rootChildren,
+    elementIds: Object.keys(elements),
+    updatedAt: planOutput.updatedAt,
+    ...(summary ? { lastSummary: summary } : {}),
+  };
+}
+
 function compactPreviousResults(input: {
   plan: EffectivePlanGraph;
   history: SemanticRefHistory;
   node: EffectivePlanNode;
-  planOutput?: NodeRuntimeInput["context"]["planOutput"];
+  planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
 }): NodeRuntimeInput["context"] {
   const directDependencyIds = dependencyIds(input.node);
   const completed = input.plan.nodes.filter((node) => node.status === "completed" || node.status === "skipped");
@@ -138,7 +164,7 @@ function compactPreviousResults(input: {
     ...(globalItems.length > 0
       ? { globalSummary: globalItems.slice(0, 3).join("; ") + (globalItems.length > 3 ? `; +${globalItems.length - 3} more` : "") }
       : {}),
-    planOutput: input.planOutput ?? { revision: 0, spec: null, updatedAt: null },
+    planOutput: visiblePlanOutput(input.planOutput),
   };
 }
 
@@ -243,7 +269,7 @@ export function branchBindingForRef(input: {
 export function buildNodeRuntimeInput(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
-  planOutput?: NodeRuntimeInput["context"]["planOutput"];
+  planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
 }): NodeRuntimeInput {
   const history = buildSemanticRefHistory(input.plan);
   const currentRef = refForNode(history, input.node.id);

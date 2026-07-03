@@ -1,7 +1,7 @@
-import type { ProviderUsage } from "@chrona/providers-foundation";
+import type { AcpProviderConfig } from "@chrona/acp-provider";
 
 export interface CodexProviderConfig {
-  /** Override codex-acp executable. Defaults to package binary on PATH. */
+  /** Internal codex-acp executable override. Defaults to package binary on PATH. */
   binaryPath?: string;
   /** Model ID passed to codex-acp through CODEX_CONFIG. */
   model?: string;
@@ -9,13 +9,17 @@ export interface CodexProviderConfig {
   timeoutMs?: number;
   /** OpenAI/Codex API key. Passed as CODEX_API_KEY. */
   apiKey?: string;
-  /** OpenAI-compatible base URL passed through CODEX_CONFIG. */
+  /** OpenAI-compatible base URL passed through CODEX_CONFIG/default gateway auth. */
   baseUrl?: string;
   /** Working directory for Codex. Defaults to current process cwd. */
   cwd?: string;
   /** Pass-through environment for codex-acp. */
   env?: Record<string, string>;
-  /** Override Codex CLI executable used by codex-acp. */
+  /** Optional Codex home directory. Omitted means default user-level CODEX_HOME (~/.codex). */
+  configDirectory?: string;
+  /** Reserved Codex named profile selector. codex-acp cannot apply it yet. */
+  profileName?: string;
+  /** Internal Codex CLI executable override used by codex-acp. */
   codexPath?: string;
   /** Initial codex-acp mode. */
   initialAgentMode?: "read-only" | "agent" | "agent-full-access";
@@ -33,27 +37,24 @@ export interface CodexProviderConfig {
 
 export type CodexRunnerMode = "acp";
 
-export class CodexProviderError extends Error {
-  readonly retryable: boolean;
-  readonly provider: string;
-
-  constructor(
-    message: string,
-    options: { retryable?: boolean; cause?: unknown; provider?: string } = {},
-  ) {
-    super(message, { cause: options.cause });
-    this.name = "CodexProviderError";
-    this.retryable = options.retryable ?? false;
-    this.provider = options.provider ?? "codex";
-  }
-}
-
-export function codexAcpCommand(config: CodexProviderConfig): string {
-  return config.binaryPath?.trim() || "codex-acp";
+export function codexAcpConfig(config: CodexProviderConfig): AcpProviderConfig {
+  return {
+    provider: "codex",
+    displayName: "OpenAI Codex",
+    command: config.binaryPath?.trim() || "codex-acp",
+    timeoutMs: config.timeoutMs,
+    cwd: config.cwd,
+    env: codexAcpEnv(config),
+    additionalDirectories: config.additionalDirectories,
+    mcpBaseUrl: config.mcpBaseUrl,
+    mcpRunToken: config.mcpRunToken,
+  };
 }
 
 export function codexAcpEnv(config: CodexProviderConfig): Record<string, string> {
-  const env = { ...process.env, ...(config.env ?? {}) } as Record<string, string>;
+  const env = { ...(config.env ?? {}) } as Record<string, string>;
+  const configDirectory = config.configDirectory?.trim();
+  if (configDirectory) env.CODEX_HOME = configDirectory;
   const apiKey = config.apiKey?.trim();
   if (apiKey) {
     env.CODEX_API_KEY = apiKey;
@@ -101,15 +102,5 @@ function buildCodexConfig(config: CodexProviderConfig): Record<string, unknown> 
     ...(config.codexConfig ?? {}),
     ...(config.model ? { model: config.model } : {}),
     ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
-  };
-}
-
-export function usageFromAcp(used?: number, size?: number): ProviderUsage | null {
-  if (typeof used !== "number" && typeof size !== "number") return null;
-  const inputTokens = typeof used === "number" ? used : 0;
-  return {
-    inputTokens,
-    outputTokens: 0,
-    totalTokens: inputTokens,
   };
 }

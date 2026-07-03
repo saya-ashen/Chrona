@@ -215,6 +215,75 @@ describe("plan-runner task executor external results", () => {
     });
   });
 
+  it("passes accumulated plan output to the next runtime-backed node", async () => {
+    executeTaskNodeCapabilityMock
+      .mockImplementationOnce(async (input) => {
+        await taskPlanExecution.submitNodeResult({
+          taskId: input.taskId,
+          action: {
+            action: "update_plan_output",
+            sessionId: input.mainSession.id,
+            patches: [
+              { op: "add", path: "/root", value: "existingRoot" },
+              { op: "add", path: "/elements/existingRoot", value: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] } },
+              { op: "add", path: "/elements/firstSection", value: { type: "Markdown", props: { content: "First section" }, children: [] } },
+            ],
+            summary: "First visible section",
+          },
+        });
+        await taskPlanExecution.submitNodeResult({
+          taskId: input.taskId,
+          action: {
+            action: "complete_manual_node",
+            sessionId: input.mainSession.id,
+            summary: "First task completed",
+          },
+        });
+
+        return {
+          status: "started",
+          summary: "Provider observed first task completion",
+          evidence: { sessionId: input.mainSession.id },
+          output: { runtimeRunRef: "runtime-first-after-plan-output" },
+        } satisfies NodeExecutionResult;
+      })
+      .mockImplementationOnce(async (input) => {
+        expect(input.node.id).toBe("second_task");
+        expect(input.planOutput).toMatchObject({
+          revision: 1,
+          spec: {
+            root: "existingRoot",
+            elements: {
+              existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
+              firstSection: { type: "Markdown", props: { content: "First section" }, children: [] },
+            },
+          },
+        });
+
+        return {
+          status: "started",
+          summary: "Second runtime run started",
+          evidence: { sessionId: input.mainSession.id },
+          output: { runtimeRunRef: "runtime-second-after-plan-output" },
+        } satisfies NodeExecutionResult;
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner passes accumulated plan output");
+    const compiledPlan = makeTwoTaskPlan("graph_passes_accumulated_plan_output");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("running");
+    await waitForTaskNodeCalls(["first_task", "second_task"]);
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.planOutput.revision).toBe(1);
+    expect(persisted?.planOutput.spec?.root).toBe("existingRoot");
+  });
+
   it("continues to downstream work when a running task submits its own terminal result", async () => {
     executeTaskNodeCapabilityMock
       .mockImplementationOnce(async (input) => {
@@ -298,6 +367,70 @@ describe("plan-runner task executor external results", () => {
       where: { taskId: task.id, nodeAttemptId: normalizedFirstAttempt.id, status: "running" },
     });
     expect(runningProviderRows).toBe(0);
+  });
+
+  it("syncs normalized attempts when the terminal provider task completes through its own tool", async () => {
+    executeTaskNodeCapabilityMock
+      .mockImplementationOnce(async (input) => {
+        await taskPlanExecution.submitNodeResult({
+          taskId: input.taskId,
+          action: {
+            action: "complete_manual_node",
+            sessionId: input.mainSession.id,
+            summary: "First task completed through terminal tool",
+          },
+        });
+
+        return {
+          status: "started",
+          summary: "First provider run observed terminal tool",
+          evidence: { sessionId: input.mainSession.id },
+          output: { runtimeRunRef: "runtime-first-stale-after-tool" },
+        } satisfies NodeExecutionResult;
+      })
+      .mockImplementationOnce(async (input) => {
+        await taskPlanExecution.submitNodeResult({
+          taskId: input.taskId,
+          action: {
+            action: "complete_manual_node",
+            sessionId: input.mainSession.id,
+            summary: "Second task completed through terminal tool",
+          },
+        });
+
+        return {
+          status: "started",
+          summary: "Second provider run observed terminal tool",
+          evidence: { sessionId: input.mainSession.id },
+          output: { runtimeRunRef: "runtime-second-stale-after-tool" },
+        } satisfies NodeExecutionResult;
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner terminal provider completion syncs attempts");
+    const compiledPlan = makeTwoTaskPlan("graph_terminal_provider_completion_sync");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("completed");
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_task", "succeeded"],
+      ["second_task", "succeeded"],
+    ]);
+
+    const normalizedAttempts = await db.taskPlanNodeAttempt.findMany({
+      where: { taskId: task.id },
+      orderBy: { startedAt: "asc" },
+    });
+    expect(normalizedAttempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+      ["first_task", "succeeded"],
+      ["second_task", "succeeded"],
+    ]);
+    expect(normalizedAttempts.every((attempt) => attempt.finishedAt instanceof Date)).toBe(true);
   });
 
   it("submits condition branch selections through the unified graph command", async () => {
@@ -589,6 +722,56 @@ describe("plan-runner task executor external results", () => {
       error: expect.stringContaining("Gateway refused the run"),
       errorDetails: expect.objectContaining({ runtimeName: "hermes" }),
     });
+  });
+
+  it("does not leave session or attempt running when provider cancels a task node", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "failed",
+      error: "Provider cancelled runtime run codex-run-cancelled",
+      evidence: {
+        sessionId: "main-session",
+        runId: "run_cancelled",
+        runtimeName: "hermes",
+        runtimeRunRef: "codex-run-cancelled",
+      },
+      details: {
+        nodeId: "task_node",
+        nodeTitle: "Execute mocked task node",
+        runtimeName: "hermes",
+        runtimeRunRef: "codex-run-cancelled",
+        runId: "run_cancelled",
+      },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner handles provider cancellation");
+    const compiledPlan = makeSingleTaskPlan("graph_task_cancelled_provider");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.message).toContain("Provider cancelled runtime run codex-run-cancelled");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts[0]).toMatchObject({
+      nodeId: "task_node",
+      status: "failed",
+    });
+    const normalizedAttempt = await db.taskPlanNodeAttempt.findFirstOrThrow({
+      where: { taskId: task.id, nodeId: "task_node" },
+      select: { status: true, finishedAt: true },
+    });
+    expect(normalizedAttempt.status).toBe("failed");
+    expect(normalizedAttempt.finishedAt).toBeInstanceOf(Date);
+    const session = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(session.status).not.toBe("Active");
+    expect(session.currentNodeId).toBe("task_node");
   });
 
   it("ignores late node result reports after execution completed", async () => {

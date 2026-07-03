@@ -24,6 +24,10 @@ export interface ClaudeCodeProviderConfig {
   apiKey?: string;
   /** Pass-through env for the Claude Code subprocess / SDK call. */
   env?: Record<string, string>;
+  /** Optional config/state directory. Omitted means Claude Code default user-level config. */
+  configDirectory?: string;
+  /** Reserved named profile selector. */
+  profileName?: string;
   /** Working directory. Defaults to `process.cwd()`. */
   cwd?: string;
   /** Resolved at construction: which runner back-end to use. */

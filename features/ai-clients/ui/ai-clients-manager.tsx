@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
 
-const DEFAULT_PROVIDER_IDLE_TIMEOUT_MS = 120 * 1000;
+const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 
 type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
 
@@ -49,6 +49,8 @@ type ClientFormValues = {
   baseUrl: string;
   apiKey: string;
   model: string;
+  configDirectory: string;
+  profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
   bindings: string[];
@@ -125,20 +127,26 @@ function buildClaudeCodeConfig(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
-
+  configDirectory: string;
+  profileName: string;
 }): Record<string, unknown> {
   const model = nonEmptyEnvValue(input.model);
   const baseUrl = nonEmptyEnvValue(input.baseUrl);
   const authToken = nonEmptyEnvValue(input.apiKey);
+  const configDirectory = nonEmptyEnvValue(input.configDirectory);
+  const profileName = nonEmptyEnvValue(input.profileName);
   const env: Record<string, string> = {};
 
   if (model) env.ANTHROPIC_MODEL = model;
   if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl;
   if (authToken) env.ANTHROPIC_AUTH_TOKEN = authToken;
+  if (configDirectory) env.CLAUDE_CONFIG_DIR = configDirectory;
 
   return {
     model,
     timeoutMs: Number(input.timeoutSeconds) * 1000,
+    configDirectory,
+    profileName,
     env: Object.keys(env).length > 0 ? env : undefined,
   };
 }
@@ -148,11 +156,21 @@ function buildCodexConfig(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
+  configDirectory: string;
+  profileName: string;
 }): Record<string, unknown> {
+  const configDirectory = nonEmptyEnvValue(input.configDirectory);
+  const env: Record<string, string> = {};
+
+  if (configDirectory) env.CODEX_HOME = configDirectory;
+
   return {
     model: nonEmptyEnvValue(input.model),
     baseUrl: nonEmptyEnvValue(input.baseUrl),
     apiKey: nonEmptyEnvValue(input.apiKey),
+    configDirectory,
+    profileName: nonEmptyEnvValue(input.profileName),
+    env: Object.keys(env).length > 0 ? env : undefined,
     timeoutMs: Number(input.timeoutSeconds) * 1000,
   };
 }
@@ -165,6 +183,8 @@ function buildClientPayload(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
+  configDirectory: string;
+  profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
 }): ClientFormPayload {
@@ -428,7 +448,7 @@ function ClientForm({
     isDefault: initial?.isDefault ?? false,
     timeoutSeconds: String(
       (initialConfig as { timeoutSeconds?: number; timeoutMs?: number } | undefined)?.timeoutSeconds
-        ?? (((initialConfig as { timeoutMs?: number } | undefined)?.timeoutMs ?? DEFAULT_PROVIDER_IDLE_TIMEOUT_MS) / 1000),
+        ?? (((initialConfig as { timeoutMs?: number } | undefined)?.timeoutMs ?? DEFAULT_PROVIDER_RUN_TIMEOUT_MS) / 1000),
     ),
     baseUrl: (initialConfig as { baseUrl?: string; env?: Record<string, string> } | undefined)?.baseUrl
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_BASE_URL
@@ -439,6 +459,11 @@ function ClientForm({
     model: (initialConfig as { model?: string; env?: Record<string, string> } | undefined)?.model
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.ANTHROPIC_MODEL
       ?? "",
+    configDirectory: (initialConfig as { configDirectory?: string; env?: Record<string, string> } | undefined)?.configDirectory
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CLAUDE_CONFIG_DIR
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CODEX_HOME
+      ?? "",
+    profileName: (initialConfig as { profileName?: string } | undefined)?.profileName ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
     bindings: initial?.bindings ?? [],
@@ -743,6 +768,24 @@ function ClientForm({
                     placeholder="optional auth token"
                   />
                 </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-config-directory">Config directory</FieldLabel>
+                    <Input
+                      {...form.register("configDirectory")}
+                      id="ai-client-config-directory"
+                      placeholder="default user-level Claude Code config"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-profile-name">Profile name</FieldLabel>
+                    <Input
+                      {...form.register("profileName")}
+                      id="ai-client-profile-name"
+                      placeholder="reserved profile selector"
+                    />
+                  </Field>
+                </div>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input
@@ -792,6 +835,25 @@ function ClientForm({
                     placeholder="optional API key"
                   />
                 </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-config-directory">CODEX_HOME</FieldLabel>
+                    <Input
+                      {...form.register("configDirectory")}
+                      id="ai-client-config-directory"
+                      placeholder="default user-level Codex home (~/.codex)"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-profile-name">Profile name</FieldLabel>
+                    <Input
+                      {...form.register("profileName")}
+                      id="ai-client-profile-name"
+                      placeholder="codex-acp cannot select named profiles yet"
+                      disabled
+                    />
+                  </Field>
+                </div>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input

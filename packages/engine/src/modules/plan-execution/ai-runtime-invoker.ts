@@ -196,7 +196,7 @@ export class AiRuntimeInvoker {
         data: {
           runtimeRunRef,
           runtimeSessionRef: runtimeSessionKey,
-          status: response.error ? RunStatus.Failed : RunStatus.Running,
+          status: runStatusFromProviderSnapshot(response),
           syncStatus: "healthy",
           errorSummary: response.error,
         },
@@ -213,7 +213,7 @@ export class AiRuntimeInvoker {
         runtimeName: input.runtimeName,
         nativeRunId: response.nativeRunId ?? null,
         status: response.error ? "failed" : response.status,
-        finishedAt: response.status === "completed" || response.error ? new Date() : null,
+        finishedAt: isTerminalProviderSnapshot(response) ? new Date() : null,
       });
 
       return {
@@ -243,6 +243,16 @@ export class AiRuntimeInvoker {
       throw error;
     }
   }
+}
+
+function runStatusFromProviderSnapshot(response: ProviderRunSnapshot): RunStatus {
+  if (response.status === "cancelled") return RunStatus.Cancelled;
+  if (response.error || response.status === "failed") return RunStatus.Failed;
+  return RunStatus.Running;
+}
+
+function isTerminalProviderSnapshot(response: ProviderRunSnapshot): boolean {
+  return response.status === "completed" || response.status === "failed" || response.status === "cancelled" || Boolean(response.error);
 }
 
 function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
@@ -616,6 +626,18 @@ async function collectProviderRunSnapshot(
         sessionId: run?.sessionId ?? fallbackSessionId,
         status: "failed",
         error: event.error,
+        raw: event.raw,
+      };
+    }
+    if (event.type === "run_cancelled") {
+      const run = event.run ?? fallbackRun;
+      snapshot = {
+        provider,
+        runId: run?.runId ?? crypto.randomUUID(),
+        nativeRunId: run?.nativeRunId,
+        sessionId: run?.sessionId ?? fallbackSessionId,
+        status: "cancelled",
+        error: null,
         raw: event.raw,
       };
     }

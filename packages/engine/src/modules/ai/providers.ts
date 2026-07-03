@@ -160,7 +160,7 @@ async function checkClientHealth(
       }
       return {
         available: true,
-        reason: health.reason ?? health.message ?? "Codex SDK provider is configured",
+        reason: health.reason ?? health.message ?? "Codex ACP provider is configured",
       };
     }
 

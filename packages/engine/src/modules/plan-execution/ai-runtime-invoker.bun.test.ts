@@ -316,6 +316,51 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(reloaded.failedByEventId).toBeNull();
   });
 
+  it("returns cancelled snapshot and closes provider audit rows from run_cancelled events", async () => {
+    const { workspace, task, providerRun, run } = await seedProviderRunChain();
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => ({
+        provider: "hermes",
+        runId: "provider-run-1",
+        nativeRunId: "provider-run-1",
+        sessionId: "provider-session-1",
+        status: "running",
+      } satisfies ProviderRunRef)),
+      streamRun: mock(() =>
+        (async function* () {
+          yield {
+            type: "run_cancelled",
+            run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "cancelled" },
+            raw: { reason: "interrupted" },
+          } as ProviderRunEvent;
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request, {
+      runId: run.id,
+      providerRunRecordId: providerRun.id,
+      eventPersistence: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        runtimeName: "hermes",
+        providerRunId: providerRun.id,
+      },
+    });
+
+    expect(snapshot.status).toBe("cancelled");
+    const reloaded = await db.taskPlanProviderRun.findUniqueOrThrow({
+      where: { id: providerRun.id },
+      select: { status: true, finishedAt: true, completedByEventId: true, failedByEventId: true },
+    });
+    expect(reloaded.status).toBe("cancelled");
+    expect(reloaded.finishedAt).toBeInstanceOf(Date);
+    expect(reloaded.completedByEventId).toBeNull();
+    expect(reloaded.failedByEventId).toBeNull();
+  });
+
   it("cancels the provider run when the execution signal aborts during streaming", async () => {
     const controller = new AbortController();
     const { providerRun, run } = await seedProviderRunChain();
