@@ -2,7 +2,6 @@
 
 import { CalendarDays, ClipboardList, LayoutDashboard, Plus, Settings } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { AssistantSurfaceDropdown } from "@/components/assistant-surface/assistant-surface-dropdown";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskCreateDialog } from "../../schedule/ui";
@@ -189,7 +188,7 @@ export function ControlPlaneShell({
             </div>
 
             <div className="flex min-w-0 flex-1 items-center justify-center">
-              <AssistantSurfaceHeaderDrawerButton />
+              <AssistantSurfaceHeaderDrawerButton disabled />
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -205,7 +204,6 @@ export function ControlPlaneShell({
               </Button>
               <LocaleSwitcher />
             </div>
-            <AssistantSurfaceDropdown />
           </div>
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:px-6 xl:px-7 xl:pb-3">

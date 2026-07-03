@@ -227,6 +227,7 @@ export type ProviderFeatureRequest = {
   instructions: string;
   input: unknown;
   structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
+  terminalToolName?: string;
   stream: boolean;
   maxOutputTokens?: number;
   timeoutSeconds?: number;
@@ -251,6 +252,7 @@ function toStartRunInput(request: ProviderFeatureRequest): StartRunInput {
     instructions: request.instructions,
     input: request.input as ProviderRunInput,
     structuredOutputSchema: request.structuredOutputSchema,
+    terminalToolName: request.terminalToolName,
     maxOutputTokens: request.maxOutputTokens,
     timeoutMs: request.timeoutSeconds
       ? request.timeoutSeconds * 1000
@@ -426,6 +428,7 @@ export function buildProviderFeatureRequest(input: {
   timeoutSeconds?: number;
   stream: boolean;
   maxOutputTokens?: number;
+  terminalToolName?: string;
 }): ProviderFeatureRequest {
   const fallbackInstructions =
     input.instructions ??
@@ -441,6 +444,7 @@ export function buildProviderFeatureRequest(input: {
     instructions: input.featureSpec?.instructions ?? fallbackInstructions,
     input: providerInput,
     structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
+    terminalToolName: input.terminalToolName,
     stream: input.stream,
     maxOutputTokens: input.maxOutputTokens,
     timeoutSeconds: input.timeoutSeconds,

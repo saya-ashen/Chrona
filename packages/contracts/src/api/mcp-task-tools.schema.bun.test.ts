@@ -165,6 +165,10 @@ describe("MCP task tool contracts", () => {
     });
 
     expect(parseChronaToolPayload("chrona.node.read", undefined)).toEqual({});
+    expect(parseChronaToolPayload("chrona.dashboard.brief", {
+      summaryText: "Needs review",
+      spec: { root: "root", elements: { root: { type: "Text", props: { text: "One task needs review." }, children: [] } } },
+    })).toMatchObject({ summaryText: "Needs review" });
     expect(() => parseChronaToolPayload("chrona.plan.output", { outputs: [{ kind: "markdown", content: "Done" }] })).toThrow();
     expect(() => parseChronaToolPayload("chrona.plan.output", { outputs: [{ kind: "json", value: { foo: "bar" } }] })).toThrow();
     expect(parseChronaToolPayload("chrona.plan.output", {

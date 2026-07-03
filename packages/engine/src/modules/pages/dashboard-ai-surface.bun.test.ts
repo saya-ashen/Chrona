@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "bun:test";
 
 import { db } from "@/lib/db";
 import { aiClientRegistry } from "@/modules/ai";
+import { buildDashboardBriefPromptInput, dashboardBriefFromTool, fingerprintDashboardBriefInput, parseDashboardBriefPayload } from "./dashboard-ai-surface";
 import { getDashboard } from "./get-dashboard";
-import { fingerprintDashboardBriefInput } from "./dashboard-ai-surface";
 
 async function seedDefaultClient() {
   const client = await db.aiClient.create({
@@ -22,6 +22,8 @@ async function seedDefaultClient() {
 async function resetDb() {
   await db.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
   try {
+    await db.toolInvocation.deleteMany();
+    await db.rawEventLog.deleteMany();
     await db.aiFeatureBinding.deleteMany();
     await db.workspaceAiSurface.deleteMany();
     await db.aiClient.deleteMany();
@@ -53,6 +55,13 @@ async function seedTask(workspaceId: string, input: { title: string; status: "Bl
   });
   return { taskId: task.id };
 }
+
+const dashboardBriefSpec = {
+  root: "root",
+  elements: {
+    root: { type: "Text", props: { text: "One task needs review." }, children: [] },
+  },
+};
 
 beforeEach(async () => {
   await resetDb();
@@ -135,5 +144,84 @@ describe("dashboard AI surface state", () => {
     };
 
     expect(fingerprintDashboardBriefInput(input)).toBe(fingerprintDashboardBriefInput({ ...input }));
+  });
+});
+
+describe("dashboard AI brief prompt", () => {
+  it("defines an attention-first operating brief contract without duplicating dashboard modules", () => {
+    const prompt = buildDashboardBriefPromptInput({
+      needsAttention: [{
+        taskId: "task-1",
+        title: "Approve release plan",
+        status: "WaitingForApproval",
+        kind: "approval",
+        reason: "Plan needs approval",
+        latestOutput: null,
+        updatedAt: "2026-07-03T00:00:00.000Z",
+      }],
+      inProgress: [],
+      autoCompleted: [],
+      recentEvents: [],
+      totalAutoCompleted: 0,
+    });
+
+    expect(prompt.rules).toContain("Treat this as an executive operating brief for Chrona Dashboard, not a task list or duplicate of the side modules.");
+    expect(prompt.rules).toContain("If needsAttention has items, lead with what needs user action and why; prioritize approval, input, blocked, failed, then schedule risk.");
+    expect(prompt.presentationContract).toMatchObject({
+      sections: ["heading", "situation", "signals", "recommendedNextStep"],
+      attentionPolicy: "needsAttention first; quiet all-clear when empty",
+      duplicationPolicy: "summarize patterns; do not recreate Focus queue, Running now, Recent completions, or Recent activity lists",
+    });
+  });
+});
+
+describe("dashboard AI brief payload parsing", () => {
+  it("rejects null provider payload with concise error", () => {
+    expect(() => parseDashboardBriefPayload(null)).toThrow("Generated dashboard brief response invalid: expected JSON object with spec");
+  });
+
+  it("accepts parsed provider payload object", () => {
+    expect(parseDashboardBriefPayload({
+      summaryText: "Needs review",
+      spec: dashboardBriefSpec,
+    })).toMatchObject({ summaryText: "Needs review" });
+  });
+});
+
+describe("dashboard brief tool audit result lookup", () => {
+  it("reads accepted chrona_dashboard_brief result by session scope", async () => {
+    const { workspaceId } = await seedWorkspace("Dashboard brief test");
+    const scope = `workspace:${workspaceId}:dashboard.brief:fingerprint`;
+    const correlationId = "dashboard-brief-operation";
+    await db.rawEventLog.create({
+      data: {
+        workspaceId,
+        taskSessionId: scope,
+        source: "chrona_tool",
+        direction: "inbound",
+        rawType: "chrona.dashboard.brief",
+        payloadHash: "dashboard-brief-input-hash",
+        correlationId,
+      },
+    });
+    await db.toolInvocation.create({
+      data: {
+        workspaceId,
+        toolName: "chrona.dashboard.brief",
+        status: "accepted",
+        correlationId,
+        outputPayload: {
+          state: {
+            result: { summaryText: "Needs review", spec: dashboardBriefSpec },
+          },
+        },
+      },
+    });
+
+    await expect(dashboardBriefFromTool(scope)).resolves.toEqual({ summaryText: "Needs review", spec: dashboardBriefSpec });
+  });
+
+  it("ignores assistant text when accepted tool result is missing", async () => {
+    await expect(dashboardBriefFromTool("workspace:missing:dashboard.brief:fingerprint")).resolves.toBeNull();
   });
 });

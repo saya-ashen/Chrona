@@ -70,6 +70,16 @@ vi.mock("@/lib/router", () => ({
   }),
 }));
 
+vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
+  useAssistantSurface: () => ({
+    isOpen: false,
+    state: {
+      topSummary: { label: "PAGE-AWARE AI", value: "Task ready" },
+    },
+    toggle: vi.fn(),
+  }),
+}));
+
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({
     t: (key: string) => {
@@ -140,7 +150,13 @@ describe("ControlPlaneShell", () => {
     expect(screen.queryByRole("link", { name: "Memory" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Workspaces" })).not.toBeInTheDocument();
+
+    const assistantStatus = screen.getByRole("button", { name: "components.assistantSurface.entryLabel" });
+    expect(assistantStatus).toBeDisabled();
+    expect(screen.getByText("PAGE-AWARE AI")).toBeInTheDocument();
+    expect(screen.getByText("Task ready")).toBeInTheDocument();
   });
+
 
   it("opens the create task dialog without linking away from the current page", async () => {
     const user = userEvent.setup();

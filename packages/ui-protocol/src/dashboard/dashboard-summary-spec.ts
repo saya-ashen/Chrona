@@ -104,6 +104,48 @@ export const dashboardSummarySpecSchema = z.object({
   }
 });
 
+function toChronaCatalogElement(element: z.infer<typeof dashboardSummaryElementSchema>): UiDocument["elements"][string] {
+  if (element.type === "Text") {
+    return {
+      type: "Text",
+      props: {
+        text: element.props.text ?? element.props.content,
+        variant: element.props.variant === "small" ? "caption" : element.props.variant === "default" ? "body" : element.props.variant,
+      },
+      children: element.children ?? [],
+    };
+  }
+
+  if (element.type === "Badge") {
+    return {
+      type: "Badge",
+      props: {
+        text: element.props.text ?? element.props.label,
+        variant: element.props.variant === "success" || element.props.variant === "warning" || element.props.variant === "info" ? "secondary" : element.props.variant,
+      },
+      children: element.children ?? [],
+    };
+  }
+
+  if (element.type === "Alert") {
+    return {
+      type: "Alert",
+      props: {
+        title: element.props.title,
+        message: element.props.description ?? null,
+        type: element.props.variant === "destructive" ? "error" : null,
+      },
+      children: element.children ?? [],
+    };
+  }
+
+  return {
+    type: element.type,
+    props: element.props ?? {},
+    children: element.children ?? [],
+  };
+}
+
 export function validateDashboardSummarySpec(input: unknown): ValidateResult {
   const parsed = dashboardSummarySpecSchema.safeParse(input);
   if (!parsed.success) {
@@ -117,11 +159,7 @@ export function validateDashboardSummarySpec(input: unknown): ValidateResult {
   }
   const spec: UiDocument = { root: parsed.data.root, elements: {} };
   for (const [key, element] of Object.entries(parsed.data.elements)) {
-    spec.elements[key] = {
-      type: element.type,
-      props: element.props ?? {},
-      children: element.children ?? [],
-    };
+    spec.elements[key] = toChronaCatalogElement(element);
   }
   return validateChronaSpec(spec);
 }

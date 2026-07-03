@@ -365,6 +365,13 @@ function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientT
   return providers.find((provider) => provider.key === type)?.features ?? [];
 }
 
+function getDefaultClientName(type: AiClientType, providers: RuntimeProviderOption[]) {
+  if (type === "llm") return "My OpenAI Compatible Client";
+
+  const label = providers.find((provider) => provider.key === type)?.label ?? type;
+  return `My ${label} Client`;
+}
+
 async function updateClientBindings(clientId: string, features: string[]) {
   const res = await api.ai.clients[":clientId"].bindings.$put({
     param: { clientId },
@@ -479,6 +486,7 @@ function ClientForm({
   const isCodexClient = values.type === "codex";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const availableFeatures = getProviderFeatures(providers, values.type);
+  const namePlaceholder = getDefaultClientName(values.type, providers);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testReason, setTestReason] = useState<string | null>(null);
   const [hermesResult, setHermesResult] = useState<HermesIntegrationResult | null>(null);
@@ -512,7 +520,7 @@ function ClientForm({
                   {...form.register("name", { required: copy.nameLabel })}
                   aria-invalid={Boolean(form.formState.errors.name)}
                   id="ai-client-name"
-                  placeholder="My Hermes Client"
+                  placeholder={namePlaceholder}
                 />
                 {form.formState.errors.name ? <FieldError errors={[form.formState.errors.name]} /> : null}
               </Field>
@@ -768,24 +776,14 @@ function ClientForm({
                     placeholder="optional auth token"
                   />
                 </Field>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-config-directory">Config directory</FieldLabel>
-                    <Input
-                      {...form.register("configDirectory")}
-                      id="ai-client-config-directory"
-                      placeholder="default user-level Claude Code config"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-profile-name">Profile name</FieldLabel>
-                    <Input
-                      {...form.register("profileName")}
-                      id="ai-client-profile-name"
-                      placeholder="reserved profile selector"
-                    />
-                  </Field>
-                </div>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-config-directory">Config directory</FieldLabel>
+                  <Input
+                    {...form.register("configDirectory")}
+                    id="ai-client-config-directory"
+                    placeholder="default user-level Claude Code config"
+                  />
+                </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input
@@ -835,25 +833,14 @@ function ClientForm({
                     placeholder="optional API key"
                   />
                 </Field>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-config-directory">CODEX_HOME</FieldLabel>
-                    <Input
-                      {...form.register("configDirectory")}
-                      id="ai-client-config-directory"
-                      placeholder="default user-level Codex home (~/.codex)"
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="ai-client-profile-name">Profile name</FieldLabel>
-                    <Input
-                      {...form.register("profileName")}
-                      id="ai-client-profile-name"
-                      placeholder="codex-acp cannot select named profiles yet"
-                      disabled
-                    />
-                  </Field>
-                </div>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-config-directory">CODEX_HOME</FieldLabel>
+                  <Input
+                    {...form.register("configDirectory")}
+                    id="ai-client-config-directory"
+                    placeholder="default user-level Codex home (~/.codex)"
+                  />
+                </Field>
                 <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
                   <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
                   <Input

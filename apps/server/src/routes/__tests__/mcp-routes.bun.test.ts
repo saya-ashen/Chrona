@@ -194,6 +194,7 @@ describe("MCP routes", () => {
     expect(body).toMatchObject({ jsonrpc: "2.0" });
     expect(body.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([
       "chrona_condition_select",
+      "chrona_dashboard_brief",
       "chrona_execution_read",
       "chrona_node_block",
       "chrona_node_complete",
@@ -229,7 +230,7 @@ describe("MCP routes", () => {
     const planOutput = __mcpRouteTestHooks.externalTools.chrona_plan_output;
 
     expect((__mcpRouteTestHooks.externalTools as Record<string, unknown>)[["chrona", "node", "output"].join("_")]).toBeUndefined();
-    expect(planOutput.description).toContain("Patch shared plan-level");
+    expect(planOutput.description).toContain("Patch task-level shared");
     expect(planOutput.description).toContain("RFC 6902");
     const planOutputShape = planOutput.inputSchema.shape as Record<string, unknown>;
     expect(planOutputShape.patches).toBeDefined();

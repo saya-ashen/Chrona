@@ -1,4 +1,5 @@
 import type { ChronaToolOperation, PlanBlueprint } from "@chrona/contracts";
+import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
 import { db } from "@/lib/db";
 import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import type { AgentToolOperationsDeps, ToolAuditContext } from "./types";
@@ -100,6 +101,14 @@ export async function executeValidatedTool(
       });
     case "chrona.node.read":
       return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
+    case "chrona.dashboard.brief": {
+      const body = payload as { summaryText?: string; spec: unknown };
+      const validation = validateDashboardSummarySpec(body.spec);
+      if (!validation.ok) {
+        throw new Error(`Generated dashboard brief spec invalid: ${validation.issues[0]?.message ?? "unknown issue"}`);
+      }
+      return { summaryText: body.summaryText ?? null, spec: validation.spec };
+    }
     case "chrona.plan.output":
     case "chrona.node.complete":
     case "chrona.node.condition_select":

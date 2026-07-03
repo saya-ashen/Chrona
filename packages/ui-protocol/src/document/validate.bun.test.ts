@@ -222,6 +222,24 @@ describe("validateDashboardSummarySpec", () => {
     expect(result.ok).toBe(true);
   });
 
+  test("normalizes dashboard-only prop aliases before catalog validation", () => {
+    const result = validateDashboardSummarySpec({
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, children: ["summary", "state", "risk"] },
+        summary: { type: "Text", props: { content: "Review two active tasks.", variant: "small" }, children: [] },
+        state: { type: "Badge", props: { label: "Needs review", variant: "warning" }, children: [] },
+        risk: { type: "Alert", props: { title: "Approval needed", description: "One run waits for review.", variant: "destructive" }, children: [] },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.spec.elements.summary?.props).toEqual({ text: "Review two active tasks.", variant: "caption" });
+    expect(result.spec.elements.state?.props).toEqual({ text: "Needs review", variant: "secondary" });
+    expect(result.spec.elements.risk?.props).toEqual({ title: "Approval needed", message: "One run waits for review.", type: "error" });
+  });
+
   test("rejects interactive or broad workspace components", () => {
     expectIssue(validateDashboardSummarySpec({
       root: "button",

@@ -26,6 +26,7 @@ const allowedIdenticalMessages = new Set([
   "components.taskPlanGraph.runOutputJsonTitle",
   "components.taskCreateDialog.recurrenceCustomLabel",
   "pages.aiClientsPage.hermes",
+  "pages.dashboard.title",
 ]);
 
 describe("i18n messages", () => {

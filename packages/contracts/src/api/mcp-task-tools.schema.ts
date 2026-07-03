@@ -25,6 +25,7 @@ export const chronaToolNames = [
   "chrona.execution.read",
   "chrona.execution.dispatch",
   "chrona.node.read",
+  "chrona.dashboard.brief",
   "chrona.plan.output",
   "chrona.node.complete",
   "chrona.node.condition_select",
@@ -141,6 +142,11 @@ export const blockPayloadSchema = z.object({ reason: z.string().min(1), actionFo
 export const failPayloadSchema = z.object({ error: z.string().min(1), retryable: z.boolean().optional(), diagnostics: z.unknown().optional(), evidence: nodeEvidencePayloadSchema }).strict();
 
 export const waitCompletePayloadSchema = z.object({ summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
+export const dashboardBriefPayloadSchema = z.object({
+  summaryText: z.string().trim().min(1).max(500).optional(),
+  spec: z.unknown(),
+}).strict();
+
 
 export const chronaToolPayloadSchemas = {
   "chrona.task.read": readPayloadSchema,
@@ -156,6 +162,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
   "chrona.node.read": readPayloadSchema,
+  "chrona.dashboard.brief": dashboardBriefPayloadSchema,
   "chrona.plan.output": planOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
@@ -171,6 +178,7 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
   "chrona.node.read": publicReadPayloadSchema,
+  "chrona.dashboard.brief": dashboardBriefPayloadSchema,
   "chrona.plan.output": publicPlanOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),

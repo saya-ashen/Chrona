@@ -1362,16 +1362,16 @@
   },
   "pages": {
     "dashboard": {
-      "title": "Chrona 工作台",
+      "title": "Chrona Dashboard",
       "subtitle": "Chrona 做了什么、正在做什么、还需要你处理什么——任务的实时动态。",
       "viewAllTasks": "全部任务",
       "newTask": "新建任务",
       "openTask": "打开任务",
       "headline": {
         "both": "今天 Chrona 已自动完成 {completed} 个任务，{attention} 个任务需要你处理。",
-        "completedOnly": "今天 Chrona 已自动完成 {completed} 个任务，暂时没有需要你处理的事项。",
-        "attentionOnly": "今天还没有自动完成的任务，有 {attention} 个任务需要你处理。",
-        "idle": "Chrona 正在待命。新建一个任务，它就会开始替你工作。"
+        "completedOnly": "今天 Chrona 已自动完成 {completed} 个任务。现在没有任务需要你处理。",
+        "attentionOnly": "今天还没有自动完成的任务。{attention} 个任务需要你处理。",
+        "idle": "Chrona 已就绪。你可以新建任务、启动工作，或在这里查看最近动态。"
       },
       "summary": {
         "title": "需要你处理",
@@ -1388,13 +1388,13 @@
         "review_result": "查看结果"
       },
       "focus": {
-        "eyebrow": "当前重点",
-        "empty": "暂时没有需要你重点处理的事项。新建一个任务开始吧。"
+        "eyebrow": "焦点队列",
+        "empty": "没有需要优先处理的任务。准备好继续推进时，可以新建任务。"
       },
       "attention": {
-        "title": "需要你处理",
+        "title": "焦点队列",
         "description": "等待审批、等待输入、被阻塞、失败或排程有风险的任务。",
-        "empty": "暂时没有需要你处理的事项。",
+        "empty": "全部清理完毕——没有审批、输入、阻塞、失败运行或排程风险需要你处理。",
         "kind": {
           "approval": "等待审批",
           "input": "等待你的输入",
@@ -1404,14 +1404,14 @@
         }
       },
       "inProgress": {
-        "title": "进行中",
+        "title": "正在运行",
         "description": "Chrona 正在推进的任务。",
-        "empty": "暂时没有正在运行的任务。"
+        "empty": "当前没有正在运行的任务。你可以从日程启动任务，或新建一个交给 Chrona 推进。"
       },
       "completed": {
         "title": "最近完成",
-        "totalLabel": "累计完成 {n} 个",
-        "empty": "暂无已完成的任务。"
+        "totalLabel": "展示最近 {n} 个完成项",
+        "empty": "Chrona 完成任务后，产出会汇总在这里。"
       },
       "digest": {
         "title": "AI 总结",
@@ -1448,9 +1448,9 @@
         }
       },
       "feed": {
-        "title": "最新动态",
-        "description": "各任务最近发生的事情。",
-        "empty": "暂无动态。",
+        "title": "最近动态",
+        "description": "AI 总结下方的最新任务事件，便于不打开每个任务也能看到变化。",
+        "empty": "暂无最近任务动态。新的计划、开始、完成、阻塞和审批会显示在这里。",
         "category": {
           "created": "已创建",
           "plan": "已规划",

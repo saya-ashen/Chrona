@@ -51,16 +51,16 @@ import type { Dictionary } from "@/pages";
 import type { UiDocument } from "@chrona/ui-protocol";
 
 const COPY = {
-  title: "Chrona workspace",
+  title: "Chrona Dashboard",
   subtitle: "At a glance",
   viewAllTasks: "All tasks",
   newTask: "New task",
   openTask: "Open",
   headline: {
     both: "Today Chrona auto-completed {completed} tasks, and {attention} need you.",
-    completedOnly: "Today Chrona auto-completed {completed} tasks — nothing needs you right now.",
-    attentionOnly: "Nothing auto-completed yet today, and {attention} tasks need you.",
-    idle: "Chrona is standing by.",
+    completedOnly: "Today Chrona auto-completed {completed} tasks. No task needs you right now.",
+    attentionOnly: "Nothing auto-completed yet today. {attention} tasks need you.",
+    idle: "Chrona is ready. Add a task, start work, or review recent activity here.",
   },
   summary: { title: "Needs you", pending: "{n} pending", none: "All clear" },
   nextStep: {
@@ -72,11 +72,11 @@ const COPY = {
     reschedule: "Reschedule",
     review_result: "Review result",
   },
-  focus: { eyebrow: "Focus now", empty: "Nothing needs your focus right now." },
+  focus: { eyebrow: "Focus queue", empty: "No task needs priority focus." },
   attention: {
-    title: "Needs you",
+    title: "Focus queue",
     description: "desc",
-    empty: "Nothing needs you right now.",
+    empty: "All clear — no approvals, input requests, blockers, failed runs, or schedule risks need you.",
     kind: {
       approval: "Waiting for approval",
       input: "Waiting for your input",
@@ -85,8 +85,8 @@ const COPY = {
       schedule_risk: "At schedule risk",
     },
   },
-  inProgress: { title: "In progress", description: "desc", empty: "Nothing is running right now." },
-  completed: { title: "Recently completed", totalLabel: "{n} completed all-time", empty: "No completed tasks yet." },
+  inProgress: { title: "Running now", description: "desc", empty: "Nothing is running. Start a task from the schedule or create a new one when you want Chrona to move." },
+  completed: { title: "Recent completions", totalLabel: "{n} recent completions shown", empty: "Completed task outputs will collect here once Chrona finishes work." },
   digest: {
     title: "AI summary",
     description: "AI-generated readout.",
@@ -122,9 +122,9 @@ const COPY = {
     },
   },
   feed: {
-    title: "Latest activity",
-    description: "desc",
-    empty: "No activity yet.",
+    title: "Recent activity",
+    description: "Latest task events after the AI summary.",
+    empty: "No recent task activity yet.",
     category: {
       created: "Created",
       plan: "Planned",
@@ -229,37 +229,6 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Today Chrona auto-completed 2 tasks, and 1 need you.")).toBeTruthy();
   });
 
-  it("renders the focus headline with its reason and next-step action", () => {
-    render(
-      <DashboardPage
-        data={makeData({
-          focusTask: {
-            taskId: "t1",
-            title: "GitHub trendings",
-            status: "Failed",
-            priority: "Urgent",
-            scheduleStatus: null,
-            reason: "GitHub API request failed",
-            stage: null,
-            nextStep: "resolve_block",
-            latestOutput: null,
-            dueAt: null,
-            updatedAt: null,
-          },
-        })}
-        copy={COPY}
-      />,
-    );
-    expect(screen.getByText("GitHub trendings")).toBeTruthy();
-    expect(screen.getByText("GitHub API request failed")).toBeTruthy();
-    expect(screen.getByText("Focus now")).toBeTruthy();
-    expect(screen.getAllByText("Resolve").length).toBeGreaterThan(0);
-  });
-
-  it("falls back to the focus empty state when no task needs attention", () => {
-    render(<DashboardPage data={makeData()} copy={COPY} />);
-    expect(screen.getByText("Nothing needs your focus right now.")).toBeTruthy();
-  });
 
   it("summarizes attention by kind in the needs-you card", () => {
     render(
@@ -336,9 +305,10 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("region", { name: "AI summary" })).toHaveAttribute("data-ui-surface-kind", "ai-authored");
     expect(screen.getByText("AI generated")).toBeTruthy();
     expect(screen.getByText("AI brief spec rendered")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Regenerate/ })).toBeTruthy();
   });
 
-  it("keeps recent activity out of the dashboard chrome", () => {
+  it("shows recent activity below the AI summary area", () => {
     render(
       <DashboardPage
         data={makeData({
@@ -356,8 +326,9 @@ describe("DashboardPage", () => {
         copy={COPY}
       />,
     );
-    expect(screen.queryByText("Daily digest")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Produced the daily digest/)).not.toBeInTheDocument();
+    expect(screen.getByText("Recent activity")).toBeTruthy();
+    expect(screen.getByText("Daily digest")).toBeTruthy();
+    expect(screen.getByText(/Produced the daily digest/)).toBeTruthy();
   });
 
   it("renders attention items directly in needs-you", () => {
@@ -386,6 +357,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Waiting on confirmation")).toBeTruthy();
     expect(screen.getByRole("link", { name: /Resolve/ })).toHaveAttribute("href", "/en/tasks/s1");
     expect(screen.queryByText("Task stream")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Recent completions").length).toBeGreaterThan(0);
   });
 
   it("shows a spinner while AI summary is generating", () => {

@@ -29,8 +29,9 @@ import type { UiDocument } from "@chrona/ui-protocol";
 import { cn } from "@/lib/utils";
 import type {
   DashboardAttentionItem,
+  DashboardCompletedItem,
   DashboardData,
-  DashboardFocusTask,
+  DashboardEvent,
   DashboardInProgressItem,
   DashboardOutput,
 } from "./dashboard-types";
@@ -116,20 +117,26 @@ function MetricPill({
   tone: "primary" | "warning" | "success" | "info";
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl border bg-background/80 px-4 py-3 shadow-sm backdrop-blur">
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-3 rounded-2xl border bg-background/80 px-4 py-3 backdrop-blur transition-colors",
+        value === 0 ? "shadow-none opacity-70" : "shadow-sm",
+      )}
+    >
       <span
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-full",
-          tone === "primary" && "bg-primary/10 text-primary",
-          tone === "warning" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-          tone === "success" && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-          tone === "info" && "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+          value === 0 && "bg-muted text-muted-foreground",
+          value > 0 && tone === "primary" && "bg-primary/10 text-primary",
+          value > 0 && tone === "warning" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+          value > 0 && tone === "success" && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+          value > 0 && tone === "info" && "bg-sky-500/10 text-sky-600 dark:text-sky-400",
         )}
       >
         <Icon className="size-5" aria-hidden />
       </span>
       <div className="min-w-0">
-        <p className="text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+        <p className={cn("font-semibold tabular-nums tracking-tight", value === 0 ? "text-xl text-muted-foreground" : "text-2xl")}>{value}</p>
         <p className="truncate text-xs text-muted-foreground">{label}</p>
       </div>
     </div>
@@ -197,48 +204,6 @@ function HeadlineBanner({
   );
 }
 
-/* ── Hero: focus headline + needs-you summary ─────────────────────────────── */
-
-function FocusCard({ task, copy }: { task: DashboardFocusTask | null; copy: DashboardCopy }) {
-  if (!task) {
-    return (
-      <Card className="min-h-[220px] border-dashed bg-muted/20">
-        <CardContent className="flex h-full flex-col items-center justify-center gap-2 py-12 text-center">
-          <Sparkles className="size-6 text-muted-foreground/60" aria-hidden />
-          <p className="text-sm text-muted-foreground">{copy.focus.empty}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="overflow-hidden border-primary/30 bg-gradient-to-br from-primary/[0.08] to-background shadow-sm">
-      <CardHeader className="gap-2 pb-3">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary">
-          <Sparkles className="size-4" aria-hidden />
-          {copy.focus.eyebrow}
-        </div>
-        <CardTitle className="text-xl leading-tight">{task.title}</CardTitle>
-        {task.reason ? (
-          <CardDescription className="text-sm text-foreground/80">{task.reason}</CardDescription>
-        ) : null}
-      </CardHeader>
-      <CardContent className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary">{task.status}</Badge>
-          {task.stage ? <span className="truncate">{task.stage}</span> : null}
-          {task.latestOutput ? <OutputLink output={task.latestOutput} /> : null}
-        </div>
-        <Button asChild size="sm" className="shrink-0">
-          <LocalizedLink href={`/tasks/${task.taskId}`}>
-            {copy.nextStep[task.nextStep]}
-            <ArrowRight className="size-4" aria-hidden />
-          </LocalizedLink>
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
 
 function NeedsYouCard({
   copy,
@@ -248,23 +213,29 @@ function NeedsYouCard({
   items: DashboardAttentionItem[];
 }) {
   const visibleItems = items.slice(0, 5);
+  const hasItems = visibleItems.length > 0;
 
   return (
-    <Card className="shadow-sm">
+    <Card className={cn("shadow-sm", hasItems ? "border-amber-500/40 bg-amber-500/[0.04]" : "bg-background")}>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AlertTriangle className="size-4 text-amber-500" aria-hidden />
-          {copy.summary.title}
-        </CardTitle>
-        <CardDescription>
-          {items.length > 0 ? copy.summary.pending.replace("{n}", String(items.length)) : copy.summary.none}
-        </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className={cn("size-4", hasItems ? "text-amber-500" : "text-muted-foreground")} aria-hidden />
+              {copy.attention.title}
+            </CardTitle>
+            <CardDescription>
+              {hasItems ? copy.summary.pending.replace("{n}", String(items.length)) : copy.summary.none}
+            </CardDescription>
+          </div>
+          <Badge variant={hasItems ? "default" : "secondary"}>{copy.summary.title}</Badge>
+        </div>
       </CardHeader>
       <CardContent>
-        {visibleItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
-            <CheckCircle2 className="size-6 text-emerald-500/70" aria-hidden />
-            <p className="text-sm text-muted-foreground">{copy.attention.empty}</p>
+        {!hasItems ? (
+          <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+            <CheckCircle2 className="size-4 shrink-0 text-emerald-500/70" aria-hidden />
+            <span>{copy.attention.empty}</span>
           </div>
         ) : (
           <ul className="divide-y">
@@ -313,11 +284,9 @@ function NeedsYouCard({
 function DashboardAiBriefStatus({
   aiBrief,
   copy,
-  onRegenerate,
 }: {
   aiBrief: DashboardData["aiBrief"];
   copy: DashboardCopy["digest"]["aiBrief"];
-  onRegenerate: () => void;
 }) {
   if (!aiBrief) return null;
 
@@ -335,17 +304,32 @@ function DashboardAiBriefStatus({
   if (!label) return null;
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-      <span>
-        <span className="font-medium text-foreground">{label}</span>
-        {aiBrief.errorMessage ? <span> · {aiBrief.errorMessage}</span> : null}
-      </span>
-      {aiBrief.canGenerate ? (
-        <Button size="sm" variant="ghost" onClick={onRegenerate}>
-          {copy.regenerate}
-        </Button>
-      ) : null}
-    </div>
+    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-xs text-muted-foreground shadow-sm">
+      {aiBrief.status === "generating" ? <Loader2 className="size-3 animate-spin text-primary" aria-hidden /> : null}
+      <span className="truncate font-medium text-foreground/80">{label}</span>
+      {aiBrief.errorMessage ? <span className="truncate"> · {aiBrief.errorMessage}</span> : null}
+    </span>
+  );
+}
+
+function DashboardAiBriefGenerateButton({
+  aiBrief,
+  copy,
+  onRegenerate,
+  isGenerating,
+}: {
+  aiBrief: DashboardData["aiBrief"];
+  copy: DashboardCopy["digest"]["aiBrief"];
+  onRegenerate: () => void;
+  isGenerating: boolean;
+}) {
+  if (!aiBrief?.canGenerate) return null;
+
+  return (
+    <Button size="sm" variant="outline" onClick={onRegenerate} disabled={isGenerating} className="h-8 rounded-full bg-background/80 px-3 shadow-sm">
+      {isGenerating ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Sparkles className="size-3.5" aria-hidden />}
+      {copy.regenerate}
+    </Button>
   );
 }
 
@@ -398,18 +382,21 @@ function DigestModule({
 }) {
   if (aiBrief?.spec) {
     return (
-      <UiSurfaceFrame kind="ai-authored" label={copy.digest.title} className="overflow-hidden p-0" bodyClassName="min-w-0">
-        <CardHeader className="gap-4 border-b bg-muted/20 pb-4">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Sparkles className="size-5 text-primary" aria-hidden />
-              {copy.digest.title}
-            </CardTitle>
-            <CardDescription>{copy.digest.description}</CardDescription>
+      <UiSurfaceFrame kind="ai-authored" label={copy.digest.title} className="overflow-hidden border-violet-200/70 bg-gradient-to-br from-background via-background to-violet-50/45 p-0 shadow-sm dark:border-violet-400/25 dark:to-violet-950/10" bodyClassName="min-w-0">
+        <CardHeader className="flex flex-col gap-3 border-b border-border/50 bg-background/60 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Sparkles className="size-4" aria-hidden />
+              </span>
+              <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">{copy.digest.title}</CardTitle>
+              <DashboardAiBriefStatus aiBrief={aiBrief} copy={copy.digest.aiBrief} />
+            </div>
+            <CardDescription className="max-w-2xl text-sm leading-relaxed">{copy.digest.description}</CardDescription>
           </div>
-          <DashboardAiBriefStatus aiBrief={aiBrief} copy={copy.digest.aiBrief} onRegenerate={onRegenerate} />
+          <DashboardAiBriefGenerateButton aiBrief={aiBrief} copy={copy.digest.aiBrief} onRegenerate={onRegenerate} isGenerating={isGenerating} />
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent className="bg-background/45 p-4 sm:p-5">
           <SpecRenderer spec={aiBrief.spec as UiDocument} fallback={null} />
         </CardContent>
       </UiSurfaceFrame>
@@ -417,27 +404,34 @@ function DigestModule({
   }
 
   return (
-    <Card className="overflow-hidden border-dashed bg-muted/20">
-      <CardHeader className="gap-3 pb-4">
-        <div className="space-y-1">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="size-5 text-primary" aria-hidden />
-            {copy.digest.title}
-          </CardTitle>
-          <CardDescription>{copy.digest.description}</CardDescription>
+    <Card className="overflow-hidden border-dashed bg-gradient-to-br from-muted/20 via-background to-primary/5 shadow-sm">
+      <CardHeader className="flex flex-col gap-3 border-b border-border/50 bg-background/55 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Sparkles className="size-4" aria-hidden />
+            </span>
+            <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">{copy.digest.title}</CardTitle>
+            <DashboardAiBriefStatus aiBrief={aiBrief} copy={copy.digest.aiBrief} />
+          </div>
+          <CardDescription className="max-w-2xl text-sm leading-relaxed">{copy.digest.description}</CardDescription>
         </div>
-        <DashboardAiBriefStatus aiBrief={aiBrief} copy={copy.digest.aiBrief} onRegenerate={onRegenerate} />
+        <DashboardAiBriefGenerateButton aiBrief={aiBrief} copy={copy.digest.aiBrief} onRegenerate={onRegenerate} isGenerating={isGenerating} />
       </CardHeader>
-      <CardContent className="flex flex-col items-center justify-center gap-2 px-5 pb-8 pt-2 text-center">
+      <CardContent className="flex min-h-[180px] flex-col items-center justify-center gap-3 px-5 py-8 text-center">
         {isGenerating ? (
           <>
-            <Loader2 className="size-7 animate-spin text-primary" aria-hidden />
+            <span className="inline-flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Loader2 className="size-6 animate-spin" aria-hidden />
+            </span>
             <p className="max-w-sm text-sm text-muted-foreground">{copy.digest.aiBrief.generating}</p>
           </>
         ) : (
           <>
-            <Sparkles className="size-7 text-muted-foreground/50" aria-hidden />
-            <p className="max-w-sm text-sm text-muted-foreground">{copy.digest.empty}</p>
+            <span className="inline-flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground/70">
+              <Sparkles className="size-6" aria-hidden />
+            </span>
+            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">{copy.digest.empty}</p>
           </>
         )}
       </CardContent>
@@ -465,9 +459,9 @@ function InProgressCard({
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-            <Loader2 className="size-6 text-muted-foreground/50" aria-hidden />
-            <p className="text-sm text-muted-foreground">{copy.inProgress.empty}</p>
+          <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+            <Clock className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
+            <span>{copy.inProgress.empty}</span>
           </div>
         ) : (
           <ul className="divide-y">
@@ -492,10 +486,95 @@ function InProgressCard({
   );
 }
 
+function RecentCompletionsCard({
+  copy,
+  items,
+}: {
+  copy: DashboardCopy;
+  items: DashboardCompletedItem[];
+}) {
+  const visibleItems = items.slice(0, 5);
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <CheckCircle2 className="size-4 text-emerald-500" aria-hidden />
+          {copy.completed.title}
+        </CardTitle>
+        <CardDescription>{copy.completed.totalLabel.replace("{n}", String(items.length))}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {visibleItems.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+            <Sparkles className="size-4 shrink-0 text-muted-foreground/70" aria-hidden />
+            <span>{copy.completed.empty}</span>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {visibleItems.map((item) => (
+              <li key={item.taskId} className="space-y-1 py-2.5">
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium">{item.title}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatRelative(item.completedAt, copy.time)}</span>
+                </div>
+                {item.summary ? <p className="line-clamp-2 text-xs text-muted-foreground">{item.summary}</p> : null}
+                {item.output ? <OutputLink output={item.output} /> : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function feedCategoryLabel(copy: DashboardCopy, category: DashboardEvent["category"]) {
+  return typeof category === "string" && category in copy.feed.category
+    ? copy.feed.category[category as keyof DashboardCopy["feed"]["category"]]
+    : category;
+}
+
+function RecentActivitySection({ copy, events }: { copy: DashboardCopy; events: DashboardEvent[] }) {
+  const visibleEvents = events.slice(0, 8);
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg">{copy.feed.title}</CardTitle>
+        <CardDescription>{copy.feed.description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {visibleEvents.length === 0 ? (
+          <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">{copy.feed.empty}</div>
+        ) : (
+          <ol className="relative space-y-3 before:absolute before:bottom-3 before:left-2 before:top-3 before:w-px before:bg-border">
+            {visibleEvents.map((event) => (
+              <li key={event.id} className="relative flex gap-3 pl-6">
+                <span className="absolute left-0 top-1.5 size-4 rounded-full border-2 border-background bg-primary" aria-hidden />
+                <div className="min-w-0 flex-1 rounded-2xl border bg-background px-3 py-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <Badge variant="outline">{feedCategoryLabel(copy, event.category)}</Badge>
+                    <LocalizedLink href={`/tasks/${event.taskId}`} className="min-w-0 truncate text-sm font-medium hover:text-primary">
+                      {event.taskTitle}
+                    </LocalizedLink>
+                    <span className="text-xs tabular-nums text-muted-foreground">{formatRelative(event.at, copy.time)}</span>
+                  </div>
+                  {event.summary ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{event.summary}</p> : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 
 /* ── Page ─────────────────────────────────────────────────────────────────── */
 export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: DashboardPageProps) {
-  const { focusTask, needsAttention, inProgress, autoCompleted, totalAutoCompleted } = data;
+  const { needsAttention, inProgress, autoCompleted, recentEvents, totalAutoCompleted } = data;
   const { isGenerating, regenerate } = useDashboardAiBriefGeneration({ workspaceId, aiBrief: data.aiBrief });
 
   const completedToday = useMemo(() => {
@@ -523,12 +602,13 @@ export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: Da
             onRegenerate={regenerate}
             isGenerating={isGenerating}
           />
+          <RecentActivitySection copy={copy} events={recentEvents} />
         </div>
 
         <aside className="min-w-0 space-y-5 xl:sticky xl:top-6 xl:self-start">
-          <FocusCard task={focusTask} copy={copy} />
           <NeedsYouCard copy={copy} items={needsAttention} />
           <InProgressCard copy={copy} items={inProgress} />
+          <RecentCompletionsCard copy={copy} items={autoCompleted} />
         </aside>
       </div>
     </div>

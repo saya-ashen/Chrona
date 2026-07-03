@@ -178,6 +178,8 @@ function testBlueprint(title: string): PlanBlueprint {
 }
 
 async function resetDb() {
+  await db.toolInvocation.deleteMany();
+  await db.rawEventLog.deleteMany();
   await db.executionSession.deleteMany();
   await db.taskPlanProviderRun.deleteMany();
   await db.taskPlanNodeAttempt.deleteMany();
@@ -728,6 +730,58 @@ describe("agent tool operations service", () => {
         error: "Command failed",
       },
     ]);
+  });
+
+  it("persists validated dashboard brief result only on dashboard tool accepted state", async () => {
+    await db.workspace.create({
+      data: { id: "workspace-dashboard-tool", name: "Dashboard tool workspace", status: "Active", defaultRuntime: "codex" },
+    });
+
+    const result = await service().execute({
+      toolName: "chrona.dashboard.brief",
+      input: {
+        workspaceId: "workspace-dashboard-tool",
+        sessionId: "workspace:workspace-dashboard-tool:dashboard.brief:fingerprint",
+        actorType: "agent",
+        idempotencyKey: "dashboard-brief-tool",
+        payload: {
+          summaryText: "Needs review",
+          spec: {
+            root: "root",
+            elements: {
+              root: { type: "Text", props: { content: "One task needs review.", variant: "small" }, children: [] },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "accepted",
+      state: {
+        result: {
+          summaryText: "Needs review",
+          spec: {
+            root: "root",
+            elements: { root: { props: { text: "One task needs review.", variant: "caption" } } },
+          },
+        },
+      },
+    });
+    const invocation = await db.toolInvocation.findFirstOrThrow({
+      where: { toolName: "chrona.dashboard.brief", workspaceId: "workspace-dashboard-tool" },
+    });
+    expect(invocation.outputPayload).toMatchObject({
+      state: {
+        result: {
+          summaryText: "Needs review",
+          spec: {
+            root: "root",
+            elements: { root: { props: { text: "One task needs review.", variant: "caption" } } },
+          },
+        },
+      },
+    });
   });
 
   it("correlates node tool audit records to the active plan node attempt", async () => {
