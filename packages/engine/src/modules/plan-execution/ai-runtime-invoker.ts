@@ -614,6 +614,9 @@ async function collectProviderRunSnapshot(
           : { raw: event.raw, terminalToolName },
       };
     }
+    if (event.type === "tool_call") {
+      terminalToolName = event.tool ?? terminalToolName;
+    }
     if (event.type === "tool_completed") {
       terminalToolName = event.toolName ?? terminalToolName;
     }

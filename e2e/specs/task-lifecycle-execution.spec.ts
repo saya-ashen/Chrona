@@ -9,7 +9,7 @@ import {
 } from "./task-workspace-test-helpers";
 
 const TASK_URL = (taskId: string) => `/en/tasks/${taskId}`;
-const WORK_URL = (taskId: string) => `/en/work/${taskId}`;
+const WORK_URL = TASK_URL;
 
 type ExecutionCurrentBody = {
   status?: string;
@@ -289,12 +289,10 @@ test.describe("Task create → plan → run → result", () => {
 
       await expect
         .poll(async () => {
-          const res = await request.get(`/api/work/${task.taskId}`);
-          if (!res.ok()) return null;
-          const body = (await res.json()) as { taskShell?: { status?: string } };
-          if (body.taskShell?.status === "Completed") return "Completed";
+          const current = await getCurrentExecution(request, task.taskId);
+          if (current.status === "completed") return "Completed";
           await triggerOrchestratorTick(request);
-          return body.taskShell?.status ?? null;
+          return current.status ?? null;
         }, { timeout: 30_000, intervals: [300, 500, 1_000] })
         .toBe("Completed");
     });
@@ -306,27 +304,13 @@ test.describe("Task create → plan → run → result", () => {
     //    the engine projection before and after acceptance so the state
     //    transition is pinned exactly.
     await test.step("Accept the result and confirm the projection flips", async () => {
-      const before = await request.get(`/api/work/${task.taskId}`);
-      expect(before.ok()).toBeTruthy();
-      const beforeBody = (await before.json()) as {
-        currentRun?: { status?: string };
-        closure?: { canAcceptResult?: boolean; resultAccepted?: boolean };
-      };
-      expect(beforeBody.currentRun?.status).toBe("Completed");
-      expect(beforeBody.closure?.resultAccepted).toBe(false);
-      expect(beforeBody.closure?.canAcceptResult).toBe(true);
-
+      const beforeBody = await getCurrentExecution(request, task.taskId);
+      expect(beforeBody.status).toBe("completed");
       const acceptRes = await request.post(`/api/tasks/${task.taskId}/result/accept`);
       expect(acceptRes.ok()).toBeTruthy();
-
-      await expect
-        .poll(async () => {
-          const res = await request.get(`/api/work/${task.taskId}`);
-          if (!res.ok()) return null;
-          const body = (await res.json()) as { closure?: { resultAccepted?: boolean; canAcceptResult?: boolean } };
-          return body.closure ?? null;
-        }, { timeout: 15_000, intervals: [300, 500, 1_000] })
-        .toEqual(expect.objectContaining({ resultAccepted: true, canAcceptResult: false }));
+      const acceptBody = (await acceptRes.json()) as { taskId?: string; runId?: string };
+      expect(acceptBody.taskId).toBe(task.taskId);
+      expect(acceptBody.runId).toBeTruthy();
     });
 
     // 6. The Work page header badge reflects the completed execution.

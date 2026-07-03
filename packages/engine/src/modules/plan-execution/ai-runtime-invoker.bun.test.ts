@@ -316,6 +316,33 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(reloaded.failedByEventId).toBeNull();
   });
 
+  it("keeps the last provider tool_call as terminal tool metadata", async () => {
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => runRef()),
+      streamRun: mock(() =>
+        (async function* () {
+          yield {
+            type: "tool_call",
+            tool: "chrona_node_complete",
+            callId: "complete-1",
+            input: { summary: "done" },
+            status: "completed",
+          } as ProviderRunEvent;
+          yield {
+            type: "run_completed",
+            run: { runId: "run-1", nativeRunId: "run-1", sessionId: "session-1", status: "completed" },
+            outputText: "done",
+          } as ProviderRunEvent;
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request);
+
+    expect(snapshot.raw).toMatchObject({ terminalToolName: "chrona_node_complete" });
+  });
+
   it("returns cancelled snapshot and closes provider audit rows from run_cancelled events", async () => {
     const { workspace, task, providerRun, run } = await seedProviderRunChain();
     const client = {
