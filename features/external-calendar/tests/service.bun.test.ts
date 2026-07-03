@@ -35,7 +35,7 @@ describe("External calendar service sync policies", () => {
     });
 
     expect("source" in result ? result.source.syncPolicy : null).toBe("auto_complete_past_events");
-    expect("source" in result ? result.source.automationPolicy : null).toBe("auto_plan");
+    expect("source" in result ? result.source.automationPolicy : null).toBe("manual");
     const importedEvent = await db.importedCalendarEvent.findFirstOrThrow({
       where: { workspaceId },
       include: { task: { include: { projection: true } } },
