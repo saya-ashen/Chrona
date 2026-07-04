@@ -656,7 +656,7 @@ describe("AiClientsManager", () => {
     expect(screen.getAllByText("Bridge health endpoint returned 503")).toHaveLength(2);
   });
 
-  it("shows configured, reachable, and capability readiness for providers", async () => {
+  it("shows execution and recovery readiness for providers", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -682,8 +682,11 @@ describe("AiClientsManager", () => {
     expect(screen.getByLabelText("Provider readiness")).toBeInTheDocument();
     expect(screen.getByText("Configured")).toBeInTheDocument();
     expect(screen.getByText("Reachable")).toBeInTheDocument();
-    expect(screen.getByText("Capability-ready")).toBeInTheDocument();
-    expect(screen.getByText("Provider lacks critical capabilities: getRunSnapshot, approvalEvent")).toBeInTheDocument();
+    expect(screen.getByText("Execution-ready")).toBeInTheDocument();
+    expect(screen.getByText("Provider supports execution start, live events, cancellation, tools, and structured output.")).toBeInTheDocument();
+    expect(screen.getByText("Recovery mode")).toBeInTheDocument();
+    expect(screen.getByText("Provider recovery mode: session_history; unavailable: active run lookup, stream reconnect")).toBeInTheDocument();
+    expect(screen.queryByText(/Provider lacks critical capabilities/)).not.toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce({
       ok: true,

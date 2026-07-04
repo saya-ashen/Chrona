@@ -226,6 +226,13 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         scopes: [],
         resolveAll: false,
       },
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: true,
+        streamReconnect: false,
+        mode: "authoritative_run_lookup",
+      },
     };
   }
 

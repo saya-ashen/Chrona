@@ -133,6 +133,8 @@ describe("CodexProviderClient", () => {
       supportsSessions: true,
       supportsStreaming: true,
       supportsToolCalls: true,
+      approval: { supported: true },
+      recovery: { mode: "session_history", sessionResume: true, historyReplay: true, activeRunLookup: false },
       reason: "OpenAI Codex ACP provider",
     });
     const run = await client.startRun(baseInput({ sessionKey: "chrona:codex" }));

@@ -22,12 +22,16 @@ import type {
   CreateSessionInput,
   GetRunInput,
   HealthCheckInput,
+  ProviderApprovalChoice,
+  ProviderApprovalRequest,
+  ProviderApprovalResolution,
   ProviderCapabilities,
   ProviderHealth,
   ProviderRunEvent,
   ProviderRunInput,
   ProviderRunRef,
   ProviderRunSnapshot,
+  ResolveProviderApprovalInput,
   StartRunInput,
   StreamRunInput,
 } from "@chrona/providers-foundation";
@@ -68,12 +72,21 @@ export type AcpRunHandle = {
   timer?: Timer;
   ready?: Promise<void>;
   sequence: number;
+  approvalEvents: ProviderRunEvent[];
+  approvalWaiters: Array<() => void>;
 };
 
 type InternalRun = {
   handle: AcpRunHandle;
   startedAt: string;
   input: StartRunInput;
+};
+
+type PendingAcpApproval = {
+  handle: AcpRunHandle;
+  request: ProviderApprovalRequest;
+  optionByChoice: Map<ProviderApprovalChoice, string>;
+  resolve(response: RequestPermissionResponse): void;
 };
 
 type StartRunInputWithControl = StartRunInput & {
@@ -278,6 +291,67 @@ function permissionOption(options: PermissionOption[]): PermissionOption | undef
   );
 }
 
+function approvalChoiceForOption(option: PermissionOption): ProviderApprovalChoice {
+  if (option.kind === "reject_once" || option.kind === "reject_always") return "deny";
+  if (option.kind === "allow_always") return "approve_always";
+  return "approve_once";
+}
+
+function approvalRequestFromAcp(config: AcpProviderConfig, handle: AcpRunHandle, params: RequestPermissionRequest): {
+  request: ProviderApprovalRequest;
+  optionByChoice: Map<ProviderApprovalChoice, string>;
+} {
+  const optionByChoice = new Map<ProviderApprovalChoice, string>();
+  const choices: ProviderApprovalChoice[] = [];
+  for (const option of params.options) {
+    const choice = approvalChoiceForOption(option);
+    if (!optionByChoice.has(choice)) {
+      optionByChoice.set(choice, option.optionId);
+      choices.push(choice);
+    }
+  }
+  if (choices.length === 0) choices.push("deny");
+  const tool = params.toolCall.title?.trim() || params.toolCall.toolCallId;
+  const approvalId = `${params.sessionId}:${params.toolCall.toolCallId}`;
+  return {
+    request: {
+      id: approvalId,
+      provider: config.provider,
+      runId: handle.ref.runId,
+      nativeRunId: handle.ref.nativeRunId,
+      sessionId: params.sessionId,
+      kind: "acp_permission",
+      providerKind: params.toolCall.kind ?? "tool_call",
+      title: `Approve ${tool}`,
+      summary: `ACP provider requests permission for ${tool}.`,
+      riskLevel: "unknown",
+      subject: { type: "tool", label: tool, preview: JSON.stringify(params.toolCall.rawInput ?? params.toolCall.content ?? null) },
+      choices,
+      defaultChoice: choices.includes("deny") ? "deny" : choices.at(0),
+      recommendedChoice: choices.includes("approve_once") ? "approve_once" : choices.at(0),
+      scopePolicy: {
+        supportsOnce: params.options.some((option) => option.kind === "allow_once"),
+        supportsSession: false,
+        supportsAlways: params.options.some((option) => option.kind === "allow_always"),
+        supportsResolveAll: false,
+      },
+      raw: params,
+    },
+    optionByChoice,
+  };
+}
+
+function queueApprovalEvent(handle: AcpRunHandle, event: ProviderRunEvent) {
+  handle.approvalEvents.push(event);
+  const waiters = handle.approvalWaiters.splice(0);
+  for (const wake of waiters) wake();
+}
+
+function waitForApprovalEvent(handle: AcpRunHandle) {
+  return new Promise<void>((resolve) => handle.approvalWaiters.push(resolve));
+}
+
+
 export class StdioAcpTransport implements AcpTransport {
   async connect<T>(
     config: AcpProviderConfig,
@@ -325,9 +399,10 @@ export class StdioAcpTransport implements AcpTransport {
   }
 }
 
-function handlers(): AcpClientHandlers {
+function handlers(requestPermission?: (params: RequestPermissionRequest) => Promise<RequestPermissionResponse>): AcpClientHandlers {
   return {
     async requestPermission(params) {
+      if (requestPermission) return requestPermission(params);
       const option = permissionOption(params.options);
       if (!option) return { outcome: { outcome: "cancelled" } };
       return { outcome: { outcome: "selected", optionId: option.optionId } };
@@ -414,6 +489,7 @@ export class AcpProviderClient implements AgentProviderClient {
   private readonly config: AcpProviderConfig;
   private readonly transport: AcpTransport;
   private readonly runs = new Map<string, InternalRun>();
+  private readonly pendingApprovals = new Map<string, PendingAcpApproval>();
 
   constructor(opts: AcpProviderOptions) {
     this.config = opts.config;
@@ -429,7 +505,14 @@ export class AcpProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
-      approval: { supported: false, choices: [], scopes: [], resolveAll: false },
+      approval: { supported: true, choices: ["approve_once", "approve_always", "deny"], scopes: ["once", "always"], resolveAll: false },
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: false,
+        streamReconnect: false,
+        mode: "session_history",
+      },
       reason: `${this.config.displayName ?? this.provider} ACP provider`,
     };
   }
@@ -514,6 +597,39 @@ export class AcpProviderClient implements AgentProviderClient {
     return this.snapshot(internal.handle);
   }
 
+  async resolveApproval(input: ResolveProviderApprovalInput): Promise<ProviderApprovalResolution> {
+    const internal = this.runs.get(input.runId);
+    if (!internal) {
+      return { provider: this.provider, runId: input.runId, nativeRunId: input.nativeRunId, choice: input.choice, resolved: 0, status: "not_active" };
+    }
+    const pending = Array.from(this.pendingApprovals.values()).find((approval) =>
+      approval.handle.ref.runId === input.runId && (!input.approvalId || approval.request.id === input.approvalId)
+    );
+    if (!pending) {
+      return { provider: this.provider, runId: input.runId, nativeRunId: input.nativeRunId, choice: input.choice, resolved: 0, status: "not_pending" };
+    }
+    const optionId = pending.optionByChoice.get(input.choice);
+    pending.resolve(optionId ? { outcome: { outcome: "selected", optionId } } : { outcome: { outcome: "cancelled" } });
+    this.pendingApprovals.delete(pending.request.id ?? "");
+    return { provider: this.provider, runId: input.runId, nativeRunId: input.nativeRunId, choice: input.choice, resolved: 1, status: "resolved" };
+  }
+
+  private async requestPermission(handle: AcpRunHandle, params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
+    const mapped = approvalRequestFromAcp(this.config, handle, params);
+    const approvalId = mapped.request.id ?? `${handle.ref.runId}:${params.toolCall.toolCallId}`;
+    const response = await new Promise<RequestPermissionResponse>((resolve) => {
+      this.pendingApprovals.set(approvalId, { handle, request: mapped.request, optionByChoice: mapped.optionByChoice, resolve });
+      queueApprovalEvent(handle, {
+        ...eventBase(this.config, handle, "approval_required"),
+        type: "approval_required",
+        approval: mapped.request,
+        raw: params,
+      });
+    });
+    this.pendingApprovals.delete(approvalId);
+    return response;
+  }
+
   private async start(input: StartRunInput): Promise<AcpRunHandle> {
     const abort = new AbortController();
     input.signal?.addEventListener("abort", () => abort.abort(), { once: true });
@@ -538,6 +654,8 @@ export class AcpProviderClient implements AgentProviderClient {
       status: "running",
       timer,
       sequence: 0,
+      approvalEvents: [],
+      approvalWaiters: [],
     };
 
     let resolveReady!: () => void;
@@ -546,7 +664,7 @@ export class AcpProviderClient implements AgentProviderClient {
       resolveReady = resolve;
       rejectReady = reject;
     });
-    handle.prompt = this.transport.connect(this.config, handlers(), async (connection) => {
+    handle.prompt = this.transport.connect(this.config, handlers((params) => this.requestPermission(handle, params)), async (connection) => {
       try {
         handle.connection = connection;
         const init = await initialize(connection.context, abort.signal);
@@ -579,7 +697,19 @@ export class AcpProviderClient implements AgentProviderClient {
     yield { ...eventBase(this.config, handle, "run_started"), type: "run_started", run: providerRunRef(handle) };
     try {
       for (;;) {
-        const message = await handle.session?.nextUpdate();
+        const queuedApproval = handle.approvalEvents.shift();
+        if (queuedApproval) {
+          yield queuedApproval;
+          continue;
+        }
+        const session = handle.session;
+        if (!session) break;
+        const next = await Promise.race([
+          session.nextUpdate().then((message) => ({ kind: "message" as const, message })),
+          waitForApprovalEvent(handle).then(() => ({ kind: "approval" as const })),
+        ]);
+        if (next.kind === "approval") continue;
+        const message = next.message;
         if (!message) break;
         if (message.kind === "stop") {
           clearTimeout(handle.timer);

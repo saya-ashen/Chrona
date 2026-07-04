@@ -1686,7 +1686,19 @@
       "featureGeneratePlan": "任务计划生成",
       "featureConflicts": "冲突分析",
       "featureTimeslots": "时间段推荐",
-      "featureChat": "对话 / 计划生成"
+      "featureChat": "对话 / 计划生成",
+      "readinessConfigured": "已配置",
+      "readinessReachable": "可连通",
+      "readinessCapability": "执行就绪",
+      "readinessRecovery": "恢复模式",
+      "readinessConfiguredDetail": "已保存设置，且客户端已启用。",
+      "readinessDisabledDetail": "客户端被禁用，或缺少必要设置。",
+      "readinessReachableDetail": "健康检查已通过。",
+      "readinessRunHealthCheck": "运行健康检查以确认提供方可连通。",
+      "readinessCapabilityDetail": "提供方支持启动执行、实时事件、取消、工具和结构化输出。",
+      "readinessCapabilityLimited": "提供方执行能力不可用",
+      "readinessRecoveryMode": "提供方恢复模式",
+      "readinessCapabilityUnknown": "提供方能力矩阵未注册。"
     },
     "advancedSettings": {
       "title": "高级设置",

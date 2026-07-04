@@ -82,7 +82,7 @@ type TestResult = {
 type ReadinessState = "ready" | "warning" | "pending";
 
 type ReadinessItem = {
-  key: "configured" | "reachable" | "capability";
+  key: "configured" | "reachable" | "execution" | "recovery";
   label: string;
   state: ReadinessState;
   detail: string;
@@ -340,16 +340,18 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
       return "outline";
   }
 }
-const CAPABILITY_CHECKS: ProviderCapabilityName[] = [
+const EXECUTION_CAPABILITY_CHECKS: ProviderCapabilityName[] = [
   "healthCheck",
   "startRun",
   "streamEvents",
-  "getRunSnapshot",
-  "cancelRun",
-  "approvalEvent",
+  "cancelActiveRun",
   "toolTraces",
   "structuredOutput",
+];
+
+const RECOVERY_CAPABILITY_CHECKS: ProviderCapabilityName[] = [
   "sessionResume",
+  "historyReplay",
 ];
 
 function providerMatrixEntry(type: AiClientType) {
@@ -370,8 +372,17 @@ function readinessItems(input: {
   testReason: string | null;
 }): ReadinessItem[] {
   const matrix = providerMatrixEntry(input.type);
-  const missingCapabilities = matrix
-    ? CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
+  const missingExecution = matrix
+    ? EXECUTION_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
+    : [];
+  const missingRecovery = matrix
+    ? RECOVERY_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
+    : [];
+  const unavailableRecovery = matrix
+    ? [
+        !matrix.recovery.activeRunLookup ? "active run lookup" : null,
+        !matrix.recovery.streamReconnect ? "stream reconnect" : null,
+      ].filter((value): value is string => Boolean(value))
     : [];
 
   return [
@@ -388,13 +399,21 @@ function readinessItems(input: {
       detail: input.testStatus === "available" ? input.copy.readinessReachableDetail : input.testReason ?? input.copy.readinessRunHealthCheck,
     },
     {
-      key: "capability",
+      key: "execution",
       label: input.copy.readinessCapability,
-      state: matrix && missingCapabilities.length === 0 ? "ready" : "warning",
+      state: matrix && missingExecution.length === 0 ? "ready" : "warning",
       detail: matrix
-        ? missingCapabilities.length === 0
+        ? missingExecution.length === 0
           ? input.copy.readinessCapabilityDetail
-          : `${input.copy.readinessCapabilityLimited}: ${missingCapabilities.join(", ")}`
+          : `${input.copy.readinessCapabilityLimited}: ${missingExecution.join(", ")}`
+        : input.copy.readinessCapabilityUnknown,
+    },
+    {
+      key: "recovery",
+      label: input.copy.readinessRecovery,
+      state: matrix && missingRecovery.length === 0 ? "ready" : "warning",
+      detail: matrix
+        ? `${input.copy.readinessRecoveryMode}: ${matrix.recovery.mode}${unavailableRecovery.length > 0 ? `; unavailable: ${unavailableRecovery.join(", ")}` : ""}`
         : input.copy.readinessCapabilityUnknown,
     },
   ];
@@ -535,13 +554,15 @@ const DEFAULTS: Record<string, string> = {
   reasonUnknown: "No details yet",
   readinessConfigured: "Configured",
   readinessReachable: "Reachable",
-  readinessCapability: "Capability-ready",
+  readinessCapability: "Execution-ready",
+  readinessRecovery: "Recovery mode",
   readinessConfiguredDetail: "Saved settings are present and client is enabled.",
   readinessDisabledDetail: "Client is disabled or required settings are missing.",
   readinessReachableDetail: "Health check passed.",
   readinessRunHealthCheck: "Run health check to confirm provider is reachable.",
-  readinessCapabilityDetail: "Required schedule execution capabilities are available.",
-  readinessCapabilityLimited: "Provider lacks critical capabilities",
+  readinessCapabilityDetail: "Provider supports execution start, live events, cancellation, tools, and structured output.",
+  readinessCapabilityLimited: "Provider execution capabilities unavailable",
+  readinessRecoveryMode: "Provider recovery mode",
   readinessCapabilityUnknown: "Provider capability matrix is not registered.",
 };
 

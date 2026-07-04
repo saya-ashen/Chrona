@@ -98,7 +98,7 @@ describe("AcpProviderClient", () => {
       supportsRunLookup: false,
       supportsCancellation: true,
       supportsToolCalls: true,
-      approval: { supported: false },
+      approval: { supported: true, choices: ["approve_once", "approve_always", "deny"], scopes: ["once", "always"], resolveAll: false },
       reason: "Test ACP ACP provider",
     });
     await expect(client.checkHealth()).resolves.toMatchObject({
@@ -331,6 +331,43 @@ describe("AcpProviderClient", () => {
       outputText: "hello",
       usage: { inputTokens: 7, outputTokens: 0, totalTokens: 7 },
     });
+  });
+
+  it("bridges ACP permission requests into approval events", async () => {
+    const transport = new FakeAcpTransport();
+    const client = new AcpProviderClient({ config: config(), transport });
+    const run = await client.startRun(baseInput());
+    const iterator = client.streamRun({ runId: run.runId })[Symbol.asyncIterator]();
+
+    await expect(iterator.next()).resolves.toMatchObject({ value: { type: "run_started" } });
+    const permission = transport.handlers?.requestPermission({
+      sessionId: "native-acp-session-1",
+      toolCall: { toolCallId: "call-approval", title: "exec_command", rawInput: { cmd: "date" } },
+      options: [
+        { optionId: "allow-once", name: "Allow once", kind: "allow_once" },
+        { optionId: "deny-once", name: "Deny", kind: "reject_once" },
+      ],
+    });
+
+    await expect(iterator.next()).resolves.toMatchObject({
+      value: {
+        type: "approval_required",
+        approval: {
+          id: "native-acp-session-1:call-approval",
+          provider: "test_acp",
+          runId: run.runId,
+          choices: ["approve_once", "deny"],
+          subject: { type: "tool", label: "exec_command" },
+        },
+      },
+    });
+    await expect(client.resolveApproval({
+      runId: run.runId,
+      approvalId: "native-acp-session-1:call-approval",
+      choice: "approve_once",
+    })).resolves.toMatchObject({ status: "resolved", resolved: 1 });
+    await expect(permission).resolves.toEqual({ outcome: { outcome: "selected", optionId: "allow-once" } });
+    await iterator.return?.();
   });
 
   it("reports failed health when ACP agent lacks HTTP MCP capability", async () => {

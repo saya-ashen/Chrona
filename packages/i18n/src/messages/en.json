@@ -1686,7 +1686,19 @@
       "featureGeneratePlan": "Task Plan Generation",
       "featureConflicts": "Conflict Analysis",
       "featureTimeslots": "Timeslot Recommendations",
-      "featureChat": "Chat / Plan Generation"
+      "featureChat": "Chat / Plan Generation",
+      "readinessConfigured": "Configured",
+      "readinessReachable": "Reachable",
+      "readinessCapability": "Execution-ready",
+      "readinessRecovery": "Recovery mode",
+      "readinessConfiguredDetail": "Saved settings are present and client is enabled.",
+      "readinessDisabledDetail": "Client is disabled or required settings are missing.",
+      "readinessReachableDetail": "Health check passed.",
+      "readinessRunHealthCheck": "Run health check to confirm provider is reachable.",
+      "readinessCapabilityDetail": "Provider supports execution start, live events, cancellation, tools, and structured output.",
+      "readinessCapabilityLimited": "Provider execution capabilities unavailable",
+      "readinessRecoveryMode": "Provider recovery mode",
+      "readinessCapabilityUnknown": "Provider capability matrix is not registered."
     },
     "advancedSettings": {
       "title": "Advanced Settings",
