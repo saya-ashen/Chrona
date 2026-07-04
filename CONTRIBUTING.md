@@ -61,7 +61,7 @@ Chrona is a Vite + Hono monorepo:
 | `packages/providers/foundation/` | Provider-neutral client contracts |
 | `packages/providers/hermes/` | Hermes provider adapter |
 
-See [docs/architecture.md](./docs/architecture.md) for full design details.
+See [docs/en/architecture.md](./docs/en/architecture.md) for full design details.
 
 ## Code Style
 

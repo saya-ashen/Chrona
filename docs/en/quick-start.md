@@ -73,52 +73,57 @@ bun run test:api
 
 1. Open `http://localhost:3101`.
 2. Open Settings / AI Clients.
-3. Add an AI client. For local agent execution, choose `Hermes`.
-4. Bind it to the features you want to use, such as `generate_plan`, `suggest`, `chat`, or `dispatch_task`.
+3. Add an AI client when you want AI-backed planning or execution. Choose `Claude Code` or `Codex` for the primary local agent execution paths.
+4. Bind it to product features such as `task.plan`, `task.execution`, or `dashboard.brief`. Lower-level feature slots such as `generate_plan`, `suggest`, `chat`, and `dispatch_task` may also appear in developer-facing contexts.
 5. Create a task with enough context to execute.
 6. Place the task on the schedule.
 7. Generate a plan from the task workspace.
 8. Review or edit the plan graph, then accept it.
 9. Start execution from the task workspace, or let configured auto-execution move due work forward.
-10. Review progress, blockers, approvals, and outputs from Inbox or the task workspace.
+10. Review progress, blockers, approvals, and outputs from the task workspace or Dashboard.
 
 ## Providers and AI clients
 
 Chrona stores AI clients and feature bindings in the database. Chrona does not ship a built-in model provider today; configure an external provider client before using AI-backed features.
 
-- `hermes`: primary supported execution provider for Hermes-backed agent execution.
-- `debug`: deterministic local test/development provider.
+- `claude_code`: primary supported provider for Claude Code-backed plan generation and task execution through scoped MCP control tools.
+- `codex`: primary supported provider for Codex-backed plan generation and task execution through scoped MCP control tools.
+- `hermes`: adapter for existing Hermes gateway setups; provider docs/config flow has not been updated yet.
 
-Feature bindings decide which client handles which capability. Typical features are `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task`.
+Feature bindings decide which client handles which capability. Product-oriented bindings include `task.plan`, `task.execution`, and `dashboard.brief`; lower-level feature slots such as `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task` remain available where needed.
 
-### Local Hermes
+### Claude Code
 
-Use local Hermes when the Hermes gateway runs on the same machine as Chrona.
+Use `Settings -> AI Clients -> Add Client -> Claude Code`.
 
-1. Add a `Hermes` client.
-2. Keep `Hermes location` set to `Local Hermes`.
-3. Keep `Base URL` as `http://127.0.0.1:8642` unless your Hermes API server uses another port.
-4. Click `Diagnose Hermes` to check the CLI, plugin, plugin MCP URL, Hermes `.env`, API key, reachability, and capabilities.
-5. Click `Auto-configure local Hermes` when setup is missing. Chrona can install/update the plugin, write plugin config, and write `API_SERVER_ENABLED=true` plus `API_SERVER_KEY` to `~/.hermes/.env`.
-6. Restart Hermes when prompted. Chrona can request `hermes gateway restart`, but if Hermes runs through a service or custom command, restarting it yourself is often clearer.
+Common fields:
 
-Equivalent CLI checks:
+| Field | Purpose | Default / note |
+| --- | --- | --- |
+| Model | Claude model passed to Claude Code | Defaults to Chrona's provider default if left empty |
+| API key | Anthropic API key for Claude Code | Optional; leave empty to use the user's existing Claude Code auth/config |
+| Config directory | Claude Code config/state directory | Optional; empty means Claude Code's default user-level config |
+| Working directory | Filesystem scope for the run | Optional; defaults to the Chrona process working directory |
+| MCP base URL | Chrona `/api/mcp` server URL | Defaults to the current Chrona server |
+| MCP bearer token | Bearer token for Chrona MCP requests | Usually leave empty; use `CHRONA_API_KEY` or `CHRONA_MCP_BEARER_TOKEN` when API auth is enabled |
+| Timeout | Maximum provider run time | Optional |
 
-```bash
-chrona hermes doctor
-chrona hermes setup
-chrona hermes setup --show-api-key
-```
+### Codex
 
-### Remote Hermes
+Use `Settings -> AI Clients -> Add Client -> Codex`.
 
-Use remote Hermes when the Hermes gateway runs on another machine.
+Common fields:
 
-1. Add a `Hermes` client.
-2. Set `Hermes location` to `Remote Hermes`.
-3. Enter the remote base URL and API key.
-4. On the remote machine, install/enable the Chrona Hermes plugin, point the plugin MCP URL at this Chrona server, set `API_SERVER_ENABLED=true`, set `API_SERVER_KEY`, and restart Hermes.
-5. Run `Diagnose Hermes` and `Test availability` from Chrona.
+| Field | Purpose | Default / note |
+| --- | --- | --- |
+| Model | Codex model passed through provider config | Optional |
+| API key | OpenAI/Codex API key | Optional; also passed as `CODEX_API_KEY` and `OPENAI_API_KEY` for the provider process |
+| Base URL | OpenAI-compatible gateway URL | Optional |
+| Config directory | Codex home directory | Optional; empty means default user-level `CODEX_HOME` (`~/.codex`) |
+| Working directory | Filesystem scope for the run | Optional; defaults to the Chrona process working directory |
+| MCP base URL | Chrona `/api/mcp` server URL | Defaults to the current Chrona server |
+| MCP bearer token | Bearer token for Chrona MCP requests | Usually leave empty; use `CHRONA_API_KEY` or `CHRONA_MCP_BEARER_TOKEN` when API auth is enabled |
+| Timeout | Maximum provider run time | Optional |
 
 ## Task workspace execution basics
 
@@ -135,6 +140,6 @@ The task workspace is the main execution surface for a task. It combines:
 
 - If the server is unreachable, confirm the process is listening on port `3101` and that no other service is using it.
 - If AI features do nothing, verify Settings / AI Clients has an enabled client and feature binding.
-- If Hermes diagnosis fails, read the individual checks first. Local mode can auto-fix plugin/config/env issues; remote mode shows manual instructions because Chrona should not modify another machine.
-- If execution pauses, check Inbox and the task workspace for waiting input, approval, block, or failure state.
+- If provider setup fails, verify the configured AI client is enabled, bound to the feature you are using, and has valid auth/config directory settings.
+- If execution pauses, check the task workspace or Dashboard for waiting input, approval, block, or failure state.
 - If developing locally after schema or dependency changes, run `bun run setup`. On NixOS, Prisma may require custom engine configuration or `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1` because upstream checksum files can be unavailable for the `linux-nixos` engine target.

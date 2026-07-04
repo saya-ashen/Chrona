@@ -19,12 +19,12 @@ Chrona is a local-first AI schedule app. It helps you turn tasks into editable p
 | --- | --- |
 | Install and run Chrona | [Quick Start](./quick-start.md) |
 | See current product direction | [Roadmap](./roadmap.md) |
-| Integrate over HTTP or MCP | [API Reference](../api-reference.md) |
-| Understand the architecture | [Architecture](../architecture.md) |
-| Trace execution internals | [Backend Execution Flow](../backend-execution-flow.md) |
-| Understand persistence | [Data Model](../data-model.md) |
-| Place code in the right package | [Package Boundaries](../package-boundaries.md) |
-| Extend AI/runtime providers | [Provider Boundary](../provider-boundary.md) |
+| Integrate over HTTP or MCP | [API Reference](./api-reference.md) |
+| Understand the architecture | [Architecture](./architecture.md) |
+| Trace execution internals | [Backend Execution Flow](./backend-execution-flow.md) |
+| Understand persistence | [Data Model](./data-model.md) |
+| Place code in the right package | [Package Boundaries](./package-boundaries.md) |
+| Extend AI/runtime providers | [Provider Boundary](./provider-boundary.md) |
 
 ## Main user workflows
 
@@ -48,7 +48,7 @@ Chrona is a local-first AI schedule app. It helps you turn tasks into editable p
 
 ### 3. Agent integration
 
-External agents call Chrona through MCP tools such as `chrona_plan_generate`, `chrona_task_complete`, `chrona_node_block`, and `chrona_condition_select`. Agents receive AI-visible node and branch refs from Chrona and must submit results through those refs instead of inventing backend IDs.
+External agents call Chrona through MCP tools such as `chrona_plan_generate`, `chrona_node_complete`, `chrona_node_block`, and `chrona_condition_select`. Agents receive AI-visible node and branch refs from Chrona and must submit results through those refs instead of inventing backend IDs.
 
 ## Developer map
 
