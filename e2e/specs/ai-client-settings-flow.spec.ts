@@ -136,7 +136,7 @@ test.describe("AI Client Settings", () => {
     await page.getByPlaceholder("My Hermes Client").fill("Default Client B");
     await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://b.mock.ai/v1");
     await page.getByPlaceholder("optional for localhost").fill("sk-b");
-    await page.getByText("Set as default Client").click();
+    await page.getByRole("checkbox", { name: "Use as default AI client" }).click();
 
     const respB = page.waitForResponse(
       (res) =>
@@ -148,7 +148,7 @@ test.describe("AI Client Settings", () => {
 
     // Now edit Client A and set as default
     await page.getByRole("button", { name: "Edit" }).first().click();
-    await page.getByText("Set as default Client").click();
+    await page.getByRole("checkbox", { name: "Use as default AI client" }).click();
 
     const patchResp = page.waitForResponse(
       (res) =>
