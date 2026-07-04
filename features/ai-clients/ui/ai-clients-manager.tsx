@@ -394,7 +394,6 @@ function recoveryReadiness(matrix: ProviderCapabilityMatrixEntry | undefined, co
     detail: copy.recoverySessionHistory,
   };
 }
-
 function hasBasicConfig(type: AiClientType, values: Pick<ClientFormValues, "baseUrl" | "timeoutSeconds" | "hermesScope">) {
   if (type === "hermes" && values.hermesScope === "remote") return Boolean(values.baseUrl.trim());
   return Number(values.timeoutSeconds) > 0;

@@ -7,7 +7,7 @@
 <h1 align="center">Chrona</h1>
 
 <p align="center">
-  <strong>一个 local-first 日程软件，用 AI 规划工作，并自动完成日程上的任务。</strong>
+  <strong>把日程上的工作变成可审查、可恢复、可追踪的 AI 执行图。</strong>
 </p>
 
 <p align="center">
@@ -18,11 +18,12 @@
 
 <p align="center">
   <a href="#快速开始">快速开始</a> ·
+  <a href="#核心工作流">工作流</a> ·
   <a href="#providers">Providers</a> ·
+  <a href="#local-first-与安全模型">安全</a> ·
   <a href="#项目状态">状态</a> ·
-  <a href="#路线图">路线图</a> ·
   <a href="./docs/zh/quick-start.md">完整指南</a> ·
-  <a href="./docs/architecture.md">架构</a> ·
+  <a href="./docs/en/architecture.md">架构</a> ·
   <a href="./CONTRIBUTING.md">贡献</a>
 </p>
 
@@ -32,41 +33,42 @@
 > schedule-first：围绕日程规划工作，并自动执行到期任务。
 
 <p align="center">
-  <img src="docs/assets/CreateTask.png" width="45%" alt="创建结构化 Chrona 任务" />
-  <img src="docs/assets/TaskWorkSpace.png" width="45%" alt="查看包含计划和执行上下文的 Chrona 任务工作区" />
+  <img src="docs/assets/generated/task-workspace.png" width="85%" alt="Chrona task workspace showing an executable AI plan graph" />
+  <br />
+  <em>安排任务、审查生成计划、交给 AI provider 执行，并检查每个 checkpoint、分支、审批和输出。</em>
 </p>
 
 ---
 
 Chrona 是一个 local-first 的 AI
-辅助日程软件。它的主要目标是把工作放到日程上，在合适的时候让 AI
-执行日程任务，并保留可检查的执行结果，而不是把过程埋在聊天记录里。
+辅助工作空间。它帮助你捕获任务、生成可编辑计划、放入日程、手动或自动执行，并在之后回看发生过什么。
 
-Chrona 把通常分散在不同工具中的四层能力连接起来：
+Chrona 把通常分散在不同工具中的四个循环连接起来：
 
 ```text
-Task -> Plan -> Schedule -> Auto Execution
+Task -> Plan -> Schedule -> Inspectable Execution
 ```
 
-你可以用 Chrona
-捕获工作、生成可编辑计划、放入日程、手动或自动执行，并在之后回看发生过什么。
+它适合那些不应该消失在聊天记录里的工作：周期性调研、发布准备、维护、跟进任务，以及需要状态、审批、恢复和持久化输出的
+agent run。
 
 ## 项目状态
 
 Chrona
-当前可用于本地开发和产品探索，但还不是稳定软件。当前代码库已经具备任务、计划、日程、执行、Dashboard、Settings
-和 AI-client 流程；接下来的重点是让“日程到自动执行”的闭环可靠到可以日常使用。
+当前可用于本地开发和产品探索，但还不是稳定软件。当前代码库已经具备任务、计划、日程、执行、Dashboard、Settings、外部日历和
+AI-client 流程；接下来的重点是让“日程到自动执行”的闭环可靠到可以日常使用。
 
 ## 为什么需要 Chrona
 
-日历告诉你应该发生什么，任务软件告诉你还有什么没做，AI chat
-可以做事但通常丢失日程、状态和责任链。Chrona 把这些循环合在一起：
+日历告诉你应该发生什么。任务软件告诉你还有什么没做。AI chat
+可以做事，但通常丢失日程、状态和责任链。Chrona
+把这些循环合在一起，但不假装它们是同一种东西。
 
 | 如果你需要...            | Chrona 提供...                                                          |
 | ------------------------ | ----------------------------------------------------------------------- |
 | 围绕真实工作安排一天     | 带优先级、状态、截止时间、估时、依赖和日程信息的任务                    |
-| 把日程任务变成可执行步骤 | 可审查、可 patch、可接受、可重新执行的 AI 计划图                        |
-| 让到期工作自动推进       | 日程块、提案、等待状态、任务工作区审批和执行动作                            |
+| 把日程任务变成可执行步骤 | 可审查、可 patch、可接受、可重新执行、可追踪的 AI 计划图                |
+| 让到期工作自动推进       | 日程块、提案、等待状态、任务工作区审批和执行动作                        |
 | 让 AI 执行可追责         | 作用域受限的 runtime refs、checkpoint、审批、工具轨迹、失败和持久化输出 |
 
 ## 快速开始
@@ -78,8 +80,7 @@ package 安装。
 
 如果你只想运行 Chrona，不需要克隆仓库，选择这条路径。
 
-1. 打开
-   [最新 GitHub Release](https://github.com/saya-ashen/Chrona/releases/latest)。
+1. 打开[最新 GitHub Release](https://github.com/saya-ashen/Chrona/releases/latest)。
 2. 下载对应平台的压缩包：
 
 | 平台                | 文件                         |
@@ -123,12 +124,15 @@ Web 应用。
 
 ## 首次运行
 
+你可以在不连接真实 provider 的情况下探索 Chrona：创建任务、安排日程、查看
+Dashboard、打开任务工作区。AI 计划生成和 agent 执行需要配置 AI client。
+
+完整执行闭环：
+
 1. 打开 `http://localhost:3101`。
-2. 进入 `Settings -> AI Clients`，添加 provider client。如果要进行本机 agent
-   执行，选择 `Hermes`。
-3. 如果 Hermes 运行在当前机器，保持 `Hermes 位置` 为 `本机 Hermes`，然后使用
-   `诊断 Hermes` 或 `自动配置本机 Hermes`。
-4. 将 client 绑定到 `generate_plan`、`suggest`、`chat`、`dispatch_task` 等功能。
+2. 进入 `Settings -> AI Clients`，添加 provider client。
+3. 选择 `Claude Code` 或 `Codex`，用于真实的本机 agent 执行。
+4. 将 client 绑定到 `task.plan`、`task.execution`、`dashboard.brief` 等功能。
 5. 创建任务，补充足够的执行上下文，并把它放入日程。
 6. 在任务工作区生成计划，审查或编辑生成的图结构，然后接受计划。
 7. 从任务工作区手动开始执行，或在配置自动执行后让 Chrona 推进到期日程任务。
@@ -136,106 +140,116 @@ Web 应用。
 
 数据目录、AI client 细节和排障说明见[完整快速开始](./docs/zh/quick-start.md)。
 
+## 核心工作流
+
+1. **捕获工作** — 创建带优先级、估时、截止时间、依赖和日程信息的任务。
+2. **生成计划** — 把粗略上下文变成结构化计划图。
+3. **执行前审查** — 在计划变成可执行任务节点前，patch、接受或重新生成计划。
+4. **带状态运行** — 手动、AI assisted 或在配置后自动执行
+   `task`、`checkpoint`、`condition`、`wait` 节点。
+5. **检查和恢复** —
+   从工作区查看审批、工具活动、失败、阻塞、持久化输出和下一步动作。
+
+<p align="center">
+  <img src="docs/assets/generated/node-detail.png" width="80%" alt="查看 Chrona 执行节点的状态、详情和活动记录" />
+  <br />
+  <em>执行记录会留在任务上下文里，包括节点状态、工具活动和输出。</em>
+</p>
+
 ## Providers
 
 Chrona 把产品工作流和执行 provider 分开。你先把 provider 配置成 AI
 client，再把这些 client 绑定到 Chrona 功能。
 
-| Provider 类型 | 状态         | 用途                                                             |
-| ------------- | ------------ | ---------------------------------------------------------------- |
-| `hermes`      | 当前主要支持 | 本机或远程 Hermes agent 执行、任务派发、计划执行和流式运行状态。 |
-| `debug`       | 开发 client  | 确定性的本地测试和开发流程。                                     |
+| Provider 类型 | 状态              | 用途                                                                 | 备注                                                       |
+| ------------- | ----------------- | -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `claude_code` | 主要支持 provider | 通过作用域受限的 MCP control tools 进行 Claude Code 计划生成和任务执行 | 未配置目录时默认使用用户级 Claude Code config              |
+| `codex`       | 主要支持 provider | 通过作用域受限的 MCP control tools 进行 Codex 计划生成和任务执行       | 未配置目录时默认使用用户级 `CODEX_HOME`（`~/.codex`）      |
+| `hermes`      | 待更新 adapter   | 面向本机或远程 agent 执行的 Hermes gateway 集成                       | 适合已有 Hermes 配置；provider 文档/配置流程还没有更新      |
 
-### Hermes 配置
+### Claude Code 配置
 
-Hermes 是当前主要执行 provider。它让 Chrona 可以把日程任务交给 agent
-runtime，同时在 Chrona 中保留可见的执行状态。
+进入 `Settings -> AI Clients -> Add Client -> Claude Code`。
 
-进入 `Settings -> AI Clients -> Add Client -> Hermes`。
+常用字段：
 
-如果 Hermes gateway 运行在当前机器：
+| 字段 | 用途 | 默认 / 说明 |
+| --- | --- | --- |
+| Model | 传给 Claude Code 的模型 | 留空则使用 Chrona provider 默认值 |
+| API key | Claude Code 使用的 Anthropic API key | 可选；留空则使用用户已有 Claude Code auth/config |
+| Config directory | Claude Code 配置/状态目录 | 可选；留空表示使用 Claude Code 默认用户级配置 |
+| Working directory | 本次运行的文件系统作用域 | 可选；默认使用 Chrona 进程工作目录 |
+| MCP base URL | Chrona `/api/mcp` server URL | 默认使用当前 Chrona server |
+| MCP bearer token | Chrona MCP 请求使用的 bearer token | 通常留空；启用 API auth 时使用 `CHRONA_API_KEY` 或 `CHRONA_MCP_BEARER_TOKEN` |
+| Timeout | provider run 最大时长 | 可选 |
 
-1. 选择 `本机 Hermes`。
-2. 保持默认 base URL `http://127.0.0.1:8642`，除非你的 Hermes API server
-   使用了其他端口。
-3. 点击 `诊断 Hermes`，检查 Hermes CLI、Chrona Hermes plugin、plugin MCP
-   URL、Hermes `.env`、API 连通性、API key 和必需 capabilities。
-4. 如果 Chrona 报告本机配置缺失，点击 `自动配置本机 Hermes`。Chrona
-   可以安装/更新 Chrona Hermes plugin、写入 plugin MCP URL，并向
-   `~/.hermes/.env` 写入 `API_SERVER_ENABLED=true` 和 `API_SERVER_KEY`。
-5. 如果提示需要重启 Hermes，请重启。Chrona 可以请求执行
-   `hermes gateway restart`，但如果你通过 service 或自定义命令运行
-   Hermes，通常你自己重启会更清楚。
+### Codex 配置
 
-如果 Hermes gateway 运行在远程机器：
+进入 `Settings -> AI Clients -> Add Client -> Codex`。
 
-1. 选择 `远程 Hermes`。
-2. 输入远程 gateway base URL 和 API key。
-3. 在远程机器上手动配置：安装/启用 Chrona Hermes plugin，把 plugin MCP URL
-   指向当前 Chrona server，启用 Hermes API server，设置
-   `API_SERVER_KEY`，然后重启 Hermes。
-4. 在 Chrona 中运行 `诊断 Hermes` 和 `测试可用性`。
+常用字段：
 
-CLI 也提供同样的检查：
+| 字段 | 用途 | 默认 / 说明 |
+| --- | --- | --- |
+| Model | 通过 provider config 传给 Codex 的模型 | 可选 |
+| API key | OpenAI/Codex API key | 可选；也会作为 `CODEX_API_KEY` 和 `OPENAI_API_KEY` 传给 provider 进程 |
+| Base URL | OpenAI-compatible gateway URL | 可选 |
+| Config directory | Codex home directory | 可选；留空表示使用默认用户级 `CODEX_HOME`（`~/.codex`） |
+| Working directory | 本次运行的文件系统作用域 | 可选；默认使用 Chrona 进程工作目录 |
+| MCP base URL | Chrona `/api/mcp` server URL | 默认使用当前 Chrona server |
+| MCP bearer token | Chrona MCP 请求使用的 bearer token | 通常留空；启用 API auth 时使用 `CHRONA_API_KEY` 或 `CHRONA_MCP_BEARER_TOKEN` |
+| Timeout | provider run 最大时长 | 可选 |
 
-```bash
-chrona hermes doctor
-chrona hermes setup
-chrona hermes setup --show-api-key
-```
+Provider 排障说明见[完整快速开始](./docs/zh/quick-start.md)。
 
-## 你可以做什么
+## Local-first 与安全模型
 
-### 构建真实日程
+Chrona 默认从本机和显式配置开始。
 
-创建带优先级、估时、截止时间、依赖和日程信息的任务，让日历成为下一步工作的来源。
+| 领域           | 默认 / 行为                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| 存储           | SQLite。源码开发默认 `file:./prisma/dev.db`；发行版默认使用平台数据目录，除非显式覆盖。    |
+| 网络绑定       | `HOST` 默认绑定本机 `127.0.0.1`。                                                          |
+| API auth       | 本地开发可不设置 `API_KEY`；把 `/api/*` 暴露到 localhost 之外前应设置。                    |
+| CORS           | Web 和 API 分离部署时，可用 `ALLOWED_ORIGINS` 限制浏览器来源。                             |
+| Provider scope | AI worker 接收作用域受限的 runtime refs 和 Chrona control tools，不直接接触内部数据库 ID。 |
+| 自动执行       | 需要显式配置 provider/feature，并通过任务工作区状态、审批、阻塞和 run records 保持可见。   |
 
-### 生成可编辑计划
+## 功能
 
-把粗略任务变成结构化计划蓝图。已接受的计划会变成持久化 task plan layer 和 graph
-node，而不是一次性的 assistant 文本。
-
-### 执行图结构工作
-
-用 `task`、`checkpoint`、`condition`、`wait` 节点运行计划图。节点可以是
-manual、assisted 或 automatic，也可以分配给 user、AI 或 system executor。
-
-### 推进日程上的工作
-
-使用 schedule views、AI insights、冲突建议、日程提案、waiting runs、failed
-runs、cancelled runs 和任务工作区 approvals，把到期工作推向执行。
-
-### 保持 AI 执行可观测
-
-AI worker 只接收安全的 runtime refs，不直接接触内部数据库 ID。它们通过
-`chrona.task.complete`、`chrona.condition.select`、`chrona.node.block`、`chrona.node.fail`、`chrona.wait.complete`
-等 Chrona 命令汇报进度。
+- **真实日程** — 任务带优先级、估时、截止时间、依赖和日程元数据。
+- **可编辑计划图** — 生成的计划可审查、可 patch、可接受、可重新执行，并
+  materialize 为类型化图节点。
+- **图结构执行** — `task`、`checkpoint`、`condition`、`wait` 节点支持
+  manual、assisted 和 automatic work。
+- **到期任务恢复** — Schedule views、AI insights、冲突建议、日程提案、waiting
+  runs、failed runs、cancelled runs 和 approvals 让下一步动作保持可见。
+- **可观测 AI 工作** — Provider runs 只接收安全的 runtime refs，不直接接触内部数据库 ID。它们通过
+  `chrona_node_complete`、`chrona_condition_select`、`chrona_node_block`、`chrona_node_fail`、`chrona_wait_complete`
+  等工具汇报进度。Conversation history、tool traces
+  和持久化输出会留在任务上下文里。
 
 <p align="center">
   <img src="docs/assets/NodeDetail.png" width="80%" alt="查看 Chrona 执行节点的状态、详情和活动记录" />
 </p>
 
-### 带着上下文恢复工作
-
-通过任务工作区、assistant surfaces、conversation history、tool traces 和持久化输出理解并继续长周期工作。
-
 ## 路线图
 
-这里是项目路线图摘要。完整内容以[路线图](./docs/zh/roadmap.md)为准。
+这里是成熟度摘要。完整内容以[路线图](./docs/zh/roadmap.md)为准。
 
-| 状态   | 领域            | 范围                                                                                        |
-| ------ | --------------- | ------------------------------------------------------------------------------------------- |
-| 已完成 | 任务基础        | 创建、更新、删除、完成/重开、状态、优先级、标签、依赖、父子任务和任务投影。                 |
-| 已完成 | 日程界面        | 时间线/任务视图、AI insights、冲突、日程提案、任务创建和配置界面。                          |
-| 已完成 | 计划生成        | 流式 AI 计划生成、计划持久化、审查/编辑/接受流程，以及 materialize 为图节点。               |
-| 已完成 | 执行 runtime    | 可执行的 `task`、`checkpoint`、`condition`、`wait` 节点，AI-visible refs 和持久化执行状态。 |
-| 已完成 | 审查闭环        | Dashboard 和任务工作区中的 pending approvals、日程提案、等待输入、失败/取消 run 入口。        |
-| 已完成 | 外部日历        | 只读日历订阅、导入忙碌事件、来源管理、刷新状态和日程上下文。                              |
-| 接下来 | 完善现有流程    | 让 Dashboard、Schedule、Task Workspace 和执行记录更可靠、更容易理解。                     |
-| 接下来 | 可靠自动执行    | 仅在配置允许且安全时启动到期日程任务，并在执行阻塞或失败时提供清晰恢复路径。                |
-| 接下来 | 更多 provider   | 在保持 provider boundary 清晰的前提下，接入更多执行/provider 集成。                         |
-| 接下来 | 多 session 执行 | 让任务执行在需要时使用多个 session，并明确隔离、复用、恢复和诊断行为。                      |
-| 后续   | 生产就绪        | 改进认证、备份恢复、部署文档、迁移安全、可观测性和运维 runbooks。                           |
+| 领域            | 可用性 | 成熟度         | 备注                                                                                    |
+| --------------- | ------ | -------------- | --------------------------------------------------------------------------------------- |
+| 任务基础        | 已可用 | 可用           | 创建、更新、删除、完成/重开、状态、优先级、标签、依赖、父子任务和投影。                 |
+| 日程界面        | 已可用 | 可用，继续打磨 | Timeline/task views、AI insights、冲突、日程提案、任务创建和配置界面。                  |
+| 计划生成        | 已可用 | 实验性         | 流式 AI 计划生成、持久化、审查/编辑/接受流程，以及 materialize 为图节点。               |
+| 执行 runtime    | 已可用 | 实验性         | 可执行的 `task`、`checkpoint`、`condition`、`wait` 节点，AI-visible refs 和持久化状态。 |
+| 审查闭环        | 已可用 | 实验性         | Dashboard 和任务工作区中的 pending approvals、日程提案、等待输入、失败/取消 run 入口。  |
+| 外部日历        | 已可用 | 早期           | 只读日历订阅、导入忙碌事件、来源管理、刷新状态和日程上下文。                            |
+| 完善现有流程    | 进行中 | Active         | 让 Dashboard、Schedule、Task Workspace 和执行记录更可靠、更容易理解。                   |
+| 可靠自动执行    | 进行中 | 尚不稳定       | 仅在配置允许且安全时启动到期日程任务，并在执行阻塞或失败时提供清晰恢复路径。            |
+| 更多 providers  | 进行中 | 实验性         | 在保持 provider 边界清晰的前提下接入更多执行/provider integrations。                    |
+| 多 session 执行 | 已计划 | 尚不可用       | 增加多 session 的隔离、复用、恢复和诊断能力。                                           |
+| 生产可用性      | 已计划 | 未就绪         | 认证、备份/恢复、部署文档、迁移安全、可观测性和运维 runbooks。                          |
 
 ## 架构
 
@@ -251,35 +265,59 @@ React SPA
       -> AI clients and provider adapters
 ```
 
-| 区域                             | 路径                      |
-| -------------------------------- | ------------------------- |
-| Web app                          | `apps/web/`               |
-| API server                       | `apps/server/`            |
-| CLI 和 binary entrypoints        | `packages/cli/`           |
-| 共享 schema 和 runtime contracts | `packages/contracts/`     |
-| 数据库层                         | `packages/db/`            |
-| 产品引擎                         | `packages/engine/`        |
-| 计划图 runtime                   | `packages/graph-runtime/` |
-| Provider adapters                | `packages/providers/`     |
+| 领域                                | 路径                      |
+| ----------------------------------- | ------------------------- |
+| Web app                             | `apps/web/`               |
+| API server                          | `apps/server/`            |
+| CLI 和 binary entrypoints           | `packages/cli/`           |
+| Shared schemas 和 runtime contracts | `packages/contracts/`     |
+| Database layer                      | `packages/db/`            |
+| Product engine                      | `packages/engine/`        |
+| Plan graph runtime                  | `packages/graph-runtime/` |
+| Provider adapters                   | `packages/providers/`     |
 
-更多设计说明见[架构指南](./docs/architecture.md)、[数据模型](./docs/data-model.md)和[后端执行流程](./docs/backend-execution-flow.md)。
+更多设计说明见[架构指南（英文）](./docs/en/architecture.md)、[数据模型（英文）](./docs/en/data-model.md)和[后端执行流程（英文）](./docs/en/backend-execution-flow.md)。
 
 ## 配置
 
 如果需要本地覆盖配置，复制 `.env.example`。
 
-| 变量                | 用途                                | 默认值 / 说明                                                              |
-| ------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
-| `DATABASE_URL`      | SQLite database URL                 | 源码默认：`file:./prisma/dev.db`；发行版默认使用平台数据目录，除非显式覆盖 |
-| `HOST`              | API server bind host                | 默认只绑定本机 `127.0.0.1`                                                 |
-| `PORT`              | API server port                     | `3101`                                                                     |
-| `API_KEY`           | `/api/*` routes 的可选 bearer token | 本机开发可省略                                                             |
-| `CHRONA_WEB_DIST`   | 静态服务使用的 Web build 目录       | `apps/web/dist`                                                            |
-| `ALLOWED_ORIGINS`   | 逗号分隔的 CORS allowlist           | 本地开发可省略                                                             |
-| `VITE_API_BASE_URL` | 前端 API base URL override          | Web 和 API 分离部署时使用                                                  |
+| 变量                | 用途                                       | 默认 / 说明                                                                |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| `DATABASE_URL`      | SQLite database URL                        | 源码默认：`file:./prisma/dev.db`；发行版默认使用平台数据目录，除非显式覆盖 |
+| `HOST`              | API server bind host                       | 默认本机 `127.0.0.1`                                                       |
+| `PORT`              | API server port                            | `3101`                                                                     |
+| `API_KEY`           | `/api/*` routes 的可选 bearer token        | 本地开发可省略                                                             |
+| `CHRONA_WEB_DIST`   | Built web app directory for static serving | `apps/web/dist`                                                            |
+| `ALLOWED_ORIGINS`   | Comma-separated CORS allowlist             | 本地开发可省略                                                             |
+| `VITE_API_BASE_URL` | Frontend API base URL override             | Web 和 API 分离时使用                                                      |
 
-AI clients 在 Web 应用的 `Settings -> AI Clients` 配置。支持的 provider 类型和
-Hermes 配置方式见 [Providers](#providers)。
+AI clients 在 Web app 的 `Settings -> AI Clients` 下配置。Provider 类型和 Claude Code/Codex
+配置方式见 [Providers](#providers)。
+
+## FAQ
+
+### 不配置 AI provider 可以使用 Chrona 吗？
+
+可以。你可以在没有 AI provider 的情况下创建任务、安排日程、查看
+Dashboard、使用任务工作区。真实 AI 计划生成和 agent 执行需要配置 AI
+client。主要本机 agent 执行路径使用 Claude Code 或 Codex。
+
+### Chrona 生产可用了吗？
+
+还没有。Chrona 当前可用于本地开发和产品探索，但 runtime contracts、provider
+行为和 auto-execution 流程仍在变化。
+
+### Chrona 数据存在哪里？
+
+源码开发默认 `file:./prisma/dev.db`。发行版默认使用平台数据目录，除非
+`DATABASE_URL` 显式覆盖。
+
+### 自动执行会静默运行吗？
+
+不会。自动执行需要显式配置
+provider/feature，并且会通过任务工作区状态、审批、阻塞、activity 和 run records
+保持可见。
 
 ## 开发
 
@@ -309,17 +347,19 @@ bun run analyze
 
 ## 文档
 
-| 主题               | 文档                                                                   |
-| ------------------ | ---------------------------------------------------------------------- |
-| 文档索引           | [docs/README.md](./docs/README.md)                                     |
-| 快速开始           | [English](./docs/en/quick-start.md) / [中文](./docs/zh/quick-start.md) |
-| 架构               | [docs/architecture.md](./docs/architecture.md)                         |
-| API reference      | [docs/api-reference.md](./docs/api-reference.md)                       |
-| 数据模型           | [docs/data-model.md](./docs/data-model.md)                             |
-| 后端执行流程       | [docs/backend-execution-flow.md](./docs/backend-execution-flow.md)     |
-| Provider boundary  | [docs/provider-boundary.md](./docs/provider-boundary.md)               |
-| Package boundaries | [docs/package-boundaries.md](./docs/package-boundaries.md)             |
-| 路线图             | [English](./docs/en/roadmap.md) / [中文](./docs/zh/roadmap.md)         |
+| 主题               | 文档                                                                     |
+| ------------------ | ------------------------------------------------------------------------ |
+| 文档索引           | [docs/README.md](./docs/README.md)                                       |
+| 快速开始           | [English](./docs/en/quick-start.md) / [中文](./docs/zh/quick-start.md)   |
+| 架构               | [docs/en/architecture.md](./docs/en/architecture.md)                     |
+| API reference      | [docs/en/api-reference.md](./docs/en/api-reference.md)                   |
+| 数据模型           | [docs/en/data-model.md](./docs/en/data-model.md)                         |
+| 后端执行流程       | [docs/en/backend-execution-flow.md](./docs/en/backend-execution-flow.md) |
+| Provider boundary  | [docs/en/provider-boundary.md](./docs/en/provider-boundary.md)           |
+| Package boundaries | [docs/en/package-boundaries.md](./docs/en/package-boundaries.md)         |
+| 路线图             | [English](./docs/en/roadmap.md) / [中文](./docs/zh/roadmap.md)           |
+| Security           | [SECURITY.md](./SECURITY.md)                                             |
+| Code of Conduct    | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)                               |
 
 ## 贡献
 

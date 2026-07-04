@@ -4,22 +4,35 @@ Chrona is an open-source, local-first AI schedule app for turning tasks into pla
 
 Use this directory as the stable product and developer documentation set. Time-point audits, refactor notes, and design-debt records are removed once their lasting content is merged into stable docs.
 
-## Start here
+## English docs
 
 | Need | Document |
 | --- | --- |
-| Install and run Chrona | [Quick Start (English)](./en/quick-start.md) / [快速开始（中文）](./zh/quick-start.md) |
-| Understand the product surface | [English guide](./en/README.md) / [中文指南](./zh/README.md) |
-| See shipped and planned product areas | [Roadmap (English)](./en/roadmap.md) / [路线图（中文）](./zh/roadmap.md) |
-| Integrate over HTTP or MCP | [API Reference](./api-reference.md) |
-| Understand system architecture | [Architecture](./architecture.md) |
-| Trace execution internals | [Backend Execution Flow](./backend-execution-flow.md) |
-| Understand persistence | [Data Model](./data-model.md) |
-| Place code in the right package | [Package Boundaries](./package-boundaries.md) |
-| Understand the frontend (`apps/web`) | [Frontend Structure](./frontend-structure.md) |
-| Extend AI/runtime providers | [Provider Boundary](./provider-boundary.md) |
-| Understand plan-level output architecture | [Plan-Level Output Architecture](./plan-level-output-architecture.md) |
-| Run tests | [中文测试指南](./zh/testing.md) |
+| Install and run Chrona | [Quick Start](./en/quick-start.md) |
+| Understand the product surface | [Product Guide](./en/README.md) |
+| See shipped and planned product areas | [Roadmap](./en/roadmap.md) |
+| Integrate over HTTP or MCP | [API Reference](./en/api-reference.md) |
+| Understand system architecture | [Architecture](./en/architecture.md) |
+| Trace execution internals | [Backend Execution Flow](./en/backend-execution-flow.md) |
+| Understand persistence | [Data Model](./en/data-model.md) |
+| Place code in the right package | [Package Boundaries](./en/package-boundaries.md) |
+| Understand the frontend (`apps/web`) | [Frontend Structure](./en/frontend-structure.md) |
+| Extend AI/runtime providers | [Provider Boundary](./en/provider-boundary.md) |
+| Understand plan-level output architecture | [Plan-Level Output Architecture](./en/plan-level-output-architecture.md) |
+
+## 中文文档
+
+| 需求 | 文档 |
+| --- | --- |
+| 安装并运行 Chrona | [快速开始](./zh/quick-start.md) |
+| 理解当前产品界面 | [中文指南](./zh/README.md) |
+| 查看已发布与计划中的产品区域 | [路线图](./zh/roadmap.md) |
+| 运行测试 | [测试指南](./zh/testing.md) |
+
+## Shared/generated docs
+
+| Need | Document |
+| --- | --- |
 | See feature/test coverage map | [Feature + Test Map](./maps/feature-test-map.md) (check/regenerate source: `bun run map:check`) |
 
 ## Current product areas
@@ -51,7 +64,7 @@ Chrona is a Bun/TypeScript monorepo:
 
 This table is a curated subset. For the complete package list (including
 `domain`, `ui-protocol`, `runtime-core`, `i18n`, `shared`) and the placement
-rules, see [Package Boundaries](./package-boundaries.md).
+rules, see [Package Boundaries](./en/package-boundaries.md).
 
 ## Common commands for repository development
 

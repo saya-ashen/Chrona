@@ -19,12 +19,12 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 | --- | --- |
 | 安装并运行 Chrona | [快速开始](./quick-start.md) |
 | 查看当前产品方向 | [路线图](./roadmap.md) |
-| 通过 HTTP 或 MCP 集成 | [API 参考](../api-reference.md) |
-| 理解系统架构 | [系统架构](../architecture.md) |
-| 跟踪执行内部流程 | [后端执行流程](../backend-execution-flow.md) |
-| 理解持久化模型 | [数据模型](../data-model.md) |
-| 判断代码应该放在哪里 | [包边界说明](../package-boundaries.md) |
-| 扩展 AI/运行时 provider | [Provider 边界](../provider-boundary.md) |
+| 通过 HTTP 或 MCP 集成 | [API 参考（英文）](../en/api-reference.md) |
+| 理解系统架构 | [系统架构（英文）](../en/architecture.md) |
+| 跟踪执行内部流程 | [后端执行流程（英文）](../en/backend-execution-flow.md) |
+| 理解持久化模型 | [数据模型（英文）](../en/data-model.md) |
+| 判断代码应该放在哪里 | [包边界说明（英文）](../en/package-boundaries.md) |
+| 扩展 AI/运行时 provider | [Provider 边界（英文）](../en/provider-boundary.md) |
 
 ## 主要用户流程
 
@@ -48,7 +48,7 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 
 ### 3. 智能体集成
 
-外部智能体通过 MCP 工具调用 Chrona，例如 `chrona_plan_generate`、`chrona_task_complete`、`chrona_node_block`、`chrona_condition_select`。智能体只能使用 Chrona 提供的 AI 可见 node / branch refs 提交结果，不能编造后端 ID。
+外部智能体通过 MCP 工具调用 Chrona，例如 `chrona_plan_generate`、`chrona_node_complete`、`chrona_node_block`、`chrona_condition_select`。智能体只能使用 Chrona 提供的 AI 可见 node / branch refs 提交结果，不能编造后端 ID。
 
 ## 开发者地图
 

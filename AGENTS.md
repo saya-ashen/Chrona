@@ -19,12 +19,12 @@ cheaper than reading files):
 
 | To understand…                                                                  | Read                                                               |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| System: layers, workflows, data/projection model, architecture rules            | [`docs/architecture.md`](docs/architecture.md)                     |
-| Where code belongs: per-package responsibilities, dependency rules, enforcement | [`docs/package-boundaries.md`](docs/package-boundaries.md)         |
-| Frontend `apps/web`: routing, components, hooks, lib, conventions               | [`docs/frontend-structure.md`](docs/frontend-structure.md)         |
-| Execution internals                                                             | [`docs/backend-execution-flow.md`](docs/backend-execution-flow.md) |
-| Persistence                                                                     | [`docs/data-model.md`](docs/data-model.md)                         |
-| HTTP/MCP surface                                                                | [`docs/api-reference.md`](docs/api-reference.md)                   |
+| System: layers, workflows, data/projection model, architecture rules            | [`docs/en/architecture.md`](docs/en/architecture.md)                     |
+| Where code belongs: per-package responsibilities, dependency rules, enforcement | [`docs/en/package-boundaries.md`](docs/en/package-boundaries.md)         |
+| Frontend `apps/web`: routing, components, hooks, lib, conventions               | [`docs/en/frontend-structure.md`](docs/en/frontend-structure.md)         |
+| Execution internals                                                             | [`docs/en/backend-execution-flow.md`](docs/en/backend-execution-flow.md) |
+| Persistence                                                                     | [`docs/en/data-model.md`](docs/en/data-model.md)                         |
+| HTTP/MCP surface                                                                | [`docs/en/api-reference.md`](docs/en/api-reference.md)                   |
 | Full doc index                                                                  | [`docs/README.md`](docs/README.md)                                 |
 
 For **structural** questions (what calls X, where is X defined, blast radius),

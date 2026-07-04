@@ -73,68 +73,73 @@ bun run test:api
 
 1. 打开 `http://localhost:3101`。
 2. 打开 Settings / AI Clients。
-3. 添加 AI client。如果要进行本机 agent 执行，选择 `Hermes`。
-4. 将它绑定到需要的功能，例如 `generate_plan`、`suggest`、`chat`、`dispatch_task`。
+3. 需要 AI 计划生成或执行时，添加 AI client。主要本机 agent 执行路径选择 `Claude Code` 或 `Codex`。
+4. 将它绑定到 `task.plan`、`task.execution`、`dashboard.brief` 等产品功能。`generate_plan`、`suggest`、`chat`、`dispatch_task` 等较底层/旧 feature slot 仍可能出现在开发者语境中。
 5. 创建任务，并补充足够的执行上下文。
 6. 把任务放入日程。
 7. 在任务工作区生成计划。
 8. 审查或编辑计划图，然后接受计划。
-9. 从任务工作区或 Work 页面开始执行，或在配置自动执行后让 Chrona 推进到期任务。
-10. 在 Work、Inbox 或任务工作区查看进度、阻塞、审批和输出。
+9. 从任务工作区开始执行，或在配置自动执行后让 Chrona 推进到期任务。
+10. 在任务工作区或 Dashboard 查看进度、阻塞、审批和输出。
 
 ## Providers 和 AI clients
 
 Chrona 将 AI clients 与 feature bindings 存在数据库中。Chrona 当前没有内置模型 provider；使用 AI 功能前，需要先配置外部 provider client。
 
-- `hermes`：当前主要支持的执行 provider，用于 Hermes-backed agent execution。
-- `debug`：确定性的本地测试/开发 provider。
+- `claude_code`：主要支持 provider，通过作用域受限的 MCP control tools 进行 Claude Code 计划生成和任务执行。
+- `codex`：主要支持 provider，通过作用域受限的 MCP control tools 进行 Codex 计划生成和任务执行。
+- `hermes`：面向已有 Hermes gateway 配置的 adapter；provider 文档/配置流程还没有更新。
 
-Feature binding 决定哪个 client 处理哪个能力。常见功能包括 `suggest`、`generate_plan`、`conflicts`、`timeslots`、`chat`、`dispatch_task`。
+Feature binding 决定哪个 client 处理哪个能力。产品功能包括 `task.plan`、`task.execution`、`dashboard.brief`；`suggest`、`generate_plan`、`conflicts`、`timeslots`、`chat`、`dispatch_task` 等较底层 feature slot 仍可在需要时使用。
 
-### 本机 Hermes
+### Claude Code
 
-当 Hermes gateway 和 Chrona 运行在同一台机器时，使用本机 Hermes。
+进入 `Settings -> AI Clients -> Add Client -> Claude Code`。
 
-1. 添加 `Hermes` client。
-2. 保持 `Hermes 位置` 为 `本机 Hermes`。
-3. 保持 `Base URL` 为 `http://127.0.0.1:8642`，除非你的 Hermes API server 使用其他端口。
-4. 点击 `诊断 Hermes`，检查 CLI、plugin、plugin MCP URL、Hermes `.env`、API key、连通性和 capabilities。
-5. 如果缺少配置，点击 `自动配置本机 Hermes`。Chrona 可以安装/更新 plugin、写入 plugin 配置，并向 `~/.hermes/.env` 写入 `API_SERVER_ENABLED=true` 和 `API_SERVER_KEY`。
-6. 如果提示需要重启 Hermes，请重启。Chrona 可以请求执行 `hermes gateway restart`，但如果 Hermes 通过 service 或自定义命令运行，通常你自己重启会更清楚。
+常用字段：
 
-CLI 也提供同样的检查：
+| 字段 | 用途 | 默认 / 说明 |
+| --- | --- | --- |
+| Model | 传给 Claude Code 的模型 | 留空则使用 Chrona provider 默认值 |
+| API key | Claude Code 使用的 Anthropic API key | 可选；留空则使用用户已有 Claude Code auth/config |
+| Config directory | Claude Code 配置/状态目录 | 可选；留空表示使用 Claude Code 默认用户级配置 |
+| Working directory | 本次运行的文件系统作用域 | 可选；默认使用 Chrona 进程工作目录 |
+| MCP base URL | Chrona `/api/mcp` server URL | 默认使用当前 Chrona server |
+| MCP bearer token | Chrona MCP 请求使用的 bearer token | 通常留空；启用 API auth 时使用 `CHRONA_API_KEY` 或 `CHRONA_MCP_BEARER_TOKEN` |
+| Timeout | provider run 最大时长 | 可选 |
 
-```bash
-chrona hermes doctor
-chrona hermes setup
-chrona hermes setup --show-api-key
-```
+### Codex
 
-### 远程 Hermes
+进入 `Settings -> AI Clients -> Add Client -> Codex`。
 
-当 Hermes gateway 运行在另一台机器时，使用远程 Hermes。
+常用字段：
 
-1. 添加 `Hermes` client。
-2. 将 `Hermes 位置` 设为 `远程 Hermes`。
-3. 输入远程 base URL 和 API key。
-4. 在远程机器上安装/启用 Chrona Hermes plugin，把 plugin MCP URL 指向当前 Chrona server，设置 `API_SERVER_ENABLED=true`，设置 `API_SERVER_KEY`，然后重启 Hermes。
-5. 在 Chrona 中运行 `诊断 Hermes` 和 `测试可用性`。
+| 字段 | 用途 | 默认 / 说明 |
+| --- | --- | --- |
+| Model | 通过 provider config 传给 Codex 的模型 | 可选 |
+| API key | OpenAI/Codex API key | 可选；也会作为 `CODEX_API_KEY` 和 `OPENAI_API_KEY` 传给 provider 进程 |
+| Base URL | OpenAI-compatible gateway URL | 可选 |
+| Config directory | Codex home directory | 可选；留空表示使用默认用户级 `CODEX_HOME`（`~/.codex`） |
+| Working directory | 本次运行的文件系统作用域 | 可选；默认使用 Chrona 进程工作目录 |
+| MCP base URL | Chrona `/api/mcp` server URL | 默认使用当前 Chrona server |
+| MCP bearer token | Chrona MCP 请求使用的 bearer token | 通常留空；启用 API auth 时使用 `CHRONA_API_KEY` 或 `CHRONA_MCP_BEARER_TOKEN` |
+| Timeout | provider run 最大时长 | 可选 |
 
-## Work 页面基础
+## 任务工作区执行基础
 
-Work 页面是单个任务的主要执行界面，包含：
+任务工作区是单个任务的主要执行界面，包含：
 
 - 最新结果
 - 已生成/已接受的计划图
 - 围绕 plan run 与 runtime event 组织的执行记录
 - 任务信息和排期状态
-- 对话与命令输入上下文
+- 对话与 command center 上下文
 - checkpoint、输入、审批、阻塞、失败恢复动作
 
 ## 排障
 
 - 如果 server 无法访问，确认进程监听在 `3101`，且端口未被其他服务占用。
 - 如果 AI 功能没有反应，检查 Settings / AI Clients 中是否有启用的 client 和 feature binding。
-- 如果 Hermes 诊断失败，先看每一项检查。本机模式可以自动修复 plugin/config/env 问题；远程模式会显示手动说明，因为 Chrona 不应该修改另一台机器。
-- 如果执行暂停，在 Inbox 和 Work 页面查看等待输入、审批、阻塞或失败状态。
+- 如果 provider 配置失败，检查对应 AI client 是否启用、是否绑定到当前功能，以及 auth/config directory 设置是否有效。
+- 如果执行暂停，在任务工作区或 Dashboard 查看等待输入、审批、阻塞或失败状态。
 - 本地开发时，如果 schema 或依赖变化，运行 `bun run setup`。在 NixOS 上，Prisma 可能需要自定义 engine 配置或设置 `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1`，因为上游可能缺少 `linux-nixos` engine target 的 checksum 文件。

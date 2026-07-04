@@ -422,7 +422,7 @@
       "cockpitViewsLabel": "Views",
       "cockpitActionsLabel": "Actions",
       "firstRunTitle": "Start with Chrona in three steps",
-      "firstRunDescription": "Connect AI, capture a real task, then review the plan before anything runs.",
+    "firstRunDescription": "Connect AI, capture a real task, then review the plan before anything runs.",
       "firstRunConnectAi": "Connect AI",
       "firstRunCreateTask": "Create first task",
       "firstRunOpenCreatedTask": "Open created task",

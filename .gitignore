@@ -102,6 +102,8 @@ artifacts/demo/playwright/
 artifacts/demo/playwright/**
 artifacts/**/*.webm
 artifacts/**/error-context.md
+docs/assets/.tmp/
+docs/assets/.tmp/**
 
 # common local/editor artifacts
 Thumbs.db
