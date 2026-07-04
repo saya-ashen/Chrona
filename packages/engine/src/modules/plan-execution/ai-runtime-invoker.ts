@@ -384,6 +384,19 @@ async function reconcileInterruptedRun(
   run: ProviderRunRef,
   signal?: AbortSignal,
 ): Promise<ProviderRunSnapshot> {
+  const capabilities = typeof providerClient.getCapabilities === "function" ? await providerClient.getCapabilities() : undefined;
+  if (capabilities?.recovery?.activeRunLookup === false) {
+    return {
+      provider: providerClient.provider,
+      runId: run.runId,
+      nativeRunId: run.nativeRunId,
+      sessionId: run.sessionId,
+      status: "failed",
+      rawStatus: "interrupted",
+      error: `Provider recovery mode ${capabilities.recovery.mode} cannot reconnect active run ${run.runId}. Retry can resume from saved provider session history.`,
+    };
+  }
+
   try {
     return await providerClient.getRun({
       runId: run.runId,

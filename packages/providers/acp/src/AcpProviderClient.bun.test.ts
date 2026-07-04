@@ -90,7 +90,8 @@ function config(overrides: Partial<AcpProviderConfig> = {}): AcpProviderConfig {
 
 describe("AcpProviderClient", () => {
   it("exposes generic ACP execution provider capabilities", async () => {
-    const client = new AcpProviderClient({ config: config({ displayName: "Test ACP" }), transport: new FakeAcpTransport() });
+    const transport = new FakeAcpTransport();
+    const client = new AcpProviderClient({ config: config({ displayName: "Test ACP" }), transport });
 
     expect(client.getCapabilities()).toMatchObject({
       supportsSessions: true,
@@ -98,15 +99,38 @@ describe("AcpProviderClient", () => {
       supportsRunLookup: false,
       supportsCancellation: true,
       supportsToolCalls: true,
-      approval: { supported: false },
+      approval: { supported: true, choices: ["approve_once", "approve_always", "deny"], scopes: ["once", "always"], resolveAll: false },
       reason: "Test ACP ACP provider",
     });
     await expect(client.checkHealth()).resolves.toMatchObject({
       provider: "test_acp",
       ok: true,
+      reason: "Test ACP ACP agent initialized",
     });
+    expect(transport.requests.some((request) => request.method === "session/new")).toBe(false);
   });
 
+  it("opens a provider session when session health is requested", async () => {
+    const transport = new FakeAcpTransport();
+    const client = new AcpProviderClient({
+      config: config({ healthCheck: "session", mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
+      transport,
+    });
+
+    await expect(client.checkHealth()).resolves.toMatchObject({
+      provider: "test_acp",
+      ok: true,
+      reason: "test_acp ACP agent connected",
+    });
+    expect(transport.requests.find((request) => request.method === "session/new")?.params).toMatchObject({
+      mcpServers: [
+        {
+          url: "http://chrona.test/api/mcp?session_id=chrona%3Aprovider-health%3Atest_acp",
+          headers: [{ name: "Authorization", value: "Bearer run-token" }],
+        },
+      ],
+    });
+  });
   it("sends Chrona HTTP MCP server through ACP session setup", async () => {
     const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
     const client = new AcpProviderClient({
@@ -331,6 +355,43 @@ describe("AcpProviderClient", () => {
       outputText: "hello",
       usage: { inputTokens: 7, outputTokens: 0, totalTokens: 7 },
     });
+  });
+
+  it("bridges ACP permission requests into approval events", async () => {
+    const transport = new FakeAcpTransport();
+    const client = new AcpProviderClient({ config: config(), transport });
+    const run = await client.startRun(baseInput());
+    const iterator = client.streamRun({ runId: run.runId })[Symbol.asyncIterator]();
+
+    await expect(iterator.next()).resolves.toMatchObject({ value: { type: "run_started" } });
+    const permission = transport.handlers?.requestPermission({
+      sessionId: "native-acp-session-1",
+      toolCall: { toolCallId: "call-approval", title: "exec_command", rawInput: { cmd: "date" } },
+      options: [
+        { optionId: "allow-once", name: "Allow once", kind: "allow_once" },
+        { optionId: "deny-once", name: "Deny", kind: "reject_once" },
+      ],
+    });
+
+    await expect(iterator.next()).resolves.toMatchObject({
+      value: {
+        type: "approval_required",
+        approval: {
+          id: "native-acp-session-1:call-approval",
+          provider: "test_acp",
+          runId: run.runId,
+          choices: ["approve_once", "deny"],
+          subject: { type: "tool", label: "exec_command" },
+        },
+      },
+    });
+    await expect(client.resolveApproval({
+      runId: run.runId,
+      approvalId: "native-acp-session-1:call-approval",
+      choice: "approve_once",
+    })).resolves.toMatchObject({ status: "resolved", resolved: 1 });
+    await expect(permission).resolves.toEqual({ outcome: { outcome: "selected", optionId: "allow-once" } });
+    await iterator.return?.();
   });
 
   it("reports failed health when ACP agent lacks HTTP MCP capability", async () => {

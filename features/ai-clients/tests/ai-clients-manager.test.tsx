@@ -42,7 +42,9 @@ const messages = {
       hermesRestartRequired: "Restart Hermes, then run diagnosis again.",
       timeoutSeconds: "Timeout (seconds)",
       modelLabel: "Model",
-      setAsDefault: "Set as default Client",
+      setAsDefault: "Use as default AI client",
+      setAsDefaultHelp: "Chrona uses the default client for planning, execution, and summaries unless a feature has its own client.",
+      makeDefault: "Make default",
       save: "Save",
       cancel: "Cancel",
       featureSuggest: "Smart Suggestions",
@@ -169,6 +171,8 @@ describe("AiClientsManager", () => {
       target: { value: "45" },
     });
 
+    expect(screen.getByRole("checkbox", { name: "Use as default AI client" })).toBeChecked();
+    expect(screen.getByText("Chrona uses the default client for planning, execution, and summaries unless a feature has its own client.")).toBeInTheDocument();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ client: { id: "client_hermes" } }),
@@ -202,6 +206,7 @@ describe("AiClientsManager", () => {
         scope: "local",
         timeoutMs: 45000,
       },
+      isDefault: true,
     });
 
     const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_hermes/bindings" && call[1]?.method === "PUT");
@@ -656,7 +661,63 @@ describe("AiClientsManager", () => {
     expect(screen.getAllByText("Bridge health endpoint returned 503")).toHaveLength(2);
   });
 
-  it("shows configured, reachable, and capability readiness for providers", async () => {
+  it("lets users make an enabled non-default client the default", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        clients: [
+          {
+            id: "client_codex",
+            name: "Codex Local",
+            type: "codex",
+            config: {},
+            isDefault: false,
+            enabled: true,
+            bindings: [],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("Codex Local");
+
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ client: { id: "client_codex", isDefault: true } }) });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        clients: [
+          {
+            id: "client_codex",
+            name: "Codex Local",
+            type: "codex",
+            config: {},
+            isDefault: true,
+            enabled: true,
+            bindings: [],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Make default" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients/client_codex",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
+    const makeDefaultCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_codex" && call[1]?.method === "PATCH");
+    expect(JSON.parse(makeDefaultCall?.[1]?.body as string)).toEqual({ isDefault: true });
+  });
+
+  it("shows execution and recovery readiness for providers", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -682,8 +743,12 @@ describe("AiClientsManager", () => {
     expect(screen.getByLabelText("Provider readiness")).toBeInTheDocument();
     expect(screen.getByText("Configured")).toBeInTheDocument();
     expect(screen.getByText("Reachable")).toBeInTheDocument();
-    expect(screen.getByText("Capability-ready")).toBeInTheDocument();
-    expect(screen.getByText("Provider lacks critical capabilities: getRunSnapshot, approvalEvent")).toBeInTheDocument();
+    expect(screen.getByText("Can run tasks")).toBeInTheDocument();
+    expect(screen.getByText("Supports task start, live progress, stop, tool use, and structured result validation.")).toBeInTheDocument();
+    expect(screen.getByText("Interruption recovery")).toBeInTheDocument();
+    expect(screen.getByText("Session context is saved; if execution is interrupted, retry this step to continue.")).toBeInTheDocument();
+    expect(screen.queryByText(/Provider lacks critical capabilities/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/session_history|active run lookup|stream reconnect/)).not.toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -693,6 +758,6 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
 
     await screen.findByText("Available");
-    expect(screen.getByText("Health check passed.")).toBeInTheDocument();
+    expect(screen.getByText("Provider health check passed.")).toBeInTheDocument();
   });
 });

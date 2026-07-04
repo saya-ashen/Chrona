@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useI18n } from "@chrona/i18n/react";
-import { providerCapabilityMatrix, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
+import { providerCapabilityMatrix, type ProviderCapabilityMatrixEntry, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,10 +79,10 @@ type TestResult = {
   status: TestStatus;
   reason: string | null;
 };
-type ReadinessState = "ready" | "warning" | "pending";
+type ReadinessState = "ready" | "limited" | "warning" | "pending";
 
 type ReadinessItem = {
-  key: "configured" | "reachable" | "capability";
+  key: "configured" | "reachable" | "execution" | "recovery";
   label: string;
   state: ReadinessState;
   detail: string;
@@ -340,20 +340,59 @@ function getStatusVariant(status: TestStatus): "default" | "secondary" | "destru
       return "outline";
   }
 }
-const CAPABILITY_CHECKS: ProviderCapabilityName[] = [
+const EXECUTION_CAPABILITY_CHECKS: ProviderCapabilityName[] = [
   "healthCheck",
   "startRun",
   "streamEvents",
-  "getRunSnapshot",
-  "cancelRun",
-  "approvalEvent",
+  "cancelActiveRun",
   "toolTraces",
   "structuredOutput",
-  "sessionResume",
 ];
-
 function providerMatrixEntry(type: AiClientType) {
   return providerCapabilityMatrix.find((entry) => entry.provider === type);
+}
+
+function recoveryReadiness(matrix: ProviderCapabilityMatrixEntry | undefined, copy: Record<string, string>): ReadinessItem {
+  if (!matrix) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "warning",
+      detail: copy.readinessCapabilityUnknown,
+    };
+  }
+
+  const recovery = matrix.recovery;
+  if (!recovery.sessionResume && !recovery.historyReplay) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "warning",
+      detail: copy.recoveryUnavailable,
+    };
+  }
+  if (recovery.streamReconnect) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "ready",
+      detail: copy.recoveryFull,
+    };
+  }
+  if (recovery.activeRunLookup) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "limited",
+      detail: copy.recoverySnapshotOnly,
+    };
+  }
+  return {
+    key: "recovery",
+    label: copy.readinessRecovery,
+    state: "limited",
+    detail: copy.recoverySessionHistory,
+  };
 }
 
 function hasBasicConfig(type: AiClientType, values: Pick<ClientFormValues, "baseUrl" | "timeoutSeconds" | "hermesScope">) {
@@ -370,10 +409,9 @@ function readinessItems(input: {
   testReason: string | null;
 }): ReadinessItem[] {
   const matrix = providerMatrixEntry(input.type);
-  const missingCapabilities = matrix
-    ? CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
+  const missingExecution = matrix
+    ? EXECUTION_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
     : [];
-
   return [
     {
       key: "configured",
@@ -388,15 +426,16 @@ function readinessItems(input: {
       detail: input.testStatus === "available" ? input.copy.readinessReachableDetail : input.testReason ?? input.copy.readinessRunHealthCheck,
     },
     {
-      key: "capability",
+      key: "execution",
       label: input.copy.readinessCapability,
-      state: matrix && missingCapabilities.length === 0 ? "ready" : "warning",
+      state: matrix && missingExecution.length === 0 ? "ready" : "warning",
       detail: matrix
-        ? missingCapabilities.length === 0
+        ? missingExecution.length === 0
           ? input.copy.readinessCapabilityDetail
-          : `${input.copy.readinessCapabilityLimited}: ${missingCapabilities.join(", ")}`
+          : `${input.copy.readinessCapabilityLimited}: ${missingExecution.join(", ")}`
         : input.copy.readinessCapabilityUnknown,
     },
+    recoveryReadiness(matrix, input.copy),
   ];
 }
 
@@ -405,7 +444,7 @@ function ReadinessChecklist({ items }: { items: ReadinessItem[] }) {
     <div className="grid gap-2 rounded-md border bg-muted/20 p-3" aria-label="Provider readiness">
       {items.map((item) => (
         <div key={item.key} className="flex items-start gap-2 text-xs">
-          <Badge variant={item.state === "ready" ? "default" : item.state === "warning" ? "destructive" : "secondary"}>{item.label}</Badge>
+          <Badge variant={item.state === "ready" ? "default" : item.state === "warning" ? "destructive" : item.state === "limited" ? "outline" : "secondary"}>{item.label}</Badge>
           <span className="min-w-0 text-muted-foreground">{item.detail}</span>
         </div>
       ))}
@@ -524,7 +563,9 @@ const DEFAULTS: Record<string, string> = {
   hermesPlanTitle: "Setup plan",
   hermesChangedTitle: "Changed",
   hermesRestartRequired: "Restart Hermes, then run diagnosis again.",
-  setAsDefault: "Set as default Client",
+  setAsDefault: "Use as default AI client",
+  setAsDefaultHelp: "Chrona uses the default client for planning, execution, and summaries unless a feature has its own client.",
+  makeDefault: "Make default",
   save: "Save",
   cancel: "Cancel",
   testAvailability: "Test availability",
@@ -535,14 +576,19 @@ const DEFAULTS: Record<string, string> = {
   reasonUnknown: "No details yet",
   readinessConfigured: "Configured",
   readinessReachable: "Reachable",
-  readinessCapability: "Capability-ready",
-  readinessConfiguredDetail: "Saved settings are present and client is enabled.",
+  readinessCapability: "Can run tasks",
+  readinessRecovery: "Interruption recovery",
+  readinessConfiguredDetail: "Client is enabled and required settings are complete.",
   readinessDisabledDetail: "Client is disabled or required settings are missing.",
-  readinessReachableDetail: "Health check passed.",
-  readinessRunHealthCheck: "Run health check to confirm provider is reachable.",
-  readinessCapabilityDetail: "Required schedule execution capabilities are available.",
-  readinessCapabilityLimited: "Provider lacks critical capabilities",
+  readinessReachableDetail: "Provider health check passed.",
+  readinessRunHealthCheck: "Click “Test availability” to confirm this provider is reachable.",
+  readinessCapabilityDetail: "Supports task start, live progress, stop, tool use, and structured result validation.",
+  readinessCapabilityLimited: "Provider execution support incomplete",
   readinessCapabilityUnknown: "Provider capability matrix is not registered.",
+  recoveryFull: "Can reconnect to an active task and sync the final state.",
+  recoverySnapshotOnly: "Can sync run state; live progress is not replayed after disconnect.",
+  recoverySessionHistory: "Session context is saved; if execution is interrupted, retry this step to continue.",
+  recoveryUnavailable: "Interrupted runs cannot be recovered automatically.",
 };
 
 function getCopy(messages: Record<string, unknown>): Record<string, string> {
@@ -556,12 +602,14 @@ function ClientForm({
   onCancel,
   copy,
   providers,
+  forceDefault = false,
 }: {
   initial?: AiClientInfo;
   onSave: (data: { payload: ClientFormPayload; bindings: string[] }) => void;
   onCancel: () => void;
   copy: Record<string, string>;
   providers: RuntimeProviderOption[];
+  forceDefault?: boolean;
 }) {
   const fallbackType = providers.find((provider) => provider.key === "claude_code")?.key ?? providers[0]?.key ?? "claude_code";
   const initialConfig = initial?.config;
@@ -573,7 +621,7 @@ function ClientForm({
   const defaultValues = useMemo<ClientFormValues>(() => ({
     name: initial?.name ?? "",
     type: initialType,
-    isDefault: initial?.isDefault ?? false,
+    isDefault: forceDefault || initial?.isDefault || false,
     timeoutSeconds: String(
       (initialConfig as { timeoutSeconds?: number; timeoutMs?: number } | undefined)?.timeoutSeconds
         ?? (((initialConfig as { timeoutMs?: number } | undefined)?.timeoutMs ?? DEFAULT_PROVIDER_RUN_TIMEOUT_MS) / 1000),
@@ -595,7 +643,7 @@ function ClientForm({
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
     bindings: initial?.bindings ?? initialRecommendedBindings,
-  }), [initialType, initial, initialConfig, initialRecommendedBindings]);
+  }), [initialType, initial, initialConfig, initialRecommendedBindings, forceDefault]);
   const form = useForm<ClientFormValues>({
     defaultValues,
     mode: "onChange",
@@ -646,7 +694,7 @@ function ClientForm({
   }, [availableFeatures, form, initial, values.type]);
 
   function handleSave(nextValues: ClientFormValues) {
-    onSave({ payload: buildClientPayload(nextValues), bindings: nextValues.bindings });
+    onSave({ payload: buildClientPayload({ ...nextValues, isDefault: forceDefault || nextValues.isDefault }), bindings: nextValues.bindings });
   }
 
   return (
@@ -1069,10 +1117,11 @@ function ClientForm({
               name="isDefault"
               control={form.control}
               render={({ field }) => (
-                <Field orientation="horizontal">
-                  <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                <Field orientation="horizontal" className="items-start gap-3">
+                  <Checkbox aria-label={copy.setAsDefault} checked={forceDefault || field.value} disabled={forceDefault} onCheckedChange={(checked) => field.onChange(checked === true)} />
                   <FieldContent>
                     <FieldLabel>{copy.setAsDefault}</FieldLabel>
+                    <p className="text-xs text-muted-foreground">{copy.setAsDefaultHelp}</p>
                   </FieldContent>
                 </Field>
               )}
@@ -1177,6 +1226,14 @@ export function AiClientsManager() {
     void fetchClients();
   };
 
+  const handleMakeDefault = async (id: string) => {
+    await api.ai.clients[":clientId"].$patch({
+      param: { clientId: id },
+      json: { isDefault: true },
+    });
+    void fetchClients();
+  };
+
   const handleToggleEnabled = async (id: string, enabled: boolean) => {
     await api.ai.clients[":clientId"].$patch({
       param: { clientId: id },
@@ -1235,7 +1292,7 @@ export function AiClientsManager() {
         </Button>
       </div>
 
-      {showForm && <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} providers={providers} />}
+      {showForm && <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} providers={providers} forceDefault={clients.length === 0} />}
 
       {clients.length === 0 && !showForm && (
         <Card className="border-dashed">
@@ -1311,6 +1368,11 @@ export function AiClientsManager() {
                     <Checkbox checked={client.enabled} onCheckedChange={(checked) => handleToggleEnabled(client.id, checked === true)} />
                     <FieldLabel className="text-xs text-muted-foreground">{copy.enabled}</FieldLabel>
                   </Field>
+                  {!client.isDefault && client.enabled && (
+                    <Button type="button" variant="outline" size="xs" onClick={() => void handleMakeDefault(client.id)}>
+                      {copy.makeDefault}
+                    </Button>
+                  )}
                   <Button type="button" variant="outline" size="xs" onClick={() => setEditingId(client.id)}>
                     {copy.edit}
                   </Button>

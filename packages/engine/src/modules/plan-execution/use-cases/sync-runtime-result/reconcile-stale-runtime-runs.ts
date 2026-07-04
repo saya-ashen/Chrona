@@ -68,6 +68,20 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
     return "skipped";
   }
 
+  const capabilities = typeof client.getCapabilities === "function" ? await client.getCapabilities() : undefined;
+  if (capabilities?.recovery?.activeRunLookup === false) {
+    const reason = `Runtime run ${runtimeRunRef} was interrupted. Provider recovery mode ${capabilities.recovery.mode} cannot query active run snapshots; retry can resume from saved provider session history.`;
+    await markRunFailed({ runId: run.id, reason, retryable: true });
+    await syncPlanRunRuntimeResult({
+      taskId: providerRun.taskId,
+      runtimeRunRef,
+      status: "Failed",
+      error: reason,
+    });
+    return "synced";
+  }
+
+
   try {
     const snapshot = await client.getRun({
       runId: runtimeRunRef,
@@ -180,7 +194,7 @@ async function missingRunReason(input: {
   return `Runtime run ${input.runtimeRunRef} is no longer available from provider ${input.runtimeName} (HTTP ${status ?? "unknown"}).${lastEvent} Marking the node failed so execution does not remain running.`;
 }
 
-async function markRunFailed(input: { runId: string; reason: string }) {
+async function markRunFailed(input: { runId: string; reason: string; retryable?: boolean }) {
   await db.run.update({
     where: { id: input.runId },
     data: {
@@ -189,7 +203,7 @@ async function markRunFailed(input: { runId: string; reason: string }) {
       errorSummary: input.reason,
       syncStatus: "degraded",
       lastSyncedAt: new Date(),
-      retryable: false,
+      retryable: input.retryable ?? false,
     },
   });
 }

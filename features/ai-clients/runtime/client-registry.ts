@@ -190,6 +190,10 @@ async function refreshAiClientRegistry() {
     }
   }
 
+  if (!defaultClientId && records[0]) {
+    defaultClientId = records[0].id;
+  }
+
   const bindings = await db.aiFeatureBinding.findMany({
     where: { clientId: { in: [...clients.keys()] } },
     orderBy: { createdAt: "asc" },

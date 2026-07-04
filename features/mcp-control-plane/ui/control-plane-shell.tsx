@@ -22,7 +22,8 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { useI18n } from "@chrona/i18n/react";
+import { localizeHref } from "@chrona/i18n";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 
 export type ControlPlaneShellProps = {
   children: ReactNode;
@@ -44,10 +45,13 @@ export function ControlPlaneShell({
   defaultWorkspace: _defaultWorkspace,
 }: ControlPlaneShellProps) {
   const { t } = useI18n();
+  const locale = useLocale();
   const router = useAppRouter();
   const pathname = useAppPathname();
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [createdOnboardingTaskId, setCreatedOnboardingTaskId] = useState<string | null>(null);
+  const [hasCompletedOnboardingTask, setHasCompletedOnboardingTask] = useState(false);
   const taskDialogDefaults = useMemo(() => {
     const initialStartAt = new Date();
     initialStartAt.setHours(9, 0, 0, 0);
@@ -209,7 +213,18 @@ export function ControlPlaneShell({
           </div>
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:px-6 xl:px-7 xl:pb-3">
-          {shouldShowStartWithChrona ? <StartWithChrona className="mb-4" /> : null}
+          {shouldShowStartWithChrona ? (
+            <StartWithChrona
+              className="mb-4"
+              createdTaskId={createdOnboardingTaskId}
+              isComplete={hasCompletedOnboardingTask}
+              onCreateTask={() => setShowCreateTaskDialog(true)}
+              onOpenCreatedTask={(taskId) => {
+                setHasCompletedOnboardingTask(true);
+                router.push(localizeHref(locale, `/tasks/${taskId}`));
+              }}
+            />
+          ) : null}
           {children}
         </main>
 
@@ -250,7 +265,7 @@ export function ControlPlaneShell({
         onSubmit={async (input) => {
           try {
             setIsCreatingTask(true);
-            await createTaskFromSchedule({
+            const created = await createTaskFromSchedule({
               workspaceId: _defaultWorkspace.id,
               title: input.title,
               description: input.description || null,
@@ -259,7 +274,10 @@ export function ControlPlaneShell({
               autoExecute: input.autoExecute,
               autoPlanGenerationTiming: input.autoPlanGenerationTiming,
               autoExecuteTiming: input.autoExecuteTiming,
-            });
+            }) as { taskId?: unknown };
+            if (typeof created.taskId === "string") {
+              setCreatedOnboardingTaskId(created.taskId);
+            }
             router.refresh();
           } finally {
             setIsCreatingTask(false);

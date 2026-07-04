@@ -328,6 +328,13 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: true,
+        streamReconnect: true,
+        mode: "authoritative_run_lookup",
+      },
       reason: `Chrona local debug provider (${this.profile})`,
     };
   }

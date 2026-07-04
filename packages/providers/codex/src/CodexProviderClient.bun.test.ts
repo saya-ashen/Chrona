@@ -117,6 +117,7 @@ describe("codexAcpConfig", () => {
       timeoutMs: 120,
       mcpBaseUrl: "http://chrona.test",
       mcpRunToken: "token",
+      healthCheck: "session",
     });
   });
 });
@@ -133,6 +134,8 @@ describe("CodexProviderClient", () => {
       supportsSessions: true,
       supportsStreaming: true,
       supportsToolCalls: true,
+      approval: { supported: true },
+      recovery: { mode: "session_history", sessionResume: true, historyReplay: true, activeRunLookup: false },
       reason: "OpenAI Codex ACP provider",
     });
     const run = await client.startRun(baseInput({ sessionKey: "chrona:codex" }));
@@ -148,6 +151,12 @@ describe("CodexProviderClient", () => {
           headers: [{ name: "Authorization", value: "Bearer run-token" }],
         },
       ],
+    });
+
+    await expect(client.checkHealth()).resolves.toMatchObject({
+      provider: "codex",
+      ok: true,
+      reason: "OpenAI Codex ACP agent connected",
     });
   });
 });

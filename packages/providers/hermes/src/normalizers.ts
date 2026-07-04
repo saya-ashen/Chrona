@@ -21,6 +21,13 @@ const defaultCapabilities: ProviderCapabilities = {
     scopes: ["once", "session", "always"],
     resolveAll: true,
   },
+  recovery: {
+    sessionResume: true,
+    historyReplay: true,
+    activeRunLookup: true,
+    streamReconnect: true,
+    mode: "authoritative_run_lookup",
+  },
 };
 
 export function mapCapabilities(raw: unknown, fallbackReason?: string): ProviderCapabilities {
@@ -40,6 +47,13 @@ export function mapCapabilities(raw: unknown, fallbackReason?: string): Provider
     supportsCancellation: Boolean(features.run_stop),
     supportsToolCalls: true,
     supportsPreviousResponse: false,
+    recovery: {
+      sessionResume: true,
+      historyReplay: true,
+      activeRunLookup: Boolean(features.run_status),
+      streamReconnect: Boolean(features.run_events_sse),
+      mode: "authoritative_run_lookup",
+    },
     details: {
       runs: {
         start: Boolean(features.run_submission),

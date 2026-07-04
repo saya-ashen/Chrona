@@ -145,7 +145,7 @@ async function checkClientHealth(
       }
       return {
         available: true,
-        reason: health.reason ?? health.message ?? "Claude Code CLI is reachable",
+        reason: health.reason ?? health.message ?? "Claude Code connectivity check passed",
       };
     }
 
@@ -160,7 +160,7 @@ async function checkClientHealth(
       }
       return {
         available: true,
-        reason: health.reason ?? health.message ?? "Codex ACP provider is configured",
+        reason: health.reason ?? health.message ?? "Codex connectivity check passed",
       };
     }
 
