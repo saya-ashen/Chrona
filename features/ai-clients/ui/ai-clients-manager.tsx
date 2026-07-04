@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useI18n } from "@chrona/i18n/react";
-import { providerCapabilityMatrix, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
+import { providerCapabilityMatrix, type ProviderCapabilityMatrixEntry, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,7 +79,7 @@ type TestResult = {
   status: TestStatus;
   reason: string | null;
 };
-type ReadinessState = "ready" | "warning" | "pending";
+type ReadinessState = "ready" | "limited" | "warning" | "pending";
 
 type ReadinessItem = {
   key: "configured" | "reachable" | "execution" | "recovery";
@@ -348,14 +348,51 @@ const EXECUTION_CAPABILITY_CHECKS: ProviderCapabilityName[] = [
   "toolTraces",
   "structuredOutput",
 ];
-
-const RECOVERY_CAPABILITY_CHECKS: ProviderCapabilityName[] = [
-  "sessionResume",
-  "historyReplay",
-];
-
 function providerMatrixEntry(type: AiClientType) {
   return providerCapabilityMatrix.find((entry) => entry.provider === type);
+}
+
+function recoveryReadiness(matrix: ProviderCapabilityMatrixEntry | undefined, copy: Record<string, string>): ReadinessItem {
+  if (!matrix) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "warning",
+      detail: copy.readinessCapabilityUnknown,
+    };
+  }
+
+  const recovery = matrix.recovery;
+  if (!recovery.sessionResume && !recovery.historyReplay) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "warning",
+      detail: copy.recoveryUnavailable,
+    };
+  }
+  if (recovery.streamReconnect) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "ready",
+      detail: copy.recoveryFull,
+    };
+  }
+  if (recovery.activeRunLookup) {
+    return {
+      key: "recovery",
+      label: copy.readinessRecovery,
+      state: "limited",
+      detail: copy.recoverySnapshotOnly,
+    };
+  }
+  return {
+    key: "recovery",
+    label: copy.readinessRecovery,
+    state: "limited",
+    detail: copy.recoverySessionHistory,
+  };
 }
 
 function hasBasicConfig(type: AiClientType, values: Pick<ClientFormValues, "baseUrl" | "timeoutSeconds" | "hermesScope">) {
@@ -375,16 +412,6 @@ function readinessItems(input: {
   const missingExecution = matrix
     ? EXECUTION_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
     : [];
-  const missingRecovery = matrix
-    ? RECOVERY_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
-    : [];
-  const unavailableRecovery = matrix
-    ? [
-        !matrix.recovery.activeRunLookup ? "active run lookup" : null,
-        !matrix.recovery.streamReconnect ? "stream reconnect" : null,
-      ].filter((value): value is string => Boolean(value))
-    : [];
-
   return [
     {
       key: "configured",
@@ -408,14 +435,7 @@ function readinessItems(input: {
           : `${input.copy.readinessCapabilityLimited}: ${missingExecution.join(", ")}`
         : input.copy.readinessCapabilityUnknown,
     },
-    {
-      key: "recovery",
-      label: input.copy.readinessRecovery,
-      state: matrix && missingRecovery.length === 0 ? "ready" : "warning",
-      detail: matrix
-        ? `${input.copy.readinessRecoveryMode}: ${matrix.recovery.mode}${unavailableRecovery.length > 0 ? `; unavailable: ${unavailableRecovery.join(", ")}` : ""}`
-        : input.copy.readinessCapabilityUnknown,
-    },
+    recoveryReadiness(matrix, input.copy),
   ];
 }
 
@@ -424,7 +444,7 @@ function ReadinessChecklist({ items }: { items: ReadinessItem[] }) {
     <div className="grid gap-2 rounded-md border bg-muted/20 p-3" aria-label="Provider readiness">
       {items.map((item) => (
         <div key={item.key} className="flex items-start gap-2 text-xs">
-          <Badge variant={item.state === "ready" ? "default" : item.state === "warning" ? "destructive" : "secondary"}>{item.label}</Badge>
+          <Badge variant={item.state === "ready" ? "default" : item.state === "warning" ? "destructive" : item.state === "limited" ? "outline" : "secondary"}>{item.label}</Badge>
           <span className="min-w-0 text-muted-foreground">{item.detail}</span>
         </div>
       ))}
@@ -554,16 +574,19 @@ const DEFAULTS: Record<string, string> = {
   reasonUnknown: "No details yet",
   readinessConfigured: "Configured",
   readinessReachable: "Reachable",
-  readinessCapability: "Execution-ready",
-  readinessRecovery: "Recovery mode",
-  readinessConfiguredDetail: "Saved settings are present and client is enabled.",
+  readinessCapability: "Can run tasks",
+  readinessRecovery: "Interruption recovery",
+  readinessConfiguredDetail: "Client is enabled and required settings are complete.",
   readinessDisabledDetail: "Client is disabled or required settings are missing.",
-  readinessReachableDetail: "Health check passed.",
-  readinessRunHealthCheck: "Run health check to confirm provider is reachable.",
-  readinessCapabilityDetail: "Provider supports execution start, live events, cancellation, tools, and structured output.",
-  readinessCapabilityLimited: "Provider execution capabilities unavailable",
-  readinessRecoveryMode: "Provider recovery mode",
+  readinessReachableDetail: "Provider health check passed.",
+  readinessRunHealthCheck: "Click “Test availability” to confirm this provider is reachable.",
+  readinessCapabilityDetail: "Supports task start, live progress, stop, tool use, and structured result validation.",
+  readinessCapabilityLimited: "Provider execution support incomplete",
   readinessCapabilityUnknown: "Provider capability matrix is not registered.",
+  recoveryFull: "Can reconnect to an active task and sync the final state.",
+  recoverySnapshotOnly: "Can sync run state; live progress is not replayed after disconnect.",
+  recoverySessionHistory: "Session context is saved; if execution is interrupted, retry this step to continue.",
+  recoveryUnavailable: "Interrupted runs cannot be recovered automatically.",
 };
 
 function getCopy(messages: Record<string, unknown>): Record<string, string> {

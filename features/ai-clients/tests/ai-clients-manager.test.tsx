@@ -682,11 +682,12 @@ describe("AiClientsManager", () => {
     expect(screen.getByLabelText("Provider readiness")).toBeInTheDocument();
     expect(screen.getByText("Configured")).toBeInTheDocument();
     expect(screen.getByText("Reachable")).toBeInTheDocument();
-    expect(screen.getByText("Execution-ready")).toBeInTheDocument();
-    expect(screen.getByText("Provider supports execution start, live events, cancellation, tools, and structured output.")).toBeInTheDocument();
-    expect(screen.getByText("Recovery mode")).toBeInTheDocument();
-    expect(screen.getByText("Provider recovery mode: session_history; unavailable: active run lookup, stream reconnect")).toBeInTheDocument();
+    expect(screen.getByText("Can run tasks")).toBeInTheDocument();
+    expect(screen.getByText("Supports task start, live progress, stop, tool use, and structured result validation.")).toBeInTheDocument();
+    expect(screen.getByText("Interruption recovery")).toBeInTheDocument();
+    expect(screen.getByText("Session context is saved; if execution is interrupted, retry this step to continue.")).toBeInTheDocument();
     expect(screen.queryByText(/Provider lacks critical capabilities/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/session_history|active run lookup|stream reconnect/)).not.toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -696,6 +697,6 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
 
     await screen.findByText("Available");
-    expect(screen.getByText("Health check passed.")).toBeInTheDocument();
+    expect(screen.getByText("Provider health check passed.")).toBeInTheDocument();
   });
 });
