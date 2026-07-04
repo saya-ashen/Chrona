@@ -226,13 +226,20 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         scopes: [],
         resolveAll: false,
       },
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: true,
+        streamReconnect: false,
+        mode: "authoritative_run_lookup",
+      },
     };
   }
 
-  async checkHealth(_input: HealthCheckInput = {}): Promise<ProviderHealth> {
+  async checkHealth(input: HealthCheckInput = {}): Promise<ProviderHealth> {
     const checkedAt = new Date().toISOString();
     const started = Date.now();
-    const reason = await this.probe();
+    const reason = await this.probe(input.timeoutMs);
     const latencyMs = Date.now() - started;
     return {
       provider: this.provider,
@@ -501,16 +508,15 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   }
 
   /**
-   * Health uses the Claude Agent SDK startup path, not `claude --version`.
-   * `startup()` spawns the configured SDK process and waits for initialize,
-   * so it verifies the same integration layer real runs use.
+   * Health sends a one-turn SDK query, not `claude --version` or SDK startup.
+   * That verifies the same model/auth/process path real runs need.
    */
-  private async probe(): Promise<string | null> {
+  private async probe(timeoutMs?: number): Promise<string | null> {
     if (this.opts.runner) return null; // user provided runner → trust it
     if (readEnv("CHRONA_CLAUDE_CODE_RECORD_DIR")) return null; // record-only
     return probeClaudeCodeSdk({
       config: await this.buildRunnerConfig(),
-      timeoutMs: this.opts.config.timeoutMs,
+      timeoutMs,
     });
   }
 

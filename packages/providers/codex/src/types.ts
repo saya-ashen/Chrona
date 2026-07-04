@@ -43,6 +43,7 @@ export function codexAcpConfig(config: CodexProviderConfig): AcpProviderConfig {
     displayName: "OpenAI Codex",
     command: config.binaryPath?.trim() || "codex-acp",
     timeoutMs: config.timeoutMs,
+    healthCheck: "session",
     cwd: config.cwd,
     env: codexAcpEnv(config),
     additionalDirectories: config.additionalDirectories,

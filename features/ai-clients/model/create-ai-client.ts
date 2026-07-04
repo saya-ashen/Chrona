@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { AiClientType } from "@chrona/contracts";
+import { ensureEnabledAiClientDefault } from "./default-ai-client";
 
 interface CreateAiClientInput {
   name: string;
@@ -12,13 +13,14 @@ interface CreateAiClientInput {
 }
 
 export async function createAiClient(input: CreateAiClientInput) {
-  const isDefault = input.isDefault ?? false;
+  const enabledClientCount = await db.aiClient.count({ where: { enabled: true } });
+  const isDefault = input.isDefault === true || enabledClientCount === 0;
 
   if (isDefault) {
     await db.aiClient.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
   }
 
-  return db.aiClient.create({
+  const client = await db.aiClient.create({
     data: {
       id: randomUUID().replace(/-/g, "").slice(0, 25),
       name: input.name,
@@ -28,4 +30,7 @@ export async function createAiClient(input: CreateAiClientInput) {
       enabled: true,
     },
   });
+
+  await ensureEnabledAiClientDefault();
+  return client;
 }

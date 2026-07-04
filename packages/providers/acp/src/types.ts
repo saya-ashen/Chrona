@@ -11,6 +11,8 @@ export type AcpProviderConfig = {
   args?: string[];
   /** Total prompt turn timeout in milliseconds. */
   timeoutMs?: number;
+  /** Health depth. "session" opens a provider session, so auth/backend setup is tested instead of process startup only. */
+  healthCheck?: "initialize" | "session";
   /** Working directory for the ACP agent. Defaults to current process cwd. */
   cwd?: string;
   /** Pass-through environment for the ACP subprocess. */

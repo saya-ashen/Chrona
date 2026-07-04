@@ -64,14 +64,12 @@ AI-client 流程；接下来的重点是让“日程到自动执行”的闭环�
 可以做事，但通常丢失日程、状态和责任链。Chrona
 把这些循环合在一起，但不假装它们是同一种东西。
 
-| 不只是...  | Chrona 额外提供...                                                      |
-| ---------- | ----------------------------------------------------------------------- |
-| 日历       | 可执行工作状态、依赖、估时、日程元数据和到期任务动作                    |
-| 任务软件   | 可审查、可 patch、可接受、可重新执行、可追踪的 AI 计划图                |
-| AI chat UI | 作用域受限的 runtime refs、checkpoint、审批、工具轨迹、失败和持久化输出 |
-
-当日程上的工作需要可见执行生命周期，而不只是提醒或一次性 assistant 答案时，使用
-Chrona。
+| 如果你需要...            | Chrona 提供...                                                          |
+| ------------------------ | ----------------------------------------------------------------------- |
+| 围绕真实工作安排一天     | 带优先级、状态、截止时间、估时、依赖和日程信息的任务                    |
+| 把日程任务变成可执行步骤 | 可审查、可 patch、可接受、可重新执行、可追踪的 AI 计划图                |
+| 让到期工作自动推进       | 日程块、提案、等待状态、任务工作区审批和执行动作                        |
+| 让 AI 执行可追责         | 作用域受限的 runtime refs、checkpoint、审批、工具轨迹、失败和持久化输出 |
 
 ## 快速开始
 
@@ -226,10 +224,14 @@ Chrona 默认从本机和显式配置开始。
   manual、assisted 和 automatic work。
 - **到期任务恢复** — Schedule views、AI insights、冲突建议、日程提案、waiting
   runs、failed runs、cancelled runs 和 approvals 让下一步动作保持可见。
-- **可观测 AI 工作** — Provider runs 通过
+- **可观测 AI 工作** — Provider runs 只接收安全的 runtime refs，不直接接触内部数据库 ID。它们通过
   `chrona_node_complete`、`chrona_condition_select`、`chrona_node_block`、`chrona_node_fail`、`chrona_wait_complete`
   等工具汇报进度。Conversation history、tool traces
   和持久化输出会留在任务上下文里。
+
+<p align="center">
+  <img src="docs/assets/NodeDetail.png" width="80%" alt="查看 Chrona 执行节点的状态、详情和活动记录" />
+</p>
 
 ## 路线图
 
@@ -243,6 +245,7 @@ Chrona 默认从本机和显式配置开始。
 | 执行 runtime    | 已可用 | 实验性         | 可执行的 `task`、`checkpoint`、`condition`、`wait` 节点，AI-visible refs 和持久化状态。 |
 | 审查闭环        | 已可用 | 实验性         | Dashboard 和任务工作区中的 pending approvals、日程提案、等待输入、失败/取消 run 入口。  |
 | 外部日历        | 已可用 | 早期           | 只读日历订阅、导入忙碌事件、来源管理、刷新状态和日程上下文。                            |
+| 完善现有流程    | 进行中 | Active         | 让 Dashboard、Schedule、Task Workspace 和执行记录更可靠、更容易理解。                   |
 | 可靠自动执行    | 进行中 | 尚不稳定       | 仅在配置允许且安全时启动到期日程任务，并在执行阻塞或失败时提供清晰恢复路径。            |
 | 更多 providers  | 进行中 | 实验性         | 在保持 provider 边界清晰的前提下接入更多执行/provider integrations。                    |
 | 多 session 执行 | 已计划 | 尚不可用       | 增加多 session 的隔离、复用、恢复和诊断能力。                                           |

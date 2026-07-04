@@ -57,7 +57,7 @@ state, approvals, recovery, and persisted outputs.
 ## Project Status
 
 Chrona is usable for local development and product exploration, but it is not
-stable software yet. The current codebase includes task, plan, schedule,
+stable software yet. The current codebase already includes task, plan, schedule,
 execution, dashboard, settings, external calendar, and AI-client flows. The next
 major focus is making the schedule-to-auto-execution loop reliable enough for
 daily use.
@@ -68,14 +68,12 @@ Calendars tell you what should happen. Task apps tell you what is pending. AI
 chat can do work, but it usually loses schedule, state, and accountability.
 Chrona combines those loops without pretending they are the same thing.
 
-| Not just... | Chrona adds... |
-| --- | --- |
-| A calendar | executable work state, dependencies, estimates, schedule metadata, and due-work actions |
-| A task app | AI-generated plan graphs that can be reviewed, patched, accepted, rerun, and traced |
-| An AI chat UI | scoped runtime refs, checkpoints, approvals, tool traces, failures, and persisted outputs |
-
-Use Chrona when scheduled work needs a visible execution lifecycle, not just a
-reminder or one-off assistant answer.
+| If you need to...                           | Chrona gives you...                                                                       |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Plan the day around real work               | tasks with priority, status, due dates, estimates, dependencies, and schedule metadata    |
+| Turn a scheduled task into executable steps | AI-generated plan graphs that can be reviewed, patched, accepted, rerun, and traced       |
+| Let due work move forward automatically     | schedule blocks, proposals, waiting states, task workspace approvals, and execution actions |
+| Keep AI execution accountable               | scoped runtime refs, checkpoints, approvals, tool traces, failures, and persisted outputs |
 
 ## Quick Start
 
@@ -242,11 +240,15 @@ Chrona is designed to start local and explicit.
 - **Due-work recovery** — schedule views, AI insights, conflict suggestions,
   proposals, waiting runs, failed runs, cancelled runs, and approvals keep the
   next action visible.
-- **Observable AI work** — provider runs report progress through Chrona tools
-  such as `chrona_node_complete`, `chrona_condition_select`,
-  `chrona_node_block`, `chrona_node_fail`, and `chrona_wait_complete`.
-  Conversation history, tool traces, and persisted outputs stay attached to the
-  task.
+- **Observable AI work** — provider runs receive safe runtime refs instead of
+  internal database IDs. They report progress through Chrona tools such as
+  `chrona_node_complete`, `chrona_condition_select`, `chrona_node_block`,
+  `chrona_node_fail`, and `chrona_wait_complete`. Conversation history, tool
+  traces, and persisted outputs stay attached to the task.
+
+<p align="center">
+  <img src="docs/assets/NodeDetail.png" width="80%" alt="Inspect a Chrona execution node with state, details, and activity" />
+</p>
 
 ## Roadmap
 
@@ -261,6 +263,7 @@ This is a short maturity summary. See the full
 | Execution runtime | Available | Experimental | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with AI-visible refs and persisted state. |
 | Review loops | Available | Experimental | Dashboard and task workspace surfaces for pending approvals, schedule proposals, waiting inputs, and failed/cancelled runs. |
 | External calendars | Available | Early | Read-only calendar subscriptions, imported busy events, source management, refresh status, and schedule context. |
+| Polish existing flows | In progress | Active | Make Dashboard, Schedule, Task Workspace, and execution records more reliable and easier to understand. |
 | Reliable auto execution | In progress | Not stable | Start due scheduled work only when configured and safe, with clear recovery when execution blocks or fails. |
 | More providers | In progress | Experimental | Add provider integrations while keeping provider boundaries explicit. |
 | Multi-session execution | Planned | Not available | Add isolation, reuse, recovery, and diagnostics across multiple sessions. |

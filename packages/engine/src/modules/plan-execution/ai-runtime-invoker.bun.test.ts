@@ -186,6 +186,44 @@ describe("runProviderRequest stream-interruption fallback", () => {
     expect(snapshot.runId).toBe("run-1");
   });
 
+  it("does not poll active run snapshots for session-history recovery providers", async () => {
+    const getRun = mock(async (): Promise<ProviderRunSnapshot> => {
+      throw new Error("should not be called");
+    });
+
+    const client = {
+      provider: "codex",
+      getCapabilities: mock(() => ({
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: false,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: false,
+        recovery: {
+          sessionResume: true,
+          historyReplay: true,
+          activeRunLookup: false,
+          streamReconnect: false,
+          mode: "session_history",
+        },
+      })),
+      startRun: mock(async () => ({ ...runRef(), provider: "codex" })),
+      streamRun: mock(() => incompleteStream()),
+      getRun,
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request);
+
+    expect(getRun).not.toHaveBeenCalled();
+    expect(snapshot).toMatchObject({
+      provider: "codex",
+      status: "failed",
+      rawStatus: "interrupted",
+      error: expect.stringContaining("session_history"),
+    });
+  });
+
   it("rethrows non-transient stream errors without reconnecting or polling", async () => {
     const getRun = mock(async () => {
       throw new Error("should not be called");

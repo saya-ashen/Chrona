@@ -13,6 +13,7 @@ export {
   type ProviderApprovalScopePolicy,
   type ProviderApprovalSubject,
   type ProviderCapabilities,
+  type ProviderRecoveryCapability,
   type ProviderConfig,
   type ProviderHealth,
   type ProviderJsonValue,
@@ -41,6 +42,7 @@ export {
   providerApprovalScopePolicySchema,
   providerApprovalSubjectSchema,
   providerCapabilitiesSchema,
+  providerRecoveryCapabilitySchema,
   providerHealthSchema,
   providerRunInputSchema,
   providerRunEventSchema,
@@ -73,4 +75,7 @@ export {
   summarizeProviderCapabilities,
   type ProviderCapabilityMatrixEntry,
   type ProviderCapabilityName,
+  type ProviderExecutionCapabilityName,
+  type ProviderRecoveryCapabilityName,
+  type ProviderRecoveryMode,
 } from "./provider-capability-matrix";

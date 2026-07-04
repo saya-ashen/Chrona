@@ -40,7 +40,7 @@ import type {
   ProviderRunSnapshot,
   StartRunInput,
 } from "@chrona/providers-foundation";
-import { query as sdkQuery, startup as sdkStartup, type HookInput } from "@anthropic-ai/claude-agent-sdk";
+import { query as sdkQuery, type SDKMessage, type HookInput } from "@anthropic-ai/claude-agent-sdk";
 import {
   createNormalizerContext,
   mapClaudeCodeStreamItems,
@@ -265,6 +265,10 @@ export interface ClaudeCodeRunner {
 
 const DEFAULT_MODEL = "claude-opus-4-8";
 const DEFAULT_TIMEOUT_MS = 120 * 1000;
+const HEALTH_PROBE_TIMEOUT_MS = 15_000;
+const HEALTH_PROBE_PROMPT = "Reply with exactly `chrona-ok`. Do not use tools.";
+const HEALTH_PROBE_FAILURE = "Claude Code SDK connectivity probe failed";
+
 
 /* -------------------------------------------------------------------------- */
 /*                                Public factories                            */
@@ -424,27 +428,49 @@ function binaryOption(cfg: ClaudeCodeRunnerConfig): Partial<SdkQueryOptions> {
   return path ? ({ executable: path } as Partial<SdkQueryOptions>) : {};
 }
 
+function healthProbeResult(message: SDKMessage): string | null | undefined {
+  if (message.type !== "result") return undefined;
+  if (message.subtype === "success" && !message.is_error) return null;
+  const errors = "errors" in message && Array.isArray(message.errors) ? message.errors.join("; ") : undefined;
+  return `${HEALTH_PROBE_FAILURE}: ${errors || message.subtype}`;
+}
+
 export async function probeClaudeCodeSdk(input: {
   config: ClaudeCodeRunnerConfig;
   timeoutMs?: number;
 }): Promise<string | null> {
-  let warm: Awaited<ReturnType<typeof sdkStartup>> | null = null;
+  const timeoutMs = input.timeoutMs ?? HEALTH_PROBE_TIMEOUT_MS;
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
+  let query: ReturnType<typeof sdkQuery> | null = null;
+
   try {
-    warm = await sdkStartup({
+    query = sdkQuery({
+      prompt: HEALTH_PROBE_PROMPT,
       options: {
         ...(input.config.sdkOptions ?? {}),
         model: input.config.model,
         cwd: input.config.cwd,
         env: claudeRunEnv(input.config),
+        tools: [],
+        maxTurns: 1,
+        permissionMode: "dontAsk",
+        abortController,
         ...binaryOption(input.config),
       },
-      initializeTimeoutMs: input.timeoutMs,
     });
-    return null;
+
+    for await (const message of query) {
+      const result = healthProbeResult(message);
+      if (result !== undefined) return result;
+    }
+    return `${HEALTH_PROBE_FAILURE}: no result message`;
   } catch (err) {
-    return `Claude Code SDK startup failed: ${err instanceof Error ? err.message : String(err)}`;
+    if (abortController.signal.aborted) return `${HEALTH_PROBE_FAILURE}: timed out after ${timeoutMs}ms`;
+    return `${HEALTH_PROBE_FAILURE}: ${err instanceof Error ? err.message : String(err)}`;
   } finally {
-    warm?.close();
+    clearTimeout(timeout);
+    query?.close();
   }
 }
 

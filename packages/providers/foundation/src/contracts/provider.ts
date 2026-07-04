@@ -148,6 +148,16 @@ export const providerApprovalResolutionSchema = z
     raw: z.unknown().optional(),
   })
   .strict();
+export const providerRecoveryCapabilitySchema = z
+  .object({
+    sessionResume: z.boolean(),
+    historyReplay: z.boolean(),
+    activeRunLookup: z.boolean(),
+    streamReconnect: z.boolean(),
+    mode: z.enum(["authoritative_run_lookup", "session_history", "local_stream_only"]),
+  })
+  .strict();
+
 export const providerCapabilitiesSchema = z
   .object({
     supportsSessions: z.boolean(),
@@ -158,6 +168,7 @@ export const providerCapabilitiesSchema = z
     supportsPreviousResponse: z.boolean(),
     reason: z.string().optional(),
     approval: providerApprovalCapabilitySchema.optional(),
+    recovery: providerRecoveryCapabilitySchema.optional(),
     details: z.unknown().optional(),
   })
   .strict();
@@ -501,6 +512,10 @@ export type ProviderApprovalScopePolicy = z.infer<
 export type ProviderApprovalCapability = z.infer<
   typeof providerApprovalCapabilitySchema
 >;
+export type ProviderRecoveryCapability = z.infer<
+  typeof providerRecoveryCapabilitySchema
+>;
+
 export type ProviderApprovalRequest = z.infer<typeof providerApprovalRequestSchema>;
 export type ResolveProviderApprovalInput = z.infer<
   typeof resolveProviderApprovalInputSchema
