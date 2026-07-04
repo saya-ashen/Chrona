@@ -62,11 +62,14 @@ vi.mock("@/lib/utils", () => ({
   cn: (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(" "),
 }));
 
+const routerPush = vi.fn();
+const routerRefresh = vi.fn();
+
 vi.mock("@/lib/router", () => ({
   useAppPathname: () => "/tasks",
   useAppRouter: () => ({
-    push: vi.fn(),
-    refresh: vi.fn(),
+    push: routerPush,
+    refresh: routerRefresh,
   }),
 }));
 
@@ -91,6 +94,19 @@ vi.mock("@chrona/i18n/react", () => ({
         "nav.tasks": "Tasks",
         "nav.settings": "Settings",
         "nav.newTask": "New Task",
+        "components.schedulePage.firstRunTitle": "Start with Chrona in three steps",
+        "components.schedulePage.firstRunDescription":
+          "Connect AI, capture a real task, then review the plan before anything runs.",
+        "components.schedulePage.firstRunStepConnectAiTitle": "Connect AI",
+        "components.schedulePage.firstRunStepConnectAi": "Add Claude Code or Codex as the AI client Chrona will use.",
+        "components.schedulePage.firstRunStepConnectAiDone": "AI client connected. Next, create a real task.",
+        "components.schedulePage.firstRunStepCreateTaskTitle": "Create a task",
+        "components.schedulePage.firstRunStepCreateTask": "Describe the goal, constraints, and context in one task.",
+        "components.schedulePage.firstRunStepReviewPlanTitle": "Review the plan",
+        "components.schedulePage.firstRunStepReviewPlan": "Chrona previews AI suggestions first; you decide what to accept or run.",
+        "components.schedulePage.firstRunConnectAi": "Connect AI",
+        "components.schedulePage.firstRunCreateTask": "Create first task",
+        "components.schedulePage.firstRunOpenCreatedTask": "Open created task",
       };
       return map[key] ?? key;
     },
@@ -207,6 +223,37 @@ describe("ControlPlaneShell", () => {
       );
     });
     expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
+  });
+
+  it("advances onboarding to plan review after creating a task", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ clients: [{ id: "client-1", enabled: true }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+
+    render(
+      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
+        <div>Workspace body</div>
+      </ControlPlaneShell>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Create first task" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create first task" }));
+    await user.click(screen.getByRole("button", { name: "Submit task" }));
+
+    await waitFor(() => {
+      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(expect.objectContaining({ title: "Created from shell" }));
+    });
+    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Review the plan");
+    expect(screen.getByRole("button", { name: "Open created task" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open created task" }));
+    expect(routerPush).toHaveBeenCalledWith("/en/tasks/created-task");
+    expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
   });
 
   it("forces plan generation when auto-execute is enabled", async () => {

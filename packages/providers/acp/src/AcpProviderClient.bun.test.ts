@@ -90,7 +90,8 @@ function config(overrides: Partial<AcpProviderConfig> = {}): AcpProviderConfig {
 
 describe("AcpProviderClient", () => {
   it("exposes generic ACP execution provider capabilities", async () => {
-    const client = new AcpProviderClient({ config: config({ displayName: "Test ACP" }), transport: new FakeAcpTransport() });
+    const transport = new FakeAcpTransport();
+    const client = new AcpProviderClient({ config: config({ displayName: "Test ACP" }), transport });
 
     expect(client.getCapabilities()).toMatchObject({
       supportsSessions: true,
@@ -104,9 +105,32 @@ describe("AcpProviderClient", () => {
     await expect(client.checkHealth()).resolves.toMatchObject({
       provider: "test_acp",
       ok: true,
+      reason: "Test ACP ACP agent initialized",
     });
+    expect(transport.requests.some((request) => request.method === "session/new")).toBe(false);
   });
 
+  it("opens a provider session when session health is requested", async () => {
+    const transport = new FakeAcpTransport();
+    const client = new AcpProviderClient({
+      config: config({ healthCheck: "session", mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
+      transport,
+    });
+
+    await expect(client.checkHealth()).resolves.toMatchObject({
+      provider: "test_acp",
+      ok: true,
+      reason: "test_acp ACP agent connected",
+    });
+    expect(transport.requests.find((request) => request.method === "session/new")?.params).toMatchObject({
+      mcpServers: [
+        {
+          url: "http://chrona.test/api/mcp?session_id=chrona%3Aprovider-health%3Atest_acp",
+          headers: [{ name: "Authorization", value: "Bearer run-token" }],
+        },
+      ],
+    });
+  });
   it("sends Chrona HTTP MCP server through ACP session setup", async () => {
     const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
     const client = new AcpProviderClient({

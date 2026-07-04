@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { AiClientType } from "@chrona/contracts";
+import { ensureEnabledAiClientDefault } from "./default-ai-client";
 
 interface UpdateAiClientInput {
   name?: string;
@@ -24,7 +25,7 @@ export async function updateAiClient(clientId: string, input: UpdateAiClientInpu
     ? undefined
     : mergeExistingSecrets(existing.config, input.config, existing.type, input.type ?? existing.type);
 
-  return db.aiClient.update({
+  const updated = await db.aiClient.update({
     where: { id: clientId },
     data: {
       ...(input.name !== undefined && { name: input.name }),
@@ -34,6 +35,9 @@ export async function updateAiClient(clientId: string, input: UpdateAiClientInpu
       ...(input.enabled !== undefined && { enabled: input.enabled }),
     },
   });
+
+  await ensureEnabledAiClientDefault();
+  return db.aiClient.findUniqueOrThrow({ where: { id: updated.id } });
 }
 
 const SECRET_CONFIG_KEYS = new Set([

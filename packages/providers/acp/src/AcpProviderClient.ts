@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { Readable, Writable } from "node:stream";
+import type { Readable as NodeReadable, Writable as NodeWritable } from "node:stream";
 import * as acp from "@agentclientprotocol/sdk";
 import type {
   ActiveSession,
@@ -368,8 +369,8 @@ export class StdioAcpTransport implements AcpTransport {
       stderr = (stderr + chunk.toString()).slice(-4000);
     });
     const stream = acp.ndJsonStream(
-      Writable.toWeb(subprocess.stdin as import("node:stream").Writable) as WritableStream<Uint8Array>,
-      Readable.toWeb(subprocess.stdout as import("node:stream").Readable) as unknown as ReadableStream<Uint8Array>,
+      Writable.toWeb(subprocess.stdin as NodeWritable) as WritableStream<Uint8Array>,
+      Readable.toWeb(subprocess.stdout as NodeReadable) as unknown as ReadableStream<Uint8Array>,
     );
     const app = acp.client({ name: "chrona" }).onRequest(
       acp.methods.client.session.requestPermission,
@@ -409,6 +410,17 @@ function handlers(requestPermission?: (params: RequestPermissionRequest) => Prom
     },
   };
 }
+async function checkAcpSessionHealth(config: AcpProviderConfig, context: ClientContext, signal?: AbortSignal) {
+  const sessionId = `${config.provider}-health-${crypto.randomUUID()}`;
+  const session = await context.buildSession(newSessionRequest(config, {
+    sessionId,
+    sessionKey: `chrona:provider-health:${config.provider}`,
+    instructions: "Health check.",
+    input: { type: "text", text: "Health check." },
+  })).start({ cancellationSignal: signal });
+  session.dispose();
+}
+
 
 async function initialize(context: ClientContext, signal?: AbortSignal): Promise<InitializeResponse> {
   return context.request(
@@ -524,6 +536,7 @@ export class AcpProviderClient implements AgentProviderClient {
       await this.transport.connect(this.config, handlers(), async (connection) => {
         const init = await initialize(connection.context, input.signal);
         assertHttpMcp(this.config, init);
+        if (this.config.healthCheck === "session") await checkAcpSessionHealth(this.config, connection.context, input.signal);
       });
       return {
         provider: this.provider,
@@ -531,7 +544,7 @@ export class AcpProviderClient implements AgentProviderClient {
         checkedAt,
         latencyMs: Date.now() - started,
         status: "ok",
-        reason: `${this.config.displayName ?? this.provider} ACP agent initialized`,
+        reason: this.config.healthCheck === "session" ? `${this.config.displayName ?? this.provider} ACP agent connected` : `${this.config.displayName ?? this.provider} ACP agent initialized`,
       };
     } catch (error) {
       return {

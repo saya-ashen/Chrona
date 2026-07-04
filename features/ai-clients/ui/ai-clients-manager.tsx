@@ -563,7 +563,9 @@ const DEFAULTS: Record<string, string> = {
   hermesPlanTitle: "Setup plan",
   hermesChangedTitle: "Changed",
   hermesRestartRequired: "Restart Hermes, then run diagnosis again.",
-  setAsDefault: "Set as default Client",
+  setAsDefault: "Use as default AI client",
+  setAsDefaultHelp: "Chrona uses the default client for planning, execution, and summaries unless a feature has its own client.",
+  makeDefault: "Make default",
   save: "Save",
   cancel: "Cancel",
   testAvailability: "Test availability",
@@ -600,12 +602,14 @@ function ClientForm({
   onCancel,
   copy,
   providers,
+  forceDefault = false,
 }: {
   initial?: AiClientInfo;
   onSave: (data: { payload: ClientFormPayload; bindings: string[] }) => void;
   onCancel: () => void;
   copy: Record<string, string>;
   providers: RuntimeProviderOption[];
+  forceDefault?: boolean;
 }) {
   const fallbackType = providers.find((provider) => provider.key === "claude_code")?.key ?? providers[0]?.key ?? "claude_code";
   const initialConfig = initial?.config;
@@ -617,7 +621,7 @@ function ClientForm({
   const defaultValues = useMemo<ClientFormValues>(() => ({
     name: initial?.name ?? "",
     type: initialType,
-    isDefault: initial?.isDefault ?? false,
+    isDefault: forceDefault || initial?.isDefault || false,
     timeoutSeconds: String(
       (initialConfig as { timeoutSeconds?: number; timeoutMs?: number } | undefined)?.timeoutSeconds
         ?? (((initialConfig as { timeoutMs?: number } | undefined)?.timeoutMs ?? DEFAULT_PROVIDER_RUN_TIMEOUT_MS) / 1000),
@@ -639,7 +643,7 @@ function ClientForm({
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
     debugProfile: normalizeDebugProfile((initialConfig as { profile?: unknown } | undefined)?.profile),
     bindings: initial?.bindings ?? initialRecommendedBindings,
-  }), [initialType, initial, initialConfig, initialRecommendedBindings]);
+  }), [initialType, initial, initialConfig, initialRecommendedBindings, forceDefault]);
   const form = useForm<ClientFormValues>({
     defaultValues,
     mode: "onChange",
@@ -690,7 +694,7 @@ function ClientForm({
   }, [availableFeatures, form, initial, values.type]);
 
   function handleSave(nextValues: ClientFormValues) {
-    onSave({ payload: buildClientPayload(nextValues), bindings: nextValues.bindings });
+    onSave({ payload: buildClientPayload({ ...nextValues, isDefault: forceDefault || nextValues.isDefault }), bindings: nextValues.bindings });
   }
 
   return (
@@ -1113,10 +1117,11 @@ function ClientForm({
               name="isDefault"
               control={form.control}
               render={({ field }) => (
-                <Field orientation="horizontal">
-                  <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                <Field orientation="horizontal" className="items-start gap-3">
+                  <Checkbox aria-label={copy.setAsDefault} checked={forceDefault || field.value} disabled={forceDefault} onCheckedChange={(checked) => field.onChange(checked === true)} />
                   <FieldContent>
                     <FieldLabel>{copy.setAsDefault}</FieldLabel>
+                    <p className="text-xs text-muted-foreground">{copy.setAsDefaultHelp}</p>
                   </FieldContent>
                 </Field>
               )}
@@ -1221,6 +1226,14 @@ export function AiClientsManager() {
     void fetchClients();
   };
 
+  const handleMakeDefault = async (id: string) => {
+    await api.ai.clients[":clientId"].$patch({
+      param: { clientId: id },
+      json: { isDefault: true },
+    });
+    void fetchClients();
+  };
+
   const handleToggleEnabled = async (id: string, enabled: boolean) => {
     await api.ai.clients[":clientId"].$patch({
       param: { clientId: id },
@@ -1279,7 +1292,7 @@ export function AiClientsManager() {
         </Button>
       </div>
 
-      {showForm && <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} providers={providers} />}
+      {showForm && <ClientForm onSave={handleCreate} onCancel={() => setShowForm(false)} copy={copy} providers={providers} forceDefault={clients.length === 0} />}
 
       {clients.length === 0 && !showForm && (
         <Card className="border-dashed">
@@ -1355,6 +1368,11 @@ export function AiClientsManager() {
                     <Checkbox checked={client.enabled} onCheckedChange={(checked) => handleToggleEnabled(client.id, checked === true)} />
                     <FieldLabel className="text-xs text-muted-foreground">{copy.enabled}</FieldLabel>
                   </Field>
+                  {!client.isDefault && client.enabled && (
+                    <Button type="button" variant="outline" size="xs" onClick={() => void handleMakeDefault(client.id)}>
+                      {copy.makeDefault}
+                    </Button>
+                  )}
                   <Button type="button" variant="outline" size="xs" onClick={() => setEditingId(client.id)}>
                     {copy.edit}
                   </Button>

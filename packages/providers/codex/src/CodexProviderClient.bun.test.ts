@@ -117,6 +117,7 @@ describe("codexAcpConfig", () => {
       timeoutMs: 120,
       mcpBaseUrl: "http://chrona.test",
       mcpRunToken: "token",
+      healthCheck: "session",
     });
   });
 });
@@ -150,6 +151,12 @@ describe("CodexProviderClient", () => {
           headers: [{ name: "Authorization", value: "Bearer run-token" }],
         },
       ],
+    });
+
+    await expect(client.checkHealth()).resolves.toMatchObject({
+      provider: "codex",
+      ok: true,
+      reason: "OpenAI Codex ACP agent connected",
     });
   });
 });
