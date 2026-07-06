@@ -1,4 +1,8 @@
-import { AcpProviderClient, type AcpProviderOptions } from "@chrona/acp-provider";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { Database } from "bun:sqlite";
+import { AcpProviderClient, type AcpDiagnostics, type AcpProviderOptions } from "@chrona/acp-provider";
 import type { AgentProviderClient, CancelRunInput, CreateSessionInput, GetRunInput, HealthCheckInput, StartRunInput, StreamRunInput } from "@chrona/providers-foundation";
 import { codexAcpConfig, type CodexProviderConfig } from "./types";
 
@@ -12,9 +16,11 @@ export class CodexProviderClient implements AgentProviderClient {
   private readonly acp: AcpProviderClient;
 
   constructor(opts: CodexProviderOptions = {}) {
+    const config = opts.config ?? {};
     this.acp = new AcpProviderClient({
       ...(opts.acp ?? {}),
-      config: codexAcpConfig(opts.config ?? {}),
+      config: codexAcpConfig(config),
+      diagnostics: opts.acp?.diagnostics ?? new CodexLogDiagnostics(config),
     });
   }
 
@@ -44,5 +50,38 @@ export class CodexProviderClient implements AgentProviderClient {
 
   cancelRun(input: CancelRunInput) {
     return this.acp.cancelRun(input);
+  }
+}
+
+class CodexLogDiagnostics implements AcpDiagnostics {
+  private readonly configDirectory?: string;
+
+  constructor(config: CodexProviderConfig) {
+    this.configDirectory = config.configDirectory?.trim();
+  }
+
+  details(): string {
+    const dbPath = this.logsPath();
+    if (!existsSync(dbPath)) return "";
+    let db: Database | undefined;
+    try {
+      db = new Database(dbPath, { readonly: true });
+      const rows = db.query<{ body: string }, []>(`
+        SELECT feedback_log_body AS body
+        FROM logs
+        WHERE feedback_log_body LIKE '%Request completed method=POST url=% status=%'
+        ORDER BY id DESC
+        LIMIT 20
+      `).all();
+      return rows.map((row) => row.body).filter((body) => body.includes("/responses") || body.includes("/chat/completions")).slice(0, 5).join("\n");
+    } catch {
+      return "";
+    } finally {
+      db?.close();
+    }
+  }
+
+  private logsPath() {
+    return join(this.configDirectory || join(homedir(), ".codex"), "logs_2.sqlite");
   }
 }

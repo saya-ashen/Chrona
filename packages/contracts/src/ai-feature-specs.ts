@@ -53,8 +53,8 @@ You are a task planning assistant that generates concise execution blueprints as
 Given a task, produce a structured plan using ONLY these 4 node types: task, checkpoint, condition, wait.
 You MUST call the chrona_plan_generate tool.
 Put the complete final graph directly into that tool input. Assistant free text is optional and non-authoritative.
-After chrona_plan_generate returns success/accepted/completed, the planning phase is complete: STOP immediately. Do NOT call chrona_execution_read, chrona_node_* tools, or any other tool. Do NOT start execution. If chrona_plan_generate is rejected with validation issues, fix the exact graph issues and call chrona_plan_generate again; still do NOT call chrona_execution_read or execution/node tools.
-The tool input MUST be a PlanBlueprint object with title, goal, nodes, and optional edges/assumptions.
+After chrona_plan_generate returns success/accepted/completed, STOP immediately. Do NOT call chrona_execution_read, chrona_node_* tools, list_mcp_resources, list_mcp_resource_templates, or any execution tools. Do NOT start execution. If chrona_plan_generate is rejected with validation issues, fix the exact graph issues and call chrona_plan_generate again; still do NOT call chrona_execution_read or execution/node tools.
+The chrona_plan_generate tool input MUST be a PlanBlueprint object with title, goal, nodes, and optional edges/assumptions.
 Only include fields that belong to the chosen node type. Do NOT copy task-only fields onto checkpoint, condition, or wait nodes.
 
 ## Node types
@@ -118,6 +118,21 @@ Pause execution for a duration or external event.
 
 This phase is planning only — do NOT execute, implement, inspect execution state, read execution context, or continue after chrona_plan_generate succeeds.
 Respond in the same language as the input.`.trim();
+
+export type GeneratePlanFeatureSpecOptions = {
+  providerType?: string;
+};
+
+export const CODEX_GENERATE_PLAN_DISCOVERY_PROMPT = `
+Codex provider note: MCP tools may be deferred behind tool_search. If chrona_plan_generate is not visible in the current tool list, first call tool_search with query "chrona_plan_generate", then call the discovered chrona_plan_generate tool. Do not use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource for plan generation.
+`.trim();
+
+function buildGeneratePlanInstructions(options?: GeneratePlanFeatureSpecOptions): string {
+  if (options?.providerType === "codex") {
+    return `${GENERATE_PLAN_SYSTEM_PROMPT}\n\n${CODEX_GENERATE_PLAN_DISCOVERY_PROMPT}`;
+  }
+  return GENERATE_PLAN_SYSTEM_PROMPT;
+}
 
 export const suggestTaskCompletionsToolSpec: AiFeatureToolSpec = {
   type: "function",
@@ -207,11 +222,13 @@ export function buildGeneratePlanFeatureInputText(
 
 export function buildGeneratePlanFeatureSpec(
   input: GenerateTaskPlanRequest,
+  options?: GeneratePlanFeatureSpecOptions,
 ): PreparedAiFeatureSpec {
   return {
     feature: "generate_plan",
-    instructions: GENERATE_PLAN_SYSTEM_PROMPT,
+    instructions: buildGeneratePlanInstructions(options),
     inputText: buildGeneratePlanFeatureInputText(input),
+    terminalToolName: GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
   };
 }
 

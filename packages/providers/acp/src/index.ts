@@ -2,6 +2,7 @@ export {
   AcpProviderClient,
   StdioAcpTransport,
   type AcpClientHandlers,
+  type AcpDiagnostics,
   type AcpProviderOptions,
   type AcpRunHandle,
   type AcpTransport,

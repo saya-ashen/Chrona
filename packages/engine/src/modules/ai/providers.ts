@@ -444,7 +444,7 @@ export function buildProviderFeatureRequest(input: {
     instructions: input.featureSpec?.instructions ?? fallbackInstructions,
     input: providerInput,
     structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
-    terminalToolName: input.terminalToolName,
+    terminalToolName: input.terminalToolName ?? input.featureSpec?.terminalToolName,
     stream: input.stream,
     maxOutputTokens: input.maxOutputTokens,
     timeoutSeconds: input.timeoutSeconds,

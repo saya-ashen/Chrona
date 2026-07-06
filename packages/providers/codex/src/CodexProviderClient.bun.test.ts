@@ -1,4 +1,8 @@
-import { describe, expect, it } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Database } from "bun:sqlite";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import type { StartRunInput } from "@chrona/providers-foundation";
 import type { AcpClientHandlers, AcpProviderConfig, AcpTransport } from "@chrona/acp-provider";
 import { codexAcpConfig, codexAcpEnv } from "./types";
@@ -28,11 +32,14 @@ class FakeAcpTransport implements AcpTransport {
   readonly requests: RequestRecord[] = [];
   readonly session: FakeSession;
 
-  constructor(updates: FakeSession["updates"] = []) {
+  constructor(input: FakeSession["updates"] | { updates?: FakeSession["updates"]; promptError?: Error } = []) {
+    const updates = Array.isArray(input) ? input : input.updates ?? [];
+    const promptError = Array.isArray(input) ? undefined : input.promptError;
     this.session = {
       sessionId: "codex-native-session-1",
       updates,
       async prompt() {
+        if (promptError) throw promptError;
         return { stopReason: "end_turn" };
       },
       async nextUpdate() {
@@ -61,6 +68,26 @@ class FakeAcpTransport implements AcpTransport {
   }
 }
 
+const ORIGINAL_FETCH = globalThis.fetch;
+
+function stubMcpTools(toolNames: string[]) {
+  globalThis.fetch = mock(async (_url: string | URL | Request, init: RequestInit = {}) => {
+    const body = typeof init.body === "string" ? JSON.parse(init.body) as { method?: string } : {};
+    if (body.method === "initialize") {
+      return new Response("", { status: 200, headers: { "mcp-session-id": "mcp-session-1" } });
+    }
+    if (body.method === "tools/list") {
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 2, result: { tools: toolNames.map((name) => ({ name })) } }), { status: 200 });
+    }
+    return new Response("unexpected MCP method", { status: 400 });
+  }) as unknown as typeof fetch;
+}
+
+afterEach(() => {
+  globalThis.fetch = ORIGINAL_FETCH;
+  mock.restore();
+});
+
 describe("codexAcpEnv", () => {
   it("passes API key auth as default ACP auth request", () => {
     const env = codexAcpEnv({ apiKey: " sk-openai " });
@@ -72,26 +99,41 @@ describe("codexAcpEnv", () => {
     });
   });
 
-  it("passes gateway auth request when base URL is configured", () => {
+  it("passes gateway config and forces Chrona MCP namespace direct exposure", () => {
     const env = codexAcpEnv({
       apiKey: "sk-gateway",
       baseUrl: " https://gateway.example/v1 ",
       model: "gpt-5-codex",
     });
 
+    expect(env.MODEL_PROVIDER).toBe("chrona-gateway");
     expect(JSON.parse(env.CODEX_CONFIG ?? "{}")).toMatchObject({
       baseUrl: " https://gateway.example/v1 ",
       model: "gpt-5-codex",
-    });
-    expect(JSON.parse(env.DEFAULT_AUTH_REQUEST ?? "{}")).toEqual({
-      methodId: "gateway",
-      _meta: {
-        gateway: {
-          baseUrl: "https://gateway.example/v1",
-          providerName: "Chrona Codex Gateway",
-          headers: { Authorization: "Bearer sk-gateway" },
+      model_provider: "chrona-gateway",
+      model_providers: {
+        "chrona-gateway": {
+          base_url: "https://gateway.example/v1",
+          http_headers: { Authorization: "Bearer sk-gateway" },
+          wire_api: "responses",
         },
       },
+      features: {
+        code_mode: {
+          enabled: true,
+          direct_only_tool_namespaces: ["chrona", "mcp__chrona"],
+        },
+      },
+    });
+    expect(env.DEFAULT_AUTH_REQUEST).toBeUndefined();
+  });
+
+  it("uses api-key auth only for default OpenAI Codex provider", () => {
+    const env = codexAcpEnv({ apiKey: "sk-openai" });
+
+    expect(JSON.parse(env.DEFAULT_AUTH_REQUEST ?? "{}")).toEqual({
+      methodId: "api-key",
+      _meta: { "api-key": { apiKey: "sk-openai" } },
     });
   });
 
@@ -99,7 +141,36 @@ describe("codexAcpEnv", () => {
     const env = codexAcpEnv({ configDirectory: " /tmp/chrona-codex " });
 
     expect(env.CODEX_HOME).toBe("/tmp/chrona-codex");
-    expect(env.CODEX_CONFIG).toBeUndefined();
+    expect(JSON.parse(env.CODEX_CONFIG ?? "{}")).toMatchObject({
+      features: {
+        code_mode: {
+          enabled: true,
+          direct_only_tool_namespaces: ["chrona", "mcp__chrona"],
+        },
+      },
+    });
+  });
+
+  it("preserves caller Codex feature config while adding Chrona direct MCP namespaces", () => {
+    const env = codexAcpEnv({
+      codexConfig: {
+        features: {
+          code_mode: {
+            enabled: false,
+            direct_only_tool_namespaces: ["existing", "chrona"],
+          },
+        },
+      },
+    });
+
+    expect(JSON.parse(env.CODEX_CONFIG ?? "{}")).toMatchObject({
+      features: {
+        code_mode: {
+          enabled: true,
+          direct_only_tool_namespaces: ["existing", "chrona", "mcp__chrona"],
+        },
+      },
+    });
   });
 });
 
@@ -119,6 +190,13 @@ describe("codexAcpConfig", () => {
       mcpRunToken: "token",
       healthCheck: "session",
     });
+  });
+
+  it("uses bundled codex-acp when no binary override is configured", () => {
+    const config = codexAcpConfig({});
+
+    expect(config.command).toContain("@agentclientprotocol/codex-acp");
+    expect(config.command.endsWith("dist/index.js")).toBe(true);
   });
 });
 
@@ -153,10 +231,36 @@ describe("CodexProviderClient", () => {
       ],
     });
 
+    stubMcpTools(["chrona_plan_generate", "chrona_plan_read"]);
     await expect(client.checkHealth()).resolves.toMatchObject({
       provider: "codex",
       ok: true,
       reason: "OpenAI Codex ACP agent connected",
+    });
+  });
+
+
+  it("surfaces upstream auth status from Codex logs", async () => {
+    const codexHome = mkdtempSync(join(tmpdir(), "chrona-codex-test-"));
+    const db = new Database(join(codexHome, "logs_2.sqlite"));
+    db.run("CREATE TABLE logs (id INTEGER PRIMARY KEY, feedback_log_body TEXT)");
+    db.query("INSERT INTO logs (feedback_log_body) VALUES (?)").run(
+      "Request completed method=POST url=https://api.krill-ai.com/codex/v1/responses status=401 Unauthorized headers={}",
+    );
+    db.close();
+    const transport = new FakeAcpTransport({ promptError: new Error("Internal error") });
+    const client = new CodexProviderClient({
+      config: { configDirectory: codexHome, mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" },
+      acp: { transport },
+    });
+
+    const streamed = [];
+    const run = await client.startRun(baseInput());
+    for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
+
+    expect(streamed.at(-1)).toMatchObject({
+      type: "run_failed",
+      error: "Internal error: upstream provider authentication failed (401 Unauthorized). Check provider API key and base URL.",
     });
   });
 });

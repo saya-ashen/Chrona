@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import type { ProviderRunEvent, StartRunInput } from "@chrona/providers-foundation";
 import {
   AcpProviderClient,
@@ -33,12 +33,14 @@ class FakeAcpTransport implements AcpTransport {
   readonly session: FakeSession;
   readonly init: unknown;
   handlers?: AcpClientHandlers;
+  readonly stderr: string;
 
-  constructor(input: { init?: unknown; updates?: FakeSession["updates"] } = {}) {
+  constructor(input: { init?: unknown; updates?: FakeSession["updates"]; stderr?: string } = {}) {
     this.init = input.init ?? {
       protocolVersion: 1,
       agentCapabilities: { loadSession: true, mcpCapabilities: { http: true } },
     };
+    this.stderr = input.stderr ?? "";
     this.session = {
       sessionId: "native-acp-session-1",
       updates: input.updates ?? [],
@@ -76,7 +78,7 @@ class FakeAcpTransport implements AcpTransport {
         this.requests.push({ method, params });
       },
     };
-    return op({ context, close() {}, closed: Promise.resolve() } as never);
+    return op({ context, close() {}, closed: Promise.resolve(), diagnostics: { stderr: () => this.stderr } } as never);
   }
 }
 
@@ -87,6 +89,29 @@ function config(overrides: Partial<AcpProviderConfig> = {}): AcpProviderConfig {
     ...overrides,
   };
 }
+
+const ORIGINAL_FETCH = globalThis.fetch;
+
+function stubMcpTools(toolNames: string[]) {
+  const calls: Array<{ url: string; init: { headers?: HeadersInit; body?: BodyInit | null } }> = [];
+  globalThis.fetch = mock(async (url: string | URL | Request, init: RequestInit = {}) => {
+    calls.push({ url: String(url), init });
+    const body = typeof init.body === "string" ? JSON.parse(init.body) as { method?: string } : {};
+    if (body.method === "initialize") {
+      return new Response("", { status: 200, headers: { "mcp-session-id": "mcp-session-1" } });
+    }
+    if (body.method === "tools/list") {
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id: 2, result: { tools: toolNames.map((name) => ({ name })) } }), { status: 200 });
+    }
+    return new Response("unexpected MCP method", { status: 400 });
+  }) as unknown as typeof fetch;
+  return calls;
+}
+
+afterEach(() => {
+  globalThis.fetch = ORIGINAL_FETCH;
+  mock.restore();
+});
 
 describe("AcpProviderClient", () => {
   it("exposes generic ACP execution provider capabilities", async () => {
@@ -110,7 +135,9 @@ describe("AcpProviderClient", () => {
     expect(transport.requests.some((request) => request.method === "session/new")).toBe(false);
   });
 
+
   it("opens a provider session when session health is requested", async () => {
+    stubMcpTools(["chrona_plan_generate", "chrona_plan_read"]);
     const transport = new FakeAcpTransport();
     const client = new AcpProviderClient({
       config: config({ healthCheck: "session", mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
@@ -125,10 +152,25 @@ describe("AcpProviderClient", () => {
     expect(transport.requests.find((request) => request.method === "session/new")?.params).toMatchObject({
       mcpServers: [
         {
-          url: "http://chrona.test/api/mcp?session_id=chrona%3Aprovider-health%3Atest_acp",
+          url: "http://chrona.test/api/mcp?session_id=chrona%3Aprovider-health%3Atest_acp%3Aplan-generation",
           headers: [{ name: "Authorization", value: "Bearer run-token" }],
         },
       ],
+    });
+  });
+
+  it("fails session health when Chrona MCP tools omit plan generation", async () => {
+    stubMcpTools(["chrona_plan_read"]);
+    const client = new AcpProviderClient({
+      config: config({ healthCheck: "session", mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
+      transport: new FakeAcpTransport(),
+    });
+
+    await expect(client.checkHealth()).resolves.toMatchObject({
+      provider: "test_acp",
+      ok: false,
+      status: "error",
+      reason: expect.stringContaining("chrona_plan_generate"),
     });
   });
   it("sends Chrona HTTP MCP server through ACP session setup", async () => {
@@ -294,6 +336,35 @@ describe("AcpProviderClient", () => {
     expect(promptText).toContain("Return success.");
     expect(promptText).toContain("Structured output schema:");
     expect(promptText).toContain('"ok"');
+    expect(promptText).not.toContain("Required Chrona MCP tools for this turn");
+    expect(promptText).not.toContain("tool_search");
+  });
+
+  it("does not inject Codex-specific MCP discovery instructions into task prompts", async () => {
+    const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
+    const client = new AcpProviderClient({ config: config(), transport });
+    const run = await client.startRun(baseInput({
+      instructions: "You MUST call the chrona_plan_generate tool.",
+      input: { type: "text", text: "Plan this task." },
+      structuredOutputSchema: {
+        name: "chrona_plan_generate",
+        description: "Plan blueprint",
+        schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] },
+      },
+    }));
+
+    for await (const _event of client.streamRun({ runId: run.runId })) {
+      // drain stream
+    }
+    const promptText = (transport.session.promptBlocks as Array<{ text: string }>)[0]?.text ?? "";
+
+    expect(promptText).toContain("You MUST call the chrona_plan_generate tool.");
+    expect(promptText).toContain("Plan this task.");
+    expect(promptText).toContain("Structured output schema:");
+    expect(promptText).not.toContain("Required Chrona MCP tools for this turn");
+    expect(promptText).not.toContain("mcp__chrona");
+    expect(promptText).not.toContain("tool_search");
+    expect(promptText).not.toContain("list_mcp_resources");
   });
 
   it("streams text, reasoning, usage, tool start, and tool failure events", async () => {
@@ -354,6 +425,23 @@ describe("AcpProviderClient", () => {
       type: "run_completed",
       outputText: "hello",
       usage: { inputTokens: 7, outputTokens: 0, totalTokens: 7 },
+    });
+  });
+
+  it("surfaces upstream auth status from ACP process diagnostics", async () => {
+    const transport = new FakeAcpTransport({ stderr: "Request completed method=POST url=https://api.krill-ai.com/codex/v1/responses status=401 Unauthorized" });
+    transport.session.prompt = async () => {
+      throw new Error("Internal error");
+    };
+    const client = new AcpProviderClient({ config: config(), transport });
+    const run = await client.startRun(baseInput());
+    const streamed: ProviderRunEvent[] = [];
+
+    for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
+
+    expect(streamed.at(-1)).toMatchObject({
+      type: "run_failed",
+      error: "Internal error: upstream provider authentication failed (401 Unauthorized). Check provider API key and base URL.",
     });
   });
 
