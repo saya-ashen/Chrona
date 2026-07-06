@@ -1316,7 +1316,10 @@
       "filePreviewReadFailed": "无法加载文件预览。",
       "expandFilePreview": "展开预览",
       "collapseFilePreview": "收起预览",
-      "liveStatusRunning": "正在运行"
+      "liveStatusRunning": "正在运行",
+      "resultSummaryLabel": "结果摘要",
+      "copyResultSummary": "复制摘要",
+      "resultSummaryCopied": "已复制"
     }
   },
   "queries": {

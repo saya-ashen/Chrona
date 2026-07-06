@@ -1,13 +1,14 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
+import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, Copy, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
 import { ActivityTimeline } from "../../../../../../../features/execution-monitoring/ui/activity-timeline";
 import type { WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
 import { useI18n, useLocale } from "@chrona/i18n/react";
+import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { chronaCatalog } from "@chrona/ui-protocol";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -169,6 +170,49 @@ function filePreviewErrorMessage(error: unknown, copy: Record<string, string | u
 const EXPANDABLE_FILE_PREVIEW_MIN_LENGTH = 1200;
 
 
+function ResultSummary({ props }: { props: { text?: string | null; copyText?: string | null } }) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const [copied, setCopied] = useState(false);
+  const text = typeof props.text === "string" ? props.text.trim() : "";
+  const copyText = typeof props.copyText === "string" && props.copyText.trim() ? props.copyText : text;
+  if (!text) return null;
+
+  const copyLabel = copied ? (copy.resultSummaryCopied ?? "Copied") : (copy.copyResultSummary ?? "Copy summary");
+
+  return (
+    <section aria-label={copy.resultSummaryLabel ?? "Result summary"} className="space-y-2.5 border-b border-border/70 pb-3.5 text-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary ring-1 ring-primary/20">
+            <Check className="size-3.5" aria-hidden="true" />
+          </span>
+          <h2 className="font-heading text-[1.05rem] font-semibold leading-none tracking-[-0.01em] text-foreground sm:text-lg">{copy.resultSummaryLabel ?? "Result summary"}</h2>
+        </div>
+        {copyText ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 rounded-full px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              void navigator.clipboard?.writeText(copyText).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1400);
+              });
+            }}
+          >
+            <Copy className="size-3.5" aria-hidden="true" />
+            {copyLabel}
+          </Button>
+        ) : null}
+      </div>
+      <p className="max-w-3xl text-[15px] font-normal leading-7 text-foreground/80 tracking-[-0.005em]">{text}</p>
+    </section>
+  );
+}
+
+
 function FileView({ props }: { props: Record<string, unknown> }) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
@@ -281,36 +325,240 @@ function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?:
   );
 }
 
-function WorkspaceTable({ props }: { props: { columns?: string[] | null; rows?: string[][] | null; caption?: string | null } }) {
-  const columns = props.columns ?? [];
-  const rows = (props.rows ?? []).map((row) => row.map(String));
+type WorkspaceTableColumn = {
+  key: string;
+  label: string;
+  type?: "text" | "number" | "link";
+  hrefKey?: string;
+};
+
+type WorkspaceTableRow = Record<string, unknown>;
+
+type WorkspaceTableProps = {
+  title?: string | null;
+  description?: string | null;
+  uri?: string | null;
+  path?: string | null;
+  displayPath?: string | null;
+  columns?: Array<string | { key?: unknown; label?: unknown; type?: unknown; hrefKey?: unknown }> | null;
+  pageSize?: number | null;
+  contentKind?: string | null;
+  contentPreview?: string | null;
+  contentTruncated?: boolean | null;
+  contentBytes?: number | null;
+  previewError?: string | null;
+};
+
+function tableCellText(value: unknown) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function safeExternalHref(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function csvRows(content: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < content.length; index += 1) {
+    const char = content[index];
+    if (char === '"') {
+      if (quoted && content[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && content[index + 1] === "\n") index += 1;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  if (cell || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((cells) => cells.some((value) => value.trim()));
+}
+
+function recordsFromRows(matrix: unknown[][]) {
+  if (matrix.length === 0) return { rows: [] as WorkspaceTableRow[], inferredColumns: [] as string[] };
+  const inferredColumns = matrix[0]!.map((value, index) => tableCellText(value).trim() || `Column ${index + 1}`);
+  const rows = matrix.slice(1).map((values) => Object.fromEntries(inferredColumns.map((key, index) => [key, values[index] ?? ""])));
+  return { rows, inferredColumns };
+}
+
+function recordsFromObjects(items: Array<Record<string, unknown>>) {
+  const inferredColumns: string[] = [];
+  const rows = items.map((item) => {
+    const row: WorkspaceTableRow = {};
+    for (const [key, value] of Object.entries(item)) {
+      if (!inferredColumns.includes(key)) inferredColumns.push(key);
+      row[key] = value;
+    }
+    return row;
+  });
+  return { rows, inferredColumns };
+}
+
+function tableSourceRows(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.rows)) return record.rows;
+    if (Array.isArray(record.data)) return record.data;
+  }
+  return [];
+}
+
+function parseTablePreview(kind: string | null | undefined, preview: string | null | undefined) {
+  if (!preview) return { rows: [] as WorkspaceTableRow[], inferredColumns: [] as string[], parseError: false };
+  try {
+    const rawRows = kind === "csv" ? csvRows(preview) : tableSourceRows(JSON.parse(preview));
+    if (rawRows.every(Array.isArray)) return { ...recordsFromRows(rawRows as unknown[][]), parseError: false };
+    if (rawRows.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
+      return { ...recordsFromObjects(rawRows as Array<Record<string, unknown>>), parseError: false };
+    }
+  } catch {
+    return { rows: [], inferredColumns: [], parseError: true };
+  }
+  return { rows: [], inferredColumns: [], parseError: true };
+}
+
+function normalizeTableColumns(propsColumns: WorkspaceTableProps["columns"], inferredColumns: string[]) {
+  const columns = propsColumns?.flatMap((column) => {
+    if (typeof column === "string") return [{ key: column, label: column }];
+    if (!column || typeof column !== "object" || typeof column.key !== "string") return [];
+    return [{
+      key: column.key,
+      label: typeof column.label === "string" ? column.label : column.key,
+      type: column.type === "number" || column.type === "link" ? column.type : "text",
+      hrefKey: typeof column.hrefKey === "string" ? column.hrefKey : undefined,
+    }];
+  }) ?? [];
+  return columns.length > 0 ? columns : inferredColumns.map((key) => ({ key, label: key }));
+}
+
+function WorkspaceTableCell({ column, row, value }: { column: WorkspaceTableColumn; row: WorkspaceTableRow; value: unknown }) {
+  const text = tableCellText(value);
+  const href = column.hrefKey ? safeExternalHref(tableCellText(row[column.hrefKey])) : column.type === "link" ? safeExternalHref(text) : null;
+  if (href) {
+    return <a href={href} target="_blank" rel="noreferrer" className="block min-w-0 whitespace-normal break-words font-medium text-primary underline-offset-4 [overflow-wrap:anywhere] hover:underline">{text}</a>;
+  }
+  return <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-5">{text}</span>;
+}
+
+function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const parsed = useMemo(() => parseTablePreview(props.contentKind, props.contentPreview), [props.contentKind, props.contentPreview]);
+  const tableColumns = useMemo(() => normalizeTableColumns(props.columns, parsed.inferredColumns), [props.columns, parsed.inferredColumns]);
+  const pageSize = typeof props.pageSize === "number" && Number.isFinite(props.pageSize) ? Math.max(1, Math.min(100, Math.floor(props.pageSize))) : 10;
+  const columnDefs = useMemo<ColumnDef<WorkspaceTableRow>[]>(() => tableColumns.map((column, index) => ({
+    id: `${column.key}:${index}`,
+    accessorFn: (row) => row[column.key],
+    header: column.label,
+    cell: ({ getValue, row }) => <WorkspaceTableCell column={column} row={row.original} value={getValue()} />,
+  })), [tableColumns]);
+  const table = useReactTable({
+    data: parsed.rows,
+    columns: columnDefs,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize } },
+  });
+  const path = props.displayPath ?? props.uri ?? props.path;
+  const size = formatFileSize(props.contentBytes);
+  const error = filePreviewErrorMessage(props.previewError, copy);
 
   return (
-    <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border">
-      <table className="w-full table-fixed caption-bottom text-sm">
-        {props.caption ? <caption className="mt-4 text-sm text-muted-foreground">{props.caption}</caption> : null}
-        <thead className="[&_tr]:border-b">
-          <tr className="border-b transition-colors hover:bg-muted/50">
-            {columns.map((column) => (
-              <th key={column} className="h-10 min-w-0 px-2 text-left align-middle font-medium text-foreground">
-                <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-snug">{column}</span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="[&_tr:last-child]:border-0">
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-b transition-colors hover:bg-muted/50">
-              {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="min-w-0 p-2 align-top text-foreground/80">
-                  <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-5">{cell}</span>
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden rounded-md border border-border bg-background/95 p-2 text-sm shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          {props.title ? <p className="font-medium text-foreground">{props.title}</p> : null}
+          {props.description ? <p className="text-xs text-muted-foreground">{props.description}</p> : null}
+          {path ? <p className="break-all text-xs text-muted-foreground">{path}</p> : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+          {props.contentKind ? <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{props.contentKind}</Badge> : null}
+          {size ? <span>{size}</span> : null}
+          {props.contentTruncated ? <span>{copy.filePreviewTruncated ?? "Preview truncated"}</span> : null}
+        </div>
+      </div>
+      {error ? <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">{error}</p> : null}
+      {parsed.parseError ? <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">Table preview could not be parsed.</p> : null}
+      {!error && !parsed.parseError && parsed.rows.length === 0 ? <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">No table rows in preview.</p> : null}
+      {parsed.rows.length > 0 && tableColumns.length > 0 ? (
+        <>
+          <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border">
+            <table className="w-full table-fixed caption-bottom text-sm">
+              <thead className="[&_tr]:border-b">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id} className="border-b transition-colors hover:bg-muted/50">
+                    {headerGroup.headers.map((header) => {
+                      const sorted = header.column.getIsSorted();
+                      return (
+                        <th key={header.id} className="h-10 min-w-0 px-2 text-left align-middle font-medium text-foreground">
+                          <button type="button" className="block min-w-0 whitespace-normal break-words text-left leading-snug [overflow-wrap:anywhere]" onClick={header.column.getToggleSortingHandler()}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}{sorted === "asc" ? " ↑" : sorted === "desc" ? " ↓" : ""}
+                          </button>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </thead>
+              <tbody className="[&_tr:last-child]:border-0">
+                {table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b transition-colors hover:bg-muted/50">
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="min-w-0 p-2 align-top text-foreground/80">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {table.getPageCount() > 1 ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>{parsed.rows.length} rows · page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</span>
+              <div className="flex gap-1.5">
+                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>Previous</Button>
+                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>Next</Button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
   );
 }
 
@@ -382,12 +630,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     ),
     FileRef: ({ props }) => <FileView props={props} />,
     FileView: ({ props }) => <FileView props={props} />,
-    ResultSummary: ({ props }) =>
-      props.text ? (
-        <section className="rounded-xl border border-primary/15 bg-primary-soft/45 px-3 py-2.5 text-sm leading-5 text-foreground shadow-sm">
-          <p>{props.text}</p>
-        </section>
-      ) : null,
+    ResultSummary: ({ props }) => <ResultSummary props={props} />,
     ActivityRow: ({ props, children }) => {
       const tone = props.tone as Tone;
       const Icon = activityIcon(props.kind, tone);

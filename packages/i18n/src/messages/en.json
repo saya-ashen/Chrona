@@ -1316,7 +1316,10 @@
       "filePreviewReadFailed": "File preview could not be loaded.",
       "expandFilePreview": "Expand preview",
       "collapseFilePreview": "Collapse preview",
-      "liveStatusRunning": "Running now"
+      "liveStatusRunning": "Running now",
+      "resultSummaryLabel": "Result summary",
+      "copyResultSummary": "Copy summary",
+      "resultSummaryCopied": "Copied"
     }
   },
   "queries": {

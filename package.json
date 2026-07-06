@@ -68,6 +68,7 @@
     "@hono/zod-validator": "^0.7.6",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@prisma/client": "7.8.0",
+    "@tanstack/react-table": "^8.21.3",
     "headroom-ai": "^0.22.4",
     "hono": "^4.9.6",
     "ical.js": "^2.2.1",

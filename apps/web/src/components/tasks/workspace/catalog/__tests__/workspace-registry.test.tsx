@@ -26,13 +26,13 @@ describe("workspace result registry", () => {
     expect(screen.getByText(/"status": "ok"/)).toBeInTheDocument();
   });
 
-  it("renders ResultSummary as a visible card surface", () => {
+  it("renders ResultSummary as a labeled summary surface with copy affordance", () => {
     const spec: UiDocument = {
       root: "root",
       elements: {
         root: {
           type: "ResultSummary",
-          props: { text: "Trending report ready." },
+          props: { text: "Trending report ready.", copyText: "Copyable report summary." },
           children: [],
         },
       },
@@ -40,8 +40,11 @@ describe("workspace result registry", () => {
 
     render(<SpecRenderer spec={spec} />);
 
-    const summary = screen.getByText("Trending report ready.");
-    expect(summary.closest("section")).toHaveClass("bg-primary-soft/45");
+    const summary = screen.getByRole("region", { name: "Result summary" });
+    expect(summary).toHaveClass("border-b");
+    expect(screen.getByText("Result summary")).toBeInTheDocument();
+    expect(screen.getByText("Trending report ready.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy summary/i })).toBeInTheDocument();
   });
 
   it("renders generated Card outputs at result region width", () => {
@@ -69,19 +72,26 @@ describe("workspace result registry", () => {
     expect(card).not.toHaveClass("max-w-sm");
   });
 
-  it("wraps table cells inside the result card width", () => {
+  it("renders file-backed JSON tables with links, sorting, and pagination", () => {
     const spec: UiDocument = {
       root: "root",
       elements: {
         root: {
           type: "Table",
           props: {
-            columns: ["Repository", "Description", "URL"],
-            rows: [[
-              "msitarzewski/agency-agents",
-              "A complete AI agency at your fingertips - From frontend wizards to Reddit community ninjas, from whimsy injectors to reality checkers.",
-              "https://github.com/msitarzewski/agency-agents",
-            ]],
+            title: "Trending repos",
+            path: ".chrona/outputs/N20260706-01/trending.json",
+            contentKind: "json",
+            contentPreview: JSON.stringify({ rows: [
+              { repo: "zeta/project", description: "Later row", url: "https://github.com/zeta/project" },
+              { repo: "alpha/project", description: "Earlier row", url: "https://github.com/alpha/project" },
+            ] }),
+            columns: [
+              { key: "repo", label: "Repository" },
+              { key: "description", label: "Description" },
+              { key: "repo", label: "Source", type: "link", hrefKey: "url" },
+            ],
+            pageSize: 1,
           },
           children: [],
         },
@@ -95,8 +105,15 @@ describe("workspace result registry", () => {
     expect(table).toHaveClass("table-fixed");
     expect(table.parentElement).toHaveClass("w-full");
     expect(table.parentElement).not.toHaveClass("overflow-x-auto");
-    expect(screen.getByText(/complete AI agency/)).toHaveClass("whitespace-normal");
-    expect(screen.getByText(/complete AI agency/)).toHaveClass("break-words");
-    expect(screen.getByText(/complete AI agency/)).toHaveClass("[overflow-wrap:anywhere]");
+    expect(screen.getByText("Trending repos")).toBeInTheDocument();
+    expect(screen.getByText(".chrona/outputs/N20260706-01/trending.json")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Repository" })).toBeInTheDocument();
+    expect(screen.getByText("Later row")).toHaveClass("whitespace-normal");
+    expect(screen.getByText("Later row")).toHaveClass("break-words");
+    expect(screen.getByText("Later row")).toHaveClass("[overflow-wrap:anywhere]");
+    expect(screen.getByRole("link", { name: "zeta/project" })).toHaveAttribute("href", "https://github.com/zeta/project");
+    expect(screen.getByText("2 rows · page 1 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
   });
 });
