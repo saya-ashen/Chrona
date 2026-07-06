@@ -32,6 +32,32 @@ describe("generate_plan feature spec", () => {
     expect(spec.inputText).not.toContain("most tasks use 3-7 nodes");
   });
 
+  it("includes current draft plan context when revising a plan", () => {
+    const spec = buildGeneratePlanFeatureSpec({
+      taskId: "task-1",
+      title: "获取 GitHub Trending",
+      userInstruction: "把收集数据步骤拆成两个节点",
+      revisionContext: {
+        planId: "plan-1",
+        status: "draft",
+        revision: 2,
+        summary: "Collect then report",
+        selectedNodeId: "collect_sources",
+        blueprint: {
+          title: "Trending plan",
+          goal: "Create report",
+          nodes: [{ id: "collect_sources", type: "task", title: "Collect sources" }],
+          edges: [],
+        },
+      },
+    });
+
+    expect(spec.inputText).toContain("Revise the current draft plan instead of starting from a blank plan");
+    expect(spec.inputText).toContain("Current draft plan JSON");
+    expect(spec.inputText).toContain('"selectedNodeId": "collect_sources"');
+    expect(spec.inputText).toContain("把收集数据步骤拆成两个节点");
+  });
+
   it("adds Codex-only tool discovery guidance", () => {
     const generic = buildGeneratePlanFeatureSpec({ title: "Build plan" });
     const codex = buildGeneratePlanFeatureSpec(

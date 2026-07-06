@@ -187,6 +187,7 @@ export async function* generateTaskPlanManualStream(input: {
   generationId?: string;
   forceRefresh?: boolean;
   userInstruction?: string | null;
+  selectedNodeId?: string | null;
   signal?: AbortSignal;
 }): AsyncGenerator<GeneratePlanSSEEvent> {
   const generationId = input.generationId ?? crypto.randomUUID();
@@ -300,6 +301,14 @@ export async function* generateTaskPlanManualStream(input: {
     return;
   }
 
+  const currentPlan = userInstruction
+    ? await getLatestTaskPlanReadModel(task.id, effectiveWorkBlockId)
+    : null;
+  const currentPlanNodeIds = new Set(currentPlan?.blueprint.nodes.map((node) => node.id) ?? []);
+  const selectedNodeId = input.selectedNodeId && currentPlanNodeIds.has(input.selectedNodeId)
+    ? input.selectedNodeId
+    : null;
+
   for await (const event of aiGeneratePlanStream({
     taskId: task.id,
     title: task.title,
@@ -307,6 +316,16 @@ export async function* generateTaskPlanManualStream(input: {
     sourceContext: task.importedCalendarEvents[0]?.description ?? undefined,
     estimatedMinutes,
     userInstruction,
+    revisionContext: currentPlan
+      ? {
+          planId: currentPlan.id,
+          status: currentPlan.status,
+          revision: currentPlan.revision,
+          summary: currentPlan.summary,
+          selectedNodeId,
+          blueprint: currentPlan.blueprint,
+        }
+      : null,
     sessionKey: taskSessionKey,
     signal: input.signal,
   })) {

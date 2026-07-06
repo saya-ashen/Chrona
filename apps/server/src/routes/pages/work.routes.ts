@@ -303,6 +303,7 @@ async function dispatchWorkspaceCommand(engine: ChronaEngine, input: {
         workBlockId: command.workBlockId ?? null,
         forceRefresh: command.forceRefresh ?? true,
         userInstruction: command.userInstruction ?? undefined,
+        selectedNodeId: command.selectedNodeId ?? null,
       });
       for await (const event of generation.events) {
         generation.emit(event);

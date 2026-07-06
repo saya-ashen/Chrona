@@ -26,7 +26,7 @@ export {
 export { TaskWorkspaceActionRail } from "./ui/action-rail";
 export { ActivityTimeline } from "./ui/activity-timeline";
 export {
-  buildAcceptOrRegenerateSpec,
+  buildPlanRevisionSpec,
   buildCommandCenterNowSpec,
   buildCommandCenterOutputTabSpec,
   buildCommandCenterTrailTabSpec,

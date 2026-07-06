@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
-import { buildAcceptOrRegenerateSpec } from "../../../../../../../features/execution-monitoring/ui/build-execution-overview-spec";
+import { buildPlanRevisionSpec } from "../../../../../../../features/execution-monitoring/ui/build-execution-overview-spec";
 import type {
   CommandCenterCopy,
   CommandCenterPrimaryAction,
@@ -131,6 +131,9 @@ export function TaskWorkspacePlanSection({
   onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
+  const [selectedNode, setSelectedNode] = useState<PlanNodeDataModel | null>(null);
+  const selectedNodeRef = useRef<PlanNodeDataModel | null>(null);
+  selectedNodeRef.current = selectedNode;
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
@@ -138,10 +141,10 @@ export function TaskWorkspacePlanSection({
     () => createTaskWorkspaceExecutionConsoleView({
       pageData,
       graphPlan,
-      selectedNode: null,
+      selectedNode,
       copy,
     }),
-    [pageData, graphPlan, copy],
+    [pageData, graphPlan, selectedNode, copy],
   );
   const stateMessage =
     consoleView.states.errorMessage ??
@@ -196,22 +199,23 @@ export function TaskWorkspacePlanSection({
   const apiCurrentOperationSpec = currentExecution?.ui?.currentOperationSpec ?? null;
   const acceptOrRegenerateSpec = useMemo<UiDocument | null>(() => {
     if (!plan) return null;
-    return buildAcceptOrRegenerateSpec({
+    return buildPlanRevisionSpec({
       copy,
       canAcceptPlan,
       isGeneratingPlan,
       visibleGenerationInstruction,
       acceptPlanError,
-      regenerationInstruction,
+      revisionInstruction: regenerationInstruction,
+      selectedNodeTitle: selectedNode?.title ?? null,
     });
-  }, [acceptPlanError, canAcceptPlan, copy, isGeneratingPlan, plan, regenerationInstruction, visibleGenerationInstruction]);
+  }, [acceptPlanError, canAcceptPlan, copy, isGeneratingPlan, plan, regenerationInstruction, selectedNode?.title, visibleGenerationInstruction]);
   const acceptOrRegenerateHandlers = useMemo(() => ({
     "accept-plan": async () => {
       if (plan) await onApplyPlan(plan);
     },
-    "regenerate-plan": (params: Record<string, unknown>) => {
+    "revise-plan": (params: Record<string, unknown>) => {
       const instruction = typeof params.instruction === "string" ? params.instruction : regenerationInstruction;
-      onGeneratePlan({ userInstruction: instruction });
+      onGeneratePlan({ userInstruction: instruction, selectedNodeId: selectedNodeRef.current?.id ?? null });
     },
   }), [onApplyPlan, onGeneratePlan, plan, regenerationInstruction]);
   const commandCenterActionHandlers = useMemo(() => ({
@@ -353,7 +357,8 @@ export function TaskWorkspacePlanSection({
             planGenerationStatus={planGenerationStatus}
             graphMode={graphMode}
             onGraphModeChange={setGraphMode}
-            onGeneratePlan={onGeneratePlan}
+            onGeneratePlan={() => onGeneratePlan()}
+            onSelectedNodeChange={setSelectedNode}
           />
         </section>
         <TaskWorkspaceInspector
@@ -368,6 +373,7 @@ export function TaskWorkspacePlanSection({
           currentExecution={currentExecution}
           commandCenterCopy={commandCenterCopy}
           isPlanCompact={graphMode === "compact"}
+          selectedNode={consoleView.nodeDetail.currentNode}
           copy={copy}
           onAction={focusNodeActions}
         />

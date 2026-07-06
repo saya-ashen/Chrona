@@ -9,7 +9,8 @@ import { z } from "zod";
 export const UI_ACTION = {
   commandCenterPrimary: "command-center-primary",
   acceptPlan: "accept-plan",
-  regeneratePlan: "regenerate-plan",
+  generatePlan: "generate-plan",
+  revisePlan: "revise-plan",
   stopPlanGeneration: "stop-plan-generation",
   dispatchExecution: "dispatch-execution",
   locateWorkspaceNode: "locate-workspace-node",
@@ -25,7 +26,9 @@ export const commandCenterPrimaryPayloadSchema = z.object({
 });
 export const acceptPlanPayloadSchema = z.object({}).optional();
 
-export const regeneratePlanPayloadSchema = z.object({
+export const generatePlanPayloadSchema = z.object({}).optional();
+
+export const revisePlanPayloadSchema = z.object({
   instruction: z.string().optional(),
 });
 
@@ -52,7 +55,8 @@ export const recoveryCancelPayloadSchema = z.object({}).optional();
 export const UI_ACTION_PAYLOAD = {
   [UI_ACTION.commandCenterPrimary]: commandCenterPrimaryPayloadSchema,
   [UI_ACTION.acceptPlan]: acceptPlanPayloadSchema,
-  [UI_ACTION.regeneratePlan]: regeneratePlanPayloadSchema,
+  [UI_ACTION.revisePlan]: revisePlanPayloadSchema,
+  [UI_ACTION.generatePlan]: generatePlanPayloadSchema,
   [UI_ACTION.stopPlanGeneration]: stopPlanGenerationPayloadSchema,
   [UI_ACTION.dispatchExecution]: dispatchExecutionPayloadSchema,
   [UI_ACTION.locateWorkspaceNode]: locateWorkspaceNodePayloadSchema,
@@ -64,7 +68,8 @@ export const UI_ACTION_PAYLOAD = {
 
 export type CommandCenterPrimaryPayload = z.infer<typeof commandCenterPrimaryPayloadSchema>;
 export type AcceptPlanPayload = z.infer<typeof acceptPlanPayloadSchema>;
-export type RegeneratePlanPayload = z.infer<typeof regeneratePlanPayloadSchema>;
+export type RevisePlanPayload = z.infer<typeof revisePlanPayloadSchema>;
+export type GeneratePlanPayload = z.infer<typeof generatePlanPayloadSchema>;
 export type StopPlanGenerationPayload = z.infer<typeof stopPlanGenerationPayloadSchema>;
 export type DispatchExecutionPayload = z.infer<typeof dispatchExecutionPayloadSchema>;
 export type LocateWorkspaceNodePayload = z.infer<typeof locateWorkspaceNodePayloadSchema>;

@@ -180,11 +180,27 @@ function toStructuredOutputSchema(
   };
 }
 
+function currentPlanRevisionText(input: GenerateTaskPlanRequest) {
+  const context = input.revisionContext;
+  if (!context) return null;
+
+  return JSON.stringify({
+    planId: context.planId,
+    status: context.status,
+    revision: context.revision,
+    summary: context.summary,
+    selectedNodeId: context.selectedNodeId ?? null,
+    blueprint: context.blueprint,
+  }, null, 2);
+}
+
 export function buildGeneratePlanFeatureInputText(
   input: GenerateTaskPlanRequest,
 ): string {
   const parts: string[] = [
-    "Create a concise plan blueprint for the task below.",
+    input.revisionContext
+      ? "Revise the current draft plan instead of starting from a blank plan. Preserve unchanged good parts. Apply the user request to the selected node when selectedNodeId is set; otherwise apply it to the whole plan. Return the full revised plan blueprint."
+      : "Create a concise plan blueprint for the task below.",
     "Do not ask follow-up questions.",
     "Make reasonable assumptions if the task is underspecified.",
     "Use the fewest nodes possible. Default to one task node for simple information requests; use two nodes only when gather and summarize/deliver must be distinct; use more than two only when the task explicitly requires branching, waiting, or independent dependencies.",
@@ -208,6 +224,14 @@ export function buildGeneratePlanFeatureInputText(
   }
   if (typeof input.estimatedMinutes === "number") {
     parts.push(`Estimated duration: ${input.estimatedMinutes} minutes`);
+  }
+  const currentPlanText = currentPlanRevisionText(input);
+  if (currentPlanText) {
+    parts.push(
+      "",
+      "Current draft plan JSON (read-only baseline for revision):",
+      currentPlanText,
+    );
   }
   if (input.userInstruction?.trim()) {
     parts.push(

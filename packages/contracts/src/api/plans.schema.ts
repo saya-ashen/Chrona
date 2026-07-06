@@ -24,6 +24,7 @@ export const planGenerateBodySchema = z.object({
   forceRefresh: z.boolean().optional(),
   workBlockId: z.string().min(1).nullable().optional(),
   userInstruction: z.string().trim().nullable().optional(),
+  selectedNodeId: z.string().min(1).nullable().optional(),
 });
 
 // ── POST /tasks/:taskId/plan/generations/stop ──

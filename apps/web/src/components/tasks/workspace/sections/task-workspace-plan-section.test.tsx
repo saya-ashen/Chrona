@@ -13,9 +13,10 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
 }));
 
 vi.mock("@/components/tasks/panels/task-plan-graph-panel", () => ({
-  TaskPlanGraphPanel: ({ plan, mode }: {
-    plan: { nodes: Array<{ id: string; title: string }> };
+  TaskPlanGraphPanel: ({ plan, mode, onSelectedNodeChange }: {
+    plan: { nodes: Array<{ id: string; title: string; objective?: string; status?: string }> };
     mode?: "full" | "compact";
+    onSelectedNodeChange?: (node: { id: string; title: string; objective?: string; status?: string }, nodes: Array<{ id: string; title: string; objective?: string; status?: string }>) => void;
   }) => (
     <div data-testid="task-plan-graph-panel" data-graph-mode={mode ?? "full"}>
       {plan.nodes.map((node) => (
@@ -24,7 +25,7 @@ vi.mock("@/components/tasks/panels/task-plan-graph-panel", () => ({
           type="button"
           className="react-flow__node"
           data-testid={`task-plan-node-${node.id}`}
-          onClick={() => undefined}
+          onClick={() => onSelectedNodeChange?.(node, plan.nodes)}
         >
           {node.title}
         </button>
@@ -76,6 +77,7 @@ vi.mock("@chrona/i18n/react", async () => {
   const { fallbackMessages } = await import("@chrona/i18n/messages");
   return {
     useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useLocale: () => "en",
   };
 });
 
@@ -444,7 +446,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
   });
 
-  it("shows accept or regenerate as the command center operation before plan acceptance", () => {
+  it("shows accept and AI revision chat with selected node detail before plan acceptance", () => {
     const onApplyPlan = vi.fn().mockResolvedValue(undefined);
     const onGeneratePlan = vi.fn();
     const draftPlan = {
@@ -454,8 +456,9 @@ describe("TaskWorkspacePlanSection", () => {
       prompt: "Prefer a smaller plan and keep the first step manual.",
       updatedAt: "2026-05-18T00:00:00.000Z",
     } as TaskPlanReadModel;
+    const readyNode = createTaskWorkspaceFixtureNode({ id: "ready", title: "Collect sources", objective: "Gather source links", status: "ready", nextAction: "Start execution" });
     const graphPlan = createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "ready", status: "ready", nextAction: "Start execution" }),
+      readyNode,
     ], "ready");
 
     renderWithQueryClient(
@@ -477,20 +480,26 @@ describe("TaskWorkspacePlanSection", () => {
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
-    expect(within(commandCenter).getByText("User instruction for this plan revision")).toBeInTheDocument();
+    expect(within(commandCenter).getByText("Last revision request")).toBeInTheDocument();
     expect(within(commandCenter).getByText("Prefer a smaller plan and keep the first step manual.")).toBeInTheDocument();
-    expect(within(commandCenter).queryByText("Current node action")).not.toBeInTheDocument();
+    expect(within(commandCenter).getByText("Ask Chrona to revise this draft plan.")).toBeInTheDocument();
     expect(within(commandCenter).queryByRole("button", { name: "Start plan" })).not.toBeInTheDocument();
 
-    fireEvent.change(within(commandCenter).getByLabelText("Plan regeneration instruction"), {
+    fireEvent.click(screen.getByTestId("task-plan-node-ready"));
+    expect(within(commandCenter).getByRole("region", { name: "Selected node details" })).toHaveTextContent("Collect sources");
+    expect(within(commandCenter).getByText("Gather source links")).toBeInTheDocument();
+    expect(within(commandCenter).getByText("Ask Chrona to revise selected step: Collect sources")).toBeInTheDocument();
+
+    fireEvent.change(within(commandCenter).getByLabelText("Plan revision message"), {
       target: { value: "Add a verification step before accepting the final output." },
     });
     fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept" }));
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Regenerate with instruction" }));
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Ask AI to revise plan" }));
 
     expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
     expect(onGeneratePlan).toHaveBeenCalledWith({
       userInstruction: "Add a verification step before accepting the final output.",
+      selectedNodeId: "ready",
     });
   });
 

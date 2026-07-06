@@ -45,7 +45,7 @@ export type TaskPlanService = {
     workBlockId?: string | null;
     workspaceId?: string;
   }): Promise<{ savedPlan: TaskPlanReadModel | null }>;
-  generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null }): {
+  generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null }): {
     generationId: string;
     events: AsyncGenerator<GeneratePlanSSEEvent>;
     emit: (event: GeneratePlanSSEEvent) => void;
@@ -118,7 +118,7 @@ export function createTaskPlanService(): TaskPlanService {
         );
       }
     },
-    generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null }) {
+    generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null }) {
       try {
         return taskPlanning.generate(input);
       } catch (cause) {

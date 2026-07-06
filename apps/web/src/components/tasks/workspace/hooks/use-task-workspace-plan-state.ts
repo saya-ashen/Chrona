@@ -28,7 +28,7 @@ const STARTING_NODE_NEXT_ACTION = "Starting execution...";
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 type WorkspaceRuntimeTextEvent = WorkspaceRuntimeEvent & { event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" | "reasoning_delta" }> };
 type WorkspaceExecutionRuntimeSseEvent = TaskWorkspaceSseEvent & Omit<WorkspaceRuntimeEvent, "type"> & { type: "execution.runtime_event" };
-export type PlanGenerationRequest = { userInstruction?: string | null };
+export type PlanGenerationRequest = { userInstruction?: string | null; selectedNodeId?: string | null };
 
 function compactActivityText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 96);
@@ -584,8 +584,9 @@ export function useTaskWorkspacePlanState(
   const handleGeneratePlanFromHeader = useCallback((request?: PlanGenerationRequest) => {
     if (isGeneratingPlan) return;
     const userInstruction = request?.userInstruction?.trim() || null;
+    const selectedNodeId = request?.selectedNodeId?.trim() || null;
     setGenerationUserInstruction(userInstruction);
-    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction });
+    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction, selectedNodeId });
   }, [isGeneratingPlan, selectedWorkBlockId, task.id]);
 
   const handleStopPlanGeneration = useCallback(async () => {

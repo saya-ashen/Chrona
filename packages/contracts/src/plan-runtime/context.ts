@@ -1,5 +1,14 @@
 import type { TaskWorkspaceUpdateProposal } from "./commands";
 
+export type GenerateTaskPlanRevisionContext = {
+  planId: string;
+  status: string;
+  revision: number;
+  summary: string | null;
+  selectedNodeId?: string | null;
+  blueprint: unknown;
+};
+
 export interface GenerateTaskPlanRequest {
   taskId?: string;
   title: string;
@@ -8,6 +17,7 @@ export interface GenerateTaskPlanRequest {
   dueAt?: Date | string | null;
   estimatedMinutes?: number;
   userInstruction?: string | null;
+  revisionContext?: GenerateTaskPlanRevisionContext | null;
   /**
    * Read-only context owned by an external source (e.g. an imported calendar
    * event's description). Distinct from `description`, which is the editable
@@ -21,6 +31,7 @@ export interface GenerateTaskPlanRequest {
 export interface GenerateTaskPlanApiRequest {
   forceRefresh?: boolean;
   userInstruction?: string | null;
+  selectedNodeId?: string | null;
 }
 
 export interface TaskWorkspaceChatRequest {
