@@ -86,7 +86,7 @@ const tableComponentDefinition = {
     previewError: z.enum(["unsafe_path", "not_found", "unsupported_type", "read_failed"]).optional(),
   }).strict(),
   description:
-    'File-backed data table. Reference a safe repo-relative JSON or CSV file with path or uri; do not inline rows. Optional columns may be strings or { key, label, type, hrefKey }. Use type: "link" or hrefKey for link cells. Example: { path: ".chrona/outputs/N20260706-01/trending.json", columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }], pageSize: 10 }.',
+    'File-backed data table. Reference a safe repo-relative JSON or CSV file with path or uri; do not inline rows. Optional columns may be strings or { key, label, type, hrefKey }. Use type: "link" or hrefKey for link cells. Prefer pageSize 10 for workspace readability; do not set pageSize equal to total rows merely to show everything. Use larger pageSize only for dense datasets or explicit user requests. Example: { path: ".chrona/outputs/N20260706-01/trending.json", columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }], pageSize: 10 }.',
   example: {
     path: ".chrona/outputs/N20260706-01/trending.json",
     columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }],

@@ -449,8 +449,8 @@ function parseTablePreview(kind: string | null | undefined, preview: string | nu
   return { rows: [], inferredColumns: [], parseError: true };
 }
 
-function normalizeTableColumns(propsColumns: WorkspaceTableProps["columns"], inferredColumns: string[]) {
-  const columns = propsColumns?.flatMap((column) => {
+function normalizeTableColumns(propsColumns: WorkspaceTableProps["columns"], inferredColumns: string[]): WorkspaceTableColumn[] {
+  const columns = propsColumns?.flatMap<WorkspaceTableColumn>((column) => {
     if (typeof column === "string") return [{ key: column, label: column }];
     if (!column || typeof column !== "object" || typeof column.key !== "string") return [];
     return [{
@@ -526,9 +526,9 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
                     {headerGroup.headers.map((header) => {
                       const sorted = header.column.getIsSorted();
                       return (
-                        <th key={header.id} className="h-10 min-w-0 px-2 text-left align-middle font-medium text-foreground">
-                          <button type="button" className="block min-w-0 whitespace-normal break-words text-left leading-snug [overflow-wrap:anywhere]" onClick={header.column.getToggleSortingHandler()}>
-                            {flexRender(header.column.columnDef.header, header.getContext())}{sorted === "asc" ? " ↑" : sorted === "desc" ? " ↓" : ""}
+                        <th key={header.id} aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"} className={`h-10 min-w-0 px-1 align-middle font-medium text-foreground ${tableColumns[header.index]?.type === "number" ? "text-right" : "text-left"}`}>
+                          <button type="button" title="Click to sort" aria-label={`Sort by ${tableColumns[header.index]?.label ?? "column"}`} className={`flex w-full cursor-pointer items-center gap-1 rounded-sm px-1.5 py-1 text-left leading-snug transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tableColumns[header.index]?.type === "number" ? "justify-end text-right" : "justify-start"}`} onClick={header.column.getToggleSortingHandler()}>
+                            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{flexRender(header.column.columnDef.header, header.getContext())}</span><span aria-hidden="true" className="shrink-0 text-muted-foreground">{sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : "↕"}</span>
                           </button>
                         </th>
                       );
@@ -540,22 +540,22 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
                 {table.getRowModel().rows.map((row) => (
                   <tr key={row.id} className="border-b transition-colors hover:bg-muted/50">
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="min-w-0 p-2 align-top text-foreground/80">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      <td key={cell.id} className={`min-w-0 p-2 align-top text-foreground/80 ${tableColumns[cell.column.getIndex()]?.type === "number" ? "text-right tabular-nums" : ""}`}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {table.getPageCount() > 1 ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span>{parsed.rows.length} rows · page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>{parsed.rows.length} rows · {table.getPageCount() > 1 ? `page ${table.getState().pagination.pageIndex + 1} of ${table.getPageCount()}` : "1 page"}</span>
+            {table.getPageCount() > 1 ? (
               <div className="flex gap-1.5">
                 <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>Previous</Button>
                 <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>Next</Button>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </>
       ) : null}
     </section>

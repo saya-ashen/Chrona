@@ -49,6 +49,8 @@ describe("validateChronaSpec", () => {
     expect(prompt).toContain("File-backed data table");
     expect(prompt).toContain("do not inline rows");
     expect(prompt).toContain("hrefKey");
+    expect(prompt).toContain("Prefer pageSize 10");
+    expect(prompt).toContain("do not set pageSize equal to total rows");
     expect(prompt).toContain("threshold MUST be a JSON number such as 800");
   });
 

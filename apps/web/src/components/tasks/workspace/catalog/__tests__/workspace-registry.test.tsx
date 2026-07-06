@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { UiDocument } from "@chrona/ui-protocol";
@@ -83,12 +83,13 @@ describe("workspace result registry", () => {
             path: ".chrona/outputs/N20260706-01/trending.json",
             contentKind: "json",
             contentPreview: JSON.stringify({ rows: [
-              { repo: "zeta/project", description: "Later row", url: "https://github.com/zeta/project" },
-              { repo: "alpha/project", description: "Earlier row", url: "https://github.com/alpha/project" },
+              { repo: "zeta/project", description: "Later row", url: "https://github.com/zeta/project", starsToday: 20 },
+              { repo: "alpha/project", description: "Earlier row", url: "https://github.com/alpha/project", starsToday: 10 },
             ] }),
             columns: [
               { key: "repo", label: "Repository" },
               { key: "description", label: "Description" },
+              { key: "starsToday", label: "Stars", type: "number" },
               { key: "repo", label: "Source", type: "link", hrefKey: "url" },
             ],
             pageSize: 1,
@@ -107,12 +108,22 @@ describe("workspace result registry", () => {
     expect(table.parentElement).not.toHaveClass("overflow-x-auto");
     expect(screen.getByText("Trending repos")).toBeInTheDocument();
     expect(screen.getByText(".chrona/outputs/N20260706-01/trending.json")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Repository" })).toBeInTheDocument();
+    const repositoryHeader = screen.getByRole("button", { name: "Sort by Repository" });
+    expect(repositoryHeader).toHaveTextContent("Repository↕");
+    expect(repositoryHeader.closest("th")).toHaveAttribute("aria-sort", "none");
+    const starsHeader = screen.getByRole("button", { name: "Sort by Stars" });
+    expect(starsHeader).toHaveTextContent("Stars↕");
+    expect(starsHeader).toHaveClass("justify-end");
+    expect(starsHeader.closest("th")).toHaveAttribute("aria-sort", "none");
     expect(screen.getByText("Later row")).toHaveClass("whitespace-normal");
     expect(screen.getByText("Later row")).toHaveClass("break-words");
     expect(screen.getByText("Later row")).toHaveClass("[overflow-wrap:anywhere]");
     expect(screen.getByRole("link", { name: "zeta/project" })).toHaveAttribute("href", "https://github.com/zeta/project");
     expect(screen.getByText("2 rows · page 1 of 2")).toBeInTheDocument();
+    fireEvent.click(repositoryHeader);
+    expect(repositoryHeader).toHaveTextContent("Repository↑");
+    expect(repositoryHeader.closest("th")).toHaveAttribute("aria-sort", "ascending");
+    expect(within(screen.getAllByRole("row")[1]!).getAllByText("alpha/project")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
   });
