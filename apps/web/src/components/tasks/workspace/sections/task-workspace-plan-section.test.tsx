@@ -217,10 +217,10 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
     expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
-    expect(within(getCommandCenter()).getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Execution flow" })).getByRole("button", { name: "Accept" })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("task-plan-node-generate"));
     expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
-    fireEvent.click(within(getCommandCenter()).getByRole("button", { name: "Accept" }));
+    fireEvent.click(within(screen.getByRole("region", { name: "Execution flow" })).getByRole("button", { name: "Accept" }));
     await waitFor(() => expect(onApplyPlan).toHaveBeenCalledWith(draftPlan));
 
     const accepted = mount(
@@ -479,22 +479,25 @@ describe("TaskWorkspacePlanSection", () => {
     );
 
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    const executionFlow = screen.getByRole("region", { name: "Execution flow" });
 
-    expect(within(commandCenter).getByText("Last revision request")).toBeInTheDocument();
-    expect(within(commandCenter).getByText("Prefer a smaller plan and keep the first step manual.")).toBeInTheDocument();
-    expect(within(commandCenter).getByText("Ask Chrona to revise this draft plan.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Last revision request")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Prefer a smaller plan and keep the first step manual.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Ask Chrona to revise this draft plan.")).toBeInTheDocument();
+    expect(within(commandCenter).queryByText("Last revision request")).not.toBeInTheDocument();
+    expect(within(commandCenter).queryByRole("region", { name: "Selected node details" })).not.toBeInTheDocument();
     expect(within(commandCenter).queryByRole("button", { name: "Start plan" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("task-plan-node-ready"));
-    expect(within(commandCenter).getByRole("region", { name: "Selected node details" })).toHaveTextContent("Collect sources");
-    expect(within(commandCenter).getByText("Gather source links")).toBeInTheDocument();
-    expect(within(commandCenter).getByText("Ask Chrona to revise selected step: Collect sources")).toBeInTheDocument();
+    expect(within(executionFlow).getByRole("region", { name: "Selected node details" })).toHaveTextContent("Collect sources");
+    expect(within(executionFlow).getByText("Gather source links")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Ask Chrona to revise selected step: Collect sources")).toBeInTheDocument();
 
-    fireEvent.change(within(commandCenter).getByLabelText("Plan revision message"), {
+    fireEvent.change(within(executionFlow).getByRole("textbox", { name: "Plan revision message" }), {
       target: { value: "Add a verification step before accepting the final output." },
     });
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Accept" }));
-    fireEvent.click(within(commandCenter).getByRole("button", { name: "Ask AI to revise plan" }));
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Accept" }));
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Ask AI to revise plan" }));
 
     expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
     expect(onGeneratePlan).toHaveBeenCalledWith({

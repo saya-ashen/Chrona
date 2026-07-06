@@ -826,9 +826,6 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     "generate-plan": async () => {
       throw new Error('[ui-protocol] action "generate-plan" requires a host handler.');
     },
-    "revise-plan": async () => {
-      throw new Error('[ui-protocol] action "revise-plan" requires a host handler.');
-    },
     "dispatch-execution": async () => {
       throw new Error('[ui-protocol] action "dispatch-execution" is wired in Phase 3 (Node action).');
     },

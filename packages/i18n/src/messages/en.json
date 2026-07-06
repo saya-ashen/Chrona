@@ -1228,6 +1228,7 @@
       "copyResult": "Copy result",
       "noRunResult": "No run result yet for this node.",
       "generatingFreshPlan": "Generating a fresh plan. The graph will update when the run completes.",
+      "planRevisionTitle": "Revise plan",
       "instructionLabel": "Last revision request",
       "instructionPlaceholder": "Ask Chrona to revise this draft plan or selected step...",
       "instructionAria": "Plan revision message",

@@ -9,7 +9,6 @@ import {
   dispatchExecutionPayloadSchema,
   locateWorkspaceNodePayloadSchema,
   generatePlanPayloadSchema,
-  revisePlanPayloadSchema,
   submitCheckpointPayloadSchema,
   recoveryRetryPayloadSchema,
   recoveryEditInstructionPayloadSchema,
@@ -351,11 +350,6 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     [UI_ACTION.generatePlan]: {
       params: generatePlanPayloadSchema,
       description: "Generate a plan for the current task.",
-    },
-    [UI_ACTION.revisePlan]: {
-      params: revisePlanPayloadSchema,
-      description:
-        "Revise the current generated plan with optional user instruction.",
     },
     [UI_ACTION.dispatchExecution]: {
       params: dispatchExecutionPayloadSchema,

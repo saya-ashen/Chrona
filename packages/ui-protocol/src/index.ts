@@ -35,7 +35,6 @@ export {
   locateWorkspaceNodePayloadSchema,
   submitCheckpointPayloadSchema,
   generatePlanPayloadSchema,
-  revisePlanPayloadSchema,
   stopPlanGenerationPayloadSchema,
   type UiActionName,
   type CommandCenterPrimaryPayload,
@@ -43,7 +42,6 @@ export {
   type DispatchExecutionPayload,
   type LocateWorkspaceNodePayload,
   type GeneratePlanPayload,
-  type RevisePlanPayload,
   type StopPlanGenerationPayload,
   type SubmitCheckpointPayload,
 } from "./actions/actions";

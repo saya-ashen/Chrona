@@ -1228,6 +1228,7 @@
       "copyResult": "复制结果",
       "noRunResult": "此节点暂无运行结果。",
       "generatingFreshPlan": "正在生成新计划，运行完成后图表将自动更新。",
+      "planRevisionTitle": "修改计划",
       "instructionLabel": "上次修订请求",
       "instructionPlaceholder": "让 Chrona 修改这个草稿计划或所选步骤…",
       "instructionAria": "计划修订消息",

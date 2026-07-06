@@ -10,7 +10,6 @@ export const UI_ACTION = {
   commandCenterPrimary: "command-center-primary",
   acceptPlan: "accept-plan",
   generatePlan: "generate-plan",
-  revisePlan: "revise-plan",
   stopPlanGeneration: "stop-plan-generation",
   dispatchExecution: "dispatch-execution",
   locateWorkspaceNode: "locate-workspace-node",
@@ -28,9 +27,6 @@ export const acceptPlanPayloadSchema = z.object({}).optional();
 
 export const generatePlanPayloadSchema = z.object({}).optional();
 
-export const revisePlanPayloadSchema = z.object({
-  instruction: z.string().optional(),
-});
 
 export const stopPlanGenerationPayloadSchema = z.object({}).optional();
 
@@ -55,7 +51,6 @@ export const recoveryCancelPayloadSchema = z.object({}).optional();
 export const UI_ACTION_PAYLOAD = {
   [UI_ACTION.commandCenterPrimary]: commandCenterPrimaryPayloadSchema,
   [UI_ACTION.acceptPlan]: acceptPlanPayloadSchema,
-  [UI_ACTION.revisePlan]: revisePlanPayloadSchema,
   [UI_ACTION.generatePlan]: generatePlanPayloadSchema,
   [UI_ACTION.stopPlanGeneration]: stopPlanGenerationPayloadSchema,
   [UI_ACTION.dispatchExecution]: dispatchExecutionPayloadSchema,
@@ -68,7 +63,6 @@ export const UI_ACTION_PAYLOAD = {
 
 export type CommandCenterPrimaryPayload = z.infer<typeof commandCenterPrimaryPayloadSchema>;
 export type AcceptPlanPayload = z.infer<typeof acceptPlanPayloadSchema>;
-export type RevisePlanPayload = z.infer<typeof revisePlanPayloadSchema>;
 export type GeneratePlanPayload = z.infer<typeof generatePlanPayloadSchema>;
 export type StopPlanGenerationPayload = z.infer<typeof stopPlanGenerationPayloadSchema>;
 export type DispatchExecutionPayload = z.infer<typeof dispatchExecutionPayloadSchema>;
