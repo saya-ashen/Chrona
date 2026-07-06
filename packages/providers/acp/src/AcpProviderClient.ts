@@ -78,6 +78,7 @@ export type AcpRunHandle = {
   timer?: Timer;
   ready?: Promise<void>;
   sequence: number;
+  toolLabels: Map<string, string>;
   approvalEvents: ProviderRunEvent[];
   approvalWaiters: Array<() => void>;
 };
@@ -409,23 +410,31 @@ function textFromContent(content: ContentBlock): string | undefined {
   return undefined;
 }
 
+function rememberToolLabel(handle: AcpRunHandle, update: Pick<ToolCall | ToolCallUpdate, "title" | "toolCallId" | "rawInput" | "_meta">) {
+  const tool = toolNameFrom(update);
+  if (tool !== update.toolCallId) {
+    handle.toolLabels.set(update.toolCallId, tool);
+    return tool;
+  }
+  return handle.toolLabels.get(update.toolCallId) ?? tool;
+}
 function normalizeUpdate(config: AcpProviderConfig, handle: AcpRunHandle, update: SessionUpdate): ProviderRunEvent[] {
   const base = eventBase(config, handle, update.sessionUpdate);
   if (update.sessionUpdate === "agent_message_chunk") {
-    const text = textFromContent(update.content);
-    if (text) handle.outputText += text;
-    return text ? [{ ...base, type: "text_delta", text }] : [{ ...base, type: "raw_event", raw: update }];
+    const text = textFromContent(update.content) ?? "";
+    handle.outputText += text;
+    return [{ ...base, type: "text_delta", text }];
   }
   if (update.sessionUpdate === "agent_thought_chunk") {
-    const text = textFromContent(update.content);
-    return text ? [{ ...base, type: "reasoning_delta", text, raw: update }] : [{ ...base, type: "raw_event", raw: update }];
+    const text = textFromContent(update.content) ?? "";
+    return [{ ...base, type: "reasoning_delta", text }];
   }
   if (update.sessionUpdate === "usage_update") {
     handle.usage = usageFromAcp(update.used, update.size);
     return [{ ...base, type: "raw_event", raw: update }];
   }
   if (update.sessionUpdate === "tool_call") {
-    const tool = toolNameFrom(update);
+    const tool = rememberToolLabel(handle, update);
     return [
       {
         ...base,
@@ -438,7 +447,7 @@ function normalizeUpdate(config: AcpProviderConfig, handle: AcpRunHandle, update
     ];
   }
   if (update.sessionUpdate === "tool_call_update") {
-    const tool = toolNameFrom(update);
+    const tool = rememberToolLabel(handle, update);
     const events: ProviderRunEvent[] = [
       {
         ...base,
@@ -853,6 +862,8 @@ export class AcpProviderClient implements AgentProviderClient {
       timer,
       sequence: 0,
       approvalEvents: [],
+      toolLabels: new Map(),
+
       approvalWaiters: [],
     };
 

@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
-import { TaskStatus } from "@/generated/prisma/client";
+import { RunStatus, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
@@ -499,6 +499,17 @@ describe("plan-runner native execution actions", () => {
       orderBy: { createdAt: "desc" },
     });
 
+    const liveRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: RunStatus.Running,
+        triggeredBy: "test",
+        runtimeRunRef: "provider-run-cancel-session",
+      },
+    });
+    await db.task.update({ where: { id: task.id }, data: { latestRunId: liveRun.id } });
+
     const cancelled = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
@@ -523,6 +534,14 @@ describe("plan-runner native execution actions", () => {
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Cancelled);
     expect(updatedTask.blockReason).toBeNull();
+
+    const cancelledRun = await db.run.findUniqueOrThrow({ where: { id: liveRun.id } });
+    expect(cancelledRun.status).toBe(RunStatus.Cancelled);
+    expect(cancelledRun.endedAt).toBeInstanceOf(Date);
+
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(projection.persistedStatus).toBe(TaskStatus.Cancelled);
+    expect(projection.latestRunStatus).toBe(RunStatus.Cancelled);
   });
 
   it("retries a blocked node by obsoleting prior result and creating a fresh blocked attempt", async () => {

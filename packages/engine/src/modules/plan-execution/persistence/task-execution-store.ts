@@ -63,3 +63,24 @@ export async function completeActiveRunsForTask(taskId: string) {
     },
   });
 }
+
+export async function cancelActiveRunsForTask(taskId: string, reason?: string | null) {
+  const now = new Date();
+  await db.run.updateMany({
+    where: {
+      taskId,
+      status: { in: [...ACTIVE_RUN_STATUSES] },
+    },
+    data: {
+      status: RunStatus.Cancelled,
+      endedAt: now,
+      errorSummary: reason ?? null,
+      retryable: false,
+      resumeSupported: false,
+      pendingInputPrompt: null,
+      lastSyncedAt: now,
+      syncStatus: "healthy",
+      mappingPartial: false,
+    },
+  });
+}

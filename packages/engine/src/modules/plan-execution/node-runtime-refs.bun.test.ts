@@ -312,7 +312,7 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).not.toContain('"history":');
     expect(runtime.instructions).not.toContain('"patches":');
   });
-  it("spells out literal array and number props for json-render outputs", () => {
+  it("spells out file-backed table props for json-render outputs", () => {
     const current = node({
       id: "task-real-456",
       title: "Render table",
@@ -321,8 +321,9 @@ describe("node runtime refs", () => {
     const plan = graph([current]);
     const runtime = buildNodeRuntimePrompt({ plan, node: current });
 
-    expect(runtime.instructions).toContain("columns MUST be a direct JSON string array");
-    expect(runtime.instructions).toContain("threshold MUST be a JSON number");
+    expect(runtime.instructions).toContain("File-backed data table");
+    expect(runtime.instructions).toContain("do not inline rows");
+    expect(runtime.instructions).toContain("pageSize");
     expect(runtime.instructions).toContain("RFC 6902");
     expect(runtime.instructions).not.toContain("Spec shape for chrona_plan_output tool arguments: { root: string, elements: Array<");
   });

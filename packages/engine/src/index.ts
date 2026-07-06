@@ -5,6 +5,7 @@ export {
   publishTaskStateSnapshot,
   publishTaskStateUpdate,
   publishTaskWorkspaceUpdatedEvent,
+  rebuildTaskProjection,
   subscribeToTaskProjectionEvents,
 } from "./modules/projections";
 export { resolveHeaderExecutionState, headerExecutionStateToStatePaths } from "./modules/tasks/get-task-header";

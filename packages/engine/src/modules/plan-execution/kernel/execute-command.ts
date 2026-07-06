@@ -39,7 +39,7 @@ import {
   completeWorkBlock,
   releaseWorkBlock,
 } from "../persistence/work-block-store";
-import { completeActiveRunsForTask } from "../persistence/task-execution-store";
+import { cancelActiveRunsForTask, completeActiveRunsForTask } from "../persistence/task-execution-store";
 import { toGraphExecutionState } from "../runtime/graph-state";
 import { buildExecutionResponse } from "../projection/execution-response";
 import {
@@ -380,6 +380,7 @@ async function finalizeOutcome(input: {
     });
   }
   if (status === "cancelled") {
+    await cancelActiveRunsForTask(taskId, outcome.message ?? null);
     await releaseWorkBlock(taskId, session.workBlockId);
   }
 
