@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 let mockTaskDialogAutoExecute = true;
 let mockTaskDialogAutoPlanGenerationEnabled = true;
+let mockAiClients = [{ id: "client-1", enabled: true }];
+let mockTaskList = { tasks: [] as Array<{ id: string }>, total: 0 };
+
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
@@ -52,6 +55,14 @@ vi.mock("../../../../../features/schedule/ui", () => ({
 
 vi.mock("@/lib/task-actions-client", () => ({
   createTaskFromSchedule: vi.fn(),
+}));
+
+vi.mock("@/api", () => ({
+  apiJson: vi.fn((path: string) => {
+    if (path === "/api/ai/clients") return Promise.resolve({ clients: mockAiClients });
+    if (path.startsWith("/api/tasks?")) return Promise.resolve(mockTaskList);
+    return Promise.reject(new Error(`Unhandled API path: ${path}`));
+  }),
 }));
 
 vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
@@ -145,6 +156,8 @@ afterEach(() => {
   vi.clearAllMocks();
   mockTaskDialogAutoExecute = true;
   mockTaskDialogAutoPlanGenerationEnabled = true;
+  mockAiClients = [{ id: "client-1", enabled: true }];
+  mockTaskList = { tasks: [], total: 0 };
 });
 
 describe("ControlPlaneShell", () => {
@@ -227,12 +240,6 @@ describe("ControlPlaneShell", () => {
 
   it("advances onboarding to plan review after creating a task", async () => {
     const user = userEvent.setup();
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ clients: [{ id: "client-1", enabled: true }] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
     mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
 
     render(
@@ -254,6 +261,28 @@ describe("ControlPlaneShell", () => {
     expect(routerPush).toHaveBeenCalledWith("/en/tasks/created-task");
     expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
+  });
+
+  it("opens existing workspace task from onboarding instead of creating another task", async () => {
+    const user = userEvent.setup();
+    mockTaskList = { tasks: [{ id: "existing-task" }], total: 1 };
+
+    render(
+      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
+        <div>Workspace body</div>
+      </ControlPlaneShell>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Open created task" })).toBeInTheDocument();
+    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Review the plan");
+    expect(screen.queryByRole("button", { name: "Create first task" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open created task" }));
+
+    expect(routerPush).toHaveBeenCalledWith("/en/tasks/existing-task");
+    expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
+    expect(mockCreateTaskFromSchedule).not.toHaveBeenCalled();
   });
 
   it("forces plan generation when auto-execute is enabled", async () => {

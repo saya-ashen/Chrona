@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 
 import { db } from "@/lib/db";
 import { aiClientRegistry } from "@/modules/ai";
-import { buildDashboardBriefPromptInput, dashboardBriefFromTool, fingerprintDashboardBriefInput, parseDashboardBriefPayload } from "./dashboard-ai-surface";
+import { buildDashboardBriefPromptInput, dashboardBriefFromTool, fingerprintDashboardBriefInput, generateDashboardBrief, parseDashboardBriefPayload, type DashboardFingerprintInput } from "./dashboard-ai-surface";
 import { getDashboard } from "./get-dashboard";
 
 async function seedDefaultClient() {
@@ -62,6 +62,83 @@ const dashboardBriefSpec = {
     root: { type: "Text", props: { text: "One task needs review." }, children: [] },
   },
 };
+function baseFingerprintInput(): DashboardFingerprintInput {
+  return {
+    needsAttention: [],
+    inProgress: [],
+    upcomingToday: [],
+    autoCompleted: [],
+    recentEvents: [],
+    totalAutoCompleted: 0,
+  };
+}
+
+function attentionItem(overrides: Partial<DashboardFingerprintInput["needsAttention"][number]> = {}): DashboardFingerprintInput["needsAttention"][number] {
+  return {
+    taskId: "attention-1",
+    title: "Approve plan",
+    status: "WaitingForApproval",
+    kind: "approval",
+    reason: "Plan needs approval",
+    latestOutput: null,
+    updatedAt: "2026-07-03T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function inProgressItem(overrides: Partial<DashboardFingerprintInput["inProgress"][number]> = {}): DashboardFingerprintInput["inProgress"][number] {
+  return {
+    taskId: "running-1",
+    title: "Run task",
+    status: "Running",
+    latestRunStatus: "Running",
+    stage: "Execute",
+    latestOutput: null,
+    updatedAt: "2026-07-03T00:01:00.000Z",
+    ...overrides,
+  };
+}
+
+function upcomingItem(overrides: Partial<DashboardFingerprintInput["upcomingToday"][number]> = {}): DashboardFingerprintInput["upcomingToday"][number] {
+  return {
+    taskId: "upcoming-1",
+    title: "Later task",
+    status: "Ready",
+    scheduledStartAt: "2026-07-03T09:00:00.000Z",
+    dueAt: null,
+    nextStep: "start_execution",
+    updatedAt: "2026-07-03T00:02:00.000Z",
+    ...overrides,
+  };
+}
+
+function completedItem(index: number, overrides: Partial<DashboardFingerprintInput["autoCompleted"][number]> = {}): DashboardFingerprintInput["autoCompleted"][number] {
+  return {
+    taskId: `done-${index}`,
+    title: `Done ${index}`,
+    completedAt: "2026-07-03T00:03:00.000Z",
+    category: "general",
+    summary: null,
+    output: null,
+    ...overrides,
+  };
+}
+
+function recentEvent(index: number, overrides: Partial<DashboardFingerprintInput["recentEvents"][number]> = {}): DashboardFingerprintInput["recentEvents"][number] {
+  return {
+    id: `event-${index}`,
+    category: "completed",
+    at: "2026-07-03T00:04:00.000Z",
+    taskId: `event-task-${index}`,
+    taskTitle: `Event task ${index}`,
+    summary: null,
+    ...overrides,
+  };
+}
+
+function fingerprint(input: DashboardFingerprintInput = baseFingerprintInput()) {
+  return fingerprintDashboardBriefInput(input);
+}
 
 beforeEach(async () => {
   await resetDb();
@@ -134,6 +211,72 @@ describe("dashboard AI surface state", () => {
     expect(surface.lastAttemptAt).toBeNull();
   });
 
+  it("keeps a ready brief ready when dashboard fingerprint is unchanged", async () => {
+    const { workspaceId } = await seedWorkspace("Ready workspace");
+    await seedDefaultClient();
+    const dashboard = await getDashboard(workspaceId);
+    const generatedAt = new Date("2026-07-03T00:00:00.000Z");
+    await db.workspaceAiSurface.update({
+      where: { workspaceId_surface: { workspaceId, surface: "dashboard.brief" } },
+      data: {
+        status: "ready",
+        generatedSpec: dashboardBriefSpec,
+        generatedAt,
+        providerClientId: dashboard.aiBrief.providerClientId,
+      },
+    });
+
+    const current = await getDashboard(workspaceId);
+
+    expect(current.aiBrief.status).toBe("ready");
+    expect(current.aiBrief.canGenerate).toBe(true);
+    expect(current.aiBrief.spec).toEqual(dashboardBriefSpec);
+    expect(current.aiBrief.generatedAt).toBe(generatedAt.toISOString());
+    expect(current.aiBrief.inputFingerprint).toBe(dashboard.aiBrief.inputFingerprint);
+  });
+
+  it("skips generation for ready same-fingerprint briefs unless forced", async () => {
+    const { workspaceId } = await seedWorkspace("Skip generation workspace");
+    const client = await seedDefaultClient();
+    const input = baseFingerprintInput();
+    const inputFingerprint = fingerprint(input);
+    const generatedAt = new Date("2026-07-03T00:00:00.000Z");
+    await db.workspaceAiSurface.create({
+      data: {
+        workspaceId,
+        surface: "dashboard.brief",
+        status: "ready",
+        inputFingerprint,
+        generatedSpec: dashboardBriefSpec,
+        generatedAt,
+        providerClientId: client.id,
+      },
+    });
+
+    const result = await generateDashboardBrief({ workspaceId, fingerprintInput: input });
+
+    expect(result.status).toBe("ready");
+    expect(result.spec).toEqual(dashboardBriefSpec);
+    expect(result.generatedAt).toBe(generatedAt.toISOString());
+  });
+
+  it("persists provider errors as failed brief state", async () => {
+    const { workspaceId } = await seedWorkspace("Provider failure workspace");
+    await seedDefaultClient();
+
+    const result = await generateDashboardBrief({ workspaceId, fingerprintInput: baseFingerprintInput(), force: true });
+
+    expect(result.status).toBe("failed");
+    expect(result.canGenerate).toBe(false);
+    expect(result.errorMessage).toContain("Generated dashboard brief response invalid");
+    const surface = await db.workspaceAiSurface.findUniqueOrThrow({
+      where: { workspaceId_surface: { workspaceId, surface: "dashboard.brief" } },
+    });
+    expect(surface.status).toBe("failed");
+    expect(surface.errorMessage).toContain("Generated dashboard brief response invalid");
+  });
+
+
   it("uses stable fingerprints for equivalent dashboard facts", () => {
     const input = {
       needsAttention: [],
@@ -145,6 +288,28 @@ describe("dashboard AI surface state", () => {
     };
 
     expect(fingerprintDashboardBriefInput(input)).toBe(fingerprintDashboardBriefInput({ ...input }));
+  });
+
+  it("includes prompt-visible facts in dashboard brief fingerprint", () => {
+    const base = baseFingerprintInput();
+
+    expect(fingerprint({ ...base, needsAttention: [attentionItem()] })).not.toBe(fingerprint(base));
+    expect(fingerprint({ ...base, inProgress: [inProgressItem()] })).not.toBe(fingerprint(base));
+    expect(fingerprint({ ...base, autoCompleted: [completedItem(1)] })).not.toBe(fingerprint(base));
+    expect(fingerprint({ ...base, recentEvents: [recentEvent(1)] })).not.toBe(fingerprint(base));
+    expect(fingerprint({ ...base, totalAutoCompleted: 1 })).not.toBe(fingerprint(base));
+  });
+
+  it("ignores facts outside dashboard brief prompt contract", () => {
+    const base = baseFingerprintInput();
+    const completed = Array.from({ length: 21 }, (_, index) => completedItem(index));
+    const changedCompletedOutsidePrompt = completed.map((item, index) => index === 20 ? completedItem(index, { title: "Changed outside prompt" }) : item);
+    const events = Array.from({ length: 31 }, (_, index) => recentEvent(index));
+    const changedEventOutsidePrompt = events.map((event, index) => index === 30 ? recentEvent(index, { summary: "Changed outside prompt" }) : event);
+
+    expect(fingerprint({ ...base, upcomingToday: [upcomingItem()] })).toBe(fingerprint(base));
+    expect(fingerprint({ ...base, autoCompleted: completed })).toBe(fingerprint({ ...base, autoCompleted: changedCompletedOutsidePrompt }));
+    expect(fingerprint({ ...base, recentEvents: events })).toBe(fingerprint({ ...base, recentEvents: changedEventOutsidePrompt }));
   });
 });
 

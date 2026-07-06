@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
+import type { Prisma } from "@chrona/db";
 import { deriveWorkItemStateView, type WorkItemStateView } from "@chrona/domain";
-import { getDashboardAiBriefState } from "./dashboard-ai-surface";
+import { getDashboardAiBriefState, type DashboardAiBriefState } from "./dashboard-ai-surface";
 
 /**
  * Dashboard "task news homepage" projection.
@@ -49,6 +50,83 @@ export type DashboardAttentionKind =
  */
 export type DashboardCompletionCategory = "report" | "research" | "code" | "automation";
 
+export type DashboardOutput = { id: string; title: string; type: string; taskId: string };
+
+type OutputRef = DashboardOutput | null;
+
+export interface DashboardTaskItem {
+  taskId: string;
+  title: string;
+  status: string;
+  stateView: WorkItemStateView;
+  priority: string;
+  scheduleStatus: string | null;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+  dueAt: string | null;
+  reason: string | null;
+  stage: string | null;
+  nextStep: DashboardNextStep;
+  latestOutput: OutputRef;
+  updatedAt: string | null;
+}
+
+export interface DashboardAttentionItem {
+  taskId: string;
+  title: string;
+  status: string;
+  stateView: WorkItemStateView;
+  priority: string;
+  kind: DashboardAttentionKind;
+  reason: string | null;
+  nextStep: DashboardNextStep;
+  latestOutput: OutputRef;
+  updatedAt: string | null;
+}
+
+export interface DashboardInProgressItem {
+  taskId: string;
+  title: string;
+  status: string;
+  stateView: WorkItemStateView;
+  latestRunStatus: string | null;
+  stage: string | null;
+  nextStep: DashboardNextStep;
+  latestOutput: OutputRef;
+  updatedAt: string | null;
+}
+
+export interface DashboardCompletedItem {
+  taskId: string;
+  title: string;
+  completedAt: string | null;
+  summary: string | null;
+  category: DashboardCompletionCategory;
+  output: OutputRef;
+}
+
+export interface DashboardEvent {
+  id: string;
+  category: string;
+  at: string;
+  taskId: string;
+  taskTitle: string;
+  summary: string | null;
+}
+
+export interface DashboardData {
+  generatedAt: string;
+  workspaceId: string;
+  focusTask: DashboardTaskItem | null;
+  needsAttention: DashboardAttentionItem[];
+  inProgress: DashboardInProgressItem[];
+  upcomingToday: DashboardTaskItem[];
+  autoCompleted: DashboardCompletedItem[];
+  totalAutoCompleted: number;
+  recentEvents: DashboardEvent[];
+  aiBrief: DashboardAiBriefState;
+}
+
 function completionCategory(output: OutputRef): DashboardCompletionCategory {
   switch (output?.type) {
     case "report":
@@ -65,7 +143,7 @@ function completionCategory(output: OutputRef): DashboardCompletionCategory {
   }
 }
 
-type ProjectionWithTask = Awaited<ReturnType<typeof loadProjections>>[number];
+type ProjectionWithTask = Prisma.TaskProjectionGetPayload<{ include: { task: { select: { title: true; priority: true; status: true; completedAt: true; createdAt: true; blockReason: true } } } }>;
 
 function loadProjections(workspaceId: string) {
   return db.taskProjection.findMany({
@@ -193,8 +271,6 @@ function mapDashboardTask(item: ProjectionWithTask, outputs: Map<string, OutputR
     updatedAt: toIso(item.lastActivityAt),
   };
 }
-
-type OutputRef = { id: string; title: string; type: string; taskId: string } | null;
 
 function planOutputTitle(planRun: unknown): string | null {
   const record = planRun as { mutableGraph?: { planOutput?: { history?: Array<{ summary?: unknown }> } } } | null;
