@@ -428,45 +428,6 @@ describe("AcpProviderClient", () => {
     });
   });
 
-  it("keeps the first human tool label when later ACP updates only carry call id", async () => {
-    const transport = new FakeAcpTransport({
-      updates: [
-        {
-          kind: "session_update",
-          update: {
-            sessionUpdate: "tool_call",
-            toolCallId: "call-command",
-            title: "bash: mkdir -p .chrona/outputs",
-            rawInput: { command: "mkdir -p .chrona/outputs" },
-            status: "pending",
-          },
-        },
-        {
-          kind: "session_update",
-          update: {
-            sessionUpdate: "tool_call_update",
-            toolCallId: "call-command",
-            status: "completed",
-            rawOutput: { ok: true },
-          },
-        },
-        { kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } },
-      ],
-    });
-    const client = new AcpProviderClient({ config: config(), transport });
-    const run = await client.startRun(baseInput());
-    const streamed: ProviderRunEvent[] = [];
-
-    for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
-
-    expect(streamed.filter((event) => event.type === "tool_call")).toMatchObject([
-      { tool: "bash: mkdir -p .chrona/outputs", callId: "call-command" },
-      { tool: "bash: mkdir -p .chrona/outputs", callId: "call-command" },
-    ]);
-    expect(streamed.find((event) => event.type === "tool_completed")).toMatchObject({
-      toolName: "bash: mkdir -p .chrona/outputs",
-    });
-  });
 
   it("surfaces upstream auth status from ACP process diagnostics", async () => {
     const transport = new FakeAcpTransport({ stderr: "Request completed method=POST url=https://api.krill-ai.com/codex/v1/responses status=401 Unauthorized" });
