@@ -7,7 +7,7 @@ function fixtureUrl(eventTitle: string, key: string) {
 }
 
 test.describe("external calendar events on schedule", () => {
-  test("shows imported calendar tasks on desktop, tablet, and mobile", async ({ page }, testInfo) => {
+  test("shows imported calendar tasks", async ({ page }, testInfo) => {
     const sourceName = `Planning calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
     const eventTitle = `External standup ${testInfo.project.name}`;
     await page.goto(`/en/schedule?day=${EVENT_DAY}`);
@@ -20,15 +20,8 @@ test.describe("external calendar events on schedule", () => {
     await expect(page.getByRole("listitem").filter({ hasText: sourceName })).toBeVisible();
     await page.goto(`/en/schedule?day=${EVENT_DAY}`);
 
-    for (const viewport of [
-      { width: 1440, height: 900 },
-      { width: 1024, height: 768 },
-      { width: 390, height: 844 },
-    ]) {
-      await page.setViewportSize(viewport);
-      await expect(page.getByText(eventTitle).first()).toBeVisible();
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
-      expect(overflow).toBe(false);
-    }
+    await expect(page.getByText(eventTitle).first()).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(overflow).toBe(false);
   });
 });

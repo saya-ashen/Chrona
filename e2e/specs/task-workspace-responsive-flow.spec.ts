@@ -1,7 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { setTaskWorkspaceViewport, type TaskWorkspaceViewport } from "./task-workspace-test-helpers";
 
-async function createResponsiveTask(request: APIRequestContext, viewport: TaskWorkspaceViewport) {
+async function createResponsiveTask(request: APIRequestContext, viewport: string) {
   const workspaceResponse = await request.get("/api/workspaces/default");
   expect(workspaceResponse.ok()).toBeTruthy();
   const workspaceBody = (await workspaceResponse.json()) as { id?: string; workspace?: { id?: string }; workspaceId?: string };
@@ -30,17 +29,15 @@ async function expectNoHorizontalScroll(page: Page) {
 }
 
 test.describe("Task workspace responsive flow", () => {
-  for (const viewport of ["desktop", "tablet", "mobile"] as const) {
-    test(`keeps primary task workflow visible on ${viewport}`, async ({ page, request }) => {
-      const taskId = await createResponsiveTask(request, viewport);
-      await setTaskWorkspaceViewport(page, viewport);
-      await page.goto(`/en/tasks/${taskId}`);
+  test("keeps primary task workflow visible", async ({ page, request }, testInfo) => {
+    const viewport = testInfo.project.name === "chromium" ? "desktop" : testInfo.project.name;
+    const taskId = await createResponsiveTask(request, viewport);
+    await page.goto(`/en/tasks/${taskId}`);
 
-      await expect(page.getByRole("heading", { name: `Responsive workspace ${viewport}` })).toBeVisible();
-      await expect(page).toHaveURL(new RegExp(`/en/tasks/${taskId}$`));
-      await expect(page.getByRole("region", { name: "Task execution workspace" })).toBeVisible();
-      await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
-      await expectNoHorizontalScroll(page);
-    });
-  }
+    await expect(page.getByRole("heading", { name: `Responsive workspace ${viewport}` })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/en/tasks/${taskId}$`));
+    await expect(page.getByRole("region", { name: "Task execution workspace" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
+    await expectNoHorizontalScroll(page);
+  });
 });

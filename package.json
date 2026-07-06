@@ -35,6 +35,7 @@
     "assets:optimize": "bun run scripts/assets.ts optimize",
     "assets:check": "bun run scripts/assets.ts check",
     "assets": "bun run scripts/assets.ts all",
+    "map:build": "bun run scripts/build-feature-test-map.ts",
     "map:check": "bun run scripts/build-feature-test-map.ts --check",
     "check:ui-foundation": "bun run scripts/check-ui-foundation.mjs",
     "analyze": "bun run chrona check all",
