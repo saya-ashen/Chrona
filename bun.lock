@@ -258,6 +258,7 @@
         "@chrona/contracts": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "@chrona/runtime-core": "workspace:*",
+        "zod": "^4.4.3",
       },
     },
     "packages/skills/chrona-node": {

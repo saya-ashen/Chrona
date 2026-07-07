@@ -193,6 +193,7 @@ model Workspace {
   runTokens            RunToken[]
   taskPlanTerminalActions TaskPlanTerminalAction[]
   aiSurfaces           WorkspaceAiSurface[]
+  userPreferences     WorkspaceUserPreference[]
 }
 
 model CalendarSource {
@@ -1030,6 +1031,20 @@ enum ExecutionSessionStatus {
   Paused
   Completed
   Abandoned
+}
+
+model WorkspaceUserPreference {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String    @default("local")
+  key         String
+  value       Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, key])
+  @@index([userId, key])
 }
 
 model WorkspaceAiSurface {

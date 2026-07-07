@@ -6,6 +6,7 @@ let mockTaskDialogAutoExecute = true;
 let mockTaskDialogAutoPlanGenerationEnabled = true;
 let mockAiClients = [{ id: "client-1", enabled: true }];
 let mockTaskList = { tasks: [] as Array<{ id: string }>, total: 0 };
+let mockStartWithChronaCompletedAt: string | null = null;
 
 
 vi.mock("@/components/i18n/localized-link", () => ({
@@ -58,9 +59,16 @@ vi.mock("@/lib/task-actions-client", () => ({
 }));
 
 vi.mock("@/api", () => ({
-  apiJson: vi.fn((path: string) => {
+  apiJson: vi.fn((path: string, init?: RequestInit) => {
     if (path === "/api/ai/clients") return Promise.resolve({ clients: mockAiClients });
     if (path.startsWith("/api/tasks?")) return Promise.resolve(mockTaskList);
+    if (path === "/api/workspaces/ws-1/preferences/start-with-chrona") {
+      if (init?.method === "PATCH") {
+        const body = JSON.parse(String(init.body ?? "{}")) as { completedAt?: string | null };
+        mockStartWithChronaCompletedAt = body.completedAt ?? null;
+      }
+      return Promise.resolve({ completedAt: mockStartWithChronaCompletedAt });
+    }
     return Promise.reject(new Error(`Unhandled API path: ${path}`));
   }),
 }));
@@ -131,11 +139,13 @@ import {
 } from "@/lib/schedule-ai-preferences";
 import { createTaskFromSchedule } from "@/lib/task-actions-client";
 import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
+import { apiJson } from "@/api";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 
 const defaultWorkspace = { id: "ws-1", name: "Default" };
 const mockCreateTaskFromSchedule = createTaskFromSchedule as ReturnType<typeof vi.fn>;
 const mockStartTaskPlanGenerationSession = startTaskPlanGenerationSession as ReturnType<typeof vi.fn>;
+const mockApiJson = apiJson as ReturnType<typeof vi.fn>;
 
 function writePreferences(preferences: ScheduleAiPreferences) {
   window.localStorage.setItem(
@@ -158,6 +168,7 @@ afterEach(() => {
   mockTaskDialogAutoPlanGenerationEnabled = true;
   mockAiClients = [{ id: "client-1", enabled: true }];
   mockTaskList = { tasks: [], total: 0 };
+  mockStartWithChronaCompletedAt = null;
 });
 
 describe("ControlPlaneShell", () => {
@@ -203,6 +214,21 @@ describe("ControlPlaneShell", () => {
     await user.click(newTaskButton);
 
     expect(screen.getByRole("dialog")).toHaveTextContent("Create task dialog");
+  });
+
+  it("hides onboarding after persisted completion loads", async () => {
+    mockStartWithChronaCompletedAt = "2026-07-07T00:00:00.000Z";
+
+    render(
+      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
+        <div>Workspace body</div>
+      </ControlPlaneShell>,
+    );
+
+    await waitFor(() => {
+      expect(mockApiJson).toHaveBeenCalledWith("/api/workspaces/ws-1/preferences/start-with-chrona");
+    });
+    expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
   });
 
   it("passes dialog automation choices into task creation", async () => {
@@ -259,6 +285,12 @@ describe("ControlPlaneShell", () => {
     expect(screen.getByRole("button", { name: "Open created task" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open created task" }));
     expect(routerPush).toHaveBeenCalledWith("/en/tasks/created-task");
+    await waitFor(() => {
+      expect(mockApiJson).toHaveBeenCalledWith(
+        "/api/workspaces/ws-1/preferences/start-with-chrona",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
     expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
   });
@@ -280,6 +312,12 @@ describe("ControlPlaneShell", () => {
     await user.click(screen.getByRole("button", { name: "Open created task" }));
 
     expect(routerPush).toHaveBeenCalledWith("/en/tasks/existing-task");
+    await waitFor(() => {
+      expect(mockApiJson).toHaveBeenCalledWith(
+        "/api/workspaces/ws-1/preferences/start-with-chrona",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
     expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
     expect(mockCreateTaskFromSchedule).not.toHaveBeenCalled();

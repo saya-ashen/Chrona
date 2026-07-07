@@ -6,9 +6,11 @@
   "dependencies": {
     "@chrona/contracts": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
-    "@chrona/runtime-core": "workspace:*"
+    "@chrona/runtime-core": "workspace:*",
+    "zod": "^4.4.3"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./runtime-config": "./src/runtime-config.ts"
   }
 }

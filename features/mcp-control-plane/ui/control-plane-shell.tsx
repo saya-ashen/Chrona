@@ -1,12 +1,13 @@
 "use client";
 
 import { CalendarDays, ClipboardList, LayoutDashboard, Plus, Settings } from "lucide-react";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { StartWithChrona } from "@/components/start-with-chrona";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskCreateDialog } from "../../schedule/ui";
 import { createTaskFromSchedule } from "@/lib/task-actions-client";
+import { apiJson } from "@/api";
 import { useAppPathname, useAppRouter } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,18 @@ type NavEntry = {
   active: boolean;
 };
 
+type StartWithChronaPreferenceResponse = {
+  completedAt?: string | null;
+};
+
+function startWithChronaPreferencePath(workspaceId: string) {
+  return `/api/workspaces/${encodeURIComponent(workspaceId)}/preferences/start-with-chrona`;
+}
+
+function completedAtFromPreference(payload: StartWithChronaPreferenceResponse): string | null {
+  return typeof payload.completedAt === "string" && payload.completedAt.trim() ? payload.completedAt : null;
+}
+
 export function ControlPlaneShell({
   children,
   defaultWorkspace: _defaultWorkspace,
@@ -51,7 +64,7 @@ export function ControlPlaneShell({
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [createdOnboardingTaskId, setCreatedOnboardingTaskId] = useState<string | null>(null);
-  const [hasCompletedOnboardingTask, setHasCompletedOnboardingTask] = useState(false);
+  const [startWithChronaCompletedAt, setStartWithChronaCompletedAt] = useState<string | null | undefined>(undefined);
   const taskDialogDefaults = useMemo(() => {
     const initialStartAt = new Date();
     initialStartAt.setHours(9, 0, 0, 0);
@@ -60,6 +73,32 @@ export function ControlPlaneShell({
 
     return { initialStartAt, initialEndAt };
   }, [showCreateTaskDialog]);
+  useEffect(() => {
+    let cancelled = false;
+    const path = startWithChronaPreferencePath(_defaultWorkspace.id);
+    setStartWithChronaCompletedAt(undefined);
+
+    apiJson<StartWithChronaPreferenceResponse>(path)
+      .then((payload) => {
+        if (!cancelled) setStartWithChronaCompletedAt(completedAtFromPreference(payload));
+      })
+      .catch(() => {
+        if (!cancelled) setStartWithChronaCompletedAt(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [_defaultWorkspace.id]);
+
+  const completeStartWithChrona = async () => {
+    const completedAt = new Date().toISOString();
+    setStartWithChronaCompletedAt(completedAt);
+    await apiJson<StartWithChronaPreferenceResponse>(startWithChronaPreferencePath(_defaultWorkspace.id), {
+      method: "PATCH",
+      body: JSON.stringify({ completedAt }),
+    });
+  };
   const breadcrumb = pathname
     .split("/")
     .filter(Boolean)
@@ -100,7 +139,7 @@ export function ControlPlaneShell({
       active: pathname.startsWith("/settings"),
     },
   ];
-  const shouldShowStartWithChrona = ["/dashboard", "/schedule", "/tasks", "/settings"].includes(pathname);
+  const shouldShowStartWithChrona = ["/dashboard", "/schedule", "/tasks", "/settings"].includes(pathname) && startWithChronaCompletedAt === null;
 
   return (
     <SidebarProvider
@@ -218,10 +257,10 @@ export function ControlPlaneShell({
               className="mb-4"
               createdTaskId={createdOnboardingTaskId}
               workspaceId={_defaultWorkspace.id}
-              isComplete={hasCompletedOnboardingTask}
+              isComplete={false}
               onCreateTask={() => setShowCreateTaskDialog(true)}
               onOpenCreatedTask={(taskId) => {
-                setHasCompletedOnboardingTask(true);
+                void completeStartWithChrona();
                 router.push(localizeHref(locale, `/tasks/${taskId}`));
               }}
             />

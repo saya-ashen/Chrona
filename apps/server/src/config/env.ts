@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
+
 
 const envSchema = z.object({
   HOST: z.string().default("127.0.0.1"),
@@ -13,6 +15,7 @@ const envSchema = z.object({
   API_KEY: z.string().optional(),
   CHRONA_UNSAFE_PUBLIC_BIND: z.string().optional(),
   CHRONA_WEB_DIST: z.string().optional(),
+  CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: z.string().optional(),
 });
 
 type Env = z.output<typeof envSchema>;
@@ -27,6 +30,7 @@ export function resetEnvCacheForTests(): void {
 
 export function readEnv(): Env {
   if (cachedEnv) return cachedEnv;
+  applyChronaRuntimeConfigToEnv(process.env);
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
     const errors = result.error.issues

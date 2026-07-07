@@ -141,6 +141,7 @@ function fingerprint(input: DashboardFingerprintInput = baseFingerprintInput()) 
 }
 
 beforeEach(async () => {
+  process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY = "1";
   await resetDb();
 });
 
@@ -153,6 +154,36 @@ describe("dashboard AI surface state", () => {
     expect(dashboard.aiBrief.status).toBe("unconfigured");
     expect(dashboard.aiBrief.canGenerate).toBe(false);
     expect(dashboard.aiBrief.spec).toBeNull();
+  });
+
+  it("returns disabled and does not create surface when experimental dashboard summary is off", async () => {
+    delete process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY;
+    const { workspaceId } = await seedWorkspace("Disabled workspace");
+    await seedDefaultClient();
+
+    const dashboard = await getDashboard(workspaceId);
+    const surface = await db.workspaceAiSurface.findUnique({
+      where: { workspaceId_surface: { workspaceId, surface: "dashboard.brief" } },
+    });
+
+    expect(dashboard.aiBrief.status).toBe("disabled");
+    expect(dashboard.aiBrief.canGenerate).toBe(false);
+    expect(surface).toBeNull();
+  });
+
+  it("does not generate dashboard summary when experimental flag is off", async () => {
+    delete process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY;
+    const { workspaceId } = await seedWorkspace("Disabled generate workspace");
+    await seedDefaultClient();
+
+    const result = await generateDashboardBrief({ workspaceId, fingerprintInput: baseFingerprintInput(), force: true });
+    const surface = await db.workspaceAiSurface.findUnique({
+      where: { workspaceId_surface: { workspaceId, surface: "dashboard.brief" } },
+    });
+
+    expect(result.status).toBe("disabled");
+    expect(result.canGenerate).toBe(false);
+    expect(surface).toBeNull();
   });
 
   it("creates a dirty dashboard brief surface when provider exists", async () => {

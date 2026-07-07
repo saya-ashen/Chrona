@@ -20,6 +20,7 @@ export async function resetTestDb() {
   try {
     await db.aiFeatureBinding.deleteMany();
     await db.workspaceAiSurface.deleteMany();
+    await db.workspaceUserPreference.deleteMany();
     await db.aiClient.deleteMany();
     await db.importedCalendarEvent.deleteMany();
     await db.calendarSource.deleteMany();

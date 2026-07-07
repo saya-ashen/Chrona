@@ -338,6 +338,8 @@ function useDashboardAiBriefGeneration(input: {
   workspaceId: string;
   aiBrief: DashboardData["aiBrief"];
 }) {
+  const enabled = input.aiBrief?.status !== "disabled";
+
   const revalidator = useRevalidator();
   const inFlightKeyRef = useRef<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -360,10 +362,10 @@ function useDashboardAiBriefGeneration(input: {
   };
 
   useEffect(() => {
-    if (input.aiBrief?.status === "dirty" && input.aiBrief.canGenerate) {
+    if (enabled && input.aiBrief?.status === "dirty" && input.aiBrief.canGenerate) {
       void generate(false);
     }
-  }, [input.aiBrief?.status, input.aiBrief?.canGenerate, input.aiBrief?.inputFingerprint, input.workspaceId]);
+  }, [enabled, input.aiBrief?.status, input.aiBrief?.canGenerate, input.aiBrief?.inputFingerprint, input.workspaceId]);
 
   return { isGenerating: isGenerating || input.aiBrief?.status === "generating", regenerate: () => void generate(true) };
 }
@@ -647,12 +649,14 @@ export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: Da
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
         <div className="min-w-0 space-y-5">
-          <DigestModule
-            copy={copy}
-            aiBrief={data.aiBrief}
-            onRegenerate={regenerate}
-            isGenerating={isGenerating}
-          />
+          {data.aiBrief?.status !== "disabled" ? (
+            <DigestModule
+              copy={copy}
+              aiBrief={data.aiBrief}
+              onRegenerate={regenerate}
+              isGenerating={isGenerating}
+            />
+          ) : null}
           <RecentActivitySection copy={copy} events={recentEvents} />
         </div>
 
