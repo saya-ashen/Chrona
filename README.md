@@ -7,7 +7,11 @@ English | [中文](./README.zh.md)
 <h1 align="center">Chrona</h1>
 
 <p align="center">
-  <strong>Turn scheduled work into inspectable AI execution graphs.</strong>
+  <strong>Your to-do list, upgraded into AI-executable workflows.</strong>
+</p>
+
+<p align="center">
+  Plan your work, schedule it, let AI help execute it, and inspect every step.
 </p>
 
 <p align="center">
@@ -26,23 +30,18 @@ English | [中文](./README.zh.md)
   <a href="./docs/en/architecture.md">Architecture</a> ·
   <a href="./CONTRIBUTING.md">Contributing</a>
 </p>
-
-> [!WARNING]
-> Chrona is in fast active development. It is Bun-only, APIs and runtime
-> contracts may change, and the main product direction is a schedule-first app
-> that can automatically execute due work.
-
 <p align="center">
   <img src="docs/assets/generated/task-workspace.png" width="85%" alt="Chrona task workspace showing an executable AI plan graph" />
   <br />
-  <em>Schedule work, review the generated plan, run it through an AI provider, and inspect every checkpoint, branch, approval, and output.</em>
+  <em>Create a task, review the AI plan, run it through an AI provider, and inspect checkpoints, approvals, branches, and outputs.</em>
 </p>
 
 ---
 
-Chrona is a local-first workspace for AI-assisted work. It helps you capture a
-task, generate an editable plan, schedule it, run it manually or automatically,
-and review what happened later.
+Chrona is a local-first AI task manager for work that should become more than a
+reminder. Create a task, schedule it, review the AI-generated plan, run it
+manually or automatically, and inspect every checkpoint, approval, failure,
+tool action, and saved output.
 
 Chrona connects four loops that usually live in separate tools:
 
@@ -50,17 +49,11 @@ Chrona connects four loops that usually live in separate tools:
 Task -> Plan -> Schedule -> Inspectable Execution
 ```
 
-It is for work that should not disappear into chat history: recurring research,
-release preparation, maintenance, follow-up tasks, and agent runs that need
-state, approvals, recovery, and persisted outputs.
+Use Chrona for:
 
-## Project Status
-
-Chrona is usable for local development and product exploration, but it is not
-stable software yet. The current codebase already includes task, plan, schedule,
-execution, dashboard, settings, external calendar, and AI-client flows. The next
-major focus is making the schedule-to-auto-execution loop reliable enough for
-daily use.
+- recurring research briefs and release preparation
+- maintenance, follow-up tasks, and scheduled work that should move forward
+- agent runs that need state, approvals, recovery, and persisted outputs
 
 ## Why Chrona
 
@@ -129,25 +122,21 @@ the Vite web app.
 
 ## First Run
 
-You can explore Chrona without connecting a real provider: create tasks, build a
-schedule, inspect the dashboard, and open task workspaces. AI plan generation and
-agent execution require an AI client.
+Explore Chrona without connecting a real provider:
 
-For the full execution loop:
+1. Create tasks with enough context to act on later.
+2. Build a schedule and inspect the Dashboard.
+3. Open task workspaces to review plans, state, and outputs.
 
-1. Open `http://localhost:3101`.
-2. Go to `Settings -> AI Clients` and add a provider client.
-3. Choose `Claude Code` or `Codex` for real local agent execution.
-4. Bind the client to features such as `task.plan`, `task.execution`, or
+Enable AI execution when you are ready:
+
+1. Go to `Settings -> AI Clients` and add a `Claude Code` or `Codex` client.
+2. Bind the client to features such as `task.plan`, `task.execution`, or
    `dashboard.brief`.
-5. Create a task, give it enough context to be executable, and place it on the
-   schedule.
-6. Generate a plan from the task workspace, review or edit the generated graph,
+3. Generate a plan from the task workspace, review or edit the generated graph,
    then accept it.
-7. Start execution manually from the task workspace, or let Chrona move
+4. Start execution manually from the task workspace, or let Chrona move
    scheduled work forward when auto-execution is configured.
-8. Review progress, blockers, approvals, tool activity, and outputs from the
-   task workspace or Dashboard.
 
 See the [full quick start](./docs/en/quick-start.md) for data directories, AI
 client details, and troubleshooting.
@@ -175,46 +164,17 @@ client details, and troubleshooting.
 Chrona separates product workflow from execution providers. You configure
 providers as AI clients, then bind those clients to Chrona features.
 
-| Provider type | Status | Use it for | Notes |
-| --- | --- | --- | --- |
-| `claude_code` | Primary supported provider | Claude Code-backed plan generation and task execution through scoped MCP control tools | Uses the user's Claude Code config by default when no config directory is set |
-| `codex` | Primary supported provider | Codex-backed plan generation and task execution through scoped MCP control tools | Uses the user's default `CODEX_HOME` (`~/.codex`) when no config directory is set |
-| `hermes` | Pending update | Hermes gateway integrations for local or remote agent execution | Available for existing Hermes setups; provider docs/config flow has not been updated yet |
-
-### Claude Code Setup
-
-Use `Settings -> AI Clients -> Add Client -> Claude Code`.
-
-Common fields:
-
-| Field | Purpose | Default / note |
+| Provider type | Status | Best for |
 | --- | --- | --- |
-| Model | Claude model passed to Claude Code | Defaults to Chrona's provider default if left empty |
-| API key | Anthropic API key for Claude Code | Optional; leave empty to use the user's existing Claude Code auth/config |
-| Config directory | Claude Code config/state directory | Optional; empty means Claude Code's default user-level config |
-| Working directory | Filesystem scope for the run | Optional; defaults to the Chrona process working directory |
-| MCP base URL | Chrona `/api/mcp` server URL | Defaults to the current Chrona server |
-| MCP bearer token | Bearer token for Chrona MCP requests | Usually leave empty; use `CHRONA_API_KEY` or `CHRONA_MCP_BEARER_TOKEN` when API auth is enabled |
-| Timeout | Maximum provider run time | Optional |
+| `claude_code` | Primary supported provider | Claude Code-backed plan generation and local task execution |
+| `codex` | Primary supported provider | Codex-backed plan generation and local task execution |
+| `hermes` | Pending update | Existing Hermes gateway setups for local or remote agent execution |
 
-### Codex Setup
+Configure providers in `Settings -> AI Clients`, then bind the client to Chrona
+features such as `task.plan`, `task.execution`, or `dashboard.brief`.
 
-Use `Settings -> AI Clients -> Add Client -> Codex`.
-
-Common fields:
-
-| Field | Purpose | Default / note |
-| --- | --- | --- |
-| Model | Codex model passed through provider config | Optional |
-| API key | OpenAI/Codex API key | Optional; also passed as `CODEX_API_KEY` and `OPENAI_API_KEY` for the provider process |
-| Base URL | OpenAI-compatible gateway URL | Optional |
-| Config directory | Codex home directory | Optional; empty means default user-level `CODEX_HOME` (`~/.codex`) |
-| Working directory | Filesystem scope for the run | Optional; defaults to the Chrona process working directory |
-| MCP base URL | Chrona `/api/mcp` server URL | Defaults to the current Chrona server |
-| MCP bearer token | Bearer token for Chrona MCP requests | Usually leave empty; use `CHRONA_API_KEY` or `CHRONA_MCP_BEARER_TOKEN` when API auth is enabled |
-| Timeout | Maximum provider run time | Optional |
-
-For provider troubleshooting, use the [full quick start](./docs/en/quick-start.md).
+For provider fields, defaults, and troubleshooting, use the
+[full quick start](./docs/en/quick-start.md).
 
 ## Local-first and Safety
 
@@ -246,9 +206,16 @@ Chrona is designed to start local and explicit.
   `chrona_node_fail`, and `chrona_wait_complete`. Conversation history, tool
   traces, and persisted outputs stay attached to the task.
 
-<p align="center">
-  <img src="docs/assets/NodeDetail.png" width="80%" alt="Inspect a Chrona execution node with state, details, and activity" />
-</p>
+## Project Status
+
+> [!WARNING]
+> Chrona is alpha software: local-first, Bun-only, and under active development.
+
+Chrona is usable for local development and product exploration, but it is not
+stable software yet. The current codebase includes task, plan, schedule,
+execution, dashboard, settings, external calendar, and AI-client flows. The next
+major focus is making the schedule-to-auto-execution loop reliable enough for
+daily use.
 
 ## Roadmap
 
