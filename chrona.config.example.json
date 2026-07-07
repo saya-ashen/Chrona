@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/json",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 3101,
+    "allowedOrigins": ["*"],
+    "unsafePublicBind": false
+  },
+  "database": {
+    "url": "file:./prisma/dev.db",
+    "migrationsDir": "prisma/migrations"
+  },
+  "web": {
+    "dist": null
+  },
+  "security": {
+    "apiKey": null
+  }
+}

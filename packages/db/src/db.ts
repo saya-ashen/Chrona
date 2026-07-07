@@ -1,8 +1,11 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
 import { resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { ensureSqliteDatabase } from "./sqlite-migrations";
 import { AUTO_TEST_DATABASE_ENV, resolveRuntimeDatabaseUrl, resolveSqliteAdapterUrl } from "./sqlite-url";
+
+applyChronaRuntimeConfigToEnv(process.env);
 
 const DATABASE_URL = resolveRuntimeDatabaseUrl(process.env);
 const MIGRATIONS_DIR = process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations");

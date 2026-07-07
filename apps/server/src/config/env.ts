@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
+
 
 const envSchema = z.object({
   HOST: z.string().default("127.0.0.1"),
@@ -27,6 +29,7 @@ export function resetEnvCacheForTests(): void {
 
 export function readEnv(): Env {
   if (cachedEnv) return cachedEnv;
+  applyChronaRuntimeConfigToEnv(process.env);
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
     const errors = result.error.issues
