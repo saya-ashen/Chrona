@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { checkpointActionKindSchema, executionActionBodySchema } from "./execution.schema";
-import { workspaceId } from "./common";
+import { isoDateString, workspaceId } from "./common";
 
 // ── GET /schedule ──
 export const scheduleProjectionQuerySchema = z.object({
@@ -73,4 +73,12 @@ export const workCommandBodySchema = z.union([
 // ── GET /workspaces/:workspaceId/overview ──
 export const workspaceOverviewParamSchema = z.object({
   workspaceId: z.string().min(1),
+});
+
+export const startWithChronaPreferenceParamSchema = z.object({
+  workspaceId: workspaceId,
+});
+
+export const startWithChronaPreferenceBodySchema = z.object({
+  completedAt: isoDateString.nullable().optional(),
 });

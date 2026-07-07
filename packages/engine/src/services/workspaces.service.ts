@@ -24,5 +24,19 @@ export function createWorkspacesService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.WORKSPACE_NOT_FOUND, "Failed to get workspace overview");
       }
     },
+    async getStartWithChronaPreference(input: { workspaceId: string }) {
+      try {
+        return await workspaceQuery.getStartWithChronaPreference(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.WORKSPACE_NOT_FOUND, "Failed to get workspace preference");
+      }
+    },
+    async setStartWithChronaPreference(input: { workspaceId: string; completedAt: string | null }) {
+      try {
+        return await workspaceQuery.setStartWithChronaPreference(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.WORKSPACE_NOT_FOUND, "Failed to update workspace preference");
+      }
+    },
   };
 }
