@@ -12,22 +12,22 @@ for the system as a whole, see [Architecture](./architecture.md).
 | --- | --- |
 | `src/main.tsx` | App bootstrap: mounts React, providers (query client, i18n), and the router |
 | `src/router.tsx` | `createBrowserRouter` route tree under a `/:lang` locale prefix; attaches per-route `loader`s |
-| `src/loaders.ts` | React Router data loaders (`loadScheduleRouteData`, `loadInboxRouteData`, `loadTaskPageData`, …) that prefetch page data before render |
+| `src/loaders.ts` | React Router data loaders (`loadScheduleRouteData`, `loadActionCenterRouteData`, `loadTaskPageData`, …) that prefetch page data before render |
 | `src/pages.tsx` | Top-level route page components wired in `router.tsx` |
 | `src/app-shell.tsx` | `AppShell` layout (nav/chrome) wrapping all locale routes |
 
-Routes today: `/:lang` landing, `schedule`, `tasks`, `tasks/:taskId` (task workspace),
-`settings`. Routing is locale-prefixed; the default locale redirects from `/`.
-`inbox` and `memory` are intentionally hidden until they have actionable product
-roles beyond read-only/duplicative record display; Dashboard owns concise
-attention/recovery visibility. Do not re-add them to primary navigation or routes
-without implementing those controls first.
+Routes today: `/:lang` landing, `dashboard`, `schedule`, `tasks`,
+`tasks/:taskId` (task workspace), `action-center`, and `settings`. Routing is
+locale-prefixed; the default locale redirects from `/`. Action Center owns the
+explicit attention queue for approvals, input requests, schedule proposals,
+recovery work, and notifications. Memory remains hidden until it has actionable
+product value.
 
 ## Directories
 
 | Path | Contents |
 | --- | --- |
-| `src/components/` | Feature-grouped UI: `schedule`, `inbox`, `memory`, `tasks`, `work`, `settings`, `assistant-surface`, `global-ai-sidebar`, `i18n`, plus shared shell/error components |
+| `src/components/` | Feature-grouped UI: `schedule`, `action-center`, `memory`, `tasks`, `work`, `settings`, `assistant-surface`, `global-ai-sidebar`, `i18n`, plus shared shell/error components |
 | `src/components/ui/` | shadcn/ui primitives — the foundation for basic controls (see UI foundation rule below) |
 | `src/hooks/` | Cross-cutting React hooks (`use-ai`, `use-mobile`, `ai/`) |
 | `src/lib/` | Framework-agnostic client/infra code (HTTP, SSE, query client, i18n, domain action clients) |

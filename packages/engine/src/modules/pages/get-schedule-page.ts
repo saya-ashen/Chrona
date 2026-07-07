@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import {
   buildPlanningSummary,
-  deriveWorkItemStateView,
+  deriveTaskProjectionStateView,
   formatDateKey,
   startOfDay,
 } from "@chrona/domain";
@@ -27,12 +27,12 @@ function stateViewFor(item: {
   actionRequired?: string | null;
   aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
 }) {
-  return deriveWorkItemStateView({
-    taskStatus: item.persistedStatus,
+  return deriveTaskProjectionStateView({
+    persistedStatus: item.persistedStatus,
     scheduleStatus: item.scheduleStatus,
     planStatus: item.aiPlanGenerationStatus,
-    executionStatus: item.displayState,
-    providerStatus: item.latestRunStatus,
+    displayState: item.displayState,
+    latestRunStatus: item.latestRunStatus,
     isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt),
     isRunnable: item.isRunnable,
     disabledReason: item.actionRequired,

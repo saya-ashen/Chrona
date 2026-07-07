@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiClientsManager } from "../ui/ai-clients-manager";
+import { AI_CLIENTS_CHANGED_EVENT } from "@/lib/ai-client-events";
 
 const messages = {
   pages: {
@@ -186,6 +187,9 @@ describe("AiClientsManager", () => {
       json: async () => ({ clients: [] }),
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    const clientsChanged = vi.fn();
+    window.addEventListener(AI_CLIENTS_CHANGED_EVENT, clientsChanged, { once: true });
+
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -211,6 +215,7 @@ describe("AiClientsManager", () => {
 
     const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_hermes/bindings" && call[1]?.method === "PUT");
     expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.plan", "task.execution", "dashboard.brief"] });
+    expect(clientsChanged).toHaveBeenCalledOnce();
   });
 
   it("creates a Claude Code client with Anthropic environment variables", async () => {

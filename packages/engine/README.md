@@ -65,7 +65,7 @@ engine.tasks.lifecycle.reopen(input)
 engine.tasks.result.accept(input)
 
 engine.pages.getSchedule(input)
-engine.pages.getInbox(input)
+engine.pages.getActionCenter(input)
 engine.pages.getMemory(input)
 engine.pages.getWork(input)
 

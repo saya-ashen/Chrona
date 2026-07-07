@@ -4,7 +4,7 @@ import { getMemoryConsole } from "@chrona/engine/modules/pages/get-memory-consol
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // getMemoryConsole — engine-layer unit for the memory read-model.
-// The HTTP surface GET /api/memory is covered by inbox-memory-schedule-pages;
+// The HTTP surface GET /api/memory is covered by action-center-memory-schedule-pages;
 // this file pins the engine contract on the bare read-model function:
 //
 // - empty workspace returns an empty list

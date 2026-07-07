@@ -5,7 +5,7 @@
     "dashboard": "概览",
     "schedule": "日程",
     "tasks": "任务",
-    "inbox": "收件箱",
+    "actionCenter": "待处理",
     "memory": "记忆",
     "settings": "设置",
     "newTask": "新建任务"
@@ -193,7 +193,7 @@
       "saveTaskConfig": "保存任务配置",
       "saving": "保存中…"
     },
-    "inboxList": {
+    "actionCenterList": {
       "risk": "风险",
       "task": "任务",
       "run": "运行",
@@ -205,7 +205,7 @@
       "retry": "重试",
       "resume": "恢复",
       "emptyTitle": "全部处理完毕",
-      "emptyDescription": "暂时没有需要你处理的审批、输入请求或日程提案。"
+      "emptyDescription": "暂时没有需要你处理的决定、输入请求、日程建议或通知。"
     },
     "memoryConsole": {
       "source": "来源",
@@ -346,7 +346,7 @@
       "action": "动作",
       "needsReview": "需要查看",
       "reviewScheduleImpact": "查看日程影响",
-      "openInbox": "打开收件箱",
+      "openActionCenter": "打开待处理",
       "pageTitle": "日程",
       "today": "今天",
       "tomorrow": "明天",
@@ -555,7 +555,7 @@
       "newTask": "新建任务",
       "workspaceViews": "执行入口",
       "allTasks": "任务列表",
-      "openInbox": "收件箱",
+      "openActionCenter": "待处理",
       "openMemory": "记忆库",
       "currentTask": "当前任务",
       "taskStages": "任务状态",
@@ -1601,9 +1601,9 @@
         "Urgent": "紧急"
       }
     },
-    "inbox": {
-      "title": "收件箱",
-      "subtitle": "在一个中断队列里统一处理审批、输入请求、日程建议和恢复工作。",
+    "actionCenter": {
+      "title": "待处理",
+      "subtitle": "集中处理需要你介入的决定、输入请求、日程建议和恢复工作。",
       "approve": "批准",
       "reject": "拒绝",
       "editPlaceholder": "编辑后的指令",

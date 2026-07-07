@@ -7,6 +7,7 @@ import type {
   TaskNodeState,
 } from "@chrona/contracts";
 import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/graph-runtime";
+import { deriveTaskExecutionState } from "@chrona/domain";
 import { deriveRepairActions, detectReconciliationIssues } from "./reconcile-invariants";
 
 type ReconcileTaskStateInput = {
@@ -88,18 +89,7 @@ function deriveExecutionState(
   blockReason?: TaskBlockReason | null,
   taskStatus?: string | null,
 ): TaskExecutionState {
-  if (graph.failedNodeIds.length > 0) return "failed";
-  if (graph.degradedNodeIds.length > 0) return "degraded";
-  if (graph.blockedNodeIds.length > 0) return "blocked";
-  if (graph.waitingForApprovalNodeIds.length > 0) return "waiting_for_approval";
-  if (graph.waitingForUserNodeIds.length > 0 || graph.waitingNodeIds.length > 0) return "waiting_for_user";
-  const blockState = executionStateFromTaskBlock(blockReason, taskStatus);
-  if (blockState) return blockState;
-  if (graph.runningNodeIds.length > 0) return "running";
-  if (graph.cancelledNodeIds.length > 0 && graph.readyNodeIds.length === 0) return "cancelled";
-  if (graph.readyNodeIds.length > 0) return "queued";
-  if (graph.nodes.length > 0 && graph.nodes.every((node) => isTerminalStatus(node.status))) return "completed";
-  return "not_started";
+  return deriveTaskExecutionState({ graph, blockReason, taskStatus });
 }
 
 function pickCurrentNode(graph: EffectivePlanGraph, blockReason?: TaskBlockReason | null) {
@@ -149,36 +139,6 @@ function derivePrimaryAction(input: {
   }
 }
 
-function executionStateFromTaskBlock(
-  blockReason?: TaskBlockReason | null,
-  taskStatus?: string | null,
-): TaskExecutionState | null {
-  if (taskStatus === "Completed" || taskStatus === "Done") return null;
-
-  const blockType = normalizeBlockType(blockReason);
-  if (blockType === "human_input_required" || blockType === "waiting_for_input") return "waiting_for_user";
-  if (blockType === "approval_required" || blockType === "approval_pending") return "waiting_for_approval";
-  if (blockType === "replan_required") return "waiting_for_approval";
-  if (blockType === "run_failed" || blockType === "node_failed") return "failed";
-  if (blockType) return "blocked";
-
-  switch (taskStatus?.toLowerCase()) {
-    case "waitingforinput":
-    case "waiting_for_input":
-      return "waiting_for_user";
-    case "waitingforapproval":
-    case "waiting_for_approval":
-      return "waiting_for_approval";
-    case "blocked":
-      return "blocked";
-    case undefined:
-      return null;
-    case "failed":
-      return "failed";
-    default:
-      return null;
-  }
-}
 
 function derivePrimaryActionFromTaskBlock(
   blockReason?: TaskBlockReason | null,
@@ -261,9 +221,6 @@ function firstReason(graph: EffectivePlanGraph, nodeIds: string[]) {
   };
 }
 
-function isTerminalStatus(status: EffectivePlanNode["status"]) {
-  return status === "completed" || status === "skipped" || status === "invalidated" || status === "cancelled";
-}
 
 function formatStateLabel(state: TaskExecutionState) {
   return state

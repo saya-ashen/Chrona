@@ -205,7 +205,7 @@ Schedule page projection: timeline, work blocks, task summaries, conflicts, and 
 
 ### GET /api/inbox?workspaceId=...
 
-Internal/hidden projection: pending approvals, schedule proposals, waiting inputs, failed/cancelled runs, and attention items. Current primary UI routes surface this state through Dashboard and the task workspace, not an Inbox page.
+Action Center projection wire contract: pending approvals, schedule proposals, waiting inputs, failed/cancelled runs, and attention items. The HTTP path remains `/api/inbox` for API stability while the user-facing surface is Action Center.
 
 ### GET /api/memory?workspaceId=...
 

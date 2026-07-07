@@ -51,7 +51,7 @@ Chrona 的长期价值应随 AI 能力增强而增强：
 
 | 区域 | 当前能力 |
 | --- | --- |
-| 页面 | 当前主导航是 Dashboard、Schedule、Tasks、Settings。Inbox 和 Memory 可以作为内部/隐藏投影保留，但不是当前主产品表面。 |
+| 页面 | 当前主导航是 Dashboard、Schedule、Tasks、Action Center、Settings。Memory 可以作为内部/隐藏投影保留，但不是当前主产品表面。 |
 | 任务 | 创建、更新、删除、完成/重开、优先级、状态、标签、依赖、父子任务，以及任务投影重建。 |
 | AI 规划 | 流式计划生成、生成计划持久化、计划审查/编辑/接受流程，以及 materialize 为可执行任务计划层。 |
 | 图计划 | 可执行的 `task`、`checkpoint`、`condition`、`wait` 节点，以及图状态解析。 |

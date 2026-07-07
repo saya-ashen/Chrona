@@ -5,6 +5,7 @@ import { getDictionary, resolveLocale, type Locale } from "@chrona/i18n";
 import { apiJson } from "./api";
 import type {
   AppBootData,
+  ActionCenterRouteData,
   DashboardRouteData,
   ScheduleRouteData,
   TaskListRouteData,
@@ -59,6 +60,17 @@ export async function loadDashboardRouteData({ request }: LoaderFunctionArgs): P
   return {
     dashboard: await apiJson<DashboardRouteData["dashboard"]>(
       `${origin}/api/dashboard?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`,
+    ),
+  };
+}
+
+export async function loadActionCenterRouteData({ request }: LoaderFunctionArgs): Promise<ActionCenterRouteData> {
+  const origin = getOrigin(request);
+  const defaultWorkspace = await apiJson<AppBootData["defaultWorkspace"]>(`${origin}/api/workspaces/default`);
+
+  return {
+    actionCenter: await apiJson<ActionCenterRouteData["actionCenter"]>(
+      `${origin}/api/inbox?workspaceId=${encodeURIComponent(defaultWorkspace.id)}`,
     ),
   };
 }

@@ -77,7 +77,7 @@ export function SelectedBlockMainColumn({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const providerName = item.aiClientName ?? availableAiClients?.find((client) => client.id === item.aiClientId)?.name ?? null;
   const runtimeLabel = item.executionRuntimeLabel ?? executionRuntimes.find((runtime) => runtime.key === item.executionRuntime)?.label ?? item.executionRuntime;
-  const executionStatus = item.latestRunStatus ?? item.displayState ?? item.stateView?.label ?? copy.noActiveRun;
+  const executionStatus = item.stateView?.label ?? item.displayState ?? item.latestRunStatus ?? copy.noActiveRun;
   const recoveryHref = `/tasks/${item.taskId}${item.workBlockId ? `?workBlockId=${encodeURIComponent(item.workBlockId)}` : ""}`;
 
 

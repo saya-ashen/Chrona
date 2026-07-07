@@ -5,7 +5,7 @@
     "dashboard": "Dashboard",
     "schedule": "Schedule",
     "tasks": "Tasks",
-    "inbox": "Inbox",
+    "actionCenter": "Action Center",
     "memory": "Memory",
     "settings": "Settings",
     "newTask": "New Task"
@@ -193,7 +193,7 @@
       "saveTaskConfig": "Save task config",
       "saving": "Saving…"
     },
-    "inboxList": {
+    "actionCenterList": {
       "risk": "Risk",
       "task": "Task",
       "run": "Run",
@@ -205,7 +205,7 @@
       "retry": "Retry",
       "resume": "Resume",
       "emptyTitle": "You're all caught up",
-      "emptyDescription": "No approvals, input requests, or schedule proposals need your attention right now."
+      "emptyDescription": "No decisions, input requests, schedule proposals, or notifications need your attention right now."
     },
     "memoryConsole": {
       "source": "Source",
@@ -346,7 +346,7 @@
       "action": "Action",
       "needsReview": "Needs review",
       "reviewScheduleImpact": "Review schedule impact",
-      "openInbox": "Open Inbox",
+      "openActionCenter": "Open Action Center",
       "pageTitle": "Schedule",
       "today": "Today",
       "tomorrow": "Tomorrow",
@@ -579,7 +579,7 @@
       "newTask": "New task",
       "workspaceViews": "Work views",
       "allTasks": "Task list",
-      "openInbox": "Inbox",
+      "openActionCenter": "Action Center",
       "openMemory": "Memory",
       "currentTask": "Current task",
       "taskStages": "Task status",
@@ -1601,9 +1601,9 @@
         "Urgent": "Urgent"
       }
     },
-    "inbox": {
-      "title": "Inbox",
-      "subtitle": "Triage approvals, input requests, schedule proposals, and recovery work from one interruption queue.",
+    "actionCenter": {
+      "title": "Action Center",
+      "subtitle": "Triage decisions, waiting inputs, schedule proposals, and recovery work from one action queue.",
       "approve": "Approve",
       "reject": "Reject",
       "editPlaceholder": "Edited instruction",

@@ -391,7 +391,7 @@ async function finalizeOutcome(input: {
     planId: runtime.planId,
     mainSessionId,
     executionSessionId: session.id,
-    planRunId: runtime.planId,
+    planRunId: runtime.persisted.id,
     status,
     effective: outcome.effective,
     currentNodeId,

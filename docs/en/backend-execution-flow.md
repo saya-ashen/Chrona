@@ -161,7 +161,7 @@ When no ready nodes remain, the runner transitions the `ExecutionSession` to
 `Completed`, records `Task.completedAt`, completes the active `Run`s and the
 `WorkBlock`, appends execution events, then rebuilds the projection. The
 committer derives the `Completed` task status from the completed session/run —
-the runner never writes the status itself. Work, Schedule, and Inbox then
+the runner never writes the status itself. Work, Schedule, and Action Center then
 reflect the updated state.
 
 ## Task state authority
@@ -199,7 +199,7 @@ just-generated plan is unaffected by an earlier occurrence's provider failure.
 ### Projection refresh invariant
 
 Any write that changes execution or plan reality MUST end by rebuilding the
-projection so Work/Schedule/Inbox reflect it without waiting for the next
+projection so Work/Schedule/Action Center reflect it without waiting for the next
 execution tick. This includes plan draft persistence
 (`materializeGeneratedTaskPlan`) and plan acceptance (`TaskPlanning.accept`),
 not only execution actions. `publishTaskWorkspaceUpdatedEvent` only notifies

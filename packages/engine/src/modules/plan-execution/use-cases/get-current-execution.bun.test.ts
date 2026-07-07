@@ -24,6 +24,14 @@ describe("currentExecutionStatusFromEffectiveGraph", () => {
     })).toBe("started");
   });
 
+  it("treats an active provider run as execution evidence before node state advances", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({ readyNodeIds: ["node-1"] }),
+      hasActiveExecutionSession: false,
+      hasActiveRun: true,
+    })).toBe("running");
+  });
+
   it("preserves failed evidence after the active execution session closes", () => {
     expect(currentExecutionStatusFromEffectiveGraph({
       effective: effectiveGraph({

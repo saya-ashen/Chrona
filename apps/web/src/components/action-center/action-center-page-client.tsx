@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import type { ActionCenterItem, ActionCenterProjection } from "@chrona/contracts/api";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Button } from "@/components/ui/button";
-import { InboxList } from "@/components/inbox/inbox-list";
+import { ActionCenterList } from "@/components/action-center/action-center-list";
 import { decideScheduleProposal, dispatchExecutionAction } from "@/lib/task-actions-client";
 
-type InboxPageClientProps = {
+type ActionCenterPageClientProps = {
   workspaceId: string;
-  initialData: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-inbox").getInbox>>;
-  copy: Parameters<typeof InboxList>[0]["copy"] & {
+  initialData: ActionCenterProjection;
+  copy: Partial<Record<"risk" | "task" | "run" | "openTask" | "approve" | "reject" | "editAndApprove" | "emptyTitle" | "emptyDescription" | "emptyAction", string>> & {
     openSchedule?: string;
     acceptProposal?: string;
     rejectProposal?: string;
@@ -20,18 +21,17 @@ type InboxPageClientProps = {
   };
 };
 
-type InboxItem = InboxPageClientProps["initialData"][number];
 
 function getActionError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
+export function ActionCenterPageClient({ initialData, copy }: ActionCenterPageClientProps) {
   const [items, setItems] = useState(initialData);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  async function runItemAction(item: InboxItem, action: "approve" | "reject" | "edit") {
+  async function runItemAction(item: ActionCenterItem, action: "approve" | "reject" | "edit") {
     setPendingItemId(item.id);
     setActionError(null);
 
@@ -81,7 +81,7 @@ export function InboxPageClient({ initialData, copy }: InboxPageClientProps) {
           {actionError}
         </div>
       ) : null}
-      <InboxList
+      <ActionCenterList
         items={items.map((item) => ({
           ...item,
           actions:

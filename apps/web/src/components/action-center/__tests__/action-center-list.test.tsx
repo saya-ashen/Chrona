@@ -21,6 +21,8 @@ vi.mock("@/components/ui/badge", () => ({
 
 vi.mock("@/components/ui/card", () => ({
   Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  CardFooter: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   CardDescription: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
@@ -39,16 +41,16 @@ vi.mock("@chrona/i18n/react", () => ({
   }),
 }));
 
-import { InboxList } from "@/components/inbox/inbox-list";
+import { ActionCenterList } from "@/components/action-center/action-center-list";
 
 afterEach(() => {
   cleanup();
 });
 
-describe("InboxList", () => {
+describe("ActionCenterList", () => {
   it("shows action type, risk, task, run, summary, and consequence", () => {
     render(
-      <InboxList
+      <ActionCenterList
         items={[
           {
             id: "approval_1",
@@ -72,6 +74,7 @@ describe("InboxList", () => {
     expect(screen.getByText(/Task: Review adapter mapping/i)).toBeInTheDocument();
     expect(screen.getByText("Approve the file patch")).toBeInTheDocument();
     expect(screen.getByText("Blocks deployment until approved")).toBeInTheDocument();
+    expect(screen.getByTestId("action-center-message")).toHaveClass("p-4");
     expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
       "href",
       "/en/tasks/task_1",
@@ -85,7 +88,7 @@ describe("InboxList", () => {
     const onEditAndApprove = vi.fn();
 
     render(
-      <InboxList
+      <ActionCenterList
         onApprove={onApprove}
         onReject={onReject}
         onEditAndApprove={onEditAndApprove}

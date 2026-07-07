@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/rpc-client";
+import { notifyAiClientsChanged } from "@/lib/ai-client-events";
 
 const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -1175,6 +1176,11 @@ export function AiClientsManager() {
   const [providers, setProviders] = useState<RuntimeProviderOption[]>([]);
   const [cardTestStates, setCardTestStates] = useState<Record<string, TestResult>>({});
 
+  const refreshAfterMutation = () => {
+    notifyAiClientsChanged();
+    void fetchClients();
+  };
+
   const fetchClients = useCallback(async () => {
     const [clientsRes, providersRes] = await Promise.all([
       api.ai.clients.$get(),
@@ -1207,7 +1213,7 @@ export function AiClientsManager() {
       await updateClientBindings(result.client.id, data.bindings);
     }
     setShowForm(false);
-    void fetchClients();
+    refreshAfterMutation();
   };
 
   const handleUpdate = async (id: string, data: { payload: ClientFormPayload; bindings: string[] }) => {
@@ -1217,12 +1223,12 @@ export function AiClientsManager() {
     });
     await updateClientBindings(id, data.bindings);
     setEditingId(null);
-    void fetchClients();
+    refreshAfterMutation();
   };
 
   const handleDelete = async (id: string) => {
     await api.ai.clients[":clientId"].$delete({ param: { clientId: id } });
-    void fetchClients();
+    refreshAfterMutation();
   };
 
   const handleMakeDefault = async (id: string) => {
@@ -1230,7 +1236,7 @@ export function AiClientsManager() {
       param: { clientId: id },
       json: { isDefault: true },
     });
-    void fetchClients();
+    refreshAfterMutation();
   };
 
   const handleToggleEnabled = async (id: string, enabled: boolean) => {
@@ -1238,7 +1244,7 @@ export function AiClientsManager() {
       param: { clientId: id },
       json: { enabled },
     });
-    void fetchClients();
+    refreshAfterMutation();
   };
 
   const handleTestExistingClient = async (client: AiClientInfo) => {

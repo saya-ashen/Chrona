@@ -57,7 +57,7 @@ export type DeriveWorkItemStateViewInput = {
   disabledReason?: string | null;
 };
 
-const NORMALIZED: Record<string, WorkItemUserState> = {
+const NORMALIZED: Partial<Record<string, WorkItemUserState>> = {
   waitingforinput: "waiting_for_input",
   waiting_for_input: "waiting_for_input",
   waitingforuser: "waiting_for_input",
@@ -108,6 +108,8 @@ const PRIORITY: WorkItemUserState[] = [
   "cancelled",
   "completed",
 ];
+
+const TERMINAL_WORK_ITEM_STATES = new Set<WorkItemUserState>(["completed", "cancelled"]);
 
 const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" | "disabledReason">> = {
   unscheduled: {
@@ -208,11 +210,19 @@ function normalizeState(value: string | null | undefined): WorkItemUserState | n
 }
 
 function pickState(input: DeriveWorkItemStateViewInput): WorkItemUserState {
+  const nodeState = normalizeState(input.nodeStatus);
+  const executionState = normalizeState(input.executionStatus);
+  const taskState = normalizeState(input.taskStatus);
+  const terminalState = [executionState, taskState]
+    .find((state) => state ? TERMINAL_WORK_ITEM_STATES.has(state) : false) ?? null;
+  if (terminalState) return terminalState;
+  const providerState = normalizeState(input.providerStatus);
+
   const candidates = [
-    normalizeState(input.nodeStatus),
-    normalizeState(input.executionStatus),
-    normalizeState(input.providerStatus),
-    normalizeState(input.taskStatus),
+    nodeState,
+    executionState,
+    providerState,
+    taskState,
     normalizeState(input.planStatus),
     normalizeState(input.scheduleStatus),
   ].filter((state): state is WorkItemUserState => Boolean(state));

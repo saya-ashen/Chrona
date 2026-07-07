@@ -6,6 +6,7 @@ import {
   reviewCheckpointNodeCapability,
 } from "@chrona/engine/modules/plan-execution";
 import { aiClientRegistry } from "../../../../../features/ai-clients";
+import type { EngineAiClient } from "../../../../../features/ai-clients";
 import { db } from "@chrona/db";
 import {
   MemoryScope,
@@ -22,7 +23,7 @@ import type {
   ProviderRunSnapshot,
   ProviderSessionRef,
 } from "@chrona/providers-foundation";
-import type { NodeAttempt } from "@chrona/contracts/ai";
+import type { EffectivePlanGraph, EffectivePlanNode, NodeAttempt } from "@chrona/contracts/ai";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 type TestProviderResponseClient = AgentProviderClient;
@@ -98,6 +99,57 @@ function createMockProviderClient(input: {
         provider: "test-provider",
         runId: "mock-run-ref",
         status: "completed",
+      };
+    },
+    async cancelRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "test-provider",
+        runId: "mock-run-ref",
+        status: "cancelled",
+      };
+    },
+  };
+}
+
+function createThrowingProviderClient(): TestProviderResponseClient {
+  return {
+    provider: "test-provider",
+    getCapabilities(): ProviderCapabilities {
+      return {
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: true,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: true,
+      };
+    },
+    async checkHealth(): Promise<ProviderHealth> {
+      return {
+        provider: "test-provider",
+        ok: true,
+        checkedAt: new Date().toISOString(),
+      };
+    },
+    async createSession(): Promise<ProviderSessionRef> {
+      return {
+        provider: "test-provider",
+        sessionId: "mock-session-key",
+        createdAt: new Date().toISOString(),
+      };
+    },
+    async startRun(): Promise<ProviderRunRef> {
+      throw new Error("provider setup failed");
+    },
+    streamRun(): AsyncIterable<ProviderRunEvent> {
+      throw new Error("streamRun should not be called after startRun failure");
+    },
+    async getRun(): Promise<ProviderRunSnapshot> {
+      return {
+        provider: "test-provider",
+        runId: "mock-run-ref",
+        status: "failed",
+        error: "provider setup failed",
       };
     },
     async cancelRun(): Promise<ProviderRunSnapshot> {
@@ -275,11 +327,18 @@ function installMockRegistryClient(
   providerClient: TestProviderResponseClient,
   clientType = "test-provider",
 ) {
-  aiClientRegistry.get = (async () =>
-    ({
-      record: { type: clientType },
-      providerClient,
-    }) as any) as typeof aiClientRegistry.get;
+  const client = {
+    record: {
+      id: `mock-${clientType}`,
+      name: `Mock ${clientType}`,
+      type: clientType,
+      config: {},
+      isDefault: true,
+      enabled: true,
+    },
+    providerClient,
+  } satisfies EngineAiClient;
+  aiClientRegistry.get = async () => client;
 }
 
 function extractUserText(request: Parameters<AgentProviderClient["startRun"]>[0]): string {
@@ -354,7 +413,7 @@ async function seedFullSetup() {
     localId: "node-1",
     type: "task",
     title: "Echo step",
-    config: { objective: "Produce a hello-world message" },
+    config: {},
     dependencies: [],
     dependents: [],
     status: "pending",
@@ -363,7 +422,7 @@ async function seedFullSetup() {
     dependenciesSatisfied: true,
     ready: true,
     reachable: true,
-  };
+  } satisfies EffectivePlanNode;
 
   const memory = await db.memory.create({
     data: {
@@ -392,7 +451,6 @@ async function seedFullSetup() {
 
   const planGraph = {
     graphId: memory.id,
-    planId: memory.id,
     basePlanId: memory.id,
     resolvedAt: now,
     resolvedVersion: 1,
@@ -402,12 +460,18 @@ async function seedFullSetup() {
     terminalNodeIds: [node.id],
     readyNodeIds: [node.id],
     blockedNodeIds: [],
+    waitingNodeIds: [],
+    waitingForUserNodeIds: [],
+    waitingForApprovalNodeIds: [],
+    degradedNodeIds: [],
+    skippedNodeIds: [],
+    cancelledNodeIds: [],
     completedNodeIds: [],
     runningNodeIds: [],
     invalidatedNodeIds: [],
     failedNodeIds: [],
     pendingNodeIds: [node.id],
-  };
+  } satisfies EffectivePlanGraph;
 
   return {
     workspaceId,
@@ -470,6 +534,24 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(run.status).toBe(RunStatus.Running);
     expect(run.runtimeRunRef).not.toBeNull();
 
+
+    const task = await db.task.findUniqueOrThrow({
+      where: { id: taskId },
+      select: { latestRunId: true },
+    });
+    const session = await db.taskSession.findUniqueOrThrow({
+      where: { id: sessionId },
+      select: { activeRunId: true, lastRunStatus: true },
+    });
+    const projection = await db.taskProjection.findUniqueOrThrow({
+      where: { taskId },
+      select: { persistedStatus: true, latestRunStatus: true },
+    });
+    expect(task.latestRunId).toBe(run.id);
+    expect(session.activeRunId).toBe(run.id);
+    expect(session.lastRunStatus).toBe(RunStatus.Running);
+    expect(projection.persistedStatus).toBe("Running");
+    expect(projection.latestRunStatus).toBe(RunStatus.Running);
     const providerEvents = await db.event.findMany({
       where: { runId: result.evidence?.runId },
       orderBy: { ingestSequence: "asc" },
@@ -484,6 +566,47 @@ describe("executeTaskNodeCapability output persistence", () => {
     });
   });
 
+
+  it("rebuilds projection when provider setup fails after run creation", async () => {
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    installMockRegistryClient(createThrowingProviderClient());
+
+    const result = await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: planGraph.nodes[0],
+      plan: planGraph,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      runtimeName: "test-provider",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(result.status).toBe("failed");
+    const run = await db.run.findFirstOrThrow({
+      where: { taskId },
+      orderBy: { createdAt: "desc" },
+    });
+    const task = await db.task.findUniqueOrThrow({
+      where: { id: taskId },
+      select: { latestRunId: true },
+    });
+    const session = await db.taskSession.findUniqueOrThrow({
+      where: { id: sessionId },
+      select: { activeRunId: true, lastRunStatus: true },
+    });
+    const projection = await db.taskProjection.findUniqueOrThrow({
+      where: { taskId },
+      select: { persistedStatus: true, latestRunStatus: true, blockType: true, actionRequired: true },
+    });
+    expect(run.status).toBe(RunStatus.Failed);
+    expect(task.latestRunId).toBe(run.id);
+    expect(session.activeRunId).toBeNull();
+    expect(session.lastRunStatus).toBe(RunStatus.Failed);
+    expect(projection.persistedStatus).toBe("Blocked");
+    expect(projection.latestRunStatus).toBe(RunStatus.Failed);
+    expect(projection.blockType).toBe("run_failed");
+    expect(projection.actionRequired).toBe("Retry Run");
+  });
   it("keeps the node running when the provider produces no output", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const providerClient = createMockProviderClient({
@@ -549,7 +672,7 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(run.status).toBe(RunStatus.Running);
   });
 
-  it("does not let provider completion override Chrona task state", async () => {
+  it("derives task running state from the active provider run", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const providerClient = createMockProviderClient({
       outputMessages: [],
@@ -559,8 +682,8 @@ describe("executeTaskNodeCapability output persistence", () => {
     const result = await executeTaskNodeCapability({
       taskId,
       mainSession: { id: sessionId, taskId, sessionKey },
-      node: planGraph.nodes[0] as any,
-      plan: planGraph as any,
+      node: planGraph.nodes[0],
+      plan: planGraph,
       attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
@@ -569,7 +692,7 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(result.status).toBe("started");
 
     const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(task.status).toBe("Ready");
+    expect(task.status).toBe("Running");
   });
 
   it("sets run status to Failed when the provider refuses to start", async () => {

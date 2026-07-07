@@ -1,5 +1,5 @@
 import type { ComponentProps, ComponentPropsWithoutRef, ReactNode } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@chrona/i18n/react", () => ({
@@ -25,6 +25,7 @@ vi.mock("@chrona/i18n/react", () => ({
 }));
 
 import { StartWithChrona } from "../start-with-chrona";
+import { notifyAiClientsChanged } from "@/lib/ai-client-events";
 
 const push = vi.fn();
 
@@ -55,6 +56,22 @@ function mockTasks(payload: { tasks?: Array<{ id?: string }>; total?: number }) 
     }),
   );
 }
+
+function deferredClients(clients: Array<{ id: string; enabled?: boolean }>) {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((next) => {
+    resolve = next;
+  });
+
+  return {
+    promise,
+    resolve: () => resolve(new Response(JSON.stringify({ clients }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })),
+  };
+}
+
 
 function currentStep() {
   return screen.getByRole("listitem", { current: "step" });
@@ -87,6 +104,41 @@ describe("StartWithChrona", () => {
     await userEvent.click(screen.getByRole("button", { name: "Connect AI" }));
 
     expect(push).toHaveBeenCalledWith("/en/settings?panel=ai-clients");
+  });
+
+  it("refreshes AI client step when clients change elsewhere", async () => {
+    mockClients([]);
+
+    renderStartWithChrona();
+
+    expect(await screen.findByText("Start with Chrona in three steps")).toBeInTheDocument();
+    expect(currentStep()).toHaveTextContent("Connect AI");
+
+    mockClients([{ id: "client-1", enabled: true }]);
+    notifyAiClientsChanged();
+
+    expect(await screen.findByText("AI client connected. Next, create a real task.")).toBeInTheDocument();
+    expect(currentStep()).toHaveTextContent("Create a task");
+  });
+
+  it("ignores stale AI client refreshes that finish out of order", async () => {
+    const initial = deferredClients([]);
+    const refreshed = deferredClients([{ id: "client-1", enabled: true }]);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockReturnValueOnce(initial.promise);
+    fetchSpy.mockReturnValueOnce(refreshed.promise);
+
+    renderStartWithChrona();
+    notifyAiClientsChanged();
+
+    refreshed.resolve();
+    expect(await screen.findByText("AI client connected. Next, create a real task.")).toBeInTheDocument();
+    expect(currentStep()).toHaveTextContent("Create a task");
+    await act(async () => {
+      initial.resolve();
+      await Promise.resolve();
+    });
+    expect(currentStep()).toHaveTextContent("Create a task");
   });
 
   it("keeps the guide visible and advances CTA when an AI client exists", async () => {

@@ -172,7 +172,7 @@ vi.mock("./dialogs/task-create-dialog", () => ({
           type="button"
           onClick={() =>
             onSubmit({
-              title: "Inbox triage",
+              title: "Action Center triage",
               scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
               scheduledEndAt: new Date(2026, 3, 15, 10, 30, 0, 0),
               priority: "High",
@@ -419,7 +419,7 @@ describe("SchedulePage quick create", () => {
       expect(createTaskFromSchedule).toHaveBeenCalledWith(
         expect.objectContaining({
           workspaceId: "workspace-1",
-          title: "Inbox triage",
+          title: "Action Center triage",
           priority: "High",
         }),
       );
@@ -454,7 +454,7 @@ describe("SchedulePage quick create", () => {
     await waitFor(() => {
       expect(createTaskFromSchedule).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: "Inbox triage",
+          title: "Action Center triage",
         }),
       );
     });

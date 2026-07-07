@@ -48,6 +48,11 @@ describe("deriveWorkItemStateView", () => {
     expect(deriveWorkItemStateView({ taskStatus: "Running", nodeStatus: "blocked" }).state).toBe("blocked");
   });
 
+  it("treats failed provider status as diagnostic after completed task state", () => {
+    expect(deriveWorkItemStateView({ taskStatus: "Completed", providerStatus: "Failed" }).state).toBe("completed");
+    expect(deriveWorkItemStateView({ executionStatus: "Completed", providerStatus: "Failed" }).state).toBe("completed");
+  });
+
   it("removes primary action when disabled reason exists", () => {
     const view = deriveWorkItemStateView({ planStatus: "accepted", disabledReason: "Plan missing runtime" });
 

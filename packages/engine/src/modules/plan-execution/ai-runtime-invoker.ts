@@ -16,6 +16,7 @@ import type {
 } from "@chrona/providers-foundation";
 import { requireAiClient } from "@/modules/ai";
 import { mintRunToken } from "./runtime/agent-control-store";
+import { syncTaskRunState } from "./persistence/task-execution-store";
 type ProviderChatHistory = {
   messages: Array<{ role: string; content: string }>;
 };
@@ -113,6 +114,14 @@ export class AiRuntimeInvoker {
       },
     });
 
+    await syncTaskRunState({
+      taskId: input.taskId,
+      taskSessionId: input.taskSessionId,
+      runId: run.id,
+      runStatus: RunStatus.Pending,
+      setAsLatest: true,
+    });
+
     try {
       const client = await requireAiClient(input.clientId);
       if (!client.providerClient) {
@@ -191,15 +200,24 @@ export class AiRuntimeInvoker {
         response,
       });
 
+      const runStatus = runStatusFromProviderSnapshot(response);
       await db.run.update({
         where: { id: run.id },
         data: {
           runtimeRunRef,
           runtimeSessionRef: runtimeSessionKey,
-          status: runStatusFromProviderSnapshot(response),
+          status: runStatus,
           syncStatus: "healthy",
           errorSummary: response.error,
         },
+      });
+      await syncTaskRunState({
+        taskId: input.taskId,
+        taskSessionId: input.taskSessionId,
+        runId: run.id,
+        runStatus,
+        runtimeRunRef,
+        rebuildProjection: false,
       });
       // Persist the provider-native session id for cross-process resume. The
       // runner rewrites the run ref's sessionId to the captured SDK
@@ -229,6 +247,12 @@ export class AiRuntimeInvoker {
       await db.run.update({
         where: { id: run.id },
         data: { status: RunStatus.Failed, errorSummary: message },
+      });
+      await syncTaskRunState({
+        taskId: input.taskId,
+        taskSessionId: input.taskSessionId,
+        runId: run.id,
+        runStatus: RunStatus.Failed,
       });
       if (input.providerRunIdempotencyKey) {
         const existingProviderRun = await db.taskPlanProviderRun.findUnique({

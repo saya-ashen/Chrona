@@ -13,7 +13,7 @@ const bootData: AppBootData = {
     common: {},
     navigation: {},
     pages: {
-      inbox: { title: "Inbox", subtitle: "subtitle" },
+      actionCenter: { title: "Action Center", subtitle: "subtitle" },
       memory: { title: "Memory", subtitle: "subtitle" },
       settings: {
         title: "Settings",
@@ -28,7 +28,7 @@ const bootData: AppBootData = {
       },
     },
     components: {
-      inboxList: {},
+      actionCenterList: {},
       memoryConsole: {},
       taskPage: {},
     },

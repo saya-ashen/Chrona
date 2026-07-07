@@ -10,11 +10,11 @@ export function createPagesService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get schedule page");
       }
     },
-    async getInbox(input: { workspaceId: string }) {
+    async getActionCenter(input: { workspaceId: string }) {
       try {
-        return await pageQuery.getInbox(input);
+        return await pageQuery.getActionCenter(input);
       } catch (cause) {
-        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get inbox");
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to get action center");
       }
     },
     async getDashboard(input: { workspaceId: string }) {

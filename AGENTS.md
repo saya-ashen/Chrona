@@ -14,32 +14,39 @@ patterns.
 
 ## Database migration policy
 
-- Database schema and migration changes require explicit human approval.
-- Before the first public release with persistent user databases, keep a single
-  `prisma/migrations/0001_initial` baseline matching `prisma/schema.prisma`.
-  Squash development-only migration folders into that baseline before cutting a
-  release.
+- Database schema changes do not require a separate human approval gate by
+  default; follow the release-line migration policy below. Still get explicit
+  approval for schema changes that also alter unsafe areas such as auth,
+  provider contracts, secrets, deployment, or execution-engine semantics.
+- Keep exactly one mutable migration folder for the current unreleased release
+  line. Do not create a new migration folder for every schema edit.
+- Before the first public release with persistent user databases, that mutable
+  release-line migration is `prisma/migrations/0001_initial`, and it must match
+  `prisma/schema.prisma`.
 - After a public release ships, never edit, rename, delete, or squash any
   migration included in that release. Treat those files and checksums as a user
   data compatibility contract.
-- Create a new migration only when changing schema from one released version to
-  the next. Name it with a release-oriented timestamp and purpose, for example
+- For the next release after a shipped version, create one new release-line
+  migration folder on the first schema change after the release. Name it with a
+  release-oriented timestamp and purpose, for example
   `20260715000000_add_workspace_preferences`.
-- Do not create migrations for temporary development churn on unreleased code.
-  Use local reset/db push during development, then regenerate the release
-  baseline before release.
+- Continue writing subsequent unreleased schema changes for that release into
+  the same release-line migration folder, keeping it aligned with
+  `prisma/schema.prisma`. Only create another migration folder after the current
+  release ships, or when a release explicitly needs multiple independently
+  reversible upgrade steps.
 - Every release candidate must prove both paths: fresh install from empty SQLite
   and upgrade from the previous released database snapshot.
 
 Recommended workflow:
 
-1. During unreleased development: edit `prisma/schema.prisma`; reset local test
-   databases as needed.
+1. During unreleased development: edit `prisma/schema.prisma`; update the
+   current mutable release-line migration; reset local test databases as needed.
 2. Before first public release: regenerate `0001_initial/migration.sql` from the
-   final schema; delete intermediate migration folders.
-3. For later releases: preserve all shipped migrations; add exactly one new
-   migration per released schema change set unless a release needs multiple
-   independently reversible upgrade steps.
+   final schema and delete any intermediate development-only migration folders.
+3. After each public release: preserve all shipped migrations; on the next
+   schema change, create exactly one new mutable release-line migration for the
+   next release and accumulate subsequent unreleased schema changes there.
 4. Verify with `bun run typecheck`, targeted DB/runtime tests, and release
    smoke (`bun run chrona build <target>` plus `bun run build:smoke`).
 

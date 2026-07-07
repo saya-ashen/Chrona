@@ -1,8 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import { getInbox } from "@/modules/pages/get-inbox";
+import { getActionCenter } from "@/modules/pages/get-action-center";
 
 async function resetDb() {
+  await db.taskTimelineItem.deleteMany();
+  await db.schedulerEvent.deleteMany();
   await db.scheduleProposal.deleteMany();
   await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
@@ -44,7 +46,7 @@ async function seedRun(taskId: string, status: string, extra: Record<string, unk
   });
 }
 
-describe("getInbox actionable states", () => {
+describe("getActionCenter actionable states", () => {
   beforeEach(async () => {
     await resetDb();
   });
@@ -55,7 +57,7 @@ describe("getInbox actionable states", () => {
 
   it("emits exactly one actionable item per paused/terminal state", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Inbox WS", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Action Center WS", status: "Active", defaultRuntime: "hermes" },
     });
 
     // WaitingForApproval -> pending Approval row (kind:"approval").
@@ -103,7 +105,7 @@ describe("getInbox actionable states", () => {
       },
     });
 
-    const items = await getInbox(workspace.id);
+    const items = await getActionCenter(workspace.id);
 
     const byTask = (taskId: string) => items.filter((item) => item.sourceTaskId === taskId);
 
@@ -136,7 +138,7 @@ describe("getInbox actionable states", () => {
 
   it("does not double-count a Blocked task whose latest run already produced a recovery item", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Inbox dedup WS", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Action Center dedup WS", status: "Active", defaultRuntime: "hermes" },
     });
 
     const task = await seedTask(workspace.id, "Blocked + failed run", "Blocked", {
@@ -145,7 +147,7 @@ describe("getInbox actionable states", () => {
     const run = await seedRun(task.id, "Failed", { runtimeRunRef: "run-dedup" });
     await db.task.update({ where: { id: task.id }, data: { latestRunId: run.id } });
 
-    const items = await getInbox(workspace.id);
+    const items = await getActionCenter(workspace.id);
     const forTask = items.filter((item) => item.sourceTaskId === task.id);
 
     expect(forTask).toHaveLength(1);
@@ -154,15 +156,93 @@ describe("getInbox actionable states", () => {
 
   it("falls back to a sensible reason when blockReason shape is unexpected", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Inbox fallback WS", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Action Center fallback WS", status: "Active", defaultRuntime: "hermes" },
     });
 
     const task = await seedTask(workspace.id, "Blocked no reason", "Blocked", { blockReason: null });
 
-    const items = await getInbox(workspace.id);
+    const items = await getActionCenter(workspace.id);
     const blocked = items.find((item) => item.sourceTaskId === task.id);
 
     expect(blocked?.kind).toBe("blocked");
     expect(blocked?.summary).toBeTruthy();
+  });
+
+  it("emits bounded notification items for due tasks, scheduler events, completed runs, and info timeline", async () => {
+    const now = new Date();
+    const minutesFromNow = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+    const workspace = await db.workspace.create({
+      data: { name: "Action Center notification WS", status: "Active", defaultRuntime: "hermes" },
+    });
+
+    const overdueTask = await seedTask(workspace.id, "Overdue task", "Scheduled", { dueAt: minutesFromNow(-60) });
+    const dueNowTask = await seedTask(workspace.id, "Due now task", "Ready", { dueAt: minutesFromNow(5) });
+    const dueSoonTask = await seedTask(workspace.id, "Due soon task", "Ready", { dueAt: minutesFromNow(120) });
+    await seedTask(workspace.id, "Old overdue task", "Ready", { dueAt: minutesFromNow(-8 * 24 * 60) });
+    await seedTask(workspace.id, "Far future task", "Ready", { dueAt: minutesFromNow(25 * 60) });
+    await seedTask(workspace.id, "Closed due task", "Completed", { dueAt: minutesFromNow(5) });
+
+    const autoStartedTask = await seedTask(workspace.id, "Auto started task", "Running");
+    const autoSkippedTask = await seedTask(workspace.id, "Auto skipped task", "Scheduled");
+    const oldAutoTask = await seedTask(workspace.id, "Old auto task", "Scheduled");
+    await db.schedulerEvent.create({
+      data: { workspaceId: workspace.id, taskId: autoStartedTask.id, eventType: "scheduler.start", createdAt: minutesFromNow(-10) },
+    });
+    await db.schedulerEvent.create({
+      data: { workspaceId: workspace.id, taskId: autoSkippedTask.id, eventType: "scheduler.skip", reason: "outside_window", createdAt: minutesFromNow(-20) },
+    });
+    await db.schedulerEvent.create({
+      data: { workspaceId: workspace.id, taskId: oldAutoTask.id, eventType: "scheduler.start", createdAt: minutesFromNow(-25 * 60) },
+    });
+
+    const completedTask = await seedTask(workspace.id, "Completed run task", "Completed");
+    await seedRun(completedTask.id, "Completed", { runtimeRunRef: "run-old-completed", endedAt: minutesFromNow(-50), updatedAt: minutesFromNow(-50) });
+    const latestCompletedRun = await seedRun(completedTask.id, "Completed", { runtimeRunRef: "run-new-completed", endedAt: minutesFromNow(-5), updatedAt: minutesFromNow(-5) });
+    await db.task.update({ where: { id: completedTask.id }, data: { latestRunId: latestCompletedRun.id } });
+    const staleCompletedTask = await seedTask(workspace.id, "Stale completed run task", "Failed");
+    await seedRun(staleCompletedTask.id, "Completed", { runtimeRunRef: "run-stale-completed", endedAt: minutesFromNow(-8), updatedAt: minutesFromNow(-8) });
+    const newerFailedRun = await seedRun(staleCompletedTask.id, "Failed", { runtimeRunRef: "run-newer-failed", updatedAt: minutesFromNow(-2) });
+    await db.task.update({ where: { id: staleCompletedTask.id }, data: { latestRunId: newerFailedRun.id } });
+    const oldCompletedTask = await seedTask(workspace.id, "Old completed run task", "Completed");
+    await seedRun(oldCompletedTask.id, "Completed", { runtimeRunRef: "run-too-old-completed", endedAt: minutesFromNow(-25 * 60), updatedAt: minutesFromNow(-25 * 60) });
+
+    const infoTask = await seedTask(workspace.id, "Info task", "Ready");
+    await db.taskTimelineItem.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: infoTask.id,
+        kind: "notification.info",
+        title: "Heads up",
+        body: "Background sync finished.",
+        severity: "warning",
+        sortTime: minutesFromNow(-3),
+      },
+    });
+
+    const items = await getActionCenter(workspace.id);
+    const byTask = (taskId: string) => items.filter((item) => item.sourceTaskId === taskId);
+
+    expect(byTask(overdueTask.id).map((item) => item.kind)).toEqual(["task_overdue"]);
+    expect(byTask(dueNowTask.id).map((item) => item.kind)).toEqual(["task_due_now"]);
+    expect(byTask(dueSoonTask.id).map((item) => item.kind)).toEqual(["task_due_soon"]);
+    expect(items.some((item) => item.sourceTaskTitle === "Old overdue task")).toBe(false);
+    expect(items.some((item) => item.sourceTaskTitle === "Far future task")).toBe(false);
+    expect(items.some((item) => item.sourceTaskTitle === "Closed due task")).toBe(false);
+
+    expect(byTask(autoStartedTask.id).map((item) => item.kind)).toEqual(["auto_execution_started"]);
+    expect(byTask(autoSkippedTask.id).map((item) => item.kind)).toEqual(["auto_execution_skipped"]);
+    expect(items.some((item) => item.sourceTaskId === oldAutoTask.id)).toBe(false);
+
+    expect(byTask(completedTask.id)).toHaveLength(1);
+    expect(byTask(completedTask.id)[0]).toMatchObject({ kind: "execution_completed", currentRunLabel: latestCompletedRun.runtimeRunRef });
+    expect(items.some((item) => item.sourceTaskId === oldCompletedTask.id)).toBe(false);
+    expect(byTask(staleCompletedTask.id).map((item) => item.kind)).toEqual(["recovery"]);
+
+    expect(byTask(infoTask.id)[0]).toMatchObject({
+      kind: "notification_info",
+      actionType: "Heads up",
+      riskLevel: "medium",
+      summary: "Background sync finished.",
+    });
   });
 });

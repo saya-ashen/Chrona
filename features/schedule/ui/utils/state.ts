@@ -124,18 +124,12 @@ export function buildTodayFocusItems(
       continue;
     }
 
-    if (
-      item.latestRunStatus === "WaitingForInput" ||
-      item.displayState === "WaitingForInput"
-    ) {
+    if (item.stateView?.state === "waiting_for_input") {
       push(item, copy.focusWaitingForInput, "warning");
       continue;
     }
 
-    if (
-      item.latestRunStatus === "WaitingForApproval" ||
-      item.displayState === "WaitingForApproval"
-    ) {
+    if (item.stateView?.state === "waiting_for_approval") {
       push(item, copy.focusWaitingForApproval, "warning");
       continue;
     }
@@ -145,9 +139,9 @@ export function buildTodayFocusItems(
 
   for (const item of activeGroup?.items ?? []) {
     const isHighPriority = item.priority === "High" || item.priority === "Urgent";
-    const hasStarted = Boolean(
-      item.latestRunStatus && item.latestRunStatus !== "Pending",
-    );
+    const hasStarted = item.stateView
+      ? !["ready", "scheduled", "unscheduled"].includes(item.stateView.state)
+      : Boolean(item.latestRunStatus && item.latestRunStatus !== "Pending");
 
     if (!hasStarted && isHighPriority) {
       push(item, copy.focusReadyToday, "info");

@@ -83,6 +83,8 @@ export type TaskPageData = {
   latestRunSummary: {
     id: string;
     status: string;
+    displayStatus?: string;
+    executionState?: TaskExecutionSummary["executionState"];
     startedAt: string | null;
     syncStatus: string;
   } | null;

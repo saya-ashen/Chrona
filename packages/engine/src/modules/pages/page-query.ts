@@ -1,5 +1,5 @@
 import { getSchedulePage } from "./get-schedule-page";
-import { getInbox } from "./get-inbox";
+import { getActionCenter } from "./get-action-center";
 import { getMemoryConsole } from "./get-memory-console";
 import { getDashboard } from "./get-dashboard";
 
@@ -8,8 +8,8 @@ export class PageQuery {
     return getSchedulePage(input.workspaceId);
   }
 
-  getInbox(input: { workspaceId: string }) {
-    return getInbox(input.workspaceId);
+  getActionCenter(input: { workspaceId: string }) {
+    return getActionCenter(input.workspaceId);
   }
 
   getDashboard(input: { workspaceId: string }) {

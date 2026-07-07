@@ -12,6 +12,7 @@ import type { NodeExecutionResult } from "../node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
 import { branchBindingForRef } from "./node-runtime-refs";
+import { syncTaskRunState } from "../persistence/task-execution-store";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
@@ -383,13 +384,21 @@ async function updateInvocationRunFromNodeResult(
   result: NodeExecutionResult,
 ) {
   const status = invocation.response.status === "cancelled" ? RunStatus.Cancelled : runStatusFromNodeResult(result);
-  await db.run.update({
+  const run = await db.run.update({
     where: { id: invocation.runId },
     data: {
       status,
       endedAt: status === RunStatus.Completed || status === RunStatus.Cancelled ? new Date() : null,
       errorSummary: errorSummaryFromNodeResult(result),
     },
+    select: { taskId: true, taskSessionId: true, runtimeRunRef: true },
+  });
+  await syncTaskRunState({
+    taskId: run.taskId,
+    taskSessionId: run.taskSessionId,
+    runId: invocation.runId,
+    runStatus: status,
+    runtimeRunRef: run.runtimeRunRef,
   });
 }
 
