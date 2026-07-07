@@ -1,6 +1,6 @@
 # Chrona Roadmap
 
-Current version: 0.1.9
+Current version: 0.2.0
 
 Chrona is an open-source AI schedule app. Its job is not to compete with models at raw planning, summarization, or tool choice. Those capabilities will keep moving into the model layer. Chrona should compound around what stronger AI makes more important: time-bound execution, human control, provider governance, observable state, recoverable failures, and trusted results.
 

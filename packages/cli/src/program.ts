@@ -63,6 +63,16 @@ type HermesCommandOptions = {
   showApiKey?: boolean;
 };
 
+export type StartCommandOptions = {
+  host?: string;
+  port?: string;
+  open?: boolean;
+};
+
+type CreateProgramOptions = {
+  startServer?: (options: StartCommandOptions) => Promise<void>;
+};
+
 function printHermesDiagnostics(diagnostics: HermesDiagnostics, plan: HermesSetupPlan): void {
   console.log(`Hermes mode: ${diagnostics.mode}`);
   console.log(`Hermes base URL: ${diagnostics.baseUrl}`);
@@ -82,13 +92,26 @@ function printHermesDiagnostics(diagnostics: HermesDiagnostics, plan: HermesSetu
   }
 }
 
-export function createProgram(): Command {
+export function createProgram(options: CreateProgramOptions = {}): Command {
   const program = new Command();
 
   program
     .name("chrona")
     .description("Chrona CLI: starts the Chrona app server.")
     .version("0.2.0");
+
+  program
+    .command("start")
+    .description("Start the Chrona app server")
+    .option("--host <host>", "Host to bind", "127.0.0.1")
+    .option("--port <port>", "Port to bind", "3101")
+    .option("--no-open", "Do not open Chrona in the default browser")
+    .action(async (startOptions: StartCommandOptions) => {
+      if (!options.startServer) {
+        throw new Error("chrona start is only available in packaged Chrona binaries.");
+      }
+      await options.startServer(startOptions);
+    });
 
   const hermes = program
     .command("hermes")

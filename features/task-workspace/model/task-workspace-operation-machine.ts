@@ -1,7 +1,7 @@
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskAction } from "@chrona/contracts";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
-import type { WorkspaceRuntimeEvent } from "../../execution-monitoring/model/workspace-runtime-events";
+import type { WorkspaceRuntimeEvent } from "../../execution-monitoring";
 import type { TaskPageData, TaskPlanGenerationStatus } from "./task-workspace-types";
 
 export type TaskWorkspaceOperationStatus =
