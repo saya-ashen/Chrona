@@ -28,7 +28,7 @@ describe("release smoke", () => {
 
   it("checks binary executable bit plus required resources", async () => {
     await writeRelease({ plugin: true });
-    await expect(smokeRelease(target)).resolves.toBeUndefined();
+    await expect(smokeRelease(target, { runtime: false })).resolves.toBeUndefined();
   });
 
   it("fails when required web index is missing", async () => {
@@ -39,6 +39,6 @@ describe("release smoke", () => {
 
   it("allows optional plugin to be absent when source is absent", async () => {
     await writeRelease();
-    await expect(smokeRelease(target, { pluginSource: "missing-plugin-source" })).resolves.toBeUndefined();
+    await expect(smokeRelease(target, { pluginSource: "missing-plugin-source", runtime: false })).resolves.toBeUndefined();
   });
 });

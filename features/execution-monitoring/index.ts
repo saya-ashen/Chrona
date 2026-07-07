@@ -5,6 +5,7 @@ export type {
   ExecutionActionInput,
   SubmitCheckpointActionInput,
 } from "@chrona/contracts/ai";
+export type { WorkspaceRuntimeEvent } from "./model/workspace-runtime-events";
 
 export {
   executionSessionStatusForRuntimeProgress,

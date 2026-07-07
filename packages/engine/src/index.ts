@@ -23,6 +23,7 @@ export type {
   PlanExecutionRuntimeEvent,
 } from "./modules/plan-execution";
 export type { TaskOrchestrator } from "./modules/orchestration/task-orchestrator";
+export type { DashboardAiBriefState, DashboardAiBriefStatus } from "./modules/pages/dashboard-ai-surface";
 export type { ChronaEngineLogger, ChronaEnginePorts } from "./ports";
 export {
   ENGINE_ERROR_CODES,

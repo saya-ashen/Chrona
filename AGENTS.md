@@ -12,6 +12,37 @@ patterns.
 - **Language:** TypeScript strict everywhere
 - **AI runtime:** Provider bridge via structured-result contracts
 
+## Database migration policy
+
+- Database schema and migration changes require explicit human approval.
+- Before the first public release with persistent user databases, keep a single
+  `prisma/migrations/0001_initial` baseline matching `prisma/schema.prisma`.
+  Squash development-only migration folders into that baseline before cutting a
+  release.
+- After a public release ships, never edit, rename, delete, or squash any
+  migration included in that release. Treat those files and checksums as a user
+  data compatibility contract.
+- Create a new migration only when changing schema from one released version to
+  the next. Name it with a release-oriented timestamp and purpose, for example
+  `20260715000000_add_workspace_preferences`.
+- Do not create migrations for temporary development churn on unreleased code.
+  Use local reset/db push during development, then regenerate the release
+  baseline before release.
+- Every release candidate must prove both paths: fresh install from empty SQLite
+  and upgrade from the previous released database snapshot.
+
+Recommended workflow:
+
+1. During unreleased development: edit `prisma/schema.prisma`; reset local test
+   databases as needed.
+2. Before first public release: regenerate `0001_initial/migration.sql` from the
+   final schema; delete intermediate migration folders.
+3. For later releases: preserve all shipped migrations; add exactly one new
+   migration per released schema change set unless a release needs multiple
+   independently reversible upgrade steps.
+4. Verify with `bun run typecheck`, targeted DB/runtime tests, and release
+   smoke (`bun run chrona build <target>` plus `bun run build:smoke`).
+
 ## Understand the codebase — read these first
 
 Before exploring source, orient with the curated docs (kept current; faster and
