@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { applyChronaRuntimeConfigToEnv, loadChronaRuntimeConfig } from "./runtime-config";
+import { applyChronaRuntimeConfigToEnv, isDashboardAiSummaryEnabled, loadChronaRuntimeConfig } from "./runtime-config";
 
 const tempDirs: string[] = [];
 
@@ -34,6 +34,7 @@ describe("runtime config", () => {
       database: { url: "file:/tmp/chrona.db", migrationsDir: "/opt/chrona/migrations" },
       web: { dist: "/opt/chrona/web" },
       security: { apiKey: "secret" },
+      experimental: { dashboardAiSummary: true },
     });
     const env: NodeJS.ProcessEnv = { CHRONA_CONFIG_FILE: path };
 
@@ -47,6 +48,7 @@ describe("runtime config", () => {
     expect(env.DATABASE_URL).toBe("file:/tmp/chrona.db");
     expect(env.CHRONA_MIGRATIONS_DIR).toBe("/opt/chrona/migrations");
     expect(env.CHRONA_WEB_DIST).toBe("/opt/chrona/web");
+    expect(env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY).toBe("1");
     expect(env.API_KEY).toBe("secret");
   });
 
@@ -62,6 +64,15 @@ describe("runtime config", () => {
 
     expect(env.PORT).toBe("9999");
     expect(env.DATABASE_URL).toBe("file:/tmp/env.db");
+  });
+
+  it("treats dashboard AI summary as disabled unless config or env enables it", () => {
+    const disabledPath = tempConfig({ experimental: { dashboardAiSummary: false } });
+    const enabledPath = tempConfig({ experimental: { dashboardAiSummary: true } });
+
+    expect(isDashboardAiSummaryEnabled({ CHRONA_CONFIG_FILE: disabledPath })).toBe(false);
+    expect(isDashboardAiSummaryEnabled({ CHRONA_CONFIG_FILE: enabledPath })).toBe(true);
+    expect(isDashboardAiSummaryEnabled({ CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: "true" })).toBe(true);
   });
 
   it("reports invalid config path and field", () => {

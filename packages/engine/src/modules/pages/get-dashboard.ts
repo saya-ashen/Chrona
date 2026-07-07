@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@chrona/db";
 import { deriveWorkItemStateView, type WorkItemStateView } from "@chrona/domain";
-import { getDashboardAiBriefState, type DashboardAiBriefState } from "./dashboard-ai-surface";
+import { isDashboardAiSummaryEnabled } from "@chrona/shared/runtime-config";
+import { dashboardAiBriefDisabledState, getDashboardAiBriefState, type DashboardAiBriefState } from "./dashboard-ai-surface";
 
 /**
  * Dashboard "task news homepage" projection.
@@ -450,17 +451,18 @@ export async function getDashboard(workspaceId: string) {
     });
 
   const totalAutoCompleted = completedTotalGroups.reduce((sum, group) => sum + group._count._all, 0);
-  const aiBrief = await getDashboardAiBriefState({
-    workspaceId,
-    fingerprintInput: {
-      needsAttention,
-      inProgress,
-      upcomingToday,
-      autoCompleted,
-      recentEvents,
-      totalAutoCompleted,
-    },
-  });
+
+  const fingerprintInput = {
+    needsAttention,
+    inProgress,
+    upcomingToday,
+    autoCompleted,
+    recentEvents,
+    totalAutoCompleted,
+  };
+  const aiBrief = isDashboardAiSummaryEnabled()
+    ? await getDashboardAiBriefState({ workspaceId, fingerprintInput })
+    : dashboardAiBriefDisabledState();
 
   return {
     generatedAt: new Date(now).toISOString(),

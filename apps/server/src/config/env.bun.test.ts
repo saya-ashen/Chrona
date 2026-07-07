@@ -25,6 +25,7 @@ function resetEnv() {
   delete process.env.CHRONA_MIGRATIONS_DIR;
   delete process.env.CHRONA_UNSAFE_PUBLIC_BIND;
   delete process.env.CHRONA_WEB_DIST;
+  delete process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY;
   resetEnvCacheForTests();
 }
 
@@ -46,6 +47,7 @@ describe("server environment safety", () => {
       server: { host: "0.0.0.0", port: 3200, allowedOrigins: ["http://localhost:3200"], unsafePublicBind: true },
       database: { url: "file:/tmp/chrona-config.db", migrationsDir: "/tmp/chrona-migrations" },
       web: { dist: "/tmp/chrona-web" },
+      experimental: { dashboardAiSummary: true },
       security: { apiKey: "from-config" },
     });
     const env = readEnv();
@@ -55,6 +57,7 @@ describe("server environment safety", () => {
     expect(env.ALLOWED_ORIGINS).toBe("http://localhost:3200");
     expect(env.DATABASE_URL).toBe("file:/tmp/chrona-config.db");
     expect(env.CHRONA_WEB_DIST).toBe("/tmp/chrona-web");
+    expect(env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY).toBe("1");
     expect(env.API_KEY).toBe("from-config");
   });
 

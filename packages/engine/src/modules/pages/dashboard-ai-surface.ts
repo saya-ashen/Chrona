@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Prisma } from "@chrona/db";
+import { isDashboardAiSummaryEnabled } from "@chrona/shared/runtime-config";
 
 import { db } from "@/lib/db";
 import { buildProviderFeatureRequest, dispatchFeaturePayload, getAiClientForFeature, providerCall } from "@/modules/ai";
@@ -8,7 +9,7 @@ import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
 
 export const DASHBOARD_BRIEF_SURFACE = "dashboard.brief" as const;
 
-export type DashboardAiBriefStatus = "ready" | "dirty" | "generating" | "failed" | "unconfigured";
+export type DashboardAiBriefStatus = "ready" | "dirty" | "generating" | "failed" | "unconfigured" | "disabled";
 
 export type DashboardAiBriefState = {
   status: DashboardAiBriefStatus;
@@ -222,6 +223,18 @@ function toDashboardAiBriefState(input: {
   };
 }
 
+export function dashboardAiBriefDisabledState(inputFingerprint = "disabled"): DashboardAiBriefState {
+  return toDashboardAiBriefState({
+    status: "disabled",
+    spec: null,
+    generatedAt: null,
+    providerClientId: null,
+    canGenerate: false,
+    errorMessage: null,
+    inputFingerprint,
+  });
+}
+
 export async function getDashboardAiBriefState(input: {
   workspaceId: string;
   fingerprintInput: DashboardFingerprintInput;
@@ -308,6 +321,7 @@ export async function generateDashboardBrief(input: {
   force?: boolean;
 }): Promise<DashboardAiBriefState> {
   const inputFingerprint = fingerprintDashboardBriefInput(input.fingerprintInput);
+  if (!isDashboardAiSummaryEnabled()) return dashboardAiBriefDisabledState(inputFingerprint);
   const provider = await getAiClientForFeature(DASHBOARD_BRIEF_SURFACE);
   const surface = await db.workspaceAiSurface.findUnique({
     where: { workspaceId_surface: { workspaceId: input.workspaceId, surface: DASHBOARD_BRIEF_SURFACE } },

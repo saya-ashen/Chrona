@@ -235,6 +235,18 @@ function readyAiBrief(): NonNullable<DashboardData["aiBrief"]> {
     inputFingerprint: "fingerprint-1",
   };
 }
+
+function disabledAiBrief(): NonNullable<DashboardData["aiBrief"]> {
+  return {
+    status: "disabled",
+    spec: null,
+    generatedAt: null,
+    providerClientId: null,
+    canGenerate: false,
+    errorMessage: null,
+    inputFingerprint: "disabled",
+  };
+}
 afterEach(() => cleanup());
 
 describe("DashboardPage", () => {
@@ -423,6 +435,16 @@ describe("DashboardPage", () => {
   it("does not auto-request generation for ready surfaces", async () => {
     renderDashboard(makeData({ aiBrief: readyAiBrief() }));
 
+    await waitFor(() => {
+      expect(apiJson).not.toHaveBeenCalled();
+    });
+  });
+
+  it("hides AI summary when experimental dashboard summary is disabled", async () => {
+    renderDashboard(makeData({ aiBrief: disabledAiBrief() }));
+
+    expect(screen.queryByText("AI summary")).not.toBeInTheDocument();
+    expect(screen.getByText("Recent activity")).toBeTruthy();
     await waitFor(() => {
       expect(apiJson).not.toHaveBeenCalled();
     });

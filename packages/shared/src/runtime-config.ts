@@ -4,6 +4,8 @@ import { join, resolve } from "node:path";
 import { z } from "zod";
 
 const ENV_CONFIG_FILE = "CHRONA_CONFIG_FILE";
+export const EXPERIMENTAL_DASHBOARD_AI_SUMMARY_ENV = "CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY";
+
 
 const runtimeConfigSchema = z.object({
   server: z.object({
@@ -18,6 +20,9 @@ const runtimeConfigSchema = z.object({
   }).optional(),
   web: z.object({
     dist: z.string().min(1).nullable().optional(),
+  }).optional(),
+  experimental: z.object({
+    dashboardAiSummary: z.boolean().optional(),
   }).optional(),
   security: z.object({
     apiKey: z.string().min(1).nullable().optional(),
@@ -87,6 +92,7 @@ function configEnvDefaults(config: ChronaRuntimeConfig) {
     ["DATABASE_URL", config.database?.url],
     ["CHRONA_MIGRATIONS_DIR", config.database?.migrationsDir],
     ["CHRONA_WEB_DIST", config.web?.dist],
+    [EXPERIMENTAL_DASHBOARD_AI_SUMMARY_ENV, unsafePublicBindEnvValue(config.experimental?.dashboardAiSummary)],
     ["API_KEY", config.security?.apiKey],
   ] as const;
 }
@@ -100,4 +106,10 @@ export function applyChronaRuntimeConfigToEnv(env: NodeJS.ProcessEnv = process.e
   }
 
   return loaded;
+}
+
+export function isDashboardAiSummaryEnabled(env: NodeJS.ProcessEnv = process.env) {
+  applyChronaRuntimeConfigToEnv(env);
+  const value = env[EXPERIMENTAL_DASHBOARD_AI_SUMMARY_ENV]?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
 }
