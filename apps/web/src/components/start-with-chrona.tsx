@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { localizeHref } from "@chrona/i18n";
 import { Button } from "@/components/ui/button";
 import { apiJson } from "@/api";
 import { useAppRouter } from "@/lib/router";
+import { listenAiClientsChanged } from "@/lib/ai-client-events";
 
 type AiClientSummary = {
   enabled?: boolean;
@@ -89,6 +90,7 @@ export function StartWithChrona({ className = "", createdTaskId = null, workspac
   const locale = useLocale();
   const router = useAppRouter();
   const [hasClients, setHasClients] = useState<boolean | null>(null);
+  const aiClientsRequestId = useRef(0);
   const [storedTask, setStoredTask] = useState<TaskPresence | null>(workspaceId ? null : EMPTY_TASK_PRESENCE);
   const currentTaskId = createdTaskId ?? storedTask?.taskId ?? null;
   const hasCreatedTask = Boolean(createdTaskId || storedTask?.hasTask);
@@ -96,17 +98,26 @@ export function StartWithChrona({ className = "", createdTaskId = null, workspac
   useEffect(() => {
     let cancelled = false;
 
-    apiJson<AiClientsResponse>("/api/ai/clients")
-      .then((payload) => {
-        if (cancelled) return;
-        setHasClients(hasEnabledClient(payload.clients));
-      })
-      .catch(() => {
-        if (!cancelled) setHasClients(true);
-      });
+    const refreshClients = () => {
+      const requestId = aiClientsRequestId.current + 1;
+      aiClientsRequestId.current = requestId;
+
+      apiJson<AiClientsResponse>("/api/ai/clients")
+        .then((payload) => {
+          if (cancelled || requestId !== aiClientsRequestId.current) return;
+          setHasClients(hasEnabledClient(payload.clients));
+        })
+        .catch(() => {
+          if (!cancelled && requestId === aiClientsRequestId.current) setHasClients(true);
+        });
+    };
+
+    refreshClients();
+    const stopListening = listenAiClientsChanged(refreshClients);
 
     return () => {
       cancelled = true;
+      stopListening();
     };
   }, []);
 
