@@ -234,9 +234,9 @@ function buildLatestResultCard(
     return {
       id: `run-${pageData.latestRunSummary.id}`,
       title: copy.latestRun,
-      description: fillTemplate(copy.runIsStatus, { status: pageData.latestRunSummary.status }),
+      description: fillTemplate(copy.runIsStatus, { status: pageData.latestRunSummary.displayStatus ?? pageData.latestRunSummary.status }),
       statusLabel: pageData.latestRunSummary.syncStatus,
-      tone: pageData.latestRunSummary.status === "Completed" ? "success" : "info",
+      tone: (pageData.latestRunSummary.displayStatus ?? pageData.latestRunSummary.status) === "Completed" ? "success" : "info",
       actionLabel: copy.reviewRunContext,
     };
   }

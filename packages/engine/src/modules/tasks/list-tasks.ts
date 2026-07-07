@@ -5,7 +5,7 @@ import {
   type TaskListFilter,
   type TaskListSortField,
 } from "@chrona/contracts/api";
-import { deriveWorkItemStateView } from "@chrona/domain";
+import { deriveTaskProjectionStateView } from "@chrona/domain";
 
 export type ListTasksInput = {
   workspaceId: string;
@@ -121,11 +121,12 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
   // and report a null source (fully editable).
   const tasks = rows.map(({ importedCalendarEvents, ...task }) => {
     const importedEvent = importedCalendarEvents[0] ?? null;
-    const stateView = deriveWorkItemStateView({
+    const stateView = deriveTaskProjectionStateView({
       taskStatus: task.status,
+      persistedStatus: task.projection?.persistedStatus,
       scheduleStatus: task.projection?.scheduleStatus,
-      executionStatus: task.projection?.displayState,
-      providerStatus: task.projection?.latestRunStatus,
+      displayState: task.projection?.displayState,
+      latestRunStatus: task.projection?.latestRunStatus,
       isScheduled: Boolean(task.projection?.scheduledStartAt || task.projection?.scheduledEndAt || task.dueAt),
       disabledReason: task.projection?.actionRequired,
     });

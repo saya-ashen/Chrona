@@ -285,7 +285,7 @@ export async function submitCheckpointAction(
   const checkpoint = deriveExecutionCheckpoint({
     taskId: input.taskId,
     sessionId: executionSession.id,
-    planRunId: runtime.planId,
+    planRunId: runtime.persisted.id,
     status,
     effective,
     currentNodeId,
@@ -306,6 +306,7 @@ export async function submitCheckpointAction(
   return resolveCheckpointTransition({
     taskId: input.taskId,
     planId: runtime.planId,
+    planRunId: runtime.persisted.id,
     mainSession,
     executionSession,
     checkpoint,

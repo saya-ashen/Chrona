@@ -39,7 +39,7 @@ export async function stayPausedTransition(
       planId: input.planId,
       mainSessionId: input.mainSession.id,
       executionSessionId: input.executionSession.id,
-      planRunId: input.planId,
+      planRunId: input.planRunId,
       status: input.status,
       effective: input.effective,
       currentNodeId: input.currentNodeId,

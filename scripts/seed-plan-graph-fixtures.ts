@@ -1,5 +1,6 @@
 import { createPlanGraphFromCompiledPlan } from "@chrona/graph-runtime";
 import type { CompiledEdge, CompiledNode, CompiledPlan, PlanGraph } from "@chrona/graph-runtime";
+import type { PlanOutputState } from "@chrona/contracts/ai";
 import { Prisma, PrismaClient, TaskPlanStatus, TaskPriority, TaskStatus, WorkspaceStatus } from "../packages/db/src/generated/prisma/client";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 
@@ -111,12 +112,12 @@ const fixtures: Fixture[] = [
   {
     slug: "linear-4",
     graphType: "Linear 4-step",
-    description: "短直线流程，用来判断基础上下/横向紧凑度。",
+    description: "Short release-readiness workflow for checking compact graph spacing.",
     nodes: [
-      task("scope", "确认目标"),
-      task("design", "设计方案"),
-      task("build", "执行实现"),
-      checkpoint("review", "确认交付"),
+      task("scope", "Confirm release goal"),
+      task("design", "Draft rollout plan"),
+      task("build", "Prepare release changes"),
+      checkpoint("review", "Approve release package"),
     ],
     edges: [
       { from: "scope", to: "design" },
@@ -127,24 +128,24 @@ const fixtures: Fixture[] = [
   {
     slug: "long-linear-9",
     graphType: "Long Linear 9-step",
-    description: "长直线流程，用来判断 snake/分行压缩是否生效。",
-    nodes: Array.from({ length: 9 }, (_, index) => task(`step-${index + 1}`, `直线步骤 ${index + 1}`)),
+    description: "Long release checklist for checking snake layout and row wrapping.",
+    nodes: Array.from({ length: 9 }, (_, index) => task(`step-${index + 1}`, `Release checklist step ${index + 1}`)),
     edges: Array.from({ length: 8 }, (_, index) => ({ from: `step-${index + 1}`, to: `step-${index + 2}` })),
   },
   {
     slug: "condition-merge",
     graphType: "Condition Branch + Merge",
-    description: "一个条件分支后汇合，用来观察 true/false 分支与合流点。",
+    description: "Branch and merge workflow for deciding whether a release note needs code changes.",
     nodes: [
-      task("start", "收集上下文"),
-      condition("choice", "是否需要修改代码", [
+      task("start", "Collect release context"),
+      condition("choice", "Does this require a code change?", [
         { label: "true", nextNodeId: "patch" },
         { label: "false", nextNodeId: "explain" },
       ]),
-      task("patch", "生成补丁"),
-      task("explain", "解释原因"),
-      checkpoint("merge", "确认下一步"),
-      task("finish", "整理结果"),
+      task("patch", "Prepare patch"),
+      task("explain", "Document no-code decision"),
+      checkpoint("merge", "Confirm next step"),
+      task("finish", "Finalize release note"),
     ],
     edges: [
       { from: "start", to: "choice" },
@@ -157,44 +158,44 @@ const fixtures: Fixture[] = [
   },
   {
     slug: "inactive-branch-tail",
-    graphType: "Inactive Branch + Dominant Tail",
-    description: "类似刚才问题任务：条件节点有未通过分支，主路径后面还有人工确认与写入尾部。",
+    graphType: "Trending Research Brief",
+    description: "Research GitHub Trending and prepare an engineering brief with evidence, themes, and next actions.",
     nodes: [
-      checkpoint("need", "确认需求"),
-      task("design", "确定规格"),
-      task("build", "创建脚本"),
-      task("verify", "验证脚本"),
-      condition("choice", "判断验证结果", [
-        { label: "true", nextNodeId: "deliver" },
-        { label: "false", nextNodeId: "blocked-summary" },
+      checkpoint("scope", "Confirm research scope"),
+      task("collect", "Fetch GitHub Trending repositories"),
+      task("normalize", "Normalize repository metadata"),
+      task("analyze", "Analyze technology themes"),
+      condition("choice", "Is the dataset complete?", [
+        { label: "true", nextNodeId: "draft" },
+        { label: "false", nextNodeId: "backfill" },
       ]),
-      task("blocked-summary", "整理阻塞事项"),
-      task("deliver", "整理交付内容"),
-      checkpoint("confirm-write", "确认写入范围", "input"),
-      task("write", "写入或更新文件"),
+      task("backfill", "Backfill missing repository details"),
+      task("draft", "Draft executive brief"),
+      checkpoint("review", "Review evidence and recommendations", "input"),
+      task("publish", "Publish research brief"),
     ],
     edges: [
-      { from: "need", to: "design" },
-      { from: "design", to: "build" },
-      { from: "build", to: "verify" },
-      { from: "verify", to: "choice" },
-      { from: "choice", to: "blocked-summary", label: "false", active: false },
-      { from: "choice", to: "deliver", label: "true" },
-      { from: "deliver", to: "confirm-write" },
-      { from: "confirm-write", to: "write" },
+      { from: "scope", to: "collect" },
+      { from: "collect", to: "normalize" },
+      { from: "normalize", to: "analyze" },
+      { from: "analyze", to: "choice" },
+      { from: "choice", to: "backfill", label: "false", active: false },
+      { from: "choice", to: "draft", label: "true" },
+      { from: "draft", to: "review" },
+      { from: "review", to: "publish" },
     ],
   },
   {
     slug: "parallel-diamond",
     graphType: "Parallel Diamond Fan-out/Fan-in",
-    description: "一个入口拆成三条并行任务后汇合。",
+    description: "Parallel release work that fans out into API, UI, and docs tracks before review.",
     nodes: [
-      task("start", "准备输入"),
-      task("api", "实现 API"),
-      task("ui", "实现 UI"),
-      task("docs", "更新文档"),
-      checkpoint("join", "并行结果验收"),
-      task("ship", "发布结果"),
+      task("start", "Prepare release input"),
+      task("api", "Verify API surface"),
+      task("ui", "Refresh UI screenshots"),
+      task("docs", "Update release docs"),
+      checkpoint("join", "Review parallel outputs"),
+      task("ship", "Ship release package"),
     ],
     edges: [
       { from: "start", to: "api" },
@@ -209,15 +210,15 @@ const fixtures: Fixture[] = [
   {
     slug: "wide-fanout",
     graphType: "Wide Fan-out 5 branches",
-    description: "宽分支压力测试，用来判断横向空间、边交叉与边界。",
+    description: "Wide release validation fan-out for checking horizontal space, crossings, and bounds.",
     nodes: [
-      task("start", "分析输入"),
-      task("branch-a", "分支 A"),
-      task("branch-b", "分支 B"),
-      task("branch-c", "分支 C"),
-      task("branch-d", "分支 D"),
-      task("branch-e", "分支 E"),
-      checkpoint("join", "汇总五条分支"),
+      task("start", "Analyze release input"),
+      task("branch-a", "Check Linux build"),
+      task("branch-b", "Check macOS build"),
+      task("branch-c", "Check Windows build"),
+      task("branch-d", "Check docs"),
+      task("branch-e", "Check provider setup"),
+      checkpoint("join", "Summarize validation"),
     ],
     edges: [
       { from: "start", to: "branch-a" },
@@ -235,22 +236,22 @@ const fixtures: Fixture[] = [
   {
     slug: "nested-conditions",
     graphType: "Nested Conditions",
-    description: "分支里继续分支，用来判断局部槽位递归复杂度。",
+    description: "Nested release decisions for checking recursive branch layout.",
     nodes: [
-      task("start", "读取需求"),
-      condition("choice-a", "是否缺少信息", [
+      task("start", "Read release request"),
+      condition("choice-a", "Is more information missing?", [
         { label: "true", nextNodeId: "ask" },
         { label: "false", nextNodeId: "choice-b" },
       ]),
-      checkpoint("ask", "补充缺失信息", "input"),
-      condition("choice-b", "是否需要实现", [
+      checkpoint("ask", "Collect missing information", "input"),
+      condition("choice-b", "Does the release need implementation?", [
         { label: "true", nextNodeId: "implement" },
         { label: "false", nextNodeId: "document" },
       ]),
-      task("implement", "实现修改"),
-      task("document", "只更新说明"),
-      checkpoint("join", "确认分支结果"),
-      task("finish", "最终回复"),
+      task("implement", "Implement release fix"),
+      task("document", "Update release notes only"),
+      checkpoint("join", "Confirm branch result"),
+      task("finish", "Send final release summary"),
     ],
     edges: [
       { from: "start", to: "choice-a" },
@@ -267,14 +268,14 @@ const fixtures: Fixture[] = [
   {
     slug: "human-sidecars",
     graphType: "Human Approval/Input/Wait",
-    description: "主执行路径穿插 approval、input、wait 节点，用来观察 sidecar/人工节点。",
+    description: "Main release path with approval, input, and wait nodes for sidecar layout checks.",
     nodes: [
-      task("draft", "生成草稿"),
-      checkpoint("approve", "人工审批草稿"),
-      task("revise", "按审批结果修订"),
-      checkpoint("input", "补充发布参数", "input"),
-      wait("wait-window", "等待发布时间窗"),
-      task("publish", "发布结果"),
+      task("draft", "Draft release notes"),
+      checkpoint("approve", "Approve release notes"),
+      task("revise", "Revise from approval"),
+      checkpoint("input", "Add publish parameters", "input"),
+      wait("wait-window", "Wait for release window"),
+      task("publish", "Publish release"),
     ],
     edges: [
       { from: "draft", to: "approve" },
@@ -287,14 +288,14 @@ const fixtures: Fixture[] = [
   {
     slug: "cross-dependency",
     graphType: "Cross Dependency DAG",
-    description: "不是树的 DAG：多个中间节点互相形成额外依赖，观察交叉边。",
+    description: "DAG release workflow with cross-track dependencies for edge crossing checks.",
     nodes: [
-      task("start", "准备基础数据"),
-      task("model", "设计数据模型"),
-      task("api", "实现接口"),
-      task("ui", "实现页面"),
-      task("integration", "联调集成"),
-      checkpoint("review", "最终检查"),
+      task("start", "Prepare baseline data"),
+      task("model", "Validate data model"),
+      task("api", "Validate API routes"),
+      task("ui", "Validate UI flow"),
+      task("integration", "Run integration checks"),
+      checkpoint("review", "Final release review"),
     ],
     edges: [
       { from: "start", to: "model" },
@@ -309,24 +310,24 @@ const fixtures: Fixture[] = [
   {
     slug: "mixed-realistic",
     graphType: "Mixed Realistic Workflow",
-    description: "混合长主路径、条件分支、人工输入、等待和汇合，作为综合压力用例。",
+    description: "Realistic release workflow with a long main path, risk branch, input, wait, and merge.",
     nodes: [
-      task("intake", "理解用户问题"),
-      task("inspect", "检查代码现状"),
-      condition("risk", "是否需要人工确认", [
+      task("intake", "Understand release request"),
+      task("inspect", "Inspect current product state"),
+      condition("risk", "Does this require human confirmation?", [
         { label: "true", nextNodeId: "confirm" },
         { label: "false", nextNodeId: "implement" },
       ]),
-      checkpoint("confirm", "确认风险范围"),
-      task("implement", "实施修改"),
-      task("tests", "运行测试"),
-      condition("test-result", "测试是否通过", [
+      checkpoint("confirm", "Confirm release risk scope"),
+      task("implement", "Apply release changes"),
+      task("tests", "Run release checks"),
+      condition("test-result", "Did tests pass?", [
         { label: "true", nextNodeId: "summarize" },
         { label: "false", nextNodeId: "fix" },
       ]),
-      task("fix", "修复失败测试"),
-      wait("wait-ci", "等待外部校验"),
-      task("summarize", "总结交付"),
+      task("fix", "Fix failing checks"),
+      wait("wait-ci", "Wait for external CI"),
+      task("summarize", "Summarize release outcome"),
     ],
     edges: [
       { from: "intake", to: "inspect" },
@@ -431,6 +432,193 @@ function createEmptyPlanRun(compiledPlan: FixtureCompiledPlan) {
   };
 }
 
+function createFixturePlanOutput(fixture: Fixture): PlanOutputState {
+  const createdAt = new Date().toISOString();
+  const resultNodeId = `${fixture.slug}-${fixture.nodes.at(-1)?.id ?? "result"}`;
+
+  if (fixture.slug !== "inactive-branch-tail") {
+    return {
+      spec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "md" }, children: ["summary", "details"] },
+          summary: {
+            type: "ResultSummary",
+            props: { text: `${fixture.graphType} fixture ready for documentation capture.` },
+            children: [],
+          },
+          details: {
+            type: "Markdown",
+            props: { content: `### ${fixture.graphType} result\n\n- Fixture seeded for README and graph layout screenshots.\n- Workflow uses English release-readiness labels.` },
+            children: [],
+          },
+        },
+      },
+      revision: 1,
+      updatedAt: createdAt,
+      updatedByNodeId: resultNodeId,
+      history: [{
+        id: `fixture-output-${fixture.slug}`,
+        nodeId: resultNodeId,
+        summary: `${fixture.graphType} fixture result`,
+        patches: [],
+        createdAt,
+      }],
+    };
+  }
+
+  return {
+    spec: {
+      root: "root",
+      elements: {
+        root: {
+          type: "Stack",
+          props: { gap: "md" },
+          children: ["summary", "overviewCard", "themesCard", "rankingCard", "actionsCard"],
+        },
+        summary: {
+          type: "ResultSummary",
+          props: {
+            text: "GitHub Trending brief complete: AI agents, MCP tooling, and self-hosted apps dominate today’s developer attention.",
+            copyText: "Top signals: AI coding workflows, MCP integrations, browser automation, security testing, and local-first self-hosted tools.",
+          },
+          children: [],
+        },
+        overviewCard: {
+          type: "Card",
+          props: { title: "Research snapshot", description: "Daily GitHub Trending sample", maxWidth: "full" },
+          children: ["overviewMarkdown"],
+        },
+        overviewMarkdown: {
+          type: "Markdown",
+          props: {
+            content: "- Reviewed **21 trending repositories** from the daily all-language feed.\n- Highest single-day growth: **AIDC-AI/codex-plugin-cc** with **1,532 stars today**.\n- Strongest total-star signal: **immich-app/immich** with **82k+ stars**.",
+          },
+          children: [],
+        },
+        rankingCard: {
+          type: "Card",
+          props: { title: "Representative projects", description: "Condensed from the dev database sample", maxWidth: "full" },
+          children: ["rankingMarkdown"],
+        },
+        rankingMarkdown: {
+          type: "Markdown",
+          props: {
+            content: "| Project | Signal | Why it matters |\n| --- | --- | --- |\n| Zackriya-Solutions/meeting-minutes | 1,409 stars today | Local AI meeting notes and workflow automation. |\n| AIDC-AI/codex-plugin-cc | 1,532 stars today | Codex/Claude skill bridge for agentic coding. |\n| immich-app/immich | 82k+ total stars | Self-hosted photo management keeps broad developer demand. |",
+          },
+          children: [],
+        },
+        themesCard: {
+          type: "Card",
+          props: { title: "Themes", maxWidth: "full" },
+          children: ["themesMarkdown"],
+        },
+        themesMarkdown: {
+          type: "Markdown",
+          props: {
+            content: "- AI coding workflows are moving from one-off prompts to plugin ecosystems and multi-agent handoffs.\n- MCP integrations are spreading into Unity, Kubernetes, browser automation, and other vertical engineering loops.\n- Local-first and self-hosted tools remain durable developer demand signals.",
+          },
+          children: [],
+        },
+        actionsCard: {
+          type: "Card",
+          props: { title: "Recommended follow-up", maxWidth: "full" },
+          children: ["actionsMarkdown"],
+        },
+        actionsMarkdown: {
+          type: "Markdown",
+          props: {
+            content: "- Track agent-plugin repositories for integration opportunities.\n- Watch self-hosted productivity tools for durable demand.\n- Re-run the brief weekly and compare theme drift against prior outputs.",
+          },
+          children: [],
+        },
+      },
+    },
+    revision: 1,
+    updatedAt: createdAt,
+    updatedByNodeId: resultNodeId,
+    history: [{
+      id: `fixture-output-${fixture.slug}`,
+      nodeId: resultNodeId,
+      summary: "GitHub Trending engineering brief",
+      patches: [],
+      createdAt,
+    }],
+  };
+}
+
+function createFixtureTimelineItems(fixture: Fixture, input: { workspaceId: string; taskId: string; planId: string }) {
+  if (fixture.slug !== "inactive-branch-tail") return [];
+
+  const baseTime = Date.now();
+  const at = (secondsAgo: number) => new Date(baseTime - secondsAgo * 1000);
+  const nodeId = `${fixture.slug}-publish`;
+
+  return [
+    {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      kind: "plan_generation.completed",
+      title: "Plan generation completed",
+      body: "Built a research workflow with collection, normalization, analysis, review, and publishing steps.",
+      severity: "success",
+      status: "completed",
+      nodeId: null,
+      sortTime: at(240),
+      metadata: { planId: input.planId, source: GENERATED_BY },
+    },
+    {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      kind: "plan_execution.execution_started",
+      title: "Execution started",
+      body: "Chrona started the accepted research plan with Hermes runtime.",
+      severity: "info",
+      status: "execution_started",
+      nodeId: null,
+      sortTime: at(180),
+      metadata: { planId: input.planId, runtime: DEFAULT_RUNTIME },
+    },
+    {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      kind: "tool.accepted",
+      title: "chrona.plan.output",
+      body: "AI submitted the visible Trending brief through Chrona-owned result state.",
+      severity: "success",
+      status: "accepted",
+      nodeId,
+      sortTime: at(90),
+      metadata: { resultStatus: "accepted" },
+    },
+    {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      kind: "plan_execution.node_result_submitted",
+      title: "Publish research brief: node_result_submitted",
+      body: "Result summary, representative projects, themes, and follow-up actions were saved.",
+      severity: "success",
+      status: "node_result_submitted",
+      nodeId,
+      sortTime: at(45),
+      metadata: { planId: input.planId, source: GENERATED_BY },
+    },
+    {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      kind: "plan_execution.execution_completed",
+      title: "Execution completed",
+      body: "Research brief ready for review and README capture.",
+      severity: "success",
+      status: "execution_completed",
+      nodeId: null,
+      sortTime: at(15),
+      metadata: { planId: input.planId, source: GENERATED_BY },
+    },
+  ];
+}
+
+
 async function resolveDefaultWorkspaceId() {
   const activeWorkspace = await prisma.workspace.findFirst({
     where: { status: WorkspaceStatus.Active },
@@ -477,6 +665,7 @@ async function seedFixture(fixture: Fixture, workspaceId: string) {
       attempts: [],
       results: [],
       executionContextSnapshots: [],
+      planOutput: createFixturePlanOutput(fixture),
     },
   };
 
@@ -565,6 +754,21 @@ async function seedFixture(fixture: Fixture, workspaceId: string) {
         createdBy: GENERATED_BY,
       },
     });
+
+    const timelineItems = createFixtureTimelineItems(fixture, {
+      workspaceId,
+      taskId,
+      planId: compiledPlan.editablePlanId,
+    });
+    if (timelineItems.length > 0) {
+      await tx.taskTimelineItem.deleteMany({ where: { taskId } });
+      await tx.taskTimelineItem.createMany({
+        data: timelineItems.map((item) => ({
+          ...item,
+          metadata: item.metadata as Prisma.InputJsonValue,
+        })),
+      });
+    }
   });
 
   return { taskId, title: `[Graph: ${fixture.graphType}] ${fixture.description}` };

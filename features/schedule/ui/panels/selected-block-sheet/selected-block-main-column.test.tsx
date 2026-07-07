@@ -123,9 +123,36 @@ describe("SelectedBlockMainColumn", () => {
     expect(screen.getByText("Auto-plan")).toBeInTheDocument();
     expect(screen.getByText("Local Hermes")).toBeInTheDocument();
     expect(screen.getByText("Hermes runtime")).toBeInTheDocument();
-    expect(screen.getByText("WaitingForInput")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for input")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open task workspace to recover this run." }))
       .toHaveAttribute("href", "/tasks/task-1?workBlockId=block-1");
+  });
+
+  it("prefers derived state label over raw failed provider status", () => {
+    renderMainColumn(item({
+      persistedStatus: "Completed",
+      displayState: null,
+      latestRunStatus: "Failed",
+      stateView: {
+        state: "completed",
+        label: "Completed",
+        severity: "success",
+        primaryAction: "review_result",
+        secondaryActions: [],
+        description: "Execution completed successfully.",
+        source: {
+          taskStatus: "Completed",
+          scheduleStatus: "Scheduled",
+          planStatus: null,
+          executionStatus: null,
+          providerStatus: "Failed",
+          nodeStatus: null,
+        },
+      },
+    }));
+
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
   });
 
   it("marks external calendar blocks as read-only and calendar sourced", () => {

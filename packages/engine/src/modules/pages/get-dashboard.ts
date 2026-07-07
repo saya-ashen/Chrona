@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@chrona/db";
-import { deriveWorkItemStateView, type WorkItemStateView } from "@chrona/domain";
+import { deriveTaskProjectionStateView, type WorkItemStateView } from "@chrona/domain";
 import { isDashboardAiSummaryEnabled } from "@chrona/shared/runtime-config";
 import { dashboardAiBriefDisabledState, getDashboardAiBriefState, type DashboardAiBriefState } from "./dashboard-ai-surface";
 
@@ -180,11 +180,11 @@ function reasonFor(item: ProjectionWithTask): string | null {
 }
 
 function stateViewFor(item: ProjectionWithTask): WorkItemStateView {
-  return deriveWorkItemStateView({
-    taskStatus: item.persistedStatus,
+  return deriveTaskProjectionStateView({
+    persistedStatus: item.persistedStatus,
     scheduleStatus: item.scheduleStatus,
-    executionStatus: item.displayState,
-    providerStatus: item.latestRunStatus,
+    displayState: item.displayState,
+    latestRunStatus: item.latestRunStatus,
     isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt),
     isRunnable: item.actionRequired ? false : undefined,
   });

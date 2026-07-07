@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { deriveWorkItemStateView } from "@chrona/domain";
+import { deriveTaskProjectionStateView } from "@chrona/domain";
 import { stateViewForWorkspaceStatus } from "./task-workspace-state";
 
 function scheduleStateView(input: {
@@ -13,12 +13,12 @@ function scheduleStateView(input: {
   actionRequired?: string | null;
   aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
 }) {
-  return deriveWorkItemStateView({
-    taskStatus: input.persistedStatus,
+  return deriveTaskProjectionStateView({
+    persistedStatus: input.persistedStatus,
     scheduleStatus: input.scheduleStatus,
     planStatus: input.aiPlanGenerationStatus,
-    executionStatus: input.displayState,
-    providerStatus: input.latestRunStatus,
+    displayState: input.displayState,
+    latestRunStatus: input.latestRunStatus,
     isScheduled: Boolean(input.scheduledStartAt || input.scheduledEndAt),
     isRunnable: input.isRunnable,
     disabledReason: input.actionRequired,
@@ -34,11 +34,11 @@ function taskListStateView(input: {
   isRunnable?: boolean;
   actionRequired?: string | null;
 }) {
-  return deriveWorkItemStateView({
+  return deriveTaskProjectionStateView({
     taskStatus: input.taskStatus,
     scheduleStatus: input.scheduleStatus,
-    executionStatus: input.displayState,
-    providerStatus: input.latestRunStatus,
+    displayState: input.displayState,
+    latestRunStatus: input.latestRunStatus,
     isScheduled: input.isScheduled,
     isRunnable: input.isRunnable,
     disabledReason: input.actionRequired,
@@ -114,7 +114,7 @@ describe("work item state cross-surface consistency", () => {
     const workspace = stateViewForWorkspaceStatus({
       taskStatus,
       scheduleStatus,
-      providerStatus: latestRunStatus,
+      latestRunStatus,
       isScheduled: true,
       isRunnable: true,
     });

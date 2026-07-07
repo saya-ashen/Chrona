@@ -39,6 +39,7 @@ export type DispatchExecutionAction = (input: {
 export type ResolveCheckpointTransitionInput = {
   taskId: string;
   planId: string;
+  planRunId: string;
   mainSession: { id: string; taskId: string; sessionKey: string };
   executionSession: ExecutionSessionRow;
   checkpoint: ExecutionCheckpoint;

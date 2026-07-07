@@ -219,13 +219,16 @@ Workspaces can be lifecycle-gated independently from task state. `TaskKind` dist
 - Seed local data: `bun run db:seed`.
 - Schema source: `prisma/schema.prisma`; migration SQL lives under
   `prisma/migrations` and is applied by `packages/db/src/sqlite-migrations.ts`.
-- Before the first public release, Chrona keeps one release baseline migration:
-  `prisma/migrations/0001_initial`. Development-only migration folders should be
-  squashed into that baseline before release because no user database needs
-  those intermediate states.
+- Chrona keeps one mutable release-line migration for the current unreleased
+  release. Before the first public release, that migration is
+  `prisma/migrations/0001_initial`; after a public release, the first schema
+  change starts one new release-oriented migration folder for the next release.
+- Do not create a migration folder for every schema edit. Accumulate subsequent
+  unreleased schema changes in the current release-line migration and keep it
+  aligned with `prisma/schema.prisma`.
 - After a public release ships, migrations in that release are immutable. Do not
-  edit, rename, delete, or squash them; add a new release-to-release migration
-  for each shipped schema change set.
+  edit, rename, delete, or squash them; start the next release-line migration
+  from the shipped release state.
 - Release migration verification must cover both fresh SQLite creation and
   upgrade from the previous released database snapshot.
 

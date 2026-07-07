@@ -1,5 +1,6 @@
 import { ApprovalStatus, RunStatus, ScheduleProposalStatus, TaskStatus } from "@/generated/prisma/client";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
+import { hasTerminalAuthoritativeTaskState } from "@chrona/domain";
 import { db } from "@/lib/db";
 
 
@@ -9,6 +10,7 @@ const OVERDUE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const RECENT_NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const CLOSED_DUE_STATUSES = [TaskStatus.Completed, TaskStatus.Done, TaskStatus.Cancelled];
+
 
 type SortableActionCenterItem = ActionCenterProjection[number] & { sortAt: Date };
 
@@ -146,6 +148,8 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
         title: true,
         workspaceId: true,
         latestRunId: true,
+        status: true,
+        projection: { select: { persistedStatus: true, displayState: true } },
       },
     }),
     db.task.findMany({
@@ -284,6 +288,17 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
       const task = taskByLatestRunId.get(run.id);
 
       if (!task) {
+        return null;
+      }
+
+      const taskStateIsTerminal = hasTerminalAuthoritativeTaskState({
+        taskStatus: task.status,
+        persistedStatus: task.projection?.persistedStatus,
+        displayState: task.projection?.displayState,
+      });
+      const isOwnCancellationRecovery = task.status === TaskStatus.Cancelled && run.status === RunStatus.Cancelled;
+
+      if (taskStateIsTerminal && !isOwnCancellationRecovery) {
         return null;
       }
 

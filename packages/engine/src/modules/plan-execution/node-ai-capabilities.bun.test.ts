@@ -134,17 +134,30 @@ function makeAttempt(input: { taskId: string; graphId: string; nodeId: string })
   };
 }
 
+async function resetNodeAiCapabilitiesDb() {
+  await db.toolInvocation.deleteMany();
+  await db.rawEventLog.deleteMany();
+  await db.executionSession.deleteMany();
+  await db.taskPlanProviderRun.deleteMany();
+  await db.taskPlanNodeAttempt.deleteMany();
+  await db.taskPlanRun.deleteMany();
+  await db.taskPlan.deleteMany();
+  await db.event.deleteMany();
+  await db.taskProjection.deleteMany();
+  await db.run.deleteMany();
+  await db.workBlock.deleteMany();
+  await db.taskSession.deleteMany();
+  await db.task.deleteMany();
+  await db.workspace.deleteMany();
+}
+
 describe("runTaskNodeFeature", () => {
   beforeEach(async () => {
-    await db.run.deleteMany();
-    await db.task.deleteMany();
-    await db.workspace.deleteMany();
+    await resetNodeAiCapabilitiesDb();
   });
 
   afterAll(async () => {
-    await db.run.deleteMany();
-    await db.task.deleteMany();
-    await db.workspace.deleteMany();
+    await resetNodeAiCapabilitiesDb();
   });
 
   it("fails a completed provider snapshot that did not use a Chrona terminal tool", async () => {

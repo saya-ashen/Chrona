@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { RunStatus } from "@/generated/prisma/client";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type {
   EffectivePlanGraph,
@@ -10,6 +11,13 @@ import { ensurePlanMainSession } from "../persistence/plan-state-store";
 import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
 import { currentNodeFromEffective } from "../projection/execution-graph-selectors";
 import { buildExecutionResponse } from "../projection/execution-response";
+
+const ACTIVE_RUN_STATUSES = [
+  RunStatus.Pending,
+  RunStatus.Running,
+  RunStatus.WaitingForApproval,
+  RunStatus.WaitingForInput,
+] as const;
 
 
 export function hasExecutionEvidence(effective: EffectivePlanGraph) {
@@ -23,8 +31,9 @@ export function hasExecutionEvidence(effective: EffectivePlanGraph) {
 export function currentExecutionStatusFromEffectiveGraph(input: {
   effective: EffectivePlanGraph;
   hasActiveExecutionSession: boolean;
+  hasActiveRun?: boolean;
 }) {
-  return input.hasActiveExecutionSession || hasExecutionEvidence(input.effective)
+  return input.hasActiveExecutionSession || input.hasActiveRun || hasExecutionEvidence(input.effective)
     ? executionStatusFromEffectiveGraph(input.effective)
     : "started";
 }
@@ -55,6 +64,20 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
+  const latestRunPointer = await db.task.findUniqueOrThrow({
+    where: { id: input.taskId },
+    select: { latestRunId: true },
+  });
+  const activeRun = latestRunPointer.latestRunId
+    ? await db.run.findFirst({
+        where: {
+          id: latestRunPointer.latestRunId,
+          taskId: input.taskId,
+          workBlockId: input.workBlockId ?? null,
+          status: { in: [...ACTIVE_RUN_STATUSES] },
+        },
+      })
+    : null;
   const mainSession = await ensurePlanMainSession({
     taskId: input.taskId,
     planId: runtime.planId,
@@ -65,9 +88,11 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     results: runtime.persisted.results,
   }) as unknown as EffectivePlanGraph;
   const hasActiveExecutionSession = Boolean(executionSession);
+  const hasActiveRun = Boolean(activeRun);
   const status = currentExecutionStatusFromEffectiveGraph({
     effective,
     hasActiveExecutionSession,
+    hasActiveRun,
   });
   const currentNodeId = currentNodeFromEffective(effective)?.id
     ?? (!hasActiveExecutionSession && status === "started" ? effective.readyNodeIds[0] : null)
@@ -79,7 +104,7 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     planId: runtime.planId,
     mainSessionId: mainSession.id,
     executionSessionId: executionSession?.id,
-    planRunId: executionSession ? runtime.planId : undefined,
+    planRunId: executionSession || activeRun ? runtime.persisted.id : undefined,
     status,
     effective,
     currentNodeId,

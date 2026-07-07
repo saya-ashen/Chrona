@@ -224,6 +224,28 @@ describe("task workspace execution console view model", () => {
     expect(view.activity.some((item) => item.id === "run-run-1")).toBe(false);
   });
 
+  it("uses execution display status for latest run card copy", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        latestRunSummary: {
+          id: "run-1",
+          status: "Failed",
+          displayStatus: "Completed",
+          executionState: "completed",
+          startedAt: "2026-05-12T10:00:00.000Z",
+          syncStatus: "synced",
+        },
+      }),
+      graphPlan: graph([]),
+    });
+
+    expect(view.latestResult).toMatchObject({
+      title: "Latest run",
+      description: "Run is Completed",
+      tone: "success",
+    });
+  });
+
   it("prioritizes persisted provider activity over summary activity", () => {
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData({

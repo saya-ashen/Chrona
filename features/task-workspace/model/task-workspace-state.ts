@@ -1,4 +1,4 @@
-import { deriveWorkItemStateView, type WorkItemStateView } from "@chrona/domain";
+import { deriveTaskProjectionStateView, type WorkItemStateView } from "@chrona/domain";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import type { ExecutionOverviewTone, ProgressSummary, TaskData, TaskHeaderAction, TaskWorkspaceUserStatus } from "./task-workspace-types";
 
@@ -54,17 +54,18 @@ export function deriveTaskStatusFromGraph(
 
 export function stateViewForWorkspaceStatus(input: {
   taskStatus?: string | null;
+  persistedStatus?: string | null;
   scheduleStatus?: string | null;
   planStatus?: string | null;
-  executionStatus?: string | null;
+  displayState?: string | null;
+  latestRunStatus?: string | null;
   nodeStatus?: string | null;
-  providerStatus?: string | null;
   isScheduled?: boolean;
   hasPlan?: boolean;
   isRunnable?: boolean;
   disabledReason?: string | null;
 }): WorkItemStateView {
-  return deriveWorkItemStateView(input);
+  return deriveTaskProjectionStateView(input);
 }
 
 export function mapTaskWorkspaceStatus(status: string): TaskWorkspaceUserStatus {

@@ -67,6 +67,36 @@ describe("task workspace console read data", () => {
     expect(typeof page.latestRunSummary?.syncStatus).toBe("string");
   });
 
+  it("keeps raw failed provider run diagnostic separate from completed execution display", async () => {
+    const { workspaceId } = await seedWorkspace("Completed Workspace Console");
+    const { taskId } = await seedTask(workspaceId, {
+      title: "Completed execution with late provider failure",
+      status: "Completed",
+    });
+
+    const run = await db.run.create({
+      data: {
+        taskId,
+        runtimeName: "hermes",
+        runtimeRunRef: "run-late-provider-failure",
+        status: RunStatus.Failed,
+        syncStatus: "synced",
+        triggeredBy: "user",
+        startedAt: new Date("2026-05-12T10:00:00.000Z"),
+      },
+    });
+
+    const page = await getTaskPage(taskId);
+
+    expect(page.task.status).toBe("Completed");
+    expect(page.latestRunSummary).toMatchObject({
+      id: run.id,
+      status: "Failed",
+      displayStatus: "Completed",
+      executionState: "completed",
+    });
+  });
+
   it("returns approvals and artifacts needed by human-review workspace cards", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Human Review");
     const { taskId } = await seedTask(workspaceId, { title: "Review execution" });

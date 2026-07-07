@@ -7,6 +7,7 @@ import {
   listExecutionRuntimes,
 } from "@/modules/execution-runtime";
 import { deriveTaskRunnability } from "@chrona/shared";
+import { deriveTaskExecutionState, taskExecutionStateToRunStatus } from "@chrona/domain";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
@@ -221,6 +222,11 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
         blockReason: readBlockReason(task),
       })
     : null;
+  const taskExecutionState = orchestratorState?.summary.executionState ?? deriveTaskExecutionState({
+    taskStatus: task.status,
+    runStatus: latestRun?.status ?? null,
+  });
+  const latestRunPresentationStatus = taskExecutionStateToRunStatus(taskExecutionState);
 
   const activityTimeline = task.timelineItems.length > 0
     ? orderActivityNewestFirst([
@@ -334,6 +340,8 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       ? {
           id: latestRun.id,
           status: latestRun.status,
+          displayStatus: latestRunPresentationStatus,
+          executionState: taskExecutionState,
           startedAt: latestRun.startedAt?.toISOString() ?? null,
           syncStatus: latestRun.syncStatus,
         }

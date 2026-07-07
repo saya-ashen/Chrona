@@ -190,6 +190,30 @@ describe("getActionCenter (engine)", () => {
     expect(item.summary).toMatch(/recovery prompt/i);
   });
 
+  it("does not surface recovery for completed tasks with failed latest provider run", async () => {
+    const { workspaceId } = await seedWorkspace("Action Center completed provider failure");
+    const { taskId } = await seedTask(workspaceId, { title: "Completed task", status: "Completed" });
+    const run = await seedRun(taskId, "Failed");
+    await linkLatestRun(taskId, run.id);
+    await db.taskProjection.upsert({
+      where: { taskId },
+      create: {
+        taskId,
+        workspaceId,
+        persistedStatus: "Completed",
+        latestRunStatus: "Failed",
+      },
+      update: {
+        persistedStatus: "Completed",
+        latestRunStatus: "Failed",
+      },
+    });
+
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
+
+    expect(result.some((item) => item.kind === "recovery" && item.sourceTaskId === taskId)).toBe(false);
+  });
+
   it("Cancelled retryable run surfaces as kind=recovery with riskLevel=high", async () => {
     const { workspaceId } = await seedWorkspace("Action Center cancelled retryable");
     const { taskId } = await seedTask(workspaceId, { title: "Cancelled task" });

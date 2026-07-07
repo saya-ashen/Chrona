@@ -1,6 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
+import { updateTaskSessionStateFromRun } from "@/modules/execution-runtime";
 
 const ACTIVE_RUN_STATUSES = [
   RunStatus.Pending,
@@ -9,6 +10,32 @@ const ACTIVE_RUN_STATUSES = [
   RunStatus.WaitingForInput,
 ] as const;
 
+
+export async function syncTaskRunState(input: {
+  taskId: string;
+  taskSessionId?: string | null;
+  runId: string;
+  runStatus: RunStatus;
+  runtimeRunRef?: string | null;
+  setAsLatest?: boolean;
+  rebuildProjection?: boolean;
+}) {
+  if (input.setAsLatest) {
+    await db.task.update({
+      where: { id: input.taskId },
+      data: { latestRunId: input.runId },
+    });
+  }
+  await updateTaskSessionStateFromRun({
+    taskSessionId: input.taskSessionId,
+    runId: input.runId,
+    runStatus: input.runStatus,
+    runtimeRunRef: input.runtimeRunRef,
+  });
+  if (input.rebuildProjection !== false) {
+    await rebuildTaskProjection(input.taskId);
+  }
+}
 export async function markExecutionNodeActive(input: {
   taskId: string;
   sessionId?: string | null;

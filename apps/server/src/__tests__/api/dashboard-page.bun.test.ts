@@ -49,6 +49,7 @@ async function seedProjection(
   fields: {
     persistedStatus?: string;
     displayState?: string | null;
+    latestRunStatus?: string | null;
     scheduleStatus?: string | null;
     approvalPendingCount?: number;
     actionRequired?: string | null;
@@ -62,6 +63,7 @@ async function seedProjection(
     workspaceId,
     persistedStatus: fields.persistedStatus ?? "Ready",
     displayState: fields.displayState ?? null,
+    latestRunStatus: fields.latestRunStatus ?? null,
     scheduleStatus: fields.scheduleStatus ?? null,
     approvalPendingCount: fields.approvalPendingCount ?? 0,
     actionRequired: fields.actionRequired ?? null,
@@ -201,6 +203,22 @@ describe("GET /api/dashboard", () => {
     expect(body.autoCompleted[0]?.output?.title).toBe("github-trending-summary");
     expect(body.autoCompleted[0]?.category).toBe("automation");
     expect(body.totalAutoCompleted).toBe(2);
+  });
+
+  it("treats failed latest run as diagnostic for completed task projections", async () => {
+    const { workspaceId } = await seedWorkspace("Completed with late run failure");
+    const { taskId } = await seedTask(workspaceId, { title: "Completed task", status: "Completed" });
+    await seedProjection(workspaceId, taskId, {
+      persistedStatus: "Completed",
+      latestRunStatus: "Failed",
+      lastActivityAt: new Date("2030-03-01T00:00:00.000Z"),
+    });
+
+    const body = await fetchDashboard(workspaceId);
+
+    expect(body.needsAttention.some((item) => item.taskId === taskId)).toBe(false);
+    expect(body.focusTask?.taskId).not.toBe(taskId);
+    expect(body.autoCompleted.map((item) => item.taskId)).toContain(taskId);
   });
 
   it("surfaces only readable, task-scoped events in the recent feed", async () => {
