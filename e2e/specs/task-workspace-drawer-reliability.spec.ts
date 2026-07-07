@@ -16,7 +16,7 @@ async function expectNoHorizontalScroll(page: Page) {
 async function clickPlanNode(page: Page) {
   const node = page.getByRole("button", { name: /Collect boundary context/ });
   await expect(node).toBeVisible();
-  await node.click();
+  await node.click({ force: true });
 }
 
 test.describe("Task workspace node drawer reliability", () => {

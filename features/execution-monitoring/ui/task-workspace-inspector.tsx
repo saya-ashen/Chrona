@@ -1,13 +1,12 @@
+import type { ReactNode } from "react";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanExecutionResult } from "@chrona/contracts/ai";
 import type { WorkspaceActivityItem } from "../../task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import type { createTaskWorkspaceExecutionConsoleView } from "../../task-workspace";
-import { TaskWorkspaceActionRail } from "./action-rail";
 import {
   TaskWorkspaceExecutionOverview,
   type CommandCenterCopy,
-  type CommandCenterPrimaryAction,
 } from "./task-workspace-execution-overview";
 
 type ConsoleView = ReturnType<typeof createTaskWorkspaceExecutionConsoleView>;
@@ -16,7 +15,6 @@ type WorkspaceCopy = Record<string, string | undefined>;
 export function TaskWorkspaceInspector({
   taskId,
   consoleView,
-  primaryAction,
   commandCenter,
   commandCenterActionHandlers,
   runtimeEvents,
@@ -24,12 +22,12 @@ export function TaskWorkspaceInspector({
   currentExecution,
   commandCenterCopy,
   copy,
+  operationPanel,
   onAction,
   isPlanCompact = false,
 }: {
   taskId: string;
   consoleView: ConsoleView;
-  primaryAction: CommandCenterPrimaryAction;
   commandCenter: { documents: { now: UiDocument; output: UiDocument; trail: UiDocument } } | null;
   commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
   runtimeEvents: WorkspaceRuntimeEvent[];
@@ -38,6 +36,7 @@ export function TaskWorkspaceInspector({
   commandCenterCopy?: Partial<CommandCenterCopy>;
   copy: WorkspaceCopy;
   isPlanCompact?: boolean;
+  operationPanel?: ReactNode;
   onAction: (nodeId?: string) => void;
 }) {
   return (
@@ -57,17 +56,8 @@ export function TaskWorkspaceInspector({
           ) : null}
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col p-2.5">
-        <TaskWorkspaceActionRail
-          taskId={taskId}
-          serverNowSpec={commandCenter?.documents.now ?? null}
-          primaryAction={primaryAction}
-          readiness={consoleView.readiness}
-          attention={consoleView.attention}
-          runtimeEvents={runtimeEvents}
-          commandCenterActionHandlers={commandCenterActionHandlers}
-          copy={copy}
-        />
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-2.5">
+        {operationPanel}
         <TaskWorkspaceExecutionOverview
           taskId={taskId}
           progress={consoleView.progress}
@@ -82,7 +72,7 @@ export function TaskWorkspaceInspector({
           runtimeEvents={runtimeEvents}
           liveActivity={liveActivity}
           currentExecution={currentExecution}
-          primaryAction={primaryAction}
+          primaryAction={null}
           copy={commandCenterCopy}
           activityLayout={isPlanCompact ? "side" : "below"}
           onAction={onAction}
