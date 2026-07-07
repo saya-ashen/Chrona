@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ClipboardList, LayoutDashboard, Plus, Settings } from "lucide-react";
+import { Bell, CalendarDays, ClipboardList, LayoutDashboard, Plus, Settings } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { StartWithChrona } from "@/components/start-with-chrona";
@@ -107,6 +107,7 @@ export function ControlPlaneShell({
       if (segment === "schedule") return t("nav.schedule");
       if (segment === "tasks") return t("nav.tasks");
       if (segment === "settings") return t("nav.settings");
+      if (segment === "action-center") return t("nav.actionCenter");
       if (segment === "work") return t("common.work");
       return segment;
     });
@@ -129,9 +130,14 @@ export function ControlPlaneShell({
       icon: ClipboardList,
       active: pathname.startsWith("/tasks"),
     },
-    // Inbox and Memory intentionally stay out of primary navigation. Dashboard
-    // owns concise attention/recovery visibility until separate pages have clear,
-    // actionable product value.
+    {
+      href: "/action-center",
+      label: t("nav.actionCenter"),
+      icon: Bell,
+      active: pathname.startsWith("/action-center"),
+    },
+    // Memory intentionally stays out of primary navigation until it has clear,
+    // actionable product value beyond Dashboard and task workspace context.
     {
       href: "/settings",
       label: t("nav.settings"),
@@ -139,7 +145,7 @@ export function ControlPlaneShell({
       active: pathname.startsWith("/settings"),
     },
   ];
-  const shouldShowStartWithChrona = ["/dashboard", "/schedule", "/tasks", "/settings"].includes(pathname) && startWithChronaCompletedAt === null;
+  const shouldShowStartWithChrona = ["/dashboard", "/schedule", "/tasks", "/action-center", "/settings"].includes(pathname) && startWithChronaCompletedAt === null;
 
   return (
     <SidebarProvider

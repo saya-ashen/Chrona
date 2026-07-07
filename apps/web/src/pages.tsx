@@ -6,6 +6,8 @@ import { TaskListPage } from "@/components/tasks/task-list-page";
 import { AiClientsDialog } from "../../../features/ai-clients/ui";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
+import { ActionCenterPageClient } from "@/components/action-center/action-center-page-client";
+import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,10 @@ export type ScheduleRouteData = {
 
 export type DashboardRouteData = {
   dashboard: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-dashboard").getDashboard>>;
+};
+
+export type ActionCenterRouteData = {
+  actionCenter: ActionCenterProjection;
 };
 
 
@@ -117,6 +123,28 @@ export function DashboardRoutePage() {
   return <DashboardPage data={dashboard} copy={dictionary.pages.dashboard} workspaceId={dashboard.workspaceId} />;
 }
 
+
+export function ActionCenterRoutePage() {
+  const { defaultWorkspace, dictionary } = useAppBootOutletData();
+  const { actionCenter } = useLoaderData() as ActionCenterRouteData;
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl bg-background p-3 sm:p-4">
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{dictionary.pages.actionCenter.title}</h1>
+          <p className="text-sm text-muted-foreground">{dictionary.pages.actionCenter.subtitle}</p>
+        </div>
+        <Separator />
+        <ActionCenterPageClient
+          workspaceId={defaultWorkspace.id}
+          initialData={actionCenter}
+          copy={{ ...dictionary.components.actionCenterList, ...dictionary.pages.actionCenter }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function SettingsRoutePage() {
   const { locale, dictionary } = useAppBootOutletData();

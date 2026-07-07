@@ -93,7 +93,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   needsReview: "Needs review",
   reviewScheduleImpact: "Review schedule impact",
   plannedWindow: "Planned window",
-  openInbox: "Open Inbox",
+  openActionCenter: "Open Action Center",
   pageTitle: "Schedule",
   cockpitSummary:
     "See today’s load, what is still waiting, and where the next decision should happen.",

@@ -24,7 +24,7 @@ vi.mock("@chrona/i18n/react", () => ({
   }),
 }));
 
-import { InboxPageClient } from "@/components/inbox/inbox-page-client";
+import { ActionCenterPageClient } from "@/components/action-center/action-center-page-client";
 
 afterEach(() => {
   cleanup();
@@ -59,7 +59,7 @@ function renderSingleItem(
   copyOverrides: Record<string, string> = {},
 ) {
   render(
-    <InboxPageClient
+    <ActionCenterPageClient
       workspaceId="ws_1"
       copy={{ ...copy, ...copyOverrides }}
       initialData={[
@@ -74,12 +74,12 @@ function renderSingleItem(
   );
 }
 
-describe("InboxPageClient", () => {
-  it("submits approval decisions directly from inbox approval cards", async () => {
+describe("ActionCenterPageClient", () => {
+  it("submits approval decisions directly from action center approval cards", async () => {
     const user = userEvent.setup();
 
     render(
-      <InboxPageClient
+      <ActionCenterPageClient
         workspaceId="ws_1"
         copy={copy}
         initialData={[
@@ -109,11 +109,11 @@ describe("InboxPageClient", () => {
     expect(screen.queryByText("Approve the file patch")).not.toBeInTheDocument();
   });
 
-  it("accepts and rejects schedule proposals without leaving inbox", async () => {
+  it("accepts and rejects schedule proposals without leaving action center", async () => {
     const user = userEvent.setup();
 
     render(
-      <InboxPageClient
+      <ActionCenterPageClient
         workspaceId="ws_1"
         copy={copy}
         initialData={[
@@ -201,7 +201,7 @@ describe("InboxPageClient", () => {
     for (const link of links) {
       expect(link).toHaveAttribute("href", "/en/tasks/task_5");
     }
-    // WaitingForInput is resolved in the workbench, not auto-dispatched from inbox.
+    // WaitingForInput is resolved in the workbench, not auto-dispatched from action center.
     expect(dispatchExecutionAction).not.toHaveBeenCalled();
   });
 

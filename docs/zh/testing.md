@@ -107,7 +107,7 @@ cassette 必须包含：
 
 - API key / Authorization header
 - 用户真实任务内容
-- 真实 calendar/memory/inbox 数据
+- 真实 calendar/memory/action-center 数据
 - 本地绝对路径
 - chain-of-thought / reasoning trace
 - provider 原始 debug metadata 中的敏感字段

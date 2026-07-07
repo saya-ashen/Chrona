@@ -44,7 +44,7 @@ Chrona currently centers on four active product surfaces:
 3. Tasks: create tasks, generate/review/accept plans, execute work, inspect results, and recover blocked or failed runs.
 4. Settings: configure AI clients, feature bindings, provider health, schedule automation defaults, and local diagnostics.
 
-Hidden/internal projections include Inbox and Memory. They may still exist as APIs or data sources, but they are not current primary navigation surfaces.
+Action Center is the current attention surface. Memory may still exist as an internal API/data source, but it is not a current primary navigation surface.
 
 ## Runtime shape
 

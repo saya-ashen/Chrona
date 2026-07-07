@@ -1,26 +1,14 @@
 import type { ReactNode } from "react";
-import { Inbox as InboxIcon } from "lucide-react";
+import type { ActionCenterItem } from "@chrona/contracts/api";
+import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 
-type InboxListProps = {
-  items: Array<{
-    id: string;
-    kind: "approval" | "input" | "schedule_proposal" | "recovery" | "blocked";
-    actionType: string;
-    riskLevel: string;
-    sourceTaskTitle: string;
-    sourceTaskId: string;
-    workspaceId: string;
-    currentRunLabel: string | null;
-    detail?: string | null;
-    summary: string;
-    consequence: string;
-    actions?: ReactNode;
-  }>;
+type ActionCenterListProps = {
+  items: Array<ActionCenterItem & { actions?: ReactNode }>;
   copy?: Partial<typeof DEFAULT_COPY>;
   onApprove?: (itemId: string) => void;
   onReject?: (itemId: string) => void;
@@ -40,20 +28,20 @@ const DEFAULT_COPY = {
   emptyAction: "View tasks",
 };
 
-export function InboxList({
+export function ActionCenterList({
   items,
   copy: copyProp,
   onApprove,
   onReject,
   onEditAndApprove,
-}: InboxListProps) {
+}: ActionCenterListProps) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
 
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-card/40 px-6 py-14 text-center">
         <div className="flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">
-          <InboxIcon className="size-6" aria-hidden />
+          <Bell className="size-6" aria-hidden />
         </div>
         <div className="space-y-1">
           <p className="text-base font-semibold text-foreground">{copy.emptyTitle}</p>
@@ -65,7 +53,6 @@ export function InboxList({
       </div>
     );
   }
-
   return (
     <div className="space-y-4">
       {items.map((item) => (

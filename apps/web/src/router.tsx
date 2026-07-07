@@ -5,6 +5,7 @@ import { defaultLocale, hasLocale } from "@chrona/i18n";
 import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import {
+  ActionCenterRoutePage,
   DashboardRoutePage,
   LocaleLandingPage,
   ScheduleRoutePage,
@@ -15,6 +16,7 @@ import {
 import { NotFoundPage } from "@/components/not-found-page";
 import {
   loadAppBootData,
+  loadActionCenterRouteData,
   loadDashboardRouteData,
   loadScheduleRouteData,
   loadTaskListData,
@@ -57,9 +59,11 @@ export function createAppRouter() {
           loader: loadScheduleRouteData,
           element: <ScheduleRoutePage />,
         },
-        // Inbox and Memory routes intentionally hidden. Dashboard owns concise
-        // attention/recovery visibility; do not re-add standalone routes without
-        // actionable controls and a clear product role.
+        {
+          path: "action-center",
+          loader: loadActionCenterRouteData,
+          element: <ActionCenterRoutePage />,
+        },
         {
           path: "tasks",
           loader: loadTaskListData,

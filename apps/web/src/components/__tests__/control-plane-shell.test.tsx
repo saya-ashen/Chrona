@@ -109,7 +109,7 @@ vi.mock("@chrona/i18n/react", () => ({
         "nav.brandTitle": "Chrona",
         "nav.brandTagline": "Human-AI task work",
         "nav.schedule": "Schedule",
-        "nav.inbox": "Inbox",
+        "nav.actionCenter": "Action Center",
         "nav.tasks": "Tasks",
         "nav.settings": "Settings",
         "nav.newTask": "New Task",
@@ -172,7 +172,7 @@ afterEach(() => {
 });
 
 describe("ControlPlaneShell", () => {
-  it("renders primary navigation with Schedule, Tasks, and Settings", () => {
+  it("renders primary navigation with Schedule, Tasks, Action Center, and Settings", () => {
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
         <div>Workspace body</div>
@@ -185,6 +185,7 @@ describe("ControlPlaneShell", () => {
     expectNavLink("Schedule", "/en/schedule");
     const taskLinks = expectNavLink("Tasks", "/en/tasks");
     expect(taskLinks.some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
+    expectNavLink("Action Center", "/en/action-center");
     expectNavLink("Settings", "/en/settings");
 
     // Should NOT show inactive or legacy workspace navigation.

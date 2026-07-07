@@ -51,7 +51,7 @@ These capabilities exist in the current codebase and should be treated as produc
 
 | Area | Current capability |
 | --- | --- |
-| Pages | Main user navigation is Dashboard, Schedule, Tasks, and Settings. Inbox and Memory may remain internal/hidden projections, but they are not current primary surfaces. |
+| Pages | Main user navigation is Dashboard, Schedule, Tasks, Action Center, and Settings. Memory may remain an internal/hidden projection, but it is not a current primary surface. |
 | Tasks | Task create/update/delete, completion/reopen, priority, status, labels, dependencies, parent/child relationships, and task projection rebuilds. |
 | AI planning | Streaming plan generation, generated-plan persistence, plan review/edit/accept flows, and materialization into executable task plan layers. |
 | Graph plans | Executable `task`, `checkpoint`, `condition`, and `wait` nodes with graph state resolution. |

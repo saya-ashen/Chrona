@@ -23,7 +23,7 @@ flowchart TB
   Integrations --> HermesLocal[Local Hermes CLI/config/plugin]
   Providers --> Hermes[Hermes / runtime gateway]
 
-  Engine --> Projections[Task/Schedule/Work/Inbox projections]
+  Engine --> Projections[Task/Schedule/Work/Action Center projections]
   Projections --> DB
 ```
 
@@ -64,9 +64,9 @@ Task execution now lives inside the task workspace. Runtime commands use `/api/w
 
 The schedule page shows task/time-block projections, conflicts, suggestions, and scheduling operations. Schedule proposals can be accepted/rejected and due work can become executable WorkBlocks.
 
-### Inbox projection
+### Action Center projection
 
-Inbox is an internal/hidden projection that aggregates attention items: approvals, schedule proposals, waiting inputs, failed runs, and cancelled runs. Current primary UI routes surface this state through Dashboard and the task workspace, not a standalone Inbox page.
+Action Center aggregates attention items: approvals, schedule proposals, waiting inputs, failed runs, cancelled runs, and other events that need operator review. Its HTTP wire path remains `/api/inbox` for API stability.
 
 ### Settings / AI Clients
 

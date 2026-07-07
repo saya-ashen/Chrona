@@ -348,7 +348,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       // Otherwise it is a genuine LLM/runtime error (4xx, network, JSON
       // parse). Map it to `run_failed` so callers always see a terminal —
       // matches the spec 017 §5 contract and lets the engine show the error
-      // in the Inbox without a separate `getRun` poll.
+      // in Action Center without a separate `getRun` poll.
       const message = providerFailureMessage(err, failureContext, handle);
       const failedEvent: ProviderRunEvent = {
         type: "run_failed",

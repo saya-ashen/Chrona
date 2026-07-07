@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import { getInbox } from "@/modules/pages/get-inbox";
+import { getActionCenter } from "@/modules/pages/get-action-center";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -44,7 +44,7 @@ async function seedRun(taskId: string, status: string, extra: Record<string, unk
   });
 }
 
-describe("getInbox actionable states", () => {
+describe("getActionCenter actionable states", () => {
   beforeEach(async () => {
     await resetDb();
   });
@@ -55,7 +55,7 @@ describe("getInbox actionable states", () => {
 
   it("emits exactly one actionable item per paused/terminal state", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Inbox WS", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Action Center WS", status: "Active", defaultRuntime: "hermes" },
     });
 
     // WaitingForApproval -> pending Approval row (kind:"approval").
@@ -103,7 +103,7 @@ describe("getInbox actionable states", () => {
       },
     });
 
-    const items = await getInbox(workspace.id);
+    const items = await getActionCenter(workspace.id);
 
     const byTask = (taskId: string) => items.filter((item) => item.sourceTaskId === taskId);
 
@@ -136,7 +136,7 @@ describe("getInbox actionable states", () => {
 
   it("does not double-count a Blocked task whose latest run already produced a recovery item", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Inbox dedup WS", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Action Center dedup WS", status: "Active", defaultRuntime: "hermes" },
     });
 
     const task = await seedTask(workspace.id, "Blocked + failed run", "Blocked", {
@@ -145,7 +145,7 @@ describe("getInbox actionable states", () => {
     const run = await seedRun(task.id, "Failed", { runtimeRunRef: "run-dedup" });
     await db.task.update({ where: { id: task.id }, data: { latestRunId: run.id } });
 
-    const items = await getInbox(workspace.id);
+    const items = await getActionCenter(workspace.id);
     const forTask = items.filter((item) => item.sourceTaskId === task.id);
 
     expect(forTask).toHaveLength(1);
@@ -154,12 +154,12 @@ describe("getInbox actionable states", () => {
 
   it("falls back to a sensible reason when blockReason shape is unexpected", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Inbox fallback WS", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Action Center fallback WS", status: "Active", defaultRuntime: "hermes" },
     });
 
     const task = await seedTask(workspace.id, "Blocked no reason", "Blocked", { blockReason: null });
 
-    const items = await getInbox(workspace.id);
+    const items = await getActionCenter(workspace.id);
     const blocked = items.find((item) => item.sourceTaskId === task.id);
 
     expect(blocked?.kind).toBe("blocked");

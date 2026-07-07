@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { getInbox } from "@chrona/engine/modules/pages/get-inbox";
+import { getActionCenter } from "@chrona/engine/modules/pages/get-action-center";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
-// getInbox — engine-layer unit for the inbox read-model.
-// The HTTP surface GET /api/inbox is covered by inbox-memory-schedule-pages;
+// getActionCenter — engine-layer unit for the action center read-model.
+// The HTTP surface GET /api/inbox is covered by action-center-memory-schedule-pages;
 // this file pins the engine contract on the bare read-model function:
 //
-// - empty workspace returns an empty inbox (no approvals, no proposals,
+// - empty workspace returns an empty action center (no approvals, no proposals,
 //   no actionable runs)
 // - Pending approval rows surface as kind=approval with riskLevel/ask
 // - Pending schedule proposals surface as kind=schedule_proposal
@@ -40,7 +40,7 @@ async function linkLatestRun(taskId: string, runId: string) {
   await db.task.update({ where: { id: taskId }, data: { latestRunId: runId } });
 }
 
-interface InboxItem {
+interface ActionCenterItem {
   id: string;
   kind: string;
   actionType: string;
@@ -54,21 +54,21 @@ interface InboxItem {
   consequence: string;
 }
 
-describe("getInbox (engine)", () => {
+describe("getActionCenter (engine)", () => {
   beforeEach(async () => {
     await resetTestDb();
   });
 
-  it("empty workspace returns an empty inbox", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox empty");
+  it("empty workspace returns an empty action center", async () => {
+    const { workspaceId } = await seedWorkspace("Action Center empty");
 
-    const result = await getInbox(workspaceId);
+    const result = await getActionCenter(workspaceId);
 
     expect(result).toEqual([]);
   });
 
   it("Pending approval surfaces as kind=approval with ask from payload", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox approval");
+    const { workspaceId } = await seedWorkspace("Action Center approval");
     const { taskId } = await seedTask(workspaceId, { title: "Approval source task" });
     const run = await seedRun(taskId, "WaitingForInput");
     await linkLatestRun(taskId, run.id);
@@ -88,7 +88,7 @@ describe("getInbox (engine)", () => {
       },
     });
 
-    const result = (await getInbox(workspaceId)) as InboxItem[];
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
 
     // The same run that backs the approval also surfaces as a separate
     // kind=input run item. Filter to the approval slot.
@@ -107,7 +107,7 @@ describe("getInbox (engine)", () => {
   });
 
   it("Pending schedule proposal surfaces as kind=schedule_proposal with ai riskLevel=medium", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox proposal ai");
+    const { workspaceId } = await seedWorkspace("Action Center proposal ai");
     const { taskId } = await seedTask(workspaceId, { title: "Proposal source task" });
 
     await db.scheduleProposal.create({
@@ -124,7 +124,7 @@ describe("getInbox (engine)", () => {
       },
     });
 
-    const result = (await getInbox(workspaceId)) as InboxItem[];
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
 
     expect(result).toHaveLength(1);
     const item = result[0];
@@ -136,7 +136,7 @@ describe("getInbox (engine)", () => {
   });
 
   it("Pending schedule proposal with human source has riskLevel=low", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox proposal human");
+    const { workspaceId } = await seedWorkspace("Action Center proposal human");
     const { taskId } = await seedTask(workspaceId, { title: "Human proposal source" });
 
     await db.scheduleProposal.create({
@@ -151,19 +151,19 @@ describe("getInbox (engine)", () => {
       },
     });
 
-    const result = (await getInbox(workspaceId)) as InboxItem[];
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
 
     expect(result).toHaveLength(1);
     expect(result[0].riskLevel).toBe("low");
   });
 
   it("WaitingForInput run surfaces as kind=input with prompt summary", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox input");
+    const { workspaceId } = await seedWorkspace("Action Center input");
     const { taskId } = await seedTask(workspaceId, { title: "Input task" });
     const run = await seedRun(taskId, "WaitingForInput", "Need clarification on the API contract");
     await linkLatestRun(taskId, run.id);
 
-    const result = (await getInbox(workspaceId)) as InboxItem[];
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
 
     const inputItem = result.find((i) => i.kind === "input");
     expect(inputItem).toBeDefined();
@@ -175,12 +175,12 @@ describe("getInbox (engine)", () => {
   });
 
   it("Failed run surfaces as kind=recovery with riskLevel=critical", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox failed");
+    const { workspaceId } = await seedWorkspace("Action Center failed");
     const { taskId } = await seedTask(workspaceId, { title: "Failed task" });
     const run = await seedRun(taskId, "Failed");
     await linkLatestRun(taskId, run.id);
 
-    const result = (await getInbox(workspaceId)) as InboxItem[];
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
 
     expect(result).toHaveLength(1);
     const item = result[0];
@@ -191,7 +191,7 @@ describe("getInbox (engine)", () => {
   });
 
   it("Cancelled retryable run surfaces as kind=recovery with riskLevel=high", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox cancelled retryable");
+    const { workspaceId } = await seedWorkspace("Action Center cancelled retryable");
     const { taskId } = await seedTask(workspaceId, { title: "Cancelled task" });
     const run = await db.run.create({
       data: {
@@ -205,37 +205,37 @@ describe("getInbox (engine)", () => {
     });
     await linkLatestRun(taskId, run.id);
 
-    const result = (await getInbox(workspaceId)) as InboxItem[];
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
 
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe("recovery");
     expect(result[0].riskLevel).toBe("high");
   });
 
-  it("Completed runs do NOT appear in the inbox", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox completed hidden");
+  it("Completed runs do NOT appear in the action center", async () => {
+    const { workspaceId } = await seedWorkspace("Action Center completed hidden");
     const { taskId } = await seedTask(workspaceId, { title: "Completed task" });
     const run = await seedRun(taskId, "Completed");
     await linkLatestRun(taskId, run.id);
 
-    const result = await getInbox(workspaceId);
+    const result = await getActionCenter(workspaceId);
 
     expect(result).toEqual([]);
   });
 
   it("tasks with no latestRunId do NOT contribute run items even if they have old runs", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox no latest run");
+    const { workspaceId } = await seedWorkspace("Action Center no latest run");
     const { taskId } = await seedTask(workspaceId, { title: "No latest run task" });
     // A Failed run exists but is NOT linked via task.latestRunId
     await seedRun(taskId, "Failed");
 
-    const result = await getInbox(workspaceId);
+    const result = await getActionCenter(workspaceId);
 
     expect(result).toEqual([]);
   });
 
   it("approvals and proposals are ordered by requestedAt/createdAt desc with sortAt stripped", async () => {
-    const { workspaceId } = await seedWorkspace("Inbox sort order");
+    const { workspaceId } = await seedWorkspace("Action Center sort order");
     const { taskId: taskA } = await seedTask(workspaceId, { title: "Older source" });
     const { taskId: taskB } = await seedTask(workspaceId, { title: "Newer source" });
 
@@ -271,7 +271,7 @@ describe("getInbox (engine)", () => {
       },
     });
 
-    const result = (await getInbox(workspaceId)) as InboxItem[];
+    const result = (await getActionCenter(workspaceId)) as ActionCenterItem[];
     const approvals = result.filter((i) => i.kind === "approval");
     expect(approvals).toHaveLength(2);
     expect(approvals[0].detail).toBe("newer");

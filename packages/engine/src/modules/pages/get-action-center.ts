@@ -1,5 +1,7 @@
 import { ApprovalStatus, RunStatus, ScheduleProposalStatus, TaskStatus } from "@/generated/prisma/client";
+import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { db } from "@/lib/db";
+
 
 const BLOCK_REASON_SUMMARIES: Record<string, string> = {
   capability_unavailable: "A required capability or provider is unavailable.",
@@ -34,7 +36,7 @@ function readBlockedReason(blockReason: unknown): { summary: string; actionRequi
   };
 }
 
-export async function getInbox(workspaceId: string) {
+export async function getActionCenter(workspaceId: string): Promise<ActionCenterProjection> {
   const [approvals, proposals, tasksWithLatestRuns, blockedTasks] = await Promise.all([
     db.approval.findMany({
       where: {

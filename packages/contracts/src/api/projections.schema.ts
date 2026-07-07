@@ -7,10 +7,31 @@ export const scheduleProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
-// ── GET /inbox ──
-export const inboxProjectionQuerySchema = z.object({
+// ── GET /inbox (Action Center projection wire contract) ──
+export const actionCenterProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
+
+export const actionCenterItemKindSchema = z.enum(["approval", "input", "schedule_proposal", "recovery", "blocked"]);
+
+export const actionCenterItemSchema = z.object({
+  id: z.string(),
+  kind: actionCenterItemKindSchema,
+  actionType: z.string(),
+  riskLevel: z.string(),
+  sourceTaskTitle: z.string(),
+  sourceTaskId: z.string(),
+  workspaceId: z.string(),
+  currentRunLabel: z.string().nullable(),
+  detail: z.string().nullable(),
+  summary: z.string(),
+  consequence: z.string(),
+});
+
+export const actionCenterProjectionSchema = z.array(actionCenterItemSchema);
+
+export type ActionCenterItem = z.infer<typeof actionCenterItemSchema>;
+export type ActionCenterProjection = z.infer<typeof actionCenterProjectionSchema>;
 
 // ── GET /dashboard ──
 export const dashboardProjectionQuerySchema = z.object({
