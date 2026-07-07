@@ -12,7 +12,20 @@ export const actionCenterProjectionQuerySchema = z.object({
   workspaceId: workspaceId,
 });
 
-export const actionCenterItemKindSchema = z.enum(["approval", "input", "schedule_proposal", "recovery", "blocked"]);
+export const actionCenterItemKindSchema = z.enum([
+  "approval",
+  "input",
+  "schedule_proposal",
+  "recovery",
+  "blocked",
+  "task_due_soon",
+  "task_due_now",
+  "task_overdue",
+  "auto_execution_started",
+  "auto_execution_skipped",
+  "execution_completed",
+  "notification_info",
+]);
 
 export const actionCenterItemSchema = z.object({
   id: z.string(),

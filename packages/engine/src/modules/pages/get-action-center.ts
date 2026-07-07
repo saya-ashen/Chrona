@@ -3,6 +3,80 @@ import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { db } from "@/lib/db";
 
 
+const DUE_NOW_WINDOW_MS = 15 * 60 * 1000;
+const DUE_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
+const OVERDUE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const RECENT_NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const CLOSED_DUE_STATUSES = [TaskStatus.Completed, TaskStatus.Done, TaskStatus.Cancelled];
+
+type SortableActionCenterItem = ActionCenterProjection[number] & { sortAt: Date };
+
+function buildDueItem(task: { id: string; title: string; workspaceId: string; dueAt: Date }, now: Date): SortableActionCenterItem {
+  const dueNowStartsAt = new Date(now.getTime() - DUE_NOW_WINDOW_MS);
+  const dueNowEndsAt = new Date(now.getTime() + DUE_NOW_WINDOW_MS);
+
+  if (task.dueAt < dueNowStartsAt) {
+    return {
+      id: `task-overdue:${task.id}`,
+      kind: "task_overdue",
+      actionType: "Task overdue",
+      riskLevel: "high",
+      sourceTaskTitle: task.title,
+      sourceTaskId: task.id,
+      workspaceId: task.workspaceId,
+      currentRunLabel: null,
+      detail: `Due at ${task.dueAt.toISOString()}`,
+      summary: "Task is past its due time and still needs attention.",
+      consequence: "Open the task to reschedule, execute, or close it.",
+      sortAt: task.dueAt,
+    };
+  }
+
+  if (task.dueAt <= dueNowEndsAt) {
+    return {
+      id: `task-due-now:${task.id}`,
+      kind: "task_due_now",
+      actionType: "Task due now",
+      riskLevel: "medium",
+      sourceTaskTitle: task.title,
+      sourceTaskId: task.id,
+      workspaceId: task.workspaceId,
+      currentRunLabel: null,
+      detail: `Due at ${task.dueAt.toISOString()}`,
+      summary: "Task is due now.",
+      consequence: "Open the task to start execution or adjust schedule.",
+      sortAt: task.dueAt,
+    };
+  }
+
+  return {
+    id: `task-due-soon:${task.id}`,
+    kind: "task_due_soon",
+    actionType: "Task due soon",
+    riskLevel: "low",
+    sourceTaskTitle: task.title,
+    sourceTaskId: task.id,
+    workspaceId: task.workspaceId,
+    currentRunLabel: null,
+    detail: `Due at ${task.dueAt.toISOString()}`,
+    summary: "Task is due soon.",
+    consequence: "Open the task to prepare or reschedule before it becomes overdue.",
+    sortAt: task.dueAt,
+  };
+}
+
+function riskLevelForTimelineSeverity(severity: string | null) {
+  switch (severity) {
+    case "error":
+      return "high";
+    case "warning":
+      return "medium";
+    default:
+      return "low";
+  }
+}
+
 const BLOCK_REASON_SUMMARIES: Record<string, string> = {
   capability_unavailable: "A required capability or provider is unavailable.",
   external_dependency: "Execution is waiting on an external dependency to resolve.",
@@ -37,7 +111,12 @@ function readBlockedReason(blockReason: unknown): { summary: string; actionRequi
 }
 
 export async function getActionCenter(workspaceId: string): Promise<ActionCenterProjection> {
-  const [approvals, proposals, tasksWithLatestRuns, blockedTasks] = await Promise.all([
+  const now = new Date();
+  const dueWindowStartsAt = new Date(now.getTime() - OVERDUE_WINDOW_MS);
+  const dueWindowEndsAt = new Date(now.getTime() + DUE_SOON_WINDOW_MS);
+  const recentWindowStartsAt = new Date(now.getTime() - RECENT_NOTIFICATION_WINDOW_MS);
+
+  const [approvals, proposals, tasksWithLatestRuns, blockedTasks, dueTasks, schedulerEvents, completedRuns, infoNotifications] = await Promise.all([
     db.approval.findMany({
       where: {
         workspaceId,
@@ -82,6 +161,46 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
         latestRunId: true,
         updatedAt: true,
       },
+    }),
+    db.task.findMany({
+      where: {
+        workspaceId,
+        dueAt: { gte: dueWindowStartsAt, lte: dueWindowEndsAt },
+        status: { notIn: CLOSED_DUE_STATUSES },
+      },
+      select: {
+        id: true,
+        title: true,
+        workspaceId: true,
+        dueAt: true,
+      },
+    }),
+    db.schedulerEvent.findMany({
+      where: {
+        workspaceId,
+        eventType: { in: ["scheduler.start", "scheduler.skip"] },
+        createdAt: { gte: recentWindowStartsAt },
+      },
+      include: { task: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.run.findMany({
+      where: {
+        status: RunStatus.Completed,
+        updatedAt: { gte: recentWindowStartsAt },
+        task: { workspaceId },
+      },
+      include: { task: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    db.taskTimelineItem.findMany({
+      where: {
+        workspaceId,
+        kind: "notification.info",
+        sortTime: { gte: recentWindowStartsAt },
+      },
+      include: { task: true },
+      orderBy: { sortTime: "desc" },
     }),
   ]);
 
@@ -205,6 +324,65 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
+  const dueItems = dueTasks
+    .filter((task): task is typeof task & { dueAt: Date } => Boolean(task.dueAt))
+    .map((task) => buildDueItem(task, now));
+
+  const schedulerItems = schedulerEvents.map((event) => {
+    const isStart = event.eventType === "scheduler.start";
+
+    return {
+      id: `${isStart ? "auto-execution-started" : "auto-execution-skipped"}:${event.id}`,
+      kind: isStart ? "auto_execution_started" as const : "auto_execution_skipped" as const,
+      actionType: isStart ? "Auto execution started" : "Auto execution skipped",
+      riskLevel: isStart ? "low" : "medium",
+      sourceTaskTitle: event.task.title,
+      sourceTaskId: event.taskId,
+      workspaceId: event.workspaceId,
+      currentRunLabel: null,
+      detail: event.reason,
+      summary: isStart ? "Scheduled automation started this task." : `Scheduled automation skipped this task${event.reason ? `: ${event.reason}` : "."}`,
+      consequence: isStart ? "Open the task to monitor progress." : "Open the task to adjust schedule or automation settings.",
+      sortAt: event.createdAt,
+    };
+  });
+
+  const latestCompletedRunByTask = new Map<string, (typeof completedRuns)[number]>();
+  for (const run of completedRuns) {
+    if (run.task.latestRunId !== run.id) continue;
+    if (!latestCompletedRunByTask.has(run.taskId)) latestCompletedRunByTask.set(run.taskId, run);
+  }
+
+  const completedItems = Array.from(latestCompletedRunByTask.values()).map((run) => ({
+    id: `execution-completed:${run.id}`,
+    kind: "execution_completed" as const,
+    actionType: "Execution completed",
+    riskLevel: "low",
+    sourceTaskTitle: run.task.title,
+    sourceTaskId: run.taskId,
+    workspaceId: run.task.workspaceId,
+    currentRunLabel: run.runtimeRunRef ?? run.id,
+    detail: "Latest execution completed",
+    summary: "Task execution completed recently.",
+    consequence: "Open the task to review results or mark follow-up complete.",
+    sortAt: run.endedAt ?? run.updatedAt,
+  }));
+
+  const infoItems = infoNotifications.map((notification) => ({
+    id: `notification-info:${notification.id}`,
+    kind: "notification_info" as const,
+    actionType: notification.title,
+    riskLevel: riskLevelForTimelineSeverity(notification.severity),
+    sourceTaskTitle: notification.task.title,
+    sourceTaskId: notification.taskId,
+    workspaceId: notification.workspaceId,
+    currentRunLabel: null,
+    detail: notification.status ?? null,
+    summary: notification.body ?? notification.title,
+    consequence: "Open the task for more context.",
+    sortAt: notification.sortTime,
+  }));
+
   // A `Blocked` task whose latest run is Failed/Cancelled/WaitingForInput is
   // already surfaced by `runItems`; emitting a separate blocked item would
   // double-count it. Dedup by task so every blocked task yields exactly one
@@ -235,7 +413,7 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
       };
     });
 
-  return [...approvalItems, ...proposalItems, ...runItems, ...blockedItems]
+  return [...approvalItems, ...proposalItems, ...runItems, ...dueItems, ...schedulerItems, ...completedItems, ...infoItems, ...blockedItems]
     .sort((left, right) => right.sortAt.getTime() - left.sortAt.getTime())
     .map(({ sortAt: _sortAt, ...item }) => item);
 }

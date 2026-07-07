@@ -15,7 +15,7 @@ import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 //   latestRunId surface as kind=input or kind=recovery
 // - items are sorted by sortAt desc and the sortAt field is stripped
 //   from the final shape
-// - completed runs do NOT appear (they're not actionable)
+// - recent completed latest runs appear as kind=execution_completed
 // - tasks with no latestRunId do NOT contribute run items
 
 async function seedRun(
@@ -212,15 +212,16 @@ describe("getActionCenter (engine)", () => {
     expect(result[0].riskLevel).toBe("high");
   });
 
-  it("Completed runs do NOT appear in the action center", async () => {
-    const { workspaceId } = await seedWorkspace("Action Center completed hidden");
+  it("recent completed latest run surfaces as kind=execution_completed", async () => {
+    const { workspaceId } = await seedWorkspace("Action Center completed notification");
     const { taskId } = await seedTask(workspaceId, { title: "Completed task" });
     const run = await seedRun(taskId, "Completed");
     await linkLatestRun(taskId, run.id);
 
     const result = await getActionCenter(workspaceId);
 
-    expect(result).toEqual([]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.kind).toBe("execution_completed");
   });
 
   it("tasks with no latestRunId do NOT contribute run items even if they have old runs", async () => {
