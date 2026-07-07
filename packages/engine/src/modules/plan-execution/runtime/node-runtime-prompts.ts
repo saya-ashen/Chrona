@@ -32,6 +32,16 @@ After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chron
 `.trim();
 
 const PLAN_OUTPUT_CATALOG_PROMPT = chronaPlanOutputCatalogPrompt();
+const RESULTS_DESIGN_BRIEF = `
+Design user-visible Results as a concise deliverable, not a raw data dump. Help the user understand what was completed, the most important findings, the primary data or report needed to inspect the result, and where full artifacts or evidence live.
+
+Choose components based on the result shape: use ResultSummary for the outcome, Markdown or Card for interpretation, caveats, and key findings, Table for ranked lists, comparisons, records, and datasets users need to scan, FileRef or FileView for full artifacts, and JsonView only for diagnostics or machine-readable evidence.
+
+For Tables, choose columns that best explain the data for the user's goal. Prefer readable, semantic fields over implementation fields. Do not mechanically include every field. Do not drop fields that explain why a row matters. When a row name or title has a URL, prefer making the name or title a link when that reads better than a standalone URL column.
+
+Keep Results rich enough to be useful, but avoid duplicating the same information across summaries, tables, and files.
+`.trim();
+
 
 function resultArtifactGuidance(runtimeInput: NodeRuntimeInput): string {
   const outputDir = `.chrona/outputs/${runtimeInput.node.ref}/`;
@@ -79,7 +89,7 @@ export function buildNodeRuntimePrompt(input: {
   });
 
   const catalogSection = input.node.type === "task"
-    ? [resultArtifactGuidance(runtimeInput), PLAN_OUTPUT_CATALOG_PROMPT]
+    ? [RESULTS_DESIGN_BRIEF, resultArtifactGuidance(runtimeInput), PLAN_OUTPUT_CATALOG_PROMPT]
     : [];
 
   const instructions = [

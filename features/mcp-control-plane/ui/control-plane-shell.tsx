@@ -217,6 +217,7 @@ export function ControlPlaneShell({
             <StartWithChrona
               className="mb-4"
               createdTaskId={createdOnboardingTaskId}
+              workspaceId={_defaultWorkspace.id}
               isComplete={hasCompletedOnboardingTask}
               onCreateTask={() => setShowCreateTaskDialog(true)}
               onOpenCreatedTask={(taskId) => {

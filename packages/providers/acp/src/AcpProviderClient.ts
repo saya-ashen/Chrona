@@ -44,6 +44,11 @@ type AcpConnection = {
   context: ClientContext;
   close(error?: unknown): void;
   closed: Promise<void>;
+  diagnostics?: { stderr(): string };
+};
+
+export type AcpDiagnostics = {
+  details(): string;
 };
 
 export type AcpTransport = {
@@ -73,6 +78,7 @@ export type AcpRunHandle = {
   timer?: Timer;
   ready?: Promise<void>;
   sequence: number;
+  toolLabels: Map<string, string>;
   approvalEvents: ProviderRunEvent[];
   approvalWaiters: Array<() => void>;
 };
@@ -91,12 +97,13 @@ type PendingAcpApproval = {
 };
 
 type StartRunInputWithControl = StartRunInput & {
-  control?: { baseUrl: string; runToken: string };
+  control?: { baseUrl?: string; runToken?: string };
 };
 
 export type AcpProviderOptions = {
   config: AcpProviderConfig;
   transport?: AcpTransport;
+  diagnostics?: AcpDiagnostics;
 };
 
 function now() {
@@ -105,6 +112,182 @@ function now() {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function errorMessageChain(error: unknown): string {
+  const messages: string[] = [];
+  let current: unknown = error;
+  while (current) {
+    const message = errorMessage(current).trim();
+    if (message) messages.push(message);
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return messages.join("\n");
+}
+
+function providerErrorMessage(error: unknown, diagnostics = "") {
+  const message = errorMessage(error);
+  const details = `${errorMessageChain(error)}\n${diagnostics}`;
+  const upstreamStatus = details.match(/(?:status=|unexpected status:?\s*)(\d{3})(?:\s+([A-Za-z][A-Za-z ]+?))?(?=\s+headers=|[\n"}]|$)/);
+  if (upstreamStatus?.[1] === "401" || upstreamStatus?.[1] === "403") {
+    const reason = statusReason(upstreamStatus[1], upstreamStatus[2]);
+    return `${message}: upstream provider authentication failed (${upstreamStatus[1]} ${reason}). Check provider API key and base URL.`;
+  }
+  if (upstreamStatus) {
+    const reason = statusReason(upstreamStatus[1], upstreamStatus[2]);
+    return `${message}: upstream provider request failed (${upstreamStatus[1]} ${reason}).`;
+  }
+  return message;
+}
+
+function statusReason(code: string, reason?: string) {
+  const trimmed = reason?.trim();
+  if (trimmed) return trimmed;
+  if (code === "401") return "Unauthorized";
+  if (code === "403") return "Forbidden";
+  return "HTTP error";
+}
+
+
+const CHRONA_PLAN_GENERATE_TOOL_NAME = "chrona_plan_generate";
+const MCP_PROBE_TIMEOUT_MS = 5_000;
+const MCP_PROBE_PROTOCOL_VERSION = "2025-03-26";
+
+type ChronaMcpConnection = {
+  baseUrl: string;
+  token: string;
+  url: string;
+  headers: Array<{ name: string; value: string }>;
+};
+
+function toolNamesFromMcpBody(text: string): string[] {
+  const tools: string[] = [];
+  try {
+    const parsed = JSON.parse(text) as { result?: { tools?: Array<{ name?: unknown }> } };
+    if (Array.isArray(parsed.result?.tools)) {
+      for (const tool of parsed.result.tools) {
+        if (typeof tool.name === "string") tools.push(tool.name);
+      }
+      return tools;
+    }
+  } catch {
+    /* fall through to SSE frame scan */
+  }
+
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith("data:")) continue;
+    const data = line.slice(5).trim();
+    if (!data) continue;
+    try {
+      const parsed = JSON.parse(data) as { result?: { tools?: Array<{ name?: unknown }> } };
+      if (Array.isArray(parsed.result?.tools)) {
+        for (const tool of parsed.result.tools) {
+          if (typeof tool.name === "string") tools.push(tool.name);
+        }
+      }
+    } catch {
+      /* ignore non-JSON SSE frames */
+    }
+  }
+  return tools;
+}
+
+function chronaMcpConnection(config: AcpProviderConfig, sessionId?: string | null, control?: StartRunInputWithControl["control"]): ChronaMcpConnection {
+  const baseUrl = nonEmpty(control?.baseUrl) ?? nonEmpty(config.mcpBaseUrl) ?? nonEmpty(process.env.CHRONA_MCP_BASE_URL) ?? defaultMcpBaseUrl();
+  const token = control?.runToken ?? config.mcpRunToken ?? process.env.CHRONA_API_KEY ?? process.env.CHRONA_MCP_BEARER_TOKEN ?? "";
+  const headers = token ? [{ name: "Authorization", value: `Bearer ${token}` }] : [];
+  return {
+    baseUrl: stripTrailingSlash(baseUrl),
+    token,
+    url: mcpUrlForSession(baseUrl, sessionId),
+    headers,
+  };
+}
+
+function mcpFetchHeaders(input: { token: string; sessionId?: string | null }): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  if (input.sessionId) headers["Mcp-Session-Id"] = input.sessionId;
+  if (input.token) headers.Authorization = `Bearer ${input.token}`;
+  return headers;
+}
+
+async function probeChronaMcpTools(input: { config: AcpProviderConfig; sessionId: string; signal?: AbortSignal }) {
+  const mcp = chronaMcpConnection(input.config, input.sessionId);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MCP_PROBE_TIMEOUT_MS);
+  timeout.unref?.();
+  const abort = () => controller.abort(input.signal?.reason);
+  input.signal?.addEventListener("abort", abort, { once: true });
+
+  let initializeResponse: Response;
+  try {
+    initializeResponse = await fetch(mcp.url, {
+      method: "POST",
+      headers: mcpFetchHeaders({ token: mcp.token }),
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: MCP_PROBE_PROTOCOL_VERSION,
+          capabilities: {},
+          clientInfo: { name: "chrona-acp-preflight", version: "0.0.0" },
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (cause) {
+    throw new AcpProviderError(`Chrona MCP server at ${mcp.url} is unreachable: ${errorMessage(cause)}`, {
+      cause,
+      retryable: true,
+      provider: input.config.provider,
+    });
+  } finally {
+    clearTimeout(timeout);
+    input.signal?.removeEventListener("abort", abort);
+  }
+
+  const status = initializeResponse.status;
+  if (status === 401 || status === 403) {
+    throw new AcpProviderError(
+      `Chrona MCP server rejected the Bearer token (HTTP ${status}). Set CHRONA_API_KEY to the server's API_KEY, or pass mcpRunToken in the client config.`,
+      { retryable: false, provider: input.config.provider },
+    );
+  }
+  if (!initializeResponse.ok) {
+    const body = await initializeResponse.text().catch(() => "");
+    throw new AcpProviderError(`Chrona MCP server returned HTTP ${status} for initialize: ${body.slice(0, 200)}`, {
+      retryable: false,
+      provider: input.config.provider,
+    });
+  }
+
+  const mcpSessionId = initializeResponse.headers.get("mcp-session-id");
+  const toolsResponse = await fetch(mcp.url, {
+    method: "POST",
+    headers: mcpFetchHeaders({ token: mcp.token, sessionId: mcpSessionId }),
+    body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    signal: input.signal,
+  });
+  if (!toolsResponse.ok) {
+    const body = await toolsResponse.text().catch(() => "");
+    throw new AcpProviderError(`Chrona MCP server returned HTTP ${toolsResponse.status} for tools/list: ${body.slice(0, 200)}`, {
+      retryable: false,
+      provider: input.config.provider,
+    });
+  }
+
+  const toolNames = toolNamesFromMcpBody(await toolsResponse.text());
+  if (!toolNames.includes(CHRONA_PLAN_GENERATE_TOOL_NAME)) {
+    throw new AcpProviderError(
+      `Chrona MCP tools missing required tool ${CHRONA_PLAN_GENERATE_TOOL_NAME}. Loaded tools: ${toolNames.length > 0 ? toolNames.join(", ") : "none"}.`,
+      { retryable: false, provider: input.config.provider },
+    );
+  }
+  return toolNames;
 }
 
 function stripTrailingSlash(value: string) {
@@ -169,6 +352,7 @@ function terminalToolInstruction(input: StartRunInput): string | undefined {
   ].join("\n");
 }
 
+
 function inputToPrompt(input: StartRunInput): ContentBlock[] {
   const text = [
     input.instructions,
@@ -226,23 +410,31 @@ function textFromContent(content: ContentBlock): string | undefined {
   return undefined;
 }
 
+function rememberToolLabel(handle: AcpRunHandle, update: Pick<ToolCall | ToolCallUpdate, "title" | "toolCallId" | "rawInput" | "_meta">) {
+  const tool = toolNameFrom(update);
+  if (tool !== update.toolCallId) {
+    handle.toolLabels.set(update.toolCallId, tool);
+    return tool;
+  }
+  return handle.toolLabels.get(update.toolCallId) ?? tool;
+}
 function normalizeUpdate(config: AcpProviderConfig, handle: AcpRunHandle, update: SessionUpdate): ProviderRunEvent[] {
   const base = eventBase(config, handle, update.sessionUpdate);
   if (update.sessionUpdate === "agent_message_chunk") {
-    const text = textFromContent(update.content);
-    if (text) handle.outputText += text;
-    return text ? [{ ...base, type: "text_delta", text }] : [{ ...base, type: "raw_event", raw: update }];
+    const text = textFromContent(update.content) ?? "";
+    handle.outputText += text;
+    return [{ ...base, type: "text_delta", text }];
   }
   if (update.sessionUpdate === "agent_thought_chunk") {
-    const text = textFromContent(update.content);
-    return text ? [{ ...base, type: "reasoning_delta", text, raw: update }] : [{ ...base, type: "raw_event", raw: update }];
+    const text = textFromContent(update.content) ?? "";
+    return [{ ...base, type: "reasoning_delta", text }];
   }
   if (update.sessionUpdate === "usage_update") {
     handle.usage = usageFromAcp(update.used, update.size);
     return [{ ...base, type: "raw_event", raw: update }];
   }
   if (update.sessionUpdate === "tool_call") {
-    const tool = toolNameFrom(update);
+    const tool = rememberToolLabel(handle, update);
     return [
       {
         ...base,
@@ -255,7 +447,7 @@ function normalizeUpdate(config: AcpProviderConfig, handle: AcpRunHandle, update
     ];
   }
   if (update.sessionUpdate === "tool_call_update") {
-    const tool = toolNameFrom(update);
+    const tool = rememberToolLabel(handle, update);
     const events: ProviderRunEvent[] = [
       {
         ...base,
@@ -385,11 +577,12 @@ export class StdioAcpTransport implements AcpTransport {
             if (error) throw error;
           },
           closed: new Promise<void>((resolve) => subprocess.once("exit", () => resolve())),
+          diagnostics: { stderr: () => stderr },
         };
         return op(connection);
       });
     } catch (error) {
-      throw new AcpProviderError(`ACP process failed: ${errorMessage(error)}${stderr ? `\n${stderr}` : ""}`, {
+      throw new AcpProviderError(`ACP process failed: ${providerErrorMessage(error, stderr)}${stderr ? `\n${stderr}` : ""}`, {
         cause: error,
         retryable: false,
         provider: config.provider,
@@ -412,9 +605,11 @@ function handlers(requestPermission?: (params: RequestPermissionRequest) => Prom
 }
 async function checkAcpSessionHealth(config: AcpProviderConfig, context: ClientContext, signal?: AbortSignal) {
   const sessionId = `${config.provider}-health-${crypto.randomUUID()}`;
+  const sessionKey = `chrona:provider-health:${config.provider}:plan-generation`;
+  await probeChronaMcpTools({ config, sessionId: sessionKey, signal });
   const session = await context.buildSession(newSessionRequest(config, {
     sessionId,
-    sessionKey: `chrona:provider-health:${config.provider}`,
+    sessionKey,
     instructions: "Health check.",
     input: { type: "text", text: "Health check." },
   })).start({ cancellationSignal: signal });
@@ -433,6 +628,7 @@ async function initialize(context: ClientContext, signal?: AbortSignal): Promise
     { cancellationSignal: signal },
   );
 }
+
 
 function assertHttpMcp(config: AcpProviderConfig, init: InitializeResponse) {
   if (init.agentCapabilities?.mcpCapabilities?.http !== true) {
@@ -470,11 +666,7 @@ async function startAcpSession(input: {
 }
 
 function newSessionRequest(config: AcpProviderConfig, input: StartRunInput): NewSessionRequest {
-  const control = (input as StartRunInputWithControl).control;
-  const mcpBaseUrl = nonEmpty(control?.baseUrl) ?? nonEmpty(config.mcpBaseUrl) ?? nonEmpty(process.env.CHRONA_MCP_BASE_URL) ?? defaultMcpBaseUrl();
-  const mcpRunToken = control?.runToken ?? config.mcpRunToken ?? process.env.CHRONA_API_KEY ?? process.env.CHRONA_MCP_BEARER_TOKEN ?? "";
-  const url = mcpUrlForSession(mcpBaseUrl, input.sessionKey ?? input.sessionId);
-  const headers = mcpRunToken ? [{ name: "Authorization", value: `Bearer ${mcpRunToken}` }] : [];
+  const mcp = chronaMcpConnection(config, input.sessionKey ?? input.sessionId, (input as StartRunInputWithControl).control);
   return {
     cwd: config.cwd ?? process.cwd(),
     additionalDirectories: config.additionalDirectories,
@@ -482,8 +674,8 @@ function newSessionRequest(config: AcpProviderConfig, input: StartRunInput): New
       {
         type: "http",
         name: "chrona",
-        url,
-        headers,
+        url: mcp.url,
+        headers: mcp.headers,
       } satisfies McpServer,
     ],
     _meta: {
@@ -500,6 +692,7 @@ export class AcpProviderClient implements AgentProviderClient {
   readonly provider: string;
   private readonly config: AcpProviderConfig;
   private readonly transport: AcpTransport;
+  private readonly diagnostics?: AcpDiagnostics;
   private readonly runs = new Map<string, InternalRun>();
   private readonly pendingApprovals = new Map<string, PendingAcpApproval>();
 
@@ -507,6 +700,7 @@ export class AcpProviderClient implements AgentProviderClient {
     this.config = opts.config;
     this.provider = opts.config.provider;
     this.transport = opts.transport ?? new StdioAcpTransport();
+    this.diagnostics = opts.diagnostics;
   }
 
   getCapabilities(): ProviderCapabilities {
@@ -578,7 +772,7 @@ export class AcpProviderClient implements AgentProviderClient {
       this.runs.set(handle.ref.runId, { handle, startedAt: now(), input });
       return handle.ref;
     } catch (error) {
-      throw new AcpProviderError(`${this.provider} startRun failed: ${errorMessage(error)}`, {
+      throw new AcpProviderError(`${this.provider} startRun failed: ${providerErrorMessage(error, this.diagnosticDetails())}`, {
         retryable: false,
         cause: error,
         provider: this.provider,
@@ -668,6 +862,8 @@ export class AcpProviderClient implements AgentProviderClient {
       timer,
       sequence: 0,
       approvalEvents: [],
+      toolLabels: new Map(),
+
       approvalWaiters: [],
     };
 
@@ -754,12 +950,16 @@ export class AcpProviderClient implements AgentProviderClient {
         yield { ...eventBase(this.config, handle, "cancelled"), type: "run_cancelled", run: providerRunRef(handle, "cancelled") };
         return;
       }
-      handle.error = errorMessage(error);
+      handle.error = providerErrorMessage(error, this.diagnosticDetails(handle.connection));
       yield { ...eventBase(this.config, handle, "error"), type: "run_failed", run: providerRunRef(handle, "failed"), error: handle.error };
     } finally {
       clearTimeout(handle.timer);
       handle.session?.dispose();
     }
+  }
+
+  private diagnosticDetails(connection?: AcpConnection) {
+    return [connection?.diagnostics?.stderr(), this.diagnostics?.details()].filter((part) => part && part.trim().length > 0).join("\n");
   }
 
   private async snapshot(handle: AcpRunHandle): Promise<ProviderRunSnapshot> {

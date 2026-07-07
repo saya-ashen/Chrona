@@ -204,7 +204,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
       zValidator("json", planGenerateBodySchema),
       async (c) => {
         const { taskId } = c.req.valid("param");
-        const { forceRefresh, userInstruction, workBlockId } = c.req.valid("json");
+        const { forceRefresh, userInstruction, workBlockId, selectedNodeId } = c.req.valid("json");
         try {
           const requestId = randomUUID();
           logger.info("request.start", {
@@ -216,7 +216,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
             hasUserInstruction: Boolean(userInstruction?.trim()),
           });
 
-          const generation = engine.tasks.plan.generate({ taskId, workBlockId, forceRefresh, userInstruction });
+          const generation = engine.tasks.plan.generate({ taskId, workBlockId, forceRefresh, userInstruction, selectedNodeId });
 
           void (async () => {
             try {

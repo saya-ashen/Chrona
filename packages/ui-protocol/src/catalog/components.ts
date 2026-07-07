@@ -8,7 +8,7 @@ import {
   acceptPlanPayloadSchema,
   dispatchExecutionPayloadSchema,
   locateWorkspaceNodePayloadSchema,
-  regeneratePlanPayloadSchema,
+  generatePlanPayloadSchema,
   submitCheckpointPayloadSchema,
   recoveryRetryPayloadSchema,
   recoveryEditInstructionPayloadSchema,
@@ -63,13 +63,34 @@ const paragraphSchema = z.object({
   variant: z.string().optional(),
 });
 
+const tableColumnSchema = z.object({
+  key: z.string(),
+  label: z.string().optional(),
+  type: z.enum(["text", "number", "link"]).optional(),
+  hrefKey: z.string().optional(),
+}).strict();
+
 const tableComponentDefinition = {
-  ...shadcn.Table,
+  props: z.object({
+    title: z.string().optional(),
+    description: z.string().optional(),
+    uri: z.string().optional(),
+    path: z.string().optional(),
+    displayPath: z.string().optional(),
+    columns: z.array(z.union([z.string(), tableColumnSchema])).optional(),
+    pageSize: z.number().int().positive().max(100).optional(),
+    contentKind: z.enum(["json", "csv", "text", "markdown"]).optional(),
+    contentPreview: z.string().optional(),
+    contentTruncated: z.boolean().optional(),
+    contentBytes: z.number().optional(),
+    previewError: z.enum(["unsafe_path", "not_found", "unsupported_type", "read_failed"]).optional(),
+  }).strict(),
   description:
-    'Data table. columns MUST be a direct JSON string array. rows MUST be a direct JSON 2D string array. Do not wrap arrays in objects such as { item: [...] }. Example: { columns: ["Repo", "Stars"], rows: [["chrona", "120"]] }.',
+    'File-backed data table. Reference a safe repo-relative JSON or CSV file with path or uri; do not inline rows. Optional columns may be strings or { key, label, type, hrefKey }. Use type: "link" or hrefKey for link cells. Prefer pageSize 10 for workspace readability; do not set pageSize equal to total rows merely to show everything. Use larger pageSize only for dense datasets or explicit user requests. Example: { path: ".chrona/outputs/N20260706-01/trending.json", columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }], pageSize: 10 }.',
   example: {
-    columns: ["Repo", "Stars"],
-    rows: [["chrona", "120"]],
+    path: ".chrona/outputs/N20260706-01/trending.json",
+    columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }],
+    pageSize: 10,
   },
 };
 
@@ -326,10 +347,9 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       params: acceptPlanPayloadSchema,
       description: "Accept the current generated plan.",
     },
-    [UI_ACTION.regeneratePlan]: {
-      params: regeneratePlanPayloadSchema,
-      description:
-        "Regenerate the current generated plan with optional user instruction.",
+    [UI_ACTION.generatePlan]: {
+      params: generatePlanPayloadSchema,
+      description: "Generate a plan for the current task.",
     },
     [UI_ACTION.dispatchExecution]: {
       params: dispatchExecutionPayloadSchema,

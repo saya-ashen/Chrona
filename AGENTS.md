@@ -17,15 +17,15 @@ patterns.
 Before exploring source, orient with the curated docs (kept current; faster and
 cheaper than reading files):
 
-| To understand…                                                                  | Read                                                               |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| To understand…                                                                  | Read                                                                     |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | System: layers, workflows, data/projection model, architecture rules            | [`docs/en/architecture.md`](docs/en/architecture.md)                     |
 | Where code belongs: per-package responsibilities, dependency rules, enforcement | [`docs/en/package-boundaries.md`](docs/en/package-boundaries.md)         |
 | Frontend `apps/web`: routing, components, hooks, lib, conventions               | [`docs/en/frontend-structure.md`](docs/en/frontend-structure.md)         |
 | Execution internals                                                             | [`docs/en/backend-execution-flow.md`](docs/en/backend-execution-flow.md) |
 | Persistence                                                                     | [`docs/en/data-model.md`](docs/en/data-model.md)                         |
 | HTTP/MCP surface                                                                | [`docs/en/api-reference.md`](docs/en/api-reference.md)                   |
-| Full doc index                                                                  | [`docs/README.md`](docs/README.md)                                 |
+| Full doc index                                                                  | [`docs/README.md`](docs/README.md)                                       |
 
 For **structural** questions (what calls X, where is X defined, blast radius),
 prefer the codegraph / GitNexus MCP tools (see the tool sections below) over
@@ -169,55 +169,90 @@ Descriptive source labels for `search(source: "label")`.
 
 ## Frontend AI surface ownership
 
-- Keep component names domain-first (`TaskResultPanel`, `ExecutionActivity`, `SettingsPage`). Do not rename components by implementation ownership unless the ownership is the domain concept.
-- Mark AI/product/runtime boundaries with surface metadata, props, wrapper names, `data-ui-surface-kind`, and local comments instead of broad directory moves or component-name churn.
-- Use these surface kinds consistently: `product-authored` for fixed Chrona UI, `ai-authored` for validated AI/json-render output, `ai-editable` for product-owned regions AI may patch after review, and `runtime-control` for execution state/actions owned by Chrona runtime.
-- Visual distinction should clarify trust and mutability: AI-authored shows source/validation, AI-editable shows pending/review/revert affordance, runtime-control emphasizes status and next action, product-authored stays default.
-- Surface kind is lifecycle metadata, not permanent identity. A region may move from product-authored to ai-editable or from ai-authored draft to saved artifact without renaming its business component.
-- AI-authored surfaces must not contain product authority controls, secret-bearing data, permission decisions, or execution lifecycle rules.
+- Keep component names domain-first (`TaskResultPanel`, `ExecutionActivity`,
+  `SettingsPage`). Do not rename components by implementation ownership unless
+  the ownership is the domain concept.
+- Mark AI/product/runtime boundaries with surface metadata, props, wrapper
+  names, `data-ui-surface-kind`, and local comments instead of broad directory
+  moves or component-name churn.
+- Use these surface kinds consistently: `product-authored` for fixed Chrona UI,
+  `ai-authored` for validated AI/json-render output, `ai-editable` for
+  product-owned regions AI may patch after review, and `runtime-control` for
+  execution state/actions owned by Chrona runtime.
+- Visual distinction should clarify trust and mutability: AI-authored shows
+  source/validation, AI-editable shows pending/review/revert affordance,
+  runtime-control emphasizes status and next action, product-authored stays
+  default.
+- Surface kind is lifecycle metadata, not permanent identity. A region may move
+  from product-authored to ai-editable or from ai-authored draft to saved
+  artifact without renaming its business component.
+- AI-authored surfaces must not contain product authority controls,
+  secret-bearing data, permission decisions, or execution lifecycle rules.
 
 ## Chrona task workspace / AI auto-edit rules
 
-Chrona task execution monitoring workspace. Core UX goal: user always sees task state, plan state, current execution state, current node state, and next action.
+Chrona task execution monitoring workspace. Core UX goal: user always sees task
+state, plan state, current execution state, current node state, and next action.
 
 ### Prohibited unattended changes
 
-- Do not change database schema, migrations, auth, run token, MCP bearer, provider protocol, execution engine semantics, deployment config, secrets, network binding, or external provider contracts without explicit human approval.
-- Do not hand-roll SSE parsing in `apps/web`; use `apps/web/src/lib/fetch-json-event-source.ts`.
-- Do not expose secrets, API keys, run tokens, provider request bodies, raw tool payloads, or run context in UI, logs, tests, or json-render output.
+- Do not change database schema, migrations, auth, run token, MCP bearer,
+  provider protocol, execution engine semantics, deployment config, secrets,
+  network binding, or external provider contracts without explicit human
+  approval.
+- Do not hand-roll SSE parsing in `apps/web`; use
+  `apps/web/src/lib/fetch-json-event-source.ts`.
+- Do not expose secrets, API keys, run tokens, provider request bodies, raw tool
+  payloads, or run context in UI, logs, tests, or json-render output.
 
 ### UI state logic constraints
 
-- Derive `task.status`, `currentExecution.status`, `savedPlan.status`, and execution node status through pure helpers under `apps/web/src/components/tasks/workspace/model/`.
-- Header badge, command center status, graph node tone, activity tone, and action disabled reason should share the same derived state source where possible.
-- `WaitingForInput` and `WaitingForApproval` must remain distinguishable in UI copy and derived metadata.
-- `Cancelled`, `Completed`, and `Done` must not be treated as identical unless the test name documents the product decision.
-- Blocked and failed states must make the next action more prominent than secondary metadata.
+- Derive `task.status`, `currentExecution.status`, `savedPlan.status`, and
+  execution node status through pure helpers under
+  `apps/web/src/components/tasks/workspace/model/`.
+- Header badge, command center status, graph node tone, activity tone, and
+  action disabled reason should share the same derived state source where
+  possible.
+- `WaitingForInput` and `WaitingForApproval` must remain distinguishable in UI
+  copy and derived metadata.
+- `Cancelled`, `Completed`, and `Done` must not be treated as identical unless
+  the test name documents the product decision.
+- Blocked and failed states must make the next action more prominent than
+  secondary metadata.
 
 ### json-render rules
 
-- All Chrona json-render specs must validate against the `@chrona/ui-protocol` catalog.
-- Add or update `packages/ui-protocol` tests when changing catalog components, builders, validation, or AI output prompt examples.
+- All Chrona json-render specs must validate against the `@chrona/ui-protocol`
+  catalog.
+- Add or update `packages/ui-protocol` tests when changing catalog components,
+  builders, validation, or AI output prompt examples.
 - Prefer shared spec builders over local one-off spec objects.
 - Fallback specs must be tested with `validateChronaSpec()`.
 
 ### Required command matrix
 
-- Type-only/model/state changes: `bun run typecheck` and targeted `bun run test`.
-- UI primitive/foundation changes: `bun run check:ui-foundation`, `bun run typecheck`, and targeted tests.
-- json-render catalog/builder/validation changes: `bun run test:bun` and `bun run typecheck`.
-- Task workspace navigation or execution flow changes: targeted tests plus `bun run test:e2e:desktop` when flow affected.
+- Type-only/model/state changes: `bun run typecheck` and targeted
+  `bun run test`.
+- UI primitive/foundation changes: `bun run check:ui-foundation`,
+  `bun run typecheck`, and targeted tests.
+- json-render catalog/builder/validation changes: `bun run test:bun` and
+  `bun run typecheck`.
+- Task workspace navigation or execution flow changes: targeted tests plus
+  `bun run test:e2e:desktop` when flow affected.
 - Package boundary changes: `bun run check:boundaries`.
 
 ### Test requirements
 
 - State derivation changes need table-driven tests.
-- UI changes must cover touched empty, loading, error, blocked, waiting, and completed states.
-- Do not test CSS snapshots only; assert user-visible labels, roles, disabled reasons, and next actions.
+- UI changes must cover touched empty, loading, error, blocked, waiting, and
+  completed states.
+- Do not test CSS snapshots only; assert user-visible labels, roles, disabled
+  reasons, and next actions.
 
 ### AI auto-edit boundaries
 
 Safe unattended AI:
+
 - pure helper extraction
 - status mapping tests
 - small UI polish
@@ -225,6 +260,7 @@ Safe unattended AI:
 - dead field cleanup covered by typecheck
 
 Unsafe without human approval:
+
 - execution engine changes
 - DB schema or migrations
 - auth, permission, or token changes
@@ -261,14 +297,6 @@ results, proceed as a fresh session.
 
 After /clear or /compact: knowledge base and session stats preserved. Use
 `ctx purge` to start fresh.
-
-<!-- SPECKIT START -->
-
-For additional context about technologies to be used, project structure, shell
-commands, and other important information, read
-`specs/015-external-calendar/plan.md`
-
-<!-- SPECKIT END -->
 
 <!-- CODEGRAPH_START -->
 

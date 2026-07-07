@@ -47,7 +47,9 @@ export async function* generatePlanStream(
   client: EngineAiClient,
   request: GenerateTaskPlanRequest,
 ): AsyncGenerator<StreamEvent> {
-  const featureSpec = buildGeneratePlanFeatureSpec(request);
+  const featureSpec = buildGeneratePlanFeatureSpec(request, {
+    providerType: client.record.type,
+  });
   const preparedInput = prepareStreamInput(
     buildGeneratePlanScope(request),
     request,

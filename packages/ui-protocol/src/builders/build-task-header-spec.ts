@@ -59,7 +59,7 @@ function actionBinding(action: TaskHeaderActionInput) {
   if (action.id === "edit") return { action: "edit-task", params: {} };
   if (action.id === "delete") return { action: "delete-task", params: {} };
   if (action.id === "accept-plan") return { action: UI_ACTION.acceptPlan, params: {} };
-  if (action.id === "generate-plan") return { action: UI_ACTION.regeneratePlan, params: {} };
+  if (action.id === "generate-plan") return { action: UI_ACTION.generatePlan, params: {} };
   return { action: UI_ACTION.dispatchExecution, params: { actionId: action.id } };
 }
 
@@ -104,7 +104,7 @@ function appendAction(elements: MutableElements, children: string[], actionId: T
       ...baseProps,
       disabled: { $state: "/plan/generation/header-action-disabled" },
     };
-    element.on = { press: { action: UI_ACTION.regeneratePlan, params: {} } };
+    element.on = { press: { action: UI_ACTION.generatePlan, params: {} } };
     element.visible = { $state: "/execution/show-generate-plan" };
   }
   elements[key] = element;

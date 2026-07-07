@@ -181,4 +181,35 @@ describe("provider approval resolve", () => {
     expect(body.status).toBe("not_pending");
     expect(body.choice).toBe("approve_once");
   });
+
+  it("resolve with inactive provider marks approval failed and clears pending list", async () => {
+    const ws = await seedWorkspace("Approval resolve inactive provider");
+    const { taskId } = await seedTask(ws.workspaceId);
+    const { approval, providerRun } = await seedPendingApproval(ws.workspaceId, taskId);
+
+    const response = await app().request(
+      `http://local/api/tasks/${taskId}/provider-approvals/${approval.id}/resolve`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ choice: "approve_once" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { status: string; resolved: number };
+    expect(body.status).toBe("not_active");
+    expect(body.resolved).toBe(0);
+
+    const updated = await db.taskPlanProviderApproval.findUniqueOrThrow({ where: { id: approval.id } });
+    expect(updated.status).toBe("failed");
+    expect(updated.resolvedAt).toBeInstanceOf(Date);
+
+    const updatedProviderRun = await db.taskPlanProviderRun.findUniqueOrThrow({ where: { id: providerRun.id } });
+    expect(updatedProviderRun.status).toBe("failed");
+
+    const pending = await app().request(`http://local/api/tasks/${taskId}/provider-approvals?status=pending`);
+    const pendingBody = (await pending.json()) as { approvals: unknown[] };
+    expect(pendingBody.approvals).toHaveLength(0);
+  });
 });

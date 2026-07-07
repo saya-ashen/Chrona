@@ -121,7 +121,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
   });
 
-  it("shows a live status strip above Results while a runtime event is active", () => {
+  it("keeps running status out of Results while activity stream stays live", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
     const liveEvent = {
       type: "runtime_event" as const,
@@ -142,9 +142,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
       currentExecution: { status: "running" },
     });
 
-    const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("Running now");
-    expect(status).toHaveTextContent("Writing report");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+    expect(screen.getByText("Writing report")).toBeInTheDocument();
   });
 
   it("hides live status strip before execution has active runtime activity", () => {

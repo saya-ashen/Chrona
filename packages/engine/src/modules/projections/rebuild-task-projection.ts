@@ -55,6 +55,10 @@ export async function rebuildTaskProjection(taskId: string) {
         where: { status: "Pending", run: { workBlockId: scopeWorkBlockId } },
         orderBy: { requestedAt: "desc" },
       },
+      taskPlanProviderApprovals: {
+        where: { status: "pending", workBlockId: scopeWorkBlockId },
+        orderBy: { requestedAt: "desc" },
+      },
       artifacts: { orderBy: { createdAt: "desc" }, take: 1 },
       scheduleProposals: { where: { status: "Pending" } },
       executionSessions: {
@@ -104,11 +108,18 @@ export async function rebuildTaskProjection(taskId: string) {
   // recover branch in deriveTaskState reads this to clear stale Blocked
   // when the user regenerates a plan to retry.
   const latestPlan = await getLatestCompiledPlan(taskId, scopeWorkBlockId);
+  const pendingApprovals = [
+    ...task.approvals,
+    ...task.taskPlanProviderApprovals.map((approval) => ({
+      status: "Pending",
+      requestedAt: approval.requestedAt,
+    })),
+  ];
 
   const derived = deriveTaskState({
     task: { status: task.status, latestRunId: task.latestRunId },
     runs: task.runs,
-    approvals: task.approvals,
+    approvals: pendingApprovals,
     sync: { stale: syncStale },
     executionSession: session
       ? {
@@ -184,7 +195,7 @@ export async function rebuildTaskProjection(taskId: string) {
       blockDetail: derived.blockReason?.detail ?? null,
       blockNodeId: derived.blockReason?.nodeId ?? null,
       latestRunStatus: latestRun?.status ?? null,
-      approvalPendingCount: task.approvals.length,
+      approvalPendingCount: pendingApprovals.length,
       dueAt: task.dueAt,
       scheduledStartAt: currentWorkBlock?.scheduledStartAt ?? null,
       scheduledEndAt: currentWorkBlock?.scheduledEndAt ?? null,
@@ -217,7 +228,7 @@ export async function rebuildTaskProjection(taskId: string) {
       blockDetail: derived.blockReason?.detail ?? null,
       blockNodeId: derived.blockReason?.nodeId ?? null,
       latestRunStatus: latestRun?.status ?? null,
-      approvalPendingCount: task.approvals.length,
+      approvalPendingCount: pendingApprovals.length,
       dueAt: task.dueAt,
       scheduledStartAt: currentWorkBlock?.scheduledStartAt ?? null,
       scheduledEndAt: currentWorkBlock?.scheduledEndAt ?? null,

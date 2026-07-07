@@ -7,6 +7,9 @@ async function resetDb() {
   await db.toolInvocation.deleteMany();
   await db.conversationEntry.deleteMany();
   await db.runtimeCursor.deleteMany();
+  await db.taskPlanProviderApproval.deleteMany();
+  await db.taskPlanProviderRun.deleteMany();
+  await db.taskPlanNodeAttempt.deleteMany();
   await db.event.deleteMany();
   await db.approval.deleteMany();
   await db.artifact.deleteMany();
@@ -196,5 +199,85 @@ describe("rebuildTaskProjection occurrence isolation", () => {
     expect(projection.blockType).toBeNull();
     expect(projection.blockDetail).toBeNull();
     expect(projection.blockNodeId).toBeNull();
+  });
+
+  it("projects pending provider approvals even when no legacy run approval exists", async () => {
+    const { workspace, task } = await seedRecurringTask();
+    const plan = await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "approval-plan",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+        generatedBy: "test",
+      },
+    });
+    const planRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: plan.planId,
+        planRun: { status: "running" },
+        executionEpoch: 0,
+      },
+    });
+    const attempt = await db.taskPlanNodeAttempt.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: plan.planId,
+        planRunId: planRun.id,
+        nodeId: "approval-node",
+        nodeLayerId: "layer-1",
+        idempotencyKey: "provider-approval-attempt",
+        attemptNumber: 1,
+        status: "waiting_for_approval",
+        executionEpoch: 0,
+      },
+    });
+    const providerRun = await db.taskPlanProviderRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: plan.planId,
+        planRunId: planRun.id,
+        nodeAttemptId: attempt.id,
+        idempotencyKey: "provider-run-approval",
+        providerRunRef: "codex-run-approval",
+        runtimeName: "hermes",
+        status: "waiting_for_approval",
+      },
+    });
+    await db.taskPlanProviderApproval.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: plan.planId,
+        planRunId: planRun.id,
+        nodeAttemptId: attempt.id,
+        providerRunId: providerRun.id,
+        provider: "codex",
+        runtimeName: "hermes",
+        approvalRef: "call-approval",
+        kind: "acp_permission",
+        providerKind: "execute",
+        title: "Approve bash command",
+        summary: "ACP provider requests permission for bash command.",
+        riskLevel: "unknown",
+        subject: { type: "tool", label: "bash command" },
+        choices: ["approve_once", "deny"],
+        status: "pending",
+        requestedAt: new Date("2026-06-08T09:01:00.000Z"),
+      },
+    });
+
+    await rebuildTaskProjection(task.id);
+
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(projection.approvalPendingCount).toBe(1);
+    expect(projection.blockType).toBe("approval_pending");
+    expect(projection.actionRequired).toBe("Open Work Page");
   });
 });

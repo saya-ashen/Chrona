@@ -29,6 +29,7 @@ type TaskWorkspacePlanContentProps = {
   graphMode: "full" | "compact";
   onGraphModeChange: (mode: "full" | "compact") => void;
   onGeneratePlan: () => void;
+  onSelectedNodeChange?: Parameters<typeof TaskPlanGraphPanel>[0]["onSelectedNodeChange"];
 };
 
 export function TaskWorkspacePlanContent({
@@ -41,6 +42,7 @@ export function TaskWorkspacePlanContent({
   graphMode,
   onGraphModeChange,
   onGeneratePlan,
+  onSelectedNodeChange,
 }: TaskWorkspacePlanContentProps) {
   const { messages } = useI18n();
   const copy = { ...DEFAULT_COPY, ...(messages.components.taskWorkspace) };
@@ -117,6 +119,7 @@ export function TaskWorkspacePlanContent({
                 : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"}
               fillHeight
               showOverview={graphMode === "full"}
+              onSelectedNodeChange={onSelectedNodeChange}
             />
           </div>
           {acceptPlanError ? <p className="border-t border-border/55 px-3 py-2 text-xs text-destructive">{acceptPlanError}</p> : null}

@@ -267,8 +267,9 @@ async function* agentProviderStream(
       const run = await agentClient.providerClient.startRun({
         sessionId,
         sessionKey,
-        instructions: input.instructions,
-        input: input.input,
+        instructions: providerInput.instructions,
+        input: providerInput.input as ProviderRunInput,
+        terminalToolName: providerInput.terminalToolName,
         timeoutMs: timeout * 1000,
         stream: true,
         signal: input.signal,

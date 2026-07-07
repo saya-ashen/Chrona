@@ -1228,10 +1228,12 @@
       "copyResult": "Copy result",
       "noRunResult": "No run result yet for this node.",
       "generatingFreshPlan": "Generating a fresh plan. The graph will update when the run completes.",
-      "instructionLabel": "User instruction for this plan revision",
-      "instructionPlaceholder": "Tell Chrona what to change in the regenerated plan...",
-      "instructionAria": "Plan regeneration instruction",
-      "regenerateWithInstruction": "Regenerate with instruction",
+      "planRevisionTitle": "Revise plan",
+      "instructionLabel": "Last revision request",
+      "instructionPlaceholder": "Ask Chrona to revise this draft plan or selected step...",
+      "instructionAria": "Plan revision message",
+      "revisePlanWithAi": "Ask AI to revise plan",
+      "planRevisionIntro": "Ask Chrona to revise this draft plan.",
       "executionWorkspaceAria": "Task execution workspace",
       "executionFlow": "Execution flow",
       "commandCenterAria": "Task command center",
@@ -1316,7 +1318,10 @@
       "filePreviewReadFailed": "File preview could not be loaded.",
       "expandFilePreview": "Expand preview",
       "collapseFilePreview": "Collapse preview",
-      "liveStatusRunning": "Running now"
+      "liveStatusRunning": "Running now",
+      "resultSummaryLabel": "Result summary",
+      "copyResultSummary": "Copy summary",
+      "resultSummaryCopied": "Copied"
     }
   },
   "queries": {

@@ -262,6 +262,49 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).toContain("FileView or FileRef");
     expect(runtime.instructions).toContain("Do not use absolute paths, .. segments");
   });
+
+  it("includes Results design guidance for task-node outputs", () => {
+    const current = node({
+      id: "task-real-791",
+      title: "Render useful result",
+      type: "task",
+    });
+    const plan = graph([current]);
+    const runtime = buildNodeRuntimePrompt({ plan, node: current });
+
+    expect(runtime.instructions).toContain("Design user-visible Results as a concise deliverable");
+    expect(runtime.instructions).toContain("not a raw data dump");
+    expect(runtime.instructions).toContain("what was completed");
+    expect(runtime.instructions).toContain("the most important findings");
+    expect(runtime.instructions).toContain("the primary data or report needed to inspect the result");
+    expect(runtime.instructions).toContain("where full artifacts or evidence live");
+    expect(runtime.instructions).toContain("Choose components based on the result shape");
+    expect(runtime.instructions).toContain("Table for ranked lists, comparisons, records, and datasets users need to scan");
+    expect(runtime.instructions).toContain("JsonView only for diagnostics or machine-readable evidence");
+    expect(runtime.instructions).toContain("choose columns that best explain the data for the user's goal");
+    expect(runtime.instructions).toContain("Do not mechanically include every field");
+    expect(runtime.instructions).toContain("Do not drop fields that explain why a row matters");
+    expect(runtime.instructions).toContain("prefer making the name or title a link");
+  });
+
+  it("keeps Results design guidance out of non-task node prompts", () => {
+    const current = node({
+      id: "condition-real-791",
+      title: "Choose branch",
+      type: "condition",
+      config: {
+        evaluationBy: "ai",
+        condition: "Pick next step",
+        branches: [],
+      },
+    });
+    const plan = graph([current]);
+    const runtime = buildNodeRuntimePrompt({ plan, node: current });
+
+    expect(runtime.instructions).not.toContain("Design user-visible Results as a concise deliverable");
+    expect(runtime.instructions).not.toContain("choose columns that best explain the data for the user's goal");
+    expect(runtime.instructions).not.toContain("prefer making the name or title a link");
+  });
   it("passes existing accumulated plan output into task prompts", () => {
     const current = node({
       id: "task-real-790",
@@ -312,7 +355,7 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).not.toContain('"history":');
     expect(runtime.instructions).not.toContain('"patches":');
   });
-  it("spells out literal array and number props for json-render outputs", () => {
+  it("spells out file-backed table props for json-render outputs", () => {
     const current = node({
       id: "task-real-456",
       title: "Render table",
@@ -321,8 +364,9 @@ describe("node runtime refs", () => {
     const plan = graph([current]);
     const runtime = buildNodeRuntimePrompt({ plan, node: current });
 
-    expect(runtime.instructions).toContain("columns MUST be a direct JSON string array");
-    expect(runtime.instructions).toContain("threshold MUST be a JSON number");
+    expect(runtime.instructions).toContain("File-backed data table");
+    expect(runtime.instructions).toContain("do not inline rows");
+    expect(runtime.instructions).toContain("pageSize");
     expect(runtime.instructions).toContain("RFC 6902");
     expect(runtime.instructions).not.toContain("Spec shape for chrona_plan_output tool arguments: { root: string, elements: Array<");
   });

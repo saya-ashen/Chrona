@@ -67,14 +67,6 @@ const separatorElementSchema = z.object({
   children: z.array(z.string()).max(0).optional(),
 }).strict();
 
-const tableElementSchema = z.object({
-  type: z.literal("Table"),
-  props: z.object({
-    columns: z.array(textProp.max(40)).min(1).max(4),
-    rows: z.array(z.array(textProp.max(80)).min(1).max(4)).max(4),
-  }).strict(),
-  children: childKeys,
-}).strict();
 
 const dashboardSummaryElementSchema = z.discriminatedUnion("type", [
   stackElementSchema,
@@ -84,7 +76,6 @@ const dashboardSummaryElementSchema = z.discriminatedUnion("type", [
   alertElementSchema,
   badgeElementSchema,
   separatorElementSchema,
-  tableElementSchema,
 ]);
 
 export const dashboardSummarySpecSchema = z.object({

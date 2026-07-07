@@ -100,4 +100,26 @@ describe("hydrateFilePreviewSpec", () => {
       });
     });
   });
+
+  it("hydrates Table props from JSON artifacts", async () => {
+    await withTempDir(async (dir) => {
+      await Bun.write(join(dir, "rows.json"), JSON.stringify({ rows: [{ repo: "chrona" }] }));
+
+      const spec = await hydrateFilePreviewSpec({
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["table"] },
+          table: { type: "Table", props: { title: "Rows", path: "rows.json" } },
+        },
+      }, { rootDir: dir });
+
+      expect(spec.elements.table.props).toMatchObject({
+        title: "Rows",
+        path: "rows.json",
+        displayPath: "rows.json",
+        contentKind: "json",
+        contentPreview: "{\n  \"rows\": [\n    {\n      \"repo\": \"chrona\"\n    }\n  ]\n}",
+      });
+    });
+  });
 });

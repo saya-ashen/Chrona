@@ -122,7 +122,7 @@ export function TaskWorkspaceHeaderCard({
     [UI_ACTION.acceptPlan]: async () => {
       await Promise.resolve(ref.current.onAcceptPlan());
     },
-    [UI_ACTION.regeneratePlan]: async () => {
+    [UI_ACTION.generatePlan]: async () => {
       await Promise.resolve(ref.current.onGeneratePlan());
     },
     [UI_ACTION.stopPlanGeneration]: async () => {

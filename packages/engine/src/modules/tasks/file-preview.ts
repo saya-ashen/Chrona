@@ -111,7 +111,7 @@ function fileUriFromProps(props: unknown) {
 export async function hydrateFilePreviewSpec(spec: UiDocument, options: FilePreviewOptions = {}): Promise<UiDocument> {
   const elements = { ...spec.elements };
   for (const [key, element] of Object.entries(spec.elements)) {
-    if (element.type !== "FileView" && element.type !== "FileRef" && element.type !== "WorkspaceArtifactItem") continue;
+    if (element.type !== "FileView" && element.type !== "FileRef" && element.type !== "WorkspaceArtifactItem" && element.type !== "Table") continue;
     const preview = await resolveFilePreview(fileUriFromProps(element.props), options);
     elements[key] = {
       ...element,

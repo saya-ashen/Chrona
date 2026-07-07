@@ -83,6 +83,51 @@ describe("generatePlanStream", () => {
     });
   });
 
+  it("adds Codex discovery guidance only for Codex plan streams", async () => {
+    async function collectStartInput(type: string) {
+      let startInput = {} as { instructions?: string; terminalToolName?: string };
+      const startRunMock = mock((input: { instructions?: string; terminalToolName?: string }) => {
+        startInput = input;
+        return Promise.resolve({
+          provider: type,
+          runId: `run-${type}`,
+          sessionId: `session-${type}`,
+        });
+      });
+      const streamRunMock = mock(async function* () {
+        yield { type: "run_completed" as const, outputText: "" };
+      });
+      const client = {
+        record: {
+          id: `client-${type}`,
+          name: type,
+          type,
+          config: { baseUrl: "" },
+          isDefault: true,
+          enabled: true,
+        },
+        providerClient: {
+          provider: type,
+          startRun: startRunMock,
+          streamRun: streamRunMock,
+        },
+      } as unknown as EngineAiClient;
+
+      for await (const _event of generatePlanStream(client, { title: "Build plan" })) {
+        // drain stream
+      }
+
+      return startInput;
+    }
+
+    const codexStart = await collectStartInput("codex");
+    const claudeStart = await collectStartInput("claude_code");
+    expect(codexStart.instructions).toContain("first call tool_search");
+    expect(codexStart.terminalToolName).toBe("chrona_plan_generate");
+    expect(claudeStart.instructions).not.toContain("tool_search");
+    expect(claudeStart.terminalToolName).toBe("chrona_plan_generate");
+  });
+
   it("streams provider clients through startRun and run event stream", async () => {
     const createSessionMock = mock(() => Promise.resolve({
       provider: "hermes",

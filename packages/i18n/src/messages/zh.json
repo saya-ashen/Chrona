@@ -1228,10 +1228,12 @@
       "copyResult": "复制结果",
       "noRunResult": "此节点暂无运行结果。",
       "generatingFreshPlan": "正在生成新计划，运行完成后图表将自动更新。",
-      "instructionLabel": "本次计划修订的用户说明",
-      "instructionPlaceholder": "告诉 Chrona 在重新生成的计划中需要修改什么…",
-      "instructionAria": "计划重新生成说明",
-      "regenerateWithInstruction": "按说明重新生成",
+      "planRevisionTitle": "修改计划",
+      "instructionLabel": "上次修订请求",
+      "instructionPlaceholder": "让 Chrona 修改这个草稿计划或所选步骤…",
+      "instructionAria": "计划修订消息",
+      "revisePlanWithAi": "让 AI 修改计划",
+      "planRevisionIntro": "让 Chrona 修改这个草稿计划。",
       "executionWorkspaceAria": "任务执行工作区",
       "executionFlow": "执行流程",
       "commandCenterAria": "任务指挥中心",
@@ -1316,7 +1318,10 @@
       "filePreviewReadFailed": "无法加载文件预览。",
       "expandFilePreview": "展开预览",
       "collapseFilePreview": "收起预览",
-      "liveStatusRunning": "正在运行"
+      "liveStatusRunning": "正在运行",
+      "resultSummaryLabel": "结果摘要",
+      "copyResultSummary": "复制摘要",
+      "resultSummaryCopied": "已复制"
     }
   },
   "queries": {

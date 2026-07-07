@@ -21,6 +21,7 @@ describe("generate_plan feature spec", () => {
       feature: "generate_plan",
     });
     expect(spec.structuredOutputSchema).toBeUndefined();
+    expect(spec.terminalToolName).toBe("chrona_plan_generate");
     expect(GENERATE_PLAN_BLUEPRINT_TOOL_NAME).toBe("chrona_plan_generate");
     expect(spec.instructions).toContain("You MUST call the chrona_plan_generate tool.");
     expect(spec.instructions).toContain("A simple task may be a SINGLE task node that both does the work and delivers the result.");
@@ -29,6 +30,49 @@ describe("generate_plan feature spec", () => {
     expect(spec.inputText).toContain("Estimated duration: 60 minutes");
     expect(spec.inputText).toContain("Default to one task node for simple information requests");
     expect(spec.inputText).not.toContain("most tasks use 3-7 nodes");
+  });
+
+  it("includes current draft plan context when revising a plan", () => {
+    const spec = buildGeneratePlanFeatureSpec({
+      taskId: "task-1",
+      title: "获取 GitHub Trending",
+      userInstruction: "把收集数据步骤拆成两个节点",
+      revisionContext: {
+        planId: "plan-1",
+        status: "draft",
+        revision: 2,
+        summary: "Collect then report",
+        selectedNodeId: "collect_sources",
+        blueprint: {
+          title: "Trending plan",
+          goal: "Create report",
+          nodes: [{ id: "collect_sources", type: "task", title: "Collect sources" }],
+          edges: [],
+        },
+      },
+    });
+
+    expect(spec.inputText).toContain("Revise the current draft plan instead of starting from a blank plan");
+    expect(spec.inputText).toContain("Current draft plan JSON");
+    expect(spec.inputText).toContain('"selectedNodeId": "collect_sources"');
+    expect(spec.inputText).toContain("把收集数据步骤拆成两个节点");
+  });
+
+  it("adds Codex-only tool discovery guidance", () => {
+    const generic = buildGeneratePlanFeatureSpec({ title: "Build plan" });
+    const codex = buildGeneratePlanFeatureSpec(
+      { title: "Build plan" },
+      { providerType: "codex" },
+    );
+    const claudeCode = buildGeneratePlanFeatureSpec(
+      { title: "Build plan" },
+      { providerType: "claude_code" },
+    );
+
+    expect(codex.instructions).toContain("first call tool_search");
+    expect(codex.instructions).toContain("chrona_plan_generate");
+    expect(generic.instructions).not.toContain("tool_search");
+    expect(claudeCode.instructions).not.toContain("tool_search");
   });
 
   it("includes both the editable Chrona note and the read-only calendar source context as distinct sections", () => {
@@ -81,7 +125,7 @@ describe("generate_plan feature spec", () => {
     ).toMatchObject({ ok: false });
   });
 
-  it("does not expose provider structured output schema for generate_plan", () => {
+  it("does not expose structured output fallback for generate_plan", () => {
     const spec = buildGeneratePlanFeatureSpec({
       title: "制作一个汉堡",
     });

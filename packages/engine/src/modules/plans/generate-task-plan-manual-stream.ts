@@ -5,7 +5,7 @@ import { ensurePlanGenerationTaskSession, ensureWorkBlockPlanTaskSession, resolv
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { updateLatestCompiledPlanPrompt } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
-import type { GeneratePlanSSEEvent, PlanBlueprint, TaskPlanReadModel } from "@chrona/contracts/ai";
+import { planBlueprintSchema, type GeneratePlanSSEEvent, type PlanBlueprint, type TaskPlanReadModel } from "@chrona/contracts/ai";
 
 const PLAN_GENERATE_TOOL_NAME = "chrona_plan_generate";
 const INTERNAL_PLAN_GENERATE_TOOL_NAME = "chrona.plan.generate";
@@ -17,14 +17,16 @@ function isPlanGenerateTool(tool: string | undefined): boolean {
     tool === CLAUDE_CODE_PLAN_GENERATE_TOOL_NAME;
 }
 
-function isPlanBlueprint(value: Record<string, unknown>): value is PlanBlueprint {
-  return typeof value.title === "string" &&
-    value.title.trim().length > 0 &&
-    typeof value.goal === "string" &&
-    value.goal.trim().length > 0 &&
-    Array.isArray(value.nodes) &&
-    value.nodes.length > 0 &&
-    Array.isArray(value.edges);
+function normalizePlanBlueprint(value: unknown): PlanBlueprint | null {
+  const parsed = planBlueprintSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+function providerFailureFromDoneText(text: string | undefined): string | null {
+  const trimmed = text?.trim();
+  if (!trimmed) return null;
+  if (/unexpected status \d{3}/i.test(trimmed) || /\bBad Gateway\b/i.test(trimmed)) return trimmed;
+  return null;
 }
 
 function getToolDisplayName(tool: string | undefined) {
@@ -185,6 +187,7 @@ export async function* generateTaskPlanManualStream(input: {
   generationId?: string;
   forceRefresh?: boolean;
   userInstruction?: string | null;
+  selectedNodeId?: string | null;
   signal?: AbortSignal;
 }): AsyncGenerator<GeneratePlanSSEEvent> {
   const generationId = input.generationId ?? crypto.randomUUID();
@@ -289,6 +292,7 @@ export async function* generateTaskPlanManualStream(input: {
   let hasPlanGenerateToolCall = false;
   let persistedPlanId: string | null = null;
   let materializedPlan: TaskPlanReadModel | null = null;
+  let providerOutputText = "";
 
   if (input.signal?.aborted) {
     const event: GeneratePlanSSEEvent = { type: "cancelled" };
@@ -297,6 +301,14 @@ export async function* generateTaskPlanManualStream(input: {
     return;
   }
 
+  const currentPlan = userInstruction
+    ? await getLatestTaskPlanReadModel(task.id, effectiveWorkBlockId)
+    : null;
+  const currentPlanNodeIds = new Set(currentPlan?.blueprint.nodes.map((node) => node.id) ?? []);
+  const selectedNodeId = input.selectedNodeId && currentPlanNodeIds.has(input.selectedNodeId)
+    ? input.selectedNodeId
+    : null;
+
   for await (const event of aiGeneratePlanStream({
     taskId: task.id,
     title: task.title,
@@ -304,6 +316,16 @@ export async function* generateTaskPlanManualStream(input: {
     sourceContext: task.importedCalendarEvents[0]?.description ?? undefined,
     estimatedMinutes,
     userInstruction,
+    revisionContext: currentPlan
+      ? {
+          planId: currentPlan.id,
+          status: currentPlan.status,
+          revision: currentPlan.revision,
+          summary: currentPlan.summary,
+          selectedNodeId,
+          blueprint: currentPlan.blueprint,
+        }
+      : null,
     sessionKey: taskSessionKey,
     signal: input.signal,
   })) {
@@ -337,15 +359,16 @@ export async function* generateTaskPlanManualStream(input: {
         if (isPlanGenerateTool(event.tool)) {
           hasPlanGenerateToolCall = true;
 
-          if (isPlanBlueprint(event.input)) {
+          const blueprint = normalizePlanBlueprint(event.input);
+          if (blueprint) {
             await recordPlanGenerationEvent({ workBlockId: effectiveWorkBlockId,
               type: "tool_called",
               task,
               generationId,
               payload: {
                 tool: PLAN_GENERATE_TOOL_NAME,
-                plan_title: event.input.title,
-                node_count: event.input.nodes.length,
+                plan_title: blueprint.title,
+                node_count: blueprint.nodes.length,
               },
             });
             if (!persistedPlanId) {
@@ -353,7 +376,7 @@ export async function* generateTaskPlanManualStream(input: {
                 taskId: task.id,
                 workspaceId: task.workspaceId,
                 workBlockId: effectiveWorkBlockId,
-                blueprint: event.input,
+                blueprint,
                 generatedBy: "hermes",
                 userInstruction,
               });
@@ -365,8 +388,8 @@ export async function* generateTaskPlanManualStream(input: {
                 generationId,
                 payload: {
                   plan_id: savedPlan.id,
-                  plan_title: event.input.title,
-                  node_count: event.input.nodes.length,
+                  plan_title: blueprint.title,
+                  node_count: blueprint.nodes.length,
                 },
               });
             }
@@ -374,7 +397,7 @@ export async function* generateTaskPlanManualStream(input: {
             const toolEvent: GeneratePlanSSEEvent = {
               type: "tool_call",
               tool: PLAN_GENERATE_TOOL_NAME,
-              input: event.input,
+              input: blueprint,
             };
             yield toolEvent;
           } else {
@@ -491,6 +514,7 @@ export async function* generateTaskPlanManualStream(input: {
 
       case "partial":
         {
+          providerOutputText += event.text;
           const partialEvent: GeneratePlanSSEEvent = { type: "partial", text: event.text };
           yield partialEvent;
         }
@@ -526,6 +550,27 @@ export async function* generateTaskPlanManualStream(input: {
             yield* yieldPlanCompletion(savedPlan, taskSessionKey, task, generationId, effectiveWorkBlockId);
             return;
           }
+
+          const doneText = event.text?.trim() ? event.text : providerOutputText;
+          const providerFailure = providerFailureFromDoneText(doneText);
+          if (providerFailure) {
+            const errorEvent: GeneratePlanSSEEvent = {
+              type: "error",
+              code: "PROVIDER_ERROR",
+              message: providerFailure,
+            };
+            await recordPlanGenerationEvent({
+              workBlockId: effectiveWorkBlockId,
+              type: "failed",
+              task,
+              generationId,
+              payload: { code: errorEvent.code, message: errorEvent.message },
+              dedupeSuffix: errorEvent.code,
+            });
+            yield errorEvent;
+            return;
+          }
+
 
           const message = hasPlanGenerateToolCall
             ? "Plan generation tool was called but no saved plan was found."

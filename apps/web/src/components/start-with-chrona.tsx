@@ -15,9 +15,35 @@ type AiClientsResponse = {
   clients?: AiClientSummary[];
 };
 
+type TasksResponse = {
+  tasks?: Array<{ id?: unknown }>;
+  total?: number;
+};
+
+type TaskPresence = {
+  hasTask: boolean;
+  taskId: string | null;
+};
+
+const EMPTY_TASK_PRESENCE: TaskPresence = { hasTask: false, taskId: null };
+
+function taskPresence(payload: TasksResponse): TaskPresence {
+  const taskId = payload.tasks?.find((task) => typeof task.id === "string")?.id;
+  return {
+    hasTask: Boolean((payload.total ?? 0) > 0 || taskId),
+    taskId: typeof taskId === "string" ? taskId : null,
+  };
+}
+
+function tasksPath(workspaceId: string) {
+  const params = new URLSearchParams({ workspaceId, pageSize: "1", sort: "updatedAt", order: "desc" });
+  return `/api/tasks?${params.toString()}`;
+}
+
 type StartWithChronaProps = {
   className?: string;
   createdTaskId?: string | null;
+  workspaceId?: string;
   isComplete?: boolean;
   onCreateTask?: () => void;
   onOpenCreatedTask?: (taskId: string) => void;
@@ -58,12 +84,14 @@ function stepBadgeClasses(state: OnboardingStep["state"]): string {
   return "bg-muted text-muted-foreground";
 }
 
-export function StartWithChrona({ className = "", createdTaskId = null, isComplete = false, onCreateTask, onOpenCreatedTask }: StartWithChronaProps) {
+export function StartWithChrona({ className = "", createdTaskId = null, workspaceId, isComplete = false, onCreateTask, onOpenCreatedTask }: StartWithChronaProps) {
   const { t } = useI18n();
   const locale = useLocale();
   const router = useAppRouter();
   const [hasClients, setHasClients] = useState<boolean | null>(null);
-  const hasCreatedTask = Boolean(createdTaskId);
+  const [storedTask, setStoredTask] = useState<TaskPresence | null>(workspaceId ? null : EMPTY_TASK_PRESENCE);
+  const currentTaskId = createdTaskId ?? storedTask?.taskId ?? null;
+  const hasCreatedTask = Boolean(createdTaskId || storedTask?.hasTask);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,8 +110,30 @@ export function StartWithChrona({ className = "", createdTaskId = null, isComple
     };
   }, []);
 
+  useEffect(() => {
+    if (!workspaceId) {
+      setStoredTask(EMPTY_TASK_PRESENCE);
+      return;
+    }
+
+    let cancelled = false;
+    setStoredTask(null);
+
+    apiJson<TasksResponse>(tasksPath(workspaceId))
+      .then((payload) => {
+        if (!cancelled) setStoredTask(taskPresence(payload));
+      })
+      .catch(() => {
+        if (!cancelled) setStoredTask(EMPTY_TASK_PRESENCE);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
+
   if (isComplete) return null;
-  if (hasClients === null) return null;
+  if (hasClients === null || storedTask === null) return null;
 
   const steps: OnboardingStep[] = [
     {
@@ -109,12 +159,17 @@ export function StartWithChrona({ className = "", createdTaskId = null, isComple
       return;
     }
 
-    if (createdTaskId) {
+    if (currentTaskId) {
       if (onOpenCreatedTask) {
-        onOpenCreatedTask(createdTaskId);
+        onOpenCreatedTask(currentTaskId);
         return;
       }
-      router.push(localizeHref(locale, `/tasks/${createdTaskId}`));
+      router.push(localizeHref(locale, `/tasks/${currentTaskId}`));
+      return;
+    }
+
+    if (hasCreatedTask) {
+      router.push(localizeHref(locale, "/tasks"));
       return;
     }
 

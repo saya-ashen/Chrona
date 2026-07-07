@@ -82,9 +82,13 @@ function stringPayloadValue(payload: unknown, key: string) {
     : null;
 }
 
+function payloadRecord(payload: unknown) {
+  return payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : null;
+}
+
 function runtimePayloadEvent(payload: unknown) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
-  const event = (payload as { event?: unknown }).event;
+  const record = payloadRecord(payload);
+  const event = record?.event;
   return event && typeof event === "object" && !Array.isArray(event) ? event as Record<string, unknown> : null;
 }
 
@@ -210,8 +214,8 @@ function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivity
   const sequence = numberPayloadValue(event.payload, "sequence") ?? undefined;
   const eventType = providerActivityEventType(event, payloadEvent);
   const timestamp = (event.occurredAt ?? event.createdAt).toISOString();
-  const payloadRecord = payloadEvent ?? {};
-  const rawEventType = optionalStringEventValue(payloadRecord, "rawEventType") ?? eventType;
+  const payloadRecordValue = payloadEvent ?? payloadRecord(event.payload) ?? {};
+  const rawEventType = optionalStringEventValue(payloadRecordValue, "rawEventType") ?? eventType;
   const withBase = (item: WorkspaceActivityTimelineItem): WorkspaceActivityTimelineItem => ({
     ...item,
     provider,
@@ -229,28 +233,28 @@ function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivity
     case "run_started":
       return withBase({ id: event.id, kind: "provider_run", title: "Provider run started", summary: provider, description: provider, tone: "info", timestamp });
     case "text_delta":
-      return withBase({ id: event.id, kind: "assistant_message", title: "Assistant response", summary: providerActivityDescription(payloadRecord, "Assistant output streamed."), description: providerActivityDescription(payloadRecord, "Assistant output streamed."), tone: "info", timestamp, assistant: { text: providerActivityDescription(payloadRecord, ""), isReasoning: false, isPartial: true } });
+      return withBase({ id: event.id, kind: "assistant_message", title: "Assistant response", summary: providerActivityDescription(payloadRecordValue, "Assistant output streamed."), description: providerActivityDescription(payloadRecordValue, "Assistant output streamed."), tone: "info", timestamp, assistant: { text: providerActivityDescription(payloadRecordValue, ""), isReasoning: false, isPartial: true } });
     case "reasoning_delta":
-      return withBase({ id: event.id, kind: "reasoning", title: "Reasoning", summary: providerActivityDescription(payloadRecord, "Reasoning streamed."), description: providerActivityDescription(payloadRecord, "Reasoning streamed."), tone: "neutral", timestamp, assistant: { text: providerActivityDescription(payloadRecord, ""), isReasoning: true, isPartial: true } });
+      return withBase({ id: event.id, kind: "reasoning", title: "Reasoning", summary: providerActivityDescription(payloadRecordValue, "Reasoning streamed."), description: providerActivityDescription(payloadRecordValue, "Reasoning streamed."), tone: "neutral", timestamp, assistant: { text: providerActivityDescription(payloadRecordValue, ""), isReasoning: true, isPartial: true } });
     case "tool_call":
     case "tool_started":
-      return withBase({ id: event.id, kind: "tool_started", title: "Tool started", summary: providerActivityDescription(payloadRecord, "Provider tool started."), description: providerActivityDescription(payloadRecord, "Provider tool started."), tone: "info", timestamp, tool: { name: optionalStringEventValue(payloadRecord, "toolName") ?? optionalStringEventValue(payloadRecord, "tool"), label: providerActivityToolLabel(payloadRecord, "Provider tool"), preview: optionalStringEventValue(payloadRecord, "preview"), inputSummary: optionalStringEventValue(payloadRecord, "inputSummary"), state: "started" } });
+      return withBase({ id: event.id, kind: "tool_started", title: "Tool started", summary: providerActivityDescription(payloadRecordValue, "Provider tool started."), description: providerActivityDescription(payloadRecordValue, "Provider tool started."), tone: "info", timestamp, tool: { name: optionalStringEventValue(payloadRecordValue, "toolName") ?? optionalStringEventValue(payloadRecordValue, "tool"), label: providerActivityToolLabel(payloadRecordValue, "Provider tool"), preview: optionalStringEventValue(payloadRecordValue, "preview"), inputSummary: optionalStringEventValue(payloadRecordValue, "inputSummary"), state: "started" } });
     case "tool_result":
     case "tool_completed": {
-      const error = providerActivityError(payloadRecord);
+      const error = providerActivityError(payloadRecordValue);
       const hasError = Boolean(error);
-      return withBase({ id: event.id, kind: "tool_completed", title: hasError ? "Tool failed" : "Tool completed", summary: providerActivityDescription(payloadRecord, "Provider tool completed."), description: providerActivityDescription(payloadRecord, "Provider tool completed."), tone: hasError ? "danger" : "success", timestamp, tool: { name: optionalStringEventValue(payloadRecord, "toolName") ?? optionalStringEventValue(payloadRecord, "tool"), label: providerActivityToolLabel(payloadRecord, "Provider tool"), preview: optionalStringEventValue(payloadRecord, "preview"), durationMs: optionalNumberEventValue(payloadRecord, "durationMs"), error, state: hasError ? "failed" : "completed" } });
+      return withBase({ id: event.id, kind: "tool_completed", title: hasError ? "Tool failed" : "Tool completed", summary: providerActivityDescription(payloadRecordValue, "Provider tool completed."), description: providerActivityDescription(payloadRecordValue, "Provider tool completed."), tone: hasError ? "danger" : "success", timestamp, tool: { name: optionalStringEventValue(payloadRecordValue, "toolName") ?? optionalStringEventValue(payloadRecordValue, "tool"), label: providerActivityToolLabel(payloadRecordValue, "Provider tool"), preview: optionalStringEventValue(payloadRecordValue, "preview"), durationMs: optionalNumberEventValue(payloadRecordValue, "durationMs"), error, state: hasError ? "failed" : "completed" } });
     }
     case "approval_required":
       return withBase({ id: event.id, kind: "approval", title: "Approval required", summary: provider, description: provider, tone: "warning", timestamp });
     case "run_completed":
       return withBase({ id: event.id, kind: "provider_run", title: "Provider run completed", summary: provider, description: provider, tone: "success", timestamp });
     case "run_failed":
-      return withBase({ id: event.id, kind: "provider_run", title: "Provider run failed", summary: providerActivityDescription(payloadRecord, provider), description: providerActivityDescription(payloadRecord, provider), tone: "danger", timestamp });
+      return withBase({ id: event.id, kind: "provider_run", title: "Provider run failed", summary: providerActivityDescription(payloadRecordValue, provider), description: providerActivityDescription(payloadRecordValue, provider), tone: "danger", timestamp });
     case "run_cancelled":
       return withBase({ id: event.id, kind: "provider_run", title: "Provider run cancelled", summary: provider, description: provider, tone: "warning", timestamp });
     default:
-      return withBase({ id: event.id, kind: "raw", title: "Provider event", summary: providerActivityDescription(payloadRecord, eventType), description: providerActivityDescription(payloadRecord, eventType), tone: "neutral", timestamp });
+      return withBase({ id: event.id, kind: "raw", title: "Provider event", summary: providerActivityDescription(payloadRecordValue, eventType), description: providerActivityDescription(payloadRecordValue, eventType), tone: "neutral", timestamp });
   }
 }
 

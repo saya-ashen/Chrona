@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
+import { rebuildTaskProjection } from "@chrona/engine";
 import { db } from "@chrona/db";
 import {
   checkpointActionBodySchema,
@@ -324,7 +325,31 @@ export function createExecutionRoutes(engine: ChronaEngine) {
         const client = await engine.runtime.aiClients.get();
         const providerClient = client?.providerClient;
         if (!providerClient || providerClient.provider !== approval.provider || !providerClient.resolveApproval) {
-          return error(c, "Provider does not support approval resolution", 409);
+          const now = new Date();
+          const updated = await db.taskPlanProviderApproval.update({
+            where: { id: approval.id },
+            data: {
+              status: "failed",
+              resolvedAt: now,
+              choice: body.choice,
+              resolveAll: body.resolveAll === true,
+              error: toJsonInput({ message: "Provider does not support approval resolution" }),
+              resolutionRaw: toJsonInput({ status: "not_active", reason: "unsupported_provider_resolution" }),
+            },
+          });
+          await db.taskPlanProviderRun.update({
+            where: { id: approval.providerRunId },
+            data: { status: "failed", finishedAt: now },
+          }).catch(() => undefined);
+          await rebuildTaskProjection(taskId);
+          return c.json({
+            approval: toApprovalReadModel(updated),
+            provider: approval.provider,
+            runId: approval.providerRun.providerRunRef ?? approval.nativeRunId ?? approval.providerRunId,
+            choice: body.choice,
+            resolved: 0,
+            status: "not_active" as const,
+          });
         }
         const resolution = await providerClient.resolveApproval({
           runId: approval.providerRun.providerRunRef ?? approval.nativeRunId ?? approval.providerRunId,

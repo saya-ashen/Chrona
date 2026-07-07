@@ -113,7 +113,7 @@ export class TaskPlanning {
     return { savedPlan: await getLatestTaskPlanReadModel(input.taskId, effectiveWorkBlockId) };
   }
 
-  generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null }) {
+  generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null }) {
     const streamLock = startTaskPlanGeneration({ taskId: input.taskId, workBlockId: input.workBlockId ?? null });
     const events = generateTaskPlanManualStream({
       ...input,

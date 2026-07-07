@@ -47,6 +47,15 @@ function mockClients(clients: Array<{ id: string; enabled?: boolean }>) {
   );
 }
 
+function mockTasks(payload: { tasks?: Array<{ id?: string }>; total?: number }) {
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+}
+
 function currentStep() {
   return screen.getByRole("listitem", { current: "step" });
 }
@@ -113,6 +122,24 @@ describe("StartWithChrona", () => {
     expect(push).toHaveBeenCalledWith("/en/tasks/created-task");
   });
 
+
+  it("advances to review when workspace already has a task", async () => {
+    const onOpenCreatedTask = vi.fn();
+    mockClients([{ id: "client-1", enabled: true }]);
+    mockTasks({ tasks: [{ id: "existing-task" }], total: 1 });
+
+    renderStartWithChrona({ workspaceId: "workspace-1", onOpenCreatedTask });
+
+    expect(await screen.findByText("Start with Chrona in three steps")).toBeInTheDocument();
+    expect(currentStep()).toHaveTextContent("Review the plan");
+    expect(currentStep()).not.toHaveTextContent("Create a task");
+    expect(screen.getByRole("button", { name: "Open created task" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Open created task" }));
+
+    expect(onOpenCreatedTask).toHaveBeenCalledWith("existing-task");
+    expect(push).not.toHaveBeenCalled();
+  });
   it("hides onboarding after the created task is opened", async () => {
     mockClients([{ id: "client-1", enabled: true }]);
 

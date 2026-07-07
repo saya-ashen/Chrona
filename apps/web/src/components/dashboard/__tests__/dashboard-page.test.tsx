@@ -208,6 +208,33 @@ function dirtyAiBrief(): NonNullable<DashboardData["aiBrief"]> {
     inputFingerprint: "fingerprint-1",
   };
 }
+
+function failedAiBrief(): NonNullable<DashboardData["aiBrief"]> {
+  return {
+    status: "failed",
+    spec: null,
+    generatedAt: null,
+    providerClientId: "client-1",
+    canGenerate: false,
+    errorMessage: "Provider unavailable",
+    inputFingerprint: "fingerprint-1",
+  };
+}
+
+function readyAiBrief(): NonNullable<DashboardData["aiBrief"]> {
+  return {
+    status: "ready",
+    spec: {
+      root: "root",
+      elements: { root: { type: "Stack", props: { gap: "md" }, children: [] } },
+    },
+    generatedAt: new Date().toISOString(),
+    providerClientId: "client-1",
+    canGenerate: true,
+    errorMessage: null,
+    inputFingerprint: "fingerprint-1",
+  };
+}
 afterEach(() => cleanup());
 
 describe("DashboardPage", () => {
@@ -375,6 +402,30 @@ describe("DashboardPage", () => {
 
     expect(screen.getAllByText("AI brief updating").length).toBe(2);
     expect(screen.queryByText("AI summary will appear here after Chrona generates it from dashboard facts.")).not.toBeInTheDocument();
+  });
+
+  it("shows provider error when AI summary generation fails", () => {
+    renderDashboard(makeData({ aiBrief: failedAiBrief() }));
+
+    expect(screen.getByText("AI brief update failed")).toBeTruthy();
+    expect(screen.getByText(/Provider unavailable/)).toBeTruthy();
+    expect(apiJson).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-request generation when dirty surface cannot generate", async () => {
+    renderDashboard(makeData({ aiBrief: { ...dirtyAiBrief(), canGenerate: false } }));
+
+    await waitFor(() => {
+      expect(apiJson).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not auto-request generation for ready surfaces", async () => {
+    renderDashboard(makeData({ aiBrief: readyAiBrief() }));
+
+    await waitFor(() => {
+      expect(apiJson).not.toHaveBeenCalled();
+    });
   });
 
 

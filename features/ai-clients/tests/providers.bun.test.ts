@@ -1,17 +1,20 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { buildProviderFeatureRequest, testAiClientAvailability } from "../../../packages/engine/src/modules/ai/providers";
 
+const originalClaudeRecordDir = process.env.CHRONA_CLAUDE_CODE_RECORD_DIR;
+
 /**
- * T10 — Golden-path validation (engine-side wireup).
+ * T10 — engine-side availability wireup.
  *
- * `testAiClientAvailability` is the single entry point the engine exposes for
- * "is this provider healthy?" — it's the same code path the UI's Diagnose
- * action and the auto-start orchestrator consult. The two cases below prove
- * that the Claude Code branch returns the expected shape and the expected
- * actionable reason when misconfigured, matching T6 acceptance and spec §8.
+ * Default tests must not probe a developer's local Claude Code SDK. Setting
+ * CHRONA_CLAUDE_CODE_RECORD_DIR exercises the same engine branch while keeping
+ * health deterministic: the provider trusts record/replay mode and skips live
+ * SDK startup.
  */
 describe("AI provider availability — claude_code wireup (T10)", () => {
-  it("reports available=true with a reachability reason when checkHealth passes", async () => {
+  it("reports available=true with a reachability reason in deterministic record mode", async () => {
+    process.env.CHRONA_CLAUDE_CODE_RECORD_DIR = ".tmp/claude-code-health-test";
+
     const result = await testAiClientAvailability({
       type: "claude_code",
       config: {
@@ -19,87 +22,28 @@ describe("AI provider availability — claude_code wireup (T10)", () => {
       },
     });
 
-    // The provider package uses `claude --version` to probe — we don't
-    // assert the exact reason text (it depends on the host), but we
-    // assert the contract shape: `available: boolean` + a non-empty
-    // `reason: string` (the UI surfaces this verbatim).
-    expect(typeof result.available).toBe("boolean");
-    expect(typeof result.reason).toBe("string");
-    expect(result.reason.length).toBeGreaterThan(0);
+    expect(result).toEqual({
+      available: true,
+      reason: "Claude Code connectivity check passed",
+    });
   });
 
   it("accepts a ClaudeCodeClientConfig that round-trips through checkClientHealth", async () => {
-    // A well-formed config should never throw; the function always returns
-    // a `{available, reason}` shape. This guards the contract used by both
-    // the Settings Diagnose button and the orchestrator's
-    // `claude_code` health precheck.
-    let result: { available: boolean; reason: string };
-    expect(async () => {
-      result = await testAiClientAvailability({
-        type: "claude_code",
-        config: {
-          mcpBaseUrl: "http://localhost:3000",
-          model: "claude-sonnet-4-6",
-          timeoutSeconds: 60,
-        },
-      });
-    }).not.toThrow();
+    process.env.CHRONA_CLAUDE_CODE_RECORD_DIR = ".tmp/claude-code-health-test";
 
-    expect(result!).toBeDefined();
-    expect(["available", "reason"]).toEqual(
-      Object.keys(result!).sort(),
-    );
-  });
-});
-
-/**
- * T10 — Golden-path validation (engine-side wireup).
- *
- * `testAiClientAvailability` is the single entry point the engine exposes for
- * "is this provider healthy?" — it's the same code path the UI's Diagnose
- * action and the auto-start orchestrator consult. The two cases below prove
- * that the Claude Code branch returns the expected shape and the expected
- * actionable reason when misconfigured, matching T6 acceptance and spec §8.
- */
-describe("AI provider availability — claude_code wireup (T10)", () => {
-  it("reports available=true with a reachability reason when checkHealth passes", async () => {
     const result = await testAiClientAvailability({
       type: "claude_code",
       config: {
         mcpBaseUrl: "http://localhost:3000",
+        model: "claude-sonnet-4-6",
+        timeoutSeconds: 60,
       },
     });
 
-    // The provider package uses `claude --version` to probe — we don't
-    // assert the exact reason text (it depends on the host), but we
-    // assert the contract shape: `available: boolean` + a non-empty
-    // `reason: string` (the UI surfaces this verbatim).
-    expect(typeof result.available).toBe("boolean");
-    expect(typeof result.reason).toBe("string");
-    expect(result.reason.length).toBeGreaterThan(0);
-  });
-
-  it("accepts a ClaudeCodeClientConfig that round-trips through checkClientHealth", async () => {
-    // A well-formed config should never throw; the function always returns
-    // a `{available, reason}` shape. This guards the contract used by both
-    // the Settings Diagnose button and the orchestrator's
-    // `claude_code` health precheck.
-    let result: { available: boolean; reason: string };
-    expect(async () => {
-      result = await testAiClientAvailability({
-        type: "claude_code",
-        config: {
-          mcpBaseUrl: "http://localhost:3000",
-          model: "claude-sonnet-4-6",
-          timeoutSeconds: 60,
-        },
-      });
-    }).not.toThrow();
-
-    expect(result!).toBeDefined();
-    expect(["available", "reason"]).toEqual(
-      Object.keys(result!).sort(),
-    );
+    expect(result).toEqual({
+      available: true,
+      reason: "Claude Code connectivity check passed",
+    });
   });
 });
 
@@ -107,6 +51,11 @@ const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  if (originalClaudeRecordDir === undefined) {
+    delete process.env.CHRONA_CLAUDE_CODE_RECORD_DIR;
+  } else {
+    process.env.CHRONA_CLAUDE_CODE_RECORD_DIR = originalClaudeRecordDir;
+  }
 });
 describe("provider feature request input", () => {
   it("uses feature inputText as the canonical provider input", () => {

@@ -29,7 +29,7 @@ describe("validateChronaSpec", () => {
       elements: {
         heading: { type: "heading", props: { text: "GitHub Trending" } },
         summary_text: { type: "paragraph", props: { text: "Daily report" } },
-        table: { type: "table", props: { columns: ["Repo"], rows: [["chrona"]] } },
+        table: { type: "table", props: { path: ".chrona/outputs/N20260706-01/trending.json", columns: ["Repo"] } },
         trend_analysis: { type: "section", props: {}, children: ["raw_data_path"] },
         raw_data_path: { type: "paragraph", props: { text: "data.json" } },
       },
@@ -42,13 +42,15 @@ describe("validateChronaSpec", () => {
     expect(result.spec.elements.github_trending_report).toMatchObject({ type: "Stack" });
   });
 
-  test("catalog prompt gives literal Table and CollapsibleText examples", () => {
+  test("catalog prompt requires file-backed Table specs", () => {
     const prompt = chronaCatalog.prompt();
 
     expect(prompt).toContain("Table:");
-    expect(prompt).toContain("columns: [\"Repo\", \"Stars\"]");
-    expect(prompt).toContain("rows: [[\"chrona\", \"120\"]]");
-    expect(prompt).toContain("Do not wrap arrays in objects such as { item: [...] }");
+    expect(prompt).toContain("File-backed data table");
+    expect(prompt).toContain("do not inline rows");
+    expect(prompt).toContain("hrefKey");
+    expect(prompt).toContain("Prefer pageSize 10");
+    expect(prompt).toContain("do not set pageSize equal to total rows");
     expect(prompt).toContain("threshold MUST be a JSON number such as 800");
   });
 
@@ -177,6 +179,23 @@ describe("validateChronaSpec", () => {
     expect(result.issues.some((i) => i.path.includes("direction"))).toBe(false);
   });
 
+  test("accepts file-backed Table specs", () => {
+    expect(validateChronaSpec({
+      root: "table",
+      elements: {
+        table: {
+          type: "Table",
+          props: {
+            path: ".chrona/outputs/N20260706-01/trending.json",
+            columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }],
+            pageSize: 20,
+          },
+          children: [],
+        },
+      },
+    }).ok).toBe(true);
+  });
+
   test("rejects missing child, cycle, invalid table, activity, and action payload structures", () => {
     expectIssue(validateChronaSpec({
       root: "root",
@@ -193,8 +212,8 @@ describe("validateChronaSpec", () => {
 
     expectIssue(validateChronaSpec({
       root: "table",
-      elements: { table: { type: "Table", props: { columns: ["Repo"], rows: [{ item: ["chrona"] }] }, children: [] } },
-    }), "elements.table.props.rows");
+      elements: { table: { type: "Table", props: { columns: ["Repo"], rows: [["chrona"]] }, children: [] } },
+    }), "rows");
 
     expectIssue(validateChronaSpec({
       root: "activity",

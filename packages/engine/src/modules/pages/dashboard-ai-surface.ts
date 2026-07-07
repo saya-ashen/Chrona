@@ -8,9 +8,9 @@ import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
 
 export const DASHBOARD_BRIEF_SURFACE = "dashboard.brief" as const;
 
-type DashboardAiBriefStatus = "ready" | "dirty" | "generating" | "failed" | "unconfigured";
+export type DashboardAiBriefStatus = "ready" | "dirty" | "generating" | "failed" | "unconfigured";
 
-type DashboardAiBriefState = {
+export type DashboardAiBriefState = {
   status: DashboardAiBriefStatus;
   spec: unknown | null;
   generatedAt: string | null;
@@ -22,7 +22,7 @@ type DashboardAiBriefState = {
 
 type OutputRef = { id: string; title: string; type: string; taskId: string } | null;
 
-type DashboardFingerprintInput = {
+export type DashboardFingerprintInput = {
   needsAttention: Array<{
     taskId: string;
     title: string;

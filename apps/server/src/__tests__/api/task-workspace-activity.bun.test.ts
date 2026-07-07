@@ -133,6 +133,42 @@ describe("task workspace activity endpoint", () => {
     expect(body.items[0]).toMatchObject({ provider: "claude_code", runtimeName: "hermes", summary: "Hello" });
   });
 
+  it("uses top-level provider tool fields when persisted payload has no nested event", async () => {
+    const { workspaceId } = await seedWorkspace("Workspace Top Level Tool Payload");
+    const { taskId } = await seedTask(workspaceId, { title: "Top-level tool payload" });
+
+    await db.event.create({
+      data: {
+        eventType: "provider.tool_completed",
+        workspaceId,
+        taskId,
+        actorType: "runtime",
+        actorId: "hermes",
+        source: "provider",
+        payload: {
+          runtimeName: "hermes",
+          provider: "codex",
+          runId: "run-1",
+          toolName: "bash: python3 -c fetch trending",
+          preview: "python3 -c fetch trending",
+          rawEventType: "tool_call_update",
+        },
+        dedupeKey: "activity-top-level-tool-payload",
+        occurredAt: new Date("2026-05-22T00:00:06.000Z"),
+        ingestSequence: 1,
+      },
+    });
+
+    const res = await app().request(`/api/tasks/${taskId}/activity?limit=10`);
+    const body = await json<{ items: Array<{ tool?: { label?: string; preview?: string } }> }>(res);
+
+    expect(res.status).toBe(200);
+    expect(body.items[0]?.tool).toMatchObject({
+      label: "bash: python3 -c fetch trending",
+      preview: "python3 -c fetch trending",
+    });
+  });
+
 
   it("drops generic provider events from the activity feed", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Generic Provider Event");

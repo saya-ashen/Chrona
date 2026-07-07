@@ -88,24 +88,17 @@ function isRunningActivity(item: WorkspaceActivityItem, items: WorkspaceActivity
 }
 
 
-function runningActivityText(item: WorkspaceActivityItem | undefined) {
-  if (!item) return null;
-  return item.tool?.label ?? item.sourceNodeTitle ?? item.summary ?? item.title;
-}
 
 
 type ActivityLayout = "below" | "side";
 
 export function TaskWorkspaceExecutionOverview({
-  readiness,
-  attention,
   latestCompletedNode,
   artifacts,
   activity,
   currentExecution,
   runtimeEvents = [],
   liveActivity = [],
-  primaryAction,
   copy: copyProp,
   commandCenter,
   activityLayout = "below",
@@ -155,8 +148,6 @@ export function TaskWorkspaceExecutionOverview({
   );
   const activeActivity = mergedActivity.find((item) => isRunningActivity(item, mergedActivity));
   const showLiveStatus = currentExecution?.status === "running" && Boolean(activeActivity);
-  const liveStatusLabel = primaryAction?.statusLabel ?? attention?.statusLabel ?? readiness.statusLabel ?? ws.liveStatusRunning;
-  const liveStatusText = showLiveStatus ? runningActivityText(activeActivity) : null;
 
   useEffect(() => {
     if (!trailStore) return;
@@ -197,15 +188,6 @@ export function TaskWorkspaceExecutionOverview({
       <h3 id="task-workspace-results-heading" className="sr-only">
         {copy.outputTab}
       </h3>
-      {showLiveStatus ? (
-        <div className="mb-2.5 flex items-start gap-2 rounded-xl border border-primary/25 bg-primary-soft/50 px-3 py-2 text-xs text-foreground" role="status" aria-live="polite">
-          <span className="mt-0.5 size-3 shrink-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary" aria-hidden="true" />
-          <span className="min-w-0">
-            <span className="block font-semibold">{ws.liveStatusRunning ?? "Running now"}</span>
-            <span className="mt-0.5 block truncate text-muted-foreground">{liveStatusText ?? liveStatusLabel}</span>
-          </span>
-        </div>
-      ) : null}
       <SpecRenderer
         spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
         handlers={locateHandlers}

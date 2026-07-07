@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import type { AcpProviderConfig } from "@chrona/acp-provider";
 
 export interface CodexProviderConfig {
@@ -36,12 +38,16 @@ export interface CodexProviderConfig {
 }
 
 export type CodexRunnerMode = "acp";
+const require = createRequire(import.meta.url);
+const CODEX_ACP_PACKAGE_NAME = "@agentclientprotocol/codex-acp";
+
+const CHRONA_MCP_DIRECT_TOOL_NAMESPACES = ["chrona", "mcp__chrona"] as const;
 
 export function codexAcpConfig(config: CodexProviderConfig): AcpProviderConfig {
   return {
     provider: "codex",
     displayName: "OpenAI Codex",
-    command: config.binaryPath?.trim() || "codex-acp",
+    command: config.binaryPath?.trim() || codexAcpBinaryPath(),
     timeoutMs: config.timeoutMs,
     healthCheck: "session",
     cwd: config.cwd,
@@ -61,6 +67,7 @@ export function codexAcpEnv(config: CodexProviderConfig): Record<string, string>
     env.CODEX_API_KEY = apiKey;
     env.OPENAI_API_KEY = apiKey;
   }
+  if (config.baseUrl?.trim()) env.MODEL_PROVIDER = "chrona-gateway";
   if (config.codexPath) env.CODEX_PATH = config.codexPath;
   if (config.initialAgentMode) env.INITIAL_AGENT_MODE = config.initialAgentMode;
   if (config.noBrowser) env.NO_BROWSER = "1";
@@ -75,33 +82,84 @@ export function codexAcpEnv(config: CodexProviderConfig): Record<string, string>
   return env;
 }
 
+
+function codexAcpBinaryPath(): string {
+  try {
+    return join(dirname(require.resolve(`${CODEX_ACP_PACKAGE_NAME}/package.json`)), "dist/index.js");
+  } catch {
+    return "codex-acp";
+  }
+}
+
 function buildDefaultAuthRequest(config: CodexProviderConfig, apiKey?: string): Record<string, unknown> | null {
-  const baseUrl = config.baseUrl?.trim();
-  if (baseUrl) {
-    return {
-      methodId: "gateway",
-      _meta: {
-        gateway: {
-          baseUrl,
-          providerName: "Chrona Codex Gateway",
-          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-        },
-      },
-    };
-  }
-  if (apiKey) {
-    return {
-      methodId: "api-key",
-      _meta: { "api-key": { apiKey } },
-    };
-  }
-  return null;
+  if (config.baseUrl?.trim()) return null;
+  if (!apiKey) return null;
+  return {
+    methodId: "api-key",
+    _meta: { "api-key": { apiKey } },
+  };
 }
 
 function buildCodexConfig(config: CodexProviderConfig): Record<string, unknown> {
-  return {
+  const codexConfig = {
     ...(config.codexConfig ?? {}),
     ...(config.model ? { model: config.model } : {}),
     ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
   };
+  const gatewayConfig = config.baseUrl ? chronaGatewayProviderConfig(config) : null;
+  return withChronaGatewayProvider(withChronaDirectToolNamespaces(codexConfig), gatewayConfig);
+}
+
+function chronaGatewayProviderConfig(config: CodexProviderConfig): Record<string, unknown> {
+  const baseUrl = config.baseUrl?.trim();
+  return {
+    name: "Chrona Codex Gateway",
+    base_url: baseUrl,
+    http_headers: config.apiKey?.trim()
+      ? { Authorization: `Bearer ${config.apiKey.trim()}` }
+      : {},
+    wire_api: "responses",
+  };
+}
+
+function withChronaDirectToolNamespaces(codexConfig: Record<string, unknown>): Record<string, unknown> {
+  const features = isRecord(codexConfig.features) ? codexConfig.features : {};
+  const codeMode = isRecord(features.code_mode) ? features.code_mode : {};
+  const existing = Array.isArray(codeMode.direct_only_tool_namespaces)
+    ? codeMode.direct_only_tool_namespaces.filter((value): value is string => typeof value === "string")
+    : [];
+  return {
+    ...codexConfig,
+    features: {
+      ...features,
+      code_mode: {
+        ...codeMode,
+        enabled: true,
+        direct_only_tool_namespaces: [...new Set([...existing, ...CHRONA_MCP_DIRECT_TOOL_NAMESPACES])],
+      },
+    },
+  };
+}
+
+
+function withChronaGatewayProvider(
+  codexConfig: Record<string, unknown>,
+  gatewayConfig: Record<string, unknown> | null,
+): Record<string, unknown> {
+  if (!gatewayConfig) return codexConfig;
+  const modelProviders = isRecord(codexConfig.model_providers)
+    ? codexConfig.model_providers
+    : {};
+  return {
+    ...codexConfig,
+    model_provider: "chrona-gateway",
+    model_providers: {
+      ...modelProviders,
+      "chrona-gateway": gatewayConfig,
+    },
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

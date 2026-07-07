@@ -107,8 +107,7 @@ const PLAN_CARDS: Record<TaskWorkspacePlanFlowState["status"], Omit<CardSpec, "d
   },
   failed: {
     // `failed` carries `error` text; surface it instead of the generic
-    // copy. The Accept/Regenerate buttons are still rendered separately
-    // by `buildAcceptOrRegenerateSpec` and they show the `<Alert>` from
+    // copy. Plan revision actions render separately and show the `<Alert>` from
     // `acceptPlanError`.
     title: "Couldn't accept the plan",
     statusLabel: "Accept failed",
@@ -409,69 +408,4 @@ export function buildArtifactsSpec(input: {
   const rootChildren = ["artifact-list"];
   elements.root = { type: "Stack", props: { gap: "sm" }, children: rootChildren };
   return { root: "root", elements };
-}
-
-export function buildAcceptOrRegenerateSpec(input: {
-  copy: WorkspaceCopy;
-  canAcceptPlan?: boolean;
-  isGeneratingPlan: boolean;
-  visibleGenerationInstruction: string | null;
-  acceptPlanError: string | null;
-  regenerationInstruction: string;
-}): UiDocument {
-  const { copy } = input;
-  const children: string[] = [];
-  const elements: UiDocument["elements"] = {
-    root: { type: "Stack", props: { gap: "sm" }, children },
-    instruction: {
-      type: "Textarea",
-      props: {
-        label: copy.instructionAria ?? "Plan regeneration instruction",
-        name: "instruction",
-        value: { $bindState: "/instruction" },
-        placeholder: copy.instructionPlaceholder ?? "Tell Chrona what to change in the regenerated plan...",
-      },
-    },
-    actions: { type: "Stack", props: { gap: "sm" }, children: ["accept", "regenerate"] },
-    accept: {
-      type: "Button",
-      props: { label: copy.accept ?? "Accept plan", variant: "primary", ...(!input.canAcceptPlan && { disabled: true }) },
-      on: { press: { action: "accept-plan" } },
-    },
-    regenerate: {
-      type: "Button",
-      props: {
-        label: input.isGeneratingPlan ? (copy.generating ?? "Generating...") : (copy.regenerateWithInstruction ?? "Regenerate with instruction"),
-        variant: "secondary",
-        ...(input.isGeneratingPlan && { disabled: true }),
-      },
-      on: { press: { action: "regenerate-plan", params: { instruction: { $state: "/instruction" } } } },
-    },
-  };
-
-  if (input.visibleGenerationInstruction) {
-    elements["visible-instruction"] = {
-      type: "Stack",
-      props: { gap: "sm" },
-      children: ["visible-instruction-label", "visible-instruction-body"],
-    };
-    elements["visible-instruction-label"] = {
-      type: "Text",
-      props: { text: copy.instructionLabel ?? "User instruction for this plan revision", variant: "caption" },
-    };
-    elements["visible-instruction-body"] = {
-      type: "Text",
-      props: { text: input.visibleGenerationInstruction },
-    };
-    children.push("visible-instruction");
-  }
-
-  children.push("instruction", "actions");
-
-  if (input.acceptPlanError) {
-    elements["accept-error"] = { type: "Alert", props: { title: input.acceptPlanError, type: "error" } };
-    children.push("accept-error");
-  }
-
-  return { root: "root", elements, state: { instruction: input.regenerationInstruction } };
 }

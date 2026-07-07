@@ -1,27 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
 import { Button } from "@/components/ui/button";
-import { buildAcceptOrRegenerateSpec } from "../../../../../../../features/execution-monitoring/ui/build-execution-overview-spec";
-import type {
-  CommandCenterCopy,
-  CommandCenterPrimaryAction,
-} from "../../../../../../../features/execution-monitoring/ui/task-workspace-execution-overview";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import type { CommandCenterCopy } from "../../../../../../../features/execution-monitoring/ui/task-workspace-execution-overview";
 import { useActionSpecRenderConfig } from "../../../../../../../features/execution-monitoring/ui/action-tab";
-import type { UiDocument } from "@chrona/ui-protocol";
 import { TaskWorkspaceInspector } from "../../../../../../../features/execution-monitoring/ui/task-workspace-inspector";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
+import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
 import {
   createTaskWorkspaceExecutionConsoleView,
   type TaskExecutionDispatchResult,
 } from "../../../../../../../features/task-workspace";
 import {
   dispatchInputForPrimaryAction,
-  resolveCommandCenterPrimaryAction,
+  resolveTaskWorkspaceOperationState,
 } from "../../../../../../../features/task-workspace";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type { TaskPageData, TaskPlanGenerationStatus, WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
@@ -85,6 +84,112 @@ function graphNodeIdForAction(action: TaskAction | null | undefined, pageData: T
     ?? null;
 }
 
+type WorkspaceCopy = Record<string, string | undefined>;
+
+function NodeDetailRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="space-y-0.5">
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</dt>
+      <dd className="text-xs text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function PlanNodeDetailCard({ node, copy }: { node: PlanNodeDataModel | null; copy: WorkspaceCopy }) {
+  if (!node) return null;
+  const dependencies = node.dependencies?.join(", ") ?? null;
+  const requiredInfo = node.requiredInfo?.join(", ") ?? null;
+  return (
+    <Card size="sm" className="gap-3 border-primary/20 bg-primary-soft/25 py-3" role="region" aria-label={copy.nodeDetailOverlayAria ?? "Selected node details"}>
+      <CardHeader className="gap-2 px-3">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">{copy.nodeDetailOverlayTitle ?? "Node details"}</p>
+            <CardTitle className="mt-1 truncate text-sm">{node.title}</CardTitle>
+          </div>
+          <Badge variant="outline">{node.statusLabel ?? node.status}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2 px-3">
+        <NodeDetailRow label="Objective" value={node.objective} />
+        <NodeDetailRow label="Summary" value={node.summary} />
+        <NodeDetailRow label="Next action" value={node.nextAction} />
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <NodeDetailRow label="Mode" value={node.executionMode ?? node.interactionType ?? null} />
+          <NodeDetailRow label="Executor" value={node.executor} />
+          <NodeDetailRow label="Estimate" value={typeof node.estimatedMinutes === "number" ? `${node.estimatedMinutes} min` : null} />
+          <NodeDetailRow label="Depends on" value={dependencies} />
+        </div>
+        <NodeDetailRow label="Required info" value={requiredInfo} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function PlanRevisionPanel({
+  copy,
+  canAcceptPlan,
+  isGeneratingPlan,
+  visibleGenerationInstruction,
+  acceptPlanError,
+  revisionInstruction,
+  selectedNode,
+  onInstructionChange,
+  onAcceptPlan,
+  onRevisePlan,
+}: {
+  copy: WorkspaceCopy;
+  canAcceptPlan?: boolean;
+  isGeneratingPlan: boolean;
+  visibleGenerationInstruction: string | null;
+  acceptPlanError: string | null;
+  revisionInstruction: string;
+  selectedNode: PlanNodeDataModel | null;
+  onInstructionChange: (value: string) => void;
+  onAcceptPlan: () => void;
+  onRevisePlan: () => void;
+}) {
+  return (
+    <Card size="sm" className="border-primary/15 bg-background/85 py-3" role="region" aria-label={copy.planRevisionTitle ?? "Plan revision"}>
+      <CardHeader className="gap-1 px-3">
+        <CardTitle className="text-sm">{copy.planRevisionTitle ?? "Revise plan"}</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          {selectedNode
+            ? `Ask Chrona to revise selected step: ${selectedNode.title}`
+            : (copy.planRevisionIntro ?? "Ask Chrona to revise this draft plan.")}
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3 px-3">
+        {visibleGenerationInstruction ? (
+          <div className="rounded-lg border border-border/60 bg-muted/35 px-2.5 py-2 text-xs">
+            <div className="font-medium text-muted-foreground">{copy.instructionLabel ?? "Last revision request"}</div>
+            <div className="mt-1 text-foreground">{visibleGenerationInstruction}</div>
+          </div>
+        ) : null}
+        <label className="block space-y-1.5 text-xs font-medium text-foreground">
+          <span>{copy.instructionAria ?? "Plan revision message"}</span>
+          <Textarea
+            value={revisionInstruction}
+            onChange={(event) => onInstructionChange(event.target.value)}
+            placeholder={copy.instructionPlaceholder ?? "Tell Chrona what to change in this draft plan..."}
+            rows={3}
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" onClick={onAcceptPlan} disabled={!canAcceptPlan}>
+            {copy.acceptPlan ?? copy.accept ?? "Accept plan"}
+          </Button>
+          <Button type="button" size="sm" variant="secondary" onClick={onRevisePlan} disabled={isGeneratingPlan}>
+            {isGeneratingPlan ? (copy.generating ?? "Revising...") : (copy.revisePlanWithAi ?? "Ask AI to revise plan")}
+          </Button>
+        </div>
+        {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 type TaskWorkspacePlanSectionProps = {
   label: string;
   commandCenterCopy?: Partial<CommandCenterCopy>;
@@ -112,7 +217,6 @@ type TaskWorkspacePlanSectionProps = {
 
 export function TaskWorkspacePlanSection({
   label,
-  commandCenterCopy,
   graphPlan,
   isGraphPlanPending,
   pageData,
@@ -131,6 +235,8 @@ export function TaskWorkspacePlanSection({
   onSubmitCheckpointAction,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
+  const [submittedRevisionInstruction, setSubmittedRevisionInstruction] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<PlanNodeDataModel | null>(null);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
@@ -138,10 +244,10 @@ export function TaskWorkspacePlanSection({
     () => createTaskWorkspaceExecutionConsoleView({
       pageData,
       graphPlan,
-      selectedNode: null,
+      selectedNode,
       copy,
     }),
-    [pageData, graphPlan, copy],
+    [pageData, graphPlan, selectedNode, copy],
   );
   const stateMessage =
     consoleView.states.errorMessage ??
@@ -159,7 +265,6 @@ export function TaskWorkspacePlanSection({
   const recoveryCurrentNodeId = pageData.reconciliation?.currentNodeId ?? undefined;
   const isGeneratingPlan = planGenerationStatus === "generating";
   const isPlanAccepted = plan?.status === "accepted";
-  const isPlanAwaitingAcceptance = Boolean(plan && !isPlanAccepted);
   const hasGraphExecutionStarted = hasStartedGraphExecution(graphPlan);
   const hasTaskCompleted = isCompletedTaskStatus(pageData.task.status) || hasCompletedGraphExecution(graphPlan);
   useEffect(() => {
@@ -170,6 +275,9 @@ export function TaskWorkspacePlanSection({
       hasTaskCompleted,
     }));
   }, [hasGraphExecutionStarted, hasTaskCompleted, isGeneratingPlan]);
+  useEffect(() => {
+    setSubmittedRevisionInstruction(null);
+  }, [plan?.id, plan?.revision]);
   const currentOperationNode = consoleView.nodeDetail.currentNode;
   const taskPrimaryAction = pageData.task.executionSummary?.primaryAction ?? null;
   const primaryActionNodeId = graphNodeIdForAction(taskPrimaryAction, pageData, graphPlan);
@@ -185,7 +293,8 @@ export function TaskWorkspacePlanSection({
   );
   const hasCurrentOperationControls = Boolean(currentOperationNode?.checkpoint) && hasNodeActionPayload(currentOperationNode) && !consoleView.nodeDetail.disabledActionReason;
   const shouldShowCurrentOperation = Boolean(currentOperationNode && (hasCurrentOperationControls || currentOperationNode.status === "blocked"));
-  const visibleGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
+  const persistedGenerationInstruction = plan?.prompt?.trim() || generationUserInstruction?.trim() || null;
+  const visibleGenerationInstruction = submittedRevisionInstruction ?? persistedGenerationInstruction;
   const commandCenterScopeKey = pageData.task.currentWorkBlock?.id ?? pageData.task.id;
   const currentOperationAction = useActionSpecRenderConfig({
     node: currentOperationNode,
@@ -194,26 +303,6 @@ export function TaskWorkspacePlanSection({
     onSubmitCheckpointAction,
   });
   const apiCurrentOperationSpec = currentExecution?.ui?.currentOperationSpec ?? null;
-  const acceptOrRegenerateSpec = useMemo<UiDocument | null>(() => {
-    if (!plan) return null;
-    return buildAcceptOrRegenerateSpec({
-      copy,
-      canAcceptPlan,
-      isGeneratingPlan,
-      visibleGenerationInstruction,
-      acceptPlanError,
-      regenerationInstruction,
-    });
-  }, [acceptPlanError, canAcceptPlan, copy, isGeneratingPlan, plan, regenerationInstruction, visibleGenerationInstruction]);
-  const acceptOrRegenerateHandlers = useMemo(() => ({
-    "accept-plan": async () => {
-      if (plan) await onApplyPlan(plan);
-    },
-    "regenerate-plan": (params: Record<string, unknown>) => {
-      const instruction = typeof params.instruction === "string" ? params.instruction : regenerationInstruction;
-      onGeneratePlan({ userInstruction: instruction });
-    },
-  }), [onApplyPlan, onGeneratePlan, plan, regenerationInstruction]);
   const commandCenterActionHandlers = useMemo(() => ({
     "submit-checkpoint": async (params: Record<string, unknown>) => {
       if (!onSubmitCheckpointAction) throw new Error("Checkpoint actions are not available for this view.");
@@ -234,58 +323,32 @@ export function TaskWorkspacePlanSection({
       });
     },
   }), [currentExecution?.checkpoint?.id, onSubmitCheckpointAction]);
-  const handleAcceptOrRegenerateStateChange = useCallback((changes: Array<{ path: string; value: unknown }>) => {
-    const instructionChange = changes.find((change) => change.path === "/instruction");
-    if (instructionChange) {
-      setRegenerationInstruction(typeof instructionChange.value === "string" ? instructionChange.value : "");
-    }
-  }, []);
-  const primaryActionDescriptor = resolveCommandCenterPrimaryAction({
-    hasPlan: Boolean(plan),
-    planStatus: plan?.status ?? null,
-    isPlanAwaitingAcceptance,
+  const currentOperationSpec = apiCurrentOperationSpec ?? currentOperationAction.spec;
+  const currentOperationHandlers = useMemo(() => ({
+    ...commandCenterActionHandlers,
+    ...currentOperationAction.handlers,
+  }), [commandCenterActionHandlers, currentOperationAction.handlers]);
+  const operationState = resolveTaskWorkspaceOperationState({
+    plan,
     planGenerationStatus,
-    isGeneratingPlan,
+    canAcceptPlan,
+    acceptPlanError,
+    generationUserInstruction,
+    graphPlan,
+    pageData,
+    currentNode: currentOperationNode,
+    selectedNode,
     hasTaskCompleted,
     hasGraphExecutionStarted,
+    hasCurrentOperationControls,
+    shouldShowCurrentOperation: shouldShowCurrentOperation && Boolean(currentOperationNode),
+    currentOperationSpec,
+    currentOperationHandlers,
+    onCurrentOperationStateChange: currentOperationAction.onStateChange,
     shouldUseTaskPrimaryAction,
     taskPrimaryAction,
-    shouldShowCurrentOperation: shouldShowCurrentOperation && Boolean(currentOperationNode),
-    currentOperationStatusLabel: currentOperationNode?.statusLabel ?? currentOperationNode?.status ?? null,
-    currentOperationDescription: currentOperationNode?.nextAction ?? currentOperationNode?.summary ?? null,
-    currentOperationTone: consoleView.attention?.tone ?? consoleView.readiness.tone,
-    primaryStateLabel: consoleView.header.primaryStateLabel ?? null,
-    taskStatus: pageData.task.status,
-    runnabilitySummary: pageData.task.runnabilitySummary || null,
-    blockActionRequired: pageData.task.blockReason?.actionRequired ?? null,
-    blockType: pageData.task.blockReason?.blockType ?? null,
+    runtimeEvents,
   });
-  const primaryAction: CommandCenterPrimaryAction = {
-    ...primaryActionDescriptor,
-    ...(primaryActionDescriptor.kind === "generate"
-      ? { onClick: () => onGeneratePlan() }
-      : {}),
-    ...(primaryActionDescriptor.kind === "task-primary-action" && primaryActionDispatch
-      ? { onClick: () => void onDispatchExecutionAction(primaryActionDispatch) }
-      : {}),
-    ...(primaryActionDescriptor.kind === "start-plan"
-      ? { onClick: () => void onDispatchExecutionAction({ action: "start_manual" }) }
-      : {}),
-    ...(primaryActionDescriptor.kind === "accept-or-regenerate" && plan
-      ? {
-          actionSpec: acceptOrRegenerateSpec,
-          actionHandlers: acceptOrRegenerateHandlers,
-          onActionStateChange: handleAcceptOrRegenerateStateChange,
-        }
-      : {}),
-    ...(primaryActionDescriptor.kind === "current-operation" && currentOperationNode
-      ? {
-          actionSpec: apiCurrentOperationSpec ?? currentOperationAction.spec,
-          actionHandlers: currentOperationAction.handlers,
-          onActionStateChange: currentOperationAction.onStateChange,
-        }
-      : {}),
-  };
   const focusNodeActions = (nodeId?: string) => {
     if (!nodeId) return;
 
@@ -294,6 +357,27 @@ export function TaskWorkspacePlanSection({
       actionsPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   };
+  const revisionPanel = plan ? (
+    <PlanRevisionPanel
+      copy={copy}
+      canAcceptPlan={canAcceptPlan}
+      isGeneratingPlan={isGeneratingPlan}
+      visibleGenerationInstruction={visibleGenerationInstruction}
+      acceptPlanError={acceptPlanError}
+      revisionInstruction={regenerationInstruction}
+      selectedNode={selectedNode}
+      onInstructionChange={setRegenerationInstruction}
+      onAcceptPlan={() => {
+        void onApplyPlan(plan);
+      }}
+      onRevisePlan={() => {
+        const userInstruction = regenerationInstruction.trim();
+        setSubmittedRevisionInstruction(userInstruction || null);
+        setRegenerationInstruction("");
+        onGeneratePlan({ userInstruction, selectedNodeId: selectedNode?.id ?? null });
+      }}
+    />
+  ) : null;
 
 
   return (
@@ -338,38 +422,55 @@ export function TaskWorkspacePlanSection({
       ) : null}
 
       <div className={graphMode === "compact"
-        ? "grid min-h-[680px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,0.44fr)_minmax(36rem,1.56fr)]"
-        : "grid min-h-[680px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]"}>
+        ? "grid min-h-[560px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,0.44fr)_minmax(36rem,1.56fr)]"
+        : "grid min-h-[560px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]"}>
         <section
           aria-label={copy.executionFlow ?? "Execution flow"}
-          className="min-h-0 min-w-0 overflow-hidden rounded-[1.25rem] border border-border/70 bg-background/75"
+          className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.25rem] border border-border/70 bg-background/75"
         >
-          <TaskWorkspacePlanContent
-            label={label}
-            graphPlan={graphPlan}
-            isGraphPlanPending={isGraphPlanPending}
-            plan={plan}
-            acceptPlanError={acceptPlanError}
-            planGenerationStatus={planGenerationStatus}
-            graphMode={graphMode}
-            onGraphModeChange={setGraphMode}
-            onGeneratePlan={onGeneratePlan}
-          />
+          <div className="min-h-0 flex-1">
+            <TaskWorkspacePlanContent
+              label={label}
+              graphPlan={graphPlan}
+              isGraphPlanPending={isGraphPlanPending}
+              plan={plan}
+              acceptPlanError={acceptPlanError}
+              planGenerationStatus={planGenerationStatus}
+              graphMode={graphMode}
+              onGraphModeChange={setGraphMode}
+              onGeneratePlan={() => onGeneratePlan()}
+              onSelectedNodeChange={setSelectedNode}
+            />
+          </div>
+          {selectedNode ? (
+            <div className="shrink-0 border-t border-border/55 bg-muted/20 p-2">
+              <PlanNodeDetailCard node={selectedNode} copy={copy} />
+            </div>
+          ) : null}
         </section>
         <TaskWorkspaceInspector
           key={commandCenterScopeKey}
           taskId={pageData.task.id}
           consoleView={consoleView}
-          primaryAction={primaryAction}
           commandCenter={isGeneratingPlan ? null : commandCenter ?? null}
           commandCenterActionHandlers={commandCenterActionHandlers}
           runtimeEvents={runtimeEvents}
           liveActivity={liveActivity}
           currentExecution={currentExecution}
-          commandCenterCopy={commandCenterCopy}
           isPlanCompact={graphMode === "compact"}
           copy={copy}
           onAction={focusNodeActions}
+          operationPanel={operationState.status === "execution-completed" ? undefined : (
+            <TaskWorkspaceOperationPanel
+              taskId={pageData.task.id}
+              state={operationState}
+              copy={copy}
+              onGeneratePlan={() => onGeneratePlan()}
+              onStartPlan={() => void onDispatchExecutionAction({ action: "start_manual" })}
+              onTaskPrimaryAction={primaryActionDispatch ? () => void onDispatchExecutionAction(primaryActionDispatch) : undefined}
+              revisionPanel={revisionPanel}
+            />
+          )}
         />
       </div>
     </section>

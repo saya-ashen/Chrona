@@ -43,13 +43,25 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
   edges: [],
 }));
 
-let streamStyle: "full" | "hermes" | "hermes-no-save" = "full";
+let streamStyle: "full" | "hermes" | "hermes-no-save" | "text-json-done" | "provider-error-done" = "full";
 let planToolName = "chrona_plan_generate";
 
 import { materializeGeneratedTaskPlan } from "./materialize-generated-task-plan";
 
 async function* aiGeneratePlanStreamMock(request: { title: string; description?: string; taskId: string }) {
   const blueprint = await aiGeneratePlanMock(request);
+
+
+  if (streamStyle === "text-json-done") {
+    yield { type: "done" as const, text: JSON.stringify(blueprint) };
+    return;
+  }
+
+
+  if (streamStyle === "provider-error-done") {
+    yield { type: "done" as const, text: "unexpected status 502 Bad Gateway: upstream unavailable" };
+    return;
+  }
 
   if (streamStyle === "hermes" || streamStyle === "hermes-no-save") {
     yield { type: "tool_call" as const, tool: "chrona_plan_generate", input: { preview: "generating plan..." } };
@@ -195,6 +207,63 @@ describe("generateTaskPlanForTask", () => {
       tool: "chrona_plan_generate",
       plan_title: "Plan for Updated task title",
       node_count: 1,
+    });
+  });
+
+  it("fails when provider completes without calling the plan generation tool", async () => {
+    streamStyle = "text-json-done";
+    const workspace = await db.workspace.create({
+      data: { name: "No tool call", status: "Active", defaultRuntime: "codex" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Codex JSON fallback task",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "codex",
+        executionConfig: {},
+      },
+    });
+
+    const result = await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
+
+    expect(result).toBeNull();
+    await expect(getLatestTaskPlanReadModel(task.id)).resolves.toBeNull();
+    const failure = await db.event.findFirst({
+      where: { taskId: task.id, eventType: "plan_generation.failed" },
+    });
+    expect(failure?.payload).toMatchObject({
+      code: "INVALID_TOOL_PAYLOAD",
+      message: "Provider completed without calling chrona_plan_generate.",
+    });
+  });
+
+  it("reports provider transport failures instead of missing tool payload", async () => {
+    streamStyle = "provider-error-done";
+    const workspace = await db.workspace.create({
+      data: { name: "Provider failure", status: "Active", defaultRuntime: "codex" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Gateway failure task",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "codex",
+        executionConfig: {},
+      },
+    });
+
+    const result = await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
+
+    expect(result).toBeNull();
+    const failure = await db.event.findFirst({
+      where: { taskId: task.id, eventType: "plan_generation.failed" },
+    });
+    expect(failure?.payload).toMatchObject({
+      code: "PROVIDER_ERROR",
+      message: "unexpected status 502 Bad Gateway: upstream unavailable",
     });
   });
 
