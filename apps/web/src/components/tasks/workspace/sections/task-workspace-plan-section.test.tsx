@@ -242,6 +242,52 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
     expect(getCurrentGraphPanel()).toHaveAttribute("data-graph-mode", "full");
 
+    const stoppedNode = createTaskWorkspaceFixtureNode({
+      id: "generate",
+      title: "Generated plan node",
+      status: "cancelled",
+      nextAction: "Continue execution",
+    });
+    accepted.rerender(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([stoppedNode], "generate")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({
+          task: {
+            savedPlan: acceptedPlan,
+            aiPlanGenerationStatus: "accepted",
+            executionSummary: {
+              taskId: "task-1",
+              executionState: "cancelled",
+              stateLabel: "Waiting",
+              stateReason: null,
+              graphVersion: 1,
+              currentNodeId: "generate",
+              primaryAction: { type: "start", enabled: true, label: "Start" },
+              progress: { completed: 0, total: 1, percent: 0 },
+              readiness: { runnable: true, reason: null },
+              degraded: null,
+              blocking: null,
+              waiting: null,
+              recoveryActions: [],
+            },
+          },
+        })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onApplyPlan={onApplyPlan}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+    expect(within(getOperationPanel()).getByRole("button", { name: "Continue plan" })).toBeInTheDocument();
+    expect(within(getOperationPanel()).getByRole("button", { name: "Restart from beginning" })).toBeInTheDocument();
+    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Restart from beginning" }));
+    expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "restart_from_beginning" });
+
     accepted.rerender(
       <TaskWorkspacePlanSection
         label="Plan"
@@ -372,6 +418,12 @@ describe("TaskWorkspacePlanSection", () => {
     );
 
     const operationPanel = screen.getByRole("region", { name: "Current operation" });
+    const primaryAction = within(operationPanel).getByTestId("current-operation-primary-action");
+    expect(primaryAction).toBeInTheDocument();
+    expect(primaryAction).toHaveClass("sm:flex-row");
+    expect(primaryAction).toHaveTextContent("Needs handling");
+    expect(within(primaryAction).getByRole("button", { name: "Retry Run" })).toHaveClass("shrink-0");
+    expect(within(primaryAction).getByRole("button", { name: "Retry Run" })).not.toHaveClass("w-full");
     fireEvent.click(within(operationPanel).getByRole("button", { name: "Retry Run" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "retry_node", nodeId: "node-failed" });
@@ -443,6 +495,77 @@ describe("TaskWorkspacePlanSection", () => {
     fireEvent.click(within(operationPanel).getByRole("button", { name: "Start plan" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
+  });
+
+  it("shows plan brief metadata without exposing the full planning prompt", () => {
+    const plan = {
+      id: "plan-brief",
+      status: "accepted",
+      revision: 2,
+      prompt: "Original long planning prompt that should stay out of the plan graph brief.",
+      summary: "Two-step plan ready for execution.",
+      generatedBy: "Claude",
+      updatedAt: "2026-05-18T00:00:00.000Z",
+      blueprint: {
+        title: "Research digest plan",
+        goal: "Collect and summarize AI research updates.",
+        assumptions: ["Use public sources only.", "Keep findings concise."],
+        nodes: [],
+        edges: [],
+      },
+      compiledPlan: {
+        title: "Research digest plan",
+        goal: "Collect and summarize AI research updates.",
+        assumptions: ["Use public sources only.", "Keep findings concise."],
+      },
+      effectivePlan: {},
+    } as unknown as TaskPlanReadModel;
+    const graphPlan = createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "collect", title: "Collect updates", status: "ready", estimatedMinutes: 12 }),
+      createTaskWorkspaceFixtureNode({ id: "summarize", title: "Summarize findings", status: "pending", estimatedMinutes: 8 }),
+    ], "collect");
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: plan, aiPlanGenerationStatus: "accepted" } })}
+        plan={plan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    const executionFlow = screen.getByRole("region", { name: "Execution flow" });
+    expect(within(executionFlow).getByText("Plan brief")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Research digest plan")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Goal: Collect and summarize AI research updates.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Summary: Two-step plan ready for execution.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("2 assumptions")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("accepted")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("2 steps")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("20 min")).toBeInTheDocument();
+    expect(within(executionFlow).queryByText("Use public sources only.")).not.toBeInTheDocument();
+    const showDetailsButton = within(executionFlow).getByRole("button", { name: "Show details" });
+    expect(showDetailsButton.querySelector("svg")).toBeInTheDocument();
+    fireEvent.click(showDetailsButton);
+    expect(within(executionFlow).getByText("Goal")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Collect and summarize AI research updates.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Summary")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Two-step plan ready for execution.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Assumptions")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Use public sources only.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Keep findings concise.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Generated by Claude")).toBeInTheDocument();
+    const hideDetailsButton = within(executionFlow).getByRole("button", { name: "Hide details" });
+    expect(hideDetailsButton).toHaveAttribute("aria-expanded", "true");
+    expect(hideDetailsButton.querySelector("svg")).toBeInTheDocument();
+    expect(within(executionFlow).queryByText("Original long planning prompt that should stay out of the plan graph brief.")).not.toBeInTheDocument();
   });
 
   it("shows accept and AI revision chat with selected node detail before plan acceptance", () => {

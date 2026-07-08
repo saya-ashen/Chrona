@@ -513,6 +513,34 @@ describe("runProviderRequest resume threading", () => {
     expect(snapshot.sessionId).toBe("sdk-session-1");
   });
 
+  it("does not forward synthetic Claude Code run ids as cross-process resume refs", async () => {
+    const startRun = mock(async () => runRef());
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+
+    const client = {
+      provider: "claude_code",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(client, {
+      ...request,
+      resumeSessionRef: "claude-sdk-3583bad8-4764-417b-9998-973c5b6bde60",
+    });
+
+    expect(startRun).toHaveBeenCalledWith(
+      expect.not.objectContaining({ resumeSessionRef: expect.anything() }),
+    );
+  });
+
   it("omits resumeSessionRef when the request has no prior provider session", async () => {
     const startRun = mock(async () => runRef());
     const streamRun = mock(() =>

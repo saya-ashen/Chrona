@@ -33,7 +33,7 @@ export type TaskWorkspaceOperationState =
   | (BaseOperationState & { status: "plan-empty"; action: "generate-plan"; isGeneratingPlan: false })
   | (BaseOperationState & { status: "plan-generating"; action: "none"; isGeneratingPlan: true })
   | (BaseOperationState & { status: "plan-review"; action: "review-plan"; canAcceptPlan: boolean; acceptPlanError: string | null; visibleGenerationInstruction: string | null })
-  | (BaseOperationState & { status: "plan-ready-to-run"; action: "start-plan" })
+  | (BaseOperationState & { status: "plan-ready-to-run"; action: "start-plan"; hasGraphExecutionStarted: boolean })
   | (BaseOperationState & { status: "task-action"; action: "task-primary-action"; taskPrimaryAction: TaskAction })
   | (BaseOperationState & { status: "execution-action"; action: "current-operation"; operationSpec: UiDocument | null; actionHandlers: Record<string, OperationHandler>; onActionStateChange?: (changes: Array<{ path: string; value: unknown }>) => void })
   | (BaseOperationState & { status: "execution-blocked"; action: "current-operation"; operationSpec: UiDocument | null; actionHandlers: Record<string, OperationHandler>; onActionStateChange?: (changes: Array<{ path: string; value: unknown }>) => void })
@@ -175,14 +175,15 @@ export function resolveTaskWorkspaceOperationState(input: ResolveTaskWorkspaceOp
     };
   }
 
-  if (!input.hasGraphExecutionStarted) {
+  if (!input.hasGraphExecutionStarted || (input.taskPrimaryAction?.type === "start" && input.taskPrimaryAction.enabled)) {
     return {
       ...base,
       status: "plan-ready-to-run",
       action: "start-plan",
       title: "Plan accepted",
-      description: "Start the accepted plan when ready.",
+      description: input.hasGraphExecutionStarted ? "Continue the accepted plan from the current state." : "Start the accepted plan when ready.",
       statusLabel: input.plan.status,
+      hasGraphExecutionStarted: input.hasGraphExecutionStarted,
       tone: "success",
     };
   }

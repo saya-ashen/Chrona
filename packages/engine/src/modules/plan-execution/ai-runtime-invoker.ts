@@ -297,6 +297,14 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
   };
 }
 
+function sanitizeStartRunInputForProvider(provider: string, input: StartRunInput): StartRunInput {
+  if (provider !== "claude_code") return input;
+  if (!input.resumeSessionRef?.startsWith("claude-sdk-")) return input;
+  const next = { ...input };
+  delete next.resumeSessionRef;
+  return next;
+}
+
 export async function runProviderRequest(
   providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
   request: ExecutionProviderRequest,
@@ -311,7 +319,7 @@ export async function runProviderRequest(
     controlRunToken?: string | null;
   } = {},
 ): Promise<ProviderRunSnapshot> {
-  const startInput = toStartRunInput(request);
+  const startInput = sanitizeStartRunInputForProvider(providerClient.provider, toStartRunInput(request));
   const idempotencyKey = options.idempotencyKey ?? (options.runId
     ? `chrona-runtime:${options.runId}`
     : undefined);

@@ -467,6 +467,7 @@ export function TaskWorkspacePlanSection({
               copy={copy}
               onGeneratePlan={() => onGeneratePlan()}
               onStartPlan={() => void onDispatchExecutionAction({ action: "start_manual" })}
+              onRestartPlan={() => void onDispatchExecutionAction({ action: "restart_from_beginning" })}
               onTaskPrimaryAction={primaryActionDispatch ? () => void onDispatchExecutionAction(primaryActionDispatch) : undefined}
               revisionPanel={revisionPanel}
             />

@@ -208,8 +208,8 @@ describe("plan-runner task executor external results", () => {
       spec: {
         root: "root",
         elements: {
-          root: { type: "Stack", props: { gap: "sm" }, children: ["summary"] },
-          summary: { type: "Markdown", props: { content: "Final UI output" }, children: [] },
+          root: { type: "Stack", props: { gap: "sm", xChronaSourceNodeId: "task_node" }, children: ["summary"] },
+          summary: { type: "Markdown", props: { content: "Final UI output", xChronaSourceNodeId: "task_node" }, children: [] },
         },
       },
     });

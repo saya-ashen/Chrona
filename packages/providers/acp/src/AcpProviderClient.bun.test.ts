@@ -235,6 +235,30 @@ describe("AcpProviderClient", () => {
     expect(streamed.at(-1)).toMatchObject({ type: "run_completed", sessionId: "native-acp-session-prior" });
   });
 
+  it("treats synthetic Claude Code run ids as ordinary ACP session ids", async () => {
+    const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
+    const client = new AcpProviderClient({
+      config: config({ mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
+      transport,
+    });
+    const syntheticClaudeRef = "claude-sdk-3583bad8-4764-417b-9998-973c5b6bde60";
+
+    const run = await client.startRun(baseInput({
+      sessionId: "chrona-session",
+      sessionKey: "chrona:task:task-1:execute:plan-1",
+      resumeSessionRef: syntheticClaudeRef,
+    }));
+    const streamed = [];
+    for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
+
+    expect(transport.requests.some((request) => request.method === "session/new")).toBe(false);
+    expect(transport.requests.find((request) => request.method === "session/load")?.params).toMatchObject({
+      sessionId: syntheticClaudeRef,
+    });
+    expect(run.sessionId).toBe(syntheticClaudeRef);
+    expect(streamed.at(-1)).toMatchObject({ type: "run_completed", sessionId: syntheticClaudeRef });
+  });
+
   it("rejects resumed runs when the ACP agent cannot load sessions", async () => {
     const transport = new FakeAcpTransport({
       init: { protocolVersion: 1, agentCapabilities: { loadSession: false, mcpCapabilities: { http: true } } },

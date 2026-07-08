@@ -145,12 +145,11 @@ export function resolveHeaderExecutionState(input: {
 }): HeaderExecutionState {
   const terminal = input.executionStatus === "completed" || input.executionStatus === "cancelled";
   const running = input.executionStatus === "running";
+  const blockedOrFailed = input.executionStatus === "blocked" || input.executionStatus === "failed";
   const stoppable = running
     || input.executionStatus === "waiting_for_user"
-    || input.executionStatus === "waiting_for_approval"
-    || input.executionStatus === "blocked"
-    || input.executionStatus === "failed";
-  const showStart = !terminal && !running && !stoppable && input.hasAcceptedPlan;
+    || input.executionStatus === "waiting_for_approval";
+  const showStart = !terminal && !running && !stoppable && !blockedOrFailed && input.hasAcceptedPlan;
   return {
     hasPlan: input.hasPlan,
     hasAcceptedPlan: input.hasAcceptedPlan,
@@ -198,7 +197,8 @@ function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAc
     { id: "pause", label: "Pause" },
     { id: "stop", label: "Stop" },
   ];
-  if (["waiting_for_user", "waiting_for_approval", "blocked", "failed"].includes(input.executionStatus)) return [{ id: "stop", label: "Stop" }];
+  if (["waiting_for_user", "waiting_for_approval"].includes(input.executionStatus)) return [{ id: "stop", label: "Stop" }];
+  if (["blocked", "failed"].includes(input.executionStatus)) return [];
   return [{ id: "start", label: "Start", disabled: !input.isRunnable, disabledReason: input.isRunnable ? undefined : "Task is not runnable." }];
 }
 export type BuildHeaderSpecInput = {

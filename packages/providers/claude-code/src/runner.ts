@@ -717,6 +717,13 @@ export function extractSdkSessionId(raw: unknown): string | undefined {
     : undefined;
 }
 
+export function validClaudeCodeResumeSessionRef(value: string | undefined): string | undefined {
+  const ref = value?.trim();
+  if (!ref) return undefined;
+  if (ref.startsWith("claude-sdk-")) return undefined;
+  return ref;
+}
+
 function updateHandleSdkSession(
   handle: ClaudeCodeRunHandle,
   sdkSessionId: string,
@@ -813,7 +820,7 @@ class SdkRunner implements ClaudeCodeRunner {
     // fall back to the engine-supplied `resumeSessionRef` so a restarted
     // process can still resume the prior SDK session from persisted state.
     const resumedSdkSessionId =
-      this.sdkSessionByChronaSessionId.get(input.sessionId) ?? input.resumeSessionRef;
+      this.sdkSessionByChronaSessionId.get(input.sessionId) ?? validClaudeCodeResumeSessionRef(input.resumeSessionRef);
     const log = runnerLogger.child({
       runId,
       sessionId: input.sessionId,

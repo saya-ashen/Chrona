@@ -77,6 +77,47 @@ describe("Claude Code MCP URL session identity", () => {
     );
     expect(mcpServers?.chrona?.url).not.toContain(input.sessionId);
   });
+
+  test("does not pass synthetic Claude Code run ids to SDK resume", async () => {
+    stubMcpProbe();
+    // Dynamic import required: this test verifies runner behavior with the mocked SDK module above.
+    const { createClaudeCodeRunner } = await import("./runner");
+    const runner = await createClaudeCodeRunner({
+      mcpBaseUrl: "http://mcp.test/",
+      mcpRunToken: "",
+    });
+
+    await runner.start({
+      sessionId: "chrona-session-1",
+      sessionKey: "chrona:task:task-1:execute:plan-1",
+      instructions: "Retry failed node.",
+      input: { type: "text", text: "Retry node." },
+      resumeSessionRef: "claude-sdk-3583bad8-4764-417b-9998-973c5b6bde60",
+    } satisfies StartRunInput);
+
+    expect(capturedOptions?.["resume"]).toBeUndefined();
+  });
+
+  test("passes native Claude session ids to SDK resume", async () => {
+    stubMcpProbe();
+    // Dynamic import required: this test verifies runner behavior with the mocked SDK module above.
+    const { createClaudeCodeRunner } = await import("./runner");
+    const runner = await createClaudeCodeRunner({
+      mcpBaseUrl: "http://mcp.test/",
+      mcpRunToken: "",
+    });
+    const nativeSessionId = "3583bad8-4764-417b-9998-973c5b6bde60";
+
+    await runner.start({
+      sessionId: "chrona-session-1",
+      sessionKey: "chrona:task:task-1:execute:plan-1",
+      instructions: "Retry failed node.",
+      input: { type: "text", text: "Retry node." },
+      resumeSessionRef: nativeSessionId,
+    } satisfies StartRunInput);
+
+    expect(capturedOptions?.["resume"]).toBe(nativeSessionId);
+  });
 });
 
 describe("Claude Code health probe", () => {

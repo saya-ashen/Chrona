@@ -17,6 +17,7 @@ type TaskWorkspaceOperationPanelProps = {
   copy: WorkspaceCopy;
   onGeneratePlan: () => void;
   onStartPlan: () => void;
+  onRestartPlan?: () => void;
   onTaskPrimaryAction?: () => void;
   revisionPanel: ReactNode;
 };
@@ -53,7 +54,7 @@ function formatRuntimeEvent(event: TaskWorkspaceOperationState["runtimeEvents"][
     case "run_status":
       return `Status: ${value.message ?? value.status}`;
     case "raw_event":
-      return `Event: ${value.rawEventType ?? "Runtime event"}`;
+      return value.message ? `Progress: ${value.message}` : `Event: ${value.rawEventType ?? "Runtime event"}`;
   }
 }
 
@@ -67,12 +68,21 @@ function SelectedNodeCue({ node, copy }: { node: PlanNodeDataModel | null; copy:
   );
 }
 
+function taskActionButtonLabel(state: Extract<TaskWorkspaceOperationState, { status: "task-action" }>) {
+  return state.taskPrimaryAction.label;
+}
+
+function taskActionButtonVariant(state: Extract<TaskWorkspaceOperationState, { status: "task-action" }>) {
+  return state.tone === "critical" ? "destructive" : "default";
+}
+
 export function TaskWorkspaceOperationPanel({
   taskId,
   state,
   copy,
   onGeneratePlan,
   onStartPlan,
+  onRestartPlan,
   onTaskPrimaryAction,
   revisionPanel,
 }: TaskWorkspaceOperationPanelProps) {
@@ -105,17 +115,35 @@ export function TaskWorkspaceOperationPanel({
             <Button type="button" disabled>{copy.generating ?? "Generating..."}</Button>
           ) : null}
           {state.status === "plan-ready-to-run" ? (
-            <Button type="button" onClick={onStartPlan}>{copy.startPlanAction ?? "Start plan"}</Button>
-          ) : null}
-          {state.status === "task-action" ? (
-            <Button type="button" variant={state.tone === "critical" ? "destructive" : "default"} onClick={onTaskPrimaryAction} disabled={!onTaskPrimaryAction}>
-              {state.taskPrimaryAction.label}
-            </Button>
+            <>
+              {state.hasGraphExecutionStarted ? (
+                <Button type="button" variant="outline" onClick={onRestartPlan} disabled={!onRestartPlan}>{copy.restartPlanAction ?? "Restart from beginning"}</Button>
+              ) : null}
+              <Button type="button" onClick={onStartPlan}>{state.hasGraphExecutionStarted ? (copy.continuePlanAction ?? "Continue plan") : (copy.startPlanAction ?? "Start plan")}</Button>
+            </>
           ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-3 px-3">
         <ProviderApprovalBanner taskId={taskId} />
+        {state.status === "task-action" ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-destructive/25 bg-background/80 px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" data-testid="current-operation-primary-action">
+            <div className="min-w-0 text-xs">
+              <p className="font-semibold text-destructive">{copy.needsHandling ?? "Needs handling"}</p>
+              <p className="mt-0.5 line-clamp-2 text-muted-foreground">{state.description}</p>
+            </div>
+            <Button
+              type="button"
+              variant={taskActionButtonVariant(state)}
+              size="sm"
+              className="shrink-0 self-start rounded-xl px-4 shadow-sm sm:self-center"
+              onClick={onTaskPrimaryAction}
+              disabled={!onTaskPrimaryAction}
+            >
+              {taskActionButtonLabel(state)}
+            </Button>
+          </div>
+        ) : null}
         {state.status === "plan-review" ? revisionPanel : null}
         {state.status === "execution-action" || state.status === "execution-blocked" ? (
           <SpecRenderer spec={state.operationSpec} handlers={state.actionHandlers} onStateChange={state.onActionStateChange} />

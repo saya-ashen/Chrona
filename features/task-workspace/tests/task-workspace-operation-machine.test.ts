@@ -73,6 +73,19 @@ describe("resolveTaskWorkspaceOperationState", () => {
       title: "Plan accepted",
     },
     {
+      name: "accepted plan ready to continue",
+      input: baseInput({
+        plan: { status: "accepted", prompt: null, summary: "Accepted summary" },
+        planGenerationStatus: "accepted",
+        taskPrimaryAction: { type: "start", enabled: true, label: "Start" },
+        graphPlan: createTaskWorkspaceFixtureGraph([createTaskWorkspaceFixtureNode({ id: "started", status: "cancelled" })], "started"),
+        hasGraphExecutionStarted: true,
+      }),
+      status: "plan-ready-to-run",
+      action: "start-plan",
+      title: "Plan accepted",
+    },
+    {
       name: "current checkpoint needs action",
       input: (() => {
         const node = createTaskWorkspaceFixtureNode({

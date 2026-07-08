@@ -186,6 +186,25 @@ describe("workspace activity helpers", () => {
     });
   });
 
+  it("keeps live provider task progress readable", () => {
+    expect(runtimeEventToWorkspaceActivity(runtimeEvent({
+      provider: "claude_code",
+      runtimeName: "hermes",
+      nodeTitle: "Search jobs",
+      rawEventType: "system",
+      event: {
+        type: "raw_event",
+        rawEventType: "system",
+        message: "Search: AI PhD jobs · WebSearch: euraxess funded AI · 84 tool uses",
+      },
+    }))).toMatchObject({
+      kind: "provider_run",
+      title: "Task progress",
+      summary: "Search: AI PhD jobs · WebSearch: euraxess funded AI · 84 tool uses",
+      tone: "info",
+    });
+  });
+
   it("drops generic live provider events from activity", () => {
     expect(runtimeEventToWorkspaceActivity(runtimeEvent({
       provider: "claude_code",

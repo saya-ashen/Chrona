@@ -134,6 +134,16 @@ export interface NodeRuntimeInput {
   };
   context: {
     taskTitle?: string;
+    plan: {
+      title: string;
+      goal: string;
+      assumptions: string[];
+      summary?: string;
+    };
+    run?: {
+      planningPrompt?: string;
+      startPrompt?: string;
+    };
     relevantPreviousResults: Array<{
       nodeRef: string;
       title: string;

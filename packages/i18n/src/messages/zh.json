@@ -1321,7 +1321,22 @@
       "liveStatusRunning": "正在运行",
       "resultSummaryLabel": "结果摘要",
       "copyResultSummary": "复制摘要",
-      "resultSummaryCopied": "已复制"
+      "resultSummaryCopied": "已复制",
+      "showResultDetails": "展开",
+      "hideResultDetails": "收起",
+      "resultDetailsLabel": "详情",
+      "resultNodeFilterLabel": "按节点筛选结果",
+      "resultNodeFilterAll": "全部节点",
+      "collapseAllResults": "全部收起",
+      "expandAllResults": "全部展开",
+      "executionResultTitle": "执行结果",
+      "aiGeneratedBadge": "AI 生成",
+      "validatedOutputDescription": "已验证的任务执行输出。",
+      "artifactPreview": "预览",
+      "artifactHidePreview": "收起预览",
+      "copyArtifactPath": "复制路径",
+      "artifactPathCopied": "已复制",
+      "downloadArtifact": "下载"
     }
   },
   "queries": {

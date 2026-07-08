@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  headerExecutionStateToStatePaths,
+  resolveHeaderExecutionState,
   resolveTaskHeaderViewModel,
   taskHeaderStatus,
   type BuildHeaderSpecInput,
@@ -180,6 +182,35 @@ describe("taskHeaderStatus", () => {
         }),
       ).toBe("blocked");
     });
+  });
+});
+
+describe("resolveHeaderExecutionState", () => {
+  it.each(["blocked", "failed"] as const)("does not expose Stop or Start for %s executions", (executionStatus) => {
+    const state = resolveHeaderExecutionState({
+      executionStatus,
+      hasPlan: true,
+      hasAcceptedPlan: true,
+      isRunnable: true,
+    });
+
+    expect(state.canStop).toBe(false);
+    expect(state.canStart).toBe(false);
+    expect(headerExecutionStateToStatePaths(state)["/execution/can-stop"]).toBe(false);
+    expect(headerExecutionStateToStatePaths(state)["/execution/can-start"]).toBe(false);
+  });
+
+  it("keeps Stop available for active cancellable executions", () => {
+    const state = resolveHeaderExecutionState({
+      executionStatus: "running",
+      hasPlan: true,
+      hasAcceptedPlan: true,
+      isRunnable: true,
+    });
+
+    expect(state.canStop).toBe(true);
+    expect(state.canPause).toBe(true);
+    expect(headerExecutionStateToStatePaths(state)["/execution/can-stop"]).toBe(true);
   });
 });
 

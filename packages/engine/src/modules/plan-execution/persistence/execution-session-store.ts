@@ -53,6 +53,27 @@ export async function ensureExecutionSession(input: {
   });
 }
 
+export async function abandonActiveExecutionSessions(input: {
+  taskId: string;
+  workBlockId?: string | null;
+  reason?: string;
+}) {
+  return db.executionSession.updateMany({
+    where: {
+      taskId: input.taskId,
+      status: { in: ["Active", "Paused"] },
+      ...(input.workBlockId !== undefined ? { workBlockId: input.workBlockId } : {}),
+    },
+    data: {
+      status: "Abandoned",
+      currentNodeId: null,
+      currentNodeAttemptId: null,
+      pauseReason: input.reason ?? null,
+      completedAt: new Date(),
+    },
+  });
+}
+
 export type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
 
 export async function getActiveExecutionWorkBlockId(taskId: string): Promise<string | null> {

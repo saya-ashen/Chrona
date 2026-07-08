@@ -1321,7 +1321,22 @@
       "liveStatusRunning": "Running now",
       "resultSummaryLabel": "Result summary",
       "copyResultSummary": "Copy summary",
-      "resultSummaryCopied": "Copied"
+      "resultSummaryCopied": "Copied",
+      "showResultDetails": "Show",
+      "hideResultDetails": "Hide",
+      "resultDetailsLabel": "Details",
+      "resultNodeFilterLabel": "Filter results by node",
+      "resultNodeFilterAll": "All nodes",
+      "collapseAllResults": "Collapse all",
+      "expandAllResults": "Expand all",
+      "executionResultTitle": "Execution Result",
+      "aiGeneratedBadge": "AI generated",
+      "validatedOutputDescription": "Validated output from task execution.",
+      "artifactPreview": "Preview",
+      "artifactHidePreview": "Hide preview",
+      "copyArtifactPath": "Copy path",
+      "artifactPathCopied": "Copied",
+      "downloadArtifact": "Download"
     }
   },
   "queries": {

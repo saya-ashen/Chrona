@@ -65,6 +65,7 @@ export function TaskWorkspaceInspector({
           latestResult={consoleView.latestResult}
           attention={consoleView.attention}
           latestCompletedNode={consoleView.latestCompletedNode}
+          nodes={consoleView.graphPlan?.nodes ?? []}
           artifacts={consoleView.artifacts}
           activity={consoleView.activity}
           commandCenterActionHandlers={commandCenterActionHandlers}

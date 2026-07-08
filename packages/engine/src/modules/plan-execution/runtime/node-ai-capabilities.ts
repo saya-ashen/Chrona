@@ -8,7 +8,7 @@ import {
   type PreparedAiFeatureSpec,
 } from "@chrona/contracts/ai";
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "../ai-runtime-invoker";
-import type { NodeExecutionResult } from "../node-executors/types";
+import type { NodeExecutionPlanContext, NodeExecutionResult, NodeExecutionRunContext } from "../node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
 import { branchBindingForRef } from "./node-runtime-refs";
@@ -28,6 +28,8 @@ export type NodeAiCapabilityInput = {
   };
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
+  planContext?: NodeExecutionPlanContext;
+  runContext?: NodeExecutionRunContext;
   attempt: NodeAttempt;
   planOutput?: PlanOutputState;
   runtimeName: string;
@@ -442,7 +444,13 @@ function defaultTerminalToolName(nodeType: EffectivePlanNode["type"]): string {
 export async function executeTaskNodeCapability(
   input: NodeAiCapabilityInput,
 ): Promise<NodeExecutionResult> {
-  const runtime = buildNodeRuntimePrompt(input);
+  const runtime = buildNodeRuntimePrompt({
+    plan: input.plan,
+    node: input.node,
+    planOutput: input.planOutput,
+    planContext: input.planContext,
+    runContext: input.runContext,
+  });
   const featureSpec: PreparedAiFeatureSpec = {
     feature: input.node.type === "condition"
       ? "evaluate_condition_node"

@@ -53,12 +53,17 @@ class FakeAcpTransport implements AcpTransport {
     const context = {
       request: async (method: string, params: unknown) => {
         this.requests.push({ method, params });
-        if (method === "initialize") return { protocolVersion: 1, agentCapabilities: { mcpCapabilities: { http: true } } };
+        if (method === "initialize") return { protocolVersion: 1, agentCapabilities: { loadSession: true, mcpCapabilities: { http: true } } };
+        if (method === "session/load") return { modes: null };
         throw new Error(`unexpected request ${method}`);
       },
       buildSession: (params: unknown) => {
         this.requests.push({ method: "session/new", params });
         return { start: async () => this.session };
+      },
+      attachSession: (response: { sessionId: string }) => {
+        this.requests.push({ method: "session/attach", params: response });
+        return { ...this.session, sessionId: response.sessionId };
       },
       notify: async (method: string, params: unknown) => {
         this.requests.push({ method, params });
@@ -99,7 +104,7 @@ describe("codexAcpEnv", () => {
     });
   });
 
-  it("passes gateway config and forces Chrona MCP namespace direct exposure", () => {
+  it("passes gateway config, default gateway auth, and Chrona MCP direct namespace", () => {
     const env = codexAcpEnv({
       apiKey: "sk-gateway",
       baseUrl: " https://gateway.example/v1 ",
@@ -125,7 +130,16 @@ describe("codexAcpEnv", () => {
         },
       },
     });
-    expect(env.DEFAULT_AUTH_REQUEST).toBeUndefined();
+    expect(JSON.parse(env.DEFAULT_AUTH_REQUEST ?? "{}")).toEqual({
+      methodId: "gateway",
+      _meta: {
+        gateway: {
+          baseUrl: "https://gateway.example/v1",
+          headers: { Authorization: "Bearer sk-gateway" },
+          providerName: "Chrona Codex Gateway",
+        },
+      },
+    });
   });
 
   it("uses api-key auth only for default OpenAI Codex provider", () => {
@@ -237,6 +251,30 @@ describe("CodexProviderClient", () => {
       ok: true,
       reason: "OpenAI Codex ACP agent connected",
     });
+  });
+
+  it("loads prior Codex ACP sessions without applying Claude Code resume guards", async () => {
+    const syntheticLookingRef = "claude-sdk-3583bad8-4764-417b-9998-973c5b6bde60";
+    const transport = new FakeAcpTransport([{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }]);
+    const client = new CodexProviderClient({
+      config: { mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" },
+      acp: { transport },
+    });
+
+    const run = await client.startRun(baseInput({
+      sessionKey: "chrona:codex",
+      resumeSessionRef: syntheticLookingRef,
+    }));
+    const streamed = [];
+    for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
+
+    expect(transport.requests.some((request) => request.method === "session/new")).toBe(false);
+    expect(transport.requests.find((request) => request.method === "session/load")?.params).toMatchObject({
+      sessionId: syntheticLookingRef,
+    });
+    expect(run.provider).toBe("codex");
+    expect(run.sessionId).toBe(syntheticLookingRef);
+    expect(streamed.at(-1)).toMatchObject({ type: "run_completed", provider: "codex", sessionId: syntheticLookingRef });
   });
 
 

@@ -140,11 +140,12 @@ export function resolveCommandCenterPrimaryAction(
     };
   }
 
-  if (!input.hasGraphExecutionStarted) {
+  if (!input.hasGraphExecutionStarted || (input.taskPrimaryAction?.type === "start" && input.taskPrimaryAction.enabled)) {
+    const hasStarted = input.hasGraphExecutionStarted;
     return {
       kind: "start-plan",
-      label: "Start plan",
-      description: "Run the accepted plan and move into the first executable step.",
+      label: hasStarted ? "Continue plan" : "Start plan",
+      description: hasStarted ? "Continue the accepted plan from its persisted execution state." : "Run the accepted plan and move into the first executable step.",
       statusLabel: input.planStatus ?? undefined,
       tone: "success",
     };

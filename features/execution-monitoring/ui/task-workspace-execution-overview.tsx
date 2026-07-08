@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
@@ -13,9 +13,18 @@ import type {
   WorkspaceArtifactItem,
 } from "../../task-workspace";
 import { SpecRenderer } from "../../../apps/web/src/components/tasks/workspace/catalog/spec-renderer";
-import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "./build-execution-overview-spec";
+import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec, type ResultNodeFilter, type ResultNodeOption } from "./build-execution-overview-spec";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
 import { UiSurfaceFrame } from "./ui-surface-frame";
+import { Button } from "../../../apps/web/src/components/ui/button";
+import { Badge } from "../../../apps/web/src/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../apps/web/src/components/ui/select";
 
 type OverviewAction = (nodeId?: string) => void;
 
@@ -47,6 +56,11 @@ const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
 };
 
 const TRAIL_ACTIVITY_LIMIT = 100;
+type ResultCollapseCommandState = {
+  mode: "collapse" | "expand";
+  revision: number;
+};
+
 
 function commandCenterTrailItems(commandCenter?: { documents: { trail: UiDocument } } | null) {
   const items = commandCenter?.documents.trail.state?.trail;
@@ -94,6 +108,7 @@ type ActivityLayout = "below" | "side";
 
 export function TaskWorkspaceExecutionOverview({
   latestCompletedNode,
+  nodes = [],
   artifacts,
   activity,
   currentExecution,
@@ -111,9 +126,10 @@ export function TaskWorkspaceExecutionOverview({
   latestResult?: ExecutionOverviewCard;
   attention: ExecutionOverviewCard | null;
   latestCompletedNode: PlanNodeDataModel | null;
+  nodes?: PlanNodeDataModel[];
   artifacts: WorkspaceArtifactItem[];
   activity: WorkspaceActivityItem[];
-  currentExecution?: Pick<PlanExecutionResult, "status"> | null;
+  currentExecution?: Pick<PlanExecutionResult, "status" | "planOutput"> | null;
   runtimeEvents?: WorkspaceRuntimeEvent[];
   liveActivity?: WorkspaceActivityItem[];
   primaryAction?: CommandCenterPrimaryAction | null;
@@ -158,6 +174,31 @@ export function TaskWorkspaceExecutionOverview({
   }, [liveActivity.length, mergedActivity, runtimeEvents, savedTrailActivity.length, trailStore]);
 
 
+  const nodeOptions = useMemo<ResultNodeOption[]>(() => {
+    const byId = new Map<string, ResultNodeOption>();
+    for (const node of nodes) {
+      byId.set(node.id, { id: node.id, title: node.title, status: node.statusLabel ?? node.status });
+    }
+    for (const artifact of artifacts) {
+      if (artifact.sourceNodeId && !byId.has(artifact.sourceNodeId)) {
+        byId.set(artifact.sourceNodeId, { id: artifact.sourceNodeId, title: artifact.sourceNodeId });
+      }
+    }
+    return Array.from(byId.values());
+  }, [artifacts, nodes]);
+  const [selectedNodeId, setSelectedNodeId] = useState<ResultNodeFilter>("all");
+
+  useEffect(() => {
+    if (selectedNodeId !== "all" && !nodeOptions.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId("all");
+    }
+  }, [nodeOptions, selectedNodeId]);
+  const [resultCollapseCommand, setResultCollapseCommand] = useState<ResultCollapseCommandState | null>(null);
+  const issueResultCollapseCommand = (mode: ResultCollapseCommandState["mode"]) => {
+    setResultCollapseCommand((current) => ({ mode, revision: (current?.revision ?? 0) + 1 }));
+  };
+
+
   const locateHandlers = {
     "locate-workspace-node": (params: Record<string, unknown>) => {
       const nodeId = typeof params.nodeId === "string" ? params.nodeId : undefined;
@@ -165,6 +206,17 @@ export function TaskWorkspaceExecutionOverview({
     },
   };
   const resultSpec = buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet);
+
+  const outputSpec = useMemo(() => buildCommandCenterOutputTabSpec({
+    latestCompletedNode,
+    resultSpec,
+    artifacts,
+    copy: ws,
+    apiArtifactsSpec: commandCenter?.documents.output ?? null,
+    selectedNodeId,
+    nodeOptions,
+    outputOwnerNodeId: currentExecution?.planOutput?.updatedByNodeId ?? null,
+  }), [artifacts, commandCenter?.documents.output, currentExecution?.planOutput?.updatedByNodeId, latestCompletedNode, nodeOptions, resultSpec, selectedNodeId, ws]);
 
   const trailSpec = withActivityStreamProps(commandCenter?.documents.trail ?? buildCommandCenterTrailTabSpec({
     activity,
@@ -178,21 +230,46 @@ export function TaskWorkspaceExecutionOverview({
   }), { active: showLiveStatus });
 
   const results = (
-    <UiSurfaceFrame
-      kind="ai-authored"
-      label="AI generated execution results"
-      description="Validated output from task execution. Product controls stay outside this surface."
+    <section
+      aria-label={ws.executionResultTitle ?? "Execution Result"}
       className="min-h-0 flex-1 overflow-y-auto"
-      bodyClassName="min-w-0"
     >
-      <h3 id="task-workspace-results-heading" className="sr-only">
-        {copy.outputTab}
-      </h3>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-3">
+        <div className="min-w-0 space-y-1">
+          <h3 id="task-workspace-results-heading" className="font-heading text-base font-semibold text-foreground">
+            {ws.executionResultTitle ?? "Execution Result"}
+          </h3>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline" className="bg-violet-500/10 text-violet-700 dark:text-violet-200">{ws.aiGeneratedBadge ?? "AI generated"}</Badge>
+            <span>{ws.validatedOutputDescription ?? "Validated output from task execution."}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-1.5">
+            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => issueResultCollapseCommand("collapse")}>{ws.collapseAllResults ?? "Collapse all"}</Button>
+            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => issueResultCollapseCommand("expand")}>{ws.expandAllResults ?? "Expand all"}</Button>
+          </div>
+          {nodeOptions.length > 1 ? (
+            <Select value={selectedNodeId} onValueChange={(value) => setSelectedNodeId(value as ResultNodeFilter)}>
+              <SelectTrigger aria-label={ws.resultNodeFilterLabel ?? "Filter results by node"} size="sm" className="max-w-full bg-background/90 text-xs">
+                <SelectValue placeholder={ws.resultNodeFilterAll ?? "All nodes"} />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="all">{ws.resultNodeFilterAll ?? "All nodes"}</SelectItem>
+                {nodeOptions.map((node) => (
+                  <SelectItem key={node.id} value={node.id}>{node.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </div>
+      </div>
       <SpecRenderer
-        spec={buildCommandCenterOutputTabSpec({ latestCompletedNode, resultSpec, artifacts, copy: ws, apiArtifactsSpec: commandCenter?.documents.output ?? null })}
+        spec={outputSpec}
         handlers={locateHandlers}
+        resultCollapseCommand={resultCollapseCommand}
       />
-    </UiSurfaceFrame>
+    </section>
   );
 
   const activityTimeline = (

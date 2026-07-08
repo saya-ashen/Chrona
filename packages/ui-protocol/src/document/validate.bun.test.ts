@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chronaCatalog, chronaPlanOutputCatalogPrompt, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
+import { chronaCatalog, chronaPlanOutputCatalog, chronaPlanOutputCatalogPrompt, chronaPlanOutputSpecSchema, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
@@ -224,6 +224,55 @@ describe("validateChronaSpec", () => {
       root: "button",
       elements: { button: { type: "Button", props: { label: "Run" }, on: { press: { action: "dispatch-execution", params: { actionId: "" } } }, children: [] } },
     }), "elements.button.on.press.params.actionId");
+  });
+
+  test("accepts component-level collapse props and host node sections", () => {
+    const spec: UiDocument = {
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, children: ["section"] },
+        section: {
+          type: "NodeResultSection",
+          props: { nodeId: "node-1", nodeTitle: "Collect data", defaultCollapsed: true, itemCount: 1 },
+          children: ["file"],
+        },
+        file: {
+          type: "FileRef",
+          props: {
+            path: ".chrona/outputs/node-1/result.json",
+            title: "Raw data",
+            collapsible: true,
+            defaultCollapsed: true,
+            collapseTitle: "Raw data file",
+            collapsedSummary: "Large generated artifact",
+          },
+          children: [],
+        },
+      },
+    };
+
+    expect(validateChronaSpec(spec).ok).toBe(true);
+  });
+
+  test("keeps NodeResultSection host-owned while allowing plan output collapse metadata", () => {
+    expect("NodeResultSection" in chronaPlanOutputCatalog.data.components).toBe(false);
+    expect("NodeResultSection" in chronaCatalog.data.components).toBe(true);
+
+    const outputSpec = chronaPlanOutputSpecSchema.safeParse({
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, children: ["answer", "details", "json", "file"] },
+        answer: { type: "ResultSummary", props: { title: "Answer", summary: "Primary answer stays visible." } },
+        details: { type: "Card", props: { title: "Evidence", defaultCollapsed: true, xChronaSourceNodeId: "node-1" }, children: ["json"] },
+        json: { type: "JsonView", props: { title: "Payload", value: { ok: true }, defaultCollapsed: true, sourceNodeId: "node-1" } },
+        file: { type: "FileRef", props: { path: ".chrona/outputs/node-1/result.json", defaultCollapsed: true, collapseTitle: "Raw artifact", xChronaSourceNodeId: "node-1" } },
+      },
+    });
+
+    expect(outputSpec.success).toBe(true);
+    const catalogText = JSON.stringify(chronaPlanOutputCatalogPrompt());
+    expect(catalogText).toContain("defaultCollapsed");
+    expect(catalogText).toContain("do not emit CollapsibleBlock");
   });
 
 describe("validateDashboardSummarySpec", () => {

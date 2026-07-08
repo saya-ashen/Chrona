@@ -258,7 +258,7 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
 
 
 function optimisticExecutionStatusForAction(action: ExecutionActionInput["action"]): string | null {
-  if (action === "start_manual") return "running";
+  if (action === "start_manual" || action === "restart_from_beginning") return "running";
   if (action === "pause_session") return "waiting_for_user";
   if (action === "cancel_session") return "cancelled";
   return null;

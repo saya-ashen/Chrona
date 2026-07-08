@@ -9,11 +9,104 @@ import type { CommandCenterPrimaryAction } from "./task-workspace-execution-over
 type WorkspaceCopy = Record<string, string | undefined>;
 type MutableElements = UiDocument["elements"];
 
+export type ResultNodeFilter = "all" | string;
+
+export type ResultNodeOption = {
+  id: string;
+  title: string;
+  status?: string;
+};
+
+type AppendDocumentOptions = {
+  selectedNodeId?: ResultNodeFilter;
+  nodeOptions?: ResultNodeOption[];
+  groupByNode?: boolean;
+  fallbackNodeId?: string | null;
+};
+
+function elementSourceNodeId(element: UiDocument["elements"][string] | undefined) {
+  const props = element?.props;
+  if (!props || typeof props !== "object") return null;
+  const record = props as Record<string, unknown>;
+  return typeof record.xChronaSourceNodeId === "string"
+    ? record.xChronaSourceNodeId
+    : typeof record.sourceNodeId === "string"
+      ? record.sourceNodeId
+      : null;
+}
+
+function nodeTitleFor(nodeId: string, nodeOptions: ResultNodeOption[]) {
+  return nodeOptions.find((node) => node.id === nodeId)?.title ?? nodeId;
+}
+
+function nodeStatusFor(nodeId: string, nodeOptions: ResultNodeOption[]) {
+  return nodeOptions.find((node) => node.id === nodeId)?.status;
+}
+
+function descendantSourceNodeId(document: UiDocument, elementKey: string, visited = new Set<string>()): string | null {
+  if (visited.has(elementKey)) return null;
+  visited.add(elementKey);
+  const direct = elementSourceNodeId(document.elements[elementKey]);
+  if (direct) return direct;
+  for (const child of document.elements[elementKey]?.children ?? []) {
+    const childOwner = descendantSourceNodeId(document, child, visited);
+    if (childOwner) return childOwner;
+  }
+  return null;
+}
+
+function filterDocumentRootChildren(document: UiDocument, selectedNodeId?: ResultNodeFilter) {
+  const root = document.elements[document.root];
+  const rootChildren = root?.children ?? [];
+  if (!selectedNodeId || selectedNodeId === "all") return rootChildren;
+  return rootChildren.filter((child) => {
+    const owner = descendantSourceNodeId(document, child);
+    return !owner || owner === selectedNodeId;
+  });
+}
+
+
+
+function groupRootChildrenByNode(document: UiDocument, rootChildren: string[], nodeOptions: ResultNodeOption[], fallbackNodeId?: string | null) {
+  const groups: Array<{ nodeId: string | null; children: string[] }> = [];
+  for (const child of rootChildren) {
+    const nodeId = descendantSourceNodeId(document, child) ?? fallbackNodeId ?? null;
+    const previous = groups.at(-1);
+    if (previous && previous.nodeId === nodeId) {
+      previous.children.push(child);
+    } else {
+      groups.push({ nodeId, children: [child] });
+    }
+  }
+  return groups.map((group, index) => ({
+    key: group.nodeId ? `node-section:${group.nodeId}:${index}` : null,
+    nodeId: group.nodeId,
+    title: group.nodeId ? nodeTitleFor(group.nodeId, nodeOptions) : null,
+    status: group.nodeId ? nodeStatusFor(group.nodeId, nodeOptions) : undefined,
+    children: group.children,
+  }));
+}
+
+const HOST_COLLAPSIBLE_RESULT_TYPES = new Set(["Card", "Markdown", "Table", "JsonView", "FileRef"]);
+
+function makeOpenCollapsibleResultElement(target: MutableElements, key: string) {
+  const element = target[key];
+  if (!element || !HOST_COLLAPSIBLE_RESULT_TYPES.has(element.type)) return;
+  const props = element.props && typeof element.props === "object" ? element.props as Record<string, unknown> : {};
+  if (props.collapsible === false || typeof props.defaultCollapsed === "boolean") return;
+  target[key] = {
+    ...element,
+    props: { ...props, defaultCollapsed: false },
+  };
+}
+
+
 function appendDocument(
   target: MutableElements,
   children: string[],
   keyPrefix: string,
   document: UiDocument | null | undefined,
+  options: AppendDocumentOptions = {},
 ) {
   if (!document?.root || !document.elements[document.root]) return;
   for (const [key, element] of Object.entries(document.elements)) {
@@ -22,7 +115,43 @@ function appendDocument(
       children: element.children?.map((child) => `${keyPrefix}:${child}`),
     };
   }
-  children.push(`${keyPrefix}:${document.root}`);
+
+  const rootChildren = filterDocumentRootChildren(document, options.selectedNodeId);
+  if (rootChildren.length === 0) return;
+
+  if (options.groupByNode) {
+    for (const group of groupRootChildrenByNode(document, rootChildren, options.nodeOptions ?? [], options.fallbackNodeId)) {
+      if (!group.nodeId || !group.key) {
+        children.push(...group.children.map((child) => `${keyPrefix}:${child}`));
+        continue;
+      }
+      for (const child of group.children) {
+        makeOpenCollapsibleResultElement(target, `${keyPrefix}:${child}`);
+      }
+      const sectionKey = `${keyPrefix}:${group.key}`;
+      target[sectionKey] = {
+        type: "NodeResultSection",
+        props: {
+          nodeId: group.nodeId,
+          nodeTitle: group.title ?? group.nodeId,
+          ...(group.status ? { status: group.status } : {}),
+          defaultCollapsed: false,
+          itemCount: group.children.length,
+        },
+        children: group.children.map((child) => `${keyPrefix}:${child}`),
+      };
+      children.push(sectionKey);
+    }
+    return;
+  }
+
+  children.push(rootChildren.length === document.elements[document.root]?.children?.length ? `${keyPrefix}:${document.root}` : `${keyPrefix}:${document.root}:filtered`);
+  if (rootChildren.length !== document.elements[document.root]?.children?.length) {
+    target[`${keyPrefix}:${document.root}:filtered`] = {
+      ...document.elements[document.root],
+      children: rootChildren.map((child) => `${keyPrefix}:${child}`),
+    };
+  }
 }
 
 function mergeDocumentState(target: UiDocument, document: UiDocument | null | undefined) {
@@ -312,21 +441,34 @@ function emptyTextSpec(message: string): UiDocument {
 }
 
 
-
 export function buildCommandCenterOutputTabSpec(input: {
   latestCompletedNode: PlanNodeDataModel | null;
   resultSpec: UiDocument;
   artifacts: WorkspaceArtifactItem[];
   copy: WorkspaceCopy;
   apiArtifactsSpec?: UiDocument | null;
+  selectedNodeId?: ResultNodeFilter;
+  nodeOptions?: ResultNodeOption[];
+  outputOwnerNodeId?: string | null;
 }): UiDocument {
   const elements: MutableElements = {};
   const children: string[] = [];
   elements.root = { type: "Stack", props: { gap: "sm" }, children };
 
-  appendDocument(elements, children, "output", input.apiArtifactsSpec ?? input.resultSpec);
+  appendDocument(elements, children, "output", input.apiArtifactsSpec ?? input.resultSpec, {
+    selectedNodeId: input.selectedNodeId,
+    nodeOptions: input.nodeOptions,
+    groupByNode: true,
+    fallbackNodeId: input.nodeOptions && input.nodeOptions.length <= 1 ? input.outputOwnerNodeId ?? input.latestCompletedNode?.id ?? null : null,
+  });
+
   if (input.artifacts.length > 0) {
-    appendDocument(elements, children, "artifacts", buildArtifactsSpec({ artifacts: input.artifacts, copy: input.copy, onLocate: true }));
+    const filteredArtifacts = !input.selectedNodeId || input.selectedNodeId === "all"
+      ? input.artifacts
+      : input.artifacts.filter((artifact) => !artifact.sourceNodeId || artifact.sourceNodeId === input.selectedNodeId);
+    if (filteredArtifacts.length > 0) {
+      appendDocument(elements, children, "artifacts", buildArtifactsSpec({ artifacts: filteredArtifacts, copy: input.copy, onLocate: true }));
+    }
   }
 
   if (children.length === 0) {
@@ -335,6 +477,8 @@ export function buildCommandCenterOutputTabSpec(input: {
 
   return { root: "root", elements };
 }
+
+
 
 export function buildCommandCenterTrailTabSpec(input: {
   activity: WorkspaceActivityItem[];
@@ -369,6 +513,12 @@ export function buildCommandCenterTrailTabSpec(input: {
 }
 
 
+const FILE_PREVIEW_KINDS = new Set(["markdown", "json", "text", "csv"]);
+
+function artifactContentKind(type: string): "markdown" | "json" | "text" | "csv" | undefined {
+  return FILE_PREVIEW_KINDS.has(type) ? type as "markdown" | "json" | "text" | "csv" : undefined;
+}
+
 export function buildArtifactsSpec(input: {
   artifacts: WorkspaceArtifactItem[];
   copy: WorkspaceCopy;
@@ -376,6 +526,11 @@ export function buildArtifactsSpec(input: {
 }): UiDocument {
   const elements: UiDocument["elements"] = {};
   const artifactChildren: string[] = [];
+  elements["artifact-title"] = {
+    type: "Heading",
+    props: { text: input.copy.artifactsLabel ?? "Artifacts", level: "h3" },
+  };
+
 
   input.artifacts.forEach((artifact) => {
     const key = `artifact:${artifact.id}`;
@@ -385,6 +540,8 @@ export function buildArtifactsSpec(input: {
         title: artifact.title,
         type: artifact.type,
         uri: artifact.uri,
+        contentKind: artifactContentKind(artifact.type),
+        contentPreview: artifact.content,
         locateLabel: input.copy.locateSourceNode ?? "Locate source node",
       },
       ...(artifact.sourceNodeId && input.onLocate
@@ -405,7 +562,7 @@ export function buildArtifactsSpec(input: {
     children: artifactChildren,
   };
 
-  const rootChildren = ["artifact-list"];
+  const rootChildren = ["artifact-title", "artifact-list"];
   elements.root = { type: "Stack", props: { gap: "sm" }, children: rootChildren };
   return { root: "root", elements };
 }

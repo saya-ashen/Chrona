@@ -70,6 +70,41 @@ const tableColumnSchema = z.object({
   hrefKey: z.string().optional(),
 }).strict();
 
+const collapsiblePresentationProps = {
+  collapsible: z.boolean().optional(),
+  defaultCollapsed: z.boolean().optional(),
+  collapseTitle: z.string().optional(),
+  collapsedSummary: z.string().optional(),
+};
+const sourceMetadataProps = {
+  sourceNodeId: z.string().optional(),
+  xChronaSourceNodeId: z.string().optional(),
+};
+
+const resultPresentationProps = {
+  ...collapsiblePresentationProps,
+  ...sourceMetadataProps,
+};
+
+const cardComponentDefinition = {
+  ...shadcn.Card,
+  props: shadcn.Card.props.extend(resultPresentationProps),
+  description: `${shadcn.Card.description} Host-rendered Chrona result cards may set defaultCollapsed to request an open or closed collapsible shell; do not emit CollapsibleBlock for ordinary cards.`,
+};
+
+
+const markdownPropsSchema = z.object({
+  content: z.string(),
+  title: z.string().optional(),
+  ...resultPresentationProps,
+});
+
+const jsonViewPropsSchema = z.object({
+  value: z.unknown(),
+  title: z.string().optional(),
+  ...resultPresentationProps,
+});
+
 const tableComponentDefinition = {
   props: z.object({
     title: z.string().optional(),
@@ -84,6 +119,7 @@ const tableComponentDefinition = {
     contentTruncated: z.boolean().optional(),
     contentBytes: z.number().optional(),
     previewError: z.enum(["unsafe_path", "not_found", "unsupported_type", "read_failed"]).optional(),
+    ...resultPresentationProps,
   }).strict(),
   description:
     'File-backed data table. Reference a safe repo-relative JSON or CSV file with path or uri; do not inline rows. Optional columns may be strings or { key, label, type, hrefKey }. Use type: "link" or hrefKey for link cells. Prefer pageSize 10 for workspace readability; do not set pageSize equal to total rows merely to show everything. Use larger pageSize only for dense datasets or explicit user requests. Example: { path: ".chrona/outputs/N20260706-01/trending.json", columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }], pageSize: 10 }.',
@@ -99,6 +135,31 @@ const collapsibleTextComponentDefinition = {
   description:
     'Long text with a show-more collapse. threshold MUST be a JSON number such as 800, not a string such as "800".',
   example: { text: "Long output...", threshold: 800 },
+};
+
+const collapsibleBlockComponentDefinition = {
+  props: z.object({
+    title: z.string().optional(),
+    summary: z.string().optional(),
+    defaultCollapsed: z.boolean().optional(),
+  }).strict(),
+  slots: ["default"],
+  description:
+    "Component-level collapsible wrapper for an entire result block. Use for long logs, raw JSON, large file previews, secondary evidence, or diagnostics; do not wrap the primary result summary.",
+  example: { title: "Raw details", summary: "Long diagnostic output", defaultCollapsed: true },
+};
+
+const nodeResultSectionComponentDefinition = {
+  props: z.object({
+    nodeId: z.string(),
+    nodeTitle: z.string(),
+    status: z.string().optional(),
+    defaultCollapsed: z.boolean().optional(),
+    itemCount: z.number().int().nonnegative().optional(),
+  }).strict(),
+  slots: ["default"],
+  description:
+    "Host-generated lightweight section wrapper for output owned by one execution node. AI-authored plan output should not emit this component.",
 };
 
 const sectionSchema = z.object({
@@ -135,8 +196,8 @@ const fileViewPropsSchema = z.object({
   previewError: filePreviewErrorSchema.optional(),
   description: z.string().optional(),
   language: z.string().optional(),
+  ...resultPresentationProps,
 });
-
 
 const bindableNumberSchema = z
   .union([z.number(), stateBindingSchema])
@@ -161,7 +222,7 @@ const bindableStringSchema = z
 export const chronaCatalog = defineCatalog(chronaSchema, {
   components: {
     // --- shadcn primitives (prebuilt definitions) ---
-    Card: shadcn.Card,
+    Card: cardComponentDefinition,
     Stack: shadcn.Stack,
     Separator: shadcn.Separator,
     Text: shadcn.Text,
@@ -202,11 +263,11 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         "Compact occurrence calendar picker for recurring task workspace header.",
     },
     Markdown: {
-      props: z.object({ content: z.string(), title: z.string().optional() }),
+      props: markdownPropsSchema,
       description: "Rendered markdown result content.",
     },
     JsonView: {
-      props: z.object({ value: z.unknown(), title: z.string().optional() }),
+      props: jsonViewPropsSchema,
       description: "Pretty-printed JSON result value.",
     },
     FileRef: {
@@ -260,6 +321,8 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       description: "Expandable tool invocation detail rows.",
     },
     CollapsibleText: collapsibleTextComponentDefinition,
+    CollapsibleBlock: collapsibleBlockComponentDefinition,
+    NodeResultSection: nodeResultSectionComponentDefinition,
     WorkspaceSummaryCard: {
       props: z.object({
         eyebrow: z.string().optional(),
@@ -385,7 +448,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
 export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
   components: {
     Stack: shadcn.Stack,
-    Card: shadcn.Card,
+    Card: cardComponentDefinition,
     Separator: shadcn.Separator,
     Heading: shadcn.Heading,
     Text: shadcn.Text,
@@ -393,19 +456,19 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
     Alert: shadcn.Alert,
     Table: tableComponentDefinition,
     Markdown: {
-      props: z.object({ content: z.string(), title: z.string().optional() }),
+      props: markdownPropsSchema,
       description:
-        "Rendered markdown result content. Use for prose, bullets, checklists, command summaries, and compact technical reports.",
+        "Rendered markdown result content. Use for prose, bullets, checklists, command summaries, and compact technical reports. Optional collapsible/defaultCollapsed controls collapse the whole component, not text inside it.",
       example: {
         title: "Summary",
         content: "- Completed implementation\n- Ran focused tests",
       },
     },
     JsonView: {
-      props: z.object({ value: z.unknown(), title: z.string().optional() }),
+      props: jsonViewPropsSchema,
       description:
-        "Pretty-printed JSON result value. Use only for diagnostics, API payloads, machine-readable evidence, or debugging details; prefer Markdown/Table/Card for user-facing reports and summaries.",
-      example: { title: "Diagnostic payload", value: { status: "ok" } },
+        "Pretty-printed JSON result value. Use only for diagnostics, API payloads, machine-readable evidence, or debugging details; prefer Markdown/Table/Card for user-facing reports and summaries. Set defaultCollapsed true for large or secondary payloads.",
+      example: { title: "Diagnostic payload", value: { status: "ok" }, defaultCollapsed: true },
     },
     FileRef: {
       props: z.object({
@@ -413,6 +476,7 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
         title: z.string().optional(),
         language: z.string().optional(),
         description: z.string().optional(),
+        ...resultPresentationProps,
       }),
       description:
         "Reference to a produced or changed file artifact. path must be repo-relative; generated result artifacts should use .chrona/outputs/<node-ref>/ when not explicit repo/code changes.",
@@ -432,6 +496,7 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
       example: { text: "Implementation complete; focused tests passed." },
     },
     CollapsibleText: collapsibleTextComponentDefinition,
+    CollapsibleBlock: collapsibleBlockComponentDefinition,
   },
   actions: {},
 });
@@ -502,8 +567,10 @@ export function chronaPlanOutputCatalogPrompt() {
       "When planOutput.hasSpec is true, never patch /root, /elements, or the existing root element as a replacement. Preserve the current root id from context.planOutput.root.",
       "For later updates, add node-specific sections under stable /elements/<id> paths, then append/reorder those ids inside an existing children array such as /elements/<currentRootId>/children/-. Use context.planOutput.rootChildren and context.planOutput.elementIds to avoid duplicate ids and preserve prior sections unless the user explicitly asks to remove them.",
       "User-facing reports should compose clear sections with Card containers around Markdown/Table/ResultSummary content so each major block has a visible background.",
+      "Use component-level defaultCollapsed on Card, Markdown, Table, JsonView, or FileRef when a block should have a Chrona-owned collapsible shell; do not emit CollapsibleBlock for ordinary user-facing sections. Set defaultCollapsed true for long logs, raw JSON, large file references, secondary evidence, and diagnostics. Set defaultCollapsed false for major sections that should remain open but user-collapsible. Do not collapse the primary ResultSummary or the main user-requested answer.",
+      "FileRef preview expansion is separate from component-level collapse: FileRef collapsible/defaultCollapsed hides the whole file result block, while preview expansion only changes the visible preview height.",
       "Use JsonView sparingly: only for diagnostics, API payloads, machine-readable evidence, or debugging details. Do not show source data or report rationale as raw JSON when Markdown or Table would be readable.",
-      "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, node-local outputs, or complete replacement Specs after bootstrap.",
+      "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, node-local outputs, NodeResultSection wrappers, or complete replacement Specs after bootstrap.",
     ],
   });
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -168,6 +168,93 @@ function filePreviewErrorMessage(error: unknown, copy: Record<string, string | u
   return null;
 }
 const EXPANDABLE_FILE_PREVIEW_MIN_LENGTH = 1200;
+type CollapsibleProps = {
+  title?: string | null;
+  summary?: string | null;
+  defaultCollapsed?: boolean | null;
+};
+
+function stringProp(value: unknown) {
+  return typeof value === "string" ? value : undefined;
+}
+
+const AUTO_COLLAPSE_MARKDOWN_LENGTH = 4000;
+const AUTO_COLLAPSE_JSON_LENGTH = 2000;
+const AUTO_COLLAPSE_FILE_BYTES = 32 * 1024;
+
+function boolProp(value: unknown) {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+
+export type ResultCollapseCommand = {
+  mode: "collapse" | "expand";
+  revision: number;
+};
+
+const ResultCollapseCommandContext = createContext<ResultCollapseCommand | null>(null);
+
+export function ResultCollapseProvider({ command, children }: { command?: ResultCollapseCommand | null; children: ReactNode }) {
+  return <ResultCollapseCommandContext.Provider value={command ?? null}>{children}</ResultCollapseCommandContext.Provider>;
+}
+
+function shouldCollapseByDefault(props: Record<string, unknown>, fallback: boolean) {
+  return boolProp(props.defaultCollapsed) ?? fallback;
+}
+function CollapsibleBlock({
+  title,
+  summary,
+  defaultCollapsed,
+  subtle = false,
+  children,
+}: CollapsibleProps & {
+  subtle?: boolean;
+  children?: ReactNode;
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const [collapsed, setCollapsed] = useState(Boolean(defaultCollapsed));
+  const command = useContext(ResultCollapseCommandContext);
+  useEffect(() => {
+    if (!command) return;
+    setCollapsed(command.mode === "collapse");
+  }, [command?.mode, command?.revision]);
+  const label = title || (copy.resultDetailsLabel ?? "Details");
+
+  return (
+    <section className={cn("min-w-0 w-full max-w-full overflow-hidden rounded-xl border text-sm", subtle ? "border-border/50 bg-background/45 px-2.5 py-2" : "border-border/70 bg-background/95 px-3 py-2.5 shadow-sm")}>
+      <button
+        type="button"
+        className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 text-left"
+        onClick={() => setCollapsed((current) => !current)}
+        aria-expanded={!collapsed}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-foreground">{label}</span>
+          {summary ? <span className="mt-0.5 block truncate text-xs text-muted-foreground">{summary}</span> : null}
+        </span>
+        <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+          {collapsed ? (copy.showResultDetails ?? "Show") : (copy.hideResultDetails ?? "Hide")}
+          {collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+        </span>
+      </button>
+      {collapsed ? null : <div className="mt-2 min-w-0 w-full max-w-full overflow-hidden space-y-2">{children}</div>}
+    </section>
+  );
+}
+
+function shouldWrapCollapsible(props: Record<string, unknown>, fallbackCollapsed?: boolean) {
+  const explicit = boolProp(props.collapsible);
+  const hasDefaultCollapsedPreference = props.defaultCollapsed === true || props.defaultCollapsed === false;
+  return explicit ?? Boolean(fallbackCollapsed || hasDefaultCollapsedPreference);
+}
+
+function MaybeCollapsible({ props, fallbackCollapsed, fallbackTitle, children }: { props: Record<string, unknown>; fallbackCollapsed?: boolean; fallbackTitle?: string; children: ReactNode }) {
+  if (!shouldWrapCollapsible(props, fallbackCollapsed)) return <>{children}</>;
+  const title = stringProp(props.collapseTitle) ?? stringProp(props.title) ?? fallbackTitle;
+  const summary = stringProp(props.collapsedSummary);
+  return <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(props, Boolean(fallbackCollapsed))}>{children}</CollapsibleBlock>;
+}
 
 
 function ResultSummary({ props }: { props: { text?: string | null; copyText?: string | null } }) {
@@ -229,50 +316,63 @@ function FileView({ props }: { props: Record<string, unknown> }) {
   const size = formatFileSize(props.contentBytes);
   const error = filePreviewErrorMessage(props.previewError, copy);
   const canExpand = Boolean(content && (content.length > EXPANDABLE_FILE_PREVIEW_MIN_LENGTH || props.contentTruncated));
-  const [expanded, setExpanded] = useState(false);
-  const previewHeightClassName = expanded ? "max-h-[70vh]" : "max-h-80";
-  const expandLabel = expanded ? (copy.collapseFilePreview ?? "Collapse preview") : (copy.expandFilePreview ?? "Expand preview");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const previewHeightClassName = canExpand && previewOpen ? "max-h-[70vh]" : "max-h-80";
+  const previewLabel = previewOpen ? (copy.artifactHidePreview ?? "Hide preview") : (copy.artifactPreview ?? "Preview");
+  const copyPathLabel = copied ? (copy.artifactPathCopied ?? "Copied") : (copy.copyArtifactPath ?? "Copy path");
 
   return (
-    <article className="rounded-lg border border-border bg-background px-2.5 py-2 text-sm">
-      <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-          <FileText className="size-3.5" />
-        </span>
+    <article className="min-w-0 w-full max-w-full border-t border-border/60 py-2 text-sm first:border-t-0">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="break-words font-medium text-foreground">{title ?? path ?? "File"}</p>
-          {path ? <p className="break-all text-xs text-muted-foreground">{path}</p> : null}
+          {path ? <p className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">{path}</p> : null}
           <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
             {contentKind ? <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{contentKind}</Badge> : null}
             {size ? <span>{size}</span> : null}
             {props.contentTruncated ? <span>{copy.filePreviewTruncated ?? "Preview truncated"}</span> : null}
           </div>
         </div>
-      </div>
-      {error ? <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">{error}</p> : null}
-      {content ? (
-        <>
-          {contentKind === "markdown" ? (
-            <div className={cn("mt-2 overflow-auto rounded-lg border border-border/60 bg-background/95 px-3 py-2 text-sm leading-6 text-foreground", previewHeightClassName)}>
-              <div className="max-w-none space-y-2 break-words [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_blockquote]:rounded-lg [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:bg-primary-soft/45 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_blockquote]:text-foreground/80 [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.82em] [&_code]:text-foreground [&_h1]:font-heading [&_h1]:text-base [&_h1]:font-semibold [&_h1]:leading-tight [&_h2]:font-heading [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:leading-tight [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-border [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5 [&_p]:text-foreground/85 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:text-xs [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border/60 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/60 [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-              </div>
-            </div>
-          ) : (
-            <pre className={cn("mt-2 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-muted/50 p-2 text-xs leading-5 text-foreground/80", previewHeightClassName)}>{content}</pre>
-          )}
-          {canExpand ? (
-            <Button type="button" variant="ghost" size="sm" className="mt-1 h-7 rounded-full px-2 text-[11px]" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>
-              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-              {expandLabel}
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          {content ? (
+            <Button type="button" variant="ghost" size="sm" className="h-7 rounded-full px-2 text-[11px]" onClick={() => setPreviewOpen((current) => !current)} aria-expanded={previewOpen}>
+              {previewOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+              {previewLabel}
             </Button>
           ) : null}
-        </>
+          {typeof props.uri === "string" ? (
+            <Button asChild variant="ghost" size="sm" className="h-7 rounded-full px-2 text-[11px]">
+              <a href={props.uri} download>{copy.downloadArtifact ?? "Download"}</a>
+            </Button>
+          ) : null}
+          {path ? (
+            <Button type="button" variant="ghost" size="sm" className="h-7 rounded-full px-2 text-[11px]" onClick={() => {
+              void navigator.clipboard?.writeText(path).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1400);
+              });
+            }}>
+              {copyPathLabel}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      {error ? <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">{error}</p> : null}
+      {content && previewOpen ? (
+        contentKind === "markdown" ? (
+          <div className={cn("mt-2 min-w-0 max-w-full overflow-auto rounded-lg bg-muted/25 px-3 py-2 text-sm leading-6 text-foreground", previewHeightClassName)}>
+            <div className="max-w-none space-y-2 break-words [overflow-wrap:anywhere] [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted/70 [&_pre]:p-3 [&_table]:w-full [&_table]:table-fixed [&_td]:break-words [&_th]:break-words">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            </div>
+          </div>
+        ) : (
+          <pre className={cn("mt-2 min-w-0 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/35 p-2 text-xs leading-5 text-foreground/80", previewHeightClassName)}>{content}</pre>
+        )
       ) : null}
     </article>
   );
 }
-
 
 function WorkspaceArtifactList({
   emptyLabel,
@@ -347,6 +447,10 @@ type WorkspaceTableProps = {
   contentTruncated?: boolean | null;
   contentBytes?: number | null;
   previewError?: string | null;
+  collapsible?: boolean | null;
+  defaultCollapsed?: boolean | null;
+  collapseTitle?: string | null;
+  collapsedSummary?: string | null;
 };
 
 function tableCellText(value: unknown) {
@@ -499,7 +603,7 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   const size = formatFileSize(props.contentBytes);
   const error = filePreviewErrorMessage(props.previewError, copy);
 
-  return (
+  const contentNode = (
     <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden rounded-md border border-border bg-background/95 p-2 text-sm shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -560,6 +664,7 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
       ) : null}
     </section>
   );
+  return <MaybeCollapsible props={props as unknown as Record<string, unknown>} fallbackCollapsed={props.contentTruncated === true || parsed.rows.length > 25} fallbackTitle={props.title ?? "Table"}>{contentNode}</MaybeCollapsible>;
 }
 
 
@@ -578,8 +683,20 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
 export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
     // standard primitives (shadcn)
-    Card: (input) => shadcnComponents.Card({ ...input, props: { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-none") } }),
-    Stack: shadcnComponents.Stack,
+    Card: (input) => {
+      const props = { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-full") };
+      if (shouldWrapCollapsible(input.props)) {
+        const title = stringProp(input.props.collapseTitle) ?? stringProp(input.props.title) ?? "Result";
+        const summary = stringProp(input.props.collapsedSummary) ?? stringProp(input.props.description);
+        return (
+          <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(input.props, false)}>
+            {input.children}
+          </CollapsibleBlock>
+        );
+      }
+      return shadcnComponents.Card({ ...input, props });
+    },
+    Stack: (input) => shadcnComponents.Stack({ ...input, props: { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-full", !input.props.align && "items-stretch") } }),
     Separator: shadcnComponents.Separator,
     Text: shadcnComponents.Text,
     Heading: shadcnComponents.Heading,
@@ -597,7 +714,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     paragraph: ({ props }) => <p className="text-sm leading-6 text-foreground/85">{props.text ?? props.content}</p>,
     table: WorkspaceTable,
     section: ({ props, children }) => (
-      <section className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3">
+      <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden rounded-xl border border-border/60 bg-background/70 p-3">
         {props.title ? <h3 className="font-heading text-sm font-semibold text-foreground">{props.title}</h3> : null}
         {children}
       </section>
@@ -613,24 +730,34 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     WorkspaceActionGroup: ({ props, children }) => <WorkspaceActionGroup label={props.label} layout={props.layout}>{children}</WorkspaceActionGroup>,
     WorkspaceActionCard: ({ props, children }) => <WorkspaceActionCard title={props.title} tone={props.tone as Tone}>{children}</WorkspaceActionCard>,
     // domain components (Chrona)
-    Markdown: ({ props }) => (
-      <article className="rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm leading-6 text-foreground shadow-sm">
-        <div className="max-w-none space-y-2 break-words [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_blockquote]:rounded-lg [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:bg-primary-soft/45 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_blockquote]:text-foreground/80 [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.82em] [&_code]:text-foreground [&_h1]:font-heading [&_h1]:text-base [&_h1]:font-semibold [&_h1]:leading-tight [&_h2]:font-heading [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:leading-tight [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-border [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5 [&_p]:text-foreground/85 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-border/70 [&_pre]:bg-muted/70 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_strong]:text-foreground [&_table]:w-full [&_table]:overflow-hidden [&_table]:rounded-lg [&_td]:border-t [&_td]:border-border/70 [&_td]:px-2 [&_td]:py-1.5 [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{props.content}</ReactMarkdown>
-        </div>
-      </article>
-    ),
-    JsonView: ({ props }) => (
-      <section className="rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm text-foreground shadow-sm">
-        {props.title ? <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{props.title}</p> : null}
-        <pre className="max-h-96 overflow-x-auto rounded-lg bg-muted/60 p-2 text-xs leading-5 text-foreground/80">
-          {typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2)}
-        </pre>
-      </section>
-    ),
-    FileRef: ({ props }) => <FileView props={props} />,
-    FileView: ({ props }) => <FileView props={props} />,
+    Markdown: ({ props }) => {
+      const content = typeof props.content === "string" ? props.content : "";
+      const contentNode = (
+        <article className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm leading-6 text-foreground shadow-sm">
+          <div className="max-w-none space-y-2 break-words [overflow-wrap:anywhere] [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_blockquote]:rounded-lg [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:bg-primary-soft/45 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_blockquote]:text-foreground/80 [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.82em] [&_code]:text-foreground [&_h1]:font-heading [&_h1]:text-base [&_h1]:font-semibold [&_h1]:leading-tight [&_h2]:font-heading [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:leading-tight [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-border [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5 [&_p]:text-foreground/88 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted/70 [&_pre]:p-3 [&_pre]:text-xs [&_strong]:text-foreground [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-1.5 [&_td]:break-words [&_th]:border [&_th]:border-border [&_th]:bg-muted/70 [&_th]:p-1.5 [&_th]:text-left [&_th]:break-words [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          </div>
+        </article>
+      );
+      return <MaybeCollapsible props={props} fallbackCollapsed={content.length > AUTO_COLLAPSE_MARKDOWN_LENGTH} fallbackTitle={typeof props.title === "string" ? props.title : "Markdown"}>{contentNode}</MaybeCollapsible>;
+    },
+    JsonView: ({ props }) => {
+      const jsonText = typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2);
+      const contentNode = (
+        <section className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm text-foreground shadow-sm">
+          {props.title ? <p className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{props.title}</p> : null}
+          <pre className="max-h-96 max-w-full overflow-x-auto rounded-lg bg-muted/60 p-2 text-xs leading-5 text-foreground/80">
+            {jsonText}
+          </pre>
+        </section>
+      );
+      return <MaybeCollapsible props={props} fallbackCollapsed={jsonText.length > AUTO_COLLAPSE_JSON_LENGTH} fallbackTitle={typeof props.title === "string" ? props.title : "JSON"}>{contentNode}</MaybeCollapsible>;
+    },
+    FileRef: ({ props }) => <MaybeCollapsible props={props} fallbackCollapsed={props.contentTruncated === true || (typeof props.contentBytes === "number" && props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)} fallbackTitle={typeof props.title === "string" ? props.title : "File"}><FileView props={props} /></MaybeCollapsible>,
+    FileView: ({ props }) => <MaybeCollapsible props={props} fallbackCollapsed={props.contentTruncated === true || (typeof props.contentBytes === "number" && props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)} fallbackTitle={typeof props.title === "string" ? props.title : "File"}><FileView props={props} /></MaybeCollapsible>,
     ResultSummary: ({ props }) => <ResultSummary props={props} />,
+    CollapsibleBlock: ({ props, children }) => <CollapsibleBlock title={stringProp(props.title)} summary={stringProp(props.summary)} defaultCollapsed={boolProp(props.defaultCollapsed)}>{children}</CollapsibleBlock>,
+    NodeResultSection: ({ props, children }) => <CollapsibleBlock title={stringProp(props.nodeTitle)} summary={typeof props.itemCount === "number" ? `${props.itemCount} result${props.itemCount === 1 ? "" : "s"}` : stringProp(props.status)} defaultCollapsed={boolProp(props.defaultCollapsed)} subtle>{children}</CollapsibleBlock>,
     ActivityRow: ({ props, children }) => {
       const tone = props.tone as Tone;
       const Icon = activityIcon(props.kind, tone);
@@ -724,10 +851,10 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     WorkspaceArtifactItem: ({ props, emit, on }) => {
       const locate = on("locate");
       return (
-        <div className="rounded-xl bg-muted/45 px-2 py-1.5">
+        <div className="min-w-0 w-full max-w-full">
           <FileView props={props} />
           {locate.bound ? (
-            <div className="mt-1 pl-9 text-xs">
+            <div className="mt-0.5 text-xs">
               <button type="button" className="font-semibold text-primary" onClick={() => emit("locate")}>
                 {props.locateLabel}
               </button>

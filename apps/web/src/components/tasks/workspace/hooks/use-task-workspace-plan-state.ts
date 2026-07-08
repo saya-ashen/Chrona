@@ -51,7 +51,7 @@ function getRuntimeActivity(event: WorkspaceRuntimeEvent | undefined) {
     case "run_status":
       return compactActivityText(value.message ?? value.status);
     case "raw_event":
-      return compactActivityText(value.rawEventType ?? "Runtime event");
+      return compactActivityText(value.message ?? value.rawEventType ?? "Runtime event");
   }
 }
 

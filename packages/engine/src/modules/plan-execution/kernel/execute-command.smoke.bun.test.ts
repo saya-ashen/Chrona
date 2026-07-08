@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { db } from "@/lib/db";
 import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import {
   executeTaskNodeCapabilityMock,
@@ -102,5 +103,90 @@ describe("kernel executeCommand (single-writer)", () => {
       ["first_task", "succeeded"],
       ["second_task", "running"],
     ]);
+  });
+
+  it("keeps normal start as continuation after graph progress", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "First task finished",
+        evidence: { sessionId: "main-session", runId: "run-first" },
+        output: { root: "root", elements: { root: { type: "Markdown", props: { content: "first output" } } } },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "Second task started",
+        evidence: { sessionId: "main-session", runId: "run-second" },
+        output: { runtimeRunRef: "runtime-second" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel continuation start");
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_continue");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    await executeCommand({ taskId: task.id, command: { type: "start", trigger: "manual" } });
+    await executeCommand({ taskId: task.id, command: { type: "start", trigger: "manual" } });
+
+    expect(executeTaskNodeCapabilityMock.mock.calls.map((c) => c[0].node.id)).toEqual([
+      "first_task",
+      "second_task",
+    ]);
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((a) => [a.nodeId, a.status])).toEqual([
+      ["first_task", "succeeded"],
+      ["second_task", "running"],
+    ]);
+  });
+
+  it("restarts an accepted plan from the first node with fresh runtime state", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "First task finished",
+        evidence: { sessionId: "main-session", runId: "run-first" },
+        output: { root: "root", elements: { root: { type: "Markdown", props: { content: "first output" } } } },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "Second task started",
+        evidence: { sessionId: "main-session", runId: "run-second" },
+        output: { runtimeRunRef: "runtime-second" },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "First task restarted",
+        evidence: { sessionId: "main-session-restart", runId: "run-first-restart" },
+        output: { runtimeRunRef: "runtime-first-restart" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel restart from beginning");
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_restart");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    await executeCommand({ taskId: task.id, command: { type: "start", trigger: "manual" } });
+    const beforeRestartSession = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id, status: "Active" },
+    });
+
+    const restarted = await executeCommand({ taskId: task.id, command: { type: "restart_from_beginning", trigger: "manual" } });
+
+    expect(restarted.status).toBe("running");
+    expect(restarted.currentNodeId).toBe("first_task");
+    expect(executeTaskNodeCapabilityMock.mock.calls.map((c) => c[0].node.id)).toEqual([
+      "first_task",
+      "second_task",
+      "first_task",
+    ]);
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.attempts.map((a) => [a.nodeId, a.status])).toEqual([
+      ["first_task", "running"],
+    ]);
+
+    const abandonedSession = await db.executionSession.findUniqueOrThrow({
+      where: { id: beforeRestartSession.id },
+      select: { status: true },
+    });
+    expect(abandonedSession).toEqual({ status: "Abandoned" });
   });
 });

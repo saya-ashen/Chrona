@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { JSONUIProvider, Renderer, type StateStore } from "@json-render/react";
 import { CATALOG_VERSION, isCatalogCompatible, type UiDocument } from "@chrona/ui-protocol";
-import { workspaceRegistry } from "./workspace-registry";
+import { ResultCollapseProvider, workspaceRegistry, type ResultCollapseCommand } from "./workspace-registry";
 
 /**
  * Renders a json-render {@link UiDocument} with the Chrona workspace registry.
@@ -18,6 +18,7 @@ export function SpecRenderer({
   handlers,
   onStateChange,
   store,
+  resultCollapseCommand,
 }: {
   spec: UiDocument | null | undefined;
   catalogVersion?: string;
@@ -28,14 +29,17 @@ export function SpecRenderer({
   /** State-change notifications from JSONUIProvider (path/value pairs). */
   onStateChange?: (changes: Array<{ path: string; value: unknown }>) => void;
   store?: StateStore;
+  resultCollapseCommand?: ResultCollapseCommand | null;
 }) {
   if (!spec || !isCatalogCompatible(catalogVersion)) {
     return <>{fallback}</>;
   }
 
   return (
-    <JSONUIProvider registry={workspaceRegistry} store={store} initialState={spec.state} handlers={handlers} onStateChange={onStateChange}>
-      <Renderer spec={spec} registry={workspaceRegistry} loading={loading} />
-    </JSONUIProvider>
+    <ResultCollapseProvider command={resultCollapseCommand}>
+      <JSONUIProvider registry={workspaceRegistry} store={store} initialState={spec.state} handlers={handlers} onStateChange={onStateChange}>
+        <Renderer spec={spec} registry={workspaceRegistry} loading={loading} />
+      </JSONUIProvider>
+    </ResultCollapseProvider>
   );
 }

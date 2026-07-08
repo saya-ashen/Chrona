@@ -21,6 +21,29 @@ function cloneJson<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function patchedElementKey(path: string) {
+  const parts = decodePointer(path);
+  return parts.length === 2 && parts[0] === "elements" && parts[1] ? parts[1] : null;
+}
+
+function stampPlanOutputElementSources(spec: Record<string, unknown>, nodeId: string, elementKeys: Set<string>) {
+  const elements = spec.elements;
+  if (!isRecord(elements)) return spec;
+  for (const key of elementKeys) {
+    const element = elements[key];
+    if (!isRecord(element) || typeof element.type !== "string") continue;
+    const props = isRecord(element.props) ? element.props : {};
+    if (typeof props.xChronaSourceNodeId === "string" || typeof props.sourceNodeId === "string") continue;
+    element.props = { ...props, xChronaSourceNodeId: nodeId };
+  }
+  return spec;
+}
+
+
 function parentAt(root: Record<string, unknown>, path: string): { parent: Record<string, unknown> | unknown[]; key: string } {
   const parts = decodePointer(path);
   if (parts.length === 0) throw new Error("Patch path must not target the document root");
@@ -76,8 +99,9 @@ function removeValue(target: Record<string, unknown>, path: string) {
   delete parent[key];
 }
 
-function applyPlanOutputPatches(current: unknown, patches: PlanOutputPatch[]): unknown {
+function applyPlanOutputPatches(current: unknown, patches: PlanOutputPatch[], sourceNodeId?: string): unknown {
   const target = cloneJson((current ?? { elements: {} }) as Record<string, unknown>);
+  const patchedElementKeys = new Set<string>();
   for (const patch of patches) {
     switch (patch.op) {
       case "add":
@@ -102,8 +126,10 @@ function applyPlanOutputPatches(current: unknown, patches: PlanOutputPatch[]): u
         if (JSON.stringify(valueAt(target, patch.path)) !== JSON.stringify(patch.value)) throw new Error(`Patch test failed: ${patch.path}`);
         break;
     }
+    const key = patch.op === "remove" || patch.op === "test" ? null : patchedElementKey(patch.path);
+    if (key) patchedElementKeys.add(key);
   }
-  return target;
+  return sourceNodeId ? stampPlanOutputElementSources(target, sourceNodeId, patchedElementKeys) : target;
 }
 
 function outputNodeFromEffective(input: {
@@ -142,7 +168,7 @@ async function updatePlanOutput(input: {
     results: persisted.results,
   });
   const node = outputNodeFromEffective({ effective, nodeId: input.action.nodeId });
-  const nextSpec = applyPlanOutputPatches(persisted.planOutput.spec, input.action.patches);
+  const nextSpec = applyPlanOutputPatches(persisted.planOutput.spec, input.action.patches, node.id);
   const validation = validateChronaSpec(nextSpec);
   if (!validation.ok) {
     throw new EngineError(

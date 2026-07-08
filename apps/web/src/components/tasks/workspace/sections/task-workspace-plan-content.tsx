@@ -1,7 +1,9 @@
-import { GitBranch, Minimize2, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronUp, GitBranch, Minimize2, Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { TaskPlanGenerationStatus } from "../../../../../../../features/task-workspace";
@@ -31,6 +33,105 @@ type TaskWorkspacePlanContentProps = {
   onGeneratePlan: () => void;
   onSelectedNodeChange?: Parameters<typeof TaskPlanGraphPanel>[0]["onSelectedNodeChange"];
 };
+
+function formatPlanUpdatedAt(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function TaskWorkspacePlanBrief({
+  plan,
+  graphPlan,
+}: {
+  plan: TaskPlanReadModel;
+  graphPlan: TaskPlanGraphPlan;
+}) {
+  const brief = plan.blueprint ?? plan.compiledPlan ?? {
+    title: "Plan",
+    goal: plan.summary ?? "Review the generated execution plan.",
+    assumptions: [],
+  };
+  const assumptions = brief.assumptions ?? [];
+  const [isExpanded, setIsExpanded] = useState(false);
+  const assumptionCountLabel = assumptions.length === 1 ? "1 assumption" : `${assumptions.length} assumptions`;
+  const estimatedMinutes = graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0);
+  const updatedAt = formatPlanUpdatedAt(plan.updatedAt);
+
+  return (
+    <section
+      aria-label="Plan brief"
+      className="rounded-xl border border-border/65 bg-background/85 px-3 py-2 shadow-none"
+    >
+      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Plan brief</span>
+            <span className="min-w-0 truncate text-sm font-semibold text-foreground" title={brief.title}>{brief.title}</span>
+            <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">{plan.status}</Badge>
+          </div>
+          <p className="line-clamp-1 text-xs leading-5 text-muted-foreground" title={brief.goal}>Goal: {brief.goal}</p>
+          {plan.summary ? <p className="line-clamp-1 text-xs leading-5 text-foreground/85" title={plan.summary}>Summary: {plan.summary}</p> : null}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs text-muted-foreground lg:self-stretch lg:justify-between">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{graphPlan.nodes.length} steps</Badge>
+            {estimatedMinutes > 0 ? <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{estimatedMinutes} min</Badge> : null}
+            <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{assumptionCountLabel}</Badge>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-7 rounded-lg px-2.5 text-xs font-medium shadow-sm"
+            aria-expanded={isExpanded}
+            onClick={() => setIsExpanded((value) => !value)}
+          >
+            {isExpanded ? "Hide details" : "Show details"}
+            {isExpanded ? <ChevronUp className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
+          </Button>
+        </div>
+      </div>
+      {isExpanded ? (
+        <div className="mt-3 max-h-64 space-y-3 overflow-auto border-t border-border/55 pt-3 text-sm">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Goal</p>
+            <p className="leading-6 text-foreground">{brief.goal}</p>
+          </div>
+          {plan.summary ? (
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Summary</p>
+              <p className="leading-6 text-foreground">{plan.summary}</p>
+            </div>
+          ) : null}
+          {assumptions.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Assumptions</p>
+              <ul className="space-y-1 text-muted-foreground">
+                {assumptions.map((assumption) => (
+                  <li key={assumption} className="flex gap-2 leading-6">
+                    <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-primary/70" />
+                    <span>{assumption}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {plan.generatedBy ? <span>Generated by {plan.generatedBy}</span> : null}
+            {updatedAt ? <span>Updated {updatedAt}</span> : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
 export function TaskWorkspacePlanContent({
   label,
@@ -107,6 +208,9 @@ export function TaskWorkspacePlanContent({
               {planSummary ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{planSummary}</p> : null}
             </div>
             {graphModeControls}
+          </div>
+          <div className="border-b border-border/55 p-2">
+            <TaskWorkspacePlanBrief plan={plan} graphPlan={graphPlan} />
           </div>
           <div className="min-h-0 flex-1 p-2">
             <TaskPlanGraphPanel
