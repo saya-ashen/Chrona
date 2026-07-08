@@ -67,6 +67,7 @@ function nowDocument(title = "Current operation"): UiDocument {
 describe("TaskWorkspaceExecutionOverview", () => {
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
   });
 
   it("renders Results as primary content and keeps Activity secondary", () => {
@@ -476,6 +477,39 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByRole("button", { name: /Primary details/ })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Evidence details")).toBeInTheDocument();
     expect(screen.getByText("Visible details")).toBeInTheDocument();
+  });
+
+  it("remembers result collapse state across workspace remounts", async () => {
+    const user = userEvent.setup();
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const commandCenter = {
+      documents: {
+        now: nowDocument("Execution completed"),
+        trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+        output: {
+          root: "root",
+          elements: {
+            root: { type: "Stack", props: { gap: "sm" }, children: ["details"] },
+            details: { type: "Card", props: { title: "Persistent details", defaultCollapsed: false }, children: ["body"] },
+            body: { type: "Markdown", props: { content: "Remembered body" }, children: [] },
+          },
+        },
+      },
+    };
+
+    const first = renderOverview(view, { commandCenter });
+    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Remembered body")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Persistent details/ }));
+    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Remembered body")).not.toBeInTheDocument();
+
+    first.unmount();
+    renderOverview(view, { commandCenter });
+
+    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Remembered body")).not.toBeInTheDocument();
   });
 
   it("collapses the whole FileRef block separately from file preview expansion", async () => {

@@ -107,6 +107,7 @@ function isRunningActivity(item: WorkspaceActivityItem, items: WorkspaceActivity
 type ActivityLayout = "below" | "side";
 
 export function TaskWorkspaceExecutionOverview({
+  taskId,
   latestCompletedNode,
   nodes = [],
   artifacts,
@@ -268,6 +269,7 @@ export function TaskWorkspaceExecutionOverview({
         spec={outputSpec}
         handlers={locateHandlers}
         resultCollapseCommand={resultCollapseCommand}
+        resultCollapseStorageKey={`task:${taskId}:execution-result`}
       />
     </section>
   );

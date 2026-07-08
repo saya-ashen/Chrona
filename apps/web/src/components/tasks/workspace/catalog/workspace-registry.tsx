@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -192,10 +192,51 @@ export type ResultCollapseCommand = {
   revision: number;
 };
 
-const ResultCollapseCommandContext = createContext<ResultCollapseCommand | null>(null);
+type ResultCollapseContextValue = {
+  command: ResultCollapseCommand | null;
+  storageKey: string | null;
+};
 
-export function ResultCollapseProvider({ command, children }: { command?: ResultCollapseCommand | null; children: ReactNode }) {
-  return <ResultCollapseCommandContext.Provider value={command ?? null}>{children}</ResultCollapseCommandContext.Provider>;
+const ResultCollapseContext = createContext<ResultCollapseContextValue>({ command: null, storageKey: null });
+
+const RESULT_COLLAPSE_STORAGE_PREFIX = "chrona.resultCollapse";
+
+function collapseStorageKey(storageKey: string) {
+  return `${RESULT_COLLAPSE_STORAGE_PREFIX}:${storageKey}`;
+}
+
+function readStoredCollapseState(storageKey: string | null, storageId: string | undefined) {
+  if (!storageKey || !storageId || typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(collapseStorageKey(storageKey));
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const value = parsed[storageId];
+    return typeof value === "boolean" ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredCollapseState(storageKey: string | null, storageId: string | undefined, collapsed: boolean) {
+  if (!storageKey || !storageId || typeof window === "undefined") return;
+  try {
+    const key = collapseStorageKey(storageKey);
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+    window.localStorage.setItem(key, JSON.stringify({ ...parsed, [storageId]: collapsed }));
+  } catch {
+    // Storage is best-effort; the in-memory collapsed state still updates.
+  }
+}
+
+export function ResultCollapseProvider({ command, storageKey, children }: { command?: ResultCollapseCommand | null; storageKey?: string | null; children: ReactNode }) {
+  const value = useMemo(() => ({ command: command ?? null, storageKey: storageKey ?? null }), [command, storageKey]);
+  return <ResultCollapseContext.Provider value={value}>{children}</ResultCollapseContext.Provider>;
+}
+
+function collapseStorageIdFromProps(props: Record<string, unknown>) {
+  return stringProp(props.__chronaCollapseStorageId);
 }
 
 function shouldCollapseByDefault(props: Record<string, unknown>, fallback: boolean) {
@@ -205,20 +246,33 @@ function CollapsibleBlock({
   title,
   summary,
   defaultCollapsed,
+  storageId,
   subtle = false,
   children,
 }: CollapsibleProps & {
+  storageId?: string;
   subtle?: boolean;
   children?: ReactNode;
 }) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
-  const [collapsed, setCollapsed] = useState(Boolean(defaultCollapsed));
-  const command = useContext(ResultCollapseCommandContext);
+  const { command, storageKey } = useContext(ResultCollapseContext);
+  const defaultState = Boolean(defaultCollapsed);
+  const [collapsed, setCollapsedState] = useState(() => readStoredCollapseState(storageKey, storageId) ?? defaultState);
+  const setCollapsed = useCallback((next: boolean | ((current: boolean) => boolean)) => {
+    setCollapsedState((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      writeStoredCollapseState(storageKey, storageId, resolved);
+      return resolved;
+    });
+  }, [storageKey, storageId]);
+  useEffect(() => {
+    setCollapsedState(readStoredCollapseState(storageKey, storageId) ?? defaultState);
+  }, [storageKey, storageId, defaultState]);
   useEffect(() => {
     if (!command) return;
     setCollapsed(command.mode === "collapse");
-  }, [command?.mode, command?.revision]);
+  }, [command?.mode, command?.revision, setCollapsed]);
   const label = title || (copy.resultDetailsLabel ?? "Details");
 
   return (
@@ -253,7 +307,7 @@ function MaybeCollapsible({ props, fallbackCollapsed, fallbackTitle, children }:
   if (!shouldWrapCollapsible(props, fallbackCollapsed)) return <>{children}</>;
   const title = stringProp(props.collapseTitle) ?? stringProp(props.title) ?? fallbackTitle;
   const summary = stringProp(props.collapsedSummary);
-  return <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(props, Boolean(fallbackCollapsed))}>{children}</CollapsibleBlock>;
+  return <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(props, Boolean(fallbackCollapsed))} storageId={collapseStorageIdFromProps(props)}>{children}</CollapsibleBlock>;
 }
 
 
@@ -689,7 +743,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         const title = stringProp(input.props.collapseTitle) ?? stringProp(input.props.title) ?? "Result";
         const summary = stringProp(input.props.collapsedSummary) ?? stringProp(input.props.description);
         return (
-          <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(input.props, false)}>
+          <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(input.props, false)} storageId={collapseStorageIdFromProps(input.props)}>
             {input.children}
           </CollapsibleBlock>
         );
@@ -756,8 +810,8 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     FileRef: ({ props }) => <MaybeCollapsible props={props} fallbackCollapsed={props.contentTruncated === true || (typeof props.contentBytes === "number" && props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)} fallbackTitle={typeof props.title === "string" ? props.title : "File"}><FileView props={props} /></MaybeCollapsible>,
     FileView: ({ props }) => <MaybeCollapsible props={props} fallbackCollapsed={props.contentTruncated === true || (typeof props.contentBytes === "number" && props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)} fallbackTitle={typeof props.title === "string" ? props.title : "File"}><FileView props={props} /></MaybeCollapsible>,
     ResultSummary: ({ props }) => <ResultSummary props={props} />,
-    CollapsibleBlock: ({ props, children }) => <CollapsibleBlock title={stringProp(props.title)} summary={stringProp(props.summary)} defaultCollapsed={boolProp(props.defaultCollapsed)}>{children}</CollapsibleBlock>,
-    NodeResultSection: ({ props, children }) => <CollapsibleBlock title={stringProp(props.nodeTitle)} summary={typeof props.itemCount === "number" ? `${props.itemCount} result${props.itemCount === 1 ? "" : "s"}` : stringProp(props.status)} defaultCollapsed={boolProp(props.defaultCollapsed)} subtle>{children}</CollapsibleBlock>,
+    CollapsibleBlock: ({ props, children }) => <CollapsibleBlock title={stringProp(props.title)} summary={stringProp(props.summary)} defaultCollapsed={boolProp(props.defaultCollapsed)} storageId={collapseStorageIdFromProps(props)}>{children}</CollapsibleBlock>,
+    NodeResultSection: ({ props, children }) => <CollapsibleBlock title={stringProp(props.nodeTitle)} summary={typeof props.itemCount === "number" ? `${props.itemCount} result${props.itemCount === 1 ? "" : "s"}` : stringProp(props.status)} defaultCollapsed={boolProp(props.defaultCollapsed)} storageId={collapseStorageIdFromProps(props)} subtle>{children}</CollapsibleBlock>,
     ActivityRow: ({ props, children }) => {
       const tone = props.tone as Tone;
       const Icon = activityIcon(props.kind, tone);
