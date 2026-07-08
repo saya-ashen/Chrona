@@ -684,7 +684,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
     // standard primitives (shadcn)
     Card: (input) => {
-      const props = { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-full") };
+      const props = { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-none") };
       if (shouldWrapCollapsible(input.props)) {
         const title = stringProp(input.props.collapseTitle) ?? stringProp(input.props.title) ?? "Result";
         const summary = stringProp(input.props.collapsedSummary) ?? stringProp(input.props.description);

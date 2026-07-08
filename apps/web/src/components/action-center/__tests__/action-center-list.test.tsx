@@ -8,9 +8,7 @@ vi.mock("@/components/i18n/localized-link", () => ({
 
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, asChild, ...props }: any) => {
-    if (asChild && children) {
-      return <>{children}</>;
-    }
+    if (asChild && children) return <>{children}</>;
     return <button {...props}>{children}</button>;
   },
 }));
@@ -22,23 +20,18 @@ vi.mock("@/components/ui/badge", () => ({
 vi.mock("@/components/ui/card", () => ({
   Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardFooter: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardDescription: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({
-    t: (key: string) => {
-      const map: Record<string, string> = {
-        "common.openTask": "Open Task",
-        "common.openWork": "Open Work",
-        "common.startWork": "Start Work",
-      };
-      return map[key] ?? key;
-    },
-  }),
+vi.mock("@/components/ui/input", () => ({
+  Input: (props: any) => <input {...props} />,
+}));
+
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ children }: any) => <div>{children}</div>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
+  SelectTrigger: ({ children, ...props }: any) => <button type="button" {...props}>{children}</button>,
+  SelectValue: () => <span />,
 }));
 
 import { ActionCenterList } from "@/components/action-center/action-center-list";
@@ -47,75 +40,73 @@ afterEach(() => {
   cleanup();
 });
 
-describe("ActionCenterList", () => {
-  it("shows action type, risk, task, run, summary, and consequence", () => {
-    render(
-      <ActionCenterList
-        items={[
-          {
-            id: "approval_1",
-            kind: "approval",
-            actionType: "approval",
-            riskLevel: "high",
-            sourceTaskTitle: "Review adapter mapping",
-            sourceTaskId: "task_1",
-            workspaceId: "ws_1",
-            currentRunLabel: "run_projection",
-            detail: "command approval",
-            summary: "Approve the file patch",
-            consequence: "Blocks deployment until approved",
-          },
-        ]}
-      />,
-    );
+const recoveryItem = {
+  id: "run_failed",
+  kind: "recovery" as const,
+  actionType: "Recovery needed",
+  riskLevel: "critical",
+  sourceTaskTitle: "Collect PhD positions",
+  sourceTaskId: "task_1",
+  workspaceId: "ws_1",
+  currentRunLabel: "run_critical",
+  detail: "Updated 12m ago · Agent: Claude SDK",
+  summary: "The last run failed before completion.",
+  consequence: "The last run failed before completion and needs operator recovery.",
+  primaryAction: <button>Recover run</button>,
+  secondaryActions: <a href="/en/tasks/task_1">Open Task</a>,
+};
 
-    expect(screen.getByText("approval")).toBeInTheDocument();
-    expect(screen.getByText(/Risk: high/i)).toBeInTheDocument();
-    expect(screen.getByText(/Task: Review adapter mapping/i)).toBeInTheDocument();
-    expect(screen.getByText("Approve the file patch")).toBeInTheDocument();
-    expect(screen.getByText("Blocks deployment until approved")).toBeInTheDocument();
-    expect(screen.getByTestId("action-center-message")).toHaveClass("p-4");
-    expect(screen.getByRole("link", { name: "Open Task" })).toHaveAttribute(
-      "href",
-      "/en/tasks/task_1",
-    );
+const completedItem = {
+  id: "run_completed",
+  kind: "execution_completed" as const,
+  actionType: "Execution completed",
+  riskLevel: "low",
+  sourceTaskTitle: "Draft report",
+  sourceTaskId: "task_2",
+  workspaceId: "ws_1",
+  currentRunLabel: "run_done",
+  detail: "Completed 1h ago · Agent: Codex",
+  summary: "Task execution completed recently.",
+  consequence: "Results are ready for review. Check the outputs and decide next steps.",
+  primaryAction: <a href="/en/tasks/task_2">Review results</a>,
+};
+
+describe("ActionCenterList", () => {
+  it("renders action queue stats, priority groups, and one primary action per card", () => {
+    render(<ActionCenterList items={[completedItem, recoveryItem]} />);
+
+    expect(screen.getByText("Needs action")).toBeInTheDocument();
+    expect(screen.getByText("Critical priority")).toBeInTheDocument();
+    expect(screen.getByText("Review and follow-up")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recovery needed" })).toBeInTheDocument();
+    expect(screen.getByText("Collect PhD positions")).toBeInTheDocument();
+    expect(screen.getByText(/Risk: critical/i)).toBeInTheDocument();
+    expect(screen.getByText(/Status: Failed/i)).toBeInTheDocument();
+    expect(screen.getByText("The last run failed before completion and needs operator recovery.")).toBeInTheDocument();
+    expect(screen.queryByTestId("action-center-message")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Recover run" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review results" })).toHaveAttribute("href", "/en/tasks/task_2");
   });
 
-  it("wires default approval buttons to item-specific actions", async () => {
+  it("filters the action queue by priority and search text", async () => {
     const user = userEvent.setup();
-    const onApprove = vi.fn();
-    const onReject = vi.fn();
-    const onEditAndApprove = vi.fn();
+    render(<ActionCenterList items={[completedItem, recoveryItem]} />);
 
-    render(
-      <ActionCenterList
-        onApprove={onApprove}
-        onReject={onReject}
-        onEditAndApprove={onEditAndApprove}
-        items={[
-          {
-            id: "approval_1",
-            kind: "approval",
-            actionType: "Approval needed",
-            riskLevel: "high",
-            sourceTaskTitle: "Review adapter mapping",
-            sourceTaskId: "task_1",
-            workspaceId: "ws_1",
-            currentRunLabel: "run_projection",
-            detail: "command approval",
-            summary: "Approve the file patch",
-            consequence: "Blocks deployment until approved",
-          },
-        ]}
-      />,
-    );
+    await user.click(screen.getByRole("button", { name: "Critical" }));
 
-    await user.click(screen.getByRole("button", { name: "Approve" }));
-    await user.click(screen.getByRole("button", { name: "Reject" }));
-    await user.click(screen.getByRole("button", { name: "Edit and Approve" }));
+    expect(screen.getByText("Recovery needed")).toBeInTheDocument();
+    expect(screen.queryByText("Execution completed")).not.toBeInTheDocument();
 
-    expect(onApprove).toHaveBeenCalledWith("approval_1");
-    expect(onReject).toHaveBeenCalledWith("approval_1");
-    expect(onEditAndApprove).toHaveBeenCalledWith("approval_1");
+    await user.clear(screen.getByPlaceholderText("Search tasks, runs, or agents..."));
+    await user.type(screen.getByPlaceholderText("Search tasks, runs, or agents..."), "missing");
+
+    expect(screen.getByText("No matching action items")).toBeInTheDocument();
+  });
+
+  it("renders an empty action queue state", () => {
+    render(<ActionCenterList items={[]} />);
+
+    expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View tasks" })).toHaveAttribute("href", "/en/tasks");
   });
 });
